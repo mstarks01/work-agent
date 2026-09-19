@@ -674,7 +674,14 @@ def restore_unimplicated(
     """The repaired model with every element the issues did not name put back.
 
     ``prompts/repair.md`` asks for untouched elements byte-identical and
-    forbids a "while I'm here" edit; this is what enforces it (#675 D01). Both
+    forbids a "while I'm here" edit; this enforces the element half of that
+    and no more (#675 D01). **An element the issues named keeps every field
+    the repair returned for it**, cited or not, so a technology rewritten
+    beside the asset tag an issue named survives; and a caller that passes no
+    implicated elements — which is what ``repair_scope`` answers for an issue
+    naming none — restores nothing at all. Both are stated in the prompt, so
+    the field half reads there as the model's own rule rather than as a
+    promise the service keeps. Both
     arguments are JSON dumps, the previous one normalized — the model the
     issues were computed against. ``implicated`` is what :func:`repair_scope`
     returns: the elements the issues named, and the flows through them, whose

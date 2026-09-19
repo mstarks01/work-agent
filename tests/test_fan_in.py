@@ -681,6 +681,30 @@ class TestQuoteVerification:
         (plain,) = critic.critic_view(joined.drafts, model)
         assert "repaired_quotes" not in plain
 
+    def test_the_critic_is_shown_which_quote_was_not_found(self, model):
+        """The other half of the repair mark, and it was missing (#1082).
+
+        A quote the ladder could not find still renders, because ``grounds``
+        is ``min_length=1`` and dropping the last entry would delete the
+        finding. Nothing carried the failure into the view, so a critic told
+        the service had matched every quote read an invented sentence beside
+        a verified crossing and had no way to see the difference.
+        """
+        drafts = self.quoting(
+            "The database accepts every forged administrator token.",
+            extra=[Ground(kind="derived-fact", flow_id=CROSSING)],
+        )
+
+        joined = join_drafts(drafts, STRIDE, model, SOURCES)
+
+        (view,) = critic.critic_view(
+            joined.drafts, model, unverified=joined.marks.unverified_grounds
+        )
+        assert [entry["index"] for entry in view["unverified_quotes"]] == [0]
+        assert LABEL in view["unverified_quotes"][0]["reason"]
+        (plain,) = critic.critic_view(joined.drafts, model)
+        assert "unverified_quotes" not in plain
+
     def test_a_claim_whose_every_ground_fails_is_dropped_and_marked(self, model):
         """The claim, not the job: one misquote on a claim that carries nothing
         else must not discard every other lane's work. The mark keeps the

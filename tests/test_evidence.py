@@ -28,10 +28,12 @@ from analysis_service.claims import (
     GROUND_TERM_MAX_CHARS,
     Ground,
 )
+from analysis_service.critic import critic_view
 from analysis_service.evidence import (
     absent_evidence_ref,
     crossing_evidence_ref,
     evidence_catalog,
+    ground_gloss,
     ground_issues,
     render_catalog,
     render_element_roster,
@@ -603,6 +605,54 @@ class TestRenderCatalog:
         positions = [rendered.index(f"| `{ref}` |") for ref in catalog]
 
         assert positions == sorted(positions)
+
+
+class TestTheCriticReadsTheRowItIsAskedToRuleOn:
+    """An assertion ground carries the row's identity and no fact (#1082).
+
+    The value and the scope are digests inside that identity, so a critic
+    handed the ground alone could not read what the row states — and it is
+    asked whether the claim follows from the facts it cites. One reader,
+    ``ground_gloss``, so the table the lane agent selected from and the view
+    the critic rules on cannot say two things about one row.
+    """
+
+    def test_the_value_and_the_scope_reach_the_critic(self):
+        stated = row(
+            predicate="credential-lifetime",
+            subject=COOKIE.id,
+            value="twelve hours",
+            basis="inferred",
+            scope=[Qualifier(kind="operation", value="release jobs")],
+        )
+        held = assertions(stated)
+        ground = evidence_catalog(valid_model(), held)[assertion_id(stated)]
+        draft = sample_draft("S-01", grounds=[ground])
+
+        (view,) = critic_view([draft], valid_model(), assertions=held)
+
+        (fact,) = view["assertion_facts"]
+        assert fact["assertion"] == assertion_id(stated)
+        assert "twelve hours" in fact["says"]
+        assert "release jobs" in fact["says"]
+
+    def test_the_critic_and_the_lane_agent_read_one_sentence(self):
+        """The gloss is the table's own, so the two cannot be told two things."""
+        held = assertions(row())
+        ground = evidence_catalog(valid_model(), held)[assertion_id(row())]
+        draft = sample_draft("S-01", grounds=[ground])
+
+        (view,) = critic_view([draft], valid_model(), assertions=held)
+
+        assert view["assertion_facts"][0]["says"] in render_catalog(
+            evidence_catalog(valid_model(), held), held
+        )
+        assert view["assertion_facts"][0]["says"] == ground_gloss(ground, held)
+
+    def test_a_job_that_ran_no_catalog_carries_no_key(self):
+        (view,) = critic_view([sample_draft("S-01")], valid_model())
+
+        assert "assertion_facts" not in view
 
 
 class TestAnAssertionGroundIsHeldToTheCatalog:

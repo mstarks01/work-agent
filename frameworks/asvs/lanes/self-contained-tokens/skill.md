@@ -8,9 +8,11 @@ Chapter boundaries: how a token was obtained is chapter V6 or chapter V10. How a
 
 ## Applicability
 
-**This chapter needs a self-contained token.** A system using opaque reference tokens or session cookies alone does not answer it, and that is a clean exclusion.
+**This chapter needs a self-contained token**: a credential the verifier reads for itself rather than looking up. Where no element of the model states one, the chapter has no subject and the exclusion rests on that absence — which `absent_elements` records and the service checks.
 
 Read the model's `authentication` values and technology fields for a JWT, a JWS, a JWE, a bearer token or an OIDC ID token. Where none appears, rule the chapter out and name the credential the model does state.
+
+**A container is not a representation.** "A session cookie" names where the credential rides and not what it carries: a signed cookie holding claims is self-contained, and this package's own note on identity after the login says so. So the exclusion is that nothing in the model names a self-contained token — never that the cookie was shown to be opaque. Write it that way, and where the input *does* say the credential carries its own claims, the chapter applies whatever it rides in.
 
 ### The requirements of this chapter
 
@@ -36,7 +38,7 @@ The recurring ways this chapter's requirements go unanswered in a system descrip
 **A token is named and its verification is not.** Which algorithms the verifier accepts, and whether it rejects `none`, is the sharpest requirement here and one prose never carries.
 **Audience and issuer go unmentioned.** A token accepted without an audience check is a token any holder can replay across services. The requirement applies wherever a token appears.
 **Expiry is assumed from the library.** The input says a token is used; it does not say what its lifetime is or whether expiry is enforced.
-**Opaque tokens only.** Where the input names a session cookie or a reference token, rule this chapter out on that fact.
+**No self-contained token named.** Where no `authentication` value and no technology field names one, rule this chapter out on that absence, and name the credentials the model does state. A session cookie is one of those credentials, not a second fact that rules the chapter out.
 
 ## Guardrails
 

@@ -66,7 +66,8 @@ class FillerRow:
 
     framework: str
     #: ``related_unknowns`` entries written in the element spelling. The
-    #: ``subject`` spelling names no attribute and so has none to be refused.
+    #: ``subject`` and ``assertion`` spellings name no attribute and so have
+    #: none to be refused.
     pointers: int
     #: Of those, how many name an attribute the evidence catalog would refuse.
     ineligible: int

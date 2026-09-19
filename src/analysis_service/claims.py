@@ -140,6 +140,13 @@ CONDITIONAL_GROUNDS: frozenset[str] = frozenset(
 #: a third attribute kind would have reached one of them.
 ATTRIBUTE_GROUNDS: frozenset[str] = frozenset({"unknown-attribute", "absent-attribute"})
 
+#: The two ground kinds whose reference is a row of the **Assertion** catalog.
+#: Both carry ``assertion`` and nothing else, and that value is a digest of the
+#: row's value and scope — so a reader holding the ground alone holds no fact.
+#: Here for the reason the pair above is here: every consumer that has to
+#: resolve one back to its row asks the same question of the same catalog.
+ASSERTION_GROUNDS: frozenset[str] = frozenset({"assertion", "unknown-assertion"})
+
 # How long a claim ID may be. **Not a grammar**: #163 ruled that ``id`` has no
 # shared one, because each package composes its own from its own ``id_format``
 # and per-lane prefix. STRIDE's ``S-01`` and an ASVS requirement ID are both
@@ -289,11 +296,53 @@ class UnknownRef(BaseModel):
         json_schema_extra={"enum": ["", *all_attribute_names()]},
     )
     subject: str = Field(default="", max_length=300)
+    #: The third spelling: one row of the job's **Assertion** catalog that the
+    #: sources left open, by its computed identity.
+    #:
+    #: **Why it exists.** ``unknown-attribute`` and ``unknown-assertion`` are
+    #: one question asked at two seams — :data:`CONDITIONAL_GROUNDS` says so —
+    #: and this record could name only the first. So a ``confirmed`` resting on
+    #: an open assertion had no pair to dismiss and passed the review seam
+    #: silently, while the identical claim resting on an open attribute was
+    #: refused. Moving a fact from a model field to the catalog weakened the
+    #: safeguard, which is the defect rather than the spelling (#1082).
+    #:
+    #: The identity is 600 characters at its source and this field holds 300:
+    #: a reference longer than that names no row here, and the review seam
+    #: reports it as one the draft does not carry, which is true.
+    assertion: str = Field(default="", max_length=300)
 
     @property
     def names_an_element(self) -> bool:
         """Is this the model-reference spelling? Asked in three places."""
         return bool(self.element_id or self.attribute)
+
+    @property
+    def key(self) -> tuple[str, str, str]:
+        """The three reference fields as one comparable value.
+
+        **The one reader of "are these two references the same".** The pair
+        was the whole of it while a reference could only name an element, and
+        a set of pairs read every assertion reference as the empty pair — so
+        two dismissals of two different open rows compared equal and one
+        dismissal answered both.
+        """
+        return self.element_id, self.attribute, self.assertion
+
+
+def name_unknown(ref: UnknownRef) -> str:
+    """One open fact as a sentence fragment, in its own spelling.
+
+    **The one spelling of a reference in a message a re-ask reads**, so the
+    three checks in :mod:`analysis_service.critic` that name one, and the
+    sentence a ``needs-info`` carries, cannot describe the same fact four
+    ways.
+    """
+    if ref.assertion:
+        return f"the open fact `{ref.assertion}`"
+    if ref.names_an_element:
+        return f"`{ref.attribute}` on `{ref.element_id}`"
+    return f"`{ref.subject}`"
 
 
 # How long an absent-element term may be. Exported because the producer must
@@ -566,20 +615,21 @@ class ProposedVerdict(BaseModel):
     immaterial_unknowns: list[UnknownRef] = Field(default_factory=list)
     rejected_because: RejectionStep | None = None
 
-    def dismissed_pairs(self) -> frozenset[tuple[str, str]]:
-        """``immaterial_unknowns`` as the ``(element_id, attribute)`` pairs it names.
+    def dismissed_refs(self) -> frozenset[tuple[str, str, str]]:
+        """``immaterial_unknowns`` as the keys it names, by :attr:`UnknownRef.key`.
+
+        Named for a reference rather than for a pair: an open assertion row is
+        one of these and has no element and no attribute to pair.
 
         **The one reader of that field as a set.** Three sites ask the same
         question of it — the review seam refusing a ``confirmed`` that leaves
-        a pair unaccounted for, ``complete_rulings`` declining to hand a
-        dismissed pair back as a question, and the critic-review replay
+        a reference unaccounted for, ``complete_rulings`` declining to hand a
+        dismissed one back as a question, and the critic-review replay
         recording what the critic ruled on — and each one spelled the
         comprehension itself. A rule with three readers is how the three come
         to disagree about what a dismissal is.
         """
-        return frozenset(
-            (ref.element_id, ref.attribute) for ref in self.immaterial_unknowns
-        )
+        return frozenset(ref.key for ref in self.immaterial_unknowns)
 
 
 class Verdict(ProposedVerdict):
@@ -803,21 +853,33 @@ class Claim(BaseModel):
         return ""
 
     def unknown_grounds(self) -> list[UnknownRef]:
-        """The element/attribute pairs this claim's own grounds say the input left open.
+        """The open facts this claim's own grounds cite, in ground order, once each.
 
-        Every ``unknown-attribute`` ground is one, in ground order and without
-        repeats. The pairs come from the evidence catalog, so they resolve by
-        construction and nothing has to re-derive them from prose (#439).
+        Every ground whose kind is in
+        :data:`CONDITIONAL_GROUNDS` is one, which is the set that already
+        declares itself the reader of "is this claim conditional". It was
+        spelled here as ``unknown-attribute`` alone, and the two therefore
+        disagreed about an open assertion: the mitigation seam licensed a
+        threat to name no countermeasure on one, and the review seam let a
+        ``confirmed`` stand on it with nothing dismissed (#1082).
+
+        An unstated attribute becomes the element spelling and an open
+        assertion row the assertion spelling, so a reference resolves by
+        construction either way and nothing has to re-derive one from prose
+        (#439).
         """
-        seen: dict[tuple[str, str], UnknownRef] = {}
+        seen: dict[tuple[str, str, str], UnknownRef] = {}
         for ground in self.grounds:
-            if ground.kind == "unknown-attribute":
-                seen.setdefault(
-                    (ground.element_id, ground.attribute),
-                    UnknownRef(
-                        element_id=ground.element_id, attribute=ground.attribute
-                    ),
+            if ground.kind not in CONDITIONAL_GROUNDS:
+                continue
+            ref = (
+                UnknownRef(assertion=ground.assertion)
+                if ground.kind in ASSERTION_GROUNDS
+                else UnknownRef(
+                    element_id=ground.element_id, attribute=ground.attribute
                 )
+            )
+            seen.setdefault(ref.key, ref)
         return list(seen.values())
 
     @classmethod
@@ -847,14 +909,10 @@ class Claim(BaseModel):
         unknowns = draft.unknown_grounds()
         if not unknowns:
             return None
-        named = ", ".join(
-            f"`{ref.attribute}` on `{ref.element_id}`" for ref in unknowns
-        )
+        named = ", ".join(name_unknown(ref) for ref in unknowns)
         reason = f"The claim rests on {named}, which the input never stated."
         if len(reason) > REASON_MAX_CHARS:
-            reason = (
-                f"The claim rests on {len(unknowns)} attributes the input never stated."
-            )
+            reason = f"The claim rests on {len(unknowns)} facts the input never stated."
         verdict = ProposedVerdict(
             status="needs-info",
             reason=reason,
@@ -2344,8 +2402,10 @@ class FrameworkAnalysis(BaseModel):
                 *claim.affected_element_ids,
                 # Only the model-reference spelling names an element. A
                 # ``subject`` states a question about something the model has
-                # no slot for, so there is nothing here to resolve and an empty
-                # ``element_id`` is the shape rather than a dangling reference.
+                # no slot for, and an ``assertion`` names a row of the job's
+                # fact catalog, so neither has anything here to resolve and an
+                # empty ``element_id`` is the shape rather than a dangling
+                # reference.
                 *(
                     ref.element_id
                     for ref in claim.verdict.related_unknowns

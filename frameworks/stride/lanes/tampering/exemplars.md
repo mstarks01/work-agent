@@ -55,7 +55,7 @@ Two shapes, one test: what does the fix protect? This draft is `alter-in-transit
 {
   "sequence": 2,
   "title": "A leaked static database password grants direct writes to every balance",
-  "description": "`flow:process:ledger-service>store:accounts-db>read-write-balances` uses a shared static password from an environment variable with full read/write scope. Possession is authority: an attacker who obtains it from a crash dump, an image layer, a log line, or a compromised `process:ledger-service` writes to `store:accounts-db` directly, bypassing whatever validation the ledger applies. Balances, account-holder records, and transaction rows can be rewritten arbitrarily. Second-order: the corruption is invisible to `store:audit-log`, because writes made outside `process:ledger-service` never traverse `flow:process:ledger-service>store:audit-log>append-transfer-record`, so reconciliation against the audit trail cannot detect them.",
+  "description": "`flow:process:ledger-service>store:accounts-db>read-write-balances` uses a shared static password from an environment variable with full read/write scope. Possession is authority: an attacker who obtains it from a crash dump, an image layer, a log line, or a compromised `process:ledger-service` writes to `store:accounts-db` directly, bypassing whatever validation the ledger applies. Balances, account-holder records, and transaction rows can be rewritten arbitrarily. Second-order: `store:audit-log` holds no record of these writes, because a write made outside `process:ledger-service` never traverses `flow:process:ledger-service>store:audit-log>append-transfer-record`, so the trail names no actor and no time for any of them. Whether a reconciliation notices balances no entry explains is not something the model says.",
   "affected_element_ids": [
     "store:accounts-db",
     "flow:process:ledger-service>store:accounts-db>read-write-balances",
@@ -89,13 +89,13 @@ Two shapes, one test: what does the fix protect? This draft is `alter-in-transit
 
 ## Unknown-conditional, in system B: unverified authorization on the topic
 
-Written against exemplar system B. The submitter's own words are the trigger here — an admitted gap, recorded as `authentication: unknown` on the internal subscription rather than as an absent control. Condition the threat on the attribute and quote the admission; asserting "nothing checks topic access" would state a fact the model does not contain.
+Written against exemplar system B. The submitter's own words are the trigger here — an admitted gap, recorded as `authentication: unknown` on the internal subscription rather than as an absent control. Condition the threat on the attribute and quote the admission; asserting "nothing checks topic access" would state a fact the model does not contain. **Each premise stays inside the operation its own evidence names**: the admission is about a subscriber, so the step that publishes rests on the stated shared certificate instead.
 
 ```json
 {
   "sequence": 3,
   "title": "Fabricated readings enter the pipeline if topic access is unchecked",
-  "description": "`flow:process:mqtt-broker>process:stream-processor>consume-topic` carries `authentication: unknown` and crosses from `boundary:ingest` into `boundary:platform`. If that unknown resolves to no check on who may attach to a topic, then any party who reaches `process:mqtt-broker` can publish onto the topic `process:stream-processor` consumes, and the processor treats the arriving payloads as gateway telemetry because they came off the expected topic. The attacker modifies the fleet's picture rather than reading it: suppressed alarm thresholds, invented readings, altered volumes written on into `store:telemetry-store` as though a device had reported them. This draft is conditional on that flow's `authentication` attribute; it is not a claim that topic authorization is missing.",
+  "description": "`flow:process:mqtt-broker>process:stream-processor>consume-topic` carries `authentication: unknown` and crosses from `boundary:ingest` into `boundary:platform`. The publisher side is stated: every device image carries the same client certificate on `flow:entity:sensor-gateway>process:mqtt-broker>publish-telemetry`, so anyone holding one image publishes as any fleet. If the unknown resolves to no check on who may attach to a topic either, `process:stream-processor` treats the arriving payloads as gateway telemetry because they came off the expected topic. The attacker modifies the fleet's picture rather than reading it: suppressed alarm thresholds, invented readings, altered volumes written on into `store:telemetry-store` as though a device had reported them. This draft is conditional on that flow's `authentication` attribute; it is not a claim that topic authorization is missing.",
   "affected_element_ids": [
     "process:mqtt-broker",
     "process:stream-processor",
@@ -110,6 +110,10 @@ Written against exemplar system B. The submitter's own words are the trigger her
   "quotes": [
     {
       "text": "I could not tell you what, if anything, checks that a subscriber is allowed on a topic",
+      "source_label": "Fleet telemetry platform notes"
+    },
+    {
+      "text": "they all share one client certificate",
       "source_label": "Fleet telemetry platform notes"
     }
   ],

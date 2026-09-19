@@ -33,6 +33,15 @@ Sources carry **equal weight**. Order is presentation only, and a `label` is a c
 5. **Quote what says it, and quote enough.** Every mention and every interaction carries at least one `quotes` entry: the `source_label` of the block, and the shortest verbatim span carrying the thing. Never tidy a quote. **A line the source holds in two places names neither of them**, so a row citing one is dropped — widen the quote until it sits in exactly one place. A quote may run across adjoining turns, keeping speaker labels as they appear, with `…` marking anything cut.
 6. **Raise what you could not answer.** An `unresolved` row carries a `question` and the words that raise it: a referent you could not resolve, two readings you would not choose between, or something the text names that none of these lists can carry.
 
+### Reading what a source says
+
+These rules decide what reaches your lists, and nothing after this pass can take a row back out.
+
+1. **Facts come from assertions, not questions.** "Is that behind the WAF?" names nothing, whoever asked it.
+2. **Plans and hypotheticals produce nothing.** "We're thinking about adding a queue" names no queue. The lists describe the system that exists.
+3. **A speaker may correct themselves.** Where one person restates what they said earlier, the later statement stands, and a thing they withdrew is not a mention. This is one speaker's own correction only.
+4. **A hedge names the thing and settles nothing about it.** "I think there's a cache in front of it" is a mention with an `unresolved` row beside it, never a certainty.
+
 ### Two names are one thing only where the text says so
 
 A workload is not its service account, a person is not the macro they run, and ownership of a component is not membership of a network. Where the text leaves it open, write two mentions and an `unresolved` row asking whether they are the same, rather than merging them to make the list tidier.

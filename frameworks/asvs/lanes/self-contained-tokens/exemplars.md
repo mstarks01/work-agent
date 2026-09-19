@@ -4,7 +4,7 @@ Two drafts against exemplar system A. This chapter's precondition fails here, an
 
 ## V9.1.2 — This system carries no self-contained token
 
-A session cookie is an opaque reference, not a self-contained token. That is the fact that rules the chapter out.
+No element of this model names a self-contained token. That absence is the fact that rules the chapter out — not the cookie, whose contents the input never states.
 
 ```json
 {
@@ -12,7 +12,7 @@ A session cookie is an opaque reference, not a self-contained token. That is the
   "direction": "excluded",
   "needs_evidence": "",
   "title": "This system carries no self-contained token",
-  "description": "V9.1.2 governs the algorithms a verifier accepts when checking a self-contained token's signature. It does not apply here. The credentials this model states are a session cookie issued after a password login on `flow:entity:customer>process:web-api>submit-payment`, a shared static password on `flow:process:ledger-service>store:accounts-db>read-write-balances`, and a service account on `flow:process:ledger-service>store:audit-log>append-transfer-record`. None of those carries its own claims, and no element's technology names a JWT, a JWS or an OIDC identity token. The requirement has no subject in this system.",
+  "description": "V9.1.2 governs the algorithms a verifier accepts when checking a self-contained token's signature. It does not apply here. The credentials this model states are a session cookie issued after a password login on `flow:entity:customer>process:web-api>submit-payment`, a shared static password on `flow:process:ledger-service>store:accounts-db>read-write-balances`, and a service account on `flow:process:ledger-service>store:audit-log>append-transfer-record`. The input says what each of the three is and never says any of them carries its own claims, and no element's technology names a JWT, a JWS or an OIDC identity token. The requirement has no subject in this system. If the session cookie turns out to be a signed cookie holding claims, the chapter applies and this ruling should be revisited.",
   "affected_element_ids": [],
   "evidence_refs": [],
   "absent_elements": [
