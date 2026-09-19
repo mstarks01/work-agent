@@ -246,7 +246,7 @@
       "likelihood": "medium",
       "impact": "high"
     },
-    "notes": "Order service is tagged availability-critical and has one datastore dependency.",
+    "notes": "Order service has one datastore dependency.",
     "verb": "flood"
   },
   {

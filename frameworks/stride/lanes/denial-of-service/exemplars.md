@@ -12,7 +12,7 @@ The model states no rate limiting. Silence is not a control — rate likelihood 
 {
   "sequence": 1,
   "title": "Request flooding on the payment endpoint exhausts the web API",
-  "description": "`process:web-api` is `internet-facing`, so the attacker population is the whole internet, and each request on `flow:entity:customer>process:web-api>submit-payment` costs a TLS session, a synchronous gRPC call to `process:ledger-service`, and a write through to `store:accounts-db`. An attacker with commodity tooling saturates the endpoint at a fraction of that cost, and no compensating control appears in the model. Second-order: the load does not stop at the dmz — it is propagated across `flow:process:web-api>process:ledger-service>post-transfer` into `boundary:core`, so a flood aimed at the public surface degrades a component tagged `availability-critical`, and legitimate payments fail while the attack runs.",
+  "description": "`process:web-api` is `internet-facing`, so the attacker population is the whole internet, and each request on `flow:entity:customer>process:web-api>submit-payment` costs a TLS session, a synchronous gRPC call to `process:ledger-service`, and a write through to `store:accounts-db`. An attacker with commodity tooling saturates the endpoint at a fraction of that cost, and no compensating control appears in the model. Second-order: the load does not stop at the dmz — it is propagated across `flow:process:web-api>process:ledger-service>post-transfer` into `boundary:core`, so a flood aimed at the public surface degrades the component every payment path runs through, and legitimate payments fail while the attack runs.",
   "affected_element_ids": [
     "process:web-api",
     "flow:entity:customer>process:web-api>submit-payment",
@@ -31,7 +31,7 @@ The model states no rate limiting. Silence is not a control — rate likelihood 
   "severity": {
     "likelihood": "high",
     "impact": "medium",
-    "justification": "Likelihood is high: `exposure: internet-facing` on a derived crossing from `boundary:public-internet`, exploitable with public tooling and no prerequisites. Impact is medium: payments are unavailable while the flood runs and `reputation` is exposed, but the outage is recoverable and no data is lost."
+    "justification": "Likelihood is high: `exposure: internet-facing` on a derived crossing from `boundary:public-internet`, exploitable with public tooling and no prerequisites. Impact is medium: payments are unavailable while the flood runs, but the outage is recoverable and no data is lost."
   },
   "mitigations": [
     {
@@ -54,7 +54,7 @@ The exemplar is the cascade. `store:accounts-db` is a shared dependency: its con
 {
   "sequence": 2,
   "title": "Database connection exhaustion cascades into total transfer outage",
-  "description": "Every payment path terminates at `store:accounts-db` over `flow:process:ledger-service>store:accounts-db>read-write-balances`, whose PostgreSQL connections and throughput are a finite shared resource. Sustained traffic through `process:web-api`, or slow-running queries induced by expensive request shapes, exhausts that capacity. Second-order: `process:ledger-service` (`availability-critical`) cannot complete or roll back transfers once the pool is starved, `flow:process:ledger-service>store:audit-log>append-transfer-record` stops producing records so the outage window is also an accountability gap, and the failure surfaces to `entity:customer` as declined payments even though nothing in the dmz is under direct attack.",
+  "description": "Every payment path terminates at `store:accounts-db` over `flow:process:ledger-service>store:accounts-db>read-write-balances`, whose PostgreSQL connections and throughput are a finite shared resource. Sustained traffic through `process:web-api`, or slow-running queries induced by expensive request shapes, exhausts that capacity. Second-order: `process:ledger-service`, which every payment path depends on, cannot complete or roll back transfers once the pool is starved, `flow:process:ledger-service>store:audit-log>append-transfer-record` stops producing records so the outage window is also an accountability gap, and the failure surfaces to `entity:customer` as declined payments even though nothing in the dmz is under direct attack.",
   "affected_element_ids": [
     "store:accounts-db",
     "process:ledger-service",
@@ -72,7 +72,7 @@ The exemplar is the cascade. `store:accounts-db` is a shared dependency: its con
   "severity": {
     "likelihood": "medium",
     "impact": "high",
-    "justification": "Likelihood is medium: reaching the database requires driving load through `process:web-api` rather than attacking the store directly. Impact is high: `process:ledger-service` is tagged `availability-critical`, the whole transfer function stops, and audit records are lost for the duration."
+    "justification": "Likelihood is medium: reaching the database requires driving load through `process:web-api` rather than attacking the store directly. Impact is high: every payment path runs through `process:ledger-service`, so the whole transfer function stops, and audit records are lost for the duration."
   },
   "mitigations": [
     {

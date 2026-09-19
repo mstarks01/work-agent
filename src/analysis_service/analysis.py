@@ -103,29 +103,17 @@ CONTROL_ATTRIBUTES: tuple[str, ...] = (
     "data_classification",
 )
 
-# Asset tags whose exposure is a confidentiality loss on its own. A subset of
-# ``CORE_ASSET_TAGS``: ``availability-critical`` and ``reputation`` are real
-# assets and are deliberately not here, because neither is disclosed.
+#: Asset tags whose exposure is a confidentiality loss on its own.
+#:
+#: Every tag the service ships is one, so this equals
+#: :data:`~analysis_service.system_model.CORE_ASSET_TAGS` today and is not the
+#: same set: a deployment extends the vocabulary through ``extra_asset_tags``,
+#: and a tag it adds names something the deployment models rather than
+#: something this rule may assume is disclosed. ``test_analysis.py`` holds the
+#: two together, so a core tag added here without a reading fails.
 SENSITIVE_ASSET_TAGS = frozenset(
     {"credentials", "pii", "financial", "health", "secrets", "business-critical-data"}
 )
-
-#: The other half of :data:`~analysis_service.system_model.CORE_ASSET_TAGS`:
-#: what a failure would cost rather than what an element holds. An attacker
-#: acts on data; reputation loss is what the business suffers because they did,
-#: and ``availability-critical`` states what a component being down would mean.
-#:
-#: **No source states either one.** The word "reputation" appears in none of the
-#: thirteen corpus sources, and no rule stands in for it: 11 corpus processes
-#: are ``exposure: internet-facing`` and 5 carry the tag. So an extraction is
-#: measured with these removed from both sides — grading a model for not
-#: inventing a tag its input never contains measures nothing (#877).
-#:
-#: ``test_analysis.py`` holds the two halves to a partition of the vocabulary,
-#: so a tag added to :data:`~analysis_service.system_model.CORE_ASSET_TAGS`
-#: fails until somebody says which
-#: kind it is.
-CONSEQUENCE_ASSET_TAGS = frozenset({"availability-critical", "reputation"})
 
 
 # A control attribute states its own absence or its own unverifiability in its
@@ -285,22 +273,15 @@ def sensitive_assets(element: Element) -> tuple[str, ...]:
 
 
 def held_asset_tags(tags: Iterable[str]) -> tuple[str, ...]:
-    """``tags`` without the consequence tags, sorted: what the element holds.
+    """``tags`` as a comparable value: sorted, and each one once.
 
-    The one reader of that distinction, so the places that draw it cannot
-    disagree. An extraction is scored on these
-    (:mod:`evals.harness.modes`) and a candidate rule reports these as the
-    fact it read, because a consequence tag states what a failure would cost
-    and no source states one (#877). It is subtraction rather than an
-    intersection with :data:`SENSITIVE_ASSET_TAGS`: a deployment may configure
-    further tags
-    (:func:`~analysis_service.validation.allowed_asset_tags`), and one of those
-    names something an element holds.
-
-    Sorted, because both readers compare the result and neither may depend on
-    the order a model happened to emit.
+    The one reader, so the places that compare an element's tags cannot
+    disagree about what they are comparing. An extraction is scored on the
+    result (:mod:`evals.harness.modes`) and a candidate rule reports it as the
+    fact it read, and neither may depend on the order a model happened to emit
+    (#877).
     """
-    return tuple(sorted(set(tags) - CONSEQUENCE_ASSET_TAGS))
+    return tuple(sorted(set(tags)))
 
 
 def cross_boundary_flows(model: SystemModel) -> list[BoundaryCrossing]:

@@ -36,6 +36,14 @@ ZONE_ATTRIBUTE = "trust_zone"
 
 # Controlled asset vocabulary; config-extendable via the validator's
 # extra_asset_tags parameter (see analysis_service.validation).
+#
+# **Every tag names something an element holds.** An Asset is what an attacker
+# acts on, and each of these is a class of data a source can state. What a
+# failure would *cost* is not one: reputation loss is what the business suffers
+# because an attacker acted, and whether a component being down matters is a
+# judgement about the business rather than a fact about the system. Those
+# belong to the person reading the report, and a deployment that wants to model
+# one adds it through ``extra_asset_tags`` (#877).
 CORE_ASSET_TAGS = frozenset(
     {
         "credentials",
@@ -44,8 +52,6 @@ CORE_ASSET_TAGS = frozenset(
         "health",
         "secrets",
         "business-critical-data",
-        "availability-critical",
-        "reputation",
     }
 )
 

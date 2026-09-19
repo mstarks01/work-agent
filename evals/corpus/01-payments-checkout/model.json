@@ -30,9 +30,7 @@
       "id": "process:storefront-api",
       "name": "storefront API",
       "description": "Node service on Cloud Run; the only internet-exposed component. Terminates shopper sessions and receives the processor's settlement webhook.",
-      "assets": [
-        "reputation"
-      ],
+      "assets": [],
       "source_excerpt": "the storefront API, a Node service running on Cloud Run. It is the only thing we expose to the internet.",
       "source_label": "System description",
       "technology": "Node on Cloud Run",
@@ -45,8 +43,7 @@
       "name": "order service",
       "description": "Python worker that captures orders, persists them, and writes receipts.",
       "assets": [
-        "financial",
-        "availability-critical"
+        "financial"
       ],
       "source_excerpt": "The order service is a Python worker in our core network; it is not exposed outside.",
       "source_label": "System description",

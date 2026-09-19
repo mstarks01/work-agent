@@ -46,8 +46,7 @@
       "description": "Signs colleagues in, issues twelve-hour tokens carrying staff id and group list, signs every application's tokens with one key, publishes the public half, pulls group changes from HR nightly and writes sign-ins to an audit log.",
       "assets": [
         "credentials",
-        "secrets",
-        "availability-critical"
+        "secrets"
       ],
       "source_excerpt": "Everything colleagues use signs them in through one identity broker. The broker runs on the corporate network.",
       "source_label": "System description",

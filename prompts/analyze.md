@@ -46,8 +46,8 @@ Trust zones: `boundary:public-internet` (network), `boundary:dmz` (network), `bo
 |---|---|---|
 | `entity:customer` | External Entity, human | zone `boundary:public-internet`; assets `pii` |
 | `entity:payments-provider` | External Entity, external-system | zone `boundary:public-internet` |
-| `process:web-api` | Process | FastAPI on Cloud Run; zone `boundary:dmz`; exposure `internet-facing`; assets `reputation` |
-| `process:ledger-service` | Process | Python worker; zone `boundary:core`; exposure `unknown`; assets `financial`, `availability-critical` |
+| `process:web-api` | Process | FastAPI on Cloud Run; zone `boundary:dmz`; exposure `internet-facing`; assets none |
+| `process:ledger-service` | Process | Python worker; zone `boundary:core`; exposure `unknown`; assets `financial` |
 | `store:accounts-db` | Data Store | PostgreSQL; zone `boundary:core`; classification `confidential`; `encryption_at_rest: unknown`; assets `pii`, `financial` |
 | `store:audit-log` | Data Store | append-only bucket; zone `boundary:core`; classification `internal`; encrypted at rest (CMEK); assets `business-critical-data` |
 
@@ -96,7 +96,7 @@ Trust zones: `boundary:field` (network), `boundary:ingest` (network), `boundary:
 | Element | Type | Key attributes |
 |---|---|---|
 | `entity:sensor-gateway` | External Entity, external-system | zone `boundary:field` |
-| `process:mqtt-broker` | Process | managed MQTT; zone `boundary:ingest`; exposure `internet-facing`; assets `availability-critical` |
+| `process:mqtt-broker` | Process | managed MQTT; zone `boundary:ingest`; exposure `internet-facing`; assets none |
 | `process:stream-processor` | Process | stream consumer; zone `boundary:platform`; exposure `unknown`; assets `business-critical-data` |
 | `store:telemetry-store` | Data Store | time-series, one shared partition space keyed by tenant; zone `boundary:platform`; classification `confidential`; `encryption_at_rest: unknown`; assets `business-critical-data` |
 

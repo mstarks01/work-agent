@@ -56,8 +56,7 @@
       "name": "store server",
       "description": "The back-office server in each of about 1,200 stores, running the till software as a container. Polls the deploy controller once a minute and pulls and restarts on a new release.",
       "assets": [
-        "business-critical-data",
-        "availability-critical"
+        "business-critical-data"
       ],
       "source_excerpt": "Each store has a small server in the back office running the till software as a container.",
       "source_label": "System description",

@@ -281,43 +281,29 @@ def test_a_term_fires_at_the_start_of_a_word_or_as_a_whole_word():
     assert not matches_term("log$", "the login flow")
 
 
-class TestTheAssetVocabularySplitsInTwo:
-    """Every asset tag is a data class or a consequence, and never both.
+class TestTheAssetVocabularyNamesWhatAnElementHolds:
+    """Every shipped asset tag is a class of data a source can state.
 
-    An attacker acts on data; reputation loss is what the business suffers
-    because they did. The two halves are read by different code — the
-    sensitive half decides whether a disclosure is a loss, the consequence
-    half is dropped from an extraction score because no source states one
-    (#877) — so a tag belonging to neither would be silently ungoverned by
-    both.
+    An attacker acts on data. What a failure would cost — reputation, whether
+    an outage matters — is a judgement about the business, so it is not a tag
+    and the person reading the report owns it (#877). A deployment that wants
+    to model one adds it through ``extra_asset_tags``.
     """
 
-    def test_the_two_halves_partition_the_vocabulary(self):
-        assert (
-            analysis.SENSITIVE_ASSET_TAGS | analysis.CONSEQUENCE_ASSET_TAGS
-            == CORE_ASSET_TAGS
-        ), (
-            "a tag added to CORE_ASSET_TAGS must be declared a data class or a consequence"
+    def test_every_shipped_tag_is_one_whose_disclosure_is_a_loss(self):
+        assert analysis.SENSITIVE_ASSET_TAGS == CORE_ASSET_TAGS, (
+            "a tag added to CORE_ASSET_TAGS must name something an element"
+            " holds, or it does not belong in the shipped vocabulary"
         )
 
-    def test_no_tag_is_both(self):
-        assert not (analysis.SENSITIVE_ASSET_TAGS & analysis.CONSEQUENCE_ASSET_TAGS)
+    def test_a_configured_tag_is_not_assumed_to_be_disclosed(self):
+        """The two sets are equal and not the same set.
 
-    def test_held_tags_drop_the_consequences(self):
-        assert analysis.held_asset_tags(
-            ["reputation", "pii", "availability-critical", "credentials"]
-        ) == ("credentials", "pii")
-
-    def test_held_tags_keep_a_tag_a_deployment_configured(self):
-        """Subtraction, not an intersection with the sensitive half.
-
-        ``allowed_asset_tags`` lets a deployment add its own vocabulary, and
-        one of those names something an element holds. Reading the sensitive
-        half instead would drop every configured tag without saying so.
+        ``allowed_asset_tags`` lets a deployment extend the vocabulary, and a
+        tag it adds names something that deployment models. Nothing here may
+        rule that its disclosure is itself a loss.
         """
-        assert analysis.held_asset_tags(["reputation", "cardholder-data"]) == (
-            "cardholder-data",
-        )
+        assert "cardholder-data" not in analysis.SENSITIVE_ASSET_TAGS
 
     def test_held_tags_are_sorted_and_deduplicated(self):
         """Both readers compare the result, so neither may read an emitted order."""
