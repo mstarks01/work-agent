@@ -1975,7 +1975,13 @@ def merge_drafts(
     state.prompt(
         nodes.key("draft_view"),
         render_fenced(
-            critic_view(merged.drafts, model, repaired=merged.marks.repaired_quotes)
+            critic_view(
+                merged.drafts,
+                model,
+                repaired=merged.marks.repaired_quotes,
+                unverified=merged.marks.unverified_grounds,
+                assertions=_held_assertions(state),
+            )
         ),
     )
     return _routed(
@@ -2068,7 +2074,14 @@ def route_review(
         )
         state.put(nodes.key("marks"), parked.model_dump(mode="json"))
     rulings = rulings_of(ruled, nodes.schemas)
-    outcome = review(package_drafts, rulings, model)
+    outcome = review(
+        package_drafts,
+        rulings,
+        model,
+        repaired=parked.repaired_quotes,
+        unverified=parked.unverified_grounds,
+        assertions=_held_assertions(state),
+    )
     if isinstance(outcome, Revision):
         # ``previous_review`` is the parked payload itself rather than anything
         # recomputed, because what the re-ask must reconcile with is the bytes

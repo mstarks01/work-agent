@@ -27,15 +27,15 @@ Two drafts against exemplar system A. This is the chapter the System Model answe
 ```
 ## V12.3.1 — Transport protection on the database link is never stated
 
-A database connection is not an HTTP service, so the requirement for it is the one that names databases. The flow's attribute is `unknown`, and the remedy differs from the draft above — one is a fix, the other is a question — so the two are never written the same way. The question goes to configuration, because a transport setting is read off the deployment and a submitter's word for it is a statement, not the setting.
+A database connection is not an HTTP service, so the requirement for it is the one that names databases. The flow's attribute is `unknown`, and the remedy differs from the draft above — one is a fix, the other is a question — so the two are never written the same way. The question goes to `prose`, because the draft above settles the same attribute on a different flow from the description alone: a submitter who writes what protects this link answers it the same way. `config` is for a question no description could answer, and "a statement does not verify the setting" is true of every stated control here — it is what **Never report a pass** already covers, not a reason to route the question away from the person who can answer it.
 
 ```json
 {
   "requirement": "3.1",
   "direction": "question",
-  "needs_evidence": "config",
+  "needs_evidence": "prose",
   "title": "Transport protection on the database link is never stated",
-  "description": "V12.3.1 asks that every connection into and out of the application — databases, middleware, management tools and partner systems among them — runs over an encrypted protocol such as TLS with no fallback to plaintext. It applies to `flow:process:ledger-service>store:accounts-db>read-write-balances`, which carries balances and account-holder PII over the PostgreSQL wire protocol. Its `encryption_in_transit` is never stated, which is a different fact from the stated absence on `flow:process:web-api>process:ledger-service>post-transfer`: here the input left the question open rather than answering it. The requirement applies and the input does not settle it. What protects the link is a deployed setting, the connection's TLS mode, so the answer is in configuration: a sentence saying the link is TLS would state support this framework does not verify.",
+  "description": "V12.3.1 asks that every connection into and out of the application — databases, middleware, management tools and partner systems among them — runs over an encrypted protocol such as TLS with no fallback to plaintext. It applies to `flow:process:ledger-service>store:accounts-db>read-write-balances`, which carries balances and account-holder PII over the PostgreSQL wire protocol. Its `encryption_in_transit` is never stated, which is a different fact from the stated absence on `flow:process:web-api>process:ledger-service>post-transfer`: here the input left the question open rather than answering it. The requirement applies and the input does not settle it. A fuller description settles it: the submitter said what protects `flow:process:web-api>process:ledger-service>post-transfer` and can say the same here, so this is a question to put back to them rather than one this job cannot reach. What such a sentence cannot do is report a pass, and no ruling here does.",
   "affected_element_ids": [
     "process:ledger-service",
     "store:accounts-db",

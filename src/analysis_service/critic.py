@@ -44,7 +44,9 @@ from dataclasses import dataclass
 from types import MappingProxyType
 from typing import Any, NamedTuple, get_args
 
+from analysis_service.assertions import AssertionCatalog
 from analysis_service.claims import (
+    ASSERTION_GROUNDS,
     Claim,
     RepairedQuote,
     RuledClaim,
@@ -52,8 +54,11 @@ from analysis_service.claims import (
     SeverityLevel,
     UnknownRef,
     UnreconciledRuling,
+    UnverifiedGround,
     Verdict,
+    name_unknown,
 )
+from analysis_service.evidence import ground_gloss
 from analysis_service.frameworks import FrameworkSchemas, lane_of
 from analysis_service.references import snap
 from analysis_service.system_model import (
@@ -285,19 +290,22 @@ def _unresolved_unknown_ref_issues(
     # function's return survives it.
     for ruling in snap_rulings(rulings, by_id.keys()):
         for ref in ruling.verdict.related_unknowns:
-            # A question with no place in the model is checked for saying
-            # something, and nothing else. There is no model reference to
-            # resolve, which is the whole reason the spelling exists.
+            # The two spellings with no place in the model are checked for
+            # saying something, and nothing else. A subject names no element,
+            # and an assertion names a row of a catalog this function does not
+            # hold — the seam that does hold it is the one that built the
+            # ground, and a reference it could not resolve never reached a
+            # draft. Both are the whole reason the spellings exist.
             if not ref.names_an_element:
-                if not ref.subject.strip():
+                if not (ref.subject.strip() or ref.assertion.strip()):
                     issues.append(
                         UnreconciledRuling.of(
                             claim_id=ruling.id,
                             kind="unresolved-unknown",
                             message=f"claim {ruling.id!r} is ruled needs-info and its"
-                            " related_unknowns entry names neither an element"
-                            " attribute nor a subject, so nothing says what has"
-                            " to be answered",
+                            " related_unknowns entry names no element"
+                            " attribute, no open fact and no subject, so"
+                            " nothing says what has to be answered",
                         )
                     )
                 continue
@@ -402,21 +410,15 @@ def complete_rulings(
         # not filled in beside the ones that are. Without this the service
         # would hand back, as the question a reader must answer, the very fact
         # the critic just said the argument does not use.
-        dismissed = ruling.verdict.dismissed_pairs()
-        derived = [
-            ref
-            for ref in by_id.get(ruling.id, [])
-            if (ref.element_id, ref.attribute) not in dismissed
-        ]
+        dismissed = ruling.verdict.dismissed_refs()
+        derived = [ref for ref in by_id.get(ruling.id, []) if ref.key not in dismissed]
         if ruling.verdict.status != "needs-info" or not derived:
             completed.append(ruling)
             continue
-        named = {
-            (ref.element_id, ref.attribute) for ref in ruling.verdict.related_unknowns
-        }
-        added = [ref for ref in derived if (ref.element_id, ref.attribute) not in named]
+        named = {ref.key for ref in ruling.verdict.related_unknowns}
+        added = [ref for ref in derived if ref.key not in named]
         reason = ruling.verdict.reason or (
-            f"The claim rests on {_named(_pairs(derived))}, which the input never stated."
+            f"The claim rests on {_named(derived)}, which the input never stated."
         )
         verdict = ruling.verdict.model_copy(
             update={
@@ -428,20 +430,15 @@ def complete_rulings(
     return completed
 
 
-def _named(pairs: Iterable[tuple[str, str]]) -> str:
-    """``(element_id, attribute)`` pairs as one sentence fragment.
+def _named(refs: Iterable[UnknownRef]) -> str:
+    """References as one sentence fragment, through the module's one speller.
 
-    The one spelling of a pair in a message a re-ask reads, so the three
-    checks that name one cannot describe the same fact three ways.
+    :func:`~analysis_service.claims.name_unknown` is that speller, so the
+    three checks that name a reference and the sentence
+    :meth:`~analysis_service.claims.Claim.settled_by_grounds` composes cannot
+    describe one fact four ways.
     """
-    return ", ".join(
-        f"`{attribute}` on `{element_id}`" for element_id, attribute in pairs
-    )
-
-
-def _pairs(unknowns: Iterable[UnknownRef]) -> list[tuple[str, str]]:
-    """References as the pairs :meth:`~analysis_service.claims.ProposedVerdict.dismissed_pairs` speaks in."""
-    return [(ref.element_id, ref.attribute) for ref in unknowns]
+    return ", ".join(name_unknown(ref) for ref in refs)
 
 
 def _duplicate_on_unit_issues(
@@ -504,11 +501,9 @@ def _confirmed_on_unknown_issues(
     for ruling in rulings:
         if ruling.verdict.status != "confirmed":
             continue
-        dismissed = ruling.verdict.dismissed_pairs()
+        dismissed = ruling.verdict.dismissed_refs()
         outstanding = [
-            ref
-            for ref in by_id.get(ruling.id, [])
-            if (ref.element_id, ref.attribute) not in dismissed
+            ref for ref in by_id.get(ruling.id, []) if ref.key not in dismissed
         ]
         if not outstanding:
             continue
@@ -517,7 +512,7 @@ def _confirmed_on_unknown_issues(
                 claim_id=ruling.id,
                 kind="confirmed-on-unknown",
                 message=f"claim {ruling.id!r} is ruled confirmed but its own grounds"
-                f" cite {_named(_pairs(outstanding))} as never stated, and the ruling does"
+                f" cite {_named(outstanding)} as never stated, and the ruling does"
                 " not say the claim stands without them: name each in"
                 " immaterial_unknowns where the argument does not rest on it,"
                 " or rule it needs-info, or reject it with a reason",
@@ -550,14 +545,13 @@ def _dismissal_off_grounds_issues(
     ``complete_rulings`` filters ``related_unknowns`` by that set whatever the
     verdict says.
     """
-    by_id = {
-        draft.id: {(ref.element_id, ref.attribute) for ref in draft.unknown_grounds()}
-        for draft in drafts
-    }
+    by_id = {draft.id: {ref.key for ref in draft.unknown_grounds()} for draft in drafts}
     issues = []
     for ruling in rulings:
         cited = by_id.get(ruling.id, set())
-        stray = sorted(ruling.verdict.dismissed_pairs() - cited)
+        stray = [
+            ref for ref in ruling.verdict.immaterial_unknowns if ref.key not in cited
+        ]
         if not stray:
             continue
         issues.append(
@@ -566,7 +560,7 @@ def _dismissal_off_grounds_issues(
                 kind="dismissal-off-grounds",
                 message=f"claim {ruling.id!r} names"
                 f" {_named(stray)} in immaterial_unknowns, which its own"
-                " grounds do not cite as never stated: dismiss only the pairs"
+                " grounds do not cite as never stated: dismiss only the facts"
                 " the draft carries",
             )
         )
@@ -932,6 +926,8 @@ def _ruling_view(
     duplicates: Mapping[str, Sequence[str]] = MappingProxyType({}),
     rated_unlike: Mapping[str, Sequence[str]] = MappingProxyType({}),
     repaired: Sequence[RepairedQuote] = (),
+    unverified: Sequence[UnverifiedGround] = (),
+    assertions: AssertionCatalog | None = None,
 ) -> list[dict]:
     """The drafts as a critic reads them, with no empty branches.
 
@@ -978,6 +974,11 @@ def _ruling_view(
         repairs_by_claim.setdefault(mark.claim_id, []).append(
             {"index": mark.index, "written": mark.written, "moved": mark.moved}
         )
+    unverified_by_claim: dict[str, list[dict]] = {}
+    for bad in unverified:
+        unverified_by_claim.setdefault(bad.claim_id, []).append(
+            {"index": bad.index, "reason": bad.reason}
+        )
     views = []
     for draft in drafts:
         view = draft.model_dump(
@@ -992,6 +993,20 @@ def _ruling_view(
         # negation or a number changed between the two.
         if draft.id in repairs_by_claim:
             view["repaired_quotes"] = repairs_by_claim[draft.id]
+        # Computed, never drafted: which quote grounds the service looked for
+        # and did not find. The entry still renders, because ``grounds`` is
+        # ``min_length=1`` and dropping the last one would delete the finding
+        # — so without this the critic reads an invented sentence beside a
+        # verified one and is told every quote was matched (#1082).
+        if draft.id in unverified_by_claim:
+            view["unverified_quotes"] = unverified_by_claim[draft.id]
+        # Computed too: the rows behind this draft's assertion grounds,
+        # resolved. A ground carries the row's identity and nothing else, and
+        # the identity is a digest of the value and the scope, so a critic
+        # asked whether the argument follows from the facts could not read the
+        # facts (#1082).
+        if rows := _assertion_rows(draft, assertions):
+            view["assertion_facts"] = rows
         # Computed, never drafted: the IDs of the other drafts naming the same
         # action at the same place (:func:`~analysis_service.critic.duplicate_groups`),
         # so the critic's duplicate step reads a pair instead of hunting for it.
@@ -1017,12 +1032,33 @@ def _ruling_view(
     return views
 
 
+def _assertion_rows(draft: Claim, assertions: AssertionCatalog | None) -> list[dict]:
+    """One draft's assertion grounds, resolved to the words the row states.
+
+    Read through :func:`~analysis_service.evidence.ground_gloss`, which is what
+    rendered the same row into the table the lane agent selected it from, so
+    the two agents cannot be told two things about one fact.
+
+    Empty for a draft citing none, and for every draft on a job that ran no
+    assertion catalog — which is every job with ``ANALYSIS_ASSERTIONS`` off.
+    """
+    if assertions is None:
+        return []
+    return [
+        {"assertion": ground.assertion, "says": ground_gloss(ground, assertions)}
+        for ground in draft.grounds
+        if ground.kind in ASSERTION_GROUNDS
+    ]
+
+
 def critic_view(
     drafts: Sequence[Claim],
     system_model: SystemModel,
     *,
     only: Collection[str] | None = None,
     repaired: Sequence[RepairedQuote] = (),
+    unverified: Sequence[UnverifiedGround] = (),
+    assertions: AssertionCatalog | None = None,
 ) -> list[dict]:
     """The drafts a critic is shown, with everything computed for it already.
 
@@ -1047,15 +1083,26 @@ def critic_view(
 
     ``repaired`` is the fan-in's :class:`~analysis_service.claims.RepairedQuote`
     marks, rendered onto the draft each one names so the evidence step reads
-    what the agent wrote beside the span the service put in its place. The
-    first pass hands them in; the re-ask hands in none, because its job is
-    structural and it is told not to re-decide a verdict.
+    what the agent wrote beside the span the service put in its place.
+    ``unverified`` is the other half of the same seam: the quote grounds the
+    service looked for and did not find, which still render because a draft
+    must keep at least one ground. Both passes get both, and **that is a
+    change from the first shipping of this view** — the re-ask was handed
+    neither, so a critic told once that a quote was invented read the same
+    quote clean on the second look.
+
+    ``assertions`` is the job's assertion catalog, read for the rows this
+    draft's assertion grounds point at. A ground carries the row's computed
+    identity, whose value and scope are digests, so without this the critic is
+    asked whether a claim follows from a fact it cannot read.
     """
     shown = list(drafts)
     duplicates = duplicate_groups(shown, system_model)
     rated_unlike = rating_disagreements(shown)
     chosen = shown if only is None else [d for d in shown if d.id in only]
-    return _ruling_view(chosen, duplicates, rated_unlike, repaired)
+    return _ruling_view(
+        chosen, duplicates, rated_unlike, repaired, unverified, assertions
+    )
 
 
 @dataclass(frozen=True)
@@ -1095,7 +1142,13 @@ class Revision:
 
 
 def review(
-    drafts: Sequence[Claim], rulings: Sequence[Ruling], system_model: SystemModel
+    drafts: Sequence[Claim],
+    rulings: Sequence[Ruling],
+    system_model: SystemModel,
+    *,
+    repaired: Sequence[RepairedQuote] = (),
+    unverified: Sequence[UnverifiedGround] = (),
+    assertions: AssertionCatalog | None = None,
 ) -> Accepted | Revision:
     """Rule on one critic pass: reconciled, or a revision and what it must read.
 
@@ -1108,6 +1161,11 @@ def review(
     The re-ask sees a **roster of IDs plus the few it must read**, not the whole
     set again. Its job is structural — cover exactly the drafted IDs, once each,
     with unknowns that resolve — and an ID carries the whole of that claim.
+
+    The three evidence arguments are the ones the first pass was given, passed
+    on so the few drafts it must read arrive spelled the way they were spelled
+    the first time. A re-ask told less than the first pass was told is a second
+    reader of one draft (#1082).
     """
     problems = review_issues(drafts, rulings, system_model)
     if not problems:
@@ -1115,6 +1173,13 @@ def review(
     return Revision(
         problems=list(problems.problems),
         roster=[draft.id for draft in drafts],
-        unreconciled=critic_view(drafts, system_model, only=problems.implicated),
+        unreconciled=critic_view(
+            drafts,
+            system_model,
+            only=problems.implicated,
+            repaired=repaired,
+            unverified=unverified,
+            assertions=assertions,
+        ),
         repairable=sorted(problems.repairable),
     )

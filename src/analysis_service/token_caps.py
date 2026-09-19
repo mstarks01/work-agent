@@ -75,8 +75,17 @@ TOKEN_CAPS: dict[str, int] = {
     # refuses the crossing as a premise. The code already carried the rule —
     # the catalog omits such a crossing and ``crossing_facts`` marks it — and
     # neither prompt told its reader what the ``decided`` field it reads means.
+    #
+    # ``critic`` raised again to 3000 for the two evidence keys the view now
+    # carries (#1082). ``unverified_quotes`` names a quote the service looked
+    # for and did not find — it renders in ``grounds`` whatever the search
+    # answered, and the critic was told every quote had matched;
+    # ``assertion_facts`` resolves an assertion ground, whose identity digests
+    # the value and the scope, so the critic was asked whether a claim follows
+    # from a fact it could not read. Both are computed rather than drafted,
+    # and both need a sentence saying how to rule with them.
     "prompts/analyze": 5000,
-    "prompts/critic": 2700,
+    "prompts/critic": 3000,
     "prompts/recritic": 1100,
     # Raised from 2900 for the naming rule in rule 3. The extraction sweep of
     # 2026-09-12 lost 98 blessed elements by ID, 59 of them to a name the model
@@ -111,7 +120,13 @@ TOKEN_CAPS: dict[str, int] = {
     # number of calls the work is spread over. Each carries one table: the
     # inventory call writes no fact and the rows call names no mention, so
     # neither is paid for the other's vocabulary.
-    "prompts/extract-inventory": 1700,
+    #
+    # ``extract-inventory`` raised from 1700 for the reading rules (#1082). It
+    # is the pass that decides what exists, and it carried none of them, while
+    # `extract-rows.md` — which may not add a mention or take one away —
+    # carried all six. A planned queue, a question and a withdrawn statement
+    # each reached the closed inventory with nothing later able to remove it.
+    "prompts/extract-inventory": 1900,
     "prompts/extract-rows": 2000,
     # The compact transport's delta, appended after the body above. It is the
     # whole cost of the route on the input side, paid on every extraction call
@@ -130,7 +145,17 @@ TOKEN_CAPS: dict[str, int] = {
     # list named an asset tag, an enum, an endpoint and a trust zone, and
     # "change nothing the issues do not cite" forbade the flows a rename
     # carries.
-    "prompts/repair": 1000,
+    #
+    # Raised again to 1200 for three contract corrections (#1082). The prompt
+    # listed `trust_zone` among the fields whose schema forbids `unknown`,
+    # which ADR 0039 reversed, so repair was told to invent a placement the
+    # gate accepts as absent; it pointed at "extraction rule 3's exception"
+    # without carrying extraction's text; and it said "the same shape as
+    # extraction", which is false on the compact route. It also now says which
+    # half of "change nothing the issues do not cite" the service enforces,
+    # because `restore_unimplicated` restores whole elements and never a field
+    # on an implicated one.
+    "prompts/repair": 1200,
     # The source-driven review body (#1003 arms C and D). The role and predicate
     # tables beside it are rendered, as they are for the facts-first body, so
     # neither moves this number.
@@ -146,9 +171,25 @@ TOKEN_CAPS: dict[str, int] = {
     # first, and puts a credential on the principal that presents it.
     "prompts/assert": 2000,
     # One package's own text, under ``frameworks/<name>/``.
-    f"package/{CRITIC_DOC}": 1200,
-    f"package/{DISCLAIMER_DOC}": 200,
-    f"package/{OUTPUT_DOC}": 1100,
+    #
+    # ``critic`` raised from 1200, which STRIDE's critic text had sat one token under for
+    # four checkpoint rounds. It said the service "already matched every quote
+    # against the source it names", and `_verify_quotes` marks a quote it could
+    # not find and keeps the draft, so the sentence was false of exactly the
+    # draft that needed the critic most (#1082).
+    f"package/{CRITIC_DOC}": 1400,
+    # Raised from 200 for what ASVS's disclaimer had to say about a `gap`
+    # (#1082). It said every claim asserts that the text "does not settle" the
+    # requirement, which describes one of the three directions ADR 0028 gives
+    # a draft and denies the one the report calls a gap.
+    f"package/{DISCLAIMER_DOC}": 300,
+    # Raised from 1100 for two contract corrections in ASVS's (#1082). The
+    # `needs_evidence` rule read as "would a sentence prove the control", which
+    # nothing ever does, so a question the submitter could answer routed to
+    # `config` and left the report as unreachable rather than as a request; and
+    # "rule on every requirement at or below the level" contradicted the scope
+    # line's own list of units code ruled out. Both now say which reading wins.
+    f"package/{OUTPUT_DOC}": 1400,
     f"package/{SEVERITY_RUBRIC_DOC}": 900,
     "package/lane_skill": 3600,
     "package/lane_exemplars": 1600,

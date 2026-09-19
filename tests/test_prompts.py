@@ -2,6 +2,7 @@
 
 import pytest
 
+from analysis_service.assertions import REGISTRY
 from analysis_service.frameworks.stride.record import STRIDE_CATEGORIES
 from analysis_service.markdown_loader import (
     MarkdownLoader,
@@ -11,9 +12,14 @@ from analysis_service.prompts import (
     PROMPT_BODY_NAMES,
     PROMPT_SECTION_HEADINGS,
     compose_analyze_prompt,
+    compose_assert_prompt,
     compose_critic_prompt,
     compose_extract_prompt,
+    compose_facts_prompt,
     compose_repair_prompt,
+    compose_reread_prompt,
+    compose_rows_prompt,
+    render_predicates,
 )
 from analysis_service.skills import lane_exemplars_doc
 
@@ -158,3 +164,58 @@ def test_exemplar_name_is_relative_to_the_package_root(package_loader):
         "lanes/denial-of-service/exemplars"
     )
     assert package_loader.load(lane_exemplars_doc("denial-of-service"))
+
+
+class TestThePredicateTableSpeaksItsStageSpelling:
+    """A ``reference`` value is a handle at one stage and an ID at another.
+
+    The rendered table said "the name of a component" at every stage, and no
+    resolver takes a display name: the bundle stages look the value up among
+    the handles that emission invented, and the catalog stage looks it up
+    among the subjects the catalog declares. A row following the table lost
+    its fact with ``dangling-value`` or ``dangling-reference`` and nothing
+    said why (#1082).
+    """
+
+    @pytest.mark.parametrize(
+        ("stage", "spelling"),
+        [
+            ("bundle", "the handle of a zone"),
+            ("catalog", "the ID of a zone"),
+            ("batch", "the handle or the element ID of a zone"),
+        ],
+    )
+    def test_each_stage_names_the_form_its_resolver_reads(self, stage, spelling):
+        rendered = render_predicates(stage)
+
+        assert f"| `network-membership` | component | {spelling} |" in rendered
+        assert "the name of a" not in rendered
+
+    def test_every_composer_renders_a_stage_the_table_holds(self, loader):
+        """A stage added tomorrow raises here rather than taking a default."""
+        for compose in (
+            compose_facts_prompt,
+            compose_rows_prompt,
+            compose_reread_prompt,
+            compose_assert_prompt,
+        ):
+            assert "## The predicates" in compose(loader)
+
+    def test_a_stated_only_predicate_says_so_in_its_own_row(self):
+        """``stated_only`` is a registry field, and the gate refuses an
+        inferred value on one. The row carried the refusal nowhere, so a
+        model had no way to have known."""
+        stated_only = {
+            name for name, predicate in REGISTRY.items() if predicate.stated_only
+        }
+        rows = {
+            line.split("`")[1]: line
+            for line in render_predicates("catalog").splitlines()
+            if line.startswith("| `")
+        }
+
+        assert stated_only, "the registry declares at least one"
+        for name in stated_only:
+            assert "never inferred" in rows[name]
+        for name in set(rows) - stated_only:
+            assert "never inferred" not in rows[name]
