@@ -303,6 +303,29 @@ class TestTheAssetVocabularySplitsInTwo:
     def test_no_tag_is_both(self):
         assert not (analysis.SENSITIVE_ASSET_TAGS & analysis.CONSEQUENCE_ASSET_TAGS)
 
+    def test_held_tags_drop_the_consequences(self):
+        assert analysis.held_asset_tags(
+            ["reputation", "pii", "availability-critical", "credentials"]
+        ) == ("credentials", "pii")
+
+    def test_held_tags_keep_a_tag_a_deployment_configured(self):
+        """Subtraction, not an intersection with the sensitive half.
+
+        ``allowed_asset_tags`` lets a deployment add its own vocabulary, and
+        one of those names something an element holds. Reading the sensitive
+        half instead would drop every configured tag without saying so.
+        """
+        assert analysis.held_asset_tags(["reputation", "cardholder-data"]) == (
+            "cardholder-data",
+        )
+
+    def test_held_tags_are_sorted_and_deduplicated(self):
+        """Both readers compare the result, so neither may read an emitted order."""
+        assert analysis.held_asset_tags(["pii", "credentials", "pii"]) == (
+            "credentials",
+            "pii",
+        )
+
 
 class TestACrossingSaysWhichZoneWasAssumed:
     """#1052: a rule keyed on a crossing owes its reader the inference behind it.
