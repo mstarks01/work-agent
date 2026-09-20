@@ -85,6 +85,11 @@ uv run python evals/verify_corpus.py
 uv run pytest -q
 ```
 
+**Read each instrument's whole output.** Filtering a command for the lines you
+expected is how this audit's first pass missed `run.py score` saying
+`NOT COMPARABLE TO THIS ARTIFACT'S OWN FIGURES` and built a finding on a number
+the tool had already disowned. Save the output, then read it.
+
 **5. Rank the failures.** One row per failure, ordered by how many important
 outcomes it can recover. Use the output contract in
 `templates/audit-report.md`.
