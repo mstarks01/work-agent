@@ -67,7 +67,11 @@ from analysis_service.evidence import (
     UNKNOWN_PREFIX,
     render_catalog,
 )
-from analysis_service.frameworks import PACKAGES
+from analysis_service.frameworks import CRITIC_DOC, OUTPUT_DOC, PACKAGES
+from analysis_service.frameworks.stride.record import (
+    LANES_OF_VERB,
+    STRIDE_CATEGORIES,
+)
 from analysis_service.grounding import verify_quote
 from analysis_service.markdown_loader import MarkdownLoader, split_sections
 from analysis_service.prompts import (
@@ -93,7 +97,8 @@ from analysis_service.token_caps import (
 from evals.harness.exemplar_verbs import proposal_type
 
 PROMPTS_DIR = Path(__file__).resolve().parents[1] / "prompts"
-FRAMEWORKS_DIR = Path(__file__).resolve().parents[1] / "frameworks"
+REPO_ROOT = Path(__file__).resolve().parents[1]
+FRAMEWORKS_DIR = REPO_ROOT / "frameworks"
 # The one place a lint here still names a package, and the declaration in
 # ``tests/test_framework_neutrality.py`` says why: the verb menu is STRIDE's
 # vocabulary, and a framework whose claims name a catalog requirement composes
@@ -988,6 +993,153 @@ def test_the_prompt_carries_the_rule_that_prevents_each_failure(code, rule):
     assert phrase in loader.load(prompt), (
         f"{prompt}.md carries no rule against {code!r}. A model that trips it "
         f"kills the job and spends its one repair pass."
+    )
+
+
+def _computed_view_keys() -> frozenset[str]:
+    """Every key :func:`~analysis_service.critic._ruling_view` can put on a draft.
+
+    Read off the source with ``ast`` rather than listed, so a key added
+    tomorrow fails the lint below until the prompt accounts for it. Listing
+    them here would be the second reader this check exists to prevent.
+
+    Only the *computed* keys: a subscript assignment onto ``view``. The
+    draft's own fields arrive through ``model_dump`` and the agent wrote them,
+    so the prompt describes them under the output contract instead.
+    """
+    import ast
+
+    source = (REPO_ROOT / "src" / "analysis_service" / "critic.py").read_text("utf-8")
+    fn = next(
+        node
+        for node in ast.walk(ast.parse(source))
+        if isinstance(node, ast.FunctionDef) and node.name == "_ruling_view"
+    )
+    return frozenset(
+        target.slice.value
+        for node in ast.walk(fn)
+        if isinstance(node, ast.Assign)
+        for target in node.targets
+        if isinstance(target, ast.Subscript)
+        and isinstance(target.value, ast.Name)
+        and target.value.id == "view"
+        and isinstance(target.slice, ast.Constant)
+        and isinstance(target.slice.value, str)
+    )
+
+
+@pytest.mark.parametrize("key", sorted(_computed_view_keys()))
+def test_every_computed_key_the_critic_is_shown_is_named_in_its_prompt(key):
+    """A key the service computes onto a draft, and the critic is told to read.
+
+    These are the fields no agent wrote: what the service found out and is
+    handing the critic. A critic that meets one the prompt never mentions has
+    to guess what it means, and #1082 found two of them shipped that way --
+    ``unverified_quotes`` did not exist, and the prompt asserted the opposite
+    of what the service did about quotes.
+
+    Self-completing: the keys come from the function, so the next one added
+    fails here rather than arriving undocumented.
+    """
+    # The shared prompt or a package's own critic text: a key a package alone
+    # rules on -- ``rated_unlike`` feeds STRIDE's rating step -- belongs in
+    # that package's file, and the neutral body has no business describing a
+    # judgement only one framework asks for.
+    read_by = [loader.load(CRITIC_PROMPT_NAME)] + [
+        PACKAGE_LOADERS[name].load(CRITIC_DOC) for name in sorted(PACKAGES)
+    ]
+
+    assert any(key in text for text in read_by), (
+        f"critic_view computes {key!r} onto a draft and neither prompts/critic.md"
+        f" nor any package's critic.md names it, so a critic reads a field"
+        f" nobody told it how to rule on."
+    )
+
+
+#: A lane whose skill text names a verb that lane cannot file, with why.
+#:
+#: **A declaration, not a suppression.** ``LANES_OF_VERB`` settles which lane
+#: files a verb, and a skill that *invites* one its lane refuses asks for a
+#: draft the service rejects whatever the critic rules (#1082's finding 11).
+#: A skill may still name such a verb to send it elsewhere, which is what a
+#: lane-boundary bullet is for -- and then it says so here.
+CROSS_LANE_VERBS: dict[tuple[str, str], str] = {
+    ("tampering", "read"): (
+        "names the `operations` value a flow carries, which shares its"
+        " spelling with the action verb and is a different vocabulary"
+    ),
+    ("repudiation", "flood"): (
+        "the lane-boundary bullet sends a log flood to denial-of-service and"
+        " names the verb to say the service rejects it here"
+    ),
+}
+
+
+@pytest.mark.parametrize(
+    "lane,verb",
+    sorted(
+        (lane, verb)
+        for verb, lanes in LANES_OF_VERB.items()
+        for lane in STRIDE_CATEGORIES
+        if lane not in lanes
+    ),
+)
+def test_a_lane_skill_does_not_invite_a_verb_its_lane_refuses(lane, verb):
+    """A skill asking for an action its own lane cannot file.
+
+    ``DraftThreat.misfiled`` rejects such a draft before any judgement is
+    spent on it, so a skill that invites one costs the lane a finding and
+    tells nobody. The repudiation skill asked for ``flood`` for a year.
+
+    A deliberate mention declares its reason in :data:`CROSS_LANE_VERBS`,
+    which is the shape this tree already uses for a vendor named outside its
+    registry: the exception is allowed and it is written down.
+    """
+    text = PACKAGE_LOADERS["stride"].load(f"lanes/{lane}/skill")
+    if f"`{verb}`" not in text:
+        pytest.skip(f"{lane} never names `{verb}`")
+
+    assert (lane, verb) in CROSS_LANE_VERBS, (
+        f"frameworks/stride/lanes/{lane}/skill.md names `{verb}`, and"
+        f" LANES_OF_VERB files that verb in {', '.join(LANES_OF_VERB[verb])}."
+        f" A draft it invites is rejected as misfiled. Reword it, or declare"
+        f" the reason in CROSS_LANE_VERBS."
+    )
+
+
+#: What each package's output contract must say about a policy the service
+#: applies to its drafts, keyed by the phrase a reader has to find.
+#:
+#: The twin of :data:`EXTRACTION_FAILURE_RULES`, for the seam after extraction.
+#: Both contracts said a duplicate ID "fails the job" while
+#: :func:`~analysis_service.fan_in._drop_duplicate_ids` kept the first draft
+#: and recorded the rest, so a lane agent was told the wrong consequence of
+#: its own mistake (#1082).
+OUTPUT_CONTRACT_RULES: dict[str, tuple[str, ...]] = {
+    "stride": ("lose the second",),
+    "asvs": ("loses the second draft",),
+}
+
+
+@pytest.mark.parametrize(
+    "framework,phrase",
+    sorted(
+        (framework, phrase)
+        for framework, phrases in OUTPUT_CONTRACT_RULES.items()
+        for phrase in phrases
+    ),
+)
+def test_the_output_contract_states_what_the_service_does(framework, phrase):
+    """The contract says what really happens to a draft the seam refuses.
+
+    A contract that overstates the consequence -- "fails the job" for a drop
+    -- teaches a reader that a partial loss is impossible, which is how the
+    loss goes unlooked-for.
+    """
+    assert phrase in PACKAGE_LOADERS[framework].load(OUTPUT_DOC), (
+        f"frameworks/{framework}/output.md does not say {phrase!r}. The fan-in"
+        f" keeps the first draft under a repeated ID and records the rest;"
+        f" a contract saying otherwise hides a partial loss."
     )
 
 

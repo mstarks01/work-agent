@@ -73,6 +73,28 @@ tree, and on surfaces no diff touched. The tag message names which pull requests
 in the range got a pre-merge review, so the next round knows which half of the
 range is new ground.
 
+### Read the prompts against the code they describe
+
+A third axis, and it is the one no diff shows. A prompt states facts the code
+owns — which fields admit `unknown`, what a flow ID looks like, what the
+service does with a repeated ID, which quotes it checked. Each sentence is
+true when it is written, and it goes stale in silence, because the prompt and
+the code are read by different people on different days and nothing compares
+them.
+
+The decidable half is linted: `tests/test_prompt_lints.py` holds each closed
+vocabulary, each extraction failure code, the verb menu, every computed key a
+critic is shown, every verb a lane may file, and what each output contract
+says the service does. **Grow that table when a round finds a new pair** — a
+one-line entry there is worth more than the finding it replaces.
+
+The rest is judgement and is this axis's real work. Read every shipped example
+against the rule above it, and every reference label against the policy the
+prompt states. The #1082 audit found eleven of those and no lint could have
+seen one: an exemplar that placed a component from a sentence about what
+reaches it, a lane skill inviting an action its own table refuses, a corpus
+label routing a question the output contract routes the other way.
+
 ## Find the last checkpoint
 
 ```
