@@ -39,8 +39,11 @@ from evals.harness.run import COMMANDS
 REPO_ROOT = Path(__file__).resolve().parents[1]
 
 #: Where a reader finds a command to type. The harness's own guides first,
-#: because those are the procedures.
-SEARCHED = ("evals", "docs", "README.md")
+#: because those are the procedures. ``.claude/skills`` is in for the same
+#: reason and one more: a skill is a procedure an *agent* follows, so a command
+#: that has moved is not a typo there either, and nobody is standing by to
+#: notice that the line failed.
+SEARCHED = ("evals", "docs", "README.md", ".claude/skills")
 
 #: The module whose commands this lint knows how to check. Others are named in
 #: the prose too -- ``python -m analysis_service.smoke`` and friends -- and are

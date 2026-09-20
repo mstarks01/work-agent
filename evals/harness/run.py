@@ -65,6 +65,7 @@ from analysis_service.report import (
 )
 from evals.harness import (
     arms,
+    audit,
     bottleneck,
     comparison,
     consent,
@@ -2381,6 +2382,18 @@ COMMANDS: dict[str, Command] = {
         " deterministic path and charge each loss to a stage (no credentials)",
         run=oracle.command_oracle,
         arguments=oracle.arguments,
+    ),
+    "experiments": Command(
+        help="what a prior quality audit already tested, and whether the tree"
+        " has moved under it (no credentials)",
+        run=audit.command_experiments,
+        arguments=audit.arguments,
+    ),
+    "phases": Command(
+        help="the six phases a quality audit attributes a loss to, and the"
+        " graph nodes each one owns (no credentials)",
+        run=audit.command_phases,
+        arguments=audit.phase_arguments,
     ),
 }
 

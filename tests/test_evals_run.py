@@ -11,28 +11,35 @@ from __future__ import annotations
 
 import argparse
 import dataclasses
+import importlib
 import json
-from types import SimpleNamespace
+import pkgutil
+from types import ModuleType, SimpleNamespace
 
 import pytest
 
 from analysis_service.certification import CertifyResult, UncertifiedNode
 from analysis_service.deployment import Deployment
-from evals.harness import (
-    comparison,
-    instruction_delta,
-    ledger,
-    queue,
-    run,
-    standings,
-    submit,
-)
+from evals.harness import run
 from evals.harness.modes import AttributeCheck, ExtractionScore, render_extraction
 from evals.harness.reference import CorpusError
 from evals.harness.run import _models_record, _print_certification
 from tests.factories import TEST_CREDENTIAL_ENV, TEST_TIER_ENV
 
 BLESSED = "a" * 64
+
+
+def _harness_modules() -> list[ModuleType]:
+    """Every module of the harness package, imported.
+
+    Read off the package rather than written down, so a command added in a new
+    module is reached by the check below on the day it is written.
+    """
+    package = importlib.import_module("evals.harness")
+    found = []
+    for module in pkgutil.iter_modules(package.__path__):
+        found.append(importlib.import_module(f"evals.harness.{module.name}"))
+    return found
 
 
 def test_a_complete_clean_run_reports_all_blessed(capsys):
@@ -221,19 +228,14 @@ class TestTheCommandTable:
     def test_every_command_function_is_in_the_table(self):
         """The quiet failure: a ``command_*`` added and never keyed.
 
-        Walked over the harness modules the table draws from, because a command
-        lives beside the subject it reads and this is what says so.
+        The harness modules are **found**, not listed. A command lives beside
+        the subject it reads, so which modules define one is a fact about the
+        package rather than a second table here -- and a listed one goes stale
+        the same way the registry it guards would.
         """
         reachable = {command.run for command in run.COMMANDS.values()}
-        modules = (
-            run,
-            comparison,
-            instruction_delta,
-            ledger,
-            queue,
-            standings,
-            submit,
-        )
+        modules = _harness_modules()
+        assert modules, "no harness module found; this lint covers nothing"
         for module in modules:
             for attribute in dir(module):
                 if not attribute.startswith("command_"):
