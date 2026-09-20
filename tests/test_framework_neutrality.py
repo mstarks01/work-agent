@@ -761,7 +761,17 @@ LINT_MODULES = sorted((REPO_ROOT / "tests").glob("test_*lints*.py"))
 #: An entry here is legitimate when the *rule itself* is one framework's — say,
 #: a check over a field only one package's record declares. Write the reason as
 #: a property of the framework, never as its name, exactly as ``DECLARED`` does.
-DECLARED_LINT_IMPORTS: dict[str, str] = {}
+DECLARED_LINT_IMPORTS: dict[str, str] = {
+    "tests/test_prompt_lints.py": (
+        "a lane skill may not invite an action its lane cannot file, and only"
+        " a package whose claims compose an identity from an action verb has"
+        " a lane-to-verb table to be held against. A package answering in"
+        " units of a published catalog composes no verb, declares the field"
+        " off its provider schema, and overrides no `misfiled` hook, so the"
+        " rule has nothing to say about one and parametrizing over PACKAGES"
+        " would assert a vacuous truth per lane."
+    ),
+}
 
 
 def _package_imports(source: Path) -> list[str]:
