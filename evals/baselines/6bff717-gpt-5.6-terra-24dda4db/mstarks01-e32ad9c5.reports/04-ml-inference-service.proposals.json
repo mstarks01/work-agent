@@ -1,0 +1,567 @@
+{
+  "stride": {
+    "spoofing": {
+      "claims": [
+        {
+          "title": "A stolen long-lived team API key can be replayed as that calling team",
+          "description": "An attacker who obtains a per-team API key can present it in the header on `flow:entity:calling-service>process:inference-gateway>submit-inference-request` and act as `entity:calling-service` to `process:inference-gateway`. The key is bearer-style and has never been expired, so the gateway cannot distinguish the attacker from the legitimate calling team while the key remains valid. Second-order: the attacker can submit inference requests containing end-user text through the gateway, which records requests and responses in `store:inference-log`.",
+          "affected_element_ids": [
+            "entity:calling-service",
+            "process:inference-gateway",
+            "flow:entity:calling-service>process:inference-gateway>submit-inference-request"
+          ],
+          "verb": "use-credential",
+          "evidence_refs": [
+            "crossing:flow:entity:calling-service>process:inference-gateway>submit-inference-request"
+          ],
+          "quotes": [
+            {
+              "text": "Callers pass an API key in a header. Keys are issued per calling team and we have never expired one.",
+              "source_label": "System description"
+            }
+          ],
+          "absent_elements": [],
+          "sequence": 1,
+          "severity": {
+            "likelihood": "medium",
+            "impact": "medium",
+            "level": "medium",
+            "justification": "Likelihood is medium: `flow:entity:calling-service>process:inference-gateway>submit-inference-request` crosses from the public-internet zone to the internet-facing `process:inference-gateway`, while exploitation requires obtaining a team key that the source states is never expired. Impact is medium because the flow carries `pii` end-user text and successful impersonation reaches `store:inference-log`, which is tagged `pii`."
+          },
+          "mitigations": [
+            {
+              "summary": "Replace permanent API keys with short-lived audience-bound credentials",
+              "detail": "Change `flow:entity:calling-service>process:inference-gateway>submit-inference-request` to use short-lived, audience-bound OAuth/OIDC access tokens or workload identity, so possession of a leaked key does not provide durable team identity."
+            },
+            {
+              "summary": "Rotate and constrain remaining API keys",
+              "detail": "Set expiration, rotation, per-team scopes, and revocation for any API key retained on `process:inference-gateway`; monitor reuse from anomalous callers."
+            }
+          ]
+        },
+        {
+          "title": "A serving-edge foothold can impersonate the gateway to the model server",
+          "description": "An attacker with a foothold in the serving-edge zone can send requests on `flow:process:inference-gateway>process:model-server>forward-request` while posing as `process:inference-gateway`; `process:model-server` accepts that flow with no authentication because it trusts network position. This is a decided boundary crossing, although the serving-edge placement of `process:inference-gateway` was inferred by the model and should be confirmed. Second-order: requests accepted as gateway traffic cause `process:model-server` to run inference and read customer features from `store:redis-feature-store`, which is confidential and tagged `pii` and `financial`.",
+          "affected_element_ids": [
+            "process:inference-gateway",
+            "process:model-server",
+            "flow:process:inference-gateway>process:model-server>forward-request"
+          ],
+          "verb": "impersonate",
+          "evidence_refs": [
+            "crossing:flow:process:inference-gateway>process:model-server>forward-request",
+            "absent:flow:process:inference-gateway>process:model-server>forward-request:authentication"
+          ],
+          "quotes": [],
+          "absent_elements": [],
+          "sequence": 2,
+          "severity": {
+            "likelihood": "medium",
+            "impact": "medium",
+            "level": "medium",
+            "justification": "Likelihood is medium: the derived crossing reaches the model network, but the attacker needs a prior foothold in the serving-edge zone; authentication on the flow is explicitly absent. Impact is medium because `process:model-server` is tagged `business-critical-data` and its accepted requests cause reads of confidential `pii` and `financial` customer features from `store:redis-feature-store`."
+          },
+          "mitigations": [
+            {
+              "summary": "Authenticate gateway-to-model-server requests independently of network location",
+              "detail": "Require mTLS with distinct workload identities, or signed short-lived service tokens, on `flow:process:inference-gateway>process:model-server>forward-request` and authorize only the gateway identity at `process:model-server`."
+            },
+            {
+              "summary": "Confirm and reduce the serving-edge-to-model-network trust path",
+              "detail": "Verify the inferred placement of `process:inference-gateway` and restrict network reachability, but retain explicit request authentication because reachability alone is not identity."
+            }
+          ]
+        },
+        {
+          "title": "A fake inference gateway could harvest team API keys if transport authentication is absent",
+          "description": "`flow:entity:calling-service>process:inference-gateway>submit-inference-request` crosses from the public internet, but its protocol and encryption-in-transit attributes are unknown. If those unknowns resolve to transport without authenticated TLS and certificate validation, an on-path attacker or DNS/ARP attacker can impersonate `process:inference-gateway` to `entity:calling-service` and collect the API key sent in the request header. The harvested key can then be replayed to the real gateway as that calling team. This draft is conditional on the unknown transport attributes; it does not assert that TLS or certificate validation is absent.",
+          "affected_element_ids": [
+            "entity:calling-service",
+            "process:inference-gateway",
+            "flow:entity:calling-service>process:inference-gateway>submit-inference-request"
+          ],
+          "verb": "impersonate",
+          "evidence_refs": [
+            "crossing:flow:entity:calling-service>process:inference-gateway>submit-inference-request",
+            "unknown:flow:entity:calling-service>process:inference-gateway>submit-inference-request:protocol",
+            "unknown:flow:entity:calling-service>process:inference-gateway>submit-inference-request:encryption_in_transit"
+          ],
+          "quotes": [
+            {
+              "text": "Callers pass an API key in a header.",
+              "source_label": "System description"
+            }
+          ],
+          "absent_elements": [],
+          "sequence": 3,
+          "severity": {
+            "likelihood": "medium",
+            "impact": "medium",
+            "level": "medium",
+            "justification": "Likelihood is medium and conditional: the flow is a crossing from `boundary:public-internet`, but exploitation requires an on-path or name-resolution position and the protocol and `encryption_in_transit` values are unknown. Impact is medium because the captured credential authenticates a calling team to `process:inference-gateway` and the flow carries `pii` end-user text."
+          },
+          "mitigations": [
+            {
+              "summary": "Establish authenticated TLS for calling-service traffic",
+              "detail": "Set `protocol` and `encryption_in_transit` explicitly on `flow:entity:calling-service>process:inference-gateway>submit-inference-request`; require TLS 1.2+ with full certificate-chain and hostname validation by every calling service."
+            },
+            {
+              "summary": "Bind caller credentials to the intended gateway audience",
+              "detail": "Replace header API keys with short-lived audience-bound tokens or mTLS workload identities, limiting the value of credentials captured from a substituted endpoint."
+            }
+          ]
+        },
+        {
+          "title": "A shared ML publishing account could let an attacker publish as an engineer",
+          "description": "`flow:entity:ml-engineer>store:model-registry-bucket>publish-artifact` has `authentication: unknown`, and the source says publishing may use a shared group account. If that unknown resolves to a shared account, anyone who acquires its credential can use it to act as `entity:ml-engineer` and publish an artifact through the flow. Second-order: `process:model-server` loads registry artifacts at startup without integrity verification, so an artifact published under the shared identity can affect the business-critical model-serving process. This draft is conditional on whether the publishing identity is shared and how access to it is authenticated.",
+          "affected_element_ids": [
+            "entity:ml-engineer",
+            "flow:entity:ml-engineer>store:model-registry-bucket>publish-artifact"
+          ],
+          "verb": "use-credential",
+          "evidence_refs": [
+            "unknown:flow:entity:ml-engineer>store:model-registry-bucket>publish-artifact:authentication"
+          ],
+          "quotes": [
+            {
+              "text": "I'm not sure what governs who can push \u2014 I think it is a shared group account.",
+              "source_label": "System description"
+            },
+            {
+              "text": "I don't believe anything verifies the artifact hasn't been swapped \u2014 we just trust the bucket.",
+              "source_label": "System description"
+            }
+          ],
+          "absent_elements": [],
+          "sequence": 4,
+          "severity": {
+            "likelihood": "medium",
+            "impact": "high",
+            "level": "high",
+            "justification": "Likelihood is medium and conditional on the unknown publishing authentication: a shared credential, if present, is a reusable impersonation credential, though the attacker must acquire it. Impact is high because artifacts written through the flow are loaded by `process:model-server`, which is tagged `business-critical-data`, and the source states that artifact integrity is not verified."
+          },
+          "mitigations": [
+            {
+              "summary": "Give each artifact publisher an individual strong identity",
+              "detail": "Replace any shared group account on `flow:entity:ml-engineer>store:model-registry-bucket>publish-artifact` with individual, short-lived federated identities and require phishing-resistant MFA for engineer authentication."
+            },
+            {
+              "summary": "Authorize and audit artifact publication per identity",
+              "detail": "Grant least-privilege publish access only to authorized engineers, retain attributable publication audit records, and require artifact signing with verification by `process:model-server` before startup loading."
+            }
+          ]
+        }
+      ],
+      "invalid": []
+    },
+    "tampering": {
+      "claims": [
+        {
+          "title": "Unverified model artifact can be planted and loaded by the model server",
+          "description": "If the unverified publisher authorization on `flow:entity:ml-engineer>store:model-registry-bucket>publish-artifact` permits an unauthorized or compromised shared-account user to push an artifact, that attacker can plant a modified model in `store:model-registry-bucket`. `process:model-server` loads the artifact at startup without integrity verification, so it cannot distinguish the planted artifact from an approved release. Second-order, the altered artifact changes inference behavior for requests forwarded through `flow:process:inference-gateway>process:model-server>forward-request`; this is an integrity threat to the serving path, not merely corruption of one stored object.",
+          "affected_element_ids": [
+            "store:model-registry-bucket",
+            "flow:entity:ml-engineer>store:model-registry-bucket>publish-artifact"
+          ],
+          "verb": "plant",
+          "evidence_refs": [
+            "unknown:flow:entity:ml-engineer>store:model-registry-bucket>publish-artifact:authentication"
+          ],
+          "quotes": [
+            {
+              "text": "I don't believe anything verifies the artifact hasn't been swapped \u2014 we just trust the bucket.",
+              "source_label": "System description"
+            },
+            {
+              "text": "I'm not sure what governs who can push \u2014 I think it is a shared group account.",
+              "source_label": "System description"
+            }
+          ],
+          "absent_elements": [],
+          "sequence": 1,
+          "severity": {
+            "likelihood": "medium",
+            "impact": "high",
+            "level": "high",
+            "justification": "Likelihood is medium and conditional on the unknown publisher authentication for `flow:entity:ml-engineer>store:model-registry-bucket>publish-artifact`: an attacker must obtain publisher access, but the source identifies a possibly shared group account and no artifact verification. Impact is high because `store:model-registry-bucket` and `process:model-server` handle `business-critical-data`, and one planted artifact can alter inference behavior for all requests served by `process:model-server`."
+          },
+          "mitigations": [
+            {
+              "summary": "Require authenticated, least-privilege artifact publishing",
+              "detail": "Resolve and enforce the authentication and authorization model on `flow:entity:ml-engineer>store:model-registry-bucket>publish-artifact`; use individual or workload identities, restrict publishing rights, and remove shared group credentials."
+            },
+            {
+              "summary": "Verify signed model artifacts before loading",
+              "detail": "Require `process:model-server` to verify a trusted signature and artifact digest from `store:model-registry-bucket` before startup loading; reject unsigned, unexpected, or rolled-back versions."
+            },
+            {
+              "summary": "Version and review artifact releases",
+              "detail": "Use immutable versioned artifacts with reviewed promotion and audit records so an unauthorized replacement is prevented and recoverable."
+            }
+          ]
+        },
+        {
+          "title": "Model-network attacker can alter customer features if Redis write authorization is absent",
+          "description": "`store:redis-feature-store` has no password, while authentication on `flow:process:model-server>store:redis-feature-store>read-features` is unverified. If that unknown authentication state means there is no compensating Redis ACL or other write restriction, an attacker who first gains a foothold in `boundary:model-network` can directly alter per-customer account-age and spend-band records in `store:redis-feature-store`. Second-order, `process:model-server` reads those altered features through `flow:process:model-server>store:redis-feature-store>read-features` and produces inference results based on attacker-modified customer data.",
+          "affected_element_ids": [
+            "store:redis-feature-store",
+            "flow:process:model-server>store:redis-feature-store>read-features"
+          ],
+          "verb": "alter",
+          "evidence_refs": [
+            "unknown:flow:process:model-server>store:redis-feature-store>read-features:authentication"
+          ],
+          "quotes": [
+            {
+              "text": "Redis has no password on it; it is only reachable inside the model network.",
+              "source_label": "System description"
+            }
+          ],
+          "absent_elements": [],
+          "sequence": 2,
+          "severity": {
+            "likelihood": "low",
+            "impact": "medium",
+            "level": "low",
+            "justification": "Likelihood is low and conditional on the unknown authentication state: the attacker needs a prior foothold in `boundary:model-network`, although the source states Redis has no password. Impact is medium because `store:redis-feature-store` is classified confidential and tagged `pii` and `financial`, and tampered features can alter inference results consumed by `process:model-server`."
+          },
+          "mitigations": [
+            {
+              "summary": "Enforce authenticated, least-privilege Redis access",
+              "detail": "Configure Redis authentication and ACLs so only the `process:model-server` workload identity can read the required feature keys, and do not grant it unrestricted write access."
+            },
+            {
+              "summary": "Separate feature writers from readers",
+              "detail": "Model feature updates as authenticated writer flows with per-tenant key restrictions, while keeping the model-server principal read-only for `store:redis-feature-store`."
+            },
+            {
+              "summary": "Validate and monitor feature changes",
+              "detail": "Use versioned feature records, server-side validation of permitted ranges and tenant ownership, and alerting or reconciliation for unexpected changes before model serving consumes them."
+            }
+          ]
+        }
+      ],
+      "invalid": []
+    },
+    "repudiation": {
+      "claims": [
+        {
+          "title": "An ML engineer may deny publishing a model artifact when the registry uses a shared group account",
+          "description": "An ML engineer can publish an artifact to `store:model-registry-bucket` through `flow:entity:ml-engineer>store:model-registry-bucket>publish-artifact`, but authentication on that write path is unknown and may resolve to a shared group account. If the group account is shared and no separate individual principal is retained in immutable publishing evidence, an engineer who publishes an unapproved or defective artifact can plausibly deny having done so: a record could identify only the group credential, not the individual. This is conditional on the unresolved authentication and audit-attribution design, not an assertion that no audit record exists. Second-order, `process:model-server` loads artifacts from `store:model-registry-bucket` at startup, so a disputed publication can affect the provenance and accountability of inference behavior across the model-serving path.",
+          "affected_element_ids": [
+            "entity:ml-engineer",
+            "store:model-registry-bucket",
+            "flow:entity:ml-engineer>store:model-registry-bucket>publish-artifact"
+          ],
+          "verb": "unattributable",
+          "evidence_refs": [
+            "unknown:flow:entity:ml-engineer>store:model-registry-bucket>publish-artifact:authentication"
+          ],
+          "quotes": [
+            {
+              "text": "I'm not sure what governs who can push \u2014 I think it is a shared group account.",
+              "source_label": "System description"
+            }
+          ],
+          "absent_elements": [],
+          "sequence": 1,
+          "severity": {
+            "likelihood": "medium",
+            "impact": "high",
+            "level": "high",
+            "justification": "Likelihood is medium and conditional: `flow:entity:ml-engineer>store:model-registry-bucket>publish-artifact` has unknown authentication, so exploiting a shared account requires publishing access but no external foothold. Impact is high because `store:model-registry-bucket` holds business-critical model artifacts that `process:model-server` loads for inference."
+          },
+          "mitigations": [
+            {
+              "summary": "Require individual identities for artifact publication",
+              "detail": "Replace any shared group account on `flow:entity:ml-engineer>store:model-registry-bucket>publish-artifact` with individual, non-shared credentials and require the authenticated principal to be recorded for every publish."
+            },
+            {
+              "summary": "Create immutable artifact-publishing evidence",
+              "detail": "Record signed artifact digest, submitting principal, timestamp, approval outcome, and before/after version in append-only audit storage under a separate write principal; require `process:model-server` to retain the loaded artifact version and digest with inference operational records."
+            }
+          ]
+        }
+      ],
+      "invalid": []
+    },
+    "information-disclosure": {
+      "claims": [
+        {
+          "title": "Inference requests may be readable in transit from external callers",
+          "description": "`flow:entity:calling-service>process:inference-gateway>submit-inference-request` carries end-user inference text and is tagged `pii` while crossing from `entity:calling-service` in `boundary:public-internet` to the internet-facing `process:inference-gateway`. Its `encryption_in_transit` is unknown, so if transport protection is absent or terminates before the exposed segment, an on-path attacker between the calling service and gateway can intercept the request text. The disclosed requests are subsequently forwarded to `process:model-server`, allowing the observer to correlate sensitive prompts with inference activity and target the affected calling team or its users.",
+          "affected_element_ids": [
+            "flow:entity:calling-service>process:inference-gateway>submit-inference-request",
+            "entity:calling-service",
+            "process:inference-gateway"
+          ],
+          "verb": "intercept",
+          "evidence_refs": [
+            "crossing:flow:entity:calling-service>process:inference-gateway>submit-inference-request",
+            "unknown:flow:entity:calling-service>process:inference-gateway>submit-inference-request:encryption_in_transit"
+          ],
+          "quotes": [],
+          "absent_elements": [],
+          "sequence": 1,
+          "severity": {
+            "likelihood": "high",
+            "impact": "medium",
+            "level": "high",
+            "justification": "Likelihood is high, conditional on the unknown transport control, because `crossing:flow:entity:calling-service>process:inference-gateway>submit-inference-request` traverses the public-internet-to-serving-edge boundary and the gateway is internet-facing. Impact is medium because the flow is tagged `pii` and carries end-user inference text, but the model does not establish corpus-scale access from one intercepted request."
+          },
+          "mitigations": [
+            {
+              "summary": "Require TLS for external inference submission",
+              "detail": "Set verified TLS 1.2+ transport protection on `flow:entity:calling-service>process:inference-gateway>submit-inference-request`, including certificate validation by calling services."
+            },
+            {
+              "summary": "Minimize sensitive prompt content in requests",
+              "detail": "Use opaque references or redact unnecessary personal data before callers submit inference text where the model does not require it."
+            }
+          ]
+        },
+        {
+          "title": "Gateway-to-model-server requests may be exposed inside the service boundary",
+          "description": "`flow:process:inference-gateway>process:model-server>forward-request` crosses from `boundary:serving-edge` to `boundary:model-network`, carries a `pii` inference-request payload, and has unverified `encryption_in_transit`. If this internal hop is not protected, an attacker with a position on the serving-edge-to-model-network path, such as a compromised workload or routing-capable infrastructure component, can intercept customer inference inputs. The gateway records request and response material in `store:inference-log`, so exposed request content can be correlated with retained inference activity and used for targeted follow-on attacks against the affected users or product team.",
+          "affected_element_ids": [
+            "flow:process:inference-gateway>process:model-server>forward-request",
+            "process:inference-gateway",
+            "process:model-server"
+          ],
+          "verb": "intercept",
+          "evidence_refs": [
+            "crossing:flow:process:inference-gateway>process:model-server>forward-request",
+            "unknown:flow:process:inference-gateway>process:model-server>forward-request:encryption_in_transit"
+          ],
+          "quotes": [],
+          "absent_elements": [],
+          "sequence": 2,
+          "severity": {
+            "likelihood": "medium",
+            "impact": "medium",
+            "level": "medium",
+            "justification": "Likelihood is medium and conditional on `unknown:flow:process:inference-gateway>process:model-server>forward-request:encryption_in_transit`: an attacker needs an internal on-path foothold, although the cited flow crosses into the model network. Impact is medium because the flow carries `pii` request payloads, but the model does not show that one observation grants direct access to the feature-store corpus."
+          },
+          "mitigations": [
+            {
+              "summary": "Encrypt and mutually authenticate the internal inference hop",
+              "detail": "Require mTLS between `process:inference-gateway` and `process:model-server` and record the resulting protected state for `flow:process:inference-gateway>process:model-server>forward-request`."
+            },
+            {
+              "summary": "Restrict network observation capability",
+              "detail": "Constrain model-network routing, packet-capture permissions, and workload network policies so only the gateway can initiate the forwarding path."
+            }
+          ]
+        },
+        {
+          "title": "An internal foothold may read confidential Redis customer features without a password",
+          "description": "`store:redis-feature-store` holds confidential `pii` and `financial` customer features, and `flow:process:model-server>store:redis-feature-store>read-features` has unverified authentication. The submitted description states that Redis has no password and is reachable within `boundary:model-network`; if no separate verified Redis authorization mechanism applies, an attacker who gains a model-network foothold can connect to the store and read account ages and spend bands directly rather than through `process:model-server`. The disclosed customer profiles can then be used to target customers and infer sensitive financial characteristics reflected in subsequent model-serving activity.",
+          "affected_element_ids": [
+            "store:redis-feature-store",
+            "flow:process:model-server>store:redis-feature-store>read-features",
+            "process:model-server"
+          ],
+          "verb": "read",
+          "evidence_refs": [
+            "unknown:flow:process:model-server>store:redis-feature-store>read-features:authentication"
+          ],
+          "quotes": [
+            {
+              "text": "Redis has no password on it; it is only reachable inside the model network.",
+              "source_label": "System description"
+            }
+          ],
+          "absent_elements": [],
+          "sequence": 3,
+          "severity": {
+            "likelihood": "medium",
+            "impact": "high",
+            "level": "high",
+            "justification": "Likelihood is medium and conditional on the unverified authentication state: the attacker needs a foothold in `boundary:model-network`, but the source states Redis has no password and `unknown:flow:process:model-server>store:redis-feature-store>read-features:authentication` leaves another access control unverified. Impact is high because `store:redis-feature-store` is classified confidential and contains both `pii` and `financial` customer features."
+          },
+          "mitigations": [
+            {
+              "summary": "Require authenticated, least-privileged Redis access",
+              "detail": "Configure Redis authentication backed by distinct workload identities, permit only `process:model-server` to read the required keys, and deny unauthenticated connections."
+            },
+            {
+              "summary": "Enforce network isolation around the feature store",
+              "detail": "Apply network policy so model-network workloads other than `process:model-server` cannot connect to `store:redis-feature-store`."
+            }
+          ]
+        },
+        {
+          "title": "A storage-layer copy of Redis may disclose all customer feature data",
+          "description": "`store:redis-feature-store` is classified confidential, holds `pii` and `financial` account-age and spend-band data, and has `encryption_at_rest: unknown`. If that unknown resolves to unencrypted storage, an attacker obtaining a Redis persistence file, snapshot, backup, or decommissioned volume can read the customer-feature corpus without using `flow:process:model-server>store:redis-feature-store>read-features` or authenticating to `process:model-server`. Those records provide customer financial profiling data that can support targeted attacks against the users whose inference requests the model server processes.",
+          "affected_element_ids": [
+            "store:redis-feature-store"
+          ],
+          "verb": "read",
+          "evidence_refs": [
+            "unknown:store:redis-feature-store:encryption_at_rest"
+          ],
+          "quotes": [],
+          "absent_elements": [],
+          "sequence": 4,
+          "severity": {
+            "likelihood": "medium",
+            "impact": "high",
+            "level": "high",
+            "justification": "Likelihood is medium and conditional on `unknown:store:redis-feature-store:encryption_at_rest`: obtaining a storage-layer copy requires access to operational media or copies, but no at-rest protection is verified. Impact is high because the store is confidential and contains `pii` and `financial` data for customer profiles, which a raw copy exposes in bulk."
+          },
+          "mitigations": [
+            {
+              "summary": "Verify and enforce encryption at rest for Redis and its copies",
+              "detail": "Establish the at-rest protection state for `store:redis-feature-store`, then use managed encryption keys for Redis persistence, snapshots, backups, and replicated copies."
+            },
+            {
+              "summary": "Restrict access to Redis export and recovery artifacts",
+              "detail": "Limit snapshot, backup, restore, and volume-management permissions to dedicated operational roles and audit bulk export activity."
+            }
+          ]
+        },
+        {
+          "title": "Unverified protection of raw-prompt inference logs may expose retained user content",
+          "description": "`process:inference-gateway` records every request and response in `store:inference-log`, including raw prompts that can contain what end users typed. The log is tagged `pii`, while both its encryption at rest and the gateway-to-log flow's authentication are unknown. If storage-layer encryption or access controls are absent or overly broad, an attacker who obtains a BigQuery storage copy or an over-privileged logging principal can read retained prompts and model responses in bulk. This creates a second disclosure surface separate from the live inference API and gives the attacker historical content that can be correlated with activity handled by `process:inference-gateway`.",
+          "affected_element_ids": [
+            "store:inference-log",
+            "flow:process:inference-gateway>store:inference-log>write-request-log",
+            "process:inference-gateway"
+          ],
+          "verb": "read",
+          "evidence_refs": [
+            "unknown:store:inference-log:encryption_at_rest",
+            "unknown:flow:process:inference-gateway>store:inference-log>write-request-log:authentication"
+          ],
+          "quotes": [
+            {
+              "text": "The gateway writes every request and response into an inference log in BigQuery, for debugging. That means raw prompts, which sometimes carry whatever the calling team's users typed.",
+              "source_label": "System description"
+            }
+          ],
+          "absent_elements": [],
+          "sequence": 5,
+          "severity": {
+            "likelihood": "medium",
+            "impact": "high",
+            "level": "high",
+            "justification": "Likelihood is medium and conditional because `unknown:store:inference-log:encryption_at_rest` and `unknown:flow:process:inference-gateway>store:inference-log>write-request-log:authentication` leave protection of the logging path and retained data unverified. Impact is high because `store:inference-log` retains every request and response, including raw user prompts, so one successful read can disclose historical content across many users."
+          },
+          "mitigations": [
+            {
+              "summary": "Stop retaining raw request and response bodies by default",
+              "detail": "Redact or tokenize prompt content at `process:inference-gateway` before it writes `flow:process:inference-gateway>store:inference-log>write-request-log`; retain only fields necessary for debugging."
+            },
+            {
+              "summary": "Protect the inference-log store and access path",
+              "detail": "Enforce encryption at rest for `store:inference-log`, require a dedicated authenticated gateway identity for log writes, and restrict BigQuery read, export, and recovery permissions to approved support roles."
+            }
+          ]
+        }
+      ],
+      "invalid": []
+    },
+    "denial-of-service": {
+      "claims": [
+        {
+          "title": "API-key caller can flood GPU inference capacity through the public gateway",
+          "description": "A malicious or compromised calling team can use its valid API key to send high-rate inference requests over `flow:entity:calling-service>process:inference-gateway>submit-inference-request` from `boundary:public-internet`. Each request received by `process:inference-gateway` is forwarded on `flow:process:inference-gateway>process:model-server>forward-request` to `process:model-server`, where GPU-backed model execution consumes substantially more defender capacity than issuing a request costs the caller. Request-size limits, per-team rate/concurrency limits, inference-cost budgets, and load-shedding behavior are not stated, so this threat is conditional on those controls not bounding the path. Sustained requests can exhaust model-server GPU/worker capacity and deny inference to legitimate product teams; the gateway also records each request and response through `flow:process:inference-gateway>store:inference-log>write-request-log`, increasing downstream logging work during the flood.",
+          "affected_element_ids": [
+            "process:inference-gateway",
+            "flow:entity:calling-service>process:inference-gateway>submit-inference-request",
+            "flow:process:inference-gateway>process:model-server>forward-request",
+            "process:model-server"
+          ],
+          "verb": "flood",
+          "evidence_refs": [
+            "crossing:flow:entity:calling-service>process:inference-gateway>submit-inference-request"
+          ],
+          "quotes": [
+            {
+              "text": "we expose on the internet because two of the calling services are in a\ndifferent cloud.",
+              "source_label": "System description"
+            },
+            {
+              "text": "Callers pass an API key in a header. Keys are issued per\ncalling team and we have never expired one.",
+              "source_label": "System description"
+            },
+            {
+              "text": "The gateway forwards the request to the model server, which runs the actual\nmodel on GPU nodes in our model network.",
+              "source_label": "System description"
+            }
+          ],
+          "absent_elements": [],
+          "sequence": 1,
+          "severity": {
+            "likelihood": "medium",
+            "impact": "high",
+            "level": "high",
+            "justification": "Likelihood is medium: `crossing:flow:entity:calling-service>process:inference-gateway>submit-inference-request` gives callers from `boundary:public-internet` a path to the internet-facing gateway, but the attack requires a calling team's valid API key. Impact is high: `process:model-server` performs the GPU inference work for requests forwarded by `process:inference-gateway`, so exhausting that shared execution path interrupts hosted inference for the product teams using the gateway."
+          },
+          "mitigations": [
+            {
+              "summary": "Apply per-team inference rate, concurrency, and cost limits",
+              "detail": "At `process:inference-gateway`, meter requests by the verified per-team API key, enforce bounded concurrent inferences and request-cost budgets, and reject or defer excess work before it reaches `process:model-server`."
+            },
+            {
+              "summary": "Bound request work and isolate overload",
+              "detail": "Set hard input-size and complexity limits, inference deadlines, and bounded queues on `flow:process:inference-gateway>process:model-server>forward-request`; shed load quickly rather than allowing requests to accumulate and consume all GPU workers."
+            },
+            {
+              "summary": "Keep logging from amplifying overload",
+              "detail": "Place bounded asynchronous logging and quota-aware failure handling on `flow:process:inference-gateway>store:inference-log>write-request-log` so request-log writes cannot compound an inference flood or block gateway recovery."
+            }
+          ]
+        }
+      ],
+      "invalid": []
+    },
+    "elevation-of-privilege": {
+      "claims": [
+        {
+          "title": "Compromising the public gateway grants unauthenticated entry to the model-server surface",
+          "description": "An attacker who obtains a foothold in the internet-facing `process:inference-gateway` can use its network position to send requests over `flow:process:inference-gateway>process:model-server>forward-request` into `process:model-server`. That flow crosses from the serving edge to the model network but has no authentication, so the attacker escalates from the gateway's public-facing position to the model server's internal request-processing authority. Second-order, `process:model-server` reads customer features from `store:redis-feature-store`; the gained position can therefore cause the model service to exercise access to confidential customer feature data rather than being constrained to the gateway's own boundary.",
+          "affected_element_ids": [
+            "process:inference-gateway",
+            "flow:process:inference-gateway>process:model-server>forward-request",
+            "process:model-server"
+          ],
+          "verb": "escalate",
+          "evidence_refs": [
+            "absent:flow:process:inference-gateway>process:model-server>forward-request:authentication",
+            "crossing:flow:process:inference-gateway>process:model-server>forward-request"
+          ],
+          "quotes": [
+            {
+              "text": "Requests often need customer features, which the model server reads from a Redis feature store on the same network.",
+              "source_label": "System description"
+            }
+          ],
+          "absent_elements": [],
+          "sequence": 1,
+          "severity": {
+            "likelihood": "medium",
+            "impact": "high",
+            "level": "high",
+            "justification": "Likelihood is medium: `process:inference-gateway` is internet-facing, but exploitation requires a foothold in that process before its boundary-crossing route can be used; `crossing:flow:process:inference-gateway>process:model-server>forward-request` and the stated absence of authentication show that no further identity is required on the internal hop. Impact is high: the escalated position reaches `process:model-server`, which reads `store:redis-feature-store`, a confidential store tagged `pii` and `financial`."
+          },
+          "mitigations": [
+            {
+              "summary": "Authenticate the gateway-to-model-server hop",
+              "detail": "Require `process:model-server` to authenticate a dedicated workload identity from `process:inference-gateway` on `flow:process:inference-gateway>process:model-server>forward-request`, using mutually authenticated service credentials rather than network position."
+            },
+            {
+              "summary": "Authorize the original caller at the model-service boundary",
+              "detail": "Propagate a verifiable calling-team identity and authorization context from `process:inference-gateway`, and have `process:model-server` validate it before processing requests or reading customer features from `store:redis-feature-store`."
+            },
+            {
+              "summary": "Restrict model-network ingress to the authenticated workload path",
+              "detail": "Use network policy and per-destination service authorization so that a gateway compromise does not make reachability to `process:model-server` sufficient to invoke it."
+            }
+          ]
+        }
+      ],
+      "invalid": []
+    }
+  }
+}

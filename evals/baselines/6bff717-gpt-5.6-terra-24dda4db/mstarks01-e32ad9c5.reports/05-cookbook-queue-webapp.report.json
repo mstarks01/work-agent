@@ -1,0 +1,1718 @@
+{
+  "schema_version": "3.0",
+  "disclaimer": "AI-generated security analysis. Not reviewed by a human security analyst.",
+  "job": {
+    "id": "eval-05-cookbook-queue-webapp",
+    "status": "completed",
+    "created_at": "2026-09-20T18:42:58.589888Z",
+    "completed_at": "2026-09-20T18:42:58.589888Z",
+    "revise_rounds": 0,
+    "frameworks": [
+      {
+        "name": "stride",
+        "options": {}
+      }
+    ]
+  },
+  "input": {
+    "system_name": "Web application with queue-decoupled background worker",
+    "sources": [
+      {
+        "kind": "description",
+        "label": "System description",
+        "sha256": "20b0aa82c922766db2353cade33f7a26b38c60a3c7061244ef4686b7a647778b"
+      }
+    ],
+    "source_sha256": "37f17dbdad7ff7968531482d9dde87a6d94cb0034cea6bf9495793720435d171"
+  },
+  "nodes": [
+    {
+      "node": "prepare",
+      "model": null,
+      "requested_model": null,
+      "instruction_sha256": null,
+      "execution_fingerprint": null,
+      "duration_ms": 4,
+      "usage": null,
+      "attempts": 1,
+      "reported_charge_usd": null,
+      "served_upstream": null,
+      "served_trust": null
+    },
+    {
+      "node": "analyze_stride_repudiation",
+      "model": "openrouter/openai/gpt-5.6-terra",
+      "requested_model": "openrouter/openai/gpt-5.6-terra",
+      "instruction_sha256": "ea3fb48de6420011ff54cfba38cd1ba317f69d85fd250c2743e6385e6047fcf5",
+      "execution_fingerprint": "26d18056229c59b96bf14e32468736d55d03db8b188dede1d59629074fc0c27f",
+      "duration_ms": 13578,
+      "usage": {
+        "prompt_tokens": 18652,
+        "cached_prompt_tokens": 0,
+        "completion_tokens": 1100,
+        "reasoning_tokens": 516,
+        "total_tokens": 19752
+      },
+      "attempts": 1,
+      "reported_charge_usd": 0.0598285,
+      "served_upstream": "OpenAI",
+      "served_trust": "requested_echo"
+    },
+    {
+      "node": "analyze_stride_denial_of_service",
+      "model": "openrouter/openai/gpt-5.6-terra",
+      "requested_model": "openrouter/openai/gpt-5.6-terra",
+      "instruction_sha256": "ea3fb48de6420011ff54cfba38cd1ba317f69d85fd250c2743e6385e6047fcf5",
+      "execution_fingerprint": "26d18056229c59b96bf14e32468736d55d03db8b188dede1d59629074fc0c27f",
+      "duration_ms": 13938,
+      "usage": {
+        "prompt_tokens": 18416,
+        "cached_prompt_tokens": 0,
+        "completion_tokens": 1200,
+        "reasoning_tokens": 481,
+        "total_tokens": 19616
+      },
+      "attempts": 1,
+      "reported_charge_usd": 0.0604385,
+      "served_upstream": "OpenAI",
+      "served_trust": "requested_echo"
+    },
+    {
+      "node": "analyze_stride_information_disclosure",
+      "model": "openrouter/openai/gpt-5.6-terra",
+      "requested_model": "openrouter/openai/gpt-5.6-terra",
+      "instruction_sha256": "ea3fb48de6420011ff54cfba38cd1ba317f69d85fd250c2743e6385e6047fcf5",
+      "execution_fingerprint": "26d18056229c59b96bf14e32468736d55d03db8b188dede1d59629074fc0c27f",
+      "duration_ms": 27977,
+      "usage": {
+        "prompt_tokens": 18875,
+        "cached_prompt_tokens": 0,
+        "completion_tokens": 2680,
+        "reasoning_tokens": 964,
+        "total_tokens": 21555
+      },
+      "attempts": 1,
+      "reported_charge_usd": 0.079346,
+      "served_upstream": "OpenAI",
+      "served_trust": "requested_echo"
+    },
+    {
+      "node": "analyze_stride_spoofing",
+      "model": "openrouter/openai/gpt-5.6-terra",
+      "requested_model": "openrouter/openai/gpt-5.6-terra",
+      "instruction_sha256": "ea3fb48de6420011ff54cfba38cd1ba317f69d85fd250c2743e6385e6047fcf5",
+      "execution_fingerprint": "26d18056229c59b96bf14e32468736d55d03db8b188dede1d59629074fc0c27f",
+      "duration_ms": 30953,
+      "usage": {
+        "prompt_tokens": 18675,
+        "cached_prompt_tokens": 0,
+        "completion_tokens": 2485,
+        "reasoning_tokens": 1906,
+        "total_tokens": 21160
+      },
+      "attempts": 1,
+      "reported_charge_usd": 0.076506,
+      "served_upstream": "OpenAI",
+      "served_trust": "requested_echo"
+    },
+    {
+      "node": "analyze_stride_tampering",
+      "model": "openrouter/openai/gpt-5.6-terra",
+      "requested_model": "openrouter/openai/gpt-5.6-terra",
+      "instruction_sha256": "ea3fb48de6420011ff54cfba38cd1ba317f69d85fd250c2743e6385e6047fcf5",
+      "execution_fingerprint": "26d18056229c59b96bf14e32468736d55d03db8b188dede1d59629074fc0c27f",
+      "duration_ms": 35857,
+      "usage": {
+        "prompt_tokens": 18925,
+        "cached_prompt_tokens": 0,
+        "completion_tokens": 3243,
+        "reasoning_tokens": 1313,
+        "total_tokens": 22168
+      },
+      "attempts": 1,
+      "reported_charge_usd": 0.086227,
+      "served_upstream": "OpenAI",
+      "served_trust": "requested_echo"
+    },
+    {
+      "node": "analyze_stride_elevation_of_privilege",
+      "model": "openrouter/openai/gpt-5.6-terra",
+      "requested_model": "openrouter/openai/gpt-5.6-terra",
+      "instruction_sha256": "ea3fb48de6420011ff54cfba38cd1ba317f69d85fd250c2743e6385e6047fcf5",
+      "execution_fingerprint": "26d18056229c59b96bf14e32468736d55d03db8b188dede1d59629074fc0c27f",
+      "duration_ms": 46277,
+      "usage": {
+        "prompt_tokens": 18243,
+        "cached_prompt_tokens": 0,
+        "completion_tokens": 3417,
+        "reasoning_tokens": 2736,
+        "total_tokens": 21660
+      },
+      "attempts": 1,
+      "reported_charge_usd": 0.08661,
+      "served_upstream": "OpenAI",
+      "served_trust": "requested_echo"
+    },
+    {
+      "node": "join_stride",
+      "model": null,
+      "requested_model": null,
+      "instruction_sha256": null,
+      "execution_fingerprint": null,
+      "duration_ms": 1,
+      "usage": null,
+      "attempts": 1,
+      "reported_charge_usd": null,
+      "served_upstream": null,
+      "served_trust": null
+    },
+    {
+      "node": "merge_stride",
+      "model": null,
+      "requested_model": null,
+      "instruction_sha256": null,
+      "execution_fingerprint": null,
+      "duration_ms": 5,
+      "usage": null,
+      "attempts": 1,
+      "reported_charge_usd": null,
+      "served_upstream": null,
+      "served_trust": null
+    },
+    {
+      "node": "critic_stride",
+      "model": "openrouter/openai/gpt-5.6-terra",
+      "requested_model": "openrouter/openai/gpt-5.6-terra",
+      "instruction_sha256": "ea3fb48de6420011ff54cfba38cd1ba317f69d85fd250c2743e6385e6047fcf5",
+      "execution_fingerprint": "26d18056229c59b96bf14e32468736d55d03db8b188dede1d59629074fc0c27f",
+      "duration_ms": 45942,
+      "usage": {
+        "prompt_tokens": 17662,
+        "cached_prompt_tokens": 0,
+        "completion_tokens": 4170,
+        "reasoning_tokens": 2070,
+        "total_tokens": 21832
+      },
+      "attempts": 1,
+      "reported_charge_usd": 0.0941935,
+      "served_upstream": "OpenAI",
+      "served_trust": "requested_echo"
+    },
+    {
+      "node": "router_stride",
+      "model": null,
+      "requested_model": null,
+      "instruction_sha256": null,
+      "execution_fingerprint": null,
+      "duration_ms": 2,
+      "usage": null,
+      "attempts": 1,
+      "reported_charge_usd": null,
+      "served_upstream": null,
+      "served_trust": null
+    },
+    {
+      "node": "assemble",
+      "model": null,
+      "requested_model": null,
+      "instruction_sha256": null,
+      "execution_fingerprint": null,
+      "duration_ms": 2,
+      "usage": null,
+      "attempts": 1,
+      "reported_charge_usd": null,
+      "served_upstream": null,
+      "served_trust": null
+    }
+  ],
+  "sampling": {
+    "base": {
+      "temperature": null,
+      "top_p": null,
+      "seed": null,
+      "max_output_tokens": 16384,
+      "candidate_count": 1,
+      "presence_penalty": null,
+      "frequency_penalty": null,
+      "thinking": null,
+      "constrain_output": true
+    },
+    "strong": {
+      "temperature": null,
+      "top_p": null,
+      "seed": null,
+      "max_output_tokens": 64000,
+      "candidate_count": 1,
+      "presence_penalty": null,
+      "frequency_penalty": null,
+      "thinking": null,
+      "constrain_output": true
+    },
+    "review": {
+      "temperature": null,
+      "top_p": null,
+      "seed": null,
+      "max_output_tokens": 64000,
+      "candidate_count": 1,
+      "presence_penalty": null,
+      "frequency_penalty": null,
+      "thinking": null,
+      "constrain_output": true
+    }
+  },
+  "system_model": {
+    "external_entities": [
+      {
+        "id": "entity:browser",
+        "name": "browser",
+        "description": "The end user's browser, outside the application's network.",
+        "assets": [],
+        "source_excerpt": "A user's browser talks to the web application over HTTP/S across the public internet.",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "external-system",
+        "trust_zone": "boundary:public-internet"
+      }
+    ],
+    "processes": [
+      {
+        "id": "process:web-application",
+        "name": "web application",
+        "description": "Serves the browser and enqueues work rather than performing it inline.",
+        "assets": [],
+        "source_excerpt": "the web application runs in our web tier",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:web-tier",
+        "exposure": "internet-facing",
+        "interface_kind": "web"
+      },
+      {
+        "id": "process:background-worker-process",
+        "name": "background worker process",
+        "description": "Consumes queued jobs and performs the work against the database.",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "a background worker process picks them up and does the work",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:backend-tier",
+        "exposure": "internal",
+        "interface_kind": "non-web"
+      }
+    ],
+    "data_stores": [
+      {
+        "id": "store:message-queue",
+        "name": "message queue",
+        "description": "Carries jobs from the web application to the worker.",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "It puts jobs onto a message queue, and a background worker process picks them up",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:backend-tier",
+        "data_classification": "unknown",
+        "encryption_at_rest": "unknown"
+      },
+      {
+        "id": "store:database",
+        "name": "database",
+        "description": "Application records and the application's log records.",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "The background worker reads and writes the database. The database is also where we keep the application's log records.",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:backend-tier",
+        "data_classification": "unknown",
+        "encryption_at_rest": "unknown"
+      },
+      {
+        "id": "store:web-application-config",
+        "name": "web application config",
+        "description": "Configuration for the web application, holding its message-queue credentials.",
+        "assets": [
+          "credentials",
+          "secrets"
+        ],
+        "source_excerpt": "Both of those config stores hold the credentials the process needs — the web application's queue credentials",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:web-tier",
+        "data_classification": "unknown",
+        "encryption_at_rest": "unknown"
+      },
+      {
+        "id": "store:worker-config",
+        "name": "worker config",
+        "description": "Configuration for the background worker, holding its database credentials.",
+        "assets": [
+          "credentials",
+          "secrets"
+        ],
+        "source_excerpt": "and the worker's database credentials",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:backend-tier",
+        "data_classification": "unknown",
+        "encryption_at_rest": "unknown"
+      }
+    ],
+    "data_flows": [
+      {
+        "id": "flow:entity:browser>process:web-application>page-request",
+        "name": "page request",
+        "description": "User's browser makes requests to the application; responses ride the same interaction.",
+        "assets": [],
+        "source_excerpt": "A user's browser talks to the web application over HTTP/S across the public internet.",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "source": "entity:browser",
+        "destination": "process:web-application",
+        "protocol": "HTTP/S",
+        "authentication": "unknown",
+        "data_description": "application requests and responses",
+        "encryption_in_transit": "encrypted (marked as the one encrypted link)",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:process:web-application>store:message-queue>enqueue-job",
+        "name": "enqueue job",
+        "description": "Application places a job on the queue.",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "It puts jobs onto a message queue",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:web-application",
+        "destination": "store:message-queue",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "job messages",
+        "encryption_in_transit": "unknown",
+        "operations": "write"
+      },
+      {
+        "id": "flow:process:background-worker-process>store:message-queue>consume-job",
+        "name": "consume job",
+        "description": "Worker takes jobs off the queue.",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "a background worker process picks them up and does the work",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:background-worker-process",
+        "destination": "store:message-queue",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "job messages",
+        "encryption_in_transit": "unknown",
+        "operations": "read-write"
+      },
+      {
+        "id": "flow:process:background-worker-process>store:database>read-write-records",
+        "name": "read write records",
+        "description": "Worker reads and writes application records and log records.",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "The background worker reads and writes the database.",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:background-worker-process",
+        "destination": "store:database",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "application records and log records",
+        "encryption_in_transit": "unknown",
+        "operations": "read-write"
+      },
+      {
+        "id": "flow:process:web-application>store:web-application-config>read-configuration",
+        "name": "read configuration",
+        "description": "Application reads its settings, including queue credentials.",
+        "assets": [
+          "credentials"
+        ],
+        "source_excerpt": "the web application has a web application config",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:web-application",
+        "destination": "store:web-application-config",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "settings and message-queue credentials",
+        "encryption_in_transit": "unknown",
+        "operations": "read"
+      },
+      {
+        "id": "flow:process:background-worker-process>store:worker-config>read-configuration",
+        "name": "read configuration",
+        "description": "Worker reads its settings, including database credentials.",
+        "assets": [
+          "credentials"
+        ],
+        "source_excerpt": "and the worker has a worker config",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:background-worker-process",
+        "destination": "store:worker-config",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "settings and database credentials",
+        "encryption_in_transit": "unknown",
+        "operations": "read"
+      }
+    ],
+    "trust_boundaries": [
+      {
+        "id": "boundary:public-internet",
+        "name": "public internet",
+        "description": "Outside the application's network, where the browser sits.",
+        "assets": [],
+        "source_excerpt": "The browser sits outside our network",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "network"
+      },
+      {
+        "id": "boundary:web-tier",
+        "name": "web tier",
+        "description": "Internet-facing tier holding the web application and its config.",
+        "assets": [],
+        "source_excerpt": "the web application runs in our web tier",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "network"
+      },
+      {
+        "id": "boundary:backend-tier",
+        "name": "backend tier",
+        "description": "Tier behind the web tier holding the queue, the worker, its config and the database.",
+        "assets": [],
+        "source_excerpt": "The queue, the worker and the database are all in the backend tier, behind the web tier.",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "network"
+      }
+    ],
+    "assumptions": [
+      {
+        "assumption": "The web application is reachable from the public internet.",
+        "element_id": "process:web-application",
+        "attribute": "exposure",
+        "basis": "The browser is stated to reach it across the public internet."
+      },
+      {
+        "assumption": "background worker process's exposure is internal, which the schema requires and no source states.",
+        "element_id": "process:background-worker-process",
+        "attribute": "exposure",
+        "basis": "Behind the web tier supplies architectural evidence beyond a network name. It still does not prove that every worker interface is inaccessible from the internet."
+      },
+      {
+        "assumption": "web application config's trust_zone is boundary:web-tier, which the schema requires and no source states.",
+        "element_id": "store:web-application-config",
+        "attribute": "trust_zone",
+        "basis": "The application's use of a config store does not establish that store's network location. A remote configuration service is also possible."
+      },
+      {
+        "assumption": "worker config's trust_zone is boundary:backend-tier, which the schema requires and no source states.",
+        "element_id": "store:worker-config",
+        "attribute": "trust_zone",
+        "basis": "The worker's use of a config store does not establish backend-tier membership."
+      }
+    ]
+  },
+  "boundary_crossings": [
+    {
+      "flow_id": "flow:entity:browser>process:web-application>page-request",
+      "source_zone": "boundary:public-internet",
+      "destination_zone": "boundary:web-tier",
+      "decided": true,
+      "assumed_endpoints": []
+    },
+    {
+      "flow_id": "flow:process:web-application>store:message-queue>enqueue-job",
+      "source_zone": "boundary:web-tier",
+      "destination_zone": "boundary:backend-tier",
+      "decided": true,
+      "assumed_endpoints": []
+    }
+  ],
+  "shared_element_names": [],
+  "elements_analyzed": 16,
+  "model_repair": null,
+  "assertions": null,
+  "analysis_context": {
+    "instruction_sha256": "ea3fb48de6420011ff54cfba38cd1ba317f69d85fd250c2743e6385e6047fcf5",
+    "domain_packs": [
+      "http-api",
+      "databases"
+    ]
+  },
+  "execution": {
+    "identity_version": 2,
+    "build": {
+      "analysis-service": "0.1.0",
+      "google-adk": "2.5.0",
+      "google-genai": "2.11.0",
+      "litellm": "1.97.0"
+    },
+    "review_independence": "shared",
+    "extraction_format": null,
+    "extraction_strategy": null
+  },
+  "analyses": [
+    {
+      "framework": "stride",
+      "framework_version": "1.0",
+      "disclaimer": "AI-generated STRIDE threat model. Each claim asserts that an attacker action against the named elements is credible against what the submitted text stated. Where the text says a control is not there, a claim says so and cites that sentence; where the text is silent, the claim is conditional on a fact nobody supplied, and the service never reads silence as absence. Nothing not listed here is thereby safe. Not reviewed by a human security analyst.",
+      "claims": [
+        {
+          "id": "D-01",
+          "framework": "stride",
+          "framework_version": "1.0",
+          "title": "Public request flooding can exhaust the job queue and stall background work",
+          "description": "An internet attacker can drive `flow:entity:browser>process:web-application>page-request` into `process:web-application`; its `authentication` is unknown, so whether anonymous requests are admitted is unverified. Each accepted request can be turned into a job on `flow:process:web-application>store:message-queue>enqueue-job`, while the worker performs the heavy work asynchronously. If request admission, job size, enqueue quotas, or queue backpressure are not bounded, the attacker spends cheap HTTP requests to build a backlog that exhausts `store:message-queue` storage or throughput and prevents legitimate jobs from being accepted or processed. Second-order, `process:background-worker-process` cannot obtain legitimate jobs through `flow:process:background-worker-process>store:message-queue>consume-job`; its database work on `flow:process:background-worker-process>store:database>read-write-records` and the application's log-record processing are delayed or stopped. This threat is conditional on the unverified authentication state and on queue admission/backpressure limits not stated in the model.",
+          "affected_element_ids": [
+            "process:web-application",
+            "flow:entity:browser>process:web-application>page-request",
+            "flow:process:web-application>store:message-queue>enqueue-job",
+            "store:message-queue"
+          ],
+          "verb": "flood",
+          "grounds": [
+            {
+              "kind": "quote",
+              "text": "The web application does not do the heavy work itself. It puts jobs onto a\nmessage queue, and a background worker process picks them up and does the work.",
+              "source_label": "System description",
+              "element_id": "",
+              "attribute": "",
+              "flow_id": "",
+              "term": "",
+              "assertion": ""
+            },
+            {
+              "kind": "derived-fact",
+              "text": "",
+              "source_label": "",
+              "element_id": "",
+              "attribute": "",
+              "flow_id": "flow:entity:browser>process:web-application>page-request",
+              "term": "",
+              "assertion": ""
+            },
+            {
+              "kind": "derived-fact",
+              "text": "",
+              "source_label": "",
+              "element_id": "",
+              "attribute": "",
+              "flow_id": "flow:process:web-application>store:message-queue>enqueue-job",
+              "term": "",
+              "assertion": ""
+            },
+            {
+              "kind": "unknown-attribute",
+              "text": "",
+              "source_label": "",
+              "element_id": "flow:entity:browser>process:web-application>page-request",
+              "attribute": "authentication",
+              "flow_id": "",
+              "term": "",
+              "assertion": ""
+            }
+          ],
+          "verdict": {
+            "status": "needs-info",
+            "reason": "The public request path and asynchronous queue are stated, but the model does not establish whether request-to-job admission, job size, queue capacity, quotas, or backpressure are bounded; authentication on the public flow is also unknown.",
+            "related_unknowns": [
+              {
+                "element_id": "flow:entity:browser>process:web-application>page-request",
+                "attribute": "authentication",
+                "subject": "",
+                "assertion": ""
+              },
+              {
+                "element_id": "",
+                "attribute": "",
+                "subject": "Are public request-to-job admission, job size, queue storage, throughput, quota, and backpressure limits bounded so requests cannot create an unbounded queue backlog?",
+                "assertion": ""
+              }
+            ],
+            "immaterial_unknowns": [],
+            "rejected_because": null
+          },
+          "category": "denial-of-service",
+          "severity": {
+            "likelihood": "high",
+            "impact": "medium",
+            "level": "high",
+            "justification": "Likelihood is high, conditional on the unknown authentication state of `flow:entity:browser>process:web-application>page-request`: the flow crosses from `boundary:public-internet` to the internet-facing `process:web-application`, so any internet user can attempt high-rate requests with commodity tooling. Impact is medium because a filled or saturated `store:message-queue` blocks the `business-critical-data` work performed by `process:background-worker-process` and delays database and log-record processing, but the stated harm is a recoverable availability outage rather than data loss."
+          },
+          "mitigations": [
+            {
+              "summary": "Authenticate and rate-limit job-creating requests",
+              "detail": "Require authentication before requests create work on `flow:process:web-application>store:message-queue>enqueue-job`, then enforce per-identity and per-source request, job-count, and cost budgets at `process:web-application`."
+            },
+            {
+              "summary": "Bound queue admission and isolate overload",
+              "detail": "Configure bounded queue retention/storage and message-size limits on `store:message-queue`; have `process:web-application` shed load or fail fast when backlog thresholds are reached rather than accepting unbounded jobs."
+            },
+            {
+              "summary": "Protect worker capacity from backlog storms",
+              "detail": "Apply bounded worker concurrency, job execution timeouts, and per-tenant fairness in `process:background-worker-process` so a queued flood cannot monopolize database work on `store:database`."
+            }
+          ],
+          "confidence": "medium",
+          "recommendation": {
+            "sound": true,
+            "note": "Authentication and rate limits, bounded queue admission, and bounded worker capacity directly address request-driven backlog exhaustion."
+          }
+        },
+        {
+          "id": "E-01",
+          "framework": "stride",
+          "framework_version": "1.0",
+          "title": "A foothold in the public web application can inherit backend job-submission authority",
+          "description": "An attacker who gains a foothold in the internet-facing `process:web-application` from `entity:browser` can read the queue credentials held by `store:web-application-config` and use the web application's authority on `flow:process:web-application>store:message-queue>enqueue-job` to act across the web-to-backend boundary. Authentication on that queue-enqueue flow is `unknown`; if its credentials permit message production without binding each job to the originating user and authorized operation, the attacker escalates from a public-web foothold into `store:message-queue` and submits work under the application's backend authority. Second-order, `process:background-worker-process` consumes those jobs and reads and writes `store:database`, so accepted attacker-supplied jobs can cause the worker's ordinary database work against business-critical application records. This is conditional on the unstated queue authentication and job-authorization behavior, not an assertion that either control is absent.",
+          "affected_element_ids": [
+            "process:web-application",
+            "flow:process:web-application>store:message-queue>enqueue-job",
+            "store:message-queue"
+          ],
+          "verb": "escalate",
+          "grounds": [
+            {
+              "kind": "quote",
+              "text": "the web application's queue credentials",
+              "source_label": "System description",
+              "element_id": "",
+              "attribute": "",
+              "flow_id": "",
+              "term": "",
+              "assertion": ""
+            },
+            {
+              "kind": "quote",
+              "text": "The background worker reads and writes the database.",
+              "source_label": "System description",
+              "element_id": "",
+              "attribute": "",
+              "flow_id": "",
+              "term": "",
+              "assertion": ""
+            },
+            {
+              "kind": "derived-fact",
+              "text": "",
+              "source_label": "",
+              "element_id": "",
+              "attribute": "",
+              "flow_id": "flow:entity:browser>process:web-application>page-request",
+              "term": "",
+              "assertion": ""
+            },
+            {
+              "kind": "derived-fact",
+              "text": "",
+              "source_label": "",
+              "element_id": "",
+              "attribute": "",
+              "flow_id": "flow:process:web-application>store:message-queue>enqueue-job",
+              "term": "",
+              "assertion": ""
+            },
+            {
+              "kind": "unknown-attribute",
+              "text": "",
+              "source_label": "",
+              "element_id": "flow:process:web-application>store:message-queue>enqueue-job",
+              "attribute": "authentication",
+              "flow_id": "",
+              "term": "",
+              "assertion": ""
+            }
+          ],
+          "verdict": {
+            "status": "needs-info",
+            "reason": "The model states that the web application holds queue credentials and crosses into the backend queue, but it does not establish whether submitted jobs are bound to an authorized originating principal and operation; queue authentication is also unknown.",
+            "related_unknowns": [
+              {
+                "element_id": "flow:process:web-application>store:message-queue>enqueue-job",
+                "attribute": "authentication",
+                "subject": "",
+                "assertion": ""
+              },
+              {
+                "element_id": "",
+                "attribute": "",
+                "subject": "Are queued jobs bound to an authorized originating principal and operation, and does the worker re-authorize that principal before database work?",
+                "assertion": ""
+              }
+            ],
+            "immaterial_unknowns": [],
+            "rejected_because": null
+          },
+          "category": "elevation-of-privilege",
+          "severity": {
+            "likelihood": "medium",
+            "impact": "medium",
+            "level": "medium",
+            "justification": "Likelihood is medium: `flow:entity:browser>process:web-application>page-request` crosses into the web tier, but the attacker must first obtain a foothold in `process:web-application`; queue authentication on `flow:process:web-application>store:message-queue>enqueue-job` is unverified. Impact is medium: the escalated authority reaches `store:message-queue`, tagged `business-critical-data`, and its consumed jobs lead to worker read/write activity against the business-critical `store:database`."
+          },
+          "mitigations": [
+            {
+              "summary": "Bind queued work to an authorized originating principal",
+              "detail": "Have `process:web-application` include a verifiable caller identity and narrowly scoped operation authorization in each job, and require `process:background-worker-process` to re-authorize that identity before performing database work."
+            },
+            {
+              "summary": "Constrain and protect web-to-queue authority",
+              "detail": "Use a dedicated short-lived credential for `flow:process:web-application>store:message-queue>enqueue-job`, grant only the required queue and write operation, and enforce queue-side producer authentication and message authorization."
+            },
+            {
+              "summary": "Reduce exposure of queue credentials",
+              "detail": "Limit `process:web-application` access to `store:web-application-config` to a narrowly scoped runtime identity and avoid persistent credentials that remain usable after compromise."
+            }
+          ],
+          "confidence": "low",
+          "recommendation": {
+            "sound": true,
+            "note": "Binding jobs to an authorized origin, re-authorizing them at the worker, and constraining the web-to-queue credential directly address inherited backend authority."
+          }
+        },
+        {
+          "id": "I-01",
+          "framework": "stride",
+          "framework_version": "1.0",
+          "title": "Queue credentials may be intercepted while the web application reads configuration",
+          "description": "`flow:process:web-application>store:web-application-config>read-configuration` carries message-queue credentials from `store:web-application-config` to `process:web-application`, but its `encryption_in_transit` value is unknown. If this same-web-tier configuration channel is not protected, an attacker with an on-path foothold in `boundary:web-tier` can intercept those credentials while they are retrieved. The disclosed credential can then be presented to `store:message-queue`, potentially enabling the attacker to read queued job messages or act as the web application on the enqueue path `flow:process:web-application>store:message-queue>enqueue-job`. This is conditional on verification of the transport control; it does not assert that the channel is plaintext.",
+          "affected_element_ids": [
+            "flow:process:web-application>store:web-application-config>read-configuration",
+            "process:web-application",
+            "store:web-application-config"
+          ],
+          "verb": "intercept",
+          "grounds": [
+            {
+              "kind": "unknown-attribute",
+              "text": "",
+              "source_label": "",
+              "element_id": "flow:process:web-application>store:web-application-config>read-configuration",
+              "attribute": "encryption_in_transit",
+              "flow_id": "",
+              "term": "",
+              "assertion": ""
+            }
+          ],
+          "verdict": {
+            "status": "needs-info",
+            "reason": "Credential interception depends on whether the configuration-read flow has transport encryption, which the model records as unknown.",
+            "related_unknowns": [
+              {
+                "element_id": "flow:process:web-application>store:web-application-config>read-configuration",
+                "attribute": "encryption_in_transit",
+                "subject": "",
+                "assertion": ""
+              }
+            ],
+            "immaterial_unknowns": [],
+            "rejected_because": null
+          },
+          "category": "information-disclosure",
+          "severity": {
+            "likelihood": "low",
+            "impact": "high",
+            "level": "medium",
+            "justification": "Likelihood is low because interception requires an on-path foothold within `boundary:web-tier`, while `encryption_in_transit` is unknown on the configuration flow; impact is high because `store:web-application-config` holds `credentials` and `secrets` for queue access."
+          },
+          "mitigations": [
+            {
+              "summary": "Encrypt and mutually authenticate configuration retrieval",
+              "detail": "Require TLS 1.2+ with workload mTLS on `flow:process:web-application>store:web-application-config>read-configuration`, and record the verified `encryption_in_transit` and authentication settings."
+            },
+            {
+              "summary": "Use short-lived queue credentials",
+              "detail": "Issue the web application's queue credential from a dedicated secret manager with rotation and narrowly scoped queue permissions, limiting the value of an intercepted credential."
+            }
+          ],
+          "confidence": "low",
+          "recommendation": {
+            "sound": true,
+            "note": "Mutually authenticated encrypted configuration retrieval and short-lived, scoped queue credentials address both interception and the value of a disclosed credential."
+          }
+        },
+        {
+          "id": "I-02",
+          "framework": "stride",
+          "framework_version": "1.0",
+          "title": "Database credentials may be intercepted while the worker reads configuration",
+          "description": "`flow:process:background-worker-process>store:worker-config>read-configuration` carries database credentials from `store:worker-config` to `process:background-worker-process`, while `encryption_in_transit` is unknown. If transport protection is absent, an attacker with an on-path foothold in `boundary:backend-tier` can intercept the worker's database credential. The credential can then be used to attempt direct access to `store:database` through `flow:process:background-worker-process>store:database>read-write-records`, exposing application and log records beyond the worker's normal execution path. This is conditional on the unverified transport setting and does not claim the backend channel is unencrypted.",
+          "affected_element_ids": [
+            "flow:process:background-worker-process>store:worker-config>read-configuration",
+            "process:background-worker-process",
+            "store:worker-config"
+          ],
+          "verb": "intercept",
+          "grounds": [
+            {
+              "kind": "unknown-attribute",
+              "text": "",
+              "source_label": "",
+              "element_id": "flow:process:background-worker-process>store:worker-config>read-configuration",
+              "attribute": "encryption_in_transit",
+              "flow_id": "",
+              "term": "",
+              "assertion": ""
+            }
+          ],
+          "verdict": {
+            "status": "needs-info",
+            "reason": "Credential interception depends on whether the worker configuration-read flow has transport encryption, which the model records as unknown.",
+            "related_unknowns": [
+              {
+                "element_id": "flow:process:background-worker-process>store:worker-config>read-configuration",
+                "attribute": "encryption_in_transit",
+                "subject": "",
+                "assertion": ""
+              }
+            ],
+            "immaterial_unknowns": [],
+            "rejected_because": null
+          },
+          "category": "information-disclosure",
+          "severity": {
+            "likelihood": "low",
+            "impact": "high",
+            "level": "medium",
+            "justification": "Likelihood is low because interception requires an on-path foothold in `boundary:backend-tier`, while `encryption_in_transit` is unknown on the worker configuration flow; impact is high because `store:worker-config` holds database `credentials` and `secrets`."
+          },
+          "mitigations": [
+            {
+              "summary": "Protect the worker-to-config channel with mTLS",
+              "detail": "Set verified TLS and mutual workload authentication on `flow:process:background-worker-process>store:worker-config>read-configuration` so database credentials cannot be read from the backend path."
+            },
+            {
+              "summary": "Replace standing database passwords with short-lived credentials",
+              "detail": "Use workload-federated or dynamically issued database credentials from a dedicated secret manager, rotate existing database credentials, and scope the worker identity to only required database operations."
+            }
+          ],
+          "confidence": "low",
+          "recommendation": {
+            "sound": true,
+            "note": "mTLS on configuration retrieval and replacing standing database passwords with short-lived scoped credentials directly address the disclosure path."
+          }
+        },
+        {
+          "id": "I-03",
+          "framework": "stride",
+          "framework_version": "1.0",
+          "title": "Unverified at-rest protection could expose web application queue credentials",
+          "description": "`store:web-application-config` holds the web application's message-queue `credentials` and `secrets`, but its `encryption_at_rest` value is unknown. If the store is not encrypted at rest, an attacker who obtains its underlying storage media or an operational copy can recover the queue credential without using `process:web-application` or its normal configuration read path. That credential can subsequently be presented to `store:message-queue`, potentially exposing queued job messages or permitting actions as the web application. This threat is conditional on resolving `encryption_at_rest`; it does not assert that the config store is unencrypted.",
+          "affected_element_ids": [
+            "store:web-application-config",
+            "flow:process:web-application>store:web-application-config>read-configuration",
+            "process:web-application"
+          ],
+          "verb": "recover-credential",
+          "grounds": [
+            {
+              "kind": "unknown-attribute",
+              "text": "",
+              "source_label": "",
+              "element_id": "store:web-application-config",
+              "attribute": "encryption_at_rest",
+              "flow_id": "",
+              "term": "",
+              "assertion": ""
+            }
+          ],
+          "verdict": {
+            "status": "needs-info",
+            "reason": "Offline recovery of queue credentials depends on the unresolved at-rest encryption state of the web application configuration store.",
+            "related_unknowns": [
+              {
+                "element_id": "store:web-application-config",
+                "attribute": "encryption_at_rest",
+                "subject": "",
+                "assertion": ""
+              }
+            ],
+            "immaterial_unknowns": [],
+            "rejected_because": null
+          },
+          "category": "information-disclosure",
+          "severity": {
+            "likelihood": "low",
+            "impact": "high",
+            "level": "medium",
+            "justification": "Likelihood is low because recovering storage-layer data requires offline access to `store:web-application-config`, while its `encryption_at_rest` control is unknown; impact is high because the store is tagged `credentials` and `secrets` and holds queue credentials."
+          },
+          "mitigations": [
+            {
+              "summary": "Verify and enforce encryption at rest for the web configuration store",
+              "detail": "Establish the at-rest posture of `store:web-application-config` and enforce managed-key or KMS-backed encryption for the primary storage and any operational copies, with tightly restricted key use."
+            },
+            {
+              "summary": "Keep queue credentials in a dedicated secret service",
+              "detail": "Move the queue credential from general application configuration to a dedicated secret store, issue it short-lived where supported, and rotate any credential previously stored in this location."
+            }
+          ],
+          "confidence": "low",
+          "recommendation": {
+            "sound": true,
+            "note": "Verifying at-rest encryption and moving or rotating queue credentials through a dedicated secret service directly reduce offline credential disclosure."
+          }
+        },
+        {
+          "id": "I-04",
+          "framework": "stride",
+          "framework_version": "1.0",
+          "title": "Unverified at-rest protection could expose worker database credentials",
+          "description": "`store:worker-config` holds the background worker's database `credentials` and `secrets`, while its `encryption_at_rest` attribute is unknown. If this store lacks encryption at rest, an attacker obtaining the underlying storage layer can recover the database credential directly, bypassing `process:background-worker-process`. The recovered credential can be used to attempt access to `store:database` through `flow:process:background-worker-process>store:database>read-write-records`, exposing application records and log records. This finding is conditional on the unknown at-rest encryption state, not an assertion that the store is cleartext.",
+          "affected_element_ids": [
+            "store:worker-config",
+            "flow:process:background-worker-process>store:worker-config>read-configuration",
+            "process:background-worker-process"
+          ],
+          "verb": "recover-credential",
+          "grounds": [
+            {
+              "kind": "unknown-attribute",
+              "text": "",
+              "source_label": "",
+              "element_id": "store:worker-config",
+              "attribute": "encryption_at_rest",
+              "flow_id": "",
+              "term": "",
+              "assertion": ""
+            }
+          ],
+          "verdict": {
+            "status": "needs-info",
+            "reason": "Offline recovery of database credentials depends on the unresolved at-rest encryption state of the worker configuration store.",
+            "related_unknowns": [
+              {
+                "element_id": "store:worker-config",
+                "attribute": "encryption_at_rest",
+                "subject": "",
+                "assertion": ""
+              }
+            ],
+            "immaterial_unknowns": [],
+            "rejected_because": null
+          },
+          "category": "information-disclosure",
+          "severity": {
+            "likelihood": "low",
+            "impact": "high",
+            "level": "medium",
+            "justification": "Likelihood is low because acquiring storage-layer data requires offline access to `store:worker-config`, while its `encryption_at_rest` control is unknown; impact is high because the store contains database `credentials` and `secrets`."
+          },
+          "mitigations": [
+            {
+              "summary": "Verify and enforce encryption at rest for worker configuration",
+              "detail": "Determine the at-rest encryption state of `store:worker-config` and require KMS-backed encryption with restricted decryption permissions for the store and its operational copies."
+            },
+            {
+              "summary": "Eliminate long-lived database credentials from configuration",
+              "detail": "Use a dedicated secret manager and short-lived workload-bound database credentials for `process:background-worker-process`; rotate the current database credential and limit its database privileges to the worker's required operations."
+            }
+          ],
+          "confidence": "low",
+          "recommendation": {
+            "sound": true,
+            "note": "At-rest encryption, restricted decryption, and replacing long-lived database credentials with short-lived workload-bound credentials address the disclosure path."
+          }
+        },
+        {
+          "id": "S-01",
+          "framework": "stride",
+          "framework_version": "1.0",
+          "title": "Web-tier foothold can impersonate the web application to enqueue jobs if queue authentication is absent",
+          "description": "`flow:process:web-application>store:message-queue>enqueue-job` crosses from the web tier into the backend tier, but its `authentication` attribute is unknown. If that unknown resolves to no verified workload identity, an attacker who gains a foothold able to originate requests in `boundary:web-tier` can impersonate `process:web-application` to `store:message-queue` and enqueue jobs as though they came from the application. Second-order: `process:background-worker-process` consumes queued jobs and reads and writes `store:database`, so forged jobs can cause the worker to act on attacker-supplied work against business-critical application records. This draft is conditional on the unknown authentication state; it does not assert that queue authentication is absent.",
+          "affected_element_ids": [
+            "process:web-application",
+            "store:message-queue",
+            "flow:process:web-application>store:message-queue>enqueue-job"
+          ],
+          "verb": "impersonate",
+          "grounds": [
+            {
+              "kind": "quote",
+              "text": "It puts jobs onto a message queue, and a background worker process picks them up and does the work.",
+              "source_label": "System description",
+              "element_id": "",
+              "attribute": "",
+              "flow_id": "",
+              "term": "",
+              "assertion": ""
+            },
+            {
+              "kind": "quote",
+              "text": "The background worker reads and writes the database.",
+              "source_label": "System description",
+              "element_id": "",
+              "attribute": "",
+              "flow_id": "",
+              "term": "",
+              "assertion": ""
+            },
+            {
+              "kind": "derived-fact",
+              "text": "",
+              "source_label": "",
+              "element_id": "",
+              "attribute": "",
+              "flow_id": "flow:process:web-application>store:message-queue>enqueue-job",
+              "term": "",
+              "assertion": ""
+            },
+            {
+              "kind": "unknown-attribute",
+              "text": "",
+              "source_label": "",
+              "element_id": "flow:process:web-application>store:message-queue>enqueue-job",
+              "attribute": "authentication",
+              "flow_id": "",
+              "term": "",
+              "assertion": ""
+            }
+          ],
+          "verdict": {
+            "status": "needs-info",
+            "reason": "The impersonation path is credible if queue-producer authentication is absent, but the model leaves that control unknown.",
+            "related_unknowns": [
+              {
+                "element_id": "flow:process:web-application>store:message-queue>enqueue-job",
+                "attribute": "authentication",
+                "subject": "",
+                "assertion": ""
+              }
+            ],
+            "immaterial_unknowns": [],
+            "rejected_because": null
+          },
+          "category": "spoofing",
+          "severity": {
+            "likelihood": "medium",
+            "impact": "medium",
+            "level": "medium",
+            "justification": "Likelihood is medium and conditional on `unknown:flow:process:web-application>store:message-queue>enqueue-job:authentication`: exploiting the gap requires a foothold able to originate traffic from the web tier, but the derived crossing shows the queue accepts traffic across the web-to-backend boundary. Impact is medium because `store:message-queue`, `process:background-worker-process`, and `store:database` are tagged `business-critical-data`, and queued work reaches the worker's read-write database flow."
+          },
+          "mitigations": [
+            {
+              "summary": "Establish and enforce a distinct workload identity for queue producers",
+              "detail": "Determine the authentication state of `flow:process:web-application>store:message-queue>enqueue-job`; if it is not verified, require mTLS or workload-identity tokens bound to `process:web-application` before `store:message-queue` accepts enqueue operations."
+            },
+            {
+              "summary": "Authorize job publication separately from network reachability",
+              "detail": "Configure the message queue so only the verified web-application workload may enqueue to the relevant queue, rather than treating traffic from `boundary:web-tier` as the application identity."
+            }
+          ],
+          "confidence": "low",
+          "recommendation": {
+            "sound": true,
+            "note": "The recommendations establish a distinct verified producer identity and queue-side authorization, directly closing the impersonation path."
+          }
+        },
+        {
+          "id": "R-01",
+          "framework": "stride",
+          "framework_version": "1.0",
+          "title": "Worker-side access may permit rewriting the application's audit evidence",
+          "description": "`store:database` holds the application's log records, while `process:background-worker-process` reads and writes both application and log records through `flow:process:background-worker-process>store:database>read-write-records`. An insider operating the worker, or an attacker who obtains its database access, could alter audit records and later deny the corresponding business-critical action if this read-write path permits amendment of existing log entries. The authentication on that path is `unknown`, and the model does not establish a separate audit principal, append-only protection, retention lock, or integrity chain. This is conditional on whether the worker's write capability can modify existing log records rather than append only. Second-order, altered records in `store:database` undermine accountability for the work consumed by `process:background-worker-process` from `store:message-queue`.",
+          "affected_element_ids": [
+            "process:background-worker-process",
+            "store:database",
+            "flow:process:background-worker-process>store:database>read-write-records"
+          ],
+          "verb": "alter",
+          "grounds": [
+            {
+              "kind": "quote",
+              "text": "The background worker reads and writes the database. The database is also where we keep the application's log records.",
+              "source_label": "System description",
+              "element_id": "",
+              "attribute": "",
+              "flow_id": "",
+              "term": "",
+              "assertion": ""
+            },
+            {
+              "kind": "unknown-attribute",
+              "text": "",
+              "source_label": "",
+              "element_id": "flow:process:background-worker-process>store:database>read-write-records",
+              "attribute": "authentication",
+              "flow_id": "",
+              "term": "",
+              "assertion": ""
+            }
+          ],
+          "verdict": {
+            "status": "needs-info",
+            "reason": "The model states that the worker writes log records, but it does not establish whether its write capability can amend or delete historical audit evidence rather than append only.",
+            "related_unknowns": [
+              {
+                "element_id": "",
+                "attribute": "",
+                "subject": "Can `process:background-worker-process` or its database credential modify or delete existing audit log records in `store:database`, rather than only append new records?",
+                "assertion": ""
+              },
+              {
+                "element_id": "flow:process:background-worker-process>store:database>read-write-records",
+                "attribute": "authentication",
+                "subject": "",
+                "assertion": ""
+              }
+            ],
+            "immaterial_unknowns": [],
+            "rejected_because": null
+          },
+          "category": "repudiation",
+          "severity": {
+            "likelihood": "low",
+            "impact": "medium",
+            "level": "low",
+            "justification": "Likelihood is low because exploiting alteration of audit evidence requires worker-side or database access and the relevant database-flow authentication is unknown; impact is medium because rewriting log records in `store:database` would undermine accountability for `business-critical-data` work."
+          },
+          "mitigations": [
+            {
+              "summary": "Separate audit evidence from the worker's mutable database access",
+              "detail": "Send structured security events from `process:background-worker-process` to a dedicated audit destination using a distinct append-only write principal, rather than allowing the worker's ordinary database path to write the authoritative log records."
+            },
+            {
+              "summary": "Make audit records tamper-evident and non-rewritable",
+              "detail": "Use append-only/WORM retention, retention locks, and signed or hash-linked log batches; record actor, action, target, timestamp, and outcome so a later database change cannot silently rewrite the evidence."
+            },
+            {
+              "summary": "Verify the worker-to-database authorization model",
+              "detail": "Resolve `unknown:flow:process:background-worker-process>store:database>read-write-records:authentication` and confirm that the worker cannot update or delete historical audit records."
+            }
+          ],
+          "confidence": "low",
+          "recommendation": {
+            "sound": true,
+            "note": "Separating audit storage, making records append-only and tamper-evident, and verifying that historical records cannot be changed address the identified accountability gap."
+          }
+        },
+        {
+          "id": "T-01",
+          "framework": "stride",
+          "framework_version": "1.0",
+          "title": "Unauthenticated queue writes could plant malicious jobs for the worker",
+          "description": "`store:message-queue` receives job messages through `flow:process:web-application>store:message-queue>enqueue-job` and is also read-write reachable through `flow:process:background-worker-process>store:message-queue>consume-job`. If the `authentication: unknown` values on these write paths resolve to no authenticated, authorized producer control, an attacker who reaches the backend queue interface can plant or overwrite job messages in `store:message-queue`. `process:background-worker-process` subsequently consumes those messages and performs work against `store:database`, so poisoned jobs can turn into altered application records rather than remaining confined to the queue. This is conditional on the unverified authentication attributes, not an assertion that queue authentication is absent.",
+          "affected_element_ids": [
+            "store:message-queue",
+            "flow:process:web-application>store:message-queue>enqueue-job",
+            "flow:process:background-worker-process>store:message-queue>consume-job",
+            "process:background-worker-process"
+          ],
+          "verb": "plant",
+          "grounds": [
+            {
+              "kind": "quote",
+              "text": "The web application does not do the heavy work itself. It puts jobs onto a message queue, and a background worker process picks them up and does the work.",
+              "source_label": "System description",
+              "element_id": "",
+              "attribute": "",
+              "flow_id": "",
+              "term": "",
+              "assertion": ""
+            },
+            {
+              "kind": "quote",
+              "text": "The diagram does not say anything about how the web application authenticates to the queue",
+              "source_label": "System description",
+              "element_id": "",
+              "attribute": "",
+              "flow_id": "",
+              "term": "",
+              "assertion": ""
+            },
+            {
+              "kind": "unknown-attribute",
+              "text": "",
+              "source_label": "",
+              "element_id": "flow:process:web-application>store:message-queue>enqueue-job",
+              "attribute": "authentication",
+              "flow_id": "",
+              "term": "",
+              "assertion": ""
+            },
+            {
+              "kind": "unknown-attribute",
+              "text": "",
+              "source_label": "",
+              "element_id": "flow:process:background-worker-process>store:message-queue>consume-job",
+              "attribute": "authentication",
+              "flow_id": "",
+              "term": "",
+              "assertion": ""
+            },
+            {
+              "kind": "derived-fact",
+              "text": "",
+              "source_label": "",
+              "element_id": "",
+              "attribute": "",
+              "flow_id": "flow:process:web-application>store:message-queue>enqueue-job",
+              "term": "",
+              "assertion": ""
+            }
+          ],
+          "verdict": {
+            "status": "needs-info",
+            "reason": "Unauthorized planting or overwriting of queue jobs depends on the unverified authentication controls on the queue write-capable flows.",
+            "related_unknowns": [
+              {
+                "element_id": "flow:process:web-application>store:message-queue>enqueue-job",
+                "attribute": "authentication",
+                "subject": "",
+                "assertion": ""
+              },
+              {
+                "element_id": "flow:process:background-worker-process>store:message-queue>consume-job",
+                "attribute": "authentication",
+                "subject": "",
+                "assertion": ""
+              }
+            ],
+            "immaterial_unknowns": [],
+            "rejected_because": null
+          },
+          "category": "tampering",
+          "severity": {
+            "likelihood": "low",
+            "impact": "medium",
+            "level": "low",
+            "justification": "Likelihood is low because an attacker must first reach the backend-tier queue interface and the relevant flow authentication is unknown; impact is medium because planted jobs can reach `process:background-worker-process` and its read-write path to the `business-critical-data` database."
+          },
+          "mitigations": [
+            {
+              "summary": "Authenticate and authorize every queue producer and consumer",
+              "detail": "Require distinct workload identities on both queue flows and enforce per-principal publish and consume permissions for `store:message-queue`."
+            },
+            {
+              "summary": "Validate jobs before worker execution",
+              "detail": "Have `process:background-worker-process` schema-validate, canonicalize, and authorize each job before it can cause writes to `store:database`; dead-letter malformed jobs."
+            }
+          ],
+          "confidence": "low",
+          "recommendation": {
+            "sound": true,
+            "note": "Producer and consumer authentication, queue permissions, and worker-side job validation directly address unauthorized job planting and execution."
+          }
+        },
+        {
+          "id": "T-02",
+          "framework": "stride",
+          "framework_version": "1.0",
+          "title": "Unverified database authentication could permit direct record tampering",
+          "description": "`flow:process:background-worker-process>store:database>read-write-records` is a read-write path to `store:database`, but its `authentication` is unknown. If that attribute resolves to no effective caller authentication and authorization, an attacker with backend-tier network access can use the database interface to alter application records directly, bypassing validation performed by `process:background-worker-process`. The same flow handles application log records, so direct modifications may also corrupt the records used to understand application activity; the integrity threat here is the alteration of the database's application records. This is conditional on the unverified authentication control.",
+          "affected_element_ids": [
+            "store:database",
+            "flow:process:background-worker-process>store:database>read-write-records",
+            "process:background-worker-process"
+          ],
+          "verb": "alter",
+          "grounds": [
+            {
+              "kind": "quote",
+              "text": "The background worker reads and writes the database. The database is also where we keep the application's log records.",
+              "source_label": "System description",
+              "element_id": "",
+              "attribute": "",
+              "flow_id": "",
+              "term": "",
+              "assertion": ""
+            },
+            {
+              "kind": "quote",
+              "text": "The diagram does not say anything about ... how the worker authenticates to the database",
+              "source_label": "System description",
+              "element_id": "",
+              "attribute": "",
+              "flow_id": "",
+              "term": "",
+              "assertion": ""
+            },
+            {
+              "kind": "unknown-attribute",
+              "text": "",
+              "source_label": "",
+              "element_id": "flow:process:background-worker-process>store:database>read-write-records",
+              "attribute": "authentication",
+              "flow_id": "",
+              "term": "",
+              "assertion": ""
+            }
+          ],
+          "verdict": {
+            "status": "needs-info",
+            "reason": "Direct database alteration is conditional on the unknown authentication control on the worker-to-database read-write flow.",
+            "related_unknowns": [
+              {
+                "element_id": "flow:process:background-worker-process>store:database>read-write-records",
+                "attribute": "authentication",
+                "subject": "",
+                "assertion": ""
+              }
+            ],
+            "immaterial_unknowns": [],
+            "rejected_because": null
+          },
+          "category": "tampering",
+          "severity": {
+            "likelihood": "low",
+            "impact": "medium",
+            "level": "low",
+            "justification": "Likelihood is low because exploitation requires backend-tier access as well as ineffective authentication on `flow:process:background-worker-process>store:database>read-write-records`; impact is medium because the flow can alter `business-critical-data` application records in `store:database`."
+          },
+          "mitigations": [
+            {
+              "summary": "Enforce authenticated least-privilege database access",
+              "detail": "Give `process:background-worker-process` a dedicated short-lived workload identity and restrict it to only the database operations and records required by its jobs."
+            },
+            {
+              "summary": "Protect record integrity independently of the connection",
+              "detail": "Apply server-side authorization and validation to database write operations, and use versioning or integrity checks to detect unauthorized changes to application records."
+            }
+          ],
+          "confidence": "low",
+          "recommendation": {
+            "sound": true,
+            "note": "Dedicated least-privilege database authentication, server-side authorization, validation, and integrity detection address the direct-tampering path."
+          }
+        }
+      ],
+      "rejected_claims": [
+        {
+          "id": "T-03",
+          "framework": "stride",
+          "framework_version": "1.0",
+          "title": "Offline tampering of web configuration could change queue-facing behavior",
+          "description": "`store:web-application-config` holds settings and message-queue credentials that `process:web-application` reads through `flow:process:web-application>store:web-application-config>read-configuration`; its `encryption_at_rest` is unknown. If snapshots, backup media, or storage backing this store are not integrity-protected, an attacker who obtains offline access can alter configuration or replace the queue credentials before the web application loads them. The second-order effect is altered behavior of `process:web-application` on its queue write path, `flow:process:web-application>store:message-queue>enqueue-job`, potentially causing it to enqueue attacker-directed work. This is conditional on the unverified at-rest protection and does not assert that offline tampering is presently possible.",
+          "affected_element_ids": [
+            "store:web-application-config",
+            "flow:process:web-application>store:web-application-config>read-configuration",
+            "process:web-application"
+          ],
+          "verb": "alter",
+          "grounds": [
+            {
+              "kind": "quote",
+              "text": "Both of those config stores hold the credentials the process needs — the web application's queue credentials, and the worker's database credentials.",
+              "source_label": "System description",
+              "element_id": "",
+              "attribute": "",
+              "flow_id": "",
+              "term": "",
+              "assertion": ""
+            },
+            {
+              "kind": "quote",
+              "text": "The diagram does not say anything about ... whether anything is encrypted at rest.",
+              "source_label": "System description",
+              "element_id": "",
+              "attribute": "",
+              "flow_id": "",
+              "term": "",
+              "assertion": ""
+            },
+            {
+              "kind": "unknown-attribute",
+              "text": "",
+              "source_label": "",
+              "element_id": "store:web-application-config",
+              "attribute": "encryption_at_rest",
+              "flow_id": "",
+              "term": "",
+              "assertion": ""
+            }
+          ],
+          "verdict": {
+            "status": "rejected",
+            "reason": "The draft infers that unknown `encryption_at_rest` means configuration snapshots or backing media lack integrity protection and can be modified. Encryption-at-rest does not establish or negate offline write authorization or integrity verification.",
+            "related_unknowns": [],
+            "immaterial_unknowns": [],
+            "rejected_because": "reasoning"
+          },
+          "category": "tampering",
+          "severity": {
+            "likelihood": "low",
+            "impact": "high",
+            "level": "medium",
+            "justification": "Likelihood is low and conditional because `store:web-application-config` has unknown at-rest protection and the attacker must obtain offline storage, snapshot, or backup access. Impact is high because the store holds `credentials` and `secrets`, and configuration tampering changes the behavior of the internet-facing `process:web-application` and its queue-writing path."
+          },
+          "mitigations": [
+            {
+              "summary": "Sign and verify configuration at load time",
+              "detail": "Require `process:web-application` to verify a reviewed, versioned signature for configuration before accepting settings or queue credentials from `store:web-application-config`."
+            },
+            {
+              "summary": "Protect configuration storage and backups",
+              "detail": "Use managed encryption with integrity protection for `store:web-application-config`, including snapshots and backups, and restrict modification rights to a separate configuration-publisher identity."
+            }
+          ],
+          "confidence": "low",
+          "recommendation": null
+        },
+        {
+          "id": "T-04",
+          "framework": "stride",
+          "framework_version": "1.0",
+          "title": "Offline tampering of worker configuration could alter database operations",
+          "description": "`store:worker-config` holds the settings and database credentials consumed by `process:background-worker-process` through `flow:process:background-worker-process>store:worker-config>read-configuration`, while its `encryption_at_rest` is unknown. If the worker configuration's backing media, backup, or snapshot lacks effective integrity protection, an attacker with offline access can alter settings or database credentials before the worker loads them. The altered configuration changes how `process:background-worker-process` reaches `store:database` through `flow:process:background-worker-process>store:database>read-write-records`, potentially causing malicious or unintended database writes. This is conditional on the unknown at-rest protection rather than a claim that it is absent.",
+          "affected_element_ids": [
+            "store:worker-config",
+            "flow:process:background-worker-process>store:worker-config>read-configuration",
+            "process:background-worker-process"
+          ],
+          "verb": "alter",
+          "grounds": [
+            {
+              "kind": "quote",
+              "text": "Both of those config stores hold the credentials the process needs — the web application's queue credentials, and the worker's database credentials.",
+              "source_label": "System description",
+              "element_id": "",
+              "attribute": "",
+              "flow_id": "",
+              "term": "",
+              "assertion": ""
+            },
+            {
+              "kind": "quote",
+              "text": "The diagram does not say anything about ... whether anything is encrypted at rest.",
+              "source_label": "System description",
+              "element_id": "",
+              "attribute": "",
+              "flow_id": "",
+              "term": "",
+              "assertion": ""
+            },
+            {
+              "kind": "unknown-attribute",
+              "text": "",
+              "source_label": "",
+              "element_id": "store:worker-config",
+              "attribute": "encryption_at_rest",
+              "flow_id": "",
+              "term": "",
+              "assertion": ""
+            }
+          ],
+          "verdict": {
+            "status": "rejected",
+            "reason": "The draft infers that unknown `encryption_at_rest` means worker-configuration storage, backups, or snapshots lack integrity protection and can be modified. The model states no such integrity or modification-control fact.",
+            "related_unknowns": [],
+            "immaterial_unknowns": [],
+            "rejected_because": "reasoning"
+          },
+          "category": "tampering",
+          "severity": {
+            "likelihood": "low",
+            "impact": "high",
+            "level": "medium",
+            "justification": "Likelihood is low and conditional because exploiting the unknown at-rest protection of `store:worker-config` requires offline access to its storage or backup. Impact is high: the store contains `credentials` and `secrets`, and its consumer is a `business-critical-data` worker with a read-write path to `store:database`."
+          },
+          "mitigations": [
+            {
+              "summary": "Verify signed worker configuration before use",
+              "detail": "Have `process:background-worker-process` load only versioned, reviewed configuration whose signature is verified before database settings or credentials are used."
+            },
+            {
+              "summary": "Separate configuration publishing from runtime access",
+              "detail": "Protect `store:worker-config` and its backups with managed encryption and integrity checks, and use a dedicated publisher identity that the worker runtime cannot use to modify configuration."
+            }
+          ],
+          "confidence": "low",
+          "recommendation": null
+        }
+      ],
+      "scope": [],
+      "coverage": [
+        {
+          "lane": "spoofing",
+          "drafts": 1,
+          "rules": 3,
+          "rules_fired": 2,
+          "candidates": 3,
+          "candidates_cited": 1,
+          "elements": 16,
+          "elements_cited": 6,
+          "boundary_crossings": 2,
+          "boundary_crossings_cited": 1,
+          "unknown_controls": 19,
+          "unknown_controls_cited": 1
+        },
+        {
+          "lane": "tampering",
+          "drafts": 4,
+          "rules": 2,
+          "rules_fired": 2,
+          "candidates": 4,
+          "candidates_cited": 3,
+          "elements": 16,
+          "elements_cited": 11,
+          "boundary_crossings": 2,
+          "boundary_crossings_cited": 1,
+          "unknown_controls": 19,
+          "unknown_controls_cited": 5
+        },
+        {
+          "lane": "repudiation",
+          "drafts": 1,
+          "rules": 1,
+          "rules_fired": 1,
+          "candidates": 5,
+          "candidates_cited": 1,
+          "elements": 16,
+          "elements_cited": 4,
+          "boundary_crossings": 2,
+          "boundary_crossings_cited": 0,
+          "unknown_controls": 19,
+          "unknown_controls_cited": 1
+        },
+        {
+          "lane": "information-disclosure",
+          "drafts": 4,
+          "rules": 2,
+          "rules_fired": 2,
+          "candidates": 9,
+          "candidates_cited": 8,
+          "elements": 16,
+          "elements_cited": 12,
+          "boundary_crossings": 2,
+          "boundary_crossings_cited": 1,
+          "unknown_controls": 19,
+          "unknown_controls_cited": 4
+        },
+        {
+          "lane": "denial-of-service",
+          "drafts": 1,
+          "rules": 2,
+          "rules_fired": 2,
+          "candidates": 2,
+          "candidates_cited": 2,
+          "elements": 16,
+          "elements_cited": 7,
+          "boundary_crossings": 2,
+          "boundary_crossings_cited": 2,
+          "unknown_controls": 19,
+          "unknown_controls_cited": 1
+        },
+        {
+          "lane": "elevation-of-privilege",
+          "drafts": 1,
+          "rules": 2,
+          "rules_fired": 1,
+          "candidates": 1,
+          "candidates_cited": 1,
+          "elements": 16,
+          "elements_cited": 8,
+          "boundary_crossings": 2,
+          "boundary_crossings_cited": 1,
+          "unknown_controls": 19,
+          "unknown_controls_cited": 1
+        }
+      ],
+      "unverified_grounds": [],
+      "unreconciled_rulings": [],
+      "repaired_quotes": [],
+      "unresolved_references": [
+        {
+          "claim_id": "E-01",
+          "element_id": "flow:process:web-application>store:web-application-config>read-configuration",
+          "reason": "more than one hop from every place the claim's grounds name"
+        },
+        {
+          "claim_id": "E-01",
+          "element_id": "store:web-application-config",
+          "reason": "more than one hop from every place the claim's grounds name"
+        }
+      ],
+      "unresolved_mentions": [],
+      "unresolved_evidence": [],
+      "unknown_claim_identities": [],
+      "dropped_claims": [],
+      "fired_rules": [
+        "denial-of-service-internet-exposed-process",
+        "denial-of-service-shared-dependency",
+        "elevation-of-privilege-inbound-from-exposed-process",
+        "information-disclosure-store-at-rest-unverified",
+        "information-disclosure-unprotected-sensitive-transit",
+        "repudiation-unattributable-action",
+        "spoofing-unverified-boundary-auth",
+        "spoofing-unverified-external-caller",
+        "tampering-unprotected-transit-crossing",
+        "tampering-unverified-write-to-store"
+      ],
+      "knowledge_docs": [
+        "cases/chained-benign-facts",
+        "cases/shared-credential-attribution",
+        "cases/stated-control-outside-the-model",
+        "cases/two-threats-one-flow",
+        "cases/unknown-is-not-absent",
+        "notes/attribution-and-audit",
+        "notes/callback-and-webhook-trust",
+        "notes/compromise-inheritance",
+        "notes/cost-of-an-unauthenticated-request",
+        "notes/failure-coupling",
+        "notes/identity-at-a-boundary",
+        "notes/protection-at-rest",
+        "notes/transport-protection",
+        "notes/write-path-integrity"
+      ],
+      "summary": {
+        "claim_count": 10,
+        "needs_info_count": 10,
+        "rejected_count": 2,
+        "by_category": {
+          "denial-of-service": 1,
+          "elevation-of-privilege": 1,
+          "information-disclosure": 4,
+          "spoofing": 1,
+          "repudiation": 1,
+          "tampering": 2
+        },
+        "by_severity": {
+          "high": 1,
+          "medium": 6,
+          "low": 3
+        },
+        "by_severity_confirmed": {}
+      },
+      "missing_mitigations": []
+    }
+  ]
+}
