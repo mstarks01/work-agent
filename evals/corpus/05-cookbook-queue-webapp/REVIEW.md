@@ -191,7 +191,7 @@ The narrower question, per record: **does this requirement apply to this system,
 
 > mark:
 
-## Part 3 — the 17 recorded STRIDE threats
+## Part 3 — the 18 recorded STRIDE threats
 
 Only after your own list exists.
 
@@ -360,6 +360,17 @@ on either of them. That is the finding this sitting exists for.
 
 > mark:
 
+
+### repudiation
+
+**18.** An attacker holding the worker's database access alters existing log records, if the worker's permissions extend to modifying them, and the record of what was done no longer shows it.
+
+- `process:background-worker-process`, `store:database`, `flow:process:background-worker-process>store:database>read-write-records`
+- severity: low/medium · verb: `alter`
+- Drafted from Baseline 6bff717-gpt-5.6-terra-24dda4db draft R-01, ruled a relevant threat scenario by the maintainer on 2026-09-20 (audit QA-2026-09-20-01). Conditional. The worker writes to the database that holds the application's log records; where its permissions include modifying existing rows, rewriting evidence enables repudiation just as deletion does. It is a distinct mechanism from reference 6, which it does not satisfy.
+
+> mark:
+
 ---
 
 ## What was on your list and not on either of theirs
@@ -407,7 +418,7 @@ your missing list, your notes and a digest of each file you read:
       "source.md": "20b0aa82c922766db2353cade33f7a26b38c60a3c7061244ef4686b7a647778b",
       "model.json": "bf3cfe67eb9ecbc49237bb6cf388bf664e1de8b54b444c8c004cdf87de5fdc46",
       "claims/asvs.json": "9e4ee6be326673ba2101ed60662718b0d50ecaf6aba7218bcec702c785b033c5",
-      "claims/stride.json": "eb2f6e6330b22dbf3f6151e8d93290df9b401f89a1171f146c17f0b27bab572e"
+      "claims/stride.json": "c224282bee1392b7f6fc0ad7307cea0e4d48db91ddea45bd17769bae4e378450"
       }
     }
   }

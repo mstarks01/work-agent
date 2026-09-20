@@ -75,6 +75,73 @@ UNSEPARATED: dict[str, str] = {
         " question rather than one this test can settle -- and until it is"
         " settled, a vote on either answers for both."
     ),
+    "01-payments-checkout | tampering |"
+    " process:order-service, process:storefront-api": (
+        "Modifying an order in flight on the gRPC channel and submitting a"
+        " fabricated one over it are `alter-in-transit` and `inject`. The first"
+        " needs an on-path position and transport protection answers it; the"
+        " second needs only reach, and authentication answers it. The verb"
+        " separates them."
+    ),
+    "05-cookbook-queue-webapp | repudiation |"
+    " process:background-worker-process, store:database": (
+        "Erasing the log records and rewriting them are `delete` and `alter`."
+        " Both destroy the account of what was done, but a retention control"
+        " answers the first and an append-only one answers the second. The verb"
+        " separates them."
+    ),
+    "07-cicd-store-deploy | information-disclosure |"
+    " process:build-runner, process:deploy-controller": (
+        "Reading the shared token out of the runner's configuration and"
+        " observing it on the link to the controller are `recover-credential`"
+        " and `intercept`. Configuration access answers the first and transport"
+        " protection answers the second. The verb separates them."
+    ),
+    "08-sso-identity-broker | spoofing |"
+    " entity:franchise-identity-provider, process:identity-broker": (
+        "Vouching for someone who is not a franchise colleague and asserting an"
+        " identity outside the franchise's permitted scope are `impersonate`"
+        " and `forge`. The first is an unrecorded membership and the second is"
+        " an unconstrained scope, so a roster answers one and a scope check"
+        " answers the other. The verb separates them."
+    ),
+    "10-cookbook-generic-cms | spoofing | entity:admin, store:mysql-database": (
+        "Connecting with the admin's credentials from anywhere and reaching an"
+        " administration interface that authenticates nobody are"
+        " `use-credential` and `impersonate`. Network position answers the"
+        " first and authentication answers the second. The verb separates them."
+    ),
+    "12-overclaiming-supplier-portal | spoofing |"
+    " entity:supplier, process:supplier-portal": (
+        "Signing in with a vendor-issued password and signing in with a"
+        " password obtained elsewhere are `use-credential` and"
+        " `guess-credential`. Both are conditional on a password alone"
+        " admitting the caller, which the source does not state either way, and"
+        " the second is the maintainer's 2026-09-20 ruling with the draft's"
+        " overclaim corrected. The verb separates them."
+    ),
+    "12-overclaiming-supplier-portal | tampering |"
+    " entity:portal-vendor, store:landing-bucket": (
+        "Altering the nightly extract on the path of the push and writing a"
+        " poisoned one into the bucket the importer reads are"
+        " `alter-in-transit` and `plant`. Transport protection answers the"
+        " first and bucket write authorization answers the second. The verb"
+        " separates them."
+    ),
+    "12-overclaiming-supplier-portal | elevation-of-privilege |"
+    " entity:supplier, process:supplier-portal": (
+        "Reaching another supplier's documents through the portal and operating"
+        " on them are `abuse-grant` and `escalate`. Per-tenant authorization"
+        " answers the first and an ownership check on the document answers the"
+        " second. The verb separates them."
+    ),
+    "13-dispatch-control-plane | tampering |"
+    " process:dispatch-api, process:dispatch-console": (
+        "Altering a dispatch request on its way into the control plane and"
+        " submitting a crafted one are `alter-in-transit` and `inject`."
+        " Transport protection answers the first and write authorization"
+        " answers the second. The verb separates them."
+    ),
     "01-payments-checkout | spoofing | entity:shopper, process:storefront-api": (
         "Replaying a stolen session cookie and signing in with a password taken"
         " from a breach elsewhere are `replay` and `guess-credential` against"
