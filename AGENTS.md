@@ -97,6 +97,28 @@ is a claim about OpenAI's catalogue. Drive the real dependency where CI can
 (`test_identity.py` drives the installed translator), and where it cannot,
 record the measurement beside the code rather than asserting it in prose.
 
+### Quality audits
+
+"Run a quality audit" invokes `.claude/skills/quality-audit/`. It diagnoses what
+is hurting report quality, attributes each loss to one of six phases, prices a
+fix before anybody pays for a run, and records the result.
+
+Two of its rules are code rather than prose, in `evals/harness/audit.py`. The
+**phase table** says which phase owns each graph node, and
+`tests/test_evals_audit.py` compares it against the graph's own names, so a node
+added tomorrow lands in exactly one phase or fails. The **experiment ledger**
+under `evals/experiments/` is append-only, one JSONL file per audit, with a
+closed outcome vocabulary a row outside raises against.
+
+**Read the ledger before proposing a fix.** `run.py experiments --signature`
+returns what an earlier audit already tested, and says whether the tree has
+moved under it. A refuted row that still reads `current` is an answer, not a
+starting point. Record every experiment, including the ones that lost: a
+refuted row is what stops the next audit paying for the same answer.
+
+The default audit is offline and its budget is zero. A paid run needs the
+user's explicit permission every time.
+
 ### Price a fix before a run
 
 A sweep costs money and sees nothing under the run-to-run spread. Before any
