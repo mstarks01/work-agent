@@ -259,7 +259,7 @@ The narrower question, per record: **does this requirement apply to this system,
 
 > mark:
 
-## Part 3 — the 23 recorded STRIDE threats
+## Part 3 — the 24 recorded STRIDE threats
 
 Only after your own list exists.
 
@@ -476,6 +476,17 @@ on either of them. That is the finding this sitting exists for.
 
 > mark:
 
+
+### spoofing
+
+**24.** An abused franchise identity provider vouches for an identity outside its permitted scope, if the broker does not constrain which identities a franchise may assert.
+
+- `entity:franchise-identity-provider`, `process:identity-broker`, `flow:entity:franchise-identity-provider>process:identity-broker>vouch-for-colleague`
+- severity: low/medium · verb: `forge`
+- Drafted from Baseline 6bff717-gpt-5.6-terra-24dda4db draft S-03, ruled a relevant threat scenario by the maintainer on 2026-09-20 (audit QA-2026-09-20-01). Conditional. The broker accepts franchise assertions and the permitted identity scope is undocumented, so an abused provider could assert an unauthorized identity where the broker fails to constrain that scope. It is a distinct mechanism from reference 1, which it does not satisfy.
+
+> mark:
+
 ---
 
 ## What was on your list and not on either of theirs
@@ -523,7 +534,7 @@ your missing list, your notes and a digest of each file you read:
       "source.md": "36115502847aa04640666b0dd9f458881e6f7f8968e4d499b58983b3403dc721",
       "model.json": "963ee0bee098fc3d83caa04610b2967c3a61ccc650e7fbd18b47b6b756354163",
       "claims/asvs.json": "5fbdf49a4d299d911b4597850d39d5ac6a8ddfb751fc2de23a668c6001cb171a",
-      "claims/stride.json": "e7d9ea199f055777363e62b00eaf13504355343e6ce84bb5230556fb1ab77cfa"
+      "claims/stride.json": "1d5751da4f5f5504de7c79564d986d2ea0d1a391cf638608cf277259eca3874a"
       }
     }
   }

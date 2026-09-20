@@ -90,8 +90,8 @@ MEASURED = {
 #: merge that survives the verb the coarser side cites no flow.
 DIRECTION = {
     # Over the corpus, what a claim yields without a new field.
-    "claims": 244,
-    "one_flow_cited": 155,
+    "claims": 254,
+    "one_flow_cited": 165,
     "several_flows_cited": 3,
     "no_flow_cited": 86,
     # Over the 3 reference merges the shipped rule makes.
@@ -128,10 +128,10 @@ FRONTIER = {
         "candidate_merges": 3,
         "reference_merges": 3,
     },
-    "endpoint equality": {"splits": 60, "candidate_merges": 36, "reference_merges": 7},
-    "subset": {"splits": 42, "candidate_merges": 64, "reference_merges": 8},
-    "endpoint subset": {"splits": 14, "candidate_merges": 81, "reference_merges": 24},
-    "overlap": {"splits": 4, "candidate_merges": 83, "reference_merges": 35},
+    "endpoint equality": {"splits": 60, "candidate_merges": 36, "reference_merges": 18},
+    "subset": {"splits": 42, "candidate_merges": 64, "reference_merges": 19},
+    "endpoint subset": {"splits": 14, "candidate_merges": 81, "reference_merges": 35},
+    "overlap": {"splits": 4, "candidate_merges": 83, "reference_merges": 50},
     # 99 before the reference corrections of #925. Case 02's calibration pair
     # about disabling the Pub/Sub topic named the gateway-to-normalizer flow,
     # because the broker was not an element to name; it now names
@@ -141,7 +141,7 @@ FRONTIER = {
     "endpoint overlap": {
         "splits": 1,
         "candidate_merges": 98,
-        "reference_merges": 129,
+        "reference_merges": 152,
     },
 }
 
@@ -407,8 +407,8 @@ class TestAClaimThatNamesNoPlaceMatchesNothing:
 #: is what survives the verb. The gap between them is what the verb buys.
 VERB_MEASURED = {
     "cases": 13,
-    "within_lane_pairs": 291,
-    "subset": 24,
+    "within_lane_pairs": 324,
+    "subset": 35,
     "subset_verb": 3,
 }
 
