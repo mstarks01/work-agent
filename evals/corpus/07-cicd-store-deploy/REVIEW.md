@@ -142,7 +142,7 @@ category.
 
 ---
 
-## Part 2 — the 24 recorded STRIDE threats
+## Part 2 — the 25 recorded STRIDE threats
 
 Only after your own list exists.
 
@@ -367,6 +367,17 @@ on either of them. That is the finding this sitting exists for.
 
 > mark:
 
+
+### information-disclosure
+
+**25.** An attacker who can observe the runner-to-controller link reads the shared build token from it, if the transport protection on that link is inadequate.
+
+- `flow:process:build-runner>process:deploy-controller>set-current-release`, `process:build-runner`, `process:deploy-controller`
+- severity: medium/high · verb: `intercept`
+- Drafted from Baseline 6bff717-gpt-5.6-terra-24dda4db draft I-01, ruled a relevant threat scenario by the maintainer on 2026-09-20 (audit QA-2026-09-20-01). Conditional. The shared token travels on that connection, so interception is a valid disclosure mechanism where transport protection is inadequate and the attacker can observe the link. It is a distinct mechanism from reference 13, which it does not satisfy.
+
+> mark:
+
 ---
 
 ## What was on your list and not on either of theirs
@@ -413,7 +424,7 @@ your missing list, your notes and a digest of each file you read:
       "opened_digests": {
       "source.md": "1bfb96ef3374b697ef78e76661daa3d2b227792a3b20d2d1ee1d526cde02652c",
       "model.json": "25e0fe698e23ea38d98c8cd7e80dcef804cea2e27a8e4c09b4c5f65fc1785291",
-      "claims/stride.json": "418d496873e962611c9b2187a1c7193dbca22348b556136d3c721e84bf0c43d8"
+      "claims/stride.json": "fb365a853668bdfe53b73b90e1729b9901765ae2bc51550f950b1c46b8f3d509"
       }
     }
   }

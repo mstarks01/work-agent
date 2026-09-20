@@ -221,7 +221,7 @@ The narrower question, per record: **does this requirement apply to this system,
 
 > mark:
 
-## Part 3 — the 15 recorded STRIDE threats
+## Part 3 — the 18 recorded STRIDE threats
 
 Only after your own list exists.
 
@@ -374,6 +374,39 @@ on either of them. That is the finding this sitting exists for.
 
 > mark:
 
+
+### spoofing
+
+**16.** An attacker who obtains a supplier's password submits documents as that supplier, if a password alone is sufficient to sign in; the portal states no additional factor either way.
+
+- `entity:supplier`, `process:supplier-portal`, `flow:entity:supplier>process:supplier-portal>upload-documents`
+- severity: high/medium · verb: `guess-credential`
+- Drafted from Baseline 6bff717-gpt-5.6-terra-24dda4db draft S-01, ruled a relevant threat scenario by the maintainer on 2026-09-20 (audit QA-2026-09-20-01). Conditional, and the wording is the maintainer's correction to the draft. Compromising supplier authentication enables fraudulent submissions, but the draft treated a username-and-password sign-in as proof that a password alone suffices, where additional factors and controls are unspecified. The dependency is stated conditionally here. See #719. It is a distinct mechanism from reference 0, which it does not satisfy.
+
+> mark:
+
+
+### tampering
+
+**17.** An unauthorized writer to the landing bucket plants a nightly extract that the master service then imports, corrupting supplier records at ingestion.
+
+- `flow:entity:portal-vendor>store:landing-bucket>push-nightly-extract`, `store:landing-bucket`
+- severity: medium/high · verb: `plant`
+- Drafted from Baseline 6bff717-gpt-5.6-terra-24dda4db draft T-01, ruled a relevant threat scenario by the maintainer on 2026-09-20 (audit QA-2026-09-20-01). Conditional. This is ingestion poisoning rather than in-transit modification: the attacker writes the object the importer reads, and never touches the vendor's connection. It is a distinct mechanism from reference 4, which it does not satisfy.
+
+> mark:
+
+
+### elevation-of-privilege
+
+**18.** A signed-in supplier operates on another supplier's documents, if the portal does not check document ownership against the caller.
+
+- `entity:supplier`, `flow:entity:supplier>process:supplier-portal>upload-documents`, `process:supplier-portal`
+- severity: medium/high · verb: `escalate`
+- Drafted from Baseline 6bff717-gpt-5.6-terra-24dda4db draft E-01, ruled a relevant threat scenario by the maintainer on 2026-09-20 (audit QA-2026-09-20-01). Conditional. Suppliers and their documents exist, so missing ownership checks could let one supplier act on another's paperwork. Document-ID substitution is a plausible mechanism to investigate rather than an established implementation detail. It is a distinct mechanism from reference 13, which it does not satisfy.
+
+> mark:
+
 ---
 
 ## What was on your list and not on either of theirs
@@ -421,7 +454,7 @@ your missing list, your notes and a digest of each file you read:
       "source.md": "3542d5a0939da730951ce8c09de7a18d1bbc74d5e972180acacba73bfd168d41",
       "model.json": "dcfd28bad38f897c03648d173c9cfd9454673988d6d13e3cd11abed53723c036",
       "claims/asvs.json": "5e505c3078704dfc0dc35288158f3090ce00160f7e39286f66f7cd8a2e7cd48c",
-      "claims/stride.json": "559fffbbdd6787424ca09a29fc43ef22e382ac426716e7136b9c1b633b3204dd"
+      "claims/stride.json": "f4dfd0eacd8a25321b971a260d0383e2bccca020e8f5ebffd7f75ec310f5327a"
       }
     }
   }

@@ -192,7 +192,7 @@ The narrower question, per record: **does this requirement apply to this system,
 
 > mark:
 
-## Part 3 — the 17 recorded STRIDE threats
+## Part 3 — the 18 recorded STRIDE threats
 
 Only after your own list exists.
 
@@ -361,6 +361,17 @@ on either of them. That is the finding this sitting exists for.
 
 > mark:
 
+
+### spoofing
+
+**18.** An attacker who reaches the direct MySQL administration interface acts as the database administrator without holding a credential, if that interface authenticates nobody.
+
+- `entity:admin`, `store:mysql-database`, `flow:entity:admin>store:mysql-database>direct-administration`
+- severity: medium/high · verb: `impersonate`
+- Drafted from Baseline 6bff717-gpt-5.6-terra-24dda4db draft S-03, ruled a relevant threat scenario by the maintainer on 2026-09-20 (audit QA-2026-09-20-01). Conditional. Direct MySQL administration exists and its authentication is unspecified, so missing authentication could permit administrative impersonation without stealing a credential. Lacking a unique identity alone would not establish unauthorized access. It is a distinct mechanism from reference 0, which it does not satisfy.
+
+> mark:
+
 ---
 
 ## What was on your list and not on either of theirs
@@ -408,7 +419,7 @@ your missing list, your notes and a digest of each file you read:
       "source.md": "11d2a58f0e1d5773054f0a72d222b3cc96f889cdd0206dd3656495a3d5fe8313",
       "model.json": "b65455924d2682e8d7ffd3f60cc9c5a29d7b5ff3335fbba4e5ad9ade51c1c5d0",
       "claims/asvs.json": "38c218796733dcb8a7704c88a23fb0896007a20be9f562109349be94034a33ad",
-      "claims/stride.json": "5811c028e97a3d75d21a7c16d2c42f50979792c74876c0ea76ee599fc8526d4b"
+      "claims/stride.json": "a555f7fd3bdf07b115345e7eb475c335aaa7a202d1e368f261287b617c0e6c82"
       }
     }
   }

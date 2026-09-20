@@ -210,7 +210,7 @@ The narrower question, per record: **does this requirement apply to this system,
 
 > mark:
 
-## Part 3 — the 19 recorded STRIDE threats
+## Part 3 — the 21 recorded STRIDE threats
 
 Only after your own list exists.
 
@@ -395,6 +395,28 @@ on either of them. That is the finding this sitting exists for.
 
 > mark:
 
+
+### tampering
+
+**20.** An attacker on the corporate network submits crafted crew-move or depot-work requests to the dispatch API, if the API does not authenticate and authorize writes.
+
+- `flow:process:dispatch-console>process:dispatch-api>dispatch-requests`, `process:dispatch-console`, `process:dispatch-api`
+- severity: medium/high · verb: `inject`
+- Drafted from Baseline 6bff717-gpt-5.6-terra-24dda4db draft T-01, ruled a relevant threat scenario by the maintainer on 2026-09-20 (audit QA-2026-09-20-01). Conditional. An unknown CORS configuration alone does not establish this; what it rests on is the API failing to authenticate and authorize the write. It is a distinct mechanism from reference 5, which it does not satisfy.
+
+> mark:
+
+
+### elevation-of-privilege
+
+**21.** An attacker with corporate-network access to the dispatch console acquires dispatch authority, if the control plane does not authorize what the console asks of it.
+
+- `process:dispatch-console`, `flow:process:dispatch-console>process:dispatch-api>dispatch-requests`, `process:dispatch-api`
+- severity: medium/high · verb: `escalate`
+- Drafted from Baseline 6bff717-gpt-5.6-terra-24dda4db draft E-01, ruled a relevant threat scenario by the maintainer on 2026-09-20 (audit QA-2026-09-20-01). Conditional. The source separates corporate access from dispatch authority, so missing API authorization could cross that privilege boundary without riding an existing session. It is a distinct mechanism from reference 17, which it does not satisfy.
+
+> mark:
+
 ---
 
 ## What was on your list and not on either of theirs
@@ -442,7 +464,7 @@ your missing list, your notes and a digest of each file you read:
       "source.md": "7e370ab58f5a0138f9dd36d41cb6d3ef2b88e15594ab7995a9eb1488b157fec7",
       "model.json": "b31bc54f80f1e972ebf62c0b2c380109a67034c38cc9c15f655d36992bea9b98",
       "claims/asvs.json": "e2a9c33f73e15df69bd2a4645afa0bb6070692516af24a275100775832359970",
-      "claims/stride.json": "a7800ca4d14d10a99c563c7b7b2cc997115548223bdf3f4faf23a741df19b991"
+      "claims/stride.json": "6fcb31494e1d471618a83bd034e6f0c49af0d7f6230f42790a5784aef918a07d"
       }
     }
   }

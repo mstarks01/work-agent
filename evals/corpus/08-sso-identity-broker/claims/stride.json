@@ -335,5 +335,21 @@
     },
     "notes": "The one crossing in this model where trust is granted to a party rather than to a network position, which is the shape this case exists to grade.",
     "verb": "escalate"
+  },
+  {
+    "category": "spoofing",
+    "affected_element_ids": [
+      "entity:franchise-identity-provider",
+      "process:identity-broker",
+      "flow:entity:franchise-identity-provider>process:identity-broker>vouch-for-colleague"
+    ],
+    "claim": "An abused franchise identity provider vouches for an identity outside its permitted scope, if the broker does not constrain which identities a franchise may assert.",
+    "tier": "expected",
+    "severity": {
+      "likelihood": "low",
+      "impact": "medium"
+    },
+    "notes": "Drafted from Baseline 6bff717-gpt-5.6-terra-24dda4db draft S-03, ruled a relevant threat scenario by the maintainer on 2026-09-20 (audit QA-2026-09-20-01). Conditional. The broker accepts franchise assertions and the permitted identity scope is undocumented, so an abused provider could assert an unauthorized identity where the broker fails to constrain that scope. It is a distinct mechanism from reference 1, which it does not satisfy.",
+    "verb": "forge"
   }
 ]

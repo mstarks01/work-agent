@@ -247,5 +247,21 @@
     },
     "notes": "Where the two crossings compound: write access in a zone the site does not control becomes execution inside the site's origin, and neither crossing on its own carries that.",
     "verb": "plant"
+  },
+  {
+    "category": "spoofing",
+    "affected_element_ids": [
+      "entity:admin",
+      "store:mysql-database",
+      "flow:entity:admin>store:mysql-database>direct-administration"
+    ],
+    "claim": "An attacker who reaches the direct MySQL administration interface acts as the database administrator without holding a credential, if that interface authenticates nobody.",
+    "tier": "expected",
+    "severity": {
+      "likelihood": "medium",
+      "impact": "high"
+    },
+    "notes": "Drafted from Baseline 6bff717-gpt-5.6-terra-24dda4db draft S-03, ruled a relevant threat scenario by the maintainer on 2026-09-20 (audit QA-2026-09-20-01). Conditional. Direct MySQL administration exists and its authentication is unspecified, so missing authentication could permit administrative impersonation without stealing a credential. Lacking a unique identity alone would not establish unauthorized access. It is a distinct mechanism from reference 0, which it does not satisfy.",
+    "verb": "impersonate"
   }
 ]

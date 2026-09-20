@@ -323,5 +323,21 @@
     },
     "notes": "Credential stuffing on a password-only sign-in with no MFA. A second finding beside the cookie replay, because the actions differ: a reused password obtains a session, a stolen cookie reuses one already issued. MFA is the countermeasure here and not there.",
     "verb": "guess-credential"
+  },
+  {
+    "category": "tampering",
+    "affected_element_ids": [
+      "flow:process:storefront-api>process:order-service>submit-order",
+      "process:order-service",
+      "process:storefront-api"
+    ],
+    "claim": "Any workload that can reach the order service submits fabricated orders over the unauthenticated gRPC channel, without altering anything in transit.",
+    "tier": "expected",
+    "severity": {
+      "likelihood": "medium",
+      "impact": "high"
+    },
+    "notes": "Drafted from Baseline 6bff717-gpt-5.6-terra-24dda4db draft T-02, ruled a relevant threat scenario by the maintainer on 2026-09-20 (audit QA-2026-09-20-01). The order service explicitly accepts unauthenticated gRPC calls from anything that reaches it, so fabricating an order is valid tampering that needs no on-path position. It is a distinct mechanism from reference 4, which it does not satisfy.",
+    "verb": "inject"
   }
 ]
