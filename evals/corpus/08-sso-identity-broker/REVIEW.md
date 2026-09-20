@@ -228,7 +228,7 @@ The narrower question, per record: **does this requirement apply to this system,
 **A9.** `V12.2.1` — Colleagues sign in from their own devices at home and no flow states its transport.
 
 - `entity:colleague`, `process:identity-broker`, `flow:entity:colleague>process:identity-broker>sign-in`
-- The broker is stated to be reachable from outside and its transport is stated nowhere. Applicability comes from what the broker presents, not from this silence — see ADR 0014.
+- The broker is stated to be reachable from outside and its transport is stated nowhere. Applicability comes from what the broker presents, not from this silence — see ADR 0014. The submitter can state what protects this link, and in this corpus they do: case 05 states transport absent on every internal link and that reference reads gap-from-prose. A property a description settles when it is written down is settled by a description when it is not, so the primary route is prose and the configuration is the alternate.
 
 > mark:
 
@@ -522,7 +522,7 @@ your missing list, your notes and a digest of each file you read:
       "opened_digests": {
       "source.md": "36115502847aa04640666b0dd9f458881e6f7f8968e4d499b58983b3403dc721",
       "model.json": "963ee0bee098fc3d83caa04610b2967c3a61ccc650e7fbd18b47b6b756354163",
-      "claims/asvs.json": "80d8f95844658dbd83985ff1c9ecd70a675f6dc5861fafe499164b82287a5e9a",
+      "claims/asvs.json": "5fbdf49a4d299d911b4597850d39d5ac6a8ddfb751fc2de23a668c6001cb171a",
       "claims/stride.json": "e7d9ea199f055777363e62b00eaf13504355343e6ce84bb5230556fb1ab77cfa"
       }
     }

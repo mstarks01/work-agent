@@ -190,7 +190,7 @@ The narrower question, per record: **does this requirement apply to this system,
 **A7.** `V12.2.1` — Colleagues reach the web app from their own phones and the source says nobody documented whether any of it is encrypted.
 
 - `entity:colleague`, `process:scheduling-web-app`, `flow:entity:colleague>process:scheduling-web-app>view-shifts`
-- The case that made #219 concrete: the app is stated to be a web app and its transport is stated to be unrecorded. The requirement applies for the first fact and is unsettled by the second.
+- The case that made #219 concrete: the app is stated to be a web app and its transport is stated to be unrecorded. The requirement applies for the first fact and is unsettled by the second. The submitter can state what protects this link, and in this corpus they do: case 05 states transport absent on every internal link and that reference reads gap-from-prose. A property a description settles when it is written down is settled by a description when it is not, so the primary route is prose and the configuration is the alternate.
 
 > mark:
 
@@ -411,7 +411,7 @@ your missing list, your notes and a digest of each file you read:
       "opened_digests": {
       "source.md": "2507fd3081003c1c94427ef81dcea36f6ca92f5358c965789b49ec4af89b6a60",
       "model.json": "252800813f3b60ff0937689d594ee0d29879b84595259d16ef4cd8f64e1e72f1",
-      "claims/asvs.json": "47f787e3c526f8ddc7da2eac4d1739f3685c9b9e926a2bd66c72c26b9d997700",
+      "claims/asvs.json": "320bf0d16aba7d873f9b2e77a5db19f7cab07403b5dc19c85adc70a718a67783",
       "claims/stride.json": "68c933a86331d8f0e25efa504ba54b19ba65dfd6d8fe5cc7e972548ea06d09a8"
       }
     }
