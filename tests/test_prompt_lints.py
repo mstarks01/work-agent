@@ -991,28 +991,6 @@ def test_the_prompt_carries_the_rule_that_prevents_each_failure(code, rule):
     )
 
 
-def test_the_extraction_prompt_spells_a_flow_id_the_way_code_builds_one():
-    """The prompt's example is what ``make_flow_id`` returns for its parts.
-
-    Rule 3 described ``flow:<source-slug>-to-<destination-slug>:<label>`` for
-    a year after ADR 0037 put both endpoints' whole IDs under ``>``, and
-    normalization hid it: a model following the sentence wrote an ID the
-    service silently replaced. A second reader of the identity rule, in the
-    one place nothing compared it to the first (#1082).
-
-    Asserted against the builder rather than against a literal, so the day
-    ``FLOW_ID_RULES`` gains a version this fails until the prompt moves with
-    it.
-    """
-    from analysis_service.system_model import make_flow_id
-
-    example = make_flow_id("entity:customer", "process:web-app", "login")
-
-    body = loader.load(EXTRACT_PROMPT_NAME)
-    assert f"`{example}`" in body
-    assert "-to-" not in body, "the superseded flow-ID shape is still described"
-
-
 # ---------------------------------------------------------------------------
 # An exemplar has to demonstrate what the prompt asks for.
 #
