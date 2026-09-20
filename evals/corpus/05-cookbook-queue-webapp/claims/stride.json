@@ -249,5 +249,21 @@
     },
     "notes": "Job content is attacker-influenceable via the queue, so worker execution is a realistic starting point.",
     "verb": "abuse-grant"
+  },
+  {
+    "category": "repudiation",
+    "affected_element_ids": [
+      "process:background-worker-process",
+      "store:database",
+      "flow:process:background-worker-process>store:database>read-write-records"
+    ],
+    "claim": "An attacker holding the worker's database access alters existing log records, if the worker's permissions extend to modifying them, and the record of what was done no longer shows it.",
+    "tier": "expected",
+    "severity": {
+      "likelihood": "low",
+      "impact": "medium"
+    },
+    "notes": "Drafted from Baseline 6bff717-gpt-5.6-terra-24dda4db draft R-01, ruled a relevant threat scenario by the maintainer on 2026-09-20 (audit QA-2026-09-20-01). Conditional. The worker writes to the database that holds the application's log records; where its permissions include modifying existing rows, rewriting evidence enables repudiation just as deletion does. It is a distinct mechanism from reference 6, which it does not satisfy.",
+    "verb": "alter"
   }
 ]
