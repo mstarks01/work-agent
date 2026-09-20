@@ -69,7 +69,11 @@ UNREVIEWED: dict[str, str] = {
         "#989 flow identity migration then moved every flow ID in model.json "
         "and in both claim files, which is a digest change and nothing more: "
         "the same five interactions between the same endpoints under the same "
-        "labels, spelled with the endpoints' types. A sitting over the current "
+        "labels, spelled with the endpoints' types. The #1082 ruling then moved "
+        "one ASVS disposition in claims/asvs.json: V12.3.3's transport question "
+        "routes to needs-more-prose, with needs-config kept as an alternate "
+        "route, so the record accepts strictly more than it did and no earlier "
+        "answer to it became wrong. A sitting over the current "
         "four files clears it."
     ),
     "02-iot-fleet-telemetry": (
