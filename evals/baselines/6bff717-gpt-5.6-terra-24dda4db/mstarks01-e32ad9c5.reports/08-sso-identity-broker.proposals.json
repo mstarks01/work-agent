@@ -1,0 +1,684 @@
+{
+  "stride": {
+    "spoofing": {
+      "claims": [
+        {
+          "title": "Unverified colleague sign-in could let an attacker obtain a colleague identity",
+          "description": "`flow:entity:colleague>process:identity-broker>sign-in` crosses into `process:identity-broker` with `authentication: unknown`. If the broker does not verify the colleague through a sufficiently strong sign-in mechanism, an attacker originating from the outside-corporate-network zone could impersonate `entity:colleague` to the broker and receive a signed token carrying that colleague's staff ID and groups. The source-zone placement for `entity:colleague` is inferred, but the flow is a decided crossing. Second-order, the token is accepted by relying applications; in particular, a token with the store-manager group is used by `process:store-admin-console` to change prices and void transactions. This is conditional on the undocumented authentication attribute, not an assertion that no sign-in control exists.",
+          "affected_element_ids": [
+            "entity:colleague",
+            "process:identity-broker",
+            "flow:entity:colleague>process:identity-broker>sign-in"
+          ],
+          "verb": "impersonate",
+          "evidence_refs": [
+            "crossing:flow:entity:colleague>process:identity-broker>sign-in",
+            "unknown:flow:entity:colleague>process:identity-broker>sign-in:authentication"
+          ],
+          "quotes": [
+            {
+              "text": "Once the broker has signed a colleague in it issues them a token. The token carries the colleague's staff id and a list of the groups they are in. Every application takes that token and decides what the colleague may do from the groups in it.",
+              "source_label": "System description"
+            },
+            {
+              "text": "If the token has the store-manager group in it, the console lets the holder change prices and void transactions.",
+              "source_label": "System description"
+            }
+          ],
+          "absent_elements": [],
+          "sequence": 1,
+          "severity": {
+            "likelihood": "medium",
+            "impact": "high",
+            "level": "high",
+            "justification": "Likelihood is medium and conditional because `flow:entity:colleague>process:identity-broker>sign-in` is a crossing from the outside-corporate-network zone but its `authentication` is explicitly unknown. Impact is high because a successful impersonation obtains a broker-issued identity token accepted by `process:store-admin-console`, which can change prices and void transactions involving `financial` and `business-critical-data` assets."
+          },
+          "mitigations": [
+            {
+              "summary": "Make colleague authentication explicit and phishing-resistant",
+              "detail": "Document and enforce the verification mechanism on `flow:entity:colleague>process:identity-broker>sign-in`; require phishing-resistant WebAuthn/passkeys for broker sign-in before issuing tokens."
+            },
+            {
+              "summary": "Constrain token use at relying applications",
+              "detail": "Have relying applications validate issuer, audience, expiry, and intended application claims for broker-issued tokens, rather than treating a token alone as sufficient across all applications."
+            }
+          ]
+        },
+        {
+          "title": "A stolen live token can be used as a colleague at the store admin console",
+          "description": "An attacker who obtains a still-valid colleague token can present it on `flow:entity:colleague>process:store-admin-console>change-prices-and-void` and act as `entity:colleague` at `process:store-admin-console`, because the console accepts the token alone and does not call back to the broker for current authorization. Tokens remain valid for twelve hours and cannot be withdrawn before expiry, extending the window in which the attacker can use the credential. Second-order, the impersonated session can change prices and void transactions; a store-manager token works against every store, increasing the financial and operational blast radius. The likelihood is conditional on the unverified in-transit protection of this externally originating flow; the model does not establish how a token would be obtained.",
+          "affected_element_ids": [
+            "entity:colleague",
+            "process:store-admin-console",
+            "flow:entity:colleague>process:store-admin-console>change-prices-and-void"
+          ],
+          "verb": "use-credential",
+          "evidence_refs": [
+            "crossing:flow:entity:colleague>process:store-admin-console>change-prices-and-void",
+            "unknown:flow:entity:colleague>process:store-admin-console>change-prices-and-void:encryption_in_transit"
+          ],
+          "quotes": [
+            {
+              "text": "Every application takes that token and decides what the colleague may do from the groups in it. Nothing calls back to the broker to ask whether a colleague is still allowed in.",
+              "source_label": "System description"
+            },
+            {
+              "text": "The console does not check which store the colleague belongs to, so a store-manager token works against every store.",
+              "source_label": "System description"
+            },
+            {
+              "text": "Tokens are good for twelve hours and there is no way to pull one back before it expires.",
+              "source_label": "System description"
+            }
+          ],
+          "absent_elements": [],
+          "sequence": 2,
+          "severity": {
+            "likelihood": "medium",
+            "impact": "high",
+            "level": "high",
+            "justification": "Likelihood is medium: the attacker must first obtain a valid token, but `flow:entity:colleague>process:store-admin-console>change-prices-and-void` crosses from outside the corporate network and its transport protection is unknown, while a captured token remains usable for twelve hours. Impact is high because `process:store-admin-console` permits price changes and transaction voids and is tagged `financial` and `business-critical-data`."
+          },
+          "mitigations": [
+            {
+              "summary": "Use short-lived, sender-constrained access tokens",
+              "detail": "Replace token-only acceptance on `flow:entity:colleague>process:store-admin-console>change-prices-and-void` with short-lived audience-bound tokens constrained to the presenting client using DPoP or mTLS where feasible."
+            },
+            {
+              "summary": "Add revocation and fresh authorization checks",
+              "detail": "Reduce token lifetime and have `process:store-admin-console` check current identity and store assignment with `process:identity-broker` for sensitive price changes and transaction voids."
+            },
+            {
+              "summary": "Establish protected token transport",
+              "detail": "Specify and enforce TLS with certificate validation for `flow:entity:colleague>process:store-admin-console>change-prices-and-void` so token exposure in transit is not left unverified."
+            }
+          ]
+        },
+        {
+          "title": "An overbroad franchise assertion could forge an unauthorized broker sign-in",
+          "description": "`flow:entity:franchise-identity-provider>process:identity-broker>vouch-for-colleague` crosses from the franchise-partner tenant boundary into `process:identity-broker`, which accepts the provider's assertion as a sign-in. The permitted population that `entity:franchise-identity-provider` may vouch for is not documented. If the broker does not enforce an issuer-and-subject allowlist or tenant-scoped identity mapping, an attacker controlling or abusing the franchise provider could forge an assertion for an unauthorized person and have the broker authenticate that person as a franchise colleague. Second-order, the broker issues tokens that relying applications use to determine what the asserted identity may do. This is conditional on the undocumented assertion-scope enforcement, rather than a claim that the franchise provider is compromised or that the broker currently accepts arbitrary assertions.",
+          "affected_element_ids": [
+            "entity:franchise-identity-provider",
+            "process:identity-broker",
+            "flow:entity:franchise-identity-provider>process:identity-broker>vouch-for-colleague"
+          ],
+          "verb": "forge",
+          "evidence_refs": [
+            "crossing:flow:entity:franchise-identity-provider>process:identity-broker>vouch-for-colleague"
+          ],
+          "quotes": [
+            {
+              "text": "Franchise colleagues do not have staff accounts with us; their own identity provider vouches for them and the broker takes that as a sign-in. We have not written down which colleagues that provider is allowed to vouch for.",
+              "source_label": "System description"
+            }
+          ],
+          "absent_elements": [],
+          "sequence": 3,
+          "severity": {
+            "likelihood": "medium",
+            "impact": "medium",
+            "level": "medium",
+            "justification": "Likelihood is medium and conditional on the unrecorded subject-scope enforcement: exploiting it requires control or abuse of the separate `entity:franchise-identity-provider`, but its assertions cross the `boundary:franchise-partner` tenant boundary and are accepted by `process:identity-broker` as sign-ins. Impact is medium because the broker turns the assertion into an identity token used by relying applications, although the model does not establish which groups or application privileges franchise identities receive."
+          },
+          "mitigations": [
+            {
+              "summary": "Enforce a tenant-scoped federation policy",
+              "detail": "Configure `process:identity-broker` to accept assertions from `entity:franchise-identity-provider` only for an explicit issuer, approved subject namespace, and franchise-specific tenant claim."
+            },
+            {
+              "summary": "Validate federation assertions completely",
+              "detail": "Verify assertion signature, issuer, audience, expiry, nonce or replay protection, and subject-to-franchise mapping before treating `flow:entity:franchise-identity-provider>process:identity-broker>vouch-for-colleague` as a sign-in."
+            },
+            {
+              "summary": "Limit downstream token authority",
+              "detail": "Issue franchise identities tokens with distinct audience and group claims, and require relying applications to enforce those claims rather than accepting franchise identities as equivalent to corporate colleagues."
+            }
+          ]
+        }
+      ],
+      "invalid": []
+    },
+    "tampering": {
+      "claims": [
+        {
+          "title": "Store-manager token can alter prices and voids at every store",
+          "description": "A colleague who legitimately holds a store-manager token can use `flow:entity:colleague>process:store-admin-console>change-prices-and-void` to alter prices or void transactions at stores beyond their own, because `process:store-admin-console` authorizes solely from the token group and does not enforce store membership. This is an integrity loss at `process:store-admin-console`: a token issued for one store becomes authority over financial and business-critical records across every store. The flow is also a boundary crossing from colleagues outside the corporate network, although the source-zone placement is assumed.",
+          "affected_element_ids": [
+            "entity:colleague",
+            "flow:entity:colleague>process:store-admin-console>change-prices-and-void",
+            "process:store-admin-console"
+          ],
+          "verb": "abuse-grant",
+          "evidence_refs": [
+            "crossing:flow:entity:colleague>process:store-admin-console>change-prices-and-void"
+          ],
+          "quotes": [
+            {
+              "text": "If the token has the store-manager group in it, the console lets the holder change prices and void transactions. The console does not check which store the colleague belongs to, so a store-manager token works against every store.",
+              "source_label": "System description"
+            }
+          ],
+          "absent_elements": [],
+          "sequence": 1,
+          "severity": {
+            "likelihood": "medium",
+            "impact": "high",
+            "level": "high",
+            "justification": "Likelihood is medium because exploitation requires a valid store-manager token, but any holder can attempt it through `flow:entity:colleague>process:store-admin-console>change-prices-and-void`, which crosses from the outside-corporate-network zone. Impact is high because the stated authorization permits alteration of prices and transaction voids at every store, and `process:store-admin-console` is tagged `financial` and `business-critical-data`."
+          },
+          "mitigations": [
+            {
+              "summary": "Enforce store-scoped authorization at the console",
+              "detail": "Have `process:store-admin-console` compare the store targeted by each price change or void with an authoritative store assignment for the token subject, and deny cross-store requests by default."
+            },
+            {
+              "summary": "Issue store-scoped grants",
+              "detail": "Include an immutable store or tenant scope in tokens issued by `process:identity-broker`, and make `process:store-admin-console` verify that scope rather than treating the store-manager group as global authority."
+            }
+          ]
+        },
+        {
+          "title": "Unverified directory write path could allow forged group membership",
+          "description": "`flow:process:identity-broker>store:directory>read-write-directory` has `authentication: unknown` despite writing colleague records and group memberships to `store:directory`. If that unknown resolves to absent or ineffective caller authentication, an attacker with access to the directory endpoint can alter group memberships through this write path, including assigning a privileged group to a chosen colleague. Second-order, `process:identity-broker` reads the directory during sign-in and issues tokens carrying the group list; `process:store-admin-console` then uses the group to authorize price changes and transaction voids. This is conditional on the unverified authentication attribute, not an assertion that directory-write authentication is absent.",
+          "affected_element_ids": [
+            "flow:process:identity-broker>store:directory>read-write-directory",
+            "store:directory",
+            "process:identity-broker"
+          ],
+          "verb": "alter",
+          "evidence_refs": [
+            "unknown:flow:process:identity-broker>store:directory>read-write-directory:authentication"
+          ],
+          "quotes": [
+            {
+              "text": "The broker keeps the colleagues and the groups they are in its own directory. Group membership is not maintained there by hand \u2014 it comes from the HR system overnight.",
+              "source_label": "System description"
+            },
+            {
+              "text": "The token carries the colleague's staff id and a list of the groups they are in. Every application takes that token and decides what the colleague may do from the groups in it.",
+              "source_label": "System description"
+            }
+          ],
+          "absent_elements": [],
+          "sequence": 2,
+          "severity": {
+            "likelihood": "low",
+            "impact": "high",
+            "level": "medium",
+            "justification": "Likelihood is low and conditional because authentication on the internal `flow:process:identity-broker>store:directory>read-write-directory` is unverified and an attacker would still need access to that corporate-network write surface. Impact is high because altered group data is issued in broker tokens and governs access at `process:store-admin-console`, which can change `financial` and `business-critical-data`."
+          },
+          "mitigations": [
+            {
+              "summary": "Authenticate and authorize directory writes",
+              "detail": "Require a distinct workload identity for `process:identity-broker` on `flow:process:identity-broker>store:directory>read-write-directory`, deny all other writers by default, and restrict that identity to the required directory operations."
+            },
+            {
+              "summary": "Protect privileged-group changes",
+              "detail": "Require reviewed, versioned group-membership updates and alert on additions to groups that authorize high-impact actions, so unauthorized directory modifications are detected before tokens are issued."
+            },
+            {
+              "summary": "Revalidate authorization for sensitive console actions",
+              "detail": "Have `process:store-admin-console` obtain current, store-scoped authorization for price changes and voids rather than relying only on a group list embedded in a twelve-hour token."
+            }
+          ]
+        }
+      ],
+      "invalid": []
+    },
+    "repudiation": {
+      "claims": [
+        {
+          "title": "Store managers may deny price changes and transaction voids because no audit trail for console actions is established",
+          "description": "A colleague holding a store-manager token can change prices and void transactions through `flow:entity:colleague>process:store-admin-console>change-prices-and-void` at `process:store-admin-console`, including against stores other than their own. The described audit path is `flow:process:identity-broker>store:audit-log>write-sign-ins`, which records broker sign-ins; no audit flow or record content for these high-value console writes is established. A manager who makes a disputed price change or void can therefore deny it if the undocumented logging does not record the verified staff identity, action, target store, timestamp, and outcome. This is conditional on the unestablished console audit trail, not an assertion that it is absent. Second-order, unresolved disputes affect financial and business-critical actions across every store reachable by a store-manager token.",
+          "affected_element_ids": [
+            "entity:colleague",
+            "process:store-admin-console",
+            "flow:entity:colleague>process:store-admin-console>change-prices-and-void"
+          ],
+          "verb": "unattributable",
+          "evidence_refs": [
+            "crossing:flow:entity:colleague>process:store-admin-console>change-prices-and-void"
+          ],
+          "quotes": [
+            {
+              "text": "If the token has the store-manager group in it, the console\nlets the holder change prices and void transactions. The console does not check\nwhich store the colleague belongs to, so a store-manager token works against\nevery store.",
+              "source_label": "System description"
+            },
+            {
+              "text": "The broker writes sign-ins to an audit log. Nobody has written down what that\nlog records, whether it covers the franchise route",
+              "source_label": "System description"
+            }
+          ],
+          "absent_elements": [],
+          "sequence": 1,
+          "severity": {
+            "likelihood": "medium",
+            "impact": "high",
+            "level": "high",
+            "justification": "Likelihood is medium: a colleague must possess a store-manager token, but `crossing:flow:entity:colleague>process:store-admin-console>change-prices-and-void` permits use from outside the corporate network and the audit coverage of the console action is unestablished. Impact is high: `process:store-admin-console` handles `financial` and `business-critical-data` actions, and the described token works against every store."
+          },
+          "mitigations": [
+            {
+              "summary": "Create attributable audit records for every console write",
+              "detail": "Have `process:store-admin-console` emit structured, append-only audit events for price changes and transaction voids, including the verified token subject, group, target store, before/after values, timestamp, request identifier, and outcome, to a dedicated audit flow."
+            },
+            {
+              "summary": "Preserve independent evidence of privileged actions",
+              "detail": "Store console audit events with retention protection and integrity chaining under a separate audit-write principal, so a disputed action can be investigated without relying on mutable application state."
+            }
+          ]
+        },
+        {
+          "title": "Franchise sign-ins may be deniable because audit-log coverage of the federation route is unknown",
+          "description": "`entity:franchise-identity-provider` crosses from the franchise-partner boundary to `process:identity-broker` over `flow:entity:franchise-identity-provider>process:identity-broker>vouch-for-colleague`, where its assertion is accepted as a sign-in. The source explicitly leaves unknown whether `store:audit-log` covers that route and what sign-in records contain. If the log does not retain the asserting provider, asserted franchise identity, assertion identifier or signed assertion evidence, the franchise provider can dispute having vouched for a particular colleague and the operator cannot rebut the denial. The accountability gap begins at the broker and can extend to applications that accept the resulting broker-issued token. This draft is conditional on the stated unknown audit coverage; it does not assert that franchise sign-ins are unlogged.",
+          "affected_element_ids": [
+            "entity:franchise-identity-provider",
+            "process:identity-broker",
+            "store:audit-log",
+            "flow:entity:franchise-identity-provider>process:identity-broker>vouch-for-colleague"
+          ],
+          "verb": "unattributable",
+          "evidence_refs": [
+            "crossing:flow:entity:franchise-identity-provider>process:identity-broker>vouch-for-colleague"
+          ],
+          "quotes": [
+            {
+              "text": "Franchise colleagues do not have staff\naccounts with us; their own identity provider vouches for them and the broker\ntakes that as a sign-in.",
+              "source_label": "System description"
+            },
+            {
+              "text": "Nobody has written down what that\nlog records, whether it covers the franchise route",
+              "source_label": "System description"
+            }
+          ],
+          "absent_elements": [],
+          "sequence": 2,
+          "severity": {
+            "likelihood": "medium",
+            "impact": "medium",
+            "level": "medium",
+            "justification": "Likelihood is medium and conditional: federation assertions enter `process:identity-broker` across `crossing:flow:entity:franchise-identity-provider>process:identity-broker>vouch-for-colleague`, while audit coverage of that route is explicitly unestablished. Impact is medium: the broker holds `credentials` and `secrets` and issues tokens accepted by applications, but the stated harm is loss of evidence for disputed federated sign-ins rather than direct compromise of those assets."
+          },
+          "mitigations": [
+            {
+              "summary": "Record durable evidence for federated sign-ins",
+              "detail": "For `flow:entity:franchise-identity-provider>process:identity-broker>vouch-for-colleague`, record the verified issuer, asserted subject, assertion ID, authentication context, timestamp, validation outcome, and a protected hash or retained copy of the signed assertion in `store:audit-log`."
+            },
+            {
+              "summary": "Verify and document audit coverage of the franchise route",
+              "detail": "Establish whether `store:audit-log` receives federation events and whether its records preserve the provider and original subject; make coverage of successful and failed franchise assertions an explicit broker audit requirement."
+            }
+          ]
+        }
+      ],
+      "invalid": []
+    },
+    "information-disclosure": {
+      "claims": [
+        {
+          "title": "Unverified transport can expose colleague credentials and bearer tokens during sign-in",
+          "description": "If `encryption_in_transit` remains absent on `flow:entity:colleague>process:identity-broker>sign-in`, an on-path attacker between a colleague's home or other external device and `process:identity-broker` can intercept sign-in credentials and the returned twelve-hour token containing the staff ID and group list. The flow crosses into the corporate network; possession of the token then enables second-order access to relying applications such as `process:store-admin-console`, which accepts the token without calling back to the broker.",
+          "affected_element_ids": [
+            "flow:entity:colleague>process:identity-broker>sign-in",
+            "entity:colleague",
+            "process:identity-broker"
+          ],
+          "verb": "intercept",
+          "evidence_refs": [
+            "unknown:flow:entity:colleague>process:identity-broker>sign-in:encryption_in_transit",
+            "crossing:flow:entity:colleague>process:identity-broker>sign-in"
+          ],
+          "quotes": [
+            {
+              "text": "Colleagues sign in to it from wherever they are, including their own devices at home.",
+              "source_label": "System description"
+            },
+            {
+              "text": "The token carries the colleague's staff id and a list of the groups they are in.",
+              "source_label": "System description"
+            }
+          ],
+          "absent_elements": [],
+          "sequence": 1,
+          "severity": {
+            "likelihood": "medium",
+            "impact": "high",
+            "level": "high",
+            "justification": "Likelihood is medium and conditional on the unknown transport control: the flow crosses from `boundary:outside-corporate-network` and an attacker must obtain an on-path position. Impact is high because the flow carries colleague credentials and a reusable token whose group list is accepted by `process:store-admin-console` for financially significant actions."
+          },
+          "mitigations": [
+            {
+              "summary": "Require protected transport for broker sign-in",
+              "detail": "Set `encryption_in_transit` on `flow:entity:colleague>process:identity-broker>sign-in` to TLS 1.2+ and validate the broker certificate; use sender-constrained tokens where feasible so a captured token cannot be replayed from another client."
+            },
+            {
+              "summary": "Reduce bearer-token exposure duration",
+              "detail": "Shorten token lifetime and support revocation or token introspection for high-risk relying applications, limiting the value of a token captured before transport protection is verified."
+            }
+          ]
+        },
+        {
+          "title": "Unverified transport can expose tokens used to administer every store",
+          "description": "If `encryption_in_transit` is not enabled on `flow:entity:colleague>process:store-admin-console>change-prices-and-void`, an observer on the external-to-corporate path can intercept the token that the console uses as the sole authentication artifact, together with price-change and void activity. A captured store-manager token reaches `process:store-admin-console` and works against every store because the console does not check the colleague's store, turning a confidentiality loss into second-order unauthorized financial operations.",
+          "affected_element_ids": [
+            "flow:entity:colleague>process:store-admin-console>change-prices-and-void",
+            "entity:colleague",
+            "process:store-admin-console"
+          ],
+          "verb": "intercept",
+          "evidence_refs": [
+            "unknown:flow:entity:colleague>process:store-admin-console>change-prices-and-void:encryption_in_transit",
+            "crossing:flow:entity:colleague>process:store-admin-console>change-prices-and-void"
+          ],
+          "quotes": [
+            {
+              "text": "If the token has the store-manager group in it, the console lets the holder change prices and void transactions.",
+              "source_label": "System description"
+            },
+            {
+              "text": "The console does not check which store the colleague belongs to, so a store-manager token works against every store.",
+              "source_label": "System description"
+            }
+          ],
+          "absent_elements": [],
+          "sequence": 2,
+          "severity": {
+            "likelihood": "medium",
+            "impact": "high",
+            "level": "high",
+            "justification": "Likelihood is medium and conditional on the unknown transport control: the crossed path starts outside the corporate network, but interception still requires an on-path position. Impact is high because the intercepted bearer token can be used at `process:store-admin-console` to act across every store and the flow concerns `financial` and `business-critical-data`."
+          },
+          "mitigations": [
+            {
+              "summary": "Encrypt and authenticate the console session path",
+              "detail": "Require TLS 1.2+ for `flow:entity:colleague>process:store-admin-console>change-prices-and-void`, with strict certificate validation and secure-cookie settings for any browser session."
+            },
+            {
+              "summary": "Bind authorization to the colleague's store",
+              "detail": "Have `process:store-admin-console` enforce store membership server-side for each price or void request, reducing the reach of any credential disclosed elsewhere."
+            }
+          ]
+        },
+        {
+          "title": "Unverified HR pull transport can disclose colleague memberships and leaver status",
+          "description": "`flow:process:identity-broker>entity:hr-system>nightly-group-pull` transfers group-membership changes and leaver records while `encryption_in_transit` is unknown. If transport protection is absent, an attacker able to observe this corporate-to-HR path can intercept colleague PII and membership data. The derived crossing depends on the assumed placement of `entity:hr-system` outside the corporate network; this is therefore conditional both on that routing and on the unverified transport control. The membership data also helps an attacker identify privileged groups and target the corresponding sign-in and token paths at `process:identity-broker`.",
+          "affected_element_ids": [
+            "flow:process:identity-broker>entity:hr-system>nightly-group-pull",
+            "process:identity-broker",
+            "entity:hr-system"
+          ],
+          "verb": "intercept",
+          "evidence_refs": [
+            "unknown:flow:process:identity-broker>entity:hr-system>nightly-group-pull:encryption_in_transit",
+            "crossing:flow:process:identity-broker>entity:hr-system>nightly-group-pull"
+          ],
+          "quotes": [
+            {
+              "text": "The broker pulls the changes once a night, and that is also how leavers stop being colleagues.",
+              "source_label": "System description"
+            }
+          ],
+          "absent_elements": [],
+          "sequence": 3,
+          "severity": {
+            "likelihood": "medium",
+            "impact": "medium",
+            "level": "medium",
+            "justification": "Likelihood is medium and conditional on the unknown transport state and the derived corporate-to-HR crossing: an attacker needs access to that path, but no encryption control is verified. Impact is medium because the flow carries colleague PII, group memberships, and leaver information that exposes workforce and authorization relationships."
+          },
+          "mitigations": [
+            {
+              "summary": "Protect the HR synchronization channel",
+              "detail": "Require mutually authenticated TLS for `flow:process:identity-broker>entity:hr-system>nightly-group-pull` and verify the HR endpoint identity before transferring membership records."
+            },
+            {
+              "summary": "Minimize replicated HR data",
+              "detail": "Transfer only the group and lifecycle fields needed by `process:identity-broker`, and avoid retaining detailed pull payloads in diagnostics or telemetry."
+            }
+          ]
+        },
+        {
+          "title": "The token-signing key may be readable in transit inside the corporate network",
+          "description": "`flow:process:identity-broker>store:key-store>read-signing-key` carries the signing key used by `process:identity-broker`, but its `encryption_in_transit` attribute is unknown. If this internal hop is unencrypted, an attacker with a corporate-network foothold on the path can intercept and recover the signing key. The key signs tokens for every application, so disclosure enables second-order token forgery and access attempts against all relying applications, including `process:store-admin-console`. This is conditional on the unverified transport attribute; it does not assert that the key is presently sent in cleartext.",
+          "affected_element_ids": [
+            "flow:process:identity-broker>store:key-store>read-signing-key",
+            "process:identity-broker",
+            "store:key-store"
+          ],
+          "verb": "intercept",
+          "evidence_refs": [
+            "unknown:flow:process:identity-broker>store:key-store>read-signing-key:encryption_in_transit"
+          ],
+          "quotes": [
+            {
+              "text": "The same key signs the tokens for every application.",
+              "source_label": "System description"
+            }
+          ],
+          "absent_elements": [],
+          "sequence": 4,
+          "severity": {
+            "likelihood": "low",
+            "impact": "high",
+            "level": "medium",
+            "justification": "Likelihood is low and conditional on the unknown transport control because exploitation requires a foothold on the internal corporate-network hop. Impact is high because `store:key-store` holds `secrets` and one recovered signing key affects tokens issued for every application."
+          },
+          "mitigations": [
+            {
+              "summary": "Use mutually authenticated encryption for key retrieval",
+              "detail": "Configure `flow:process:identity-broker>store:key-store>read-signing-key` for mTLS and ensure the key-store protocol never returns private key material over an unprotected channel."
+            },
+            {
+              "summary": "Keep private key use within the key store",
+              "detail": "Use a KMS or HSM signing operation so `process:identity-broker` submits data to sign rather than retrieving the token-signing private key."
+            }
+          ]
+        },
+        {
+          "title": "An unencrypted key-store copy would expose the signing key for every application",
+          "description": "`store:key-store` holds the single signing key used by `process:identity-broker`, while its `encryption_at_rest` value is unknown. If that attribute resolves to storage without encryption, an attacker who obtains a disk, snapshot, backup, or decommissioned operational copy can read and recover the private signing key without using the broker's normal access path. The recovered key enables second-order forgery of tokens trusted by every application, including `process:store-admin-console`. This is conditional on the unknown at-rest control and does not claim that encryption is absent.",
+          "affected_element_ids": [
+            "store:key-store",
+            "process:identity-broker",
+            "flow:process:identity-broker>store:key-store>read-signing-key"
+          ],
+          "verb": "recover-credential",
+          "evidence_refs": [
+            "unknown:store:key-store:encryption_at_rest"
+          ],
+          "quotes": [
+            {
+              "text": "The broker signs tokens with a signing key it keeps in a key store.",
+              "source_label": "System description"
+            },
+            {
+              "text": "The same key signs the tokens for every application.",
+              "source_label": "System description"
+            }
+          ],
+          "absent_elements": [],
+          "sequence": 5,
+          "severity": {
+            "likelihood": "medium",
+            "impact": "high",
+            "level": "high",
+            "justification": "Likelihood is medium and conditional on the unknown `encryption_at_rest` value: acquiring an operational storage copy is a prerequisite, but an unencrypted copy can be read without broker authentication. Impact is high because `store:key-store` is tagged `secrets` and its single key signs tokens accepted by every relying application."
+          },
+          "mitigations": [
+            {
+              "summary": "Encrypt the key store and all operational copies",
+              "detail": "Establish and record encryption at rest for `store:key-store`, using KMS- or HSM-held keys and applying the same protection to backups, snapshots, replicas, and decommissioned media."
+            },
+            {
+              "summary": "Restrict key export",
+              "detail": "Use non-exportable signing keys and tightly scoped key-use permissions so a storage-layer reader cannot recover reusable private-key material."
+            }
+          ]
+        },
+        {
+          "title": "A raw directory copy may disclose the workforce's identities and group memberships",
+          "description": "`store:directory` contains colleague records and group memberships, but its `encryption_at_rest` attribute is unknown. If the store is not encrypted at rest, a storage-layer attacker who obtains a snapshot, backup, disk, or decommissioned copy can read the directory without authenticating through `process:identity-broker`. The resulting PII and group data reveals who holds privileged roles and can be used second-order to target the broker's sign-in route or high-value group members. This is conditional on the unverified at-rest control, not an assertion that `store:directory` is unencrypted.",
+          "affected_element_ids": [
+            "store:directory",
+            "process:identity-broker",
+            "flow:process:identity-broker>store:directory>read-write-directory"
+          ],
+          "verb": "read",
+          "evidence_refs": [
+            "unknown:store:directory:encryption_at_rest"
+          ],
+          "quotes": [
+            {
+              "text": "The broker keeps the colleagues and the groups they are in its own directory.",
+              "source_label": "System description"
+            },
+            {
+              "text": "Nobody has written down what that log records, whether it covers the franchise route, or whether the directory or the log are encrypted where they sit.",
+              "source_label": "System description"
+            }
+          ],
+          "absent_elements": [],
+          "sequence": 6,
+          "severity": {
+            "likelihood": "medium",
+            "impact": "medium",
+            "level": "medium",
+            "justification": "Likelihood is medium and conditional on the unknown `encryption_at_rest` value: storage-copy access is required, but no stated control protects such copies. Impact is medium because `store:directory` holds `pii` and group memberships for the colleague population, exposing both personal data and authorization relationships."
+          },
+          "mitigations": [
+            {
+              "summary": "Verify and enforce directory encryption at rest",
+              "detail": "Establish whether `store:directory` is encrypted at rest, then require managed-key encryption for the primary store and every backup, snapshot, replica, and decommissioned copy."
+            },
+            {
+              "summary": "Constrain storage-copy access",
+              "detail": "Restrict snapshot, backup, and export privileges to dedicated principals and audit all reads or exports of directory operational copies."
+            }
+          ]
+        }
+      ],
+      "invalid": []
+    },
+    "denial-of-service": {
+      "claims": [
+        {
+          "title": "Flooding the shared identity broker can deny sign-in services",
+          "description": "An attacker starting outside `boundary:corporate-network` can repeatedly drive `flow:entity:colleague>process:identity-broker>sign-in` toward `process:identity-broker`. The flow crosses into the corporate network and its `authentication` is unknown; if unauthenticated or insufficiently metered sign-in attempts reach the broker, each attempt can consume broker processing, token-signing work, and its reads and writes to the directory, key store, and audit log. The attacker pays only to submit requests while the shared broker performs the more expensive identity work. Second-order, `process:identity-broker` is also the sign-in authority for franchise assertions and supplies the public signing key to `process:store-admin-console`; saturation can therefore prevent new colleague and franchise sign-ins and impair applications that need to obtain verification keys. This is conditional on the unverified authentication and load-control posture of the external sign-in path, not an assertion that those controls are absent.",
+          "affected_element_ids": [
+            "process:identity-broker",
+            "flow:entity:colleague>process:identity-broker>sign-in"
+          ],
+          "verb": "flood",
+          "evidence_refs": [
+            "crossing:flow:entity:colleague>process:identity-broker>sign-in",
+            "unknown:flow:entity:colleague>process:identity-broker>sign-in:authentication"
+          ],
+          "quotes": [
+            {
+              "text": "Everything colleagues use signs them in through one identity broker.",
+              "source_label": "System description"
+            }
+          ],
+          "absent_elements": [],
+          "sequence": 1,
+          "severity": {
+            "likelihood": "medium",
+            "impact": "medium",
+            "level": "medium",
+            "justification": "Likelihood is medium and conditional: `flow:entity:colleague>process:identity-broker>sign-in` crosses from `boundary:outside-corporate-network`, while its `authentication` is unknown, so an external attacker may be able to submit enough requests without a stated prerequisite or metering control. Impact is medium because the shared `process:identity-broker` signs colleagues in and supplies identity material to applications, denying new access across the modeled sign-in paths, but the model states issued tokens remain valid for twelve hours and does not establish a permanent outage or data loss."
+          },
+          "mitigations": [
+            {
+              "summary": "Apply pre-authentication abuse controls to the broker sign-in path",
+              "detail": "Place hard per-source and per-account request-rate, concurrent-request, and request-size limits on `flow:entity:colleague>process:identity-broker>sign-in`; reject or challenge excess attempts before token issuance, directory access, key access, or audit-log writes."
+            },
+            {
+              "summary": "Bound dependency work and preserve service under overload",
+              "detail": "Give `process:identity-broker` bounded queues, short timeouts, and load shedding for directory, key-store, and audit-log calls so external bursts cannot consume all broker workers; define caching and graceful degradation for public-key retrieval by `process:store-admin-console`."
+            }
+          ]
+        }
+      ],
+      "invalid": []
+    },
+    "elevation-of-privilege": {
+      "claims": [
+        {
+          "title": "Any store manager can administer every store",
+          "description": "An authenticated colleague holding a legitimate store-manager token can act through `flow:entity:colleague>process:store-admin-console>change-prices-and-void` against `process:store-admin-console` to change prices or void transactions for stores beyond the colleague's own assignment. The console uses the group claim but does not bind the requested store to the verified colleague, so this is horizontal authorization escalation by a real store manager rather than impersonation. The authority reaches price and transaction operations across every store, affecting the `financial` and `business-critical-data` assets handled by the console.",
+          "affected_element_ids": [
+            "entity:colleague",
+            "flow:entity:colleague>process:store-admin-console>change-prices-and-void",
+            "process:store-admin-console"
+          ],
+          "verb": "abuse-grant",
+          "evidence_refs": [
+            "crossing:flow:entity:colleague>process:store-admin-console>change-prices-and-void"
+          ],
+          "quotes": [
+            {
+              "text": "The console does not check which store the colleague belongs to, so a store-manager token works against every store.",
+              "source_label": "System description"
+            }
+          ],
+          "absent_elements": [],
+          "sequence": 1,
+          "severity": {
+            "likelihood": "medium",
+            "impact": "high",
+            "level": "high",
+            "justification": "Likelihood is medium: `crossing:flow:entity:colleague>process:store-admin-console>change-prices-and-void` exposes the console to colleagues outside `boundary:corporate-network`, but exploitation requires a legitimate store-manager token. Impact is high because the flow performs price changes and transaction voids against any store and carries `financial` and `business-critical-data` assets."
+          },
+          "mitigations": [
+            {
+              "summary": "Enforce store-scoped authorization at the console",
+              "detail": "Have `process:store-admin-console` derive the colleague's permitted store scope from the verified token subject or a trusted server-side entitlement source, and deny price changes and voids whose target store is outside that scope."
+            },
+            {
+              "summary": "Use resource-level authorization for every administrative operation",
+              "detail": "Apply a centralized, deny-by-default authorization check to each price-change and transaction-void request rather than treating membership in the store-manager group as authority over all stores."
+            }
+          ]
+        },
+        {
+          "title": "Franchise federation may grant corporate access beyond its approved population",
+          "description": "`entity:franchise-identity-provider` is a separate party in the tenant boundary `boundary:franchise-partner`, and its assertions enter `process:identity-broker` over `flow:entity:franchise-identity-provider>process:identity-broker>vouch-for-colleague`. The broker accepts those assertions as sign-ins, but the model does not state which colleagues the provider is authorized to vouch for. If the broker does not enforce an allowlist or equivalent per-assertion authorization policy, a franchise party can use its federation grant to obtain broker-issued access for identities outside the approved franchise population. Those issued tokens are accepted by applications including `process:store-admin-console`, so the resulting authority extends beyond the broker boundary into corporate applications. This is conditional on the unstated authorization scope, not an assertion that assertion validation is absent.",
+          "affected_element_ids": [
+            "entity:franchise-identity-provider",
+            "flow:entity:franchise-identity-provider>process:identity-broker>vouch-for-colleague",
+            "process:identity-broker"
+          ],
+          "verb": "abuse-grant",
+          "evidence_refs": [
+            "crossing:flow:entity:franchise-identity-provider>process:identity-broker>vouch-for-colleague"
+          ],
+          "quotes": [
+            {
+              "text": "their own identity provider vouches for them and the broker takes that as a sign-in. We have not written down which colleagues that provider is allowed to vouch for.",
+              "source_label": "System description"
+            }
+          ],
+          "absent_elements": [],
+          "sequence": 2,
+          "severity": {
+            "likelihood": "medium",
+            "impact": "medium",
+            "level": "medium",
+            "justification": "Likelihood is medium and conditional on the undocumented authorization scope: the assertion crosses from `boundary:franchise-partner` into `boundary:corporate-network`, but exploitation requires control of or misuse by the franchise identity provider. Impact is medium because `process:identity-broker` issues tokens accepted by corporate applications, including `process:store-admin-console`, which handles `financial` and `business-critical-data` operations."
+          },
+          "mitigations": [
+            {
+              "summary": "Constrain federation to explicitly authorized franchise identities",
+              "detail": "Make `process:identity-broker` validate issuer, audience, and assertion subject, then enforce an allowlist or managed mapping of franchise identities to the exact corporate applications and groups they may receive."
+            },
+            {
+              "summary": "Issue minimally scoped federation tokens",
+              "detail": "Give franchise-originated sessions distinct, short-lived claims that cannot receive corporate administrative groups unless an explicit corporate authorization decision permits them."
+            }
+          ]
+        }
+      ],
+      "invalid": []
+    }
+  }
+}

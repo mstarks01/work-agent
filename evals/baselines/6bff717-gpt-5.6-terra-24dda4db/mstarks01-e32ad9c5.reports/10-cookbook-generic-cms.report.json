@@ -1,0 +1,1752 @@
+{
+  "schema_version": "3.0",
+  "disclaimer": "AI-generated security analysis. Not reviewed by a human security analyst.",
+  "job": {
+    "id": "eval-10-cookbook-generic-cms",
+    "status": "completed",
+    "created_at": "2026-09-20T18:50:53.046633Z",
+    "completed_at": "2026-09-20T18:50:53.046633Z",
+    "revise_rounds": 0,
+    "frameworks": [
+      {
+        "name": "stride",
+        "options": {}
+      }
+    ]
+  },
+  "input": {
+    "system_name": "Content site with a CDN-served asset path and direct admin database access",
+    "sources": [
+      {
+        "kind": "description",
+        "label": "System description",
+        "sha256": "11d2a58f0e1d5773054f0a72d222b3cc96f889cdd0206dd3656495a3d5fe8313"
+      }
+    ],
+    "source_sha256": "ebad6dfc9e9594bbe3aed68cffbddce0236ec91e2a02fd196810da4681cff060"
+  },
+  "nodes": [
+    {
+      "node": "prepare",
+      "model": null,
+      "requested_model": null,
+      "instruction_sha256": null,
+      "execution_fingerprint": null,
+      "duration_ms": 4,
+      "usage": null,
+      "attempts": 1,
+      "reported_charge_usd": null,
+      "served_upstream": null,
+      "served_trust": null
+    },
+    {
+      "node": "analyze_stride_elevation_of_privilege",
+      "model": "openrouter/openai/gpt-5.6-terra",
+      "requested_model": "openrouter/openai/gpt-5.6-terra",
+      "instruction_sha256": "ea3fb48de6420011ff54cfba38cd1ba317f69d85fd250c2743e6385e6047fcf5",
+      "execution_fingerprint": "26d18056229c59b96bf14e32468736d55d03db8b188dede1d59629074fc0c27f",
+      "duration_ms": 17159,
+      "usage": {
+        "prompt_tokens": 18151,
+        "cached_prompt_tokens": 0,
+        "completion_tokens": 1301,
+        "reasoning_tokens": 781,
+        "total_tokens": 19452
+      },
+      "attempts": 1,
+      "reported_charge_usd": 0.060988,
+      "served_upstream": "OpenAI",
+      "served_trust": "requested_echo"
+    },
+    {
+      "node": "analyze_stride_repudiation",
+      "model": "openrouter/openai/gpt-5.6-terra",
+      "requested_model": "openrouter/openai/gpt-5.6-terra",
+      "instruction_sha256": "ea3fb48de6420011ff54cfba38cd1ba317f69d85fd250c2743e6385e6047fcf5",
+      "execution_fingerprint": "26d18056229c59b96bf14e32468736d55d03db8b188dede1d59629074fc0c27f",
+      "duration_ms": 21366,
+      "usage": {
+        "prompt_tokens": 18370,
+        "cached_prompt_tokens": 0,
+        "completion_tokens": 1751,
+        "reasoning_tokens": 1183,
+        "total_tokens": 20121
+      },
+      "attempts": 1,
+      "reported_charge_usd": 0.0669355,
+      "served_upstream": "OpenAI",
+      "served_trust": "requested_echo"
+    },
+    {
+      "node": "analyze_stride_denial_of_service",
+      "model": "openrouter/openai/gpt-5.6-terra",
+      "requested_model": "openrouter/openai/gpt-5.6-terra",
+      "instruction_sha256": "ea3fb48de6420011ff54cfba38cd1ba317f69d85fd250c2743e6385e6047fcf5",
+      "execution_fingerprint": "26d18056229c59b96bf14e32468736d55d03db8b188dede1d59629074fc0c27f",
+      "duration_ms": 21922,
+      "usage": {
+        "prompt_tokens": 18321,
+        "cached_prompt_tokens": 0,
+        "completion_tokens": 1686,
+        "reasoning_tokens": 1034,
+        "total_tokens": 20007
+      },
+      "attempts": 1,
+      "reported_charge_usd": 0.066033,
+      "served_upstream": "OpenAI",
+      "served_trust": "requested_echo"
+    },
+    {
+      "node": "analyze_stride_information_disclosure",
+      "model": "openrouter/openai/gpt-5.6-terra",
+      "requested_model": "openrouter/openai/gpt-5.6-terra",
+      "instruction_sha256": "ea3fb48de6420011ff54cfba38cd1ba317f69d85fd250c2743e6385e6047fcf5",
+      "execution_fingerprint": "26d18056229c59b96bf14e32468736d55d03db8b188dede1d59629074fc0c27f",
+      "duration_ms": 33316,
+      "usage": {
+        "prompt_tokens": 18391,
+        "cached_prompt_tokens": 0,
+        "completion_tokens": 2748,
+        "reasoning_tokens": 1445,
+        "total_tokens": 21139
+      },
+      "attempts": 1,
+      "reported_charge_usd": 0.078952,
+      "served_upstream": "OpenAI",
+      "served_trust": "requested_echo"
+    },
+    {
+      "node": "analyze_stride_spoofing",
+      "model": "openrouter/openai/gpt-5.6-terra",
+      "requested_model": "openrouter/openai/gpt-5.6-terra",
+      "instruction_sha256": "ea3fb48de6420011ff54cfba38cd1ba317f69d85fd250c2743e6385e6047fcf5",
+      "execution_fingerprint": "26d18056229c59b96bf14e32468736d55d03db8b188dede1d59629074fc0c27f",
+      "duration_ms": 34379,
+      "usage": {
+        "prompt_tokens": 18146,
+        "cached_prompt_tokens": 0,
+        "completion_tokens": 2848,
+        "reasoning_tokens": 1552,
+        "total_tokens": 20994
+      },
+      "attempts": 1,
+      "reported_charge_usd": 0.0795395,
+      "served_upstream": "OpenAI",
+      "served_trust": "requested_echo"
+    },
+    {
+      "node": "analyze_stride_tampering",
+      "model": "openrouter/openai/gpt-5.6-terra",
+      "requested_model": "openrouter/openai/gpt-5.6-terra",
+      "instruction_sha256": "ea3fb48de6420011ff54cfba38cd1ba317f69d85fd250c2743e6385e6047fcf5",
+      "execution_fingerprint": "26d18056229c59b96bf14e32468736d55d03db8b188dede1d59629074fc0c27f",
+      "duration_ms": 41788,
+      "usage": {
+        "prompt_tokens": 19143,
+        "cached_prompt_tokens": 0,
+        "completion_tokens": 3643,
+        "reasoning_tokens": 1444,
+        "total_tokens": 22786
+      },
+      "attempts": 1,
+      "reported_charge_usd": 0.091572,
+      "served_upstream": "OpenAI",
+      "served_trust": "requested_echo"
+    },
+    {
+      "node": "join_stride",
+      "model": null,
+      "requested_model": null,
+      "instruction_sha256": null,
+      "execution_fingerprint": null,
+      "duration_ms": 1,
+      "usage": null,
+      "attempts": 1,
+      "reported_charge_usd": null,
+      "served_upstream": null,
+      "served_trust": null
+    },
+    {
+      "node": "merge_stride",
+      "model": null,
+      "requested_model": null,
+      "instruction_sha256": null,
+      "execution_fingerprint": null,
+      "duration_ms": 5,
+      "usage": null,
+      "attempts": 1,
+      "reported_charge_usd": null,
+      "served_upstream": null,
+      "served_trust": null
+    },
+    {
+      "node": "critic_stride",
+      "model": "openrouter/openai/gpt-5.6-terra",
+      "requested_model": "openrouter/openai/gpt-5.6-terra",
+      "instruction_sha256": "ea3fb48de6420011ff54cfba38cd1ba317f69d85fd250c2743e6385e6047fcf5",
+      "execution_fingerprint": "26d18056229c59b96bf14e32468736d55d03db8b188dede1d59629074fc0c27f",
+      "duration_ms": 35287,
+      "usage": {
+        "prompt_tokens": 18518,
+        "cached_prompt_tokens": 0,
+        "completion_tokens": 3217,
+        "reasoning_tokens": 1473,
+        "total_tokens": 21735
+      },
+      "attempts": 1,
+      "reported_charge_usd": 0.0848975,
+      "served_upstream": "OpenAI",
+      "served_trust": "requested_echo"
+    },
+    {
+      "node": "router_stride",
+      "model": null,
+      "requested_model": null,
+      "instruction_sha256": null,
+      "execution_fingerprint": null,
+      "duration_ms": 2,
+      "usage": null,
+      "attempts": 1,
+      "reported_charge_usd": null,
+      "served_upstream": null,
+      "served_trust": null
+    },
+    {
+      "node": "assemble",
+      "model": null,
+      "requested_model": null,
+      "instruction_sha256": null,
+      "execution_fingerprint": null,
+      "duration_ms": 2,
+      "usage": null,
+      "attempts": 1,
+      "reported_charge_usd": null,
+      "served_upstream": null,
+      "served_trust": null
+    }
+  ],
+  "sampling": {
+    "base": {
+      "temperature": null,
+      "top_p": null,
+      "seed": null,
+      "max_output_tokens": 16384,
+      "candidate_count": 1,
+      "presence_penalty": null,
+      "frequency_penalty": null,
+      "thinking": null,
+      "constrain_output": true
+    },
+    "strong": {
+      "temperature": null,
+      "top_p": null,
+      "seed": null,
+      "max_output_tokens": 64000,
+      "candidate_count": 1,
+      "presence_penalty": null,
+      "frequency_penalty": null,
+      "thinking": null,
+      "constrain_output": true
+    },
+    "review": {
+      "temperature": null,
+      "top_p": null,
+      "seed": null,
+      "max_output_tokens": 64000,
+      "candidate_count": 1,
+      "presence_penalty": null,
+      "frequency_penalty": null,
+      "thinking": null,
+      "constrain_output": true
+    }
+  },
+  "system_model": {
+    "external_entities": [
+      {
+        "id": "entity:reader",
+        "name": "Reader",
+        "description": "A visitor to the public content site; some readers are signed in, others are anonymous. Readers fetch pages from the web server and static assets from the CDN.",
+        "assets": [],
+        "source_excerpt": "readers hit the web server over HTTPS, some of them signed in",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "The source does not distinguish signed-in and anonymous readers as separate actors, so they are modelled as one element.",
+        "kind": "human",
+        "trust_zone": "boundary:public-internet"
+      },
+      {
+        "id": "entity:admin",
+        "name": "Admin",
+        "description": "An administrator who maintains the MySQL database directly rather than through the CMS, connecting from arbitrary locations with no jump host.",
+        "assets": [],
+        "source_excerpt": "There is an admin who maintains the database directly rather than through the CMS",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "The source says nothing about how the admin authenticates or what credential they hold, so no asset tag is carried here; the direct-administration flow is what grounds claims about this path.",
+        "kind": "human",
+        "trust_zone": "boundary:public-internet"
+      },
+      {
+        "id": "entity:cdn",
+        "name": "CDN",
+        "description": "Content delivery network that serves images, stylesheets and downloads to readers and hosts the bucket the web server publishes assets into.",
+        "assets": [],
+        "source_excerpt": "Readers fetch those from the CDN over HTTP.",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "The source names no CDN provider and does not say whether it is operated by the same party as the hosted network.",
+        "kind": "external-system",
+        "trust_zone": "boundary:cdn"
+      }
+    ],
+    "processes": [
+      {
+        "id": "process:web-server",
+        "name": "Web server",
+        "description": "Serves the public content site over HTTPS and runs the CMS. Reads and writes pages, accounts and comments in MySQL and pushes newly published assets to the CDN bucket.",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "The web server runs the CMS and keeps pages, accounts and comments in a MySQL database on the same hosted network.",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "The source treats 'the web server' and 'the CMS' as one deployed thing; modelled as a single process.",
+        "technology": "unknown",
+        "trust_zone": "boundary:hosted-network",
+        "exposure": "internet-facing",
+        "interface_kind": "web"
+      }
+    ],
+    "data_stores": [
+      {
+        "id": "store:mysql-database",
+        "name": "MySQL database",
+        "description": "Holds pages, accounts and comments for the CMS. Sits on the same hosted network as the web server and is also reachable directly by the admin.",
+        "assets": [
+          "pii",
+          "business-critical-data"
+        ],
+        "source_excerpt": "keeps pages, accounts and comments in a MySQL database on the same hosted network",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "Not tagged credentials: the source says the database holds accounts, and what an account record contains is never stated. Sign-in exists for some readers, but where its secrets live is not described.",
+        "technology": "MySQL",
+        "trust_zone": "boundary:hosted-network",
+        "data_classification": "unknown",
+        "encryption_at_rest": "unknown"
+      },
+      {
+        "id": "store:cdn-bucket",
+        "name": "CDN bucket",
+        "description": "Bucket behind the CDN holding images, stylesheets and downloads published from the web server.",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "the web server pushes them up to the CDN's bucket",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:cdn",
+        "data_classification": "unknown",
+        "encryption_at_rest": "unknown"
+      }
+    ],
+    "data_flows": [
+      {
+        "id": "flow:entity:reader>process:web-server>page-requests",
+        "name": "Page requests",
+        "description": "Readers request site pages from the web server over HTTPS; some readers are signed in.",
+        "assets": [],
+        "source_excerpt": "readers hit the web server over HTTPS, some of them signed in",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "source": "entity:reader",
+        "destination": "process:web-server",
+        "protocol": "HTTPS",
+        "authentication": "sign-in exists for some readers; the mechanism, its strength and how sessions are handled are not stated",
+        "data_description": "Page requests and rendered site content",
+        "encryption_in_transit": "HTTPS",
+        "operations": "read"
+      },
+      {
+        "id": "flow:entity:reader>entity:cdn>asset-fetch",
+        "name": "Asset fetch",
+        "description": "Readers fetch images, stylesheets and downloads from the CDN over HTTP.",
+        "assets": [],
+        "source_excerpt": "Readers fetch those from the CDN over HTTP.",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "source": "entity:reader",
+        "destination": "entity:cdn",
+        "protocol": "HTTP",
+        "authentication": "unknown",
+        "data_description": "Images, stylesheets and downloads",
+        "encryption_in_transit": "none — readers fetch these over HTTP",
+        "operations": "read"
+      },
+      {
+        "id": "flow:process:web-server>store:mysql-database>cms-data",
+        "name": "CMS data",
+        "description": "The web server stores and retrieves pages, accounts and comments in the MySQL database.",
+        "assets": [
+          "pii",
+          "business-critical-data"
+        ],
+        "source_excerpt": "keeps pages, accounts and comments in a MySQL database on the same hosted network",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:web-server",
+        "destination": "store:mysql-database",
+        "protocol": "MySQL",
+        "authentication": "unknown",
+        "data_description": "Pages, accounts and comments",
+        "encryption_in_transit": "unknown",
+        "operations": "read-write"
+      },
+      {
+        "id": "flow:process:web-server>store:cdn-bucket>asset-publish",
+        "name": "Asset publish",
+        "description": "When new assets are published the web server pushes them to the CDN's bucket.",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "When new assets are published the web server pushes them up to the CDN's bucket.",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "The source states outright that how this push is authenticated is not described, which is why the attribute is unknown rather than absent.",
+        "source": "process:web-server",
+        "destination": "store:cdn-bucket",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "Newly published images, stylesheets and downloads",
+        "encryption_in_transit": "unknown",
+        "operations": "write"
+      },
+      {
+        "id": "flow:entity:admin>store:mysql-database>direct-administration",
+        "name": "Direct administration",
+        "description": "The admin connects straight to the database box over an unsecured MySQL connection with no TLS, from arbitrary locations and with no jump host, bypassing the CMS.",
+        "assets": [
+          "pii",
+          "business-critical-data"
+        ],
+        "source_excerpt": "That is an unsecured MySQL connection straight to the box, no TLS on it, and they do it from wherever they happen to be — there is no jump host.",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "source": "entity:admin",
+        "destination": "store:mysql-database",
+        "protocol": "MySQL",
+        "authentication": "unknown",
+        "data_description": "Direct database maintenance against pages, accounts and comments, performed outside the CMS",
+        "encryption_in_transit": "none — an unsecured MySQL connection, no TLS on it",
+        "operations": "read-write"
+      }
+    ],
+    "trust_boundaries": [
+      {
+        "id": "boundary:public-internet",
+        "name": "Public internet",
+        "description": "Everything outside the hosted network: readers on the public site and the admin connecting from wherever they happen to be.",
+        "assets": [],
+        "source_excerpt": "Public site: readers hit the web server over HTTPS",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "network"
+      },
+      {
+        "id": "boundary:hosted-network",
+        "name": "Hosted network",
+        "description": "The hosted network carrying the web server running the CMS and the MySQL database.",
+        "assets": [],
+        "source_excerpt": "a MySQL database on the same hosted network",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "network"
+      },
+      {
+        "id": "boundary:cdn",
+        "name": "CDN",
+        "description": "The content delivery network and its bucket, which serve static assets and are separate from the web server.",
+        "assets": [],
+        "source_excerpt": "Images, stylesheets and downloads do not come off the web server.",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "network"
+      }
+    ],
+    "assumptions": [
+      {
+        "assumption": "The web server is reachable from the internet.",
+        "element_id": "process:web-server",
+        "attribute": "exposure",
+        "basis": "Described as the 'Public site' that 'readers hit ... over HTTPS'."
+      },
+      {
+        "assumption": "The admin connects from outside the hosted network.",
+        "element_id": "entity:admin",
+        "attribute": "trust_zone",
+        "basis": "\"they do it from wherever they happen to be — there is no jump host\"."
+      },
+      {
+        "assumption": "The CDN and its bucket sit in a separate trust zone from the hosted network.",
+        "element_id": "entity:cdn",
+        "attribute": "trust_zone",
+        "basis": "Assets 'do not come off the web server'; the web server 'pushes them up to the CDN's bucket', implying a distinct, separately operated location."
+      },
+      {
+        "assumption": "CDN's trust_zone is boundary:cdn, which the schema requires and no source states.",
+        "element_id": "entity:cdn",
+        "attribute": "trust_zone",
+        "basis": "A CDN entity can reasonably belong to a CDN-provider grouping. This does not establish a particular network perimeter or shared connectivity."
+      },
+      {
+        "assumption": "CDN bucket's trust_zone is boundary:cdn, which the schema requires and no source states.",
+        "element_id": "store:cdn-bucket",
+        "attribute": "trust_zone",
+        "basis": "The stated ownership supports the grouping. It does not establish network co-location with CDN serving infrastructure."
+      },
+      {
+        "assumption": "Reader's trust_zone is boundary:public-internet, which the schema requires and no source states.",
+        "element_id": "entity:reader",
+        "attribute": "trust_zone",
+        "basis": "A public audience supports this abstraction. It does not locate every reader on a specific network."
+      }
+    ]
+  },
+  "boundary_crossings": [
+    {
+      "flow_id": "flow:entity:reader>process:web-server>page-requests",
+      "source_zone": "boundary:public-internet",
+      "destination_zone": "boundary:hosted-network",
+      "decided": true,
+      "assumed_endpoints": [
+        "entity:reader"
+      ]
+    },
+    {
+      "flow_id": "flow:entity:reader>entity:cdn>asset-fetch",
+      "source_zone": "boundary:public-internet",
+      "destination_zone": "boundary:cdn",
+      "decided": true,
+      "assumed_endpoints": [
+        "entity:reader",
+        "entity:cdn"
+      ]
+    },
+    {
+      "flow_id": "flow:process:web-server>store:cdn-bucket>asset-publish",
+      "source_zone": "boundary:hosted-network",
+      "destination_zone": "boundary:cdn",
+      "decided": true,
+      "assumed_endpoints": [
+        "store:cdn-bucket"
+      ]
+    },
+    {
+      "flow_id": "flow:entity:admin>store:mysql-database>direct-administration",
+      "source_zone": "boundary:public-internet",
+      "destination_zone": "boundary:hosted-network",
+      "decided": true,
+      "assumed_endpoints": [
+        "entity:admin"
+      ]
+    }
+  ],
+  "shared_element_names": [],
+  "elements_analyzed": 14,
+  "model_repair": null,
+  "assertions": null,
+  "analysis_context": {
+    "instruction_sha256": "ea3fb48de6420011ff54cfba38cd1ba317f69d85fd250c2743e6385e6047fcf5",
+    "domain_packs": [
+      "databases",
+      "http-api"
+    ]
+  },
+  "execution": {
+    "identity_version": 2,
+    "build": {
+      "analysis-service": "0.1.0",
+      "google-adk": "2.5.0",
+      "google-genai": "2.11.0",
+      "litellm": "1.97.0"
+    },
+    "review_independence": "shared",
+    "extraction_format": null,
+    "extraction_strategy": null
+  },
+  "analyses": [
+    {
+      "framework": "stride",
+      "framework_version": "1.0",
+      "disclaimer": "AI-generated STRIDE threat model. Each claim asserts that an attacker action against the named elements is credible against what the submitted text stated. Where the text says a control is not there, a claim says so and cites that sentence; where the text is silent, the claim is conditional on a fact nobody supplied, and the service never reads silence as absence. Nothing not listed here is thereby safe. Not reviewed by a human security analyst.",
+      "claims": [
+        {
+          "id": "D-01",
+          "framework": "stride",
+          "framework_version": "1.0",
+          "title": "Public page-request flooding can exhaust the CMS web server",
+          "description": "An internet attacker can flood `process:web-server` through `flow:entity:reader>process:web-server>page-requests`, which crosses from `boundary:public-internet` into `boundary:hosted-network`. The public request path reaches the CMS, which maintains pages, accounts, and comments in `store:mysql-database`; if request-rate, request-size, parsing, and work-concurrency bounds are not enforced before CMS/database work, cheap repeated page requests can consume web workers, CPU, memory, and downstream MySQL capacity faster than legitimate readers can obtain service. Second-order, exhaustion of `process:web-server` makes the public site unavailable, while saturation propagated through `flow:process:web-server>store:mysql-database>cms-data` can also delay the web server's CMS reads and writes. This is conditional on the unrecorded request-cost and load-shedding posture; it does not assert that rate limiting or capacity controls are absent.",
+          "affected_element_ids": [
+            "process:web-server",
+            "flow:entity:reader>process:web-server>page-requests"
+          ],
+          "verb": "flood",
+          "grounds": [
+            {
+              "kind": "quote",
+              "text": "Public site: readers hit the web server over HTTPS, some of them signed in.",
+              "source_label": "System description",
+              "element_id": "",
+              "attribute": "",
+              "flow_id": "",
+              "term": "",
+              "assertion": ""
+            },
+            {
+              "kind": "quote",
+              "text": "The web server runs the CMS and keeps pages, accounts and comments in a MySQL\ndatabase on the same hosted network.",
+              "source_label": "System description",
+              "element_id": "",
+              "attribute": "",
+              "flow_id": "",
+              "term": "",
+              "assertion": ""
+            },
+            {
+              "kind": "derived-fact",
+              "text": "",
+              "source_label": "",
+              "element_id": "",
+              "attribute": "",
+              "flow_id": "flow:entity:reader>process:web-server>page-requests",
+              "term": "",
+              "assertion": ""
+            }
+          ],
+          "verdict": {
+            "status": "needs-info",
+            "reason": "The public request path is stated, but whether repeated requests can exhaust web-server or database resources depends on unmodelled request-cost, capacity, rate-limiting, concurrency, and load-shedding controls.",
+            "related_unknowns": [
+              {
+                "element_id": "",
+                "attribute": "",
+                "subject": "What request-rate, request-cost, worker, memory, database-concurrency, and load-shedding limits protect `process:web-server` and its MySQL work from public page-request flooding?",
+                "assertion": ""
+              }
+            ],
+            "immaterial_unknowns": [],
+            "rejected_because": null
+          },
+          "category": "denial-of-service",
+          "severity": {
+            "likelihood": "high",
+            "impact": "medium",
+            "level": "high",
+            "justification": "Likelihood is high because `flow:entity:reader>process:web-server>page-requests` is a derived crossing from `boundary:public-internet` to the public web server, so attackers can repeatedly invoke the page-request path without a prior network foothold; the model does not record request-cost or throttling bounds. Impact is medium because flooding `process:web-server` denies the public content service and can delay its CMS access to `store:mysql-database`, but the described availability loss is recoverable and no irreversible data loss is stated."
+          },
+          "mitigations": [
+            {
+              "summary": "Apply bounded admission control before CMS work",
+              "detail": "Set per-source and, where identity exists, per-account request-rate and concurrency limits on `process:web-server`; reject excess page requests before they allocate CMS workers or initiate MySQL work."
+            },
+            {
+              "summary": "Bound request and database work",
+              "detail": "Enforce request-size, parser-complexity, and execution-time limits in `process:web-server`, and use bounded MySQL query/connection concurrency on `flow:process:web-server>store:mysql-database>cms-data` so public-request bursts fail fast rather than queueing indefinitely."
+            },
+            {
+              "summary": "Validate the unrecorded availability posture",
+              "detail": "Record the maximum cost of a page request, worker and memory limits, database connection limits, timeouts, and load-shedding behavior for `process:web-server` so the conditional exposure can be resolved."
+            }
+          ],
+          "confidence": "low",
+          "recommendation": {
+            "sound": true,
+            "note": "Admission control, bounded request and database work, and documenting capacity and load-shedding controls directly address the described flooding risk."
+          }
+        },
+        {
+          "id": "S-03",
+          "framework": "stride",
+          "framework_version": "1.0",
+          "title": "An attacker could administer MySQL as the admin if direct-login authentication is absent",
+          "description": "`flow:entity:admin>store:mysql-database>direct-administration` crosses from `boundary:public-internet` into the hosted network, while its `authentication` is unknown. If the direct MySQL interface does not verify a unique administrator identity, an internet-originating attacker could impersonate `entity:admin` and perform database maintenance directly against `store:mysql-database`. Second-order: that direct-maintenance path has read-write operations over pages, accounts, and comments, so the false administrator identity reaches the database's `pii` and `business-critical-data`. This draft is conditional on the unknown authentication attribute and does not claim the database accepts unauthenticated administration.",
+          "affected_element_ids": [
+            "entity:admin",
+            "store:mysql-database",
+            "flow:entity:admin>store:mysql-database>direct-administration"
+          ],
+          "verb": "impersonate",
+          "grounds": [
+            {
+              "kind": "derived-fact",
+              "text": "",
+              "source_label": "",
+              "element_id": "",
+              "attribute": "",
+              "flow_id": "flow:entity:admin>store:mysql-database>direct-administration",
+              "term": "",
+              "assertion": ""
+            },
+            {
+              "kind": "unknown-attribute",
+              "text": "",
+              "source_label": "",
+              "element_id": "flow:entity:admin>store:mysql-database>direct-administration",
+              "attribute": "authentication",
+              "flow_id": "",
+              "term": "",
+              "assertion": ""
+            }
+          ],
+          "verdict": {
+            "status": "needs-info",
+            "reason": "Whether direct MySQL administration verifies a unique administrator identity is unknown; the impersonation claim depends on that control.",
+            "related_unknowns": [
+              {
+                "element_id": "flow:entity:admin>store:mysql-database>direct-administration",
+                "attribute": "authentication",
+                "subject": "",
+                "assertion": ""
+              }
+            ],
+            "immaterial_unknowns": [],
+            "rejected_because": null
+          },
+          "category": "spoofing",
+          "severity": {
+            "likelihood": "medium",
+            "impact": "high",
+            "level": "high",
+            "justification": "Likelihood is medium and conditional on the unverified authentication of a boundary-crossing flow that originates from `boundary:public-internet`; a real authentication control may exist but is not recorded. Impact is high because the impersonated administrator obtains direct read-write access to `store:mysql-database`, which holds `pii` and `business-critical-data`."
+          },
+          "mitigations": [
+            {
+              "summary": "Require unique, verifiable administrator authentication",
+              "detail": "Require a distinct administrator identity for `flow:entity:admin>store:mysql-database>direct-administration`, using strong authentication such as client certificates or federated short-lived credentials rather than network reachability."
+            },
+            {
+              "summary": "Protect direct administration with an authenticated management path",
+              "detail": "Place database administration behind a controlled access path and enforce TLS with server certificate validation and a dedicated per-admin identity, rather than permitting direct connections from arbitrary locations."
+            }
+          ],
+          "confidence": "low",
+          "recommendation": {
+            "sound": true,
+            "note": "Individual strong administrator identities and a controlled authenticated management path address impersonation on direct administration."
+          }
+        },
+        {
+          "id": "T-02",
+          "framework": "stride",
+          "framework_version": "1.0",
+          "title": "On-path modification of direct MySQL administration traffic",
+          "description": "An attacker able to occupy the network path from `entity:admin` to `store:mysql-database` can alter direct maintenance commands or returned results on `flow:entity:admin>store:mysql-database>direct-administration`. This is a public-internet-to-hosted-network boundary crossing with no TLS, so modified MySQL writes can rewrite pages, accounts, or comments outside the CMS. Second-order, `process:web-server` subsequently reads the altered CMS data through `flow:process:web-server>store:mysql-database>cms-data` and serves or administers the corrupted records as database state.",
+          "affected_element_ids": [
+            "flow:entity:admin>store:mysql-database>direct-administration",
+            "store:mysql-database",
+            "entity:admin"
+          ],
+          "verb": "alter-in-transit",
+          "grounds": [
+            {
+              "kind": "derived-fact",
+              "text": "",
+              "source_label": "",
+              "element_id": "",
+              "attribute": "",
+              "flow_id": "flow:entity:admin>store:mysql-database>direct-administration",
+              "term": "",
+              "assertion": ""
+            },
+            {
+              "kind": "absent-attribute",
+              "text": "",
+              "source_label": "",
+              "element_id": "flow:entity:admin>store:mysql-database>direct-administration",
+              "attribute": "encryption_in_transit",
+              "flow_id": "",
+              "term": "",
+              "assertion": ""
+            }
+          ],
+          "verdict": {
+            "status": "confirmed",
+            "reason": "",
+            "related_unknowns": [],
+            "immaterial_unknowns": [],
+            "rejected_because": null
+          },
+          "category": "tampering",
+          "severity": {
+            "likelihood": "medium",
+            "impact": "high",
+            "level": "high",
+            "justification": "Likelihood is medium because the flow crosses from the public-internet zone to the hosted network with TLS stated absent, but exploitation still requires an attacker to gain an on-path position for the administrator's connection. Impact is high because `store:mysql-database` holds `pii` and `business-critical-data`, and arbitrary modification of pages, accounts, and comments is consumed by `process:web-server`."
+          },
+          "mitigations": [
+            {
+              "summary": "Encrypt and authenticate the administrative database connection",
+              "detail": "Require TLS with server certificate validation and mutually authenticated database access for `flow:entity:admin>store:mysql-database>direct-administration`."
+            },
+            {
+              "summary": "Remove direct public-network database administration",
+              "detail": "Require administration through a controlled private access path such as a hardened jump host or VPN, with network policies preventing arbitrary public-source MySQL connections."
+            },
+            {
+              "summary": "Use integrity-aware administration controls",
+              "detail": "Require reviewed, attributable administrative changes and database auditing so unauthorized or altered maintenance operations can be detected and rolled back."
+            }
+          ],
+          "confidence": "high",
+          "recommendation": {
+            "sound": true,
+            "note": "Mutually authenticated TLS and removal of direct public-network administration address alteration of the MySQL maintenance path."
+          }
+        },
+        {
+          "id": "T-03",
+          "framework": "stride",
+          "framework_version": "1.0",
+          "title": "Unverified direct-database authentication may permit unauthorized record rewrites",
+          "description": "`flow:entity:admin>store:mysql-database>direct-administration` is a public-internet-to-hosted-network, read-write path into `store:mysql-database`, but its `authentication` attribute is unknown. If that unknown resolves to absent, weak, or overly broad direct-database authentication, an attacker who reaches the database service can alter pages, accounts, and comments directly rather than through `process:web-server` and its CMS behavior. The corruption is subsequently consumed by `process:web-server` over `flow:process:web-server>store:mysql-database>cms-data`. This threat is conditional on the unresolved authentication control; it does not assert that authentication is absent.",
+          "affected_element_ids": [
+            "flow:entity:admin>store:mysql-database>direct-administration",
+            "store:mysql-database",
+            "entity:admin"
+          ],
+          "verb": "alter",
+          "grounds": [
+            {
+              "kind": "derived-fact",
+              "text": "",
+              "source_label": "",
+              "element_id": "",
+              "attribute": "",
+              "flow_id": "flow:entity:admin>store:mysql-database>direct-administration",
+              "term": "",
+              "assertion": ""
+            },
+            {
+              "kind": "unknown-attribute",
+              "text": "",
+              "source_label": "",
+              "element_id": "flow:entity:admin>store:mysql-database>direct-administration",
+              "attribute": "authentication",
+              "flow_id": "",
+              "term": "",
+              "assertion": ""
+            }
+          ],
+          "verdict": {
+            "status": "needs-info",
+            "reason": "Whether the direct database path enforces strong and appropriately scoped authentication and authorization is unknown; the unauthorized rewrite claim depends on that control.",
+            "related_unknowns": [
+              {
+                "element_id": "flow:entity:admin>store:mysql-database>direct-administration",
+                "attribute": "authentication",
+                "subject": "",
+                "assertion": ""
+              }
+            ],
+            "immaterial_unknowns": [],
+            "rejected_because": null
+          },
+          "category": "tampering",
+          "severity": {
+            "likelihood": "medium",
+            "impact": "high",
+            "level": "high",
+            "justification": "Likelihood is medium and conditional on the unknown authentication state: the path is a decided public-internet-to-hosted-network crossing, but successful unauthorized use depends on whether direct MySQL authentication and authorization are actually strong. Impact is high because `store:mysql-database` contains `pii` and `business-critical-data` and supports direct read-write maintenance of CMS pages, accounts, and comments."
+          },
+          "mitigations": [
+            {
+              "summary": "Establish and enforce direct-database authentication",
+              "detail": "Determine the authentication mechanism on `flow:entity:admin>store:mysql-database>direct-administration` and require strong individual administrator identities, MFA-backed access where applicable, and TLS client authentication."
+            },
+            {
+              "summary": "Apply least-privilege database roles",
+              "detail": "Grant each administrator only the required tables and write operations, avoid shared database accounts, and enforce server-side authorization for sensitive account changes."
+            },
+            {
+              "summary": "Restrict database network exposure",
+              "detail": "Allow MySQL connections only from an approved administration network path and deny direct connections from arbitrary public locations."
+            }
+          ],
+          "confidence": "low",
+          "recommendation": {
+            "sound": true,
+            "note": "Strong individual authentication, least-privilege database roles, and restricted network access address unauthorized direct record changes."
+          }
+        },
+        {
+          "id": "E-01",
+          "framework": "stride",
+          "framework_version": "1.0",
+          "title": "A compromise of the public web server may extend into the CDN publishing boundary",
+          "description": "An attacker who gains execution in the internet-facing `process:web-server` starts with the web server's hosted-network authority and can invoke its normal publishing path, `flow:process:web-server>store:cdn-bucket>asset-publish`, across the decided boundary into `boundary:cdn`. Authentication on that publishing flow is `unknown`; if the CDN accepts a standing web-server credential or network-origin trust without narrowly scoping it, the attacker escalates from the web-server process to write authority over `store:cdn-bucket`. They could then publish attacker-controlled images, stylesheets, or downloads for CDN delivery to readers. This is conditional on resolving the unknown authentication and authorization scope of the publishing flow; it does not assert that the web server has already been compromised.",
+          "affected_element_ids": [
+            "process:web-server",
+            "flow:process:web-server>store:cdn-bucket>asset-publish",
+            "store:cdn-bucket"
+          ],
+          "verb": "escalate",
+          "grounds": [
+            {
+              "kind": "quote",
+              "text": "Public site: readers hit the web server over HTTPS",
+              "source_label": "System description",
+              "element_id": "",
+              "attribute": "",
+              "flow_id": "",
+              "term": "",
+              "assertion": ""
+            },
+            {
+              "kind": "derived-fact",
+              "text": "",
+              "source_label": "",
+              "element_id": "",
+              "attribute": "",
+              "flow_id": "flow:process:web-server>store:cdn-bucket>asset-publish",
+              "term": "",
+              "assertion": ""
+            },
+            {
+              "kind": "unknown-attribute",
+              "text": "",
+              "source_label": "",
+              "element_id": "flow:process:web-server>store:cdn-bucket>asset-publish",
+              "attribute": "authentication",
+              "flow_id": "",
+              "term": "",
+              "assertion": ""
+            }
+          ],
+          "verdict": {
+            "status": "confirmed",
+            "reason": "",
+            "related_unknowns": [],
+            "immaterial_unknowns": [
+              {
+                "element_id": "flow:process:web-server>store:cdn-bucket>asset-publish",
+                "attribute": "authentication",
+                "subject": "",
+                "assertion": ""
+              }
+            ],
+            "rejected_because": null
+          },
+          "category": "elevation-of-privilege",
+          "severity": {
+            "likelihood": "medium",
+            "impact": "medium",
+            "level": "medium",
+            "justification": "Likelihood is medium: `process:web-server` is publicly reachable according to the source, but exploitation first requires compromise of that process and the authentication on `flow:process:web-server>store:cdn-bucket>asset-publish` is unverified. Impact is medium: a successful escalation can alter business-critical assets in `store:cdn-bucket` that are delivered to readers through the CDN."
+          },
+          "mitigations": [
+            {
+              "summary": "Use a narrowly scoped CDN publishing identity",
+              "detail": "Require `flow:process:web-server>store:cdn-bucket>asset-publish` to authenticate with a short-lived workload identity limited to writing only the required publishing prefix and operations; do not authorize publishing based solely on hosted-network origin."
+            },
+            {
+              "summary": "Constrain the web server's CDN reach",
+              "detail": "Limit CDN-bucket ingress and the web server's egress to the explicit publishing endpoint, and separate any asset-release authority from the internet-facing CMS runtime so compromise of `process:web-server` cannot publish arbitrary content."
+            }
+          ],
+          "confidence": "medium",
+          "recommendation": {
+            "sound": true,
+            "note": "A short-lived narrowly scoped publishing identity and constrained CDN reach reduce the authority a compromised web-server process can exercise over the bucket."
+          }
+        },
+        {
+          "id": "I-01",
+          "framework": "stride",
+          "framework_version": "1.0",
+          "title": "Database maintenance traffic is readable on the public-network path",
+          "description": "An attacker able to observe the path used by `entity:admin` can intercept the unencrypted `flow:entity:admin>store:mysql-database>direct-administration` from `boundary:public-internet` to `store:mysql-database`. The flow performs direct read-write MySQL maintenance against pages, accounts, and comments, so captured sessions disclose the PII and business-critical CMS data being queried without requiring the attacker to authenticate to the database. Second-order, the disclosed account and content data can be used to target readers of `process:web-server` and understand the CMS records served through its database read path.",
+          "affected_element_ids": [
+            "flow:entity:admin>store:mysql-database>direct-administration",
+            "entity:admin",
+            "store:mysql-database"
+          ],
+          "verb": "intercept",
+          "grounds": [
+            {
+              "kind": "absent-attribute",
+              "text": "",
+              "source_label": "",
+              "element_id": "flow:entity:admin>store:mysql-database>direct-administration",
+              "attribute": "encryption_in_transit",
+              "flow_id": "",
+              "term": "",
+              "assertion": ""
+            },
+            {
+              "kind": "derived-fact",
+              "text": "",
+              "source_label": "",
+              "element_id": "",
+              "attribute": "",
+              "flow_id": "flow:entity:admin>store:mysql-database>direct-administration",
+              "term": "",
+              "assertion": ""
+            }
+          ],
+          "verdict": {
+            "status": "confirmed",
+            "reason": "",
+            "related_unknowns": [],
+            "immaterial_unknowns": [],
+            "rejected_because": null
+          },
+          "category": "information-disclosure",
+          "severity": {
+            "likelihood": "medium",
+            "impact": "medium",
+            "level": "medium",
+            "justification": "Likelihood is medium because `flow:entity:admin>store:mysql-database>direct-administration` crosses from the public internet and its transport encryption is stated absent, although the attacker must obtain an on-path observation position. Impact is medium because the flow exposes maintenance reads of `store:mysql-database`, which is tagged `pii` and `business-critical-data`, but the model does not establish that every administrative session exports the whole corpus."
+          },
+          "mitigations": [
+            {
+              "summary": "Require encrypted, mutually authenticated database administration",
+              "detail": "Replace the unsecured MySQL transport on `flow:entity:admin>store:mysql-database>direct-administration` with TLS 1.2+ and client-certificate or equivalent strong administrator authentication."
+            },
+            {
+              "summary": "Constrain the administration path",
+              "detail": "Require administration through a controlled access path with encrypted tunneling and restrict direct database connectivity to approved administrator source networks."
+            }
+          ],
+          "confidence": "high",
+          "recommendation": {
+            "sound": true,
+            "note": "Encrypted mutually authenticated administration and a controlled access path directly prevent passive reading of the plaintext MySQL session."
+          }
+        },
+        {
+          "id": "I-02",
+          "framework": "stride",
+          "framework_version": "1.0",
+          "title": "CMS database records may be readable on an unverified internal database connection",
+          "description": "`flow:process:web-server>store:mysql-database>cms-data` carries pages, accounts, and comments between `process:web-server` and `store:mysql-database`, including elements tagged `pii` and `business-critical-data`, but its `encryption_in_transit` is unknown. If this unknown resolves to an unencrypted MySQL connection, an attacker with a foothold able to observe the hosted-network segment can intercept CMS reads and writes and read the records in transit. Second-order, captured account and content records reveal the data consumed by `process:web-server` and can support targeted attacks against the public site and its readers. This is conditional on verifying the transport protection; it does not assert that the internal connection is plaintext.",
+          "affected_element_ids": [
+            "flow:process:web-server>store:mysql-database>cms-data",
+            "process:web-server",
+            "store:mysql-database"
+          ],
+          "verb": "intercept",
+          "grounds": [
+            {
+              "kind": "unknown-attribute",
+              "text": "",
+              "source_label": "",
+              "element_id": "flow:process:web-server>store:mysql-database>cms-data",
+              "attribute": "encryption_in_transit",
+              "flow_id": "",
+              "term": "",
+              "assertion": ""
+            }
+          ],
+          "verdict": {
+            "status": "needs-info",
+            "reason": "Whether the CMS-to-MySQL flow encrypts data in transit is unknown; interception of plaintext CMS records depends on that control.",
+            "related_unknowns": [
+              {
+                "element_id": "flow:process:web-server>store:mysql-database>cms-data",
+                "attribute": "encryption_in_transit",
+                "subject": "",
+                "assertion": ""
+              }
+            ],
+            "immaterial_unknowns": [],
+            "rejected_because": null
+          },
+          "category": "information-disclosure",
+          "severity": {
+            "likelihood": "low",
+            "impact": "high",
+            "level": "medium",
+            "justification": "Likelihood is low and conditional because `encryption_in_transit` for `flow:process:web-server>store:mysql-database>cms-data` is unstated and exploitation also requires a foothold on the hosted-network path. Impact is high if plaintext is present because the connection carries the CMS database's accounts, pages, and comments, while `store:mysql-database` is tagged `pii` and can expose the records used by the internet-facing `process:web-server`."
+          },
+          "mitigations": [
+            {
+              "summary": "Verify and enforce TLS for the CMS-to-MySQL connection",
+              "detail": "Establish the current transport posture for `flow:process:web-server>store:mysql-database>cms-data`, then require TLS for MySQL with certificate validation; use mTLS if both workload identities can be managed."
+            },
+            {
+              "summary": "Limit exposure of the database network segment",
+              "detail": "Restrict database connectivity so only `process:web-server` can reach `store:mysql-database`, and isolate the database traffic from other hosted-network workloads."
+            }
+          ],
+          "confidence": "low",
+          "recommendation": {
+            "sound": true,
+            "note": "Verifying and enforcing TLS for the CMS-to-MySQL flow, with network isolation, addresses interception on the hosted-network segment."
+          }
+        },
+        {
+          "id": "I-03",
+          "framework": "stride",
+          "framework_version": "1.0",
+          "title": "A copied MySQL volume could disclose CMS records if encryption at rest is absent",
+          "description": "`store:mysql-database` holds pages, accounts, and comments and is tagged `pii` and `business-critical-data`, but its `encryption_at_rest` attribute is unknown. If that unknown resolves to unencrypted storage, an attacker who obtains a database volume, snapshot, backup, or decommissioned storage copy can read CMS records directly without authenticating through `process:web-server` or the database's normal connection flows. Second-order, a raw copy exposes the account and content data consumed by `process:web-server`, enabling privacy harm and more focused attacks on public-site readers. This threat is conditional on the unresolved at-rest encryption state, not a claim that the database is unencrypted.",
+          "affected_element_ids": [
+            "store:mysql-database"
+          ],
+          "verb": "read",
+          "grounds": [
+            {
+              "kind": "unknown-attribute",
+              "text": "",
+              "source_label": "",
+              "element_id": "store:mysql-database",
+              "attribute": "encryption_at_rest",
+              "flow_id": "",
+              "term": "",
+              "assertion": ""
+            }
+          ],
+          "verdict": {
+            "status": "needs-info",
+            "reason": "Whether MySQL volumes and operational copies are encrypted at rest is unknown; disclosure from a copied storage artifact depends on that control.",
+            "related_unknowns": [
+              {
+                "element_id": "store:mysql-database",
+                "attribute": "encryption_at_rest",
+                "subject": "",
+                "assertion": ""
+              }
+            ],
+            "immaterial_unknowns": [],
+            "rejected_because": null
+          },
+          "category": "information-disclosure",
+          "severity": {
+            "likelihood": "low",
+            "impact": "high",
+            "level": "medium",
+            "justification": "Likelihood is low because the unknown at-rest control must be absent and an attacker must also obtain a volume, snapshot, backup, or other offline storage copy. Impact is high because such a copy can expose the MySQL corpus tagged `pii` and `business-critical-data`."
+          },
+          "mitigations": [
+            {
+              "summary": "Verify and enforce encryption at rest for MySQL and its operational copies",
+              "detail": "Determine the at-rest protection for `store:mysql-database`, then require managed-key encryption for database volumes and explicitly cover backups, snapshots, replicas, exports, and decommissioned media."
+            },
+            {
+              "summary": "Restrict storage and key access",
+              "detail": "Use separate least-privilege roles for database administration, backup operations, and key use, and audit snapshot creation, export, and restore activity."
+            }
+          ],
+          "confidence": "low",
+          "recommendation": {
+            "sound": true,
+            "note": "Encryption covering volumes and operational copies, plus restricted storage and key access, directly addresses disclosure from copied MySQL media."
+          }
+        },
+        {
+          "id": "S-01",
+          "framework": "stride",
+          "framework_version": "1.0",
+          "title": "Plain HTTP lets an attacker masquerade as the CDN to readers",
+          "description": "An attacker able to intervene on the public-network path can impersonate `entity:cdn` to `entity:reader` on `flow:entity:reader>entity:cdn>asset-fetch`, because readers fetch CDN assets over HTTP with encryption in transit explicitly absent. The reader has no authenticated server channel on which to distinguish the genuine CDN from a look-alike endpoint. Second-order: the impostor can deliver substituted images, stylesheets, or downloads in place of assets served from `store:cdn-bucket`, affecting the public site's business-critical published content.",
+          "affected_element_ids": [
+            "entity:reader",
+            "entity:cdn",
+            "flow:entity:reader>entity:cdn>asset-fetch"
+          ],
+          "verb": "impersonate",
+          "grounds": [
+            {
+              "kind": "derived-fact",
+              "text": "",
+              "source_label": "",
+              "element_id": "",
+              "attribute": "",
+              "flow_id": "flow:entity:reader>entity:cdn>asset-fetch",
+              "term": "",
+              "assertion": ""
+            },
+            {
+              "kind": "absent-attribute",
+              "text": "",
+              "source_label": "",
+              "element_id": "flow:entity:reader>entity:cdn>asset-fetch",
+              "attribute": "encryption_in_transit",
+              "flow_id": "",
+              "term": "",
+              "assertion": ""
+            }
+          ],
+          "verdict": {
+            "status": "confirmed",
+            "reason": "",
+            "related_unknowns": [],
+            "immaterial_unknowns": [],
+            "rejected_because": null
+          },
+          "category": "spoofing",
+          "severity": {
+            "likelihood": "medium",
+            "impact": "medium",
+            "level": "medium",
+            "justification": "Likelihood is medium because `flow:entity:reader>entity:cdn>asset-fetch` is a public-internet boundary crossing and its transport protection is stated absent, but exploitation still requires an on-path or traffic-redirection position. Impact is medium because the substituted content replaces assets from `store:cdn-bucket`, which is tagged `business-critical-data`, for public readers."
+          },
+          "mitigations": [
+            {
+              "summary": "Require authenticated TLS for CDN asset delivery",
+              "detail": "Change `flow:entity:reader>entity:cdn>asset-fetch` to HTTPS with TLS 1.2+ and full certificate-chain validation, redirecting all HTTP requests to the authenticated HTTPS endpoint."
+            }
+          ],
+          "confidence": "high",
+          "recommendation": {
+            "sound": true,
+            "note": "Authenticated TLS with certificate validation directly prevents CDN endpoint impersonation on the HTTP asset-delivery path."
+          }
+        },
+        {
+          "id": "S-02",
+          "framework": "stride",
+          "framework_version": "1.0",
+          "title": "An attacker could publish to the CDN as the web server if caller authentication is absent",
+          "description": "`flow:process:web-server>store:cdn-bucket>asset-publish` crosses from the hosted network to the CDN, but its `authentication` and transport details are unknown. If the CDN bucket does not verify a distinct web-server workload identity, an attacker who can reach that publishing interface could impersonate `process:web-server` and upload assets as though they were a genuine CMS publication. Second-order: `entity:reader` consumes assets from the CDN, so content published under the false web-server identity can be distributed to public readers. This draft is conditional on the unknown authentication state; it does not assert that bucket authentication is absent.",
+          "affected_element_ids": [
+            "process:web-server",
+            "store:cdn-bucket",
+            "flow:process:web-server>store:cdn-bucket>asset-publish"
+          ],
+          "verb": "impersonate",
+          "grounds": [
+            {
+              "kind": "derived-fact",
+              "text": "",
+              "source_label": "",
+              "element_id": "",
+              "attribute": "",
+              "flow_id": "flow:process:web-server>store:cdn-bucket>asset-publish",
+              "term": "",
+              "assertion": ""
+            },
+            {
+              "kind": "unknown-attribute",
+              "text": "",
+              "source_label": "",
+              "element_id": "flow:process:web-server>store:cdn-bucket>asset-publish",
+              "attribute": "authentication",
+              "flow_id": "",
+              "term": "",
+              "assertion": ""
+            },
+            {
+              "kind": "unknown-attribute",
+              "text": "",
+              "source_label": "",
+              "element_id": "flow:process:web-server>store:cdn-bucket>asset-publish",
+              "attribute": "encryption_in_transit",
+              "flow_id": "",
+              "term": "",
+              "assertion": ""
+            }
+          ],
+          "verdict": {
+            "status": "needs-info",
+            "reason": "Whether the CDN publishing interface verifies a distinct web-server identity is unknown; the impersonation claim depends on that control.",
+            "related_unknowns": [
+              {
+                "element_id": "flow:process:web-server>store:cdn-bucket>asset-publish",
+                "attribute": "authentication",
+                "subject": "",
+                "assertion": ""
+              }
+            ],
+            "immaterial_unknowns": [
+              {
+                "element_id": "flow:process:web-server>store:cdn-bucket>asset-publish",
+                "attribute": "encryption_in_transit",
+                "subject": "",
+                "assertion": ""
+              }
+            ],
+            "rejected_because": null
+          },
+          "category": "spoofing",
+          "severity": {
+            "likelihood": "medium",
+            "impact": "medium",
+            "level": "medium",
+            "justification": "Likelihood is medium and conditional because `flow:process:web-server>store:cdn-bucket>asset-publish` is a boundary crossing and both caller authentication and transport protection are unverified, though the attacker must reach the publishing interface. Impact is medium because successful impersonation writes published assets to `store:cdn-bucket`, tagged `business-critical-data`, which are subsequently fetched by `entity:reader`."
+          },
+          "mitigations": [
+            {
+              "summary": "Give the web server a verifiable CDN publishing identity",
+              "detail": "Require `flow:process:web-server>store:cdn-bucket>asset-publish` to use a dedicated, least-privilege workload identity, such as mTLS or short-lived audience-bound tokens, and authorize it only to publish the required asset prefix."
+            },
+            {
+              "summary": "Authenticate and encrypt the publishing channel",
+              "detail": "Record the protocol and require TLS with certificate validation for the web-server-to-CDN publishing flow so the bucket and publisher can verify one another."
+            }
+          ],
+          "confidence": "low",
+          "recommendation": {
+            "sound": true,
+            "note": "Dedicated least-privilege workload authentication and authenticated TLS address false publisher identity and protect the publication channel."
+          }
+        },
+        {
+          "id": "T-01",
+          "framework": "stride",
+          "framework_version": "1.0",
+          "title": "On-path attacker can alter CDN assets delivered over HTTP",
+          "description": "An attacker positioned between `entity:reader` and `entity:cdn` can alter images, stylesheets, or downloads on `flow:entity:reader>entity:cdn>asset-fetch` because the boundary-crossing flow uses HTTP with transport encryption stated absent. Readers receive attacker-modified site assets as CDN content. This compromises the integrity of content distributed to the public rather than merely observing it.",
+          "affected_element_ids": [
+            "flow:entity:reader>entity:cdn>asset-fetch",
+            "entity:cdn"
+          ],
+          "verb": "alter-in-transit",
+          "grounds": [
+            {
+              "kind": "derived-fact",
+              "text": "",
+              "source_label": "",
+              "element_id": "",
+              "attribute": "",
+              "flow_id": "flow:entity:reader>entity:cdn>asset-fetch",
+              "term": "",
+              "assertion": ""
+            },
+            {
+              "kind": "absent-attribute",
+              "text": "",
+              "source_label": "",
+              "element_id": "flow:entity:reader>entity:cdn>asset-fetch",
+              "attribute": "encryption_in_transit",
+              "flow_id": "",
+              "term": "",
+              "assertion": ""
+            }
+          ],
+          "verdict": {
+            "status": "confirmed",
+            "reason": "",
+            "related_unknowns": [],
+            "immaterial_unknowns": [],
+            "rejected_because": null
+          },
+          "category": "tampering",
+          "severity": {
+            "likelihood": "medium",
+            "impact": "medium",
+            "level": "medium",
+            "justification": "Likelihood is medium because `flow:entity:reader>entity:cdn>asset-fetch` is an unencrypted public-internet boundary crossing, but altering traffic still requires an attacker to obtain an on-path or traffic-redirection position. Impact is medium because altered CDN assets affect public delivery of `store:cdn-bucket` business-critical content."
+          },
+          "mitigations": [
+            {
+              "summary": "Serve all CDN assets over authenticated HTTPS",
+              "detail": "Require TLS 1.2+ with certificate validation on `flow:entity:reader>entity:cdn>asset-fetch`, redirect HTTP requests to HTTPS, and enable HSTS for the public site."
+            },
+            {
+              "summary": "Add integrity protection for published downloads",
+              "detail": "Publish signed release artifacts or checksums over an authenticated channel so readers can detect modified downloads even if a delivery path is compromised."
+            }
+          ],
+          "confidence": "high",
+          "recommendation": {
+            "sound": true,
+            "note": "Authenticated HTTPS, HSTS, and signed artifacts directly address in-transit modification of CDN assets."
+          }
+        },
+        {
+          "id": "T-04",
+          "framework": "stride",
+          "framework_version": "1.0",
+          "title": "Unverified CDN publish authentication may allow malicious asset replacement",
+          "description": "`flow:process:web-server>store:cdn-bucket>asset-publish` writes newly published images, stylesheets, and downloads into `store:cdn-bucket` across a trust boundary, but both its authentication and transport protection are unknown. If the unknown authentication control resolves to absent, weak, or insufficiently scoped authorization, an attacker able to reach the publish interface can replace legitimate assets with malicious content. Second-order, readers retrieve the planted assets through `flow:entity:reader>entity:cdn>asset-fetch`; that delivery flow is HTTP with encryption stated absent, so it provides no transport-integrity protection for the resulting public distribution. This threat is conditional on the unresolved publish authentication state.",
+          "affected_element_ids": [
+            "flow:process:web-server>store:cdn-bucket>asset-publish",
+            "store:cdn-bucket",
+            "process:web-server"
+          ],
+          "verb": "alter",
+          "grounds": [
+            {
+              "kind": "derived-fact",
+              "text": "",
+              "source_label": "",
+              "element_id": "",
+              "attribute": "",
+              "flow_id": "flow:process:web-server>store:cdn-bucket>asset-publish",
+              "term": "",
+              "assertion": ""
+            },
+            {
+              "kind": "unknown-attribute",
+              "text": "",
+              "source_label": "",
+              "element_id": "flow:process:web-server>store:cdn-bucket>asset-publish",
+              "attribute": "authentication",
+              "flow_id": "",
+              "term": "",
+              "assertion": ""
+            },
+            {
+              "kind": "unknown-attribute",
+              "text": "",
+              "source_label": "",
+              "element_id": "flow:process:web-server>store:cdn-bucket>asset-publish",
+              "attribute": "encryption_in_transit",
+              "flow_id": "",
+              "term": "",
+              "assertion": ""
+            },
+            {
+              "kind": "absent-attribute",
+              "text": "",
+              "source_label": "",
+              "element_id": "flow:entity:reader>entity:cdn>asset-fetch",
+              "attribute": "encryption_in_transit",
+              "flow_id": "",
+              "term": "",
+              "assertion": ""
+            }
+          ],
+          "verdict": {
+            "status": "needs-info",
+            "reason": "Whether the CDN publishing interface authenticates and sufficiently authorizes publishers is unknown; malicious asset replacement through that interface depends on that control.",
+            "related_unknowns": [
+              {
+                "element_id": "flow:process:web-server>store:cdn-bucket>asset-publish",
+                "attribute": "authentication",
+                "subject": "",
+                "assertion": ""
+              }
+            ],
+            "immaterial_unknowns": [
+              {
+                "element_id": "flow:process:web-server>store:cdn-bucket>asset-publish",
+                "attribute": "encryption_in_transit",
+                "subject": "",
+                "assertion": ""
+              }
+            ],
+            "rejected_because": null
+          },
+          "category": "tampering",
+          "severity": {
+            "likelihood": "medium",
+            "impact": "medium",
+            "level": "medium",
+            "justification": "Likelihood is medium and conditional because `flow:process:web-server>store:cdn-bucket>asset-publish` crosses into the CDN zone but its authentication and encryption-in-transit controls are unverified. Impact is medium because `store:cdn-bucket` holds `business-critical-data` and replacement assets are distributed to readers through the public asset-fetch flow."
+          },
+          "mitigations": [
+            {
+              "summary": "Authenticate and authorize CDN publishing with a dedicated workload identity",
+              "detail": "Require `process:web-server` to use short-lived, scoped credentials that permit writes only to the intended `store:cdn-bucket` paths, and deny anonymous or shared publish access."
+            },
+            {
+              "summary": "Protect the publication hop with authenticated TLS",
+              "detail": "Require verified TLS for `flow:process:web-server>store:cdn-bucket>asset-publish` so publishing requests and asset bytes cannot be modified in transit if transport protection is otherwise absent."
+            },
+            {
+              "summary": "Verify assets before serving them",
+              "detail": "Use signed artifacts or an integrity manifest verified during publication and deployment, preventing unauthorized replacement from becoming trusted CDN content."
+            }
+          ],
+          "confidence": "low",
+          "recommendation": {
+            "sound": true,
+            "note": "Scoped publisher authentication, authenticated TLS, and publication-time integrity verification address unauthorized CDN asset replacement."
+          }
+        }
+      ],
+      "rejected_claims": [
+        {
+          "id": "T-05",
+          "framework": "stride",
+          "framework_version": "1.0",
+          "title": "Unverified at-rest protection may allow offline tampering of MySQL data",
+          "description": "`store:mysql-database` has `encryption_at_rest: unknown` while holding pages, accounts, and comments tagged `pii` and `business-critical-data`. If the unknown resolves to no protection for database files, snapshots, or restored media, an attacker who obtains offline access to the store's underlying media can alter records and have the manipulated state later treated as authentic. Second-order, `process:web-server` reads this data through `flow:process:web-server>store:mysql-database>cms-data` and can serve or act on corrupted pages, accounts, and comments. This threat is conditional on the unresolved at-rest protection and does not claim that offline media is currently exposed.",
+          "affected_element_ids": [
+            "store:mysql-database",
+            "flow:process:web-server>store:mysql-database>cms-data"
+          ],
+          "verb": "alter",
+          "grounds": [
+            {
+              "kind": "unknown-attribute",
+              "text": "",
+              "source_label": "",
+              "element_id": "store:mysql-database",
+              "attribute": "encryption_at_rest",
+              "flow_id": "",
+              "term": "",
+              "assertion": ""
+            }
+          ],
+          "verdict": {
+            "status": "rejected",
+            "reason": "The description infers that unknown encryption at rest permits offline record modification, but encryption-at-rest state does not establish whether an attacker can obtain writable media access or whether integrity protections reject altered records.",
+            "related_unknowns": [],
+            "immaterial_unknowns": [],
+            "rejected_because": "reasoning"
+          },
+          "category": "tampering",
+          "severity": {
+            "likelihood": "low",
+            "impact": "high",
+            "level": "medium",
+            "justification": "Likelihood is low and conditional because exploitation requires the additional hard prerequisite of offline access to storage media and `store:mysql-database` at-rest protection is unverified rather than stated absent. Impact is high because the store contains `pii` and `business-critical-data`, and its records are consumed by `process:web-server` as authoritative CMS state."
+          },
+          "mitigations": [
+            {
+              "summary": "Verify encryption and integrity protection for database media",
+              "detail": "Establish whether `store:mysql-database` encryption at rest covers database files, backups, snapshots, and exports; use managed envelope encryption with protected keys where it does not."
+            },
+            {
+              "summary": "Validate restores before production use",
+              "detail": "Maintain signed or checksummed backups and require integrity verification and controlled review before restored MySQL data can replace production records."
+            }
+          ],
+          "confidence": "low",
+          "recommendation": null
+        },
+        {
+          "id": "R-01",
+          "framework": "stride",
+          "framework_version": "1.0",
+          "title": "Direct database changes may be deniable because no attributable audit evidence is modelled",
+          "description": "An administrator acting through `flow:entity:admin>store:mysql-database>direct-administration` can alter pages, accounts, or comments in `store:mysql-database` and later deny a disputed change. The flow crosses from `boundary:public-internet` into `boundary:hosted-network`, while its `authentication` is unknown; the model also contains no `audit` element or stated change-history for direct writes. If the unresolved authentication does not bind each connection to an individual and an independent record does not capture the acting principal, before/after state, timestamp, and outcome, the database's current contents cannot rebut the admin's denial. Second-order: because `store:mysql-database` holds `pii` and `business-critical-data` and is also written by `process:web-server`, disputes over account, page, and comment changes affect the CMS records consumed through `flow:process:web-server>store:mysql-database>cms-data`.",
+          "affected_element_ids": [
+            "entity:admin",
+            "store:mysql-database",
+            "flow:entity:admin>store:mysql-database>direct-administration"
+          ],
+          "verb": "unattributable",
+          "grounds": [
+            {
+              "kind": "quote",
+              "text": "There is an admin who maintains the database directly rather than through the CMS.",
+              "source_label": "System description",
+              "element_id": "",
+              "attribute": "",
+              "flow_id": "",
+              "term": "",
+              "assertion": ""
+            },
+            {
+              "kind": "derived-fact",
+              "text": "",
+              "source_label": "",
+              "element_id": "",
+              "attribute": "",
+              "flow_id": "flow:entity:admin>store:mysql-database>direct-administration",
+              "term": "",
+              "assertion": ""
+            },
+            {
+              "kind": "unknown-attribute",
+              "text": "",
+              "source_label": "",
+              "element_id": "flow:entity:admin>store:mysql-database>direct-administration",
+              "attribute": "authentication",
+              "flow_id": "",
+              "term": "",
+              "assertion": ""
+            },
+            {
+              "kind": "absent-element",
+              "text": "",
+              "source_label": "",
+              "element_id": "",
+              "attribute": "",
+              "flow_id": "",
+              "term": "audit",
+              "assertion": ""
+            }
+          ],
+          "verdict": {
+            "status": "rejected",
+            "reason": "The claim treats the graph's lack of an audit element or stated change-history as proof that independent audit evidence does not exist. The model does not state that absence, so the asserted accountability gap is unsupported.",
+            "related_unknowns": [],
+            "immaterial_unknowns": [],
+            "rejected_because": "reasoning"
+          },
+          "category": "repudiation",
+          "severity": {
+            "likelihood": "high",
+            "impact": "medium",
+            "level": "high",
+            "justification": "Likelihood is high, conditionally on the unknown authentication and unmodelled audit evidence: `entity:admin` performs routine direct read-write maintenance over `flow:entity:admin>store:mysql-database>direct-administration`, a crossing from `boundary:public-internet`. Impact is medium because `store:mysql-database` holds `pii` and `business-critical-data`, so disputed changes can affect the CMS's account and published-content records."
+          },
+          "mitigations": [
+            {
+              "summary": "Record attributable, tamper-evident direct database changes",
+              "detail": "Require individual administrator identities on `flow:entity:admin>store:mysql-database>direct-administration` and retain append-only audit or change-history records containing the verified principal, timestamp, action, target, and before/after values."
+            },
+            {
+              "summary": "Make corrections additive and independently retained",
+              "detail": "Use database auditing or change-data-capture with protected retention so direct changes to `store:mysql-database` are recorded as new evidence rather than being obscured by later overwrites."
+            }
+          ],
+          "confidence": "low",
+          "recommendation": null
+        }
+      ],
+      "scope": [],
+      "coverage": [
+        {
+          "lane": "spoofing",
+          "drafts": 3,
+          "rules": 3,
+          "rules_fired": 1,
+          "candidates": 3,
+          "candidates_cited": 3,
+          "elements": 14,
+          "elements_cited": 10,
+          "boundary_crossings": 4,
+          "boundary_crossings_cited": 3,
+          "unknown_controls": 12,
+          "unknown_controls_cited": 4
+        },
+        {
+          "lane": "tampering",
+          "drafts": 5,
+          "rules": 2,
+          "rules_fired": 2,
+          "candidates": 6,
+          "candidates_cited": 6,
+          "elements": 14,
+          "elements_cited": 10,
+          "boundary_crossings": 4,
+          "boundary_crossings_cited": 3,
+          "unknown_controls": 12,
+          "unknown_controls_cited": 6
+        },
+        {
+          "lane": "repudiation",
+          "drafts": 1,
+          "rules": 1,
+          "rules_fired": 1,
+          "candidates": 3,
+          "candidates_cited": 2,
+          "elements": 14,
+          "elements_cited": 7,
+          "boundary_crossings": 4,
+          "boundary_crossings_cited": 1,
+          "unknown_controls": 12,
+          "unknown_controls_cited": 1
+        },
+        {
+          "lane": "information-disclosure",
+          "drafts": 3,
+          "rules": 2,
+          "rules_fired": 2,
+          "candidates": 5,
+          "candidates_cited": 3,
+          "elements": 14,
+          "elements_cited": 6,
+          "boundary_crossings": 4,
+          "boundary_crossings_cited": 1,
+          "unknown_controls": 12,
+          "unknown_controls_cited": 3
+        },
+        {
+          "lane": "denial-of-service",
+          "drafts": 1,
+          "rules": 2,
+          "rules_fired": 2,
+          "candidates": 2,
+          "candidates_cited": 1,
+          "elements": 14,
+          "elements_cited": 6,
+          "boundary_crossings": 4,
+          "boundary_crossings_cited": 1,
+          "unknown_controls": 12,
+          "unknown_controls_cited": 0
+        },
+        {
+          "lane": "elevation-of-privilege",
+          "drafts": 1,
+          "rules": 2,
+          "rules_fired": 1,
+          "candidates": 1,
+          "candidates_cited": 1,
+          "elements": 14,
+          "elements_cited": 4,
+          "boundary_crossings": 4,
+          "boundary_crossings_cited": 1,
+          "unknown_controls": 12,
+          "unknown_controls_cited": 1
+        }
+      ],
+      "unverified_grounds": [],
+      "unreconciled_rulings": [],
+      "repaired_quotes": [],
+      "unresolved_references": [
+        {
+          "claim_id": "D-01",
+          "element_id": "store:mysql-database",
+          "reason": "more than one hop from every place the claim's grounds name"
+        }
+      ],
+      "unresolved_mentions": [],
+      "unresolved_evidence": [],
+      "unknown_claim_identities": [],
+      "dropped_claims": [],
+      "fired_rules": [
+        "denial-of-service-internet-exposed-process",
+        "denial-of-service-shared-dependency",
+        "elevation-of-privilege-inbound-from-exposed-process",
+        "information-disclosure-store-at-rest-unverified",
+        "information-disclosure-unprotected-sensitive-transit",
+        "repudiation-unattributable-action",
+        "spoofing-unverified-boundary-auth",
+        "tampering-unprotected-transit-crossing",
+        "tampering-unverified-write-to-store"
+      ],
+      "knowledge_docs": [
+        "cases/chained-benign-facts",
+        "cases/shared-credential-attribution",
+        "cases/stated-control-outside-the-model",
+        "cases/two-threats-one-flow",
+        "cases/unknown-is-not-absent",
+        "notes/attribution-and-audit",
+        "notes/compromise-inheritance",
+        "notes/cost-of-an-unauthenticated-request",
+        "notes/failure-coupling",
+        "notes/identity-at-a-boundary",
+        "notes/protection-at-rest",
+        "notes/transport-protection",
+        "notes/write-path-integrity"
+      ],
+      "summary": {
+        "claim_count": 12,
+        "needs_info_count": 7,
+        "rejected_count": 2,
+        "by_category": {
+          "denial-of-service": 1,
+          "spoofing": 3,
+          "tampering": 4,
+          "elevation-of-privilege": 1,
+          "information-disclosure": 3
+        },
+        "by_severity": {
+          "high": 4,
+          "medium": 8
+        },
+        "by_severity_confirmed": {
+          "high": 1,
+          "medium": 4
+        }
+      },
+      "missing_mitigations": []
+    }
+  ]
+}

@@ -1,0 +1,1019 @@
+{
+  "stride": [
+    {
+      "id": "S-01",
+      "framework": "stride",
+      "framework_version": "1.0",
+      "title": "Password compromise lets an attacker submit documents as a supplier",
+      "description": "An attacker targets `entity:supplier` over `flow:entity:supplier>process:supplier-portal>upload-documents` and uses credential stuffing or a phishing proxy to guess and present a supplier's password to `process:supplier-portal`. The flow crosses from `boundary:public-internet` into the vendor platform, although the supplier's source-zone placement was inferred, and its stated username-and-password authentication makes a recovered password sufficient to act as that supplier. Second-order: the impostor can submit fraudulent compliance paperwork that reaches `store:document-store` and is subsequently reviewed by category managers, affecting business-critical supplier approval decisions and supplier-staff PII.",
+      "affected_element_ids": [
+        "entity:supplier",
+        "process:supplier-portal",
+        "flow:entity:supplier>process:supplier-portal>upload-documents"
+      ],
+      "verb": "guess-credential",
+      "grounds": [
+        {
+          "kind": "quote",
+          "text": "Suppliers sign in with a username and password that the vendor issues to them.",
+          "source_label": "System description",
+          "element_id": "",
+          "attribute": "",
+          "flow_id": "",
+          "term": "",
+          "assertion": ""
+        },
+        {
+          "kind": "derived-fact",
+          "text": "",
+          "source_label": "",
+          "element_id": "",
+          "attribute": "",
+          "flow_id": "flow:entity:supplier>process:supplier-portal>upload-documents",
+          "term": "",
+          "assertion": ""
+        }
+      ],
+      "category": "spoofing",
+      "severity": {
+        "likelihood": "high",
+        "impact": "medium",
+        "level": "high",
+        "justification": "Likelihood is high because `flow:entity:supplier>process:supplier-portal>upload-documents` is a boundary crossing from the public-internet zone, albeit with that endpoint placement inferred, and password compromise and phishing tooling are widely available. Impact is medium because the flow carries PII and business-critical compliance documents, which are retained in `store:document-store` and influence the approval or rejection work performed by `entity:category-manager`."
+      },
+      "mitigations": [
+        {
+          "summary": "Require phishing-resistant supplier authentication",
+          "detail": "Configure `flow:entity:supplier>process:supplier-portal>upload-documents` to require WebAuthn/passkeys or equivalent phishing-resistant MFA, so possession of a supplier password alone cannot establish the supplier identity."
+        },
+        {
+          "summary": "Reduce password-compromise success",
+          "detail": "Apply breached-password screening, rate limits, and credential-stuffing detection to supplier authentication at `process:supplier-portal`."
+        }
+      ]
+    },
+    {
+      "id": "S-02",
+      "framework": "stride",
+      "framework_version": "1.0",
+      "title": "Category-manager approvals can be forged if boundary authentication is absent",
+      "description": "`flow:entity:category-manager>process:supplier-portal>review-documents` crosses from `boundary:corporate-network` into `boundary:vendor-platform`, but its `authentication` is unknown. If that unknown resolves to no verified caller identity, an attacker who obtains a foothold on the corporate network can impersonate `entity:category-manager` to `process:supplier-portal` and submit approvals or rejections as that manager. Second-order: those decisions govern documents containing supplier-staff PII and business-critical compliance information held in `store:document-store`. This is conditional on the unverified authentication attribute; it does not assert that authentication is absent.",
+      "affected_element_ids": [
+        "entity:category-manager",
+        "process:supplier-portal",
+        "flow:entity:category-manager>process:supplier-portal>review-documents"
+      ],
+      "verb": "impersonate",
+      "grounds": [
+        {
+          "kind": "quote",
+          "text": "Our category managers, who work from the corporate network, review what has been uploaded and approve or reject it.",
+          "source_label": "System description",
+          "element_id": "",
+          "attribute": "",
+          "flow_id": "",
+          "term": "",
+          "assertion": ""
+        },
+        {
+          "kind": "derived-fact",
+          "text": "",
+          "source_label": "",
+          "element_id": "",
+          "attribute": "",
+          "flow_id": "flow:entity:category-manager>process:supplier-portal>review-documents",
+          "term": "",
+          "assertion": ""
+        },
+        {
+          "kind": "unknown-attribute",
+          "text": "",
+          "source_label": "",
+          "element_id": "flow:entity:category-manager>process:supplier-portal>review-documents",
+          "attribute": "authentication",
+          "flow_id": "",
+          "term": "",
+          "assertion": ""
+        }
+      ],
+      "category": "spoofing",
+      "severity": {
+        "likelihood": "medium",
+        "impact": "medium",
+        "level": "medium",
+        "justification": "Likelihood is medium and conditional because the authentication state on the cross-boundary flow is unknown, while exploitation also requires a foothold in `boundary:corporate-network`. Impact is medium because a forged manager decision affects approvals or rejections over uploaded documents containing PII and business-critical compliance information."
+      },
+      "mitigations": [
+        {
+          "summary": "Establish and enforce manager identity on the portal flow",
+          "detail": "Determine and record the authentication used by `flow:entity:category-manager>process:supplier-portal>review-documents`; if it is not independently verifiable, require corporate OIDC authentication with phishing-resistant MFA and validate the resulting identity at `process:supplier-portal`."
+        },
+        {
+          "summary": "Make approval actions attributable and constrained",
+          "detail": "Bind each approval or rejection to the verified manager identity and require appropriate role and workflow authorization before `process:supplier-portal` accepts the decision."
+        }
+      ]
+    },
+    {
+      "id": "S-03",
+      "framework": "stride",
+      "framework_version": "1.0",
+      "title": "Forged nightly extracts can impersonate the portal vendor if sender verification is absent",
+      "description": "`flow:entity:portal-vendor>store:landing-bucket>push-nightly-extract` is an externally initiated, decided boundary crossing into `boundary:cloud-account` whose `authentication` is unknown. If the landing-bucket ingestion path does not verify a signature, mutually authenticated channel, or equivalent vendor identity, an attacker who discovers the delivery interface can forge a nightly extract as `entity:portal-vendor` and plant it in `store:landing-bucket`. The vendor endpoint's placement in `boundary:vendor-platform` was inferred, but the external-system-originated delivery remains the stated flow. Second-order: `process:supplier-master-service` loads the file as-is and writes its records to `store:supplier-database`, so the forgery can propagate across the supplier-record corpus containing PII and business-critical data. This draft is conditional on the unknown authentication attribute.",
+      "affected_element_ids": [
+        "entity:portal-vendor",
+        "store:landing-bucket",
+        "flow:entity:portal-vendor>store:landing-bucket>push-nightly-extract"
+      ],
+      "verb": "forge",
+      "grounds": [
+        {
+          "kind": "quote",
+          "text": "Every night the vendor pushes a supplier data extract to a landing bucket in our cloud account. Our supplier master service loads that file and writes the records into the supplier database.",
+          "source_label": "System description",
+          "element_id": "",
+          "attribute": "",
+          "flow_id": "",
+          "term": "",
+          "assertion": ""
+        },
+        {
+          "kind": "derived-fact",
+          "text": "",
+          "source_label": "",
+          "element_id": "",
+          "attribute": "",
+          "flow_id": "flow:entity:portal-vendor>store:landing-bucket>push-nightly-extract",
+          "term": "",
+          "assertion": ""
+        },
+        {
+          "kind": "unknown-attribute",
+          "text": "",
+          "source_label": "",
+          "element_id": "flow:entity:portal-vendor>store:landing-bucket>push-nightly-extract",
+          "attribute": "authentication",
+          "flow_id": "",
+          "term": "",
+          "assertion": ""
+        }
+      ],
+      "category": "spoofing",
+      "severity": {
+        "likelihood": "medium",
+        "impact": "high",
+        "level": "high",
+        "justification": "Likelihood is medium and conditional on the unknown authentication state: the vendor-originated flow crosses into `boundary:cloud-account`, and an unverified delivery interface can be forged by an attacker who learns it. Impact is high because the nightly extract is loaded by `process:supplier-master-service` into `store:supplier-database`, propagating attacker-supplied records across supplier data tagged PII and business-critical-data."
+      },
+      "mitigations": [
+        {
+          "summary": "Authenticate every extract delivery as the vendor",
+          "detail": "Require `flow:entity:portal-vendor>store:landing-bucket>push-nightly-extract` to use mutually authenticated TLS or verify a per-vendor signature over the extract before the bucket accepts it."
+        },
+        {
+          "summary": "Prevent replay and untrusted ingestion",
+          "detail": "Require signed timestamps, delivery identifiers, and replay detection, and have `process:supplier-master-service` load only extracts that have passed vendor-identity and integrity validation."
+        }
+      ]
+    },
+    {
+      "id": "S-04",
+      "framework": "stride",
+      "framework_version": "1.0",
+      "title": "A counterfeit supplier portal can harvest supplier credentials if server authentication is not provided",
+      "description": "The protocol and `encryption_in_transit` properties of `flow:entity:supplier>process:supplier-portal>upload-documents` are unknown. If the flow lacks TLS with validated server authentication, an attacker able to manipulate DNS or occupy the network path can impersonate `process:supplier-portal` to `entity:supplier` and collect the supplier's vendor-issued username and password. Second-order: the attacker can use the collected credentials on the genuine portal to upload documents as that supplier, reaching `store:document-store` and the downstream supplier-review process. This draft is conditional on the unknown transport attributes and does not assert that the vendor portal lacks encryption or certificate validation.",
+      "affected_element_ids": [
+        "entity:supplier",
+        "process:supplier-portal",
+        "flow:entity:supplier>process:supplier-portal>upload-documents"
+      ],
+      "verb": "impersonate",
+      "grounds": [
+        {
+          "kind": "quote",
+          "text": "Suppliers sign in with a username and password that the vendor issues to them.",
+          "source_label": "System description",
+          "element_id": "",
+          "attribute": "",
+          "flow_id": "",
+          "term": "",
+          "assertion": ""
+        },
+        {
+          "kind": "derived-fact",
+          "text": "",
+          "source_label": "",
+          "element_id": "",
+          "attribute": "",
+          "flow_id": "flow:entity:supplier>process:supplier-portal>upload-documents",
+          "term": "",
+          "assertion": ""
+        },
+        {
+          "kind": "unknown-attribute",
+          "text": "",
+          "source_label": "",
+          "element_id": "flow:entity:supplier>process:supplier-portal>upload-documents",
+          "attribute": "protocol",
+          "flow_id": "",
+          "term": "",
+          "assertion": ""
+        },
+        {
+          "kind": "unknown-attribute",
+          "text": "",
+          "source_label": "",
+          "element_id": "flow:entity:supplier>process:supplier-portal>upload-documents",
+          "attribute": "encryption_in_transit",
+          "flow_id": "",
+          "term": "",
+          "assertion": ""
+        }
+      ],
+      "category": "spoofing",
+      "severity": {
+        "likelihood": "low",
+        "impact": "medium",
+        "level": "low",
+        "justification": "Likelihood is low and conditional because both protocol and in-transit encryption are unknown, while exploitation additionally requires an on-path or DNS-manipulation position. Impact is medium because captured supplier credentials can be used to submit documents through `process:supplier-portal`, affecting PII and business-critical compliance records."
+      },
+      "mitigations": [
+        {
+          "summary": "Require validated server-authenticated TLS",
+          "detail": "Set `flow:entity:supplier>process:supplier-portal>upload-documents` to TLS 1.2+ with full certificate-chain and hostname validation, and document the protocol and `encryption_in_transit` control explicitly."
+        },
+        {
+          "summary": "Use phishing-resistant supplier credentials",
+          "detail": "Add WebAuthn/passkeys or equivalent phishing-resistant MFA so a password collected by a counterfeit endpoint cannot by itself authenticate a supplier."
+        }
+      ]
+    },
+    {
+      "id": "T-01",
+      "framework": "stride",
+      "framework_version": "1.0",
+      "title": "Poisoned nightly extract can corrupt supplier records if vendor bucket writes are not authenticated",
+      "description": "`flow:entity:portal-vendor>store:landing-bucket>push-nightly-extract` crosses from the vendor platform into our cloud account, but its `authentication` is unknown. If that unknown resolves to missing or insufficient writer authentication, an attacker able to submit to the vendor-facing bucket path can plant a modified nightly supplier extract in `store:landing-bucket`. `process:supplier-master-service` loads the extract through `flow:process:supplier-master-service>store:landing-bucket>load-extract` as-is and writes its records through `flow:process:supplier-master-service>store:supplier-database>write-supplier-records`; poisoned names, compliance status, contact details, or other supplier records therefore become authoritative data in `store:supplier-database`. This is conditional on the unverified authentication control, not an assertion that the bucket currently accepts unauthenticated writes.",
+      "affected_element_ids": [
+        "flow:entity:portal-vendor>store:landing-bucket>push-nightly-extract",
+        "store:landing-bucket"
+      ],
+      "verb": "plant",
+      "grounds": [
+        {
+          "kind": "quote",
+          "text": "The runbook for the landing bucket says the file arrives as a plain CSV and is picked up as-is.",
+          "source_label": "System description",
+          "element_id": "",
+          "attribute": "",
+          "flow_id": "",
+          "term": "",
+          "assertion": ""
+        },
+        {
+          "kind": "derived-fact",
+          "text": "",
+          "source_label": "",
+          "element_id": "",
+          "attribute": "",
+          "flow_id": "flow:entity:portal-vendor>store:landing-bucket>push-nightly-extract",
+          "term": "",
+          "assertion": ""
+        },
+        {
+          "kind": "unknown-attribute",
+          "text": "",
+          "source_label": "",
+          "element_id": "flow:entity:portal-vendor>store:landing-bucket>push-nightly-extract",
+          "attribute": "authentication",
+          "flow_id": "",
+          "term": "",
+          "assertion": ""
+        }
+      ],
+      "category": "tampering",
+      "severity": {
+        "likelihood": "medium",
+        "impact": "high",
+        "level": "high",
+        "justification": "Likelihood is medium and conditional on `unknown:flow:entity:portal-vendor>store:landing-bucket>push-nightly-extract:authentication`: the write path crosses into `boundary:cloud-account`, although exploiting it requires the unverified writer control to be inadequate. Impact is high because the planted extract is loaded into `store:supplier-database`, which holds `pii` and `business-critical-data`."
+      },
+      "mitigations": [
+        {
+          "summary": "Authenticate and restrict the vendor's bucket write path",
+          "detail": "Assign the vendor a dedicated, least-privilege identity that can write only the expected extract location in `store:landing-bucket`; deny all other writers by default."
+        },
+        {
+          "summary": "Verify extracts before import",
+          "detail": "Require `process:supplier-master-service` to verify a vendor signature or authenticated manifest, enforce an allowlisted schema and validation rules, and reject unexpected or malformed CSV content before writing supplier records."
+        }
+      ]
+    },
+    {
+      "id": "T-02",
+      "framework": "stride",
+      "framework_version": "1.0",
+      "title": "Direct supplier-record modification is possible if database writer authentication is insufficient",
+      "description": "`flow:process:supplier-master-service>store:supplier-database>write-supplier-records` writes supplier records to `store:supplier-database`, but its `authentication` is unknown. If that unknown resolves to an absent or overly broad database write control, an attacker who reaches that write interface can alter existing supplier records directly rather than using `process:supplier-master-service`. The attacker could rewrite compliance data, supplier contact details, or status-bearing records stored as `pii` and `business-critical-data`, bypassing any validation the loader may apply. This threat is conditional on the currently unverified authentication attribute and requires confirming the database's caller identity, authorization scope, and network exposure.",
+      "affected_element_ids": [
+        "flow:process:supplier-master-service>store:supplier-database>write-supplier-records",
+        "store:supplier-database"
+      ],
+      "verb": "alter",
+      "grounds": [
+        {
+          "kind": "unknown-attribute",
+          "text": "",
+          "source_label": "",
+          "element_id": "flow:process:supplier-master-service>store:supplier-database>write-supplier-records",
+          "attribute": "authentication",
+          "flow_id": "",
+          "term": "",
+          "assertion": ""
+        }
+      ],
+      "category": "tampering",
+      "severity": {
+        "likelihood": "low",
+        "impact": "high",
+        "level": "medium",
+        "justification": "Likelihood is low and conditional because `unknown:flow:process:supplier-master-service>store:supplier-database>write-supplier-records:authentication` does not establish that an attacker can reach or authenticate to the database; doing so requires an additional foothold or exposed write path. Impact is high because arbitrary corruption of `store:supplier-database` affects supplier records tagged `pii` and `business-critical-data`."
+      },
+      "mitigations": [
+        {
+          "summary": "Use a dedicated least-privilege workload identity",
+          "detail": "Authenticate `process:supplier-master-service` to `store:supplier-database` with a short-lived workload identity and grant only the write operations and record scope required for the nightly load."
+        },
+        {
+          "summary": "Enforce server-side write authorization and integrity controls",
+          "detail": "Make `store:supplier-database` deny direct writes outside the loader identity, apply server-side ownership and schema checks, and retain versioned or append-only change history to detect and recover from altered supplier records."
+        }
+      ]
+    },
+    {
+      "id": "R-01",
+      "framework": "stride",
+      "framework_version": "1.0",
+      "title": "Category managers may deny disputed approval or rejection decisions",
+      "description": "A category manager can approve or reject supplier paperwork through `flow:entity:category-manager>process:supplier-portal>review-documents`, but that flow's `authentication` is unknown despite carrying approval and rejection actions into `process:supplier-portal`. If the unknown does not resolve to an individually verifiable identity that is retained with each decision, a manager can deny approving or rejecting a document and the portal's records cannot rebut the dispute. The vendor's general statement that access is \u201cfully authenticated and audited\u201d does not establish the authentication method for this flow or that an audit event binds the reviewed document, decision, time, and verified manager identity. Second-order, disputed decisions affect the `business-critical-data` documents in `store:document-store` and undermine the defensibility of supplier compliance decisions.",
+      "affected_element_ids": [
+        "entity:category-manager",
+        "process:supplier-portal",
+        "flow:entity:category-manager>process:supplier-portal>review-documents"
+      ],
+      "verb": "unattributable",
+      "grounds": [
+        {
+          "kind": "quote",
+          "text": "Our category managers, who work from the corporate network, review what has been uploaded and approve or reject it.",
+          "source_label": "System description",
+          "element_id": "",
+          "attribute": "",
+          "flow_id": "",
+          "term": "",
+          "assertion": ""
+        },
+        {
+          "kind": "quote",
+          "text": "all access is fully authenticated and audited",
+          "source_label": "System description",
+          "element_id": "",
+          "attribute": "",
+          "flow_id": "",
+          "term": "",
+          "assertion": ""
+        },
+        {
+          "kind": "derived-fact",
+          "text": "",
+          "source_label": "",
+          "element_id": "",
+          "attribute": "",
+          "flow_id": "flow:entity:category-manager>process:supplier-portal>review-documents",
+          "term": "",
+          "assertion": ""
+        },
+        {
+          "kind": "unknown-attribute",
+          "text": "",
+          "source_label": "",
+          "element_id": "flow:entity:category-manager>process:supplier-portal>review-documents",
+          "attribute": "authentication",
+          "flow_id": "",
+          "term": "",
+          "assertion": ""
+        }
+      ],
+      "category": "repudiation",
+      "severity": {
+        "likelihood": "medium",
+        "impact": "medium",
+        "level": "medium",
+        "justification": "Likelihood is medium and conditional on the unknown authentication of `flow:entity:category-manager>process:supplier-portal>review-documents`: a disputing manager needs ordinary corporate-network access, but no individually attributable authentication is stated. Impact is medium because the decision concerns `business-critical-data` held by `process:supplier-portal` and `store:document-store`, affecting supplier compliance decisions."
+      },
+      "mitigations": [
+        {
+          "summary": "Record each review decision against a verified individual identity",
+          "detail": "Use individual category-manager authentication on `flow:entity:category-manager>process:supplier-portal>review-documents` and retain an audit event containing the verified subject, document identifier, approval or rejection outcome, timestamp, and request identifier."
+        },
+        {
+          "summary": "Preserve decision evidence independently",
+          "detail": "Retain immutable or append-only approval records in a separate audit path so later changes to a document or decision do not overwrite the evidence of who made the original decision."
+        }
+      ]
+    },
+    {
+      "id": "R-02",
+      "framework": "stride",
+      "framework_version": "1.0",
+      "title": "The portal vendor may deny sending a disputed nightly supplier extract",
+      "description": "`entity:portal-vendor` initiates `flow:entity:portal-vendor>store:landing-bucket>push-nightly-extract` across the vendor-platform to cloud-account boundary, but the flow's authentication is unknown. If this unknown does not resolve to retained signed requests or another verifiable sender identity, the vendor can deny having sent a particular extract after it is loaded by `process:supplier-master-service`; conversely, the receiving organization cannot prove which party originated the disputed file. The accountability gap reaches `store:supplier-database` through `flow:process:supplier-master-service>store:supplier-database>write-supplier-records`, where the extract becomes supplier records containing PII and business-critical data.",
+      "affected_element_ids": [
+        "entity:portal-vendor",
+        "store:landing-bucket",
+        "flow:entity:portal-vendor>store:landing-bucket>push-nightly-extract"
+      ],
+      "verb": "unattributable",
+      "grounds": [
+        {
+          "kind": "quote",
+          "text": "Every night the vendor pushes a supplier data extract to a landing bucket in our cloud account.",
+          "source_label": "System description",
+          "element_id": "",
+          "attribute": "",
+          "flow_id": "",
+          "term": "",
+          "assertion": ""
+        },
+        {
+          "kind": "derived-fact",
+          "text": "",
+          "source_label": "",
+          "element_id": "",
+          "attribute": "",
+          "flow_id": "flow:entity:portal-vendor>store:landing-bucket>push-nightly-extract",
+          "term": "",
+          "assertion": ""
+        },
+        {
+          "kind": "unknown-attribute",
+          "text": "",
+          "source_label": "",
+          "element_id": "flow:entity:portal-vendor>store:landing-bucket>push-nightly-extract",
+          "attribute": "authentication",
+          "flow_id": "",
+          "term": "",
+          "assertion": ""
+        }
+      ],
+      "category": "repudiation",
+      "severity": {
+        "likelihood": "medium",
+        "impact": "medium",
+        "level": "medium",
+        "justification": "Likelihood is medium and conditional on the unknown authentication of the cross-boundary vendor push: the vendor has the normal ability to originate the extract, but whether a sender-verifiable control exists is unstated. Impact is medium because the extract populates `store:supplier-database` with PII and `business-critical-data`, making disputed supplier-record changes difficult to resolve."
+      },
+      "mitigations": [
+        {
+          "summary": "Require and retain cryptographically verifiable extract delivery",
+          "detail": "Require `entity:portal-vendor` to sign each extract or delivery request with a vendor-specific key, timestamp, nonce, and extract digest, and retain the original signed artifact and verification result in the landing path."
+        },
+        {
+          "summary": "Create an immutable import provenance record",
+          "detail": "Have `process:supplier-master-service` record the verified vendor identity, received-file digest, ingestion time, import outcome, and resulting record batch before writing supplier records, using append-only retention for the dispute window."
+        }
+      ]
+    },
+    {
+      "id": "I-01",
+      "framework": "stride",
+      "framework_version": "1.0",
+      "title": "Portal document traffic may be readable across unverified external connections",
+      "description": "`flow:entity:supplier>process:supplier-portal>upload-documents` and `flow:entity:category-manager>process:supplier-portal>review-documents` each cross into `boundary:vendor-platform` while `encryption_in_transit` is unknown. If those channels are not transport-encrypted end to end, an on-path attacker can intercept supplier compliance paperwork and staff contact details on the supplier-to-portal path, or documents and approval activity on the corporate-manager-to-portal path. The supplier-side crossing relies partly on the model's assumed placement of `entity:supplier` in `boundary:public-internet`; it still requires verification of the actual client path and TLS termination. Second-order, the captured identities and document contents enable targeted attacks against suppliers and reveal the material category managers use to approve suppliers.",
+      "affected_element_ids": [
+        "flow:entity:supplier>process:supplier-portal>upload-documents",
+        "flow:entity:category-manager>process:supplier-portal>review-documents",
+        "process:supplier-portal"
+      ],
+      "verb": "intercept",
+      "grounds": [
+        {
+          "kind": "unknown-attribute",
+          "text": "",
+          "source_label": "",
+          "element_id": "flow:entity:supplier>process:supplier-portal>upload-documents",
+          "attribute": "encryption_in_transit",
+          "flow_id": "",
+          "term": "",
+          "assertion": ""
+        },
+        {
+          "kind": "unknown-attribute",
+          "text": "",
+          "source_label": "",
+          "element_id": "flow:entity:category-manager>process:supplier-portal>review-documents",
+          "attribute": "encryption_in_transit",
+          "flow_id": "",
+          "term": "",
+          "assertion": ""
+        },
+        {
+          "kind": "derived-fact",
+          "text": "",
+          "source_label": "",
+          "element_id": "",
+          "attribute": "",
+          "flow_id": "flow:entity:supplier>process:supplier-portal>upload-documents",
+          "term": "",
+          "assertion": ""
+        },
+        {
+          "kind": "derived-fact",
+          "text": "",
+          "source_label": "",
+          "element_id": "",
+          "attribute": "",
+          "flow_id": "flow:entity:category-manager>process:supplier-portal>review-documents",
+          "term": "",
+          "assertion": ""
+        }
+      ],
+      "category": "information-disclosure",
+      "severity": {
+        "likelihood": "medium",
+        "impact": "medium",
+        "level": "medium",
+        "justification": "Likelihood is medium and conditional because both boundary-crossing portal flows have unverified `encryption_in_transit`, allowing a capable attacker with an on-path position to exploit any missing protection. Impact is medium because the flows carry model-tagged `pii` and `business-critical-data`, including supplier documents and staff contact details."
+      },
+      "mitigations": [
+        {
+          "summary": "Verify and enforce TLS for every portal client connection",
+          "detail": "Establish the transport protection and TLS termination points for both portal flows, then require TLS 1.2+ from supplier and corporate-manager clients through the vendor portal; use modern cipher suites and certificate validation."
+        },
+        {
+          "summary": "Limit sensitive document exposure in browser-facing responses",
+          "detail": "Minimize document metadata and contact details returned by portal views, and ensure download links and document retrieval requests use the same verified transport protection."
+        }
+      ]
+    },
+    {
+      "id": "I-02",
+      "framework": "stride",
+      "framework_version": "1.0",
+      "title": "Nightly supplier extract may be intercepted between the vendor platform and cloud account",
+      "description": "`flow:entity:portal-vendor>store:landing-bucket>push-nightly-extract` crosses from `boundary:vendor-platform` to `boundary:cloud-account` with both its protocol and `encryption_in_transit` unknown. If the unresolved transport state means the vendor-to-bucket transfer lacks end-to-end encryption, a party able to observe that inter-boundary route can intercept the nightly supplier extract, including its `pii` and `business-critical-data`. This is not an assertion that encryption is absent: the source statements about end-to-end encryption and a plain CSV at the bucket do not establish protection of the channel. Second-order, the intercepted extract is the same data later loaded by `process:supplier-master-service` into `store:supplier-database`, enabling bulk targeting of the supplier records pipeline.",
+      "affected_element_ids": [
+        "flow:entity:portal-vendor>store:landing-bucket>push-nightly-extract",
+        "entity:portal-vendor",
+        "store:landing-bucket"
+      ],
+      "verb": "intercept",
+      "grounds": [
+        {
+          "kind": "unknown-attribute",
+          "text": "",
+          "source_label": "",
+          "element_id": "flow:entity:portal-vendor>store:landing-bucket>push-nightly-extract",
+          "attribute": "protocol",
+          "flow_id": "",
+          "term": "",
+          "assertion": ""
+        },
+        {
+          "kind": "unknown-attribute",
+          "text": "",
+          "source_label": "",
+          "element_id": "flow:entity:portal-vendor>store:landing-bucket>push-nightly-extract",
+          "attribute": "encryption_in_transit",
+          "flow_id": "",
+          "term": "",
+          "assertion": ""
+        },
+        {
+          "kind": "derived-fact",
+          "text": "",
+          "source_label": "",
+          "element_id": "",
+          "attribute": "",
+          "flow_id": "flow:entity:portal-vendor>store:landing-bucket>push-nightly-extract",
+          "term": "",
+          "assertion": ""
+        }
+      ],
+      "category": "information-disclosure",
+      "severity": {
+        "likelihood": "medium",
+        "impact": "medium",
+        "level": "medium",
+        "justification": "Likelihood is medium and conditional: the flow crosses from `boundary:vendor-platform` to `boundary:cloud-account` and records no protocol or transport encryption, though interception still requires access to that path. Impact is medium because the nightly extract carries `pii` and `business-critical-data` and supplies the records subsequently written to `store:supplier-database`."
+      },
+      "mitigations": [
+        {
+          "summary": "Require authenticated encrypted delivery of the nightly extract",
+          "detail": "Use a documented TLS-protected or managed-transfer protocol for `flow:entity:portal-vendor>store:landing-bucket>push-nightly-extract`, validate the vendor endpoint identity, and record the negotiated transport controls."
+        },
+        {
+          "summary": "Encrypt the extract as a separate payload layer",
+          "detail": "Have the vendor encrypt each extract for a cloud-account-controlled key before transfer, so a transfer-path observer cannot read the CSV even if transport configuration later regresses."
+        }
+      ]
+    },
+    {
+      "id": "I-03",
+      "framework": "stride",
+      "framework_version": "1.0",
+      "title": "Sensitive backend data paths have no verified transport confidentiality",
+      "description": "`flow:process:supplier-portal>store:document-store>store-documents`, `flow:process:supplier-master-service>store:landing-bucket>load-extract`, and `flow:process:supplier-master-service>store:supplier-database>write-supplier-records` all carry `pii` and `business-critical-data` but have `encryption_in_transit: unknown`. If any of these backend segments is plaintext, an attacker with a foothold able to observe the relevant vendor-platform or cloud-account path can intercept uploaded compliance documents, the nightly extract, or supplier records. This is conditional on each unresolved transport control and does not infer an on-path position merely from the unknown value. Second-order, captured extract or record contents expose data that `process:supplier-master-service` uses to populate `store:supplier-database`, while captured document contents reveal the material retained for portal review.",
+      "affected_element_ids": [
+        "flow:process:supplier-portal>store:document-store>store-documents",
+        "flow:process:supplier-master-service>store:landing-bucket>load-extract",
+        "flow:process:supplier-master-service>store:supplier-database>write-supplier-records"
+      ],
+      "verb": "intercept",
+      "grounds": [
+        {
+          "kind": "unknown-attribute",
+          "text": "",
+          "source_label": "",
+          "element_id": "flow:process:supplier-portal>store:document-store>store-documents",
+          "attribute": "encryption_in_transit",
+          "flow_id": "",
+          "term": "",
+          "assertion": ""
+        },
+        {
+          "kind": "unknown-attribute",
+          "text": "",
+          "source_label": "",
+          "element_id": "flow:process:supplier-master-service>store:landing-bucket>load-extract",
+          "attribute": "encryption_in_transit",
+          "flow_id": "",
+          "term": "",
+          "assertion": ""
+        },
+        {
+          "kind": "unknown-attribute",
+          "text": "",
+          "source_label": "",
+          "element_id": "flow:process:supplier-master-service>store:supplier-database>write-supplier-records",
+          "attribute": "encryption_in_transit",
+          "flow_id": "",
+          "term": "",
+          "assertion": ""
+        }
+      ],
+      "category": "information-disclosure",
+      "severity": {
+        "likelihood": "low",
+        "impact": "medium",
+        "level": "low",
+        "justification": "Likelihood is low and conditional because each relevant transport control is unverified and an attacker additionally needs a foothold or observation position on an internal vendor-platform or cloud-account path. Impact is medium because each path carries `pii` and `business-critical-data`, including bulk supplier extracts and records."
+      },
+      "mitigations": [
+        {
+          "summary": "Verify and require encrypted service-to-store transports",
+          "detail": "Document the protocol and `encryption_in_transit` control for each listed backend flow, then enforce TLS for portal-to-store, service-to-bucket, and service-to-database communications, including certificate validation or mTLS where supported."
+        },
+        {
+          "summary": "Reduce plaintext data on internal hops",
+          "detail": "Use opaque document and extract references where feasible, and restrict full document or supplier-record payloads to the component that must process them."
+        }
+      ]
+    },
+    {
+      "id": "I-04",
+      "framework": "stride",
+      "framework_version": "1.0",
+      "title": "Vendor-hosted compliance documents may be readable from storage media if at-rest encryption is absent",
+      "description": "`store:document-store` retains uploaded compliance documents tagged `pii` and `business-critical-data`, but its `encryption_at_rest` attribute is unknown. If that unresolved value represents unencrypted storage, a vendor operator, storage-layer attacker, or person obtaining the store's underlying media can read the documents without using `process:supplier-portal` or its application access path. This is conditional on the unknown at-rest control, not a claim that vendor storage is unencrypted. Second-order, disclosure of document contents and supplier staff contact details enables targeted attacks against the suppliers whose paperwork category managers review through `process:supplier-portal`.",
+      "affected_element_ids": [
+        "store:document-store"
+      ],
+      "verb": "read",
+      "grounds": [
+        {
+          "kind": "unknown-attribute",
+          "text": "",
+          "source_label": "",
+          "element_id": "store:document-store",
+          "attribute": "encryption_at_rest",
+          "flow_id": "",
+          "term": "",
+          "assertion": ""
+        },
+        {
+          "kind": "unknown-attribute",
+          "text": "",
+          "source_label": "",
+          "element_id": "store:document-store",
+          "attribute": "data_classification",
+          "flow_id": "",
+          "term": "",
+          "assertion": ""
+        }
+      ],
+      "category": "information-disclosure",
+      "severity": {
+        "likelihood": "low",
+        "impact": "medium",
+        "level": "low",
+        "justification": "Likelihood is low and conditional because `store:document-store` has unverified at-rest encryption and exploitation requires storage-layer access rather than ordinary portal access. Impact is medium because the store is tagged `pii` and `business-critical-data`, even though its data classification is not stated."
+      },
+      "mitigations": [
+        {
+          "summary": "Verify vendor encryption coverage for the document store",
+          "detail": "Obtain evidence of encryption at rest for `store:document-store`, including who controls keys and whether retained operational copies are covered."
+        },
+        {
+          "summary": "Contractually restrict storage-layer and export access",
+          "detail": "Require least-privilege vendor access to stored documents, audited export controls, and encryption coverage for any backup, snapshot, or recovery copy associated with the document store."
+        }
+      ]
+    },
+    {
+      "id": "I-05",
+      "framework": "stride",
+      "framework_version": "1.0",
+      "title": "Cloud-resident supplier extracts and records may be exposed from unencrypted storage",
+      "description": "`store:landing-bucket` contains the nightly supplier extract and `store:supplier-database` holds the loaded supplier records; both are tagged `pii` and `business-critical-data` and have `encryption_at_rest: unknown`. If either store is unencrypted at rest, an attacker or over-privileged insider with access to its backing storage can read the extract or supplier corpus directly, bypassing `process:supplier-master-service` and its normal read and write paths. This is conditional on the unresolved controls, not an assertion that either cloud store is unencrypted. Second-order, a landing-bucket copy exposes the same records that `process:supplier-master-service` loads into `store:supplier-database`, so one storage-layer disclosure can reveal the end-to-end supplier dataset before or after processing.",
+      "affected_element_ids": [
+        "store:landing-bucket",
+        "store:supplier-database"
+      ],
+      "verb": "read",
+      "grounds": [
+        {
+          "kind": "unknown-attribute",
+          "text": "",
+          "source_label": "",
+          "element_id": "store:landing-bucket",
+          "attribute": "encryption_at_rest",
+          "flow_id": "",
+          "term": "",
+          "assertion": ""
+        },
+        {
+          "kind": "unknown-attribute",
+          "text": "",
+          "source_label": "",
+          "element_id": "store:supplier-database",
+          "attribute": "encryption_at_rest",
+          "flow_id": "",
+          "term": "",
+          "assertion": ""
+        },
+        {
+          "kind": "unknown-attribute",
+          "text": "",
+          "source_label": "",
+          "element_id": "store:landing-bucket",
+          "attribute": "data_classification",
+          "flow_id": "",
+          "term": "",
+          "assertion": ""
+        },
+        {
+          "kind": "unknown-attribute",
+          "text": "",
+          "source_label": "",
+          "element_id": "store:supplier-database",
+          "attribute": "data_classification",
+          "flow_id": "",
+          "term": "",
+          "assertion": ""
+        }
+      ],
+      "category": "information-disclosure",
+      "severity": {
+        "likelihood": "low",
+        "impact": "medium",
+        "level": "low",
+        "justification": "Likelihood is low and conditional because both cloud stores have unverified encryption at rest and exploitation requires storage-layer access. Impact is medium because both stores hold `pii` and `business-critical-data`, including the nightly extract and the supplier records derived from it."
+      },
+      "mitigations": [
+        {
+          "summary": "Establish and enforce at-rest encryption for both cloud stores",
+          "detail": "Verify the current state, then require encryption at rest with cloud-account-controlled managed keys for `store:landing-bucket` and `store:supplier-database`."
+        },
+        {
+          "summary": "Apply the same controls to operational copies",
+          "detail": "Ensure bucket versions, recovery copies, snapshots, exports, and database backups inherit encryption and deny-by-default access controls; restrict decrypt and export permissions to separate least-privilege principals."
+        }
+      ]
+    },
+    {
+      "id": "D-01",
+      "framework": "stride",
+      "framework_version": "1.0",
+      "title": "Supplier upload flooding can exhaust the shared portal and document intake path",
+      "description": "A malicious or compromised supplier with vendor-issued credentials can repeatedly submit oversized or high-volume paperwork on `flow:entity:supplier>process:supplier-portal>upload-documents`. The model places that flow across a boundary from `entity:supplier` into `process:supplier-portal` (with the supplier endpoint placement inferred), while the portal's technology and any request-size, concurrency, timeout, or per-supplier quota controls are unverified. If those bounds are not enforced, attacker traffic consumes portal request-processing and document-ingest capacity at lower cost than the vendor platform spends accepting and storing each upload. Second-order, the same `process:supplier-portal` serves `flow:entity:category-manager>process:supplier-portal>review-documents`; exhausting it prevents category managers from reviewing, approving, or rejecting documents, while writes through `flow:process:supplier-portal>store:document-store>store-documents` may also backlog or fail.",
+      "affected_element_ids": [
+        "process:supplier-portal",
+        "flow:entity:supplier>process:supplier-portal>upload-documents"
+      ],
+      "verb": "flood",
+      "grounds": [
+        {
+          "kind": "quote",
+          "text": "Suppliers upload their compliance paperwork through a portal",
+          "source_label": "System description",
+          "element_id": "",
+          "attribute": "",
+          "flow_id": "",
+          "term": "",
+          "assertion": ""
+        },
+        {
+          "kind": "quote",
+          "text": "Suppliers sign in with a username and password that the vendor issues to them.",
+          "source_label": "System description",
+          "element_id": "",
+          "attribute": "",
+          "flow_id": "",
+          "term": "",
+          "assertion": ""
+        },
+        {
+          "kind": "derived-fact",
+          "text": "",
+          "source_label": "",
+          "element_id": "",
+          "attribute": "",
+          "flow_id": "flow:entity:supplier>process:supplier-portal>upload-documents",
+          "term": "",
+          "assertion": ""
+        },
+        {
+          "kind": "unknown-attribute",
+          "text": "",
+          "source_label": "",
+          "element_id": "process:supplier-portal",
+          "attribute": "technology",
+          "flow_id": "",
+          "term": "",
+          "assertion": ""
+        }
+      ],
+      "category": "denial-of-service",
+      "severity": {
+        "likelihood": "medium",
+        "impact": "medium",
+        "level": "medium",
+        "justification": "Likelihood is medium because a supplier needs a vendor-issued account, but the model places `entity:supplier` across the boundary on `flow:entity:supplier>process:supplier-portal>upload-documents` and records no verifiable portal technology or upload-processing bounds. Impact is medium because exhausting `process:supplier-portal` disrupts both supplier uploads and the separate category-manager review flow, but the stated availability loss is recoverable."
+      },
+      "mitigations": [
+        {
+          "summary": "Bound supplier upload cost before portal processing",
+          "detail": "Enforce authenticated per-supplier request, byte, concurrent-upload, and storage quotas on `flow:entity:supplier>process:supplier-portal>upload-documents`; reject over-limit requests before document parsing or storage allocation."
+        },
+        {
+          "summary": "Isolate review availability from document ingestion",
+          "detail": "Use bounded asynchronous document ingestion and load shedding so upload bursts cannot consume the request capacity needed by `flow:entity:category-manager>process:supplier-portal>review-documents`."
+        }
+      ]
+    },
+    {
+      "id": "D-02",
+      "framework": "stride",
+      "framework_version": "1.0",
+      "title": "Unverified vendor extract authentication may permit landing-bucket exhaustion",
+      "description": "`flow:entity:portal-vendor>store:landing-bucket>push-nightly-extract` crosses from `boundary:vendor-platform` into `boundary:cloud-account`, but its authentication is unknown. If the bucket's extract-write interface permits an attacker to submit data without a verified vendor identity, the attacker can flood `store:landing-bucket` with large or repeated extracts, consuming finite storage, write throughput, or provider quota. Second-order, `process:supplier-master-service` reads the extract via `flow:process:supplier-master-service>store:landing-bucket>load-extract`; a full or throughput-starved bucket prevents the nightly load, delaying supplier-record updates through `flow:process:supplier-master-service>store:supplier-database>write-supplier-records` and leaving dependent business processes without current supplier data. This is conditional on resolving the unknown authentication and on the bucket's unverified quota and object-size posture.",
+      "affected_element_ids": [
+        "store:landing-bucket",
+        "flow:entity:portal-vendor>store:landing-bucket>push-nightly-extract"
+      ],
+      "verb": "flood",
+      "grounds": [
+        {
+          "kind": "quote",
+          "text": "Every night the vendor pushes a supplier data extract to a landing bucket in our cloud account.",
+          "source_label": "System description",
+          "element_id": "",
+          "attribute": "",
+          "flow_id": "",
+          "term": "",
+          "assertion": ""
+        },
+        {
+          "kind": "derived-fact",
+          "text": "",
+          "source_label": "",
+          "element_id": "",
+          "attribute": "",
+          "flow_id": "flow:entity:portal-vendor>store:landing-bucket>push-nightly-extract",
+          "term": "",
+          "assertion": ""
+        },
+        {
+          "kind": "unknown-attribute",
+          "text": "",
+          "source_label": "",
+          "element_id": "flow:entity:portal-vendor>store:landing-bucket>push-nightly-extract",
+          "attribute": "authentication",
+          "flow_id": "",
+          "term": "",
+          "assertion": ""
+        },
+        {
+          "kind": "unknown-attribute",
+          "text": "",
+          "source_label": "",
+          "element_id": "store:landing-bucket",
+          "attribute": "technology",
+          "flow_id": "",
+          "term": "",
+          "assertion": ""
+        }
+      ],
+      "category": "denial-of-service",
+      "severity": {
+        "likelihood": "medium",
+        "impact": "medium",
+        "level": "medium",
+        "justification": "Likelihood is medium and conditional because `flow:entity:portal-vendor>store:landing-bucket>push-nightly-extract` is a cross-boundary write path whose authentication is unknown, so no verified identity gate is stated. Impact is medium because a starved `store:landing-bucket` stops the supplier-master load and delays business-critical supplier records, but the described outage is recoverable."
+      },
+      "mitigations": [
+        {
+          "summary": "Authenticate and constrain extract writers",
+          "detail": "Require a verified vendor workload identity for `flow:entity:portal-vendor>store:landing-bucket>push-nightly-extract`, authorize it only to a dedicated prefix, and apply per-writer object-size, write-rate, and storage quotas."
+        },
+        {
+          "summary": "Bound ingestion and protect the nightly loader",
+          "detail": "Validate extract size and format before `process:supplier-master-service` loads it, retain capacity headroom in `store:landing-bucket`, and alert on abnormal object count, byte growth, and quota consumption."
+        }
+      ]
+    },
+    {
+      "id": "E-01",
+      "framework": "stride",
+      "framework_version": "1.0",
+      "title": "Supplier accounts may gain cross-supplier document authority",
+      "description": "A supplier using its legitimately issued vendor username and password enters `process:supplier-portal` through `flow:entity:supplier>process:supplier-portal>upload-documents`, which crosses into the tenant-controlled `boundary:vendor-platform`. If `process:supplier-portal` does not enforce server-side ownership and role checks on every document operation, that supplier can substitute another supplier's document identifier to access or replace paperwork outside its own authority. This is a conditional horizontal escalation, not an assertion that the check is absent. Second-order, the unauthorized operation reaches documents retained in `store:document-store`, including supplier staff contact details and compliance records; altered documents can also affect the category-manager approval or rejection process.",
+      "affected_element_ids": [
+        "entity:supplier",
+        "flow:entity:supplier>process:supplier-portal>upload-documents",
+        "process:supplier-portal"
+      ],
+      "verb": "escalate",
+      "grounds": [
+        {
+          "kind": "quote",
+          "text": "Suppliers upload their compliance paperwork through a portal \u2014 insurance certificates, food safety audits, and contact details for their own staff.",
+          "source_label": "System description",
+          "element_id": "",
+          "attribute": "",
+          "flow_id": "",
+          "term": "",
+          "assertion": ""
+        },
+        {
+          "kind": "quote",
+          "text": "Suppliers sign in with a username and password that the vendor issues to them.",
+          "source_label": "System description",
+          "element_id": "",
+          "attribute": "",
+          "flow_id": "",
+          "term": "",
+          "assertion": ""
+        },
+        {
+          "kind": "quote",
+          "text": "The documents themselves stay in the vendor's platform.",
+          "source_label": "System description",
+          "element_id": "",
+          "attribute": "",
+          "flow_id": "",
+          "term": "",
+          "assertion": ""
+        },
+        {
+          "kind": "derived-fact",
+          "text": "",
+          "source_label": "",
+          "element_id": "",
+          "attribute": "",
+          "flow_id": "flow:entity:supplier>process:supplier-portal>upload-documents",
+          "term": "",
+          "assertion": ""
+        }
+      ],
+      "category": "elevation-of-privilege",
+      "severity": {
+        "likelihood": "medium",
+        "impact": "high",
+        "level": "high",
+        "justification": "Likelihood is medium and conditional on unverified per-object authorization in `process:supplier-portal`: an attacker needs a legitimately issued supplier credential but can exercise the normal `flow:entity:supplier>process:supplier-portal>upload-documents` crossing. Impact is high because the resulting authority can span other suppliers' compliance documents and staff contact details in `store:document-store`, which the model tags with `pii` and `business-critical-data`."
+      },
+      "mitigations": [
+        {
+          "summary": "Enforce object ownership in the portal",
+          "detail": "Make `process:supplier-portal` derive the supplier identity from the verified session and enforce server-side ownership checks for every read, update, and replacement of a document; reject caller-supplied supplier or document references outside that scope."
+        },
+        {
+          "summary": "Authorize review functions separately from supplier functions",
+          "detail": "Apply centralized, deny-by-default authorization in `process:supplier-portal` so supplier upload privileges cannot invoke category-manager review, approval, or rejection operations."
+        }
+      ]
+    }
+  ]
+}

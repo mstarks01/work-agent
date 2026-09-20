@@ -1,0 +1,1685 @@
+{
+  "schema_version": "3.0",
+  "disclaimer": "AI-generated security analysis. Not reviewed by a human security analyst.",
+  "job": {
+    "id": "eval-07-cicd-store-deploy",
+    "status": "completed",
+    "created_at": "2026-09-20T18:46:19.895141Z",
+    "completed_at": "2026-09-20T18:46:19.895141Z",
+    "revise_rounds": 0,
+    "frameworks": [
+      {
+        "name": "stride",
+        "options": {}
+      }
+    ]
+  },
+  "input": {
+    "system_name": "Build and deploy pipeline pushing container images to a 1,200-store estate",
+    "sources": [
+      {
+        "kind": "description",
+        "label": "System description",
+        "sha256": "1bfb96ef3374b697ef78e76661daa3d2b227792a3b20d2d1ee1d526cde02652c"
+      }
+    ],
+    "source_sha256": "07bdebd2c753c987d607e0f5eb4f1c22e14934ff863c035288d539d27b2ef05b"
+  },
+  "nodes": [
+    {
+      "node": "prepare",
+      "model": null,
+      "requested_model": null,
+      "instruction_sha256": null,
+      "execution_fingerprint": null,
+      "duration_ms": 4,
+      "usage": null,
+      "attempts": 1,
+      "reported_charge_usd": null,
+      "served_upstream": null,
+      "served_trust": null
+    },
+    {
+      "node": "analyze_stride_denial_of_service",
+      "model": "openrouter/openai/gpt-5.6-terra",
+      "requested_model": "openrouter/openai/gpt-5.6-terra",
+      "instruction_sha256": "ea3fb48de6420011ff54cfba38cd1ba317f69d85fd250c2743e6385e6047fcf5",
+      "execution_fingerprint": "26d18056229c59b96bf14e32468736d55d03db8b188dede1d59629074fc0c27f",
+      "duration_ms": 14131,
+      "usage": {
+        "prompt_tokens": 18254,
+        "cached_prompt_tokens": 0,
+        "completion_tokens": 1105,
+        "reasoning_tokens": 516,
+        "total_tokens": 19359
+      },
+      "attempts": 1,
+      "reported_charge_usd": 0.0588935,
+      "served_upstream": "OpenAI",
+      "served_trust": "requested_echo"
+    },
+    {
+      "node": "analyze_stride_repudiation",
+      "model": "openrouter/openai/gpt-5.6-terra",
+      "requested_model": "openrouter/openai/gpt-5.6-terra",
+      "instruction_sha256": "ea3fb48de6420011ff54cfba38cd1ba317f69d85fd250c2743e6385e6047fcf5",
+      "execution_fingerprint": "26d18056229c59b96bf14e32468736d55d03db8b188dede1d59629074fc0c27f",
+      "duration_ms": 19213,
+      "usage": {
+        "prompt_tokens": 18896,
+        "cached_prompt_tokens": 0,
+        "completion_tokens": 1604,
+        "reasoning_tokens": 516,
+        "total_tokens": 20500
+      },
+      "attempts": 1,
+      "reported_charge_usd": 0.0664865,
+      "served_upstream": "OpenAI",
+      "served_trust": "requested_echo"
+    },
+    {
+      "node": "analyze_stride_information_disclosure",
+      "model": "openrouter/openai/gpt-5.6-terra",
+      "requested_model": "openrouter/openai/gpt-5.6-terra",
+      "instruction_sha256": "ea3fb48de6420011ff54cfba38cd1ba317f69d85fd250c2743e6385e6047fcf5",
+      "execution_fingerprint": "26d18056229c59b96bf14e32468736d55d03db8b188dede1d59629074fc0c27f",
+      "duration_ms": 36623,
+      "usage": {
+        "prompt_tokens": 19181,
+        "cached_prompt_tokens": 0,
+        "completion_tokens": 2875,
+        "reasoning_tokens": 1890,
+        "total_tokens": 22056
+      },
+      "attempts": 1,
+      "reported_charge_usd": 0.082451,
+      "served_upstream": "OpenAI",
+      "served_trust": "requested_echo"
+    },
+    {
+      "node": "analyze_stride_spoofing",
+      "model": "openrouter/openai/gpt-5.6-terra",
+      "requested_model": "openrouter/openai/gpt-5.6-terra",
+      "instruction_sha256": "ea3fb48de6420011ff54cfba38cd1ba317f69d85fd250c2743e6385e6047fcf5",
+      "execution_fingerprint": "26d18056229c59b96bf14e32468736d55d03db8b188dede1d59629074fc0c27f",
+      "duration_ms": 37497,
+      "usage": {
+        "prompt_tokens": 18692,
+        "cached_prompt_tokens": 0,
+        "completion_tokens": 3194,
+        "reasoning_tokens": 2063,
+        "total_tokens": 21886
+      },
+      "attempts": 1,
+      "reported_charge_usd": 0.0850565,
+      "served_upstream": "OpenAI",
+      "served_trust": "requested_echo"
+    },
+    {
+      "node": "analyze_stride_tampering",
+      "model": "openrouter/openai/gpt-5.6-terra",
+      "requested_model": "openrouter/openai/gpt-5.6-terra",
+      "instruction_sha256": "ea3fb48de6420011ff54cfba38cd1ba317f69d85fd250c2743e6385e6047fcf5",
+      "execution_fingerprint": "26d18056229c59b96bf14e32468736d55d03db8b188dede1d59629074fc0c27f",
+      "duration_ms": 41094,
+      "usage": {
+        "prompt_tokens": 19749,
+        "cached_prompt_tokens": 0,
+        "completion_tokens": 3474,
+        "reasoning_tokens": 1748,
+        "total_tokens": 23223
+      },
+      "attempts": 1,
+      "reported_charge_usd": 0.091059,
+      "served_upstream": "OpenAI",
+      "served_trust": "requested_echo"
+    },
+    {
+      "node": "analyze_stride_elevation_of_privilege",
+      "model": "openrouter/openai/gpt-5.6-terra",
+      "requested_model": "openrouter/openai/gpt-5.6-terra",
+      "instruction_sha256": "ea3fb48de6420011ff54cfba38cd1ba317f69d85fd250c2743e6385e6047fcf5",
+      "execution_fingerprint": "26d18056229c59b96bf14e32468736d55d03db8b188dede1d59629074fc0c27f",
+      "duration_ms": 48246,
+      "usage": {
+        "prompt_tokens": 17478,
+        "cached_prompt_tokens": 0,
+        "completion_tokens": 3726,
+        "reasoning_tokens": 3106,
+        "total_tokens": 21204
+      },
+      "attempts": 1,
+      "reported_charge_usd": 0.0884055,
+      "served_upstream": "OpenAI",
+      "served_trust": "requested_echo"
+    },
+    {
+      "node": "join_stride",
+      "model": null,
+      "requested_model": null,
+      "instruction_sha256": null,
+      "execution_fingerprint": null,
+      "duration_ms": 1,
+      "usage": null,
+      "attempts": 1,
+      "reported_charge_usd": null,
+      "served_upstream": null,
+      "served_trust": null
+    },
+    {
+      "node": "merge_stride",
+      "model": null,
+      "requested_model": null,
+      "instruction_sha256": null,
+      "execution_fingerprint": null,
+      "duration_ms": 5,
+      "usage": null,
+      "attempts": 1,
+      "reported_charge_usd": null,
+      "served_upstream": null,
+      "served_trust": null
+    },
+    {
+      "node": "critic_stride",
+      "model": "openrouter/openai/gpt-5.6-terra",
+      "requested_model": "openrouter/openai/gpt-5.6-terra",
+      "instruction_sha256": "ea3fb48de6420011ff54cfba38cd1ba317f69d85fd250c2743e6385e6047fcf5",
+      "execution_fingerprint": "26d18056229c59b96bf14e32468736d55d03db8b188dede1d59629074fc0c27f",
+      "duration_ms": 45298,
+      "usage": {
+        "prompt_tokens": 18295,
+        "cached_prompt_tokens": 0,
+        "completion_tokens": 3741,
+        "reasoning_tokens": 2272,
+        "total_tokens": 22036
+      },
+      "attempts": 1,
+      "reported_charge_usd": 0.090628,
+      "served_upstream": "OpenAI",
+      "served_trust": "requested_echo"
+    },
+    {
+      "node": "router_stride",
+      "model": null,
+      "requested_model": null,
+      "instruction_sha256": null,
+      "execution_fingerprint": null,
+      "duration_ms": 2,
+      "usage": null,
+      "attempts": 1,
+      "reported_charge_usd": null,
+      "served_upstream": null,
+      "served_trust": null
+    },
+    {
+      "node": "assemble",
+      "model": null,
+      "requested_model": null,
+      "instruction_sha256": null,
+      "execution_fingerprint": null,
+      "duration_ms": 2,
+      "usage": null,
+      "attempts": 1,
+      "reported_charge_usd": null,
+      "served_upstream": null,
+      "served_trust": null
+    }
+  ],
+  "sampling": {
+    "base": {
+      "temperature": null,
+      "top_p": null,
+      "seed": null,
+      "max_output_tokens": 16384,
+      "candidate_count": 1,
+      "presence_penalty": null,
+      "frequency_penalty": null,
+      "thinking": null,
+      "constrain_output": true
+    },
+    "strong": {
+      "temperature": null,
+      "top_p": null,
+      "seed": null,
+      "max_output_tokens": 64000,
+      "candidate_count": 1,
+      "presence_penalty": null,
+      "frequency_penalty": null,
+      "thinking": null,
+      "constrain_output": true
+    },
+    "review": {
+      "temperature": null,
+      "top_p": null,
+      "seed": null,
+      "max_output_tokens": 64000,
+      "candidate_count": 1,
+      "presence_penalty": null,
+      "frequency_penalty": null,
+      "thinking": null,
+      "constrain_output": true
+    }
+  },
+  "system_model": {
+    "external_entities": [
+      {
+        "id": "entity:developer",
+        "name": "developer",
+        "description": "Writes changes and pushes branches to the self-hosted git server; can also log in to the build runner and trigger an unreviewed rebuild of main by hand.",
+        "assets": [],
+        "source_excerpt": "Developers push their branches to our self-hosted git server, which sits on the corporate network.",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "human",
+        "trust_zone": "boundary:corporate-network"
+      },
+      {
+        "id": "entity:public-package-registry",
+        "name": "public package registry",
+        "description": "Public dependency source on the internet that the build runner resolves the lockfile against.",
+        "assets": [],
+        "source_excerpt": "Dependency resolution reaches out to the public package registry on the internet",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "external-system",
+        "trust_zone": "boundary:internet"
+      }
+    ],
+    "processes": [
+      {
+        "id": "process:build-runner",
+        "name": "build runner",
+        "description": "Picks up a merge to main, fetches the source, resolves the dependency lockfile and produces a container image tagged with the commit sha. Holds the shared build token used to call the deploy controller.",
+        "assets": [
+          "credentials",
+          "business-critical-data"
+        ],
+        "source_excerpt": "The build runner picks the merge up, fetches the source, resolves the dependency lockfile and produces a container image.",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:build-environment",
+        "exposure": "unknown",
+        "interface_kind": "unknown"
+      },
+      {
+        "id": "process:deploy-controller",
+        "name": "deploy controller",
+        "description": "Holds one record — which image sha the estate should be on. Set by the build runner, polled by every store server.",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "The deploy controller runs on the corporate network and holds one record: which image sha the estate should be on.",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:corporate-network",
+        "exposure": "unknown",
+        "interface_kind": "unknown"
+      },
+      {
+        "id": "process:store-server",
+        "name": "store server",
+        "description": "The back-office server in each of about 1,200 stores, running the till software as a container. Polls the deploy controller once a minute and pulls and restarts on a new release.",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "Each store has a small server in the back office running the till software as a container.",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "One element stands for the whole fleet of ~1,200 identical servers; the source describes them collectively and states no per-store difference.",
+        "technology": "container runtime running the till software",
+        "trust_zone": "boundary:store-estate",
+        "exposure": "unknown",
+        "interface_kind": "unknown"
+      }
+    ],
+    "data_stores": [
+      {
+        "id": "store:git-server",
+        "name": "git server",
+        "description": "Self-hosted git server holding developer branches and main; a merge to main is what starts a build.",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "Developers push their branches to our self-hosted git server, which sits on the corporate network.",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "The source treats the git server both as somewhere source rests and as something developers push to; modelled as a Data Store, which is where the source code actually lives.",
+        "technology": "self-hosted git server",
+        "trust_zone": "boundary:corporate-network",
+        "data_classification": "unknown",
+        "encryption_at_rest": "unknown"
+      },
+      {
+        "id": "store:image-registry",
+        "name": "image registry",
+        "description": "Holds the container images, tagged with the commit sha. Sits in the build environment and is reachable from the store estate over the WAN.",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "It pushes the finished image to our image registry, which is also in the build environment.",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "container image registry",
+        "trust_zone": "boundary:build-environment",
+        "data_classification": "unknown",
+        "encryption_at_rest": "unknown"
+      }
+    ],
+    "data_flows": [
+      {
+        "id": "flow:entity:developer>store:git-server>push-branches",
+        "name": "push branches",
+        "description": "Developers push their branches to the git server; a merge to main is what starts a build.",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "Developers push their branches to our self-hosted git server, which sits on the corporate network.",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "source": "entity:developer",
+        "destination": "store:git-server",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "source code branches",
+        "encryption_in_transit": "unknown",
+        "operations": "write"
+      },
+      {
+        "id": "flow:entity:developer>process:build-runner>manual-rebuild",
+        "name": "manual rebuild",
+        "description": "Any developer can log in to the build runner and kick off a rebuild of main by hand.",
+        "assets": [],
+        "source_excerpt": "And any developer can log in to the build runner and kick off a rebuild of main by hand; that path does not require a merge and is not reviewed.",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "source": "entity:developer",
+        "destination": "process:build-runner",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "an interactive login and a rebuild of main that any developer may trigger, requiring no merge and receiving no review",
+        "encryption_in_transit": "unknown",
+        "operations": "write"
+      },
+      {
+        "id": "flow:process:build-runner>store:git-server>fetch-source",
+        "name": "fetch source",
+        "description": "The runner picks the merge up and fetches the source it is going to build.",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "The build runner picks the merge up, fetches the source, resolves the dependency lockfile and produces a container image.",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:build-runner",
+        "destination": "store:git-server",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "the source of the merged commit",
+        "encryption_in_transit": "unknown",
+        "operations": "read"
+      },
+      {
+        "id": "flow:process:build-runner>entity:public-package-registry>resolve-dependencies",
+        "name": "resolve dependencies",
+        "description": "The runner resolves the lockfile against the public package registry and takes what it downloads as given.",
+        "assets": [],
+        "source_excerpt": "Dependency resolution reaches out to the public package registry on the internet, and the lockfile is taken as given — the runner does not verify signatures on what it downloads.",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "The source states one verification gap: the runner does not verify signatures on what it downloads. That is artifact authenticity under a signing trust policy, not how the runner authenticates to the registry, which the source never describes. This prose is the only record of it — no rule reads notes, so the gap reaches no candidate and no evidence entry until the assertion layer in #926 gives it a field.",
+        "source": "process:build-runner",
+        "destination": "entity:public-package-registry",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "dependency packages named by the lockfile, which is taken as given",
+        "encryption_in_transit": "unknown",
+        "operations": "read"
+      },
+      {
+        "id": "flow:process:build-runner>store:image-registry>push-image",
+        "name": "push image",
+        "description": "The runner pushes the finished image, tagged with the commit sha, to the registry.",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "It pushes the finished image to our image registry, which is also in the build environment.",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:build-runner",
+        "destination": "store:image-registry",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "the built container image, tagged with the commit sha",
+        "encryption_in_transit": "unknown",
+        "operations": "write"
+      },
+      {
+        "id": "flow:process:build-runner>process:deploy-controller>set-current-release",
+        "name": "set current release",
+        "description": "The runner calls the controller and asks it to make the image it just pushed the current release.",
+        "assets": [
+          "credentials",
+          "business-critical-data"
+        ],
+        "source_excerpt": "The token the runner uses to call the controller is a shared build token that is the same for every pipeline and has not been rotated since the pipeline was set up.",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:build-runner",
+        "destination": "process:deploy-controller",
+        "protocol": "unknown",
+        "authentication": "a shared build token, the same for every pipeline, never rotated since the pipeline was set up",
+        "data_description": "the image sha that should become the current release",
+        "encryption_in_transit": "unknown",
+        "operations": "write"
+      },
+      {
+        "id": "flow:process:store-server>process:deploy-controller>poll-current-release",
+        "name": "poll current release",
+        "description": "Every store server asks the controller once a minute what the current release is; the store initiates, nothing is pushed to it.",
+        "assets": [],
+        "source_excerpt": "The store servers do not get pushed to. Every store server asks the deploy controller once a minute what the current release is",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:store-server",
+        "destination": "process:deploy-controller",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "the image sha the estate should be on",
+        "encryption_in_transit": "unknown",
+        "operations": "read"
+      },
+      {
+        "id": "flow:process:store-server>store:image-registry>pull-image",
+        "name": "pull image",
+        "description": "On a changed release the store server pulls that image from the registry over the WAN and restarts the container.",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "if it differs from what it is running it pulls that image from the registry and restarts the container. The registry allows the pull; nobody has written down what a store server presents to it",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:store-server",
+        "destination": "store:image-registry",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "the container image for the current release",
+        "encryption_in_transit": "unknown",
+        "operations": "read"
+      }
+    ],
+    "trust_boundaries": [
+      {
+        "id": "boundary:corporate-network",
+        "name": "corporate network",
+        "description": "Holds the git server and the deploy controller, and is where developers sit.",
+        "assets": [],
+        "source_excerpt": "our self-hosted git server, which sits on the corporate network",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "network"
+      },
+      {
+        "id": "boundary:build-environment",
+        "name": "build environment",
+        "description": "The runner's own environment, stated to be separate from the corporate network; the image registry is in it too.",
+        "assets": [],
+        "source_excerpt": "The runner lives in its own build environment, separate from the corporate network.",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "network"
+      },
+      {
+        "id": "boundary:store-estate",
+        "name": "store estate",
+        "description": "About 1,200 back-office store servers, reaching the corporate network and the registry over the retail WAN.",
+        "assets": [],
+        "source_excerpt": "Traffic between the stores and the corporate network goes over the retail WAN.",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "network"
+      },
+      {
+        "id": "boundary:internet",
+        "name": "internet",
+        "description": "Where the public package registry sits.",
+        "assets": [],
+        "source_excerpt": "Dependency resolution reaches out to the public package registry on the internet",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "network"
+      }
+    ],
+    "assumptions": [
+      {
+        "assumption": "Developers sit on the corporate network.",
+        "element_id": "entity:developer",
+        "attribute": "trust_zone",
+        "basis": "The git server they push to is stated to sit on the corporate network; the source places developers nowhere else."
+      },
+      {
+        "assumption": "developer's trust_zone is boundary:corporate-network, which the schema requires and no source states.",
+        "element_id": "entity:developer",
+        "attribute": "trust_zone",
+        "basis": "The description locates the git server, not developers. Access to a corporate service does not establish the caller's network membership."
+      }
+    ]
+  },
+  "boundary_crossings": [
+    {
+      "flow_id": "flow:entity:developer>process:build-runner>manual-rebuild",
+      "source_zone": "boundary:corporate-network",
+      "destination_zone": "boundary:build-environment",
+      "decided": true,
+      "assumed_endpoints": [
+        "entity:developer"
+      ]
+    },
+    {
+      "flow_id": "flow:process:build-runner>store:git-server>fetch-source",
+      "source_zone": "boundary:build-environment",
+      "destination_zone": "boundary:corporate-network",
+      "decided": true,
+      "assumed_endpoints": []
+    },
+    {
+      "flow_id": "flow:process:build-runner>entity:public-package-registry>resolve-dependencies",
+      "source_zone": "boundary:build-environment",
+      "destination_zone": "boundary:internet",
+      "decided": true,
+      "assumed_endpoints": []
+    },
+    {
+      "flow_id": "flow:process:build-runner>process:deploy-controller>set-current-release",
+      "source_zone": "boundary:build-environment",
+      "destination_zone": "boundary:corporate-network",
+      "decided": true,
+      "assumed_endpoints": []
+    },
+    {
+      "flow_id": "flow:process:store-server>process:deploy-controller>poll-current-release",
+      "source_zone": "boundary:store-estate",
+      "destination_zone": "boundary:corporate-network",
+      "decided": true,
+      "assumed_endpoints": []
+    },
+    {
+      "flow_id": "flow:process:store-server>store:image-registry>pull-image",
+      "source_zone": "boundary:store-estate",
+      "destination_zone": "boundary:build-environment",
+      "decided": true,
+      "assumed_endpoints": []
+    }
+  ],
+  "shared_element_names": [],
+  "elements_analyzed": 19,
+  "model_repair": null,
+  "assertions": null,
+  "analysis_context": {
+    "instruction_sha256": "ea3fb48de6420011ff54cfba38cd1ba317f69d85fd250c2743e6385e6047fcf5",
+    "domain_packs": []
+  },
+  "execution": {
+    "identity_version": 2,
+    "build": {
+      "analysis-service": "0.1.0",
+      "google-adk": "2.5.0",
+      "google-genai": "2.11.0",
+      "litellm": "1.97.0"
+    },
+    "review_independence": "shared",
+    "extraction_format": null,
+    "extraction_strategy": null
+  },
+  "analyses": [
+    {
+      "framework": "stride",
+      "framework_version": "1.0",
+      "disclaimer": "AI-generated STRIDE threat model. Each claim asserts that an attacker action against the named elements is credible against what the submitted text stated. Where the text says a control is not there, a claim says so and cites that sentence; where the text is silent, the claim is conditional on a fact nobody supplied, and the service never reads silence as absence. Nothing not listed here is thereby safe. Not reviewed by a human security analyst.",
+      "claims": [
+        {
+          "id": "I-01",
+          "framework": "stride",
+          "framework_version": "1.0",
+          "title": "Shared build token may be intercepted on the unverified runner-to-controller link",
+          "description": "`flow:process:build-runner>process:deploy-controller>set-current-release` crosses from `boundary:build-environment` to `boundary:corporate-network`, and its `encryption_in_transit` attribute is unknown. If transport encryption is absent or terminates before this segment, an attacker able to observe that crossing can intercept the shared build token used by `process:build-runner` to call `process:deploy-controller`. The token is shared by every pipeline and has never been rotated, so its disclosure is not isolated to one build. Second-order, a holder can use the credential on the controller path that sets the current image SHA; `process:store-server` polls that controller and then pulls the selected release, extending the credential's reach to the store estate.",
+          "affected_element_ids": [
+            "flow:process:build-runner>process:deploy-controller>set-current-release",
+            "process:build-runner",
+            "process:deploy-controller"
+          ],
+          "verb": "intercept",
+          "grounds": [
+            {
+              "kind": "quote",
+              "text": "The token the runner uses to call the controller is a shared build token that is the same for every pipeline and has not been rotated since the pipeline was set up.",
+              "source_label": "System description",
+              "element_id": "",
+              "attribute": "",
+              "flow_id": "",
+              "term": "",
+              "assertion": ""
+            },
+            {
+              "kind": "unknown-attribute",
+              "text": "",
+              "source_label": "",
+              "element_id": "flow:process:build-runner>process:deploy-controller>set-current-release",
+              "attribute": "encryption_in_transit",
+              "flow_id": "",
+              "term": "",
+              "assertion": ""
+            },
+            {
+              "kind": "derived-fact",
+              "text": "",
+              "source_label": "",
+              "element_id": "",
+              "attribute": "",
+              "flow_id": "flow:process:build-runner>process:deploy-controller>set-current-release",
+              "term": "",
+              "assertion": ""
+            }
+          ],
+          "verdict": {
+            "status": "needs-info",
+            "reason": "Interception of the shared build token depends on whether the build-runner-to-controller crossing is encrypted in transit.",
+            "related_unknowns": [
+              {
+                "element_id": "flow:process:build-runner>process:deploy-controller>set-current-release",
+                "attribute": "encryption_in_transit",
+                "subject": "",
+                "assertion": ""
+              }
+            ],
+            "immaterial_unknowns": [],
+            "rejected_because": null
+          },
+          "category": "information-disclosure",
+          "severity": {
+            "likelihood": "medium",
+            "impact": "high",
+            "level": "high",
+            "justification": "Likelihood is medium and conditional on the unknown transport protection: the flow crosses the build and corporate zones, so an attacker still needs an on-path position, but no verified encryption is recorded. Impact is high because the disclosed credential is shared across every pipeline and authorizes the release-selection path used by `process:store-server` throughout the approximately 1,200-store estate."
+          },
+          "mitigations": [
+            {
+              "summary": "Require mutually authenticated encrypted transport to the deploy controller",
+              "detail": "Configure TLS 1.2+ with mTLS on `flow:process:build-runner>process:deploy-controller>set-current-release`, and document where TLS terminates so the entire zone-crossing segment is protected."
+            },
+            {
+              "summary": "Replace the shared build token with scoped short-lived credentials",
+              "detail": "Issue a unique workload identity per pipeline with only the authority needed to set its release, rotate credentials automatically, and revoke identities promptly after a compromise."
+            }
+          ],
+          "confidence": "low",
+          "recommendation": {
+            "sound": true,
+            "note": "End-to-end mutually authenticated encrypted transport and replacement of the static shared token directly address interception and reuse."
+          }
+        },
+        {
+          "id": "R-01",
+          "framework": "stride",
+          "framework_version": "1.0",
+          "title": "Shared build token prevents attribution of a release change to a pipeline",
+          "description": "A person operating one pipeline, or an actor who obtains its build credential, can set a release through `flow:process:build-runner>process:deploy-controller>set-current-release` on `process:deploy-controller` and later deny having done so. The authentication value is a shared build token used by every pipeline, so any controller record that identifies the presenting credential can narrow the action only to the population of pipelines, not to the pipeline or responsible actor that selected the image SHA. This is an accountability gap rather than a claim that the actor obtained the token. Second-order: `process:deploy-controller` supplies the selected release to `process:store-server` through `flow:process:store-server>process:deploy-controller>poll-current-release`; an unattributable release decision can therefore affect the whole store estate.",
+          "affected_element_ids": [
+            "process:build-runner",
+            "process:deploy-controller",
+            "flow:process:build-runner>process:deploy-controller>set-current-release"
+          ],
+          "verb": "unattributable",
+          "grounds": [
+            {
+              "kind": "quote",
+              "text": "The token the runner uses to call the controller is a shared build token that is the same for every pipeline",
+              "source_label": "System description",
+              "element_id": "",
+              "attribute": "",
+              "flow_id": "",
+              "term": "",
+              "assertion": ""
+            },
+            {
+              "kind": "derived-fact",
+              "text": "",
+              "source_label": "",
+              "element_id": "",
+              "attribute": "",
+              "flow_id": "flow:process:build-runner>process:deploy-controller>set-current-release",
+              "term": "",
+              "assertion": ""
+            }
+          ],
+          "verdict": {
+            "status": "confirmed",
+            "reason": "",
+            "related_unknowns": [],
+            "immaterial_unknowns": [],
+            "rejected_because": null
+          },
+          "category": "repudiation",
+          "severity": {
+            "likelihood": "medium",
+            "impact": "high",
+            "level": "high",
+            "justification": "Likelihood is medium: exploiting the attribution gap requires control of, or responsibility for, a pipeline using the shared token, although `flow:process:build-runner>process:deploy-controller>set-current-release` crosses from `boundary:build-environment` to `boundary:corporate-network`. Impact is high: `process:deploy-controller` holds `business-critical-data` determining the estate release, and every `process:store-server` polls it through `flow:process:store-server>process:deploy-controller>poll-current-release`."
+          },
+          "mitigations": [
+            {
+              "summary": "Give each pipeline a distinct deploy identity",
+              "detail": "Replace the shared build token on `flow:process:build-runner>process:deploy-controller>set-current-release` with short-lived, per-pipeline credentials so the controller can record a principal unique to the pipeline initiating each release."
+            },
+            {
+              "summary": "Retain immutable deployment evidence",
+              "detail": "Have `process:deploy-controller` record the verified pipeline identity, requested image SHA, timestamp, outcome, and originating change identifier in append-only audit storage separate from the build runner."
+            }
+          ],
+          "confidence": "high",
+          "recommendation": {
+            "sound": true,
+            "note": "Unique pipeline identities and immutable controller-side deployment evidence directly address the shared-token attribution gap."
+          }
+        },
+        {
+          "id": "R-02",
+          "framework": "stride",
+          "framework_version": "1.0",
+          "title": "Manual rebuilds may not be attributable to an individual developer",
+          "description": "Any developer can initiate an unreviewed rebuild of main through `flow:entity:developer>process:build-runner>manual-rebuild`, but that flow's `authentication` is unknown. If the unresolved authentication does not bind the interactive session and resulting rebuild to an individual developer in retained records, a developer can trigger a rebuild and deny doing so; neither the lack of review nor a record naming only a generic runner session would rebut the dispute. This is conditional on the unknown attribute, not an assertion that the runner lacks authentication or logging. Second-order: a rebuild produces an image via `flow:process:build-runner>store:image-registry>push-image` and can set the estate release through `flow:process:build-runner>process:deploy-controller>set-current-release`, so the accountability failure can extend to a deployment consumed by store servers.",
+          "affected_element_ids": [
+            "entity:developer",
+            "process:build-runner",
+            "flow:entity:developer>process:build-runner>manual-rebuild"
+          ],
+          "verb": "unattributable",
+          "grounds": [
+            {
+              "kind": "quote",
+              "text": "any developer can log in to the build runner and kick off a rebuild of `main` by hand; that path does not require a merge and is not reviewed",
+              "source_label": "System description",
+              "element_id": "",
+              "attribute": "",
+              "flow_id": "",
+              "term": "",
+              "assertion": ""
+            },
+            {
+              "kind": "derived-fact",
+              "text": "",
+              "source_label": "",
+              "element_id": "",
+              "attribute": "",
+              "flow_id": "flow:entity:developer>process:build-runner>manual-rebuild",
+              "term": "",
+              "assertion": ""
+            },
+            {
+              "kind": "unknown-attribute",
+              "text": "",
+              "source_label": "",
+              "element_id": "flow:entity:developer>process:build-runner>manual-rebuild",
+              "attribute": "authentication",
+              "flow_id": "",
+              "term": "",
+              "assertion": ""
+            }
+          ],
+          "verdict": {
+            "status": "needs-info",
+            "reason": "Whether a manual rebuild can be reliably attributed depends on whether the interactive rebuild flow authenticates and binds the action to an individual developer.",
+            "related_unknowns": [
+              {
+                "element_id": "flow:entity:developer>process:build-runner>manual-rebuild",
+                "attribute": "authentication",
+                "subject": "",
+                "assertion": ""
+              }
+            ],
+            "immaterial_unknowns": [],
+            "rejected_because": null
+          },
+          "category": "repudiation",
+          "severity": {
+            "likelihood": "medium",
+            "impact": "high",
+            "level": "high",
+            "justification": "Likelihood is medium and conditional on the unknown authentication on `flow:entity:developer>process:build-runner>manual-rebuild`: a developer must access the corporate development environment, but the flow crosses into `boundary:build-environment` and any developer is stated to be able to invoke it. Impact is high: `process:build-runner` holds `credentials` and `business-critical-data`, and its rebuild output can be deployed through `process:deploy-controller` to the approximately 1,200-store estate."
+          },
+          "mitigations": [
+            {
+              "summary": "Require individually attributable manual rebuild authentication",
+              "detail": "Use individual developer credentials with strong authentication on `flow:entity:developer>process:build-runner>manual-rebuild`, and record the verified subject rather than a self-reported username."
+            },
+            {
+              "summary": "Record immutable rebuild-to-release provenance",
+              "detail": "Emit structured audit events for manual rebuild requests, source revision, image SHA, approval state, deployment request, timestamp, and outcome to append-only audit storage under a separate write principal."
+            }
+          ],
+          "confidence": "low",
+          "recommendation": {
+            "sound": true,
+            "note": "Individual strong authentication and immutable rebuild-to-release audit evidence address attribution of manual rebuilds."
+          }
+        },
+        {
+          "id": "S-01",
+          "framework": "stride",
+          "framework_version": "1.0",
+          "title": "Shared build token lets a token holder act as the build runner",
+          "description": "An attacker who obtains the shared build token can present it on `flow:process:build-runner>process:deploy-controller>set-current-release` and act as `process:build-runner` to `process:deploy-controller`, selecting a release as though it came from a legitimate pipeline. The token is shared by every pipeline and has never been rotated, so compromise of any holder remains useful and cannot be attributed to one pipeline. Second-order, `process:store-server` polls the controller and the model represents about 1,200 store servers; a forged current-release value therefore reaches the estate's deployment path rather than only the controller.",
+          "affected_element_ids": [
+            "process:build-runner",
+            "process:deploy-controller",
+            "flow:process:build-runner>process:deploy-controller>set-current-release"
+          ],
+          "verb": "use-credential",
+          "grounds": [
+            {
+              "kind": "quote",
+              "text": "The token the runner uses to call the controller is a shared build token that is the same for every pipeline and has not been rotated since the pipeline was set up.",
+              "source_label": "System description",
+              "element_id": "",
+              "attribute": "",
+              "flow_id": "",
+              "term": "",
+              "assertion": ""
+            },
+            {
+              "kind": "quote",
+              "text": "We run about 1,200 stores.",
+              "source_label": "System description",
+              "element_id": "",
+              "attribute": "",
+              "flow_id": "",
+              "term": "",
+              "assertion": ""
+            },
+            {
+              "kind": "derived-fact",
+              "text": "",
+              "source_label": "",
+              "element_id": "",
+              "attribute": "",
+              "flow_id": "flow:process:build-runner>process:deploy-controller>set-current-release",
+              "term": "",
+              "assertion": ""
+            }
+          ],
+          "verdict": {
+            "status": "confirmed",
+            "reason": "",
+            "related_unknowns": [],
+            "immaterial_unknowns": [],
+            "rejected_because": null
+          },
+          "category": "spoofing",
+          "severity": {
+            "likelihood": "medium",
+            "impact": "high",
+            "level": "high",
+            "justification": "Likelihood is medium: `flow:process:build-runner>process:deploy-controller>set-current-release` crosses from the build environment to the corporate network, while the stated credential is shared across every pipeline and never rotated; exploitation still requires obtaining that token. Impact is high: `process:deploy-controller` selects the release that every `process:store-server` polls, and the model states the store-server element represents roughly 1,200 servers carrying `business-critical-data`."
+          },
+          "mitigations": [
+            {
+              "summary": "Replace the shared build token with per-workload short-lived identity",
+              "detail": "Authenticate `flow:process:build-runner>process:deploy-controller>set-current-release` with a unique build-runner workload identity, such as mTLS or short-lived audience-bound OIDC tokens, rather than a token shared by all pipelines."
+            },
+            {
+              "summary": "Rotate and scope deployment credentials",
+              "detail": "Immediately rotate the existing token, restrict any residual credential to the minimum release-setting operation and one pipeline identity, and record the authenticated workload identity at `process:deploy-controller`."
+            }
+          ],
+          "confidence": "high",
+          "recommendation": {
+            "sound": true,
+            "note": "The recommendations replace the shared credential with uniquely attributable, scoped identities and address rotation and controller-side evidence."
+          }
+        },
+        {
+          "id": "S-02",
+          "framework": "stride",
+          "framework_version": "1.0",
+          "title": "A spoofed public package registry could supply dependencies to the build runner",
+          "description": "`flow:process:build-runner>entity:public-package-registry>resolve-dependencies` crosses from the build environment to the internet, while its `protocol` and `encryption_in_transit` are unknown. If those unknowns resolve to transport without validated registry identity, an attacker able to redirect the dependency request can impersonate `entity:public-package-registry` to `process:build-runner`. The runner takes downloaded dependencies as given and does not verify signatures, so the impostor can supply a dependency that is incorporated into the produced image. Second-order, the build path sets the current release through `process:deploy-controller`, and store servers subsequently pull and restart on that release; the reach is therefore the in-store estate, not only the build environment. This draft is conditional on the unverified transport and server-authentication state; it does not assert that those controls are absent.",
+          "affected_element_ids": [
+            "process:build-runner",
+            "entity:public-package-registry",
+            "flow:process:build-runner>entity:public-package-registry>resolve-dependencies"
+          ],
+          "verb": "impersonate",
+          "grounds": [
+            {
+              "kind": "quote",
+              "text": "the lockfile is taken as given — the runner does not verify signatures on what it downloads.",
+              "source_label": "System description",
+              "element_id": "",
+              "attribute": "",
+              "flow_id": "",
+              "term": "",
+              "assertion": ""
+            },
+            {
+              "kind": "derived-fact",
+              "text": "",
+              "source_label": "",
+              "element_id": "",
+              "attribute": "",
+              "flow_id": "flow:process:build-runner>entity:public-package-registry>resolve-dependencies",
+              "term": "",
+              "assertion": ""
+            },
+            {
+              "kind": "unknown-attribute",
+              "text": "",
+              "source_label": "",
+              "element_id": "flow:process:build-runner>entity:public-package-registry>resolve-dependencies",
+              "attribute": "protocol",
+              "flow_id": "",
+              "term": "",
+              "assertion": ""
+            },
+            {
+              "kind": "unknown-attribute",
+              "text": "",
+              "source_label": "",
+              "element_id": "flow:process:build-runner>entity:public-package-registry>resolve-dependencies",
+              "attribute": "encryption_in_transit",
+              "flow_id": "",
+              "term": "",
+              "assertion": ""
+            }
+          ],
+          "verdict": {
+            "status": "needs-info",
+            "reason": "Registry impersonation is conditional on whether the dependency connection validates the intended registry identity and protects transport.",
+            "related_unknowns": [
+              {
+                "element_id": "flow:process:build-runner>entity:public-package-registry>resolve-dependencies",
+                "attribute": "protocol",
+                "subject": "",
+                "assertion": ""
+              },
+              {
+                "element_id": "flow:process:build-runner>entity:public-package-registry>resolve-dependencies",
+                "attribute": "encryption_in_transit",
+                "subject": "",
+                "assertion": ""
+              }
+            ],
+            "immaterial_unknowns": [],
+            "rejected_because": null
+          },
+          "category": "spoofing",
+          "severity": {
+            "likelihood": "medium",
+            "impact": "high",
+            "level": "high",
+            "justification": "Likelihood is medium and conditional: this is a crossing from the build environment to `boundary:internet`, and both protocol and encryption-in-transit controls on the dependency flow are unverified, but redirecting the connection requires an attacker to influence name resolution or the network path. Impact is high: `process:build-runner` produces deployment images and holds `credentials` and `business-critical-data`; its output is selected by `process:deploy-controller` and consumed by the approximately 1,200-store estate."
+          },
+          "mitigations": [
+            {
+              "summary": "Require validated TLS server identity for dependency resolution",
+              "detail": "Make the protocol and `encryption_in_transit` of `flow:process:build-runner>entity:public-package-registry>resolve-dependencies` explicit: require TLS 1.2+ with full certificate-chain and hostname validation, and constrain trust to the intended registry where feasible."
+            },
+            {
+              "summary": "Verify signed, pinned dependency artifacts",
+              "detail": "Require `process:build-runner` to verify package signatures and lockfile integrity or content hashes before building, so a substituted registry response is rejected even if delivery is redirected."
+            }
+          ],
+          "confidence": "low",
+          "recommendation": {
+            "sound": true,
+            "note": "Validated TLS server identity and independently verified, pinned package artifacts address both the impersonation path and substituted downloads."
+          }
+        },
+        {
+          "id": "T-02",
+          "framework": "stride",
+          "framework_version": "1.0",
+          "title": "A compromised shared build token can rewrite the estate release pointer",
+          "description": "An attacker who obtains the shared build token can use `flow:process:build-runner>process:deploy-controller>set-current-release` to alter the release SHA held by `process:deploy-controller`, selecting an attacker-controlled or inappropriate image rather than the intended release. The token is shared by every pipeline and has never been rotated, enlarging the set of locations from which the authority can be recovered. Second-order, every `process:store-server` reads the controller's one current-release record through `flow:process:store-server>process:deploy-controller>poll-current-release`; each server then pulls the selected image and restarts its till container, propagating the altered deployment decision across about 1,200 stores.",
+          "affected_element_ids": [
+            "process:deploy-controller",
+            "flow:process:build-runner>process:deploy-controller>set-current-release"
+          ],
+          "verb": "alter",
+          "grounds": [
+            {
+              "kind": "quote",
+              "text": "The token the runner uses to call the controller is a shared build token that is the same for every pipeline and has not been rotated since the pipeline was set up.",
+              "source_label": "System description",
+              "element_id": "",
+              "attribute": "",
+              "flow_id": "",
+              "term": "",
+              "assertion": ""
+            }
+          ],
+          "verdict": {
+            "status": "confirmed",
+            "reason": "",
+            "related_unknowns": [],
+            "immaterial_unknowns": [],
+            "rejected_because": null
+          },
+          "category": "tampering",
+          "severity": {
+            "likelihood": "medium",
+            "impact": "high",
+            "level": "high",
+            "justification": "Likelihood is medium because the attacker must first obtain the build token, but it is shared across every pipeline and never rotated. Impact is high because modifying `process:deploy-controller` changes the release consumed by the approximately 1,200 `process:store-server` instances and can replace business-critical till software fleet-wide."
+          },
+          "mitigations": [
+            {
+              "summary": "Replace the shared build token with workload identity",
+              "detail": "Give each pipeline a distinct short-lived identity for `flow:process:build-runner>process:deploy-controller>set-current-release`, with only the narrowly required release-update permission."
+            },
+            {
+              "summary": "Enforce release provenance at the controller",
+              "detail": "Make `process:deploy-controller` accept only signed, attested image digests produced by an authorized build, rather than accepting an arbitrary image SHA presented with a token."
+            },
+            {
+              "summary": "Rotate and revoke deployment credentials",
+              "detail": "Rotate the existing shared token immediately and support revocation and audit trails until it is eliminated."
+            }
+          ],
+          "confidence": "high",
+          "recommendation": {
+            "sound": true,
+            "note": "Per-pipeline workload identities, credential rotation, and controller-enforced release provenance address unauthorized alteration of the release record."
+          }
+        },
+        {
+          "id": "T-04",
+          "framework": "stride",
+          "framework_version": "1.0",
+          "title": "Unverified registry push authorization may allow malicious release images",
+          "description": "`flow:process:build-runner>store:image-registry>push-image` writes built container images to `store:image-registry`, but the flow's `authentication` is unknown. If the unverified registry write control does not restrict image publication to the authorized build identity, an attacker with access to its write interface can plant or replace an image under a release tag. When `process:deploy-controller` identifies that tag as current, `process:store-server` consumes the modified image through `flow:process:store-server>store:image-registry>pull-image` and restarts its till container. This threat is conditional on the unknown write authentication; it does not assert that the registry accepts anonymous pushes.",
+          "affected_element_ids": [
+            "store:image-registry",
+            "flow:process:build-runner>store:image-registry>push-image",
+            "process:build-runner"
+          ],
+          "verb": "plant",
+          "grounds": [
+            {
+              "kind": "unknown-attribute",
+              "text": "",
+              "source_label": "",
+              "element_id": "flow:process:build-runner>store:image-registry>push-image",
+              "attribute": "authentication",
+              "flow_id": "",
+              "term": "",
+              "assertion": ""
+            }
+          ],
+          "verdict": {
+            "status": "needs-info",
+            "reason": "Unauthorized publication or replacement of release images is conditional on whether registry writes are restricted to the authorized build identity.",
+            "related_unknowns": [
+              {
+                "element_id": "flow:process:build-runner>store:image-registry>push-image",
+                "attribute": "authentication",
+                "subject": "",
+                "assertion": ""
+              }
+            ],
+            "immaterial_unknowns": [],
+            "rejected_because": null
+          },
+          "category": "tampering",
+          "severity": {
+            "likelihood": "medium",
+            "impact": "high",
+            "level": "high",
+            "justification": "Likelihood is medium and conditional on the unknown authentication state for the registry push flow: an attacker must reach the image-registry write interface, but no verified caller identity is recorded. Impact is high because `store:image-registry` holds business-critical container images that `process:store-server` instances pull and execute across the approximately 1,200-store estate."
+          },
+          "mitigations": [
+            {
+              "summary": "Restrict registry pushes to a dedicated build identity",
+              "detail": "Require authenticated workload identity and least-privilege repository permissions on `flow:process:build-runner>store:image-registry>push-image`; deny all other publishers."
+            },
+            {
+              "summary": "Make release tags immutable and verified",
+              "detail": "Prevent tag overwrite, deploy immutable image digests rather than mutable tags, and require signature or provenance verification before a store server accepts an image."
+            }
+          ],
+          "confidence": "low",
+          "recommendation": {
+            "sound": true,
+            "note": "Dedicated authenticated registry-push identity, immutable release references, and image provenance verification address unauthorized image publication and replacement."
+          }
+        },
+        {
+          "id": "D-01",
+          "framework": "stride",
+          "framework_version": "1.0",
+          "title": "Repeated manual rebuilds can exhaust build-runner capacity and delay releases",
+          "description": "A developer who can access `entity:developer` can repeatedly invoke `flow:entity:developer>process:build-runner>manual-rebuild`, which permits any developer to rebuild `main` without a merge or review. Each invocation makes `process:build-runner` fetch source, resolve dependencies from the public registry, and produce an image; if concurrency, per-developer quotas, and load shedding are not enforced, an attacker with ordinary developer access can make the runner spend CPU, memory, network capacity, and dependency-resolution capacity on repeated builds at lower cost than the work imposed. The manual-rebuild flow crosses from `boundary:corporate-network` into `boundary:build-environment`. Second-order, saturation delays legitimate builds and prevents `process:build-runner` from publishing images or setting releases through `flow:process:build-runner>process:deploy-controller>set-current-release`, delaying estate-wide software updates for `process:store-server`.",
+          "affected_element_ids": [
+            "entity:developer",
+            "flow:entity:developer>process:build-runner>manual-rebuild",
+            "process:build-runner"
+          ],
+          "verb": "flood",
+          "grounds": [
+            {
+              "kind": "quote",
+              "text": "any developer can log in to the build runner and kick off a rebuild of `main` by hand; that path does not require a merge and is not reviewed.",
+              "source_label": "System description",
+              "element_id": "",
+              "attribute": "",
+              "flow_id": "",
+              "term": "",
+              "assertion": ""
+            },
+            {
+              "kind": "derived-fact",
+              "text": "",
+              "source_label": "",
+              "element_id": "",
+              "attribute": "",
+              "flow_id": "flow:entity:developer>process:build-runner>manual-rebuild",
+              "term": "",
+              "assertion": ""
+            },
+            {
+              "kind": "unknown-attribute",
+              "text": "",
+              "source_label": "",
+              "element_id": "flow:entity:developer>process:build-runner>manual-rebuild",
+              "attribute": "authentication",
+              "flow_id": "",
+              "term": "",
+              "assertion": ""
+            }
+          ],
+          "verdict": {
+            "status": "needs-info",
+            "reason": "The model states that any developer can trigger a rebuild, but it does not state whether manual rebuilds have concurrency limits, per-identity quotas, load shedding, or reserved release capacity; those controls determine whether repeated requests can exhaust the runner.",
+            "related_unknowns": [
+              {
+                "element_id": "",
+                "attribute": "",
+                "subject": "Are manual rebuild requests subject to concurrency limits, per-developer quotas, load shedding, and capacity reservation for legitimate release builds?",
+                "assertion": ""
+              }
+            ],
+            "immaterial_unknowns": [
+              {
+                "element_id": "flow:entity:developer>process:build-runner>manual-rebuild",
+                "attribute": "authentication",
+                "subject": "",
+                "assertion": ""
+              }
+            ],
+            "rejected_because": null
+          },
+          "category": "denial-of-service",
+          "severity": {
+            "likelihood": "medium",
+            "impact": "medium",
+            "level": "medium",
+            "justification": "Likelihood is medium: the attacker needs developer access, but the source states that any developer can invoke `flow:entity:developer>process:build-runner>manual-rebuild`, and its authentication state is unverified. Impact is medium: saturating `process:build-runner` blocks a business-critical build-and-release path and delays updates across `process:store-server`, but the model does not establish an immediate outage of the running till estate."
+          },
+          "mitigations": [
+            {
+              "summary": "Authorize and rate-limit manual rebuilds",
+              "detail": "Require an explicit build-trigger role for `flow:entity:developer>process:build-runner>manual-rebuild`, enforce per-identity rebuild quotas and concurrency limits, and reject or defer excess requests before dependency resolution begins."
+            },
+            {
+              "summary": "Bound build work and preserve release capacity",
+              "detail": "Apply build timeouts, CPU, memory, and network budgets to `process:build-runner`; reserve capacity for trusted release builds so manual rebuild bursts cannot block `flow:process:build-runner>process:deploy-controller>set-current-release`."
+            }
+          ],
+          "confidence": "low",
+          "recommendation": {
+            "sound": true,
+            "note": "Authorization and rate limits on manual rebuilds, together with bounded build work and reserved release capacity, address the proposed exhaustion path."
+          }
+        },
+        {
+          "id": "I-02",
+          "framework": "stride",
+          "framework_version": "1.0",
+          "title": "Unverified at-rest encryption may expose pipeline source and deployable images",
+          "description": "`store:git-server` contains the branches and `main` source used to start builds, while `store:image-registry` contains the finished images pulled by `process:store-server`. Both stores have `encryption_at_rest: unknown`. If either unknown resolves to unencrypted storage, an attacker who obtains a decommissioned volume, mounted snapshot, backup, or other storage-layer copy can read the source or deployable container artifacts without using the normal git or registry access paths. Second-order, the recovered source and images reveal the software deployed through `process:deploy-controller` to the store estate and can provide reconnaissance for later attacks against those systems. This is conditional on the unresolved at-rest encryption attributes, not an assertion that either store is unencrypted.",
+          "affected_element_ids": [
+            "store:git-server",
+            "store:image-registry"
+          ],
+          "verb": "read",
+          "grounds": [
+            {
+              "kind": "quote",
+              "text": "Nobody has documented whether the git server encrypts what it stores, or\nwhether the image registry does.",
+              "source_label": "System description",
+              "element_id": "",
+              "attribute": "",
+              "flow_id": "",
+              "term": "",
+              "assertion": ""
+            },
+            {
+              "kind": "unknown-attribute",
+              "text": "",
+              "source_label": "",
+              "element_id": "store:git-server",
+              "attribute": "encryption_at_rest",
+              "flow_id": "",
+              "term": "",
+              "assertion": ""
+            },
+            {
+              "kind": "unknown-attribute",
+              "text": "",
+              "source_label": "",
+              "element_id": "store:image-registry",
+              "attribute": "encryption_at_rest",
+              "flow_id": "",
+              "term": "",
+              "assertion": ""
+            }
+          ],
+          "verdict": {
+            "status": "needs-info",
+            "reason": "Storage-layer disclosure of source or container artifacts depends on the unresolved at-rest encryption state of both pipeline stores.",
+            "related_unknowns": [
+              {
+                "element_id": "store:git-server",
+                "attribute": "encryption_at_rest",
+                "subject": "",
+                "assertion": ""
+              },
+              {
+                "element_id": "store:image-registry",
+                "attribute": "encryption_at_rest",
+                "subject": "",
+                "assertion": ""
+              }
+            ],
+            "immaterial_unknowns": [],
+            "rejected_because": null
+          },
+          "category": "information-disclosure",
+          "severity": {
+            "likelihood": "low",
+            "impact": "low",
+            "level": "low",
+            "justification": "Likelihood remains low because exploitation requires storage-layer access to `store:git-server` or `store:image-registry`, and impact is low because both stores have unknown data classifications and the model states no confidential, restricted, credential, or secret asset in their stored contents."
+          },
+          "mitigations": [
+            {
+              "summary": "Verify and enforce encryption at rest for both pipeline stores",
+              "detail": "Establish the encryption posture of `store:git-server` and `store:image-registry`, then require managed-key encryption for their primary volumes, snapshots, backups, replicas, and decommissioned media."
+            },
+            {
+              "summary": "Restrict and audit access to storage-layer copies",
+              "detail": "Use separate least-privilege principals for backup, snapshot, and restore operations; prevent unapproved exports and alert on bulk reads or snapshot creation."
+            }
+          ],
+          "confidence": "low",
+          "recommendation": {
+            "sound": true,
+            "note": "Encryption covering primary volumes and operational copies, plus restricted and audited storage-copy access, addresses the stated storage-layer disclosure path."
+          }
+        }
+      ],
+      "rejected_claims": [
+        {
+          "id": "T-01",
+          "framework": "stride",
+          "framework_version": "1.0",
+          "title": "Unsigned public dependencies can be planted into store releases",
+          "description": "An attacker who can publish or alter a dependency selected by the lockfile plants a malicious package through `flow:process:build-runner>entity:public-package-registry>resolve-dependencies`. `process:build-runner` accepts downloaded dependencies without signature verification and incorporates them into the container image it writes through `flow:process:build-runner>store:image-registry>push-image`. Second-order, `process:deploy-controller` can designate that image as current and the approximately 1,200 `process:store-server` instances pull and restart it, distributing attacker-modified code throughout the estate.",
+          "affected_element_ids": [
+            "flow:process:build-runner>entity:public-package-registry>resolve-dependencies",
+            "process:build-runner"
+          ],
+          "verb": "plant",
+          "grounds": [
+            {
+              "kind": "quote",
+              "text": "the lockfile is taken as given — the runner does not verify signatures on what it downloads",
+              "source_label": "System description",
+              "element_id": "",
+              "attribute": "",
+              "flow_id": "",
+              "term": "",
+              "assertion": ""
+            }
+          ],
+          "verdict": {
+            "status": "rejected",
+            "reason": "The claim treats the absence of dependency signature verification as an established control state, but that statement appears only in the flow notes; notes cannot establish a control's state for this finding.",
+            "related_unknowns": [],
+            "immaterial_unknowns": [],
+            "rejected_because": "reasoning"
+          },
+          "category": "tampering",
+          "severity": {
+            "likelihood": "medium",
+            "impact": "high",
+            "level": "high",
+            "justification": "Likelihood is medium because the attacker must control a selected public dependency or its publisher, but `process:build-runner` performs no stated signature verification on downloads from the internet-facing public registry. Impact is high because the altered dependency becomes code in release images and reaches the approximately 1,200-store `process:store-server` fleet, whose containers run the till software."
+          },
+          "mitigations": [
+            {
+              "summary": "Verify dependency provenance before building",
+              "detail": "Require registry/package signatures or attestations and verify them in `process:build-runner` against trusted publisher identities before accepting packages named by the lockfile."
+            },
+            {
+              "summary": "Pin immutable dependency digests",
+              "detail": "Record and enforce cryptographic package digests in the lockfile so changed registry content cannot silently replace the reviewed dependency."
+            }
+          ],
+          "confidence": "low",
+          "recommendation": null
+        },
+        {
+          "id": "T-03",
+          "framework": "stride",
+          "framework_version": "1.0",
+          "title": "Unverified git write authentication may permit source-code tampering before builds",
+          "description": "`flow:entity:developer>store:git-server>push-branches` is a write path for source-code branches, but its `authentication` is unknown. If that unresolved control does not enforce authenticated, authorized, branch-protected writes, an attacker able to reach the developer-to-git path can alter code or introduce a malicious change into `store:git-server` and cause it to be merged to `main`. A merge to `main` starts the build; `process:build-runner` subsequently reads the merged source through `flow:process:build-runner>store:git-server>fetch-source`, produces an image, and the release path can reach the store fleet. This is conditional on the unknown authentication state, not an assertion that git authentication or branch protection is absent.",
+          "affected_element_ids": [
+            "store:git-server",
+            "flow:entity:developer>store:git-server>push-branches"
+          ],
+          "verb": "alter",
+          "grounds": [
+            {
+              "kind": "unknown-attribute",
+              "text": "",
+              "source_label": "",
+              "element_id": "flow:entity:developer>store:git-server>push-branches",
+              "attribute": "authentication",
+              "flow_id": "",
+              "term": "",
+              "assertion": ""
+            }
+          ],
+          "verdict": {
+            "status": "rejected",
+            "reason": "Unknown authentication on the branch-push flow supports a conditional question about caller authentication, but the draft additionally asserts that an attacker can cause a changed branch to be merged to main; the model does not state that branch protection or merge authorization is absent or bypassable.",
+            "related_unknowns": [],
+            "immaterial_unknowns": [],
+            "rejected_because": "reasoning"
+          },
+          "category": "tampering",
+          "severity": {
+            "likelihood": "medium",
+            "impact": "high",
+            "level": "high",
+            "justification": "Likelihood is medium and conditional on the unknown authentication control on the developer write flow: an attacker must reach that corporate-network path, but the model does not verify an identity or authorization check. Impact is high because tampered source in `store:git-server` is built by `process:build-runner` and can become the till-software image deployed across approximately 1,200 `process:store-server` instances."
+          },
+          "mitigations": [
+            {
+              "summary": "Verify and enforce protected Git writes",
+              "detail": "Require strong authenticated developer identities on `flow:entity:developer>store:git-server>push-branches`, enforce server-side authorization, and protect `main` from direct or unreviewed updates."
+            },
+            {
+              "summary": "Require reviewed, attestable merges before release",
+              "detail": "Require approved pull requests and signed commits for changes reaching `main`, and have `process:build-runner` reject source revisions that lack the required provenance."
+            }
+          ],
+          "confidence": "low",
+          "recommendation": null
+        },
+        {
+          "id": "E-01",
+          "framework": "stride",
+          "framework_version": "1.0",
+          "title": "Any developer can use the build runner to exercise production release authority",
+          "description": "An authenticated developer can invoke `flow:entity:developer>process:build-runner>manual-rebuild` to make `process:build-runner` rebuild `main` without the merge-and-review gate. The runner then uses its standing shared build token on `flow:process:build-runner>process:deploy-controller>set-current-release` to update `process:deploy-controller`'s current-release record. This grants every developer production rollout authority through the runner, rather than limiting that authority to an approved release process. Second-order, every `process:store-server` polls that record and pulls the selected image, so the exercised grant changes the software deployed throughout the store estate.",
+          "affected_element_ids": [
+            "flow:entity:developer>process:build-runner>manual-rebuild",
+            "process:build-runner"
+          ],
+          "verb": "abuse-grant",
+          "grounds": [
+            {
+              "kind": "quote",
+              "text": "any developer can log in to the build runner and kick off a rebuild of `main` by hand; that path does not require a merge and is not reviewed.",
+              "source_label": "System description",
+              "element_id": "",
+              "attribute": "",
+              "flow_id": "",
+              "term": "",
+              "assertion": ""
+            },
+            {
+              "kind": "quote",
+              "text": "The token the runner uses to call the controller is a shared build token that is the same for every pipeline and has not been rotated since the pipeline was set up.",
+              "source_label": "System description",
+              "element_id": "",
+              "attribute": "",
+              "flow_id": "",
+              "term": "",
+              "assertion": ""
+            },
+            {
+              "kind": "quote",
+              "text": "Every store server asks the deploy controller once a minute what the current release is, and if it differs from what it is running it pulls that image from the registry and restarts the container.",
+              "source_label": "System description",
+              "element_id": "",
+              "attribute": "",
+              "flow_id": "",
+              "term": "",
+              "assertion": ""
+            },
+            {
+              "kind": "derived-fact",
+              "text": "",
+              "source_label": "",
+              "element_id": "",
+              "attribute": "",
+              "flow_id": "flow:entity:developer>process:build-runner>manual-rebuild",
+              "term": "",
+              "assertion": ""
+            }
+          ],
+          "verdict": {
+            "status": "rejected",
+            "reason": "The model states that developers can manually rebuild main and that the build runner has a token used to call the deploy controller, but it does not state that a manually triggered rebuild automatically invokes the controller or grants the initiating developer authority to promote a release estate-wide.",
+            "related_unknowns": [],
+            "immaterial_unknowns": [],
+            "rejected_because": "reasoning"
+          },
+          "category": "elevation-of-privilege",
+          "severity": {
+            "likelihood": "medium",
+            "impact": "high",
+            "level": "high",
+            "justification": "Likelihood is medium: exploitation requires a developer identity or compromise of one, but `flow:entity:developer>process:build-runner>manual-rebuild` crosses into the build environment and the source states that any developer may invoke it without review. Impact is high: exercising the release-setting authority reaches `process:deploy-controller`, whose selected release is consumed by the approximately 1,200 `process:store-server` instances running business-critical till software."
+          },
+          "mitigations": [
+            {
+              "summary": "Restrict manual rebuild and release-setting authority",
+              "detail": "Require a distinct, tightly scoped release role and approval workflow before `process:build-runner` can invoke `flow:process:build-runner>process:deploy-controller>set-current-release`; ordinary developers should not be able to promote a build by logging into the runner."
+            },
+            {
+              "summary": "Replace the shared build token with scoped short-lived credentials",
+              "detail": "Issue a short-lived workload identity to the approved release pipeline and bind it to a reviewed commit and a single release operation, rather than using one static token shared by every pipeline."
+            }
+          ],
+          "confidence": "low",
+          "recommendation": null
+        }
+      ],
+      "scope": [],
+      "coverage": [
+        {
+          "lane": "spoofing",
+          "drafts": 2,
+          "rules": 3,
+          "rules_fired": 1,
+          "candidates": 5,
+          "candidates_cited": 1,
+          "elements": 19,
+          "elements_cited": 6,
+          "boundary_crossings": 6,
+          "boundary_crossings_cited": 2,
+          "unknown_controls": 22,
+          "unknown_controls_cited": 1
+        },
+        {
+          "lane": "tampering",
+          "drafts": 4,
+          "rules": 2,
+          "rules_fired": 2,
+          "candidates": 8,
+          "candidates_cited": 6,
+          "elements": 19,
+          "elements_cited": 12,
+          "boundary_crossings": 6,
+          "boundary_crossings_cited": 5,
+          "unknown_controls": 22,
+          "unknown_controls_cited": 2
+        },
+        {
+          "lane": "repudiation",
+          "drafts": 2,
+          "rules": 1,
+          "rules_fired": 1,
+          "candidates": 6,
+          "candidates_cited": 2,
+          "elements": 19,
+          "elements_cited": 8,
+          "boundary_crossings": 6,
+          "boundary_crossings_cited": 3,
+          "unknown_controls": 22,
+          "unknown_controls_cited": 1
+        },
+        {
+          "lane": "information-disclosure",
+          "drafts": 2,
+          "rules": 2,
+          "rules_fired": 2,
+          "candidates": 10,
+          "candidates_cited": 3,
+          "elements": 19,
+          "elements_cited": 8,
+          "boundary_crossings": 6,
+          "boundary_crossings_cited": 1,
+          "unknown_controls": 22,
+          "unknown_controls_cited": 3
+        },
+        {
+          "lane": "denial-of-service",
+          "drafts": 1,
+          "rules": 2,
+          "rules_fired": 1,
+          "candidates": 3,
+          "candidates_cited": 0,
+          "elements": 19,
+          "elements_cited": 7,
+          "boundary_crossings": 6,
+          "boundary_crossings_cited": 2,
+          "unknown_controls": 22,
+          "unknown_controls_cited": 1
+        },
+        {
+          "lane": "elevation-of-privilege",
+          "drafts": 1,
+          "rules": 2,
+          "rules_fired": 0,
+          "candidates": 0,
+          "candidates_cited": 0,
+          "elements": 19,
+          "elements_cited": 5,
+          "boundary_crossings": 6,
+          "boundary_crossings_cited": 2,
+          "unknown_controls": 22,
+          "unknown_controls_cited": 0
+        }
+      ],
+      "unverified_grounds": [],
+      "unreconciled_rulings": [],
+      "repaired_quotes": [],
+      "unresolved_references": [
+        {
+          "claim_id": "T-02",
+          "element_id": "process:build-runner",
+          "reason": "more than one hop from every place the claim's grounds name"
+        },
+        {
+          "claim_id": "E-01",
+          "element_id": "flow:process:build-runner>process:deploy-controller>set-current-release",
+          "reason": "more than one hop from every place the claim's grounds name"
+        },
+        {
+          "claim_id": "E-01",
+          "element_id": "process:deploy-controller",
+          "reason": "more than one hop from every place the claim's grounds name"
+        }
+      ],
+      "unresolved_mentions": [],
+      "unresolved_evidence": [],
+      "unknown_claim_identities": [],
+      "dropped_claims": [],
+      "fired_rules": [
+        "denial-of-service-shared-dependency",
+        "information-disclosure-store-at-rest-unverified",
+        "information-disclosure-unprotected-sensitive-transit",
+        "repudiation-unattributable-action",
+        "spoofing-unverified-boundary-auth",
+        "tampering-unprotected-transit-crossing",
+        "tampering-unverified-write-to-store"
+      ],
+      "knowledge_docs": [
+        "cases/chained-benign-facts",
+        "cases/shared-credential-attribution",
+        "cases/stated-control-outside-the-model",
+        "cases/two-threats-one-flow",
+        "cases/unknown-is-not-absent",
+        "notes/attribution-and-audit",
+        "notes/failure-coupling",
+        "notes/identity-at-a-boundary",
+        "notes/protection-at-rest",
+        "notes/transport-protection",
+        "notes/write-path-integrity"
+      ],
+      "summary": {
+        "claim_count": 9,
+        "needs_info_count": 6,
+        "rejected_count": 3,
+        "by_category": {
+          "information-disclosure": 2,
+          "repudiation": 2,
+          "spoofing": 2,
+          "tampering": 2,
+          "denial-of-service": 1
+        },
+        "by_severity": {
+          "high": 7,
+          "medium": 1,
+          "low": 1
+        },
+        "by_severity_confirmed": {
+          "high": 3
+        }
+      },
+      "missing_mitigations": []
+    }
+  ]
+}
