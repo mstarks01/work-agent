@@ -1,0 +1,926 @@
+{
+  "stride": [
+    {
+      "id": "S-01",
+      "framework": "stride",
+      "framework_version": "1.0",
+      "title": "Unverified API caller identity could let an attacker order as a customer",
+      "description": "`flow:process:mobile-app>process:web-api>api-traffic` crosses from the customer-device zone to `process:web-api` with `authentication: unknown`. If that unknown resolves to absent or inadequate caller verification, an attacker originating requests from a customer-controlled device can claim the identity of `entity:customer` to `process:web-api` and place orders as that customer. Second-order: placed orders are handed from `process:web-api` to `process:sims`, so the impersonation can initiate fulfilment and dispatch processing; this is conditional on the unverified authentication attribute, not an assertion that authentication is absent.",
+      "affected_element_ids": [
+        "process:mobile-app",
+        "process:web-api",
+        "flow:process:mobile-app>process:web-api>api-traffic"
+      ],
+      "verb": "impersonate",
+      "grounds": [
+        {
+          "kind": "quote",
+          "text": "When an order is placed the API hands the order over to SIMS",
+          "source_label": "System description",
+          "element_id": "",
+          "attribute": "",
+          "flow_id": "",
+          "term": "",
+          "assertion": ""
+        },
+        {
+          "kind": "derived-fact",
+          "text": "",
+          "source_label": "",
+          "element_id": "",
+          "attribute": "",
+          "flow_id": "flow:process:mobile-app>process:web-api>api-traffic",
+          "term": "",
+          "assertion": ""
+        },
+        {
+          "kind": "unknown-attribute",
+          "text": "",
+          "source_label": "",
+          "element_id": "flow:process:mobile-app>process:web-api>api-traffic",
+          "attribute": "authentication",
+          "flow_id": "",
+          "term": "",
+          "assertion": ""
+        }
+      ],
+      "category": "spoofing",
+      "severity": {
+        "likelihood": "medium",
+        "impact": "medium",
+        "level": "medium",
+        "justification": "Likelihood is medium and conditional because `flow:process:mobile-app>process:web-api>api-traffic` is a derived boundary crossing but its caller authentication is unstated; impact is medium because a successful impersonation can place orders through `process:web-api` and trigger downstream processing by `process:sims`."
+      },
+      "mitigations": [
+        {
+          "summary": "Establish and enforce verified customer authentication on the API flow",
+          "detail": "Make `flow:process:mobile-app>process:web-api>api-traffic` authenticate a customer with short-lived, audience-bound credentials and enforce that the identity is verified before order operations are accepted."
+        },
+        {
+          "summary": "Bind order actions to the authenticated customer identity",
+          "detail": "Have `process:web-api` derive the customer identity from the verified credential rather than from caller-supplied order fields, and authorize each order operation against that identity."
+        }
+      ]
+    },
+    {
+      "id": "S-02",
+      "framework": "stride",
+      "framework_version": "1.0",
+      "title": "Plain HTTP lets an on-path attacker impersonate the Web API to mobile clients",
+      "description": "Because `flow:process:mobile-app>process:web-api>api-traffic` uses HTTP with transport encryption stated absent, an attacker able to intercept traffic between `process:mobile-app` and `process:web-api` can present a look-alike endpoint as the Web API. The mobile app cannot use the stated transport to verify that it reached the real API, allowing the impostor to collect customer order details or issue deceptive responses. Second-order: customer details supplied on this flow are processed by `process:web-api`, which keeps customer records including names, addresses, and payment-card information.",
+      "affected_element_ids": [
+        "process:mobile-app",
+        "process:web-api",
+        "flow:process:mobile-app>process:web-api>api-traffic"
+      ],
+      "verb": "impersonate",
+      "grounds": [
+        {
+          "kind": "quote",
+          "text": "The app talks to the web API over HTTP \u2014 not HTTPS",
+          "source_label": "System description",
+          "element_id": "",
+          "attribute": "",
+          "flow_id": "",
+          "term": "",
+          "assertion": ""
+        },
+        {
+          "kind": "quote",
+          "text": "The web API keeps customers in the user database: name, address, and the card they paid with.",
+          "source_label": "System description",
+          "element_id": "",
+          "attribute": "",
+          "flow_id": "",
+          "term": "",
+          "assertion": ""
+        },
+        {
+          "kind": "derived-fact",
+          "text": "",
+          "source_label": "",
+          "element_id": "",
+          "attribute": "",
+          "flow_id": "flow:process:mobile-app>process:web-api>api-traffic",
+          "term": "",
+          "assertion": ""
+        },
+        {
+          "kind": "absent-attribute",
+          "text": "",
+          "source_label": "",
+          "element_id": "flow:process:mobile-app>process:web-api>api-traffic",
+          "attribute": "encryption_in_transit",
+          "flow_id": "",
+          "term": "",
+          "assertion": ""
+        }
+      ],
+      "category": "spoofing",
+      "severity": {
+        "likelihood": "medium",
+        "impact": "medium",
+        "level": "medium",
+        "justification": "Likelihood is medium because exploitation requires an on-path position, but `flow:process:mobile-app>process:web-api>api-traffic` is a boundary crossing with encryption explicitly absent; impact is medium because the impersonated endpoint can receive customer order details and the real `process:web-api` handles PII and financial customer records."
+      },
+      "mitigations": [
+        {
+          "summary": "Use authenticated TLS for the mobile-app API connection",
+          "detail": "Replace HTTP on `flow:process:mobile-app>process:web-api>api-traffic` with TLS 1.2+ and full certificate-chain validation so the mobile app verifies the identity of `process:web-api`."
+        },
+        {
+          "summary": "Constrain accepted API certificates",
+          "detail": "Use certificate pinning or a constrained/private issuing CA where operationally appropriate, and fail closed when the mobile app cannot validate the Web API certificate."
+        }
+      ]
+    },
+    {
+      "id": "S-03",
+      "framework": "stride",
+      "framework_version": "1.0",
+      "title": "Unverified spreadsheet identity could let a marketing-zone attacker submit catalogue SQL",
+      "description": "`flow:process:catalogue-spreadsheet>process:web-api>sql-statements` is a derived crossing from `process:catalogue-spreadsheet` in the marketing-office zone to `process:web-api`, and its `authentication` is unknown. If the Web API does not verify a distinct identity for the spreadsheet macros, an attacker with a foothold in the marketing-office zone can impersonate `process:catalogue-spreadsheet` and send SQL statements to change catalogue prices or product copy. This is conditional on the unstated authentication control and on the inferred endpoint zone placement; it does not assert that the API currently accepts unauthenticated SQL.",
+      "affected_element_ids": [
+        "process:catalogue-spreadsheet",
+        "process:web-api",
+        "flow:process:catalogue-spreadsheet>process:web-api>sql-statements"
+      ],
+      "verb": "impersonate",
+      "grounds": [
+        {
+          "kind": "quote",
+          "text": "The macros in it send SQL statements straight to the web API to change prices and product copy",
+          "source_label": "System description",
+          "element_id": "",
+          "attribute": "",
+          "flow_id": "",
+          "term": "",
+          "assertion": ""
+        },
+        {
+          "kind": "derived-fact",
+          "text": "",
+          "source_label": "",
+          "element_id": "",
+          "attribute": "",
+          "flow_id": "flow:process:catalogue-spreadsheet>process:web-api>sql-statements",
+          "term": "",
+          "assertion": ""
+        },
+        {
+          "kind": "unknown-attribute",
+          "text": "",
+          "source_label": "",
+          "element_id": "flow:process:catalogue-spreadsheet>process:web-api>sql-statements",
+          "attribute": "authentication",
+          "flow_id": "",
+          "term": "",
+          "assertion": ""
+        }
+      ],
+      "category": "spoofing",
+      "severity": {
+        "likelihood": "low",
+        "impact": "medium",
+        "level": "low",
+        "justification": "Likelihood is low and conditional because the attacker first needs a foothold in the marketing-office source zone and authentication on the crossing is unstated; impact is medium because the impersonated spreadsheet path can change prices and product copy through `process:web-api`, affecting business-critical catalogue data."
+      },
+      "mitigations": [
+        {
+          "summary": "Give the spreadsheet integration a unique verified workload identity",
+          "detail": "Require mTLS or short-lived workload credentials on `flow:process:catalogue-spreadsheet>process:web-api>sql-statements`, and authorize only that identity for narrowly scoped catalogue-update operations."
+        },
+        {
+          "summary": "Replace raw SQL submission with constrained catalogue operations",
+          "detail": "Have `process:web-api` expose authenticated, parameterized catalogue-update operations rather than accepting SQL statements from `process:catalogue-spreadsheet`."
+        }
+      ]
+    },
+    {
+      "id": "T-01",
+      "framework": "stride",
+      "framework_version": "1.0",
+      "title": "On-path attacker can alter customer orders sent to the Web API",
+      "description": "An attacker positioned between `process:mobile-app` and `process:web-api` can rewrite order details and customer data on `flow:process:mobile-app>process:web-api>api-traffic`, which crosses from the customer-device zone to Sokify systems over HTTP with transport encryption stated absent. The altered request reaches the internet-facing `process:web-api` as though it came from the mobile app. Second-order, the API can persist corrupted customer records through `flow:process:web-api>store:user-database>customer-records` and hand altered orders to `process:sims` through `flow:process:web-api>process:sims>order-handover`, affecting delivery processing and business records.",
+      "affected_element_ids": [
+        "flow:process:mobile-app>process:web-api>api-traffic",
+        "process:mobile-app",
+        "process:web-api"
+      ],
+      "verb": "alter-in-transit",
+      "grounds": [
+        {
+          "kind": "derived-fact",
+          "text": "",
+          "source_label": "",
+          "element_id": "",
+          "attribute": "",
+          "flow_id": "flow:process:mobile-app>process:web-api>api-traffic",
+          "term": "",
+          "assertion": ""
+        },
+        {
+          "kind": "absent-attribute",
+          "text": "",
+          "source_label": "",
+          "element_id": "flow:process:mobile-app>process:web-api>api-traffic",
+          "attribute": "encryption_in_transit",
+          "flow_id": "",
+          "term": "",
+          "assertion": ""
+        }
+      ],
+      "category": "tampering",
+      "severity": {
+        "likelihood": "medium",
+        "impact": "high",
+        "level": "high",
+        "justification": "Likelihood is medium because the flow crosses from `boundary:customer-device` to Sokify systems without stated transport protection, but exploitation requires an on-path position. Impact is high because altered orders are processed by `process:web-api`, which holds `pii`, `financial`, and `business-critical-data`, and can be propagated into the user database and SIMS."
+      },
+      "mitigations": [
+        {
+          "summary": "Protect mobile-app API traffic with authenticated TLS",
+          "detail": "Replace HTTP on `flow:process:mobile-app>process:web-api>api-traffic` with HTTPS using TLS 1.2+ and certificate validation by the mobile app, providing authenticated integrity protection for requests and responses."
+        },
+        {
+          "summary": "Validate order integrity at the API",
+          "detail": "Have `process:web-api` enforce server-side validation of order fields, prices, delivery details, and workflow state before persisting records or forwarding orders to SIMS."
+        }
+      ]
+    },
+    {
+      "id": "T-02",
+      "framework": "stride",
+      "framework_version": "1.0",
+      "title": "Raw SQL submission can alter catalogue data if API caller authentication is absent",
+      "description": "`process:web-api` receives `flow:process:catalogue-spreadsheet>process:web-api>sql-statements`, whose payload is SQL statements intended to change prices and product copy, while the flow's `authentication` is unknown. If that unknown resolves to the API accepting this SQL-writing interface without verified caller identity, an internet attacker can submit crafted SQL statements to the internet-facing `process:web-api` and inject unauthorized catalogue modifications. The altered prices or product copy become business data acted on by the customer-facing ordering path; this is conditional on the unresolved authentication state, not an assertion that authentication is absent.",
+      "affected_element_ids": [
+        "flow:process:catalogue-spreadsheet>process:web-api>sql-statements",
+        "process:web-api"
+      ],
+      "verb": "inject",
+      "grounds": [
+        {
+          "kind": "quote",
+          "text": "The macros in it send SQL statements straight to the web API to change prices and product copy",
+          "source_label": "System description",
+          "element_id": "",
+          "attribute": "",
+          "flow_id": "",
+          "term": "",
+          "assertion": ""
+        },
+        {
+          "kind": "unknown-attribute",
+          "text": "",
+          "source_label": "",
+          "element_id": "flow:process:catalogue-spreadsheet>process:web-api>sql-statements",
+          "attribute": "authentication",
+          "flow_id": "",
+          "term": "",
+          "assertion": ""
+        },
+        {
+          "kind": "derived-fact",
+          "text": "",
+          "source_label": "",
+          "element_id": "",
+          "attribute": "",
+          "flow_id": "flow:process:catalogue-spreadsheet>process:web-api>sql-statements",
+          "term": "",
+          "assertion": ""
+        }
+      ],
+      "category": "tampering",
+      "severity": {
+        "likelihood": "medium",
+        "impact": "high",
+        "level": "high",
+        "justification": "Likelihood is medium and conditional because `process:web-api` is internet-facing while authentication on `flow:process:catalogue-spreadsheet>process:web-api>sql-statements` is unverified. Impact is high because the flow changes prices and product copy, and `process:web-api` is tagged `business-critical-data`, so a successful injection can affect the catalogue offered to all customers."
+      },
+      "mitigations": [
+        {
+          "summary": "Remove raw SQL from the catalogue update interface",
+          "detail": "Replace SQL statements on `flow:process:catalogue-spreadsheet>process:web-api>sql-statements` with a narrow, authenticated catalogue-update API that accepts validated price and product fields rather than executable SQL."
+        },
+        {
+          "summary": "Authenticate and authorize the marketing writer",
+          "detail": "Require a distinct authenticated writer identity for the catalogue spreadsheet and enforce server-side authorization for only the product records and update operations it requires."
+        },
+        {
+          "summary": "Use parameterized database operations",
+          "detail": "Ensure `process:web-api` maps validated update requests to parameterized queries or safe database APIs rather than executing client-supplied SQL text."
+        }
+      ]
+    },
+    {
+      "id": "T-03",
+      "framework": "stride",
+      "framework_version": "1.0",
+      "title": "Unverified database write identity may permit alteration of customer records",
+      "description": "`flow:process:web-api>store:user-database>customer-records` has `operations: read-write` but an unknown authentication state. If the user database does not verify the identity and authority of callers on this path, an attacker who gains network reach to its write surface can alter `store:user-database` directly rather than going through Web API validation, changing customer names, addresses, or payment-related records. Second-order, `process:web-api` consumes the same customer-records flow with read-write access and may treat the altered confidential records as legitimate during customer and order processing. This threat is conditional on the unresolved authentication attribute; it does not assert that the database accepts unauthenticated writes.",
+      "affected_element_ids": [
+        "store:user-database",
+        "flow:process:web-api>store:user-database>customer-records",
+        "process:web-api"
+      ],
+      "verb": "alter",
+      "grounds": [
+        {
+          "kind": "quote",
+          "text": "Nobody here can tell me what the API does about authentication, or whether the user database and the flat file are encrypted.",
+          "source_label": "System description",
+          "element_id": "",
+          "attribute": "",
+          "flow_id": "",
+          "term": "",
+          "assertion": ""
+        },
+        {
+          "kind": "unknown-attribute",
+          "text": "",
+          "source_label": "",
+          "element_id": "flow:process:web-api>store:user-database>customer-records",
+          "attribute": "authentication",
+          "flow_id": "",
+          "term": "",
+          "assertion": ""
+        }
+      ],
+      "category": "tampering",
+      "severity": {
+        "likelihood": "low",
+        "impact": "high",
+        "level": "medium",
+        "justification": "Likelihood is low and conditional: authentication on the database write flow is unverified, but an attacker must first obtain network reach to an internal database write surface. Impact is high because `store:user-database` is confidential and holds `pii` and `financial` data, and `process:web-api` relies on the altered records for customer processing."
+      },
+      "mitigations": [
+        {
+          "summary": "Verify and constrain database writer identities",
+          "detail": "Configure `store:user-database` to authenticate `process:web-api` with a dedicated workload identity and deny all other callers by default."
+        },
+        {
+          "summary": "Apply least-privilege database grants",
+          "detail": "Grant the Web API only the tables and write operations it requires, separating read and write privileges where possible and preventing direct broad record modification."
+        },
+        {
+          "summary": "Add integrity controls for customer-record changes",
+          "detail": "Use server-side ownership checks, record versioning, and auditable change history so unauthorized or conflicting updates to customer and payment-related records are rejected or detectable."
+        }
+      ]
+    },
+    {
+      "id": "R-01",
+      "framework": "stride",
+      "framework_version": "1.0",
+      "title": "Customer orders may be impossible to attribute in a later dispute",
+      "description": "A customer using `entity:customer` can place an order through `flow:entity:customer>process:mobile-app>browse-and-order` and onward through `flow:process:mobile-app>process:web-api>api-traffic`. The latter crosses into `process:web-api`, but its `authentication` is unknown, and the model contains no `audit log` element or audit flow recording an authenticated actor, action, target, timestamp, and outcome. If the unknown authentication does not establish and propagate an individual identity, a customer can deny placing an order or authorizing a related customer-record update and Sokify cannot rebut the dispute with attributable evidence. This is conditional on the unstated authentication and recording arrangements, not an assertion that orders are unauthenticated. The accountability gap reaches the order handover to `process:sims` and customer records in `store:user-database`, so disputes may affect fulfilment and financial customer records.",
+      "affected_element_ids": [
+        "entity:customer",
+        "process:mobile-app",
+        "process:web-api",
+        "flow:process:mobile-app>process:web-api>api-traffic"
+      ],
+      "verb": "unattributable",
+      "grounds": [
+        {
+          "kind": "quote",
+          "text": "Nobody here can tell me what the API does about authentication",
+          "source_label": "System description",
+          "element_id": "",
+          "attribute": "",
+          "flow_id": "",
+          "term": "",
+          "assertion": ""
+        },
+        {
+          "kind": "unknown-attribute",
+          "text": "",
+          "source_label": "",
+          "element_id": "flow:entity:customer>process:mobile-app>browse-and-order",
+          "attribute": "authentication",
+          "flow_id": "",
+          "term": "",
+          "assertion": ""
+        },
+        {
+          "kind": "unknown-attribute",
+          "text": "",
+          "source_label": "",
+          "element_id": "flow:process:mobile-app>process:web-api>api-traffic",
+          "attribute": "authentication",
+          "flow_id": "",
+          "term": "",
+          "assertion": ""
+        },
+        {
+          "kind": "derived-fact",
+          "text": "",
+          "source_label": "",
+          "element_id": "",
+          "attribute": "",
+          "flow_id": "flow:process:mobile-app>process:web-api>api-traffic",
+          "term": "",
+          "assertion": ""
+        },
+        {
+          "kind": "absent-element",
+          "text": "",
+          "source_label": "",
+          "element_id": "",
+          "attribute": "",
+          "flow_id": "",
+          "term": "audit log",
+          "assertion": ""
+        }
+      ],
+      "category": "repudiation",
+      "severity": {
+        "likelihood": "high",
+        "impact": "medium",
+        "level": "high",
+        "justification": "Likelihood is high, conditionally: customer order traffic reaches internet-facing `process:web-api` across `crossing:flow:process:mobile-app>process:web-api>api-traffic`, while authentication on both order legs is unverified. Impact is medium because `process:web-api` handles `financial` and `business-critical-data` assets, so unresolved order disputes can affect customer records and fulfilment."
+      },
+      "mitigations": [
+        {
+          "summary": "Record attributable order events in a dedicated audit trail",
+          "detail": "Have `process:web-api` emit immutable security-event records for order placement and customer-record changes, including verified actor identity, action, target, timestamp, outcome, and correlation ID, to a dedicated audit flow."
+        },
+        {
+          "summary": "Establish and propagate an individual customer identity",
+          "detail": "Resolve the unknown authentication on the customer and mobile-app flows, use individual authenticated customer identities, and carry the verified subject into `process:web-api`, `process:sims`, and their audit records."
+        }
+      ]
+    },
+    {
+      "id": "R-02",
+      "framework": "stride",
+      "framework_version": "1.0",
+      "title": "Marketing users may deny catalogue price and copy changes",
+      "description": "A marketing user can cause `process:catalogue-spreadsheet` to send SQL changes through `flow:process:catalogue-spreadsheet>process:web-api>sql-statements` to `process:web-api`. This cross-zone write flow has `authentication: unknown`, while the model contains no `audit log` element or audit flow that would retain the verified operator and the before/after change. If the unstated authentication does not bind the spreadsheet action to an individual and preserve that attribution, a marketing user who changes prices or product copy can plausibly deny doing so, leaving Sokify unable to resolve disputes over catalogue changes. This is conditional on the unknown authentication and unmodelled audit arrangement, not a claim that the SQL flow is unauthenticated. The resulting catalogue state can affect orders subsequently handed from `process:web-api` to `process:sims`.",
+      "affected_element_ids": [
+        "process:catalogue-spreadsheet",
+        "process:web-api",
+        "flow:process:catalogue-spreadsheet>process:web-api>sql-statements"
+      ],
+      "verb": "unattributable",
+      "grounds": [
+        {
+          "kind": "quote",
+          "text": "The macros in it send SQL statements straight to the web API to change prices and product copy",
+          "source_label": "System description",
+          "element_id": "",
+          "attribute": "",
+          "flow_id": "",
+          "term": "",
+          "assertion": ""
+        },
+        {
+          "kind": "quote",
+          "text": "Nobody here can tell me what the API does about authentication",
+          "source_label": "System description",
+          "element_id": "",
+          "attribute": "",
+          "flow_id": "",
+          "term": "",
+          "assertion": ""
+        },
+        {
+          "kind": "unknown-attribute",
+          "text": "",
+          "source_label": "",
+          "element_id": "flow:process:catalogue-spreadsheet>process:web-api>sql-statements",
+          "attribute": "authentication",
+          "flow_id": "",
+          "term": "",
+          "assertion": ""
+        },
+        {
+          "kind": "derived-fact",
+          "text": "",
+          "source_label": "",
+          "element_id": "",
+          "attribute": "",
+          "flow_id": "flow:process:catalogue-spreadsheet>process:web-api>sql-statements",
+          "term": "",
+          "assertion": ""
+        },
+        {
+          "kind": "absent-element",
+          "text": "",
+          "source_label": "",
+          "element_id": "",
+          "attribute": "",
+          "flow_id": "",
+          "term": "audit log",
+          "assertion": ""
+        }
+      ],
+      "category": "repudiation",
+      "severity": {
+        "likelihood": "medium",
+        "impact": "medium",
+        "level": "medium",
+        "justification": "Likelihood is medium, conditionally: exploiting the gap requires access to `process:catalogue-spreadsheet` in `boundary:marketing-office`, but its write flow crosses into `process:web-api` with `unknown:flow:process:catalogue-spreadsheet>process:web-api>sql-statements:authentication`. Impact is medium because the target `process:web-api` handles `business-critical-data`, and disputed price or product-copy changes can affect subsequent orders."
+      },
+      "mitigations": [
+        {
+          "summary": "Authenticate catalogue changes as named users",
+          "detail": "Replace or constrain the spreadsheet-to-API write path so each catalogue update is authenticated as an individual marketing user rather than only as a workstation or macro, and resolve the unknown authentication on `flow:process:catalogue-spreadsheet>process:web-api>sql-statements`."
+        },
+        {
+          "summary": "Create tamper-evident catalogue change history",
+          "detail": "Have `process:web-api` retain append-only audit records for catalogue writes with the verified principal, timestamp, request or change ID, affected product, and before/after values; corrections should be new recorded changes rather than overwrites."
+        }
+      ]
+    },
+    {
+      "id": "I-01",
+      "framework": "stride",
+      "framework_version": "1.0",
+      "title": "Customer order details are readable over plaintext HTTP",
+      "description": "An on-path attacker between `process:mobile-app` in `boundary:customer-device` and the internet-facing `process:web-api` can intercept `flow:process:mobile-app>process:web-api>api-traffic`, which carries customer order details, because transport encryption is stated absent. The flow crosses into `boundary:sokify-internal-systems`, exposing customer PII to network observers before the Web API processes it. The captured identity and order information can enable targeted fraud or social-engineering against the affected customer.",
+      "affected_element_ids": [
+        "flow:process:mobile-app>process:web-api>api-traffic",
+        "process:mobile-app",
+        "process:web-api"
+      ],
+      "verb": "intercept",
+      "grounds": [
+        {
+          "kind": "absent-attribute",
+          "text": "",
+          "source_label": "",
+          "element_id": "flow:process:mobile-app>process:web-api>api-traffic",
+          "attribute": "encryption_in_transit",
+          "flow_id": "",
+          "term": "",
+          "assertion": ""
+        },
+        {
+          "kind": "derived-fact",
+          "text": "",
+          "source_label": "",
+          "element_id": "",
+          "attribute": "",
+          "flow_id": "flow:process:mobile-app>process:web-api>api-traffic",
+          "term": "",
+          "assertion": ""
+        }
+      ],
+      "category": "information-disclosure",
+      "severity": {
+        "likelihood": "high",
+        "impact": "medium",
+        "level": "high",
+        "justification": "Likelihood is high because `flow:process:mobile-app>process:web-api>api-traffic` crosses a trust boundary to the internet-facing `process:web-api` with encryption stated absent, allowing any capable observer of the customer-to-service path to capture traffic. Impact is medium because the flow carries customer order details and is tagged `pii`, creating irreversible disclosure of customers' personal and purchasing information."
+      },
+      "mitigations": [
+        {
+          "summary": "Replace HTTP with authenticated TLS for the mobile API",
+          "detail": "Require TLS 1.2+ for `flow:process:mobile-app>process:web-api>api-traffic`, validate the Web API certificate in `process:mobile-app`, and reject plaintext HTTP rather than redirecting sensitive requests."
+        },
+        {
+          "summary": "Minimize sensitive order content in requests",
+          "detail": "Use opaque order references where possible and avoid transmitting unnecessary customer fields on the mobile-to-API flow."
+        }
+      ]
+    },
+    {
+      "id": "I-02",
+      "framework": "stride",
+      "framework_version": "1.0",
+      "title": "Customer and payment records may be readable on the unverified API-to-database link",
+      "description": "`flow:process:web-api>store:user-database>customer-records` carries customer names, addresses, and payment-card information between `process:web-api` and confidential `store:user-database`, but its `encryption_in_transit` attribute is unknown. If transport protection is absent, an attacker with an internal network foothold or visibility into this server-side path can intercept the records in transit. The exposed data is the same corpus used by `process:web-api` for customer records, enabling targeted compromise of customers and payment-related fraud. This is conditional on resolving the flow's unverified transport protection; it does not assert that the link is plaintext.",
+      "affected_element_ids": [
+        "flow:process:web-api>store:user-database>customer-records",
+        "process:web-api",
+        "store:user-database"
+      ],
+      "verb": "intercept",
+      "grounds": [
+        {
+          "kind": "unknown-attribute",
+          "text": "",
+          "source_label": "",
+          "element_id": "flow:process:web-api>store:user-database>customer-records",
+          "attribute": "encryption_in_transit",
+          "flow_id": "",
+          "term": "",
+          "assertion": ""
+        }
+      ],
+      "category": "information-disclosure",
+      "severity": {
+        "likelihood": "medium",
+        "impact": "high",
+        "level": "high",
+        "justification": "Likelihood is medium and conditional because `flow:process:web-api>store:user-database>customer-records` has unverified `encryption_in_transit`, while an attacker still needs visibility into the internal server-side path. Impact is high because the flow carries the contents of confidential `store:user-database`, which is tagged `pii` and `financial`, including card information."
+      },
+      "mitigations": [
+        {
+          "summary": "Verify and enforce encrypted database transport",
+          "detail": "Require TLS for `flow:process:web-api>store:user-database>customer-records`, validate database certificates from `process:web-api`, and record the verified `encryption_in_transit` posture."
+        },
+        {
+          "summary": "Restrict visibility of the database path",
+          "detail": "Segment the database network path and limit packet-capture, routing, and administrative access to the principals that require it."
+        }
+      ]
+    },
+    {
+      "id": "I-03",
+      "framework": "stride",
+      "framework_version": "1.0",
+      "title": "A storage-layer copy may disclose all user database records",
+      "description": "`store:user-database` is confidential and holds customer names, addresses, and the card used for payment, while its `encryption_at_rest` attribute is unknown. If encryption at rest is not enabled, an attacker who obtains a database volume, snapshot, backup, or other storage-layer copy can read the full customer corpus without using `process:web-api` or its normal access path. The disclosure includes financial and PII records and can enable broad customer targeting and payment-related fraud. This threat is conditional on the unresolved at-rest encryption state, not an assertion that the database is unencrypted.",
+      "affected_element_ids": [
+        "store:user-database"
+      ],
+      "verb": "read",
+      "grounds": [
+        {
+          "kind": "quote",
+          "text": "whether the user database and the flat file are encrypted.",
+          "source_label": "System description",
+          "element_id": "",
+          "attribute": "",
+          "flow_id": "",
+          "term": "",
+          "assertion": ""
+        },
+        {
+          "kind": "unknown-attribute",
+          "text": "",
+          "source_label": "",
+          "element_id": "store:user-database",
+          "attribute": "encryption_at_rest",
+          "flow_id": "",
+          "term": "",
+          "assertion": ""
+        }
+      ],
+      "category": "information-disclosure",
+      "severity": {
+        "likelihood": "medium",
+        "impact": "high",
+        "level": "high",
+        "justification": "Likelihood is medium and conditional because `store:user-database` has `encryption_at_rest` unverified; storage-layer compromise or an operational copy is required, but no stated control confirms that such a copy is unreadable. Impact is high because the store is classified confidential and tagged `pii` and `financial`, so one copied artifact can expose all stored customer and payment records."
+      },
+      "mitigations": [
+        {
+          "summary": "Encrypt the user database and all operational copies",
+          "detail": "Establish and enforce encryption at rest for `store:user-database`, including backups, snapshots, replicas, and decommissioned media, with managed keys and restricted key-use permissions."
+        },
+        {
+          "summary": "Limit export and storage-layer access",
+          "detail": "Apply deny-by-default access controls and audit export, backup, restore, and snapshot operations for the user database."
+        }
+      ]
+    },
+    {
+      "id": "I-04",
+      "framework": "stride",
+      "framework_version": "1.0",
+      "title": "An unencrypted delivery-address file may expose customer locations",
+      "description": "`store:delivery-address-flat-file` is a confidential store containing delivery addresses, but its `encryption_at_rest` attribute is unknown. If the flat file is not encrypted, a person with access to the host filesystem, decommissioned media, or an operational copy can read customers' home delivery addresses without going through `process:sims`. Those addresses can be correlated with the named-customer dispatch information passed through `flow:process:sims>process:fax-gateway>dispatch-note`, increasing the utility of the disclosure for customer targeting. This threat is conditional on the unresolved encryption state.",
+      "affected_element_ids": [
+        "store:delivery-address-flat-file"
+      ],
+      "verb": "read",
+      "grounds": [
+        {
+          "kind": "quote",
+          "text": "whether the user database and the flat file are encrypted.",
+          "source_label": "System description",
+          "element_id": "",
+          "attribute": "",
+          "flow_id": "",
+          "term": "",
+          "assertion": ""
+        },
+        {
+          "kind": "unknown-attribute",
+          "text": "",
+          "source_label": "",
+          "element_id": "store:delivery-address-flat-file",
+          "attribute": "encryption_at_rest",
+          "flow_id": "",
+          "term": "",
+          "assertion": ""
+        }
+      ],
+      "category": "information-disclosure",
+      "severity": {
+        "likelihood": "medium",
+        "impact": "medium",
+        "level": "medium",
+        "justification": "Likelihood is medium and conditional because `store:delivery-address-flat-file` has unverified `encryption_at_rest`, and a storage-layer or filesystem-access prerequisite remains. Impact is medium because the store is classified confidential and tagged `pii`, and disclosure reveals customers' delivery locations."
+      },
+      "mitigations": [
+        {
+          "summary": "Encrypt the delivery-address file and its copies",
+          "detail": "Enable encryption at rest for `store:delivery-address-flat-file`, cover backups and host volumes, and restrict access to the decryption keys."
+        },
+        {
+          "summary": "Reduce filesystem exposure",
+          "detail": "Run `process:sims` with a dedicated least-privilege account, restrict read access to the file, and securely delete address records once dispatch processing no longer requires them."
+        }
+      ]
+    },
+    {
+      "id": "I-05",
+      "framework": "stride",
+      "framework_version": "1.0",
+      "title": "Misaddressed fax confirmations can disclose customer names and addresses",
+      "description": "An unintended fax recipient can read the confirmation sent through `flow:process:fax-gateway>entity:customer>confirmation-fax` when `process:fax-gateway` dials the number stored against an order but does not verify the confirmation arrived at the intended recipient. The flow carries the customer's name and address across a boundary to the customer device zone, so an incorrect, stale, or attacker-controlled destination number delivers that PII to another party. The disclosed address and identity can enable targeted fraud or physical-world targeting of the customer.",
+      "affected_element_ids": [
+        "flow:process:fax-gateway>entity:customer>confirmation-fax",
+        "process:fax-gateway",
+        "entity:customer"
+      ],
+      "verb": "read",
+      "grounds": [
+        {
+          "kind": "quote",
+          "text": "The gateway dials the number stored against the order and nobody checks it arrived at the right place.",
+          "source_label": "System description",
+          "element_id": "",
+          "attribute": "",
+          "flow_id": "",
+          "term": "",
+          "assertion": ""
+        },
+        {
+          "kind": "derived-fact",
+          "text": "",
+          "source_label": "",
+          "element_id": "",
+          "attribute": "",
+          "flow_id": "flow:process:fax-gateway>entity:customer>confirmation-fax",
+          "term": "",
+          "assertion": ""
+        }
+      ],
+      "category": "information-disclosure",
+      "severity": {
+        "likelihood": "medium",
+        "impact": "medium",
+        "level": "medium",
+        "justification": "Likelihood is medium because every confirmation is sent to a stored fax number and the source states that delivery to the intended recipient is not checked, although an incorrect or redirected destination is still required. Impact is medium because the confirmation contains customer names and addresses, which are `pii` on `flow:process:fax-gateway>entity:customer>confirmation-fax`."
+      },
+      "mitigations": [
+        {
+          "summary": "Verify the recipient before sending dispatch information",
+          "detail": "Require an authenticated or out-of-band confirmation of the destination number and recipient before `process:fax-gateway` sends a confirmation containing customer PII."
+        },
+        {
+          "summary": "Replace fax delivery with an authenticated customer channel",
+          "detail": "Send confirmations through an authenticated in-app channel or another verified delivery mechanism, and minimize any PII included in the notification."
+        }
+      ]
+    },
+    {
+      "id": "D-01",
+      "framework": "stride",
+      "framework_version": "1.0",
+      "title": "Flooding the web API can halt customer ordering and catalogue updates",
+      "description": "`process:web-api` is internet-facing and receives `flow:process:mobile-app>process:web-api>api-traffic` across a trust boundary. Its authentication is unknown; if that flow permits unauthenticated requests, or authenticated requests are not cost-metered, an internet attacker can repeatedly submit order-shaped traffic to exhaust the web API's finite request-processing capacity. Each accepted order causes customer-record work on `flow:process:web-api>store:user-database>customer-records` and is handed to `process:sims` on `flow:process:web-api>process:sims>order-handover`, making the attacker request cheaper than the downstream work it induces. Second-order, saturation prevents legitimate customers from using the only customer-facing ordering channel and also blocks the separate `flow:process:catalogue-spreadsheet>process:web-api>sql-statements` path used for catalogue changes. This is conditional on the unresolved authentication and request-size/rate/cost-bound posture, not an assertion that such controls are absent.",
+      "affected_element_ids": [
+        "process:web-api",
+        "flow:process:mobile-app>process:web-api>api-traffic"
+      ],
+      "verb": "flood",
+      "grounds": [
+        {
+          "kind": "quote",
+          "text": "The web API keeps customers in the user database: name, address, and the card they paid with. When an order is placed the API hands the order over to SIMS",
+          "source_label": "System description",
+          "element_id": "",
+          "attribute": "",
+          "flow_id": "",
+          "term": "",
+          "assertion": ""
+        },
+        {
+          "kind": "quote",
+          "text": "Customers browse and order through our mobile app; there is no website.",
+          "source_label": "System description",
+          "element_id": "",
+          "attribute": "",
+          "flow_id": "",
+          "term": "",
+          "assertion": ""
+        },
+        {
+          "kind": "unknown-attribute",
+          "text": "",
+          "source_label": "",
+          "element_id": "flow:process:mobile-app>process:web-api>api-traffic",
+          "attribute": "authentication",
+          "flow_id": "",
+          "term": "",
+          "assertion": ""
+        },
+        {
+          "kind": "derived-fact",
+          "text": "",
+          "source_label": "",
+          "element_id": "",
+          "attribute": "",
+          "flow_id": "flow:process:mobile-app>process:web-api>api-traffic",
+          "term": "",
+          "assertion": ""
+        },
+        {
+          "kind": "derived-fact",
+          "text": "",
+          "source_label": "",
+          "element_id": "",
+          "attribute": "",
+          "flow_id": "flow:process:catalogue-spreadsheet>process:web-api>sql-statements",
+          "term": "",
+          "assertion": ""
+        }
+      ],
+      "category": "denial-of-service",
+      "severity": {
+        "likelihood": "high",
+        "impact": "medium",
+        "level": "high",
+        "justification": "Likelihood is high, conditional on the unknown authentication posture of `flow:process:mobile-app>process:web-api>api-traffic`: `process:web-api` is internet-facing and the flow crosses from `boundary:customer-device`, so a broad attacker population can attempt a commodity request flood. Impact is medium because `process:web-api` is the only stated customer ordering channel and its outage also blocks the catalogue-spreadsheet caller, but the stated harm is a recoverable service interruption."
+      },
+      "mitigations": [
+        {
+          "summary": "Bound request cost before downstream order processing",
+          "detail": "Authenticate and apply per-identity and per-source rate and concurrency limits at `process:web-api`; enforce hard request-size and parsing-complexity limits before customer-record or order-handover work."
+        },
+        {
+          "summary": "Isolate and shed downstream work",
+          "detail": "Apply bounded queues, timeouts, concurrency ceilings, and load-shedding on the paths from `process:web-api` to `store:user-database` and `process:sims` so a request flood fails fast rather than consuming all shared capacity."
+        }
+      ]
+    },
+    {
+      "id": "E-01",
+      "framework": "stride",
+      "framework_version": "1.0",
+      "title": "Customer-controlled API requests may gain authority over other customers' records",
+      "description": "`process:web-api` is internet-facing and receives customer-originated requests over the boundary-crossing `flow:process:mobile-app>process:web-api>api-traffic`, whose `authentication` is unknown. If the API does not authenticate the caller and bind every customer-record operation to the verified subject, an anonymous caller or one authenticated as one customer can modify identifiers or request parameters to make `process:web-api` act on another customer's records. This is horizontal privilege escalation through the API's standing read/write path `flow:process:web-api>store:user-database>customer-records`; the terminal capability is access to other customers' names, addresses, and payment-card data in `store:user-database`, rather than only the attacker's own account. The claim is conditional on the unstated authentication and server-side object-authorization behavior of `process:web-api`.",
+      "affected_element_ids": [
+        "process:web-api",
+        "flow:process:mobile-app>process:web-api>api-traffic"
+      ],
+      "verb": "escalate",
+      "grounds": [
+        {
+          "kind": "quote",
+          "text": "The web API keeps customers in the user database: name, address, and the card they paid with.",
+          "source_label": "System description",
+          "element_id": "",
+          "attribute": "",
+          "flow_id": "",
+          "term": "",
+          "assertion": ""
+        },
+        {
+          "kind": "unknown-attribute",
+          "text": "",
+          "source_label": "",
+          "element_id": "flow:process:mobile-app>process:web-api>api-traffic",
+          "attribute": "authentication",
+          "flow_id": "",
+          "term": "",
+          "assertion": ""
+        },
+        {
+          "kind": "derived-fact",
+          "text": "",
+          "source_label": "",
+          "element_id": "",
+          "attribute": "",
+          "flow_id": "flow:process:mobile-app>process:web-api>api-traffic",
+          "term": "",
+          "assertion": ""
+        }
+      ],
+      "category": "elevation-of-privilege",
+      "severity": {
+        "likelihood": "high",
+        "impact": "high",
+        "level": "critical",
+        "justification": "Likelihood is high, conditional on the unknown authentication state: `process:web-api` is internet-facing and `flow:process:mobile-app>process:web-api>api-traffic` crosses from the customer-device boundary, so attackers can submit manipulated API requests. Impact is high because the resulting authority reaches `store:user-database`, which holds customer payment-card data and is tagged `pii` and `financial` with confidential classification."
+      },
+      "mitigations": [
+        {
+          "summary": "Authenticate callers and enforce ownership checks on every customer-record operation",
+          "detail": "Have `process:web-api` verify a credential on `flow:process:mobile-app>process:web-api>api-traffic` and derive the customer subject from that credential. Apply server-side, deny-by-default ownership or role checks to every read and write over `flow:process:web-api>store:user-database>customer-records`, rather than trusting customer identifiers supplied by the client."
+        },
+        {
+          "summary": "Constrain database operations to authorized customer scope",
+          "detail": "Use mandatory tenant/customer predicates or row-level security for `store:user-database` where feasible, so a request whose record identifier does not match the verified subject cannot be serviced by the web API's database access path."
+        }
+      ]
+    }
+  ]
+}

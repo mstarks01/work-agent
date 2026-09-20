@@ -50,6 +50,34 @@ Nobody has voted on this Baseline's findings, so every vote-dependent number bel
 | --- | --- | --- | --- |
 | 0.527 | 0.634 | no votes yet | no votes yet |
 
+## Commit `6bff71720140`, corpus `d5f345c2eedb`
+
+1 baseline(s). Numbers in this section compare with each other and with nothing above or below it.
+
+### `6bff717-gpt-5.6-terra-24dda4db`
+
+`strong`: `openrouter/openai/gpt-5.6-terra` via `OpenAI` pinned to `openai` · frameworks stride · 1 sweep(s) · $7.34 reported by the provider · submitted by mstarks01
+
+Vote coverage: 0 of 72 unmatched finding(s) judged by a person.
+
+Nobody has voted on this Baseline's findings, so every vote-dependent number below reads `no votes yet`.
+
+**Series `maintainer`** — reads maintainer votes.
+
+`stride`
+
+| reference coverage | must-find coverage | rejected rate | writing objections |
+| --- | --- | --- | --- |
+| 0.434 | 0.563 | no votes yet | no votes yet |
+
+**Series `all`** — reads maintainer, contributor votes.
+
+`stride`
+
+| reference coverage | must-find coverage | rejected rate | writing objections |
+| --- | --- | --- | --- |
+| 0.434 | 0.563 | no votes yet | no votes yet |
+
 ## Commit `d3f1898c8959`, corpus `b09805c6726d`
 
 1 baseline(s). Numbers in this section compare with each other and with nothing above or below it.
