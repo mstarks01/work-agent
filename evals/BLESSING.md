@@ -10,16 +10,19 @@ bookkeeping around it.
 > is free, offline, and open to outside contributors. New here? Start at
 > [`../CONTRIBUTING.md`](../CONTRIBUTING.md).
 
-> **A person has read the calibration labels, and no case has a merged Case
-> Sitting.** All 13 cases in `evals/corpus/` were written by an agent. Two
+> **A person has now read every case.** All 13 cases in `evals/corpus/` were
+> written by an agent, and on 2026-09-21 a single **Case Sitting** cleared all
+> of them: 130 own-list threats written blind, then all 344 recorded claims
+> marked — 233 `agree`, 61 `unsure`, 26 `reject`, 24 `duplicate`. Two
 > calibration reviews read the pairs step 5 produces:
 > [`calibration_labels/REVIEW-01.md`](calibration_labels/REVIEW-01.md) on
 > 2026-08-18, and
 > [`calibration_labels/REVIEW-02.md`](calibration_labels/REVIEW-02.md) on
-> 2026-09-02. Step 6 is the step that clears a case, and it has cleared none: a
-> **Case Sitting** merges as one JSON file under `evals/review/submissions/`,
-> that directory holds no submission, and `tests/test_case_review.py` derives the
-> count from it — so this sentence and the gate cannot disagree. Case
+> 2026-09-02. Step 6 is the step that clears a case: a **Case Sitting** merges
+> as one JSON file under `evals/review/submissions/`, and
+> `tests/test_case_review.py` derives the count from that directory — so this
+> sentence and the gate cannot disagree. Read the count off
+> `uv run python webapp/sitting.py --list` rather than from prose here. Case
 > `01-payments-checkout` carries a reading document one person filled on
 > 2026-08-23,
 > [`corpus/01-payments-checkout/REVIEW-02.md`](corpus/01-payments-checkout/REVIEW-02.md),

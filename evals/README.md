@@ -13,7 +13,12 @@ what a person decided about each finding.
 
 **An agent wrote all of it; review records now identify the subsets people have
 read.** Every golden case, every reference claim and every calibration label
-began agent-authored. The first calibration review was
+began agent-authored. On 2026-09-21 one **Case Sitting** read all 13 cases and
+marked all 344 recorded claims, so every reference set now carries a human
+judgement per claim — `agree`, `reject`, `duplicate` or `unsure`. A mark is a
+reader's answer on a claim as written; it does not make the set exhaustive, and
+the 26 `missing` entries that sitting recorded say where the reader thought it
+is not. The first calibration review was
 [`calibration_labels/REVIEW-01.md`](calibration_labels/REVIEW-01.md), on
 2026-08-18, over the 30 hardest pairs. It answered 25 `same`, 1 `different` and 4
 `unclear`, and it changed two things — a wrong label, and a reference claim in
@@ -445,15 +450,14 @@ Once a rule ships, its false-split and false-merge counts are the regression
 signal: `tests/test_evals_identity.py` asserts them exactly, so they bind
 harder than the ratio and a rule cannot rot downwards inside the bar's slack.
 Read the bar as the top of this file describes it: the labels are
-agent-authored and unreviewed, so it measures agreement with them and not
-correctness.
+agent-authored, so it measures agreement with them and not correctness.
 
 ## What the metrics mean
 
 Every number here is measured **against the rule and the ledger** — use
 them to compare configurations and track movement, never as absolute scores or
 against another tool's published figures. The reference sets they rest on are
-agent-authored and unreviewed.
+agent-authored, and every claim in them now carries one reader's mark.
 
 **ASVS's differ only in mechanism.** The `applicability` block is a confusion
 matrix over a finite catalog, matched by requirement ID: its claims carry
