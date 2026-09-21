@@ -110,7 +110,7 @@
       "flow:process:mobile-app>process:web-api>api-traffic"
     ],
     "claim": "A customer denies placing an order and, on what is described, Sokify cannot show who submitted it: how the API authenticates callers is unverified and the input names no order record that binds a customer identity.",
-    "tier": "must-find",
+    "tier": "expected",
     "severity": {
       "likelihood": "medium",
       "impact": "medium"

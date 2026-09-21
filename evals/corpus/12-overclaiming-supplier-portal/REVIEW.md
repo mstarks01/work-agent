@@ -413,7 +413,7 @@ your missing list, your notes and a digest of each file you read:
       "source.md": "3542d5a0939da730951ce8c09de7a18d1bbc74d5e972180acacba73bfd168d41",
       "model.json": "dcfd28bad38f897c03648d173c9cfd9454673988d6d13e3cd11abed53723c036",
       "claims/asvs.json": "5e505c3078704dfc0dc35288158f3090ce00160f7e39286f66f7cd8a2e7cd48c",
-      "claims/stride.json": "ef044f8203389f2d96a4842a16b35794be13be59626cb2a29808e464a4b419ee"
+      "claims/stride.json": "5eecb61287ef30d780541c4d93c0c30e4bd4e83a40d5e0ff87e752b59f7224eb"
       }
     }
   }

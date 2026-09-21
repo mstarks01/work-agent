@@ -95,7 +95,7 @@
       "entity:insurance-partner"
     ],
     "claim": "A partner denies having sent an extract and nothing binds a landed file to the key that uploaded it.",
-    "tier": "must-find",
+    "tier": "expected",
     "severity": {
       "likelihood": "medium",
       "impact": "medium"

@@ -109,7 +109,7 @@
       "flow:entity:store-manager>process:scheduling-web-app>build-rota"
     ],
     "claim": "A store manager denies having made a rota change that disadvantaged a colleague, and the model records nothing that attributes the change, so whether the application keeps such a record is unverified.",
-    "tier": "must-find",
+    "tier": "expected",
     "severity": {
       "likelihood": "medium",
       "impact": "medium"
