@@ -135,7 +135,7 @@ category.
 
 ---
 
-## Part 2 — the 18 recorded STRIDE threats
+## Part 2 — the 13 recorded STRIDE threats
 
 Only after your own list exists.
 
@@ -188,15 +188,7 @@ on either of them. That is the finding this sitting exists for.
 
 > mark:
 
-**5.** An attacker holding the fleet key injects fabricated readings that the normalizer loads into the lake as genuine customer data.
-
-- `flow:entity:sensor-node>process:device-gateway>publish-readings`, `store:telemetry-lake`
-- severity: high/medium · verb: `forge`
-- Data integrity downstream of a spoofable device identity; distinct from the spoofing lane's identity claim.
-
-> mark:
-
-**6.** An attacker who can write to the device registry reassigns a node to a different customer, redirecting or corrupting that customer's data.
+**5.** An attacker who can write to the device registry reassigns a node to a different customer, redirecting or corrupting that customer's data.
 
 - `store:device-registry`, `flow:process:device-gateway>store:device-registry>look-up-device`
 - severity: low/high · verb: `alter`
@@ -207,7 +199,7 @@ on either of them. That is the finding this sitting exists for.
 
 ### repudiation
 
-**7.** A customer disputes a reading attributed to their site and no per-device identity exists to establish which node actually sent it.
+**6.** A customer disputes a reading attributed to their site and no per-device identity exists to establish which node actually sent it.
 
 - `entity:sensor-node`, `store:telemetry-lake`
 - severity: medium/medium · verb: `unattributable`
@@ -215,18 +207,10 @@ on either of them. That is the finding this sitting exists for.
 
 > mark:
 
-**8.** A technician denies having made a configuration change on a node, and the unauthenticated local console records no actor to contradict them.
-
-- `flow:entity:field-technician>entity:sensor-node>local-service-session`
-- severity: medium/medium · verb: `unattributable`
-- No logging is described anywhere on the service path.
-
-> mark:
-
 
 ### information-disclosure
 
-**9.** An attacker who reaches the telemetry lake reads customer site addresses and occupancy patterns, whose protection at rest is unverified.
+**7.** An attacker who reaches the telemetry lake reads customer site addresses and occupancy patterns, whose protection at rest is unverified.
 
 - `store:telemetry-lake`
 - severity: medium/high · verb: `read`
@@ -234,7 +218,7 @@ on either of them. That is the finding this sitting exists for.
 
 > mark:
 
-**10.** An attacker on the path between a node and the gateway reads readings and the presented key, because transport encryption on the MQTT session is unverified.
+**8.** An attacker on the path between a node and the gateway reads readings and the presented key, because transport encryption on the MQTT session is unverified.
 
 - `flow:entity:sensor-node>process:device-gateway>publish-readings`
 - severity: medium/high · verb: `intercept`
@@ -242,7 +226,7 @@ on either of them. That is the finding this sitting exists for.
 
 > mark:
 
-**11.** An attacker downloads firmware images from the public bucket and reverse-engineers them to recover embedded fleet credentials or logic.
+**9.** An attacker downloads firmware images from the public bucket and reverse-engineers them to recover embedded fleet credentials or logic.
 
 - `store:firmware-bucket`
 - severity: high/medium · verb: `read`
@@ -250,7 +234,7 @@ on either of them. That is the finding this sitting exists for.
 
 > mark:
 
-**12.** An attacker who reaches the device registry reads the key material and customer assignments it holds, whose protection at rest is unverified.
+**10.** An attacker who reaches the device registry reads the key material and customer assignments it holds, whose protection at rest is unverified.
 
 - `store:device-registry`
 - severity: medium/high · verb: `read`
@@ -261,7 +245,7 @@ on either of them. That is the finding this sitting exists for.
 
 ### denial-of-service
 
-**13.** An attacker floods the internet-exposed MQTT broker with connections until genuine nodes can no longer publish readings.
+**11.** An attacker floods the internet-exposed MQTT broker with connections until genuine nodes can no longer publish readings.
 
 - `process:device-gateway`, `flow:entity:sensor-node>process:device-gateway>publish-readings`
 - severity: high/high · verb: `flood`
@@ -269,15 +253,7 @@ on either of them. That is the finding this sitting exists for.
 
 > mark:
 
-**14.** An attacker publishes a firmware image that bricks every node that installs it, taking the fleet offline with no remote recovery path.
-
-- `entity:sensor-node`, `store:firmware-bucket`
-- severity: medium/high · verb: `plant`
-- Availability consequence of the same unverified update path; the devices are physically remote.
-
-> mark:
-
-**15.** An attacker holding the fleet key floods the ingest path with readings until the normalizer falls behind and dashboards stop reflecting the fleet.
+**12.** An attacker holding the fleet key floods the ingest path with readings until the normalizer falls behind and dashboards stop reflecting the fleet.
 
 - `process:telemetry-normalizer`, `store:telemetry-lake`
 - severity: medium/medium · verb: `flood`
@@ -288,23 +264,7 @@ on either of them. That is the finding this sitting exists for.
 
 ### elevation-of-privilege
 
-**16.** An attacker turns an unsigned firmware update into code execution on every node, escalating from bucket write access to control of the physical fleet.
-
-- `entity:sensor-node`, `flow:entity:sensor-node>store:firmware-bucket>poll-firmware`
-- severity: high/high · verb: `escalate`
-- The escalation framing of the firmware finding: privilege gained, not just data changed.
-
-> mark:
-
-**17.** An attacker who compromises one physically accessible node uses its fleet-wide credential to act as the whole fleet against the ingest edge.
-
-- `entity:sensor-node`, `process:device-gateway`
-- severity: high/high · verb: `escalate`
-- One-device compromise to fleet-scope privilege; the shared key is the escalation mechanism.
-
-> mark:
-
-**18.** An operator signed in for dashboards queries raw customer records beyond what their role needs, because no narrower grant on the lake is described.
+**13.** An operator signed in for dashboards queries raw customer records beyond what their role needs, because no narrower grant on the lake is described.
 
 - `entity:fleet-operator`, `store:telemetry-lake`
 - severity: medium/medium · verb: `abuse-grant`
@@ -358,7 +318,7 @@ your missing list, your notes and a digest of each file you read:
       "opened_digests": {
       "source.md": "fc745e273aff8be740a814f0a9b4a45d6f3c6fe39dc7c8efa2b879d4f270ac74",
       "model.json": "fbe6f9b1304f947a2efe454df07391e4a430acf808055be11c5b3bb7911995a4",
-      "claims/stride.json": "5e19650733b2e65206dc03b7522d469f010afe34a8618c3b813b3e41ca12cc61"
+      "claims/stride.json": "7231cb4f89d5306db2261a4de175c0a37bfdcc9ec28e75731010007e62851153"
       }
     }
   }

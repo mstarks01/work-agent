@@ -62,21 +62,6 @@
   {
     "category": "tampering",
     "affected_element_ids": [
-      "flow:entity:sensor-node>process:device-gateway>publish-readings",
-      "store:telemetry-lake"
-    ],
-    "claim": "An attacker holding the fleet key injects fabricated readings that the normalizer loads into the lake as genuine customer data.",
-    "tier": "must-find",
-    "severity": {
-      "likelihood": "high",
-      "impact": "medium"
-    },
-    "notes": "Data integrity downstream of a spoofable device identity; distinct from the spoofing lane's identity claim.",
-    "verb": "forge"
-  },
-  {
-    "category": "tampering",
-    "affected_element_ids": [
       "store:device-registry",
       "flow:process:device-gateway>store:device-registry>look-up-device"
     ],
@@ -102,20 +87,6 @@
       "impact": "medium"
     },
     "notes": "Follows directly from a fleet-wide rather than per-device credential.",
-    "verb": "unattributable"
-  },
-  {
-    "category": "repudiation",
-    "affected_element_ids": [
-      "flow:entity:field-technician>entity:sensor-node>local-service-session"
-    ],
-    "claim": "A technician denies having made a configuration change on a node, and the unauthenticated local console records no actor to contradict them.",
-    "tier": "expected",
-    "severity": {
-      "likelihood": "medium",
-      "impact": "medium"
-    },
-    "notes": "No logging is described anywhere on the service path.",
     "verb": "unattributable"
   },
   {
@@ -192,21 +163,6 @@
   {
     "category": "denial-of-service",
     "affected_element_ids": [
-      "entity:sensor-node",
-      "store:firmware-bucket"
-    ],
-    "claim": "An attacker publishes a firmware image that bricks every node that installs it, taking the fleet offline with no remote recovery path.",
-    "tier": "expected",
-    "severity": {
-      "likelihood": "medium",
-      "impact": "high"
-    },
-    "notes": "Availability consequence of the same unverified update path; the devices are physically remote.",
-    "verb": "plant"
-  },
-  {
-    "category": "denial-of-service",
-    "affected_element_ids": [
       "process:telemetry-normalizer",
       "store:telemetry-lake"
     ],
@@ -218,36 +174,6 @@
     },
     "notes": "Cost-amplification against a metered analytics store as well as an availability effect.",
     "verb": "flood"
-  },
-  {
-    "category": "elevation-of-privilege",
-    "affected_element_ids": [
-      "entity:sensor-node",
-      "flow:entity:sensor-node>store:firmware-bucket>poll-firmware"
-    ],
-    "claim": "An attacker turns an unsigned firmware update into code execution on every node, escalating from bucket write access to control of the physical fleet.",
-    "tier": "must-find",
-    "severity": {
-      "likelihood": "high",
-      "impact": "high"
-    },
-    "notes": "The escalation framing of the firmware finding: privilege gained, not just data changed.",
-    "verb": "escalate"
-  },
-  {
-    "category": "elevation-of-privilege",
-    "affected_element_ids": [
-      "entity:sensor-node",
-      "process:device-gateway"
-    ],
-    "claim": "An attacker who compromises one physically accessible node uses its fleet-wide credential to act as the whole fleet against the ingest edge.",
-    "tier": "must-find",
-    "severity": {
-      "likelihood": "high",
-      "impact": "high"
-    },
-    "notes": "One-device compromise to fleet-scope privilege; the shared key is the escalation mechanism.",
-    "verb": "escalate"
   },
   {
     "category": "elevation-of-privilege",

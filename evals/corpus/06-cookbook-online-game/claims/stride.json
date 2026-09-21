@@ -145,7 +145,7 @@
       "likelihood": "medium",
       "impact": "medium"
     },
-    "notes": "Both links are recorded as bare port numbers \u2014 the model gives no transport protection at all.",
+    "notes": "Both links are recorded as bare port numbers — the model gives no transport protection at all.",
     "verb": "intercept"
   },
   {
@@ -209,36 +209,6 @@
     "verb": "flood"
   },
   {
-    "category": "denial-of-service",
-    "affected_element_ids": [
-      "store:player-database",
-      "process:lobby"
-    ],
-    "claim": "An attacker drives enough matchmaking requests to exhaust the player database and stall both matchmaking and moderation.",
-    "tier": "expected",
-    "severity": {
-      "likelihood": "medium",
-      "impact": "medium"
-    },
-    "notes": "One store shared by the player path and the staff path.",
-    "verb": "flood"
-  },
-  {
-    "category": "elevation-of-privilege",
-    "affected_element_ids": [
-      "process:game-server",
-      "store:player-database"
-    ],
-    "claim": "An attacker who compromises an internet-exposed game server gains write access to player records across the production network.",
-    "tier": "must-find",
-    "severity": {
-      "likelihood": "medium",
-      "impact": "high"
-    },
-    "notes": "The exposed element writes the sensitive store directly, with no intermediary and unverified authentication.",
-    "verb": "escalate"
-  },
-  {
     "category": "elevation-of-privilege",
     "affected_element_ids": [
       "process:moderation-website",
@@ -252,20 +222,5 @@
     },
     "notes": "No role separation inside the tool is described; the blast radius is the whole player base.",
     "verb": "abuse-grant"
-  },
-  {
-    "category": "elevation-of-privilege",
-    "affected_element_ids": [
-      "process:game-client",
-      "process:lobby"
-    ],
-    "claim": "A player uses their control over the client to obtain a match assignment or account state they are not entitled to.",
-    "tier": "expected",
-    "severity": {
-      "likelihood": "medium",
-      "impact": "medium"
-    },
-    "notes": "Escalation framing of the untrusted-client fact, against the lobby rather than the game servers.",
-    "verb": "escalate"
   }
 ]

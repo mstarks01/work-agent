@@ -178,7 +178,7 @@ The narrower question, per record: **does this requirement apply to this system,
 
 > mark:
 
-## Part 3 — the 18 recorded STRIDE threats
+## Part 3 — the 15 recorded STRIDE threats
 
 Only after your own list exists.
 
@@ -320,38 +320,14 @@ on either of them. That is the finding this sitting exists for.
 
 > mark:
 
-**15.** An attacker drives enough matchmaking requests to exhaust the player database and stall both matchmaking and moderation.
-
-- `store:player-database`, `process:lobby`
-- severity: medium/medium · verb: `flood`
-- One store shared by the player path and the staff path.
-
-> mark:
-
 
 ### elevation-of-privilege
 
-**16.** An attacker who compromises an internet-exposed game server gains write access to player records across the production network.
-
-- `process:game-server`, `store:player-database`
-- severity: medium/high · verb: `escalate`
-- The exposed element writes the sensitive store directly, with no intermediary and unverified authentication.
-
-> mark:
-
-**17.** An attacker who gets any access to the moderation website acquires privilege over every player account it can reach.
+**15.** An attacker who gets any access to the moderation website acquires privilege over every player account it can reach.
 
 - `process:moderation-website`, `entity:customer-support-staff`
 - severity: medium/high · verb: `abuse-grant`
 - No role separation inside the tool is described; the blast radius is the whole player base.
-
-> mark:
-
-**18.** A player uses their control over the client to obtain a match assignment or account state they are not entitled to.
-
-- `process:game-client`, `process:lobby`
-- severity: medium/medium · verb: `escalate`
-- Escalation framing of the untrusted-client fact, against the lobby rather than the game servers.
 
 > mark:
 
@@ -402,7 +378,7 @@ your missing list, your notes and a digest of each file you read:
       "source.md": "17e797d0315fdd53d5acf05962ca0ae8a23e08f84779f8528ade6422c34577a3",
       "model.json": "400ad2ee53ee5b0e87c310c881be77f6cc748b7f817fc176bf8967818238c3eb",
       "claims/asvs.json": "79b1fb614daf429bf079268027870240a41c056ba1d41174eb35007f22006bf8",
-      "claims/stride.json": "31830dded82e283717060789608df528807231ce2e7468dd5f38098ea466fa32"
+      "claims/stride.json": "713c169321f02a3ad73b852da9e26bfc5cbd73e37e7a3f792827d5a4a5402e58"
       }
     }
   }

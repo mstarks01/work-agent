@@ -217,7 +217,7 @@ The narrower question, per record: **does this requirement apply to this system,
 
 > mark:
 
-## Part 3 — the 20 recorded STRIDE threats
+## Part 3 — the 18 recorded STRIDE threats
 
 Only after your own list exists.
 
@@ -286,15 +286,7 @@ on either of them. That is the finding this sitting exists for.
 
 > mark:
 
-**7.** An attacker who can write to the flat file rewrites a delivery address so goods are dispatched somewhere else.
-
-- `store:delivery-address-flat-file`, `process:sims`
-- severity: low/high · verb: `alter`
-- The file sits alongside SIMS with no stated protection; the impact is physical goods, not records.
-
-> mark:
-
-**8.** An attacker changes the number stored against an order so the confirmation is faxed to a machine they control.
+**7.** An attacker changes the number stored against an order so the confirmation is faxed to a machine they control.
 
 - `flow:process:web-api>process:sims>order-handover`, `process:sims`
 - severity: low/medium · verb: `alter`
@@ -305,7 +297,7 @@ on either of them. That is the finding this sitting exists for.
 
 ### repudiation
 
-**9.** A customer denies placing an order and, on what is described, Sokify cannot show who submitted it: how the API authenticates callers is unverified and the input names no order record that binds a customer identity.
+**8.** A customer denies placing an order and, on what is described, Sokify cannot show who submitted it: how the API authenticates callers is unverified and the input names no order record that binds a customer identity.
 
 - `process:web-api`, `flow:process:mobile-app>process:web-api>api-traffic`
 - severity: medium/medium · verb: `unattributable`
@@ -313,7 +305,7 @@ on either of them. That is the finding this sitting exists for.
 
 > mark:
 
-**10.** Nobody can show who made a price change, because the changes arrive at the web API as SQL from a spreadsheet rather than from an identified user.
+**9.** Nobody can show who made a price change, because the changes arrive at the web API as SQL from a spreadsheet rather than from an identified user.
 
 - `flow:process:catalogue-spreadsheet>process:web-api>sql-statements`
 - severity: medium/medium · verb: `unattributable`
@@ -321,7 +313,7 @@ on either of them. That is the finding this sitting exists for.
 
 > mark:
 
-**11.** Sokify cannot show a confirmation ever reached the customer, because nobody checks the fax arrived at the right place.
+**10.** Sokify cannot show a confirmation ever reached the customer, because nobody checks the fax arrived at the right place.
 
 - `flow:process:fax-gateway>entity:customer>confirmation-fax`
 - severity: medium/low · verb: `unattributable`
@@ -332,7 +324,7 @@ on either of them. That is the finding this sitting exists for.
 
 ### information-disclosure
 
-**12.** An attacker on the network path reads customer details out of the app's plain-HTTP traffic to the web API.
+**11.** An attacker on the network path reads customer details out of the app's plain-HTTP traffic to the web API.
 
 - `flow:process:mobile-app>process:web-api>api-traffic`
 - severity: high/high · verb: `intercept`
@@ -340,7 +332,7 @@ on either of them. That is the finding this sitting exists for.
 
 > mark:
 
-**13.** An attacker who reaches the user database reads customers' names, addresses and the cards they paid with, since at-rest protection is unverified.
+**12.** An attacker who reaches the user database reads customers' names, addresses and the cards they paid with, since at-rest protection is unverified.
 
 - `store:user-database`
 - severity: medium/high · verb: `read`
@@ -348,7 +340,7 @@ on either of them. That is the finding this sitting exists for.
 
 > mark:
 
-**14.** An attacker who reaches the flat file reads every delivery address written into it.
+**13.** An attacker who reaches the flat file reads every delivery address written into it.
 
 - `store:delivery-address-flat-file`
 - severity: medium/medium · verb: `read`
@@ -356,7 +348,7 @@ on either of them. That is the finding this sitting exists for.
 
 > mark:
 
-**15.** The confirmation fax discloses a customer's name and address to whoever holds the dialled number, because nobody checks it arrived at the right place.
+**14.** The confirmation fax discloses a customer's name and address to whoever holds the dialled number, because nobody checks it arrived at the right place.
 
 - `flow:process:fax-gateway>entity:customer>confirmation-fax`, `process:fax-gateway`
 - severity: medium/medium · verb: `read`
@@ -367,7 +359,7 @@ on either of them. That is the finding this sitting exists for.
 
 ### denial-of-service
 
-**16.** An attacker floods the internet-facing web API until customers cannot place orders.
+**15.** An attacker floods the internet-facing web API until customers cannot place orders.
 
 - `process:web-api`
 - severity: medium/medium · verb: `flood`
@@ -375,7 +367,7 @@ on either of them. That is the finding this sitting exists for.
 
 > mark:
 
-**17.** An attacker sends SQL through the macro path that locks catalogue rows so the app cannot serve the catalogue.
+**16.** An attacker sends SQL through the macro path that locks catalogue rows so the app cannot serve the catalogue.
 
 - `flow:process:catalogue-spreadsheet>process:web-api>sql-statements`, `process:web-api`
 - severity: low/high · verb: `inject`
@@ -383,7 +375,7 @@ on either of them. That is the finding this sitting exists for.
 
 > mark:
 
-**18.** An attacker who stops SIMS accepting order handovers halts dispatch for every order placed.
+**17.** An attacker who stops SIMS accepting order handovers halts dispatch for every order placed.
 
 - `process:sims`, `flow:process:web-api>process:sims>order-handover`
 - severity: low/high · verb: `disable`
@@ -394,15 +386,7 @@ on either of them. That is the finding this sitting exists for.
 
 ### elevation-of-privilege
 
-**19.** An attacker who reaches the marketing laptop gains a write path into the web API from the office zone, because the spreadsheet's macros speak SQL to it.
-
-- `process:catalogue-spreadsheet`, `flow:process:catalogue-spreadsheet>process:web-api>sql-statements`, `process:web-api`
-- severity: medium/high · verb: `escalate`
-- The crossing an analyst should see first: an unmanaged endpoint in a different zone holds a standing write path into the server-side estate.
-
-> mark:
-
-**20.** An attacker whose SQL reaches the web API through the catalogue path acts against customer records the catalogue tool has no business touching.
+**18.** An attacker whose SQL reaches the web API through the catalogue path acts against customer records the catalogue tool has no business touching.
 
 - `flow:process:catalogue-spreadsheet>process:web-api>sql-statements`, `store:user-database`
 - severity: medium/high · verb: `abuse-grant`
@@ -457,7 +441,7 @@ your missing list, your notes and a digest of each file you read:
       "source.md": "603873a0d569ba3f0ac4a91a363086b54bae022cf432862d17be9eec9465e4ea",
       "model.json": "d6c0f91a9ae04bdb237850d3aff9a13c7b5c206578658d4ea44e169d8323d14d",
       "claims/asvs.json": "fbc32dc14ac8a90e9bbb2bab6801dc704f2468a03e056d992f41564c9d8de41c",
-      "claims/stride.json": "b51bc22b321e6e9eac87c6e50d585892cadfe6b0024940047a3de41df18b0ef1"
+      "claims/stride.json": "bf1f3049cd435d42612f9b0076c5790ea3763efe321af50c2d3a643b58ed6f7a"
       }
     }
   }

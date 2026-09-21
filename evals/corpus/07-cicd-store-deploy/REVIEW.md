@@ -142,7 +142,7 @@ category.
 
 ---
 
-## Part 2 — the 25 recorded STRIDE threats
+## Part 2 — the 21 recorded STRIDE threats
 
 Only after your own list exists.
 
@@ -203,15 +203,7 @@ on either of them. That is the finding this sitting exists for.
 
 ### tampering
 
-**6.** An attacker alters the deploy controller's current-release record so that every store server pulls and runs an image of the attacker's choosing within a minute.
-
-- `process:deploy-controller`, `process:store-server`
-- severity: medium/high · verb: `alter`
-- The single record is the whole control plane of the estate, and the poll loop turns one write into 1,200 restarts with no further attacker action.
-
-> mark:
-
-**7.** An attacker publishes a package that the lockfile resolves to and the runner bakes it into the image unchecked, because signatures on downloads are not verified.
+**6.** An attacker publishes a package that the lockfile resolves to and the runner bakes it into the image unchecked, because signatures on downloads are not verified.
 
 - `flow:process:build-runner>entity:public-package-registry>resolve-dependencies`, `process:build-runner`
 - severity: medium/high · verb: `plant`
@@ -219,7 +211,7 @@ on either of them. That is the finding this sitting exists for.
 
 > mark:
 
-**8.** An attacker replaces the image stored under a commit-sha tag in the registry, so store servers pull attacker content while the recorded release is unchanged.
+**7.** An attacker replaces the image stored under a commit-sha tag in the registry, so store servers pull attacker content while the recorded release is unchanged.
 
 - `store:image-registry`, `process:store-server`
 - severity: medium/high · verb: `plant`
@@ -227,7 +219,7 @@ on either of them. That is the finding this sitting exists for.
 
 > mark:
 
-**9.** An attacker modifies source held on the git server so the change is carried into the next image the runner builds.
+**8.** An attacker modifies source held on the git server so the change is carried into the next image the runner builds.
 
 - `store:git-server`
 - severity: low/high · verb: `alter`
@@ -235,7 +227,7 @@ on either of them. That is the finding this sitting exists for.
 
 > mark:
 
-**10.** An attacker on the retail WAN alters the container image as a store server pulls it, since protection of that traffic is unverified.
+**9.** An attacker on the retail WAN alters the container image as a store server pulls it, since protection of that traffic is unverified.
 
 - `flow:process:store-server>store:image-registry>pull-image`
 - severity: low/high · verb: `alter-in-transit`
@@ -243,7 +235,7 @@ on either of them. That is the finding this sitting exists for.
 
 > mark:
 
-**11.** An attacker on the retail WAN alters the answer to a store server's poll so that store installs a different image sha from the rest of the estate.
+**10.** An attacker on the retail WAN alters the answer to a store server's poll so that store installs a different image sha from the rest of the estate.
 
 - `flow:process:store-server>process:deploy-controller>poll-current-release`
 - severity: low/medium · verb: `alter-in-transit`
@@ -254,7 +246,7 @@ on either of them. That is the finding this sitting exists for.
 
 ### repudiation
 
-**12.** A build that reached the estate may not be attributable to the developer who started it, because any developer can trigger a manual rebuild on an unreviewed path and the input does not state how that path identifies them.
+**11.** A build that reached the estate may not be attributable to the developer who started it, because any developer can trigger a manual rebuild on an unreviewed path and the input does not state how that path identifies them.
 
 - `flow:entity:developer>process:build-runner>manual-rebuild`, `process:build-runner`
 - severity: medium/medium · verb: `unattributable`
@@ -262,7 +254,7 @@ on either of them. That is the finding this sitting exists for.
 
 > mark:
 
-**13.** The deploy controller cannot tell which pipeline set a release, because every pipeline presents the same shared build token.
+**12.** The deploy controller cannot tell which pipeline set a release, because every pipeline presents the same shared build token.
 
 - `flow:process:build-runner>process:deploy-controller>set-current-release`, `process:deploy-controller`
 - severity: high/medium · verb: `unattributable`
@@ -273,7 +265,7 @@ on either of them. That is the finding this sitting exists for.
 
 ### information-disclosure
 
-**14.** An attacker who reads the build runner's configuration recovers the shared build token and can thereafter set the estate's release.
+**13.** An attacker who reads the build runner's configuration recovers the shared build token and can thereafter set the estate's release.
 
 - `process:build-runner`, `flow:process:build-runner>process:deploy-controller>set-current-release`
 - severity: medium/high · verb: `recover-credential`
@@ -281,7 +273,7 @@ on either of them. That is the finding this sitting exists for.
 
 > mark:
 
-**15.** An attacker who reaches the git server's storage reads the estate's source code, since protection of what it stores is unverified.
+**14.** An attacker who reaches the git server's storage reads the estate's source code, since protection of what it stores is unverified.
 
 - `store:git-server`
 - severity: low/medium · verb: `read`
@@ -289,7 +281,7 @@ on either of them. That is the finding this sitting exists for.
 
 > mark:
 
-**16.** An attacker who reaches the image registry's storage reads the built images and whatever is baked into them, since protection at rest is unverified.
+**15.** An attacker who reaches the image registry's storage reads the built images and whatever is baked into them, since protection at rest is unverified.
 
 - `store:image-registry`
 - severity: low/medium · verb: `read`
@@ -297,7 +289,7 @@ on either of them. That is the finding this sitting exists for.
 
 > mark:
 
-**17.** An attacker on the retail WAN reads the container image as a store server pulls it, since protection of that traffic is unverified.
+**16.** An attacker on the retail WAN reads the container image as a store server pulls it, since protection of that traffic is unverified.
 
 - `flow:process:store-server>store:image-registry>pull-image`
 - severity: low/medium · verb: `intercept`
@@ -308,15 +300,7 @@ on either of them. That is the finding this sitting exists for.
 
 ### denial-of-service
 
-**18.** An attacker sets the current release to an image that does not start, and every store server restarts into it and stops serving tills.
-
-- `process:deploy-controller`, `process:store-server`
-- severity: medium/high · verb: `alter`
-- The estate-wide blast radius is the poll loop working as designed; this is the availability face of the same write the tampering lane files as integrity.
-
-> mark:
-
-**19.** An attacker floods the deploy controller until the estate's polls fail and no new release can reach any store.
+**17.** An attacker floods the deploy controller until the estate's polls fail and no new release can reach any store.
 
 - `process:deploy-controller`
 - severity: medium/low · verb: `flood`
@@ -324,7 +308,7 @@ on either of them. That is the finding this sitting exists for.
 
 > mark:
 
-**20.** An attacker makes the image registry unreachable over the WAN so store servers cannot complete a pull and the estate is left split across two releases.
+**18.** An attacker makes the image registry unreachable over the WAN so store servers cannot complete a pull and the estate is left split across two releases.
 
 - `flow:process:store-server>store:image-registry>pull-image`, `store:image-registry`
 - severity: low/medium · verb: `disable`
@@ -335,15 +319,7 @@ on either of them. That is the finding this sitting exists for.
 
 ### elevation-of-privilege
 
-**21.** Any developer turns code of their own choosing into the software running in 1,200 stores by triggering the manual rebuild, a path the source states requires no merge and receives no review.
-
-- `flow:entity:developer>process:build-runner>manual-rebuild`, `process:store-server`
-- severity: medium/high · verb: `abuse-grant`
-- The case's signature shape: authority flows upward through the build, so the weakest gate on the input side is the real authority over the estate.
-
-> mark:
-
-**22.** An attacker who compromises the build runner controls what every store server runs, because the runner both writes the image and holds the token that names the release.
+**19.** An attacker who compromises the build runner controls what every store server runs, because the runner both writes the image and holds the token that names the release.
 
 - `process:build-runner`, `process:store-server`
 - severity: medium/high · verb: `escalate`
@@ -351,15 +327,7 @@ on either of them. That is the finding this sitting exists for.
 
 > mark:
 
-**23.** An attacker who takes one store server uses whatever it presents to reach the deploy controller on the corporate network and the registry in the build environment.
-
-- `flow:process:store-server>process:deploy-controller>poll-current-release`, `flow:process:store-server>store:image-registry>pull-image`, `process:store-server`
-- severity: low/high · verb: `escalate`
-- A back-office box in one of 1,200 stores is the least defensible element in the model and it is stated to reach across two boundaries. It cites the two flows it crosses on, so the image registry it reaches is part of the place and this claim does not sit at the same place as the dependency one.
-
-> mark:
-
-**24.** A malicious dependency executes with the build runner's authority during the build, carrying an attacker from the public internet into the build environment.
+**20.** A malicious dependency executes with the build runner's authority during the build, carrying an attacker from the public internet into the build environment.
 
 - `flow:process:build-runner>entity:public-package-registry>resolve-dependencies`, `process:build-runner`
 - severity: medium/high · verb: `escalate`
@@ -370,7 +338,7 @@ on either of them. That is the finding this sitting exists for.
 
 ### information-disclosure
 
-**25.** An attacker who can observe the runner-to-controller link reads the shared build token from it, if the transport protection on that link is inadequate.
+**21.** An attacker who can observe the runner-to-controller link reads the shared build token from it, if the transport protection on that link is inadequate.
 
 - `flow:process:build-runner>process:deploy-controller>set-current-release`, `process:build-runner`, `process:deploy-controller`
 - severity: medium/high · verb: `intercept`
@@ -424,7 +392,7 @@ your missing list, your notes and a digest of each file you read:
       "opened_digests": {
       "source.md": "1bfb96ef3374b697ef78e76661daa3d2b227792a3b20d2d1ee1d526cde02652c",
       "model.json": "25e0fe698e23ea38d98c8cd7e80dcef804cea2e27a8e4c09b4c5f65fc1785291",
-      "claims/stride.json": "ed92fed571bab27711265db2c3865b67aa7b980ee87e0536e830c0819b846e16"
+      "claims/stride.json": "aeeaf0f9d09ceaa69b10ec217519333427bf96f72c288efad4ba320dd113b110"
       }
     }
   }

@@ -32,21 +32,6 @@
   {
     "category": "spoofing",
     "affected_element_ids": [
-      "flow:process:storefront-api>process:order-service>submit-order",
-      "process:order-service"
-    ],
-    "claim": "Any workload that can reach the order service impersonates the storefront API on the unauthenticated gRPC channel and submits orders.",
-    "tier": "must-find",
-    "severity": {
-      "likelihood": "medium",
-      "impact": "high"
-    },
-    "notes": "Authentication is stated as none, accepted by network position — a stated absence, not an unknown.",
-    "verb": "impersonate"
-  },
-  {
-    "category": "spoofing",
-    "affected_element_ids": [
       "flow:process:order-service>store:orders-db>read-write-orders",
       "store:orders-db"
     ],
@@ -237,21 +222,6 @@
   {
     "category": "denial-of-service",
     "affected_element_ids": [
-      "process:order-service",
-      "store:orders-db"
-    ],
-    "claim": "An attacker drives enough order submissions to exhaust the order service's database connections and halt order capture.",
-    "tier": "expected",
-    "severity": {
-      "likelihood": "medium",
-      "impact": "high"
-    },
-    "notes": "Order service has one datastore dependency.",
-    "verb": "flood"
-  },
-  {
-    "category": "denial-of-service",
-    "affected_element_ids": [
       "flow:entity:shopper>process:storefront-api>place-order",
       "process:storefront-api"
     ],
@@ -263,51 +233,6 @@
     },
     "notes": "Generic but grounded: the storefront API is the single internet-facing component.",
     "verb": "flood"
-  },
-  {
-    "category": "elevation-of-privilege",
-    "affected_element_ids": [
-      "flow:process:storefront-api>process:order-service>submit-order",
-      "process:order-service"
-    ],
-    "claim": "An attacker with any foothold in the storefront tier gains order-writing privilege in the core zone, because the order service grants it on network position alone.",
-    "tier": "must-find",
-    "severity": {
-      "likelihood": "high",
-      "impact": "high"
-    },
-    "notes": "The boundary crossing plus authentication none is the highest-signal fact in this model.",
-    "verb": "escalate"
-  },
-  {
-    "category": "elevation-of-privilege",
-    "affected_element_ids": [
-      "flow:process:order-service>store:orders-db>read-write-orders",
-      "store:orders-db"
-    ],
-    "claim": "An attacker who compromises the order service inherits full read/write over every order record, because the service holds one unscoped database account.",
-    "tier": "must-find",
-    "severity": {
-      "likelihood": "medium",
-      "impact": "high"
-    },
-    "notes": "Blast radius of a single compromise; distinct from the tampering entry, which assumes the credential is already held.",
-    "verb": "abuse-grant"
-  },
-  {
-    "category": "elevation-of-privilege",
-    "affected_element_ids": [
-      "process:storefront-api",
-      "process:order-service"
-    ],
-    "claim": "An attacker who compromises the internet-facing storefront API pivots from the DMZ into the core zone.",
-    "tier": "expected",
-    "severity": {
-      "likelihood": "medium",
-      "impact": "high"
-    },
-    "notes": "The pivot itself, stated against the two processes rather than the flow between them.",
-    "verb": "escalate"
   },
   {
     "category": "spoofing",
