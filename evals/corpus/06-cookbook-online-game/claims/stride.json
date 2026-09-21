@@ -96,7 +96,7 @@
       "store:player-database"
     ],
     "claim": "A support agent's action on a player account cannot be attributed to them from what is described, because the input states no record of who performed a moderation change.",
-    "tier": "must-find",
+    "tier": "expected",
     "severity": {
       "likelihood": "medium",
       "impact": "high"
@@ -145,7 +145,7 @@
       "likelihood": "medium",
       "impact": "medium"
     },
-    "notes": "Both links are recorded as bare port numbers \u2014 the model gives no transport protection at all.",
+    "notes": "Both links are recorded as bare port numbers — the model gives no transport protection at all.",
     "verb": "intercept"
   },
   {

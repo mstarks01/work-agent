@@ -56,7 +56,7 @@
       "likelihood": "medium",
       "impact": "high"
     },
-    "notes": "The runbook states the file is picked up as-is, which is a stated absence of validation rather than an inferred one \u2014 the strongest grounded finding in the case.",
+    "notes": "The runbook states the file is picked up as-is, which is a stated absence of validation rather than an inferred one — the strongest grounded finding in the case.",
     "verb": "alter"
   },
   {
@@ -95,7 +95,7 @@
       "process:supplier-portal"
     ],
     "claim": "A category manager denies having approved a supplier's paperwork, and the input names no decision record that we control and could produce to rebut them.",
-    "tier": "must-find",
+    "tier": "expected",
     "severity": {
       "likelihood": "medium",
       "impact": "medium"

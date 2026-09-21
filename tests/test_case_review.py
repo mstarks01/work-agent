@@ -75,14 +75,14 @@ UNREVIEWED: dict[str, str] = {
     ),
     "03-batch-data-pipeline": (
         "Read on 2026-09-21 and un-read by that same sitting's own "
-        "rulings: 2 STRIDE claims dropped. The reader read the sets they then ruled "
+        "rulings: one repudiation claim retiered to `expected`, because the reader marked it `unsure` and their note says a description cannot settle it; 2 STRIDE claims dropped. The reader read the sets they then ruled "
         "out, so the signature cannot match and nothing they judged "
         "has been hidden. A second sitting over the current files "
         "clears it."
     ),
     "04-ml-inference-service": (
         "Read on 2026-09-21 and un-read by that same sitting's own "
-        "rulings: 2 STRIDE claims dropped; 1 ASVS record dropped. The reader read the sets they then ruled "
+        "rulings: one repudiation claim retiered to `expected`, because the reader marked it `unsure` and their note says a description cannot settle it; 2 STRIDE claims dropped; 1 ASVS record dropped. The reader read the sets they then ruled "
         "out, so the signature cannot match and nothing they judged "
         "has been hidden. A second sitting over the current files "
         "clears it."
@@ -96,14 +96,14 @@ UNREVIEWED: dict[str, str] = {
     ),
     "06-cookbook-online-game": (
         "Read on 2026-09-21 and un-read by that same sitting's own "
-        "rulings: 3 STRIDE claims dropped. The reader read the sets they then ruled "
+        "rulings: one repudiation claim retiered to `expected`, because the reader marked it `unsure` and their note says a description cannot settle it; 3 STRIDE claims dropped. The reader read the sets they then ruled "
         "out, so the signature cannot match and nothing they judged "
         "has been hidden. A second sitting over the current files "
         "clears it."
     ),
     "07-cicd-store-deploy": (
         "Read on 2026-09-21 and un-read by that same sitting's own "
-        "rulings: 4 STRIDE claims dropped. The reader read the sets they then ruled "
+        "rulings: one repudiation claim retiered to `expected`, because the reader marked it `unsure` and their note says a description cannot settle it; 4 STRIDE claims dropped. The reader read the sets they then ruled "
         "out, so the signature cannot match and nothing they judged "
         "has been hidden. A second sitting over the current files "
         "clears it."
@@ -117,35 +117,35 @@ UNREVIEWED: dict[str, str] = {
     ),
     "09-cookbook-sokify-retail": (
         "Read on 2026-09-21 and un-read by that same sitting's own "
-        "rulings: 2 STRIDE claims dropped. The reader read the sets they then ruled "
+        "rulings: one repudiation claim retiered to `expected`, because the reader marked it `unsure` and their note says a description cannot settle it; 2 STRIDE claims dropped. The reader read the sets they then ruled "
         "out, so the signature cannot match and nothing they judged "
         "has been hidden. A second sitting over the current files "
         "clears it."
     ),
     "10-cookbook-generic-cms": (
         "Read on 2026-09-21 and un-read by that same sitting's own "
-        "rulings: 1 STRIDE claim dropped; 1 ASVS record dropped. The reader read the sets they then ruled "
+        "rulings: one repudiation claim retiered to `expected`, because the reader marked it `unsure` and their note says a description cannot settle it; 1 STRIDE claim dropped; 1 ASVS record dropped. The reader read the sets they then ruled "
         "out, so the signature cannot match and nothing they judged "
         "has been hidden. A second sitting over the current files "
         "clears it."
     ),
     "11-sparse-shift-scheduling": (
         "Read on 2026-09-21 and un-read by that same sitting's own "
-        "rulings: 1 STRIDE claim dropped. The reader read the sets they then ruled "
+        "rulings: one repudiation claim retiered to `expected`, because the reader marked it `unsure` and their note says a description cannot settle it; 1 STRIDE claim dropped. The reader read the sets they then ruled "
         "out, so the signature cannot match and nothing they judged "
         "has been hidden. A second sitting over the current files "
         "clears it."
     ),
     "12-overclaiming-supplier-portal": (
         "Read on 2026-09-21 and un-read by that same sitting's own "
-        "rulings: 4 STRIDE claims dropped. The reader read the sets they then ruled "
+        "rulings: one repudiation claim retiered to `expected`, because the reader marked it `unsure` and their note says a description cannot settle it; 4 STRIDE claims dropped. The reader read the sets they then ruled "
         "out, so the signature cannot match and nothing they judged "
         "has been hidden. A second sitting over the current files "
         "clears it."
     ),
     "13-dispatch-control-plane": (
         "Read on 2026-09-21 and un-read by that same sitting's own "
-        "rulings: 2 STRIDE claims dropped. The reader read the sets they then ruled "
+        "rulings: one repudiation claim retiered to `expected`, because the reader marked it `unsure` and their note says a description cannot settle it; 2 STRIDE claims dropped. The reader read the sets they then ruled "
         "out, so the signature cannot match and nothing they judged "
         "has been hidden. A second sitting over the current files "
         "clears it."

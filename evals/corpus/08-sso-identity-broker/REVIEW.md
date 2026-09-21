@@ -510,7 +510,7 @@ your missing list, your notes and a digest of each file you read:
       "source.md": "36115502847aa04640666b0dd9f458881e6f7f8968e4d499b58983b3403dc721",
       "model.json": "963ee0bee098fc3d83caa04610b2967c3a61ccc650e7fbd18b47b6b756354163",
       "claims/asvs.json": "5fbdf49a4d299d911b4597850d39d5ac6a8ddfb751fc2de23a668c6001cb171a",
-      "claims/stride.json": "b7c58f72f50eb0f3ae85f3e06e9521ee060769ce463d2e45c7c6e0761e9787dc"
+      "claims/stride.json": "769b12615efd6a4cf6eb2b004a640b4557284071dc2126c81eee257dedf24289"
       }
     }
   }
