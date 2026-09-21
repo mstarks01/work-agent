@@ -196,13 +196,13 @@
     "affected_element_ids": [
       "store:git-server"
     ],
-    "claim": "An attacker who reaches the git server's storage reads the estate's source code, since protection of what it stores is unverified.",
+    "claim": "An attacker who reaches the git server's storage reads the estate's source, if that source is confidential and protection at rest does not stop them; the input states neither.",
     "tier": "expected",
     "severity": {
       "likelihood": "low",
       "impact": "medium"
     },
-    "notes": "The source names this gap explicitly in its closing line, which is the sentence most likely to be dropped in extraction.",
+    "notes": "The source names this gap explicitly in its closing line, which is the sentence most likely to be dropped in extraction. Being business-critical is not the same as being confidential, and the input settles neither.",
     "verb": "read"
   },
   {
@@ -210,13 +210,13 @@
     "affected_element_ids": [
       "store:image-registry"
     ],
-    "claim": "An attacker who reaches the image registry's storage reads the built images and whatever is baked into them, since protection at rest is unverified.",
+    "claim": "An attacker who reaches the image registry's storage reads the built images, if anything confidential is built into them and protection at rest does not stop them; the input states neither.",
     "tier": "expected",
     "severity": {
       "likelihood": "low",
       "impact": "medium"
     },
-    "notes": "Paired with the git-server claim in the same closing sentence; kept separate because they are different stores with different reachability.",
+    "notes": "Paired with the git-server claim in the same closing sentence; kept separate because they are different stores with different reachability. What an image carries is unrecorded rather than known to include a secret.",
     "verb": "read"
   },
   {

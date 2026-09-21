@@ -382,11 +382,11 @@ on either of them. That is the finding this sitting exists for.
 
 > mark:
 
-**13.** An attacker who reaches the audit log reads when and from where colleagues signed in, since protection at rest is unverified.
+**13.** An attacker who reaches the audit log reads whatever it records of colleague sign-ins, and the source says outright that nobody wrote down what it records or whether it is protected where it sits.
 
 - `store:audit-log`
 - severity: low/low · verb: `read`
-- Paired with the directory in the same closing sentence; kept separate because they are different stores holding different things.
+- Paired with the directory in the same closing sentence; kept separate because they are different stores holding different things. The source states the gap in its own words, so the unknown contents are the finding rather than an assumption about them.
 
 > mark:
 
@@ -510,7 +510,7 @@ your missing list, your notes and a digest of each file you read:
       "source.md": "36115502847aa04640666b0dd9f458881e6f7f8968e4d499b58983b3403dc721",
       "model.json": "963ee0bee098fc3d83caa04610b2967c3a61ccc650e7fbd18b47b6b756354163",
       "claims/asvs.json": "5fbdf49a4d299d911b4597850d39d5ac6a8ddfb751fc2de23a668c6001cb171a",
-      "claims/stride.json": "769b12615efd6a4cf6eb2b004a640b4557284071dc2126c81eee257dedf24289"
+      "claims/stride.json": "7dfe3e0a09ce18f512e75a49d4ae8f347a9be19d7bc24fbc87abf4b450ba2ff1"
       }
     }
   }
