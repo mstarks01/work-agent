@@ -84,7 +84,17 @@ TOKEN_CAPS: dict[str, int] = {
     # the value and the scope, so the critic was asked whether a claim follows
     # from a fact it could not read. Both are computed rather than drafted,
     # and both need a sentence saying how to rule with them.
-    "prompts/analyze": 5000,
+    # ``analyze`` raised again to 5600 for what an absence establishes (#1110).
+    # The bullet said how to write an ``absent_elements`` entry and never what
+    # one licenses, so a lane read the service's confirmation — no element
+    # names this term — as a verified fact about the deployment. Seven of ten
+    # repudiation findings in the first review sitting could not be judged for
+    # that reason. The two sentences added say an absence rules a claim out and
+    # never holds one up, and that a claim asserting nothing anywhere provides
+    # a property rests on a fact that holds everywhere or is written as what
+    # cannot be produced. Both are properties of a claim rather than of a
+    # package, so they sit here and not in a framework's contract.
+    "prompts/analyze": 5600,
     "prompts/critic": 3000,
     "prompts/recritic": 1100,
     # Raised from 2900 for the naming rule in rule 3. The extraction sweep of
