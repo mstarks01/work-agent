@@ -39,6 +39,23 @@ def flows(case):
     return ModelIndex.of(case.model).flow_endpoints
 
 
+#: The case that carries two references at one place under one verb, which is
+#: the only shape where two claims compete to be charged. Case 01 was the
+#: original example; the Case Sitting of 2026-09-21 ruled its references 18 and
+#: 20 one finding written twice and both left the corpus. Case 08 carries the
+#: shape twice over. :func:`merge_pair` derives the indices rather than pinning
+#: them, so this is the only line that moves if it has to move again — and
+#: ``next`` raising is the alarm that no case exercises the cause at all.
+@pytest.fixture(scope="module")
+def merge_case():
+    return load_case(CASE_DIR.parent / "08-sso-identity-broker")
+
+
+@pytest.fixture(scope="module")
+def merge_flows(merge_case):
+    return ModelIndex.of(merge_case.model).flow_endpoints
+
+
 def charge(case, flows, drafts, produced, unreconciled=()):
     score = score_case(case, produced, SubsetVerbIdentity({case.id: flows}), Ledger())
     block = Block(produced, unreconciled_rulings=unreconciled)
@@ -74,10 +91,12 @@ def test_a_surviving_claim_at_the_place_with_another_verb_is_a_verb_loss(case, f
     assert loss.must_find is (reference.tier == "must-find")
 
 
-def test_two_references_at_one_place_under_one_verb_leave_one_merged(case, flows):
-    """Case 01's references 18 and 20: one draft, one verb, one place, two
-    references. The scorer assigns the draft to one; the other is not the
-    lane's loss, and the row says so."""
+def test_two_references_at_one_place_under_one_verb_leave_one_merged(
+    merge_case, merge_flows
+):
+    """One draft, one verb, one place, two references. The scorer assigns the
+    draft to one; the other is not the lane's loss, and the row says so."""
+    case, flows = merge_case, merge_flows
     references = case.stride_claims()
     pair = [
         (i, j)
@@ -90,7 +109,7 @@ def test_two_references_at_one_place_under_one_verb_leave_one_merged(case, flows
             left.affected_element_ids, right.affected_element_ids, flows
         )
     ]
-    assert pair, "case 01 carries such a pair"
+    assert pair, "the merge case carries such a pair"
     first, second = pair[0]
     draft = at(references[first], 1, references[first].verb)
 
@@ -488,7 +507,7 @@ class TestHowTheTwoPlacesRelate:
 
 
 def merge_pair(case, flows) -> tuple[int, int]:
-    """Two references at one place under one verb, as case 01 carries them.
+    """Two references at one place under one verb, as the merge case carries them.
 
     The scorer matches a claim there to one of the two, so the other is a miss
     with that claim still sitting at its place — which is the only shape where
@@ -510,7 +529,9 @@ def merge_pair(case, flows) -> tuple[int, int]:
     )
 
 
-def test_two_claims_at_one_place_charge_the_same_cause_in_either_order(case, flows):
+def test_two_claims_at_one_place_charge_the_same_cause_in_either_order(
+    merge_case, merge_flows
+):
     """Reversing the report's claims must not move a cause.
 
     The defect this pins: ``_at_place`` returned the claims in report order and
@@ -520,6 +541,7 @@ def test_two_claims_at_one_place_charge_the_same_cause_in_either_order(case, flo
     two archived Baselines. An instrument that priced three prompt edits this
     week cannot answer differently when its input is shuffled.
     """
+    case, flows = merge_case, merge_flows
     reference = case.stride_claims()[merge_pair(case, flows)[0]]
     other = "guess-credential" if reference.verb != "guess-credential" else "replay"
     same_verb = at(reference, 1, reference.verb)
@@ -543,7 +565,7 @@ def test_two_claims_at_one_place_charge_the_same_cause_in_either_order(case, flo
 
 
 def test_a_claim_carrying_the_references_action_wins_over_one_that_does_not(
-    case, flows
+    merge_case, merge_flows
 ):
     """The rule behind the tie-break, stated on its own.
 
@@ -551,6 +573,7 @@ def test_a_claim_carrying_the_references_action_wins_over_one_that_does_not(
     must rule on. Charging it to the verb while that claim sits beside it would
     send a reader to fix an exemplar that is already right.
     """
+    case, flows = merge_case, merge_flows
     first, second = merge_pair(case, flows)
     reference = case.stride_claims()[first]
     other = "guess-credential" if reference.verb != "guess-credential" else "replay"

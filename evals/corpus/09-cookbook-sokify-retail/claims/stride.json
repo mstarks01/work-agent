@@ -91,21 +91,6 @@
   {
     "category": "tampering",
     "affected_element_ids": [
-      "store:delivery-address-flat-file",
-      "process:sims"
-    ],
-    "claim": "An attacker who can write to the flat file rewrites a delivery address so goods are dispatched somewhere else.",
-    "tier": "expected",
-    "severity": {
-      "likelihood": "low",
-      "impact": "high"
-    },
-    "notes": "The file sits alongside SIMS with no stated protection; the impact is physical goods, not records.",
-    "verb": "alter"
-  },
-  {
-    "category": "tampering",
-    "affected_element_ids": [
       "flow:process:web-api>process:sims>order-handover",
       "process:sims"
     ],
@@ -261,22 +246,6 @@
     },
     "notes": "SIMS is a single legacy path with no stated alternative; orders are taken but nothing ships.",
     "verb": "disable"
-  },
-  {
-    "category": "elevation-of-privilege",
-    "affected_element_ids": [
-      "process:catalogue-spreadsheet",
-      "flow:process:catalogue-spreadsheet>process:web-api>sql-statements",
-      "process:web-api"
-    ],
-    "claim": "An attacker who reaches the marketing laptop gains a write path into the web API from the office zone, because the spreadsheet's macros speak SQL to it.",
-    "tier": "must-find",
-    "severity": {
-      "likelihood": "medium",
-      "impact": "high"
-    },
-    "notes": "The crossing an analyst should see first: an unmanaged endpoint in a different zone holds a standing write path into the server-side estate.",
-    "verb": "escalate"
   },
   {
     "category": "elevation-of-privilege",

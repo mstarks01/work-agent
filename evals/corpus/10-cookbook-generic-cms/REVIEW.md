@@ -121,7 +121,7 @@ category.
 
 ---
 
-## Part 2 — the 7 recorded ASVS records
+## Part 2 — the 6 recorded ASVS records
 
 The narrower question, per record: **does this requirement apply to this system, and does the input show it satisfied?** An ASVS claim rules applicability and never a pass.
 
@@ -182,17 +182,7 @@ The narrower question, per record: **does this requirement apply to this system,
 
 > mark:
 
-
-### authorization
-
-**A7.** `V8.2.1` — Nothing states what separates reader access from administrator access.
-
-- `entity:admin`, `entity:reader`, `process:web-server`
-- Two human entities reach the same web server and no rule is named.
-
-> mark:
-
-## Part 3 — the 18 recorded STRIDE threats
+## Part 3 — the 17 recorded STRIDE threats
 
 Only after your own list exists.
 
@@ -345,15 +335,7 @@ on either of them. That is the finding this sitting exists for.
 
 ### elevation-of-privilege
 
-**16.** An attacker who actively intercepts the admin's unencrypted session, or captures a reusable credential from it, obtains the authority of the admin's database account and bypasses the controls the CMS applies.
-
-- `flow:entity:admin>store:mysql-database>direct-administration`, `store:mysql-database`
-- severity: medium/high · verb: `escalate`
-- The escalation the case is built to grade: authority is not gained inside the application but around it, and the CMS never sees the actor. The authority reaches as far as the admin's database account permits and no further.
-
-> mark:
-
-**17.** An attacker who can write to the CDN bucket plants a script there, and it runs in the site's own context in the browser of each reader the site delivers it to.
+**16.** An attacker who can write to the CDN bucket plants a script there, and it runs in the site's own context in the browser of each reader the site delivers it to.
 
 - `store:cdn-bucket`, `flow:entity:reader>entity:cdn>asset-fetch`
 - severity: medium/high · verb: `plant`
@@ -364,7 +346,7 @@ on either of them. That is the finding this sitting exists for.
 
 ### spoofing
 
-**18.** An attacker who reaches the direct MySQL administration interface acts as the database administrator without holding a credential, if that interface authenticates nobody.
+**17.** An attacker who reaches the direct MySQL administration interface acts as the database administrator without holding a credential, if that interface authenticates nobody.
 
 - `entity:admin`, `store:mysql-database`, `flow:entity:admin>store:mysql-database>direct-administration`
 - severity: medium/high · verb: `impersonate`
@@ -418,8 +400,8 @@ your missing list, your notes and a digest of each file you read:
       "opened_digests": {
       "source.md": "11d2a58f0e1d5773054f0a72d222b3cc96f889cdd0206dd3656495a3d5fe8313",
       "model.json": "b65455924d2682e8d7ffd3f60cc9c5a29d7b5ff3335fbba4e5ad9ade51c1c5d0",
-      "claims/asvs.json": "38c218796733dcb8a7704c88a23fb0896007a20be9f562109349be94034a33ad",
-      "claims/stride.json": "a555f7fd3bdf07b115345e7eb475c335aaa7a202d1e368f261287b617c0e6c82"
+      "claims/asvs.json": "94a4b8bb0cc5e626225766a800eafa32eb85fe99ff00af49f5f8cc7e477ea19f",
+      "claims/stride.json": "c9dc815bfd5f1aff17545dba458a64db9611931f64f6b45896a8340792281a66"
       }
     }
   }

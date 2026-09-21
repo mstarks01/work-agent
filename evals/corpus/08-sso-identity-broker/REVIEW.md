@@ -259,7 +259,7 @@ The narrower question, per record: **does this requirement apply to this system,
 
 > mark:
 
-## Part 3 — the 24 recorded STRIDE threats
+## Part 3 — the 21 recorded STRIDE threats
 
 Only after your own list exists.
 
@@ -285,15 +285,7 @@ on either of them. That is the finding this sitting exists for.
 
 > mark:
 
-**2.** The franchise identity provider vouches for someone who is not a franchise colleague and the broker signs them in as that person, since nothing records which colleagues it may vouch for.
-
-- `flow:entity:franchise-identity-provider>process:identity-broker>vouch-for-colleague`, `entity:franchise-identity-provider`
-- severity: medium/high · verb: `impersonate`
-- A stated gap rather than an unknown: the source says outright that the restriction has not been written down, which is what makes this grounded rather than speculative.
-
-> mark:
-
-**3.** An attacker signs in to the broker as a colleague, because whether colleagues are asked for a second factor is unverified.
+**2.** An attacker signs in to the broker as a colleague, because whether colleagues are asked for a second factor is unverified.
 
 - `flow:entity:colleague>process:identity-broker>sign-in`, `entity:colleague`
 - severity: medium/high · verb: `impersonate`
@@ -301,7 +293,7 @@ on either of them. That is the finding this sitting exists for.
 
 > mark:
 
-**4.** An attacker who obtains a colleague's token acts as that colleague for the rest of its twelve hours, because nothing calls back to the broker and there is no way to pull a token back.
+**3.** An attacker who obtains a colleague's token acts as that colleague for the rest of its twelve hours, because nothing calls back to the broker and there is no way to pull a token back.
 
 - `flow:entity:colleague>process:identity-broker>sign-in`, `process:store-admin-console`
 - severity: medium/high · verb: `use-credential`
@@ -309,7 +301,7 @@ on either of them. That is the finding this sitting exists for.
 
 > mark:
 
-**5.** An attacker serves the console a signing public key of their own so that tokens the attacker signed verify, since how the console fetches and trusts that key is unverified.
+**4.** An attacker serves the console a signing public key of their own so that tokens the attacker signed verify, since how the console fetches and trusts that key is unverified.
 
 - `flow:process:store-admin-console>process:identity-broker>fetch-public-key`, `process:store-admin-console`
 - severity: low/high · verb: `forge`
@@ -320,7 +312,7 @@ on either of them. That is the finding this sitting exists for.
 
 ### tampering
 
-**6.** An attacker writes a group into the broker's directory and the next token issued to that colleague carries it into every application.
+**5.** An attacker writes a group into the broker's directory and the next token issued to that colleague carries it into every application.
 
 - `store:directory`, `process:identity-broker`
 - severity: low/high · verb: `alter`
@@ -328,7 +320,7 @@ on either of them. That is the finding this sitting exists for.
 
 > mark:
 
-**7.** An attacker alters what the nightly pull returns so that groups are granted, or so that leavers are never removed.
+**6.** An attacker alters what the nightly pull returns so that groups are granted, or so that leavers are never removed.
 
 - `flow:process:identity-broker>entity:hr-system>nightly-group-pull`, `entity:hr-system`
 - severity: low/high · verb: `alter-in-transit`
@@ -336,7 +328,7 @@ on either of them. That is the finding this sitting exists for.
 
 > mark:
 
-**8.** An attacker on the path to the console alters a colleague's price change or void in flight, since protection of that traffic is unverified.
+**7.** An attacker on the path to the console alters a colleague's price change or void in flight, since protection of that traffic is unverified.
 
 - `flow:entity:colleague>process:store-admin-console>change-prices-and-void`
 - severity: low/medium · verb: `alter-in-transit`
@@ -344,7 +336,7 @@ on either of them. That is the finding this sitting exists for.
 
 > mark:
 
-**9.** An attacker alters or removes sign-in records in the audit log so a sign-in leaves no trace.
+**8.** An attacker alters or removes sign-in records in the audit log so a sign-in leaves no trace.
 
 - `store:audit-log`, `flow:process:identity-broker>store:audit-log>write-sign-ins`
 - severity: low/medium · verb: `delete`
@@ -355,7 +347,7 @@ on either of them. That is the finding this sitting exists for.
 
 ### repudiation
 
-**10.** A franchise sign-in cannot be attributed to a person, because the identity was asserted by a provider we do not run and whether the log covers that route at all is unverified.
+**9.** A franchise sign-in cannot be attributed to a person, because the identity was asserted by a provider we do not run and whether the log covers that route at all is unverified.
 
 - `flow:entity:franchise-identity-provider>process:identity-broker>vouch-for-colleague`, `store:audit-log`
 - severity: medium/medium · verb: `unattributable`
@@ -363,15 +355,7 @@ on either of them. That is the finding this sitting exists for.
 
 > mark:
 
-**11.** A price change or a void cannot be tied to the store it belongs to, because the console never establishes which store the token holder is from.
-
-- `process:store-admin-console`, `flow:entity:colleague>process:store-admin-console>change-prices-and-void`
-- severity: high/medium · verb: `unattributable`
-- High likelihood because it is the described steady state rather than an attack condition, and it is the accountability face of the case's central authorization gap.
-
-> mark:
-
-**12.** A disputed sign-in may have no evidence behind it, since what the audit log records is unverified.
+**10.** A disputed sign-in may have no evidence behind it, since what the audit log records is unverified.
 
 - `store:audit-log`
 - severity: medium/medium · verb: `unattributable`
@@ -382,7 +366,7 @@ on either of them. That is the finding this sitting exists for.
 
 ### information-disclosure
 
-**13.** An attacker who reaches the key store reads the signing key, since protection of what it holds at rest is unverified.
+**11.** An attacker who reaches the key store reads the signing key, since protection of what it holds at rest is unverified.
 
 - `store:key-store`
 - severity: low/high · verb: `recover-credential`
@@ -390,7 +374,7 @@ on either of them. That is the finding this sitting exists for.
 
 > mark:
 
-**14.** An attacker who reaches the directory reads colleague records and everyone's group membership, since protection at rest is unverified.
+**12.** An attacker who reaches the directory reads colleague records and everyone's group membership, since protection at rest is unverified.
 
 - `store:directory`
 - severity: low/medium · verb: `read`
@@ -398,7 +382,7 @@ on either of them. That is the finding this sitting exists for.
 
 > mark:
 
-**15.** An attacker who reaches the audit log reads when and from where colleagues signed in, since protection at rest is unverified.
+**13.** An attacker who reaches the audit log reads when and from where colleagues signed in, since protection at rest is unverified.
 
 - `store:audit-log`
 - severity: low/low · verb: `read`
@@ -406,7 +390,7 @@ on either of them. That is the finding this sitting exists for.
 
 > mark:
 
-**16.** An attacker on the path between a colleague and the broker reads the sign-in and the token that comes back, since protection of that traffic is unverified.
+**14.** An attacker on the path between a colleague and the broker reads the sign-in and the token that comes back, since protection of that traffic is unverified.
 
 - `flow:entity:colleague>process:identity-broker>sign-in`
 - severity: medium/high · verb: `intercept`
@@ -414,7 +398,7 @@ on either of them. That is the finding this sitting exists for.
 
 > mark:
 
-**17.** An attacker on the path of the nightly pull reads colleague and leaver records as they cross out of the corporate network.
+**15.** An attacker on the path of the nightly pull reads colleague and leaver records as they cross out of the corporate network.
 
 - `flow:process:identity-broker>entity:hr-system>nightly-group-pull`
 - severity: low/medium · verb: `intercept`
@@ -425,7 +409,7 @@ on either of them. That is the finding this sitting exists for.
 
 ### denial-of-service
 
-**18.** An attacker makes the broker unavailable and no colleague can sign in to anything, because everything colleagues use signs them in through it.
+**16.** An attacker makes the broker unavailable and no colleague can sign in to anything, because everything colleagues use signs them in through it.
 
 - `process:identity-broker`
 - severity: medium/high · verb: `disable`
@@ -433,7 +417,7 @@ on either of them. That is the finding this sitting exists for.
 
 > mark:
 
-**19.** An attacker stops the nightly pull and group changes silently stop reaching the directory while everything else keeps working.
+**17.** An attacker stops the nightly pull and group changes silently stop reaching the directory while everything else keeps working.
 
 - `flow:process:identity-broker>entity:hr-system>nightly-group-pull`, `store:directory`
 - severity: medium/medium · verb: `disable`
@@ -441,7 +425,7 @@ on either of them. That is the finding this sitting exists for.
 
 > mark:
 
-**20.** An attacker destroys or replaces the signing key so that every application rejects every token at once.
+**18.** An attacker destroys or replaces the signing key so that every application rejects every token at once.
 
 - `store:key-store`, `process:identity-broker`
 - severity: low/high · verb: `delete`
@@ -452,7 +436,7 @@ on either of them. That is the finding this sitting exists for.
 
 ### elevation-of-privilege
 
-**21.** A colleague who is a store manager in one store changes prices and voids transactions in every store, because the console decides from the group alone and never checks which store they belong to.
+**19.** A colleague who is a store manager in one store changes prices and voids transactions in every store, because the console decides from the group alone and never checks which store they belong to.
 
 - `process:store-admin-console`, `flow:entity:colleague>process:store-admin-console>change-prices-and-void`
 - severity: high/high · verb: `abuse-grant`
@@ -460,7 +444,7 @@ on either of them. That is the finding this sitting exists for.
 
 > mark:
 
-**22.** A leaver keeps their access until the nightly pull runs, and a token issued before it goes on working for twelve hours after that.
+**20.** A leaver keeps their access until the nightly pull runs, and a token issued before it goes on working for twelve hours after that.
 
 - `flow:process:identity-broker>entity:hr-system>nightly-group-pull`, `entity:colleague`
 - severity: high/high · verb: `abuse-grant`
@@ -468,18 +452,10 @@ on either of them. That is the finding this sitting exists for.
 
 > mark:
 
-**23.** An attacker who controls the franchise provider reaches internal applications on the corporate network, because a sign-in it vouches for is treated like any other.
-
-- `entity:franchise-identity-provider`, `process:store-admin-console`
-- severity: low/high · verb: `escalate`
-- The one crossing in this model where trust is granted to a party rather than to a network position, which is the shape this case exists to grade.
-
-> mark:
-
 
 ### spoofing
 
-**24.** An abused franchise identity provider vouches for an identity outside its permitted scope, if the broker does not constrain which identities a franchise may assert.
+**21.** An abused franchise identity provider vouches for an identity outside its permitted scope, if the broker does not constrain which identities a franchise may assert.
 
 - `entity:franchise-identity-provider`, `process:identity-broker`, `flow:entity:franchise-identity-provider>process:identity-broker>vouch-for-colleague`
 - severity: low/medium · verb: `forge`
@@ -534,7 +510,7 @@ your missing list, your notes and a digest of each file you read:
       "source.md": "36115502847aa04640666b0dd9f458881e6f7f8968e4d499b58983b3403dc721",
       "model.json": "963ee0bee098fc3d83caa04610b2967c3a61ccc650e7fbd18b47b6b756354163",
       "claims/asvs.json": "5fbdf49a4d299d911b4597850d39d5ac6a8ddfb751fc2de23a668c6001cb171a",
-      "claims/stride.json": "1d5751da4f5f5504de7c79564d986d2ea0d1a391cf638608cf277259eca3874a"
+      "claims/stride.json": "a2c75d4d60a1bc87feafbef20246162b3cfd1a6fa48b7b68173d96f258b25931"
       }
     }
   }

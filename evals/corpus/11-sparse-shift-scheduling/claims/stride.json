@@ -218,20 +218,5 @@
     },
     "notes": "Both roles are stated to use the same app, and no authorization rule between them is stated anywhere. This is the finding that follows from the shared-app fact rather than from any missing control.",
     "verb": "abuse-grant"
-  },
-  {
-    "category": "elevation-of-privilege",
-    "affected_element_ids": [
-      "process:scheduling-service",
-      "flow:process:scheduling-web-app>process:scheduling-service>rota-requests"
-    ],
-    "claim": "An attacker on the internal network calls the scheduling service directly and performs rota writes the web app would not have allowed.",
-    "tier": "expected",
-    "severity": {
-      "likelihood": "low",
-      "impact": "high"
-    },
-    "notes": "The service is where writes actually happen, which the source says outright; whether it re-checks anything the app checked is undocumented.",
-    "verb": "escalate"
   }
 ]

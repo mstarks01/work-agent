@@ -17,11 +17,11 @@ free.
 Version 1 reads what a claim carries today: framework, lane, and the
 endpoint-resolved **Element** IDs. It has a measured cost.
 ``tests/test_evals_identity.py``'s ``endpoint subset`` row prices element
-agreement alone at 14 false splits of 200, 81 false merges of 111 candidate
+agreement alone at 12 false splits of 169, 69 false merges of 92 candidate
 negatives, and 23 false merges of 287 reference pairs.
 
 Version 2 adds the action verb, which closes most of that gap without adding a
-false split, and it takes the candidate merges from 81 to 3. Read the candidate
+false split, and it takes the candidate merges from 69 to 2. Read the candidate
 column rather than the reference one: on reference pairs alone the verb removes
 twenty of 23 and version 1 looks survivable, and on the paraphrases a live run
 emits it removes 78 of 81.

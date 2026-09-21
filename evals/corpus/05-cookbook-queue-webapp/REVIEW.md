@@ -191,7 +191,7 @@ The narrower question, per record: **does this requirement apply to this system,
 
 > mark:
 
-## Part 3 — the 18 recorded STRIDE threats
+## Part 3 — the 14 recorded STRIDE threats
 
 Only after your own list exists.
 
@@ -236,15 +236,7 @@ on either of them. That is the finding this sitting exists for.
 
 ### tampering
 
-**4.** An attacker places a poisoned message on the queue and the worker processes it as legitimate work.
-
-- `store:message-queue`, `process:background-worker-process`
-- severity: medium/high · verb: `plant`
-- The canonical queue-decoupling threat: the worker's input is only as trustworthy as write access to the queue.
-
-> mark:
-
-**5.** An attacker who can write to the web application config changes the queue endpoint or credentials and redirects the application's work.
+**4.** An attacker who can write to the web application config changes the queue endpoint or credentials and redirects the application's work.
 
 - `store:web-application-config`, `process:web-application`
 - severity: low/high · verb: `alter`
@@ -252,7 +244,7 @@ on either of them. That is the finding this sitting exists for.
 
 > mark:
 
-**6.** An attacker with the worker's database access alters application records or the log records stored alongside them.
+**5.** An attacker with the worker's database access alters application records or the log records stored alongside them.
 
 - `store:database`, `flow:process:background-worker-process>store:database>read-write-records`
 - severity: medium/high · verb: `alter`
@@ -263,15 +255,7 @@ on either of them. That is the finding this sitting exists for.
 
 ### repudiation
 
-**7.** An attacker who compromises the worker erases or edits the log records that would show what it did, because the logs live in the same database the worker writes.
-
-- `store:database`, `process:background-worker-process`
-- severity: medium/high · verb: `delete`
-- The strongest finding available from the diagram: no separation between the audit record and the audited actor.
-
-> mark:
-
-**8.** The origin of a processed job cannot be established from what is described, because the input states nothing that records which producer enqueued it.
+**6.** The origin of a processed job cannot be established from what is described, because the input states nothing that records which producer enqueued it.
 
 - `store:message-queue`, `flow:process:web-application>store:message-queue>enqueue-job`
 - severity: medium/medium · verb: `unattributable`
@@ -282,7 +266,7 @@ on either of them. That is the finding this sitting exists for.
 
 ### information-disclosure
 
-**9.** An attacker who compromises the background worker reads the database credentials from its config store.
+**7.** An attacker who compromises the background worker reads the database credentials from its config store.
 
 - `store:worker-config`
 - severity: medium/high · verb: `recover-credential`
@@ -290,7 +274,7 @@ on either of them. That is the finding this sitting exists for.
 
 > mark:
 
-**10.** An attacker who compromises the internet-facing web application reads the queue credentials from its config store.
+**8.** An attacker who compromises the internet-facing web application reads the queue credentials from its config store.
 
 - `store:web-application-config`
 - severity: medium/high · verb: `recover-credential`
@@ -298,7 +282,7 @@ on either of them. That is the finding this sitting exists for.
 
 > mark:
 
-**11.** An attacker who reaches the database storage reads application and log records, whose protection at rest is unverified.
+**9.** An attacker who reaches the database storage reads application and log records, whose protection at rest is unverified.
 
 - `store:database`
 - severity: medium/medium · verb: `read`
@@ -306,7 +290,7 @@ on either of them. That is the finding this sitting exists for.
 
 > mark:
 
-**12.** An attacker on the internal network reads job contents in transit, because transport encryption between the tiers is unverified.
+**10.** An attacker on the internal network reads job contents in transit, because transport encryption between the tiers is unverified.
 
 - `flow:process:web-application>store:message-queue>enqueue-job`, `flow:process:background-worker-process>store:message-queue>consume-job`
 - severity: medium/medium · verb: `intercept`
@@ -317,7 +301,7 @@ on either of them. That is the finding this sitting exists for.
 
 ### denial-of-service
 
-**13.** An attacker floods the queue with jobs until the worker cannot keep up and queued work stops completing.
+**11.** An attacker floods the queue with jobs until the worker cannot keep up and queued work stops completing.
 
 - `store:message-queue`, `process:background-worker-process`
 - severity: medium/medium · verb: `flood`
@@ -325,7 +309,7 @@ on either of them. That is the finding this sitting exists for.
 
 > mark:
 
-**14.** An attacker floods the internet-facing web application until it stops serving browsers.
+**12.** An attacker floods the internet-facing web application until it stops serving browsers.
 
 - `process:web-application`, `flow:entity:browser>process:web-application>page-request`
 - severity: medium/medium · verb: `flood`
@@ -333,41 +317,25 @@ on either of them. That is the finding this sitting exists for.
 
 > mark:
 
-**15.** An attacker submits work that makes the worker exhaust database capacity, stalling both job processing and logging.
 
-- `store:database`, `process:background-worker-process`
-- severity: low/medium · verb: `flood`
-- Shared store means one saturation affects the audit trail too.
+### repudiation
+
+**13.** An attacker holding the worker's database access alters existing log records, if the worker's permissions extend to modifying them, and the record of what was done no longer shows it.
+
+- `process:background-worker-process`, `store:database`, `flow:process:background-worker-process>store:database>read-write-records`
+- severity: low/medium · verb: `alter`
+- Drafted from Baseline 6bff717-gpt-5.6-terra-24dda4db draft R-01, ruled a relevant threat scenario by the maintainer on 2026-09-20 (audit QA-2026-09-20-01). Conditional. The worker writes to the database that holds the application's log records; where its permissions include modifying existing rows, rewriting evidence enables repudiation just as deletion does. It is a distinct mechanism from reference 6, which it does not satisfy.
 
 > mark:
 
 
 ### elevation-of-privilege
 
-**16.** An attacker who compromises the internet-facing web application uses its queue credentials to reach the backend tier.
+**14.** A legitimate web user makes the worker act on another user's records, if a queued job carries a caller-chosen target and neither the web application nor the worker preserves and enforces the originating user's authorization.
 
-- `process:web-application`, `store:message-queue`
-- severity: medium/high · verb: `escalate`
-- The queue is the only path across the tier boundary, so it is the escalation route by construction.
-
-> mark:
-
-**17.** An attacker who gets code execution in the worker inherits whatever database privilege its credentials carry, which is unverified and may be unrestricted.
-
-- `process:background-worker-process`, `store:database`
-- severity: medium/high · verb: `abuse-grant`
-- Job content is attacker-influenceable via the queue, so worker execution is a realistic starting point.
-
-> mark:
-
-
-### repudiation
-
-**18.** An attacker holding the worker's database access alters existing log records, if the worker's permissions extend to modifying them, and the record of what was done no longer shows it.
-
-- `process:background-worker-process`, `store:database`, `flow:process:background-worker-process>store:database>read-write-records`
-- severity: low/medium · verb: `alter`
-- Drafted from Baseline 6bff717-gpt-5.6-terra-24dda4db draft R-01, ruled a relevant threat scenario by the maintainer on 2026-09-20 (audit QA-2026-09-20-01). Conditional. The worker writes to the database that holds the application's log records; where its permissions include modifying existing rows, rewriting evidence enables repudiation just as deletion does. It is a distinct mechanism from reference 6, which it does not satisfy.
+- `entity:browser`, `process:web-application`, `store:message-queue`, `process:background-worker-process`, `store:database`
+- severity: medium/medium · verb: `escalate`
+- Written by the reader during the Case Sitting of 2026-09-21 and promoted at `expected`, after every elevation claim this case carried was ruled out for filing a component's own existing grant as an escalation. Conditional: the job's operations, its user and target fields, and the worker's own checks are all unstated. Distinct from an unauthorized queue producer — the producer may be legitimate while the action it asks for is not. The verb is `escalate` because the user holds nothing that reaches another user's records.
 
 > mark:
 
@@ -418,7 +386,7 @@ your missing list, your notes and a digest of each file you read:
       "source.md": "20b0aa82c922766db2353cade33f7a26b38c60a3c7061244ef4686b7a647778b",
       "model.json": "bf3cfe67eb9ecbc49237bb6cf388bf664e1de8b54b444c8c004cdf87de5fdc46",
       "claims/asvs.json": "9e4ee6be326673ba2101ed60662718b0d50ecaf6aba7218bcec702c785b033c5",
-      "claims/stride.json": "ba9f2cf92f7dc4187fc92fd5621eb78cbd128f4d89ca234eef4a61a0a18885cf"
+      "claims/stride.json": "c7358b0fcbdd5178cd88c557c7728fb4ed72dd3d3a003a7751473df53dcde0e0"
       }
     }
   }

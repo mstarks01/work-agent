@@ -77,21 +77,6 @@
   {
     "category": "tampering",
     "affected_element_ids": [
-      "process:deploy-controller",
-      "process:store-server"
-    ],
-    "claim": "An attacker alters the deploy controller's current-release record so that every store server pulls and runs an image of the attacker's choosing within a minute.",
-    "tier": "must-find",
-    "severity": {
-      "likelihood": "medium",
-      "impact": "high"
-    },
-    "notes": "The single record is the whole control plane of the estate, and the poll loop turns one write into 1,200 restarts with no further attacker action.",
-    "verb": "alter"
-  },
-  {
-    "category": "tampering",
-    "affected_element_ids": [
       "flow:process:build-runner>entity:public-package-registry>resolve-dependencies",
       "process:build-runner"
     ],
@@ -251,21 +236,6 @@
   {
     "category": "denial-of-service",
     "affected_element_ids": [
-      "process:deploy-controller",
-      "process:store-server"
-    ],
-    "claim": "An attacker sets the current release to an image that does not start, and every store server restarts into it and stops serving tills.",
-    "tier": "must-find",
-    "severity": {
-      "likelihood": "medium",
-      "impact": "high"
-    },
-    "notes": "The estate-wide blast radius is the poll loop working as designed; this is the availability face of the same write the tampering lane files as integrity.",
-    "verb": "alter"
-  },
-  {
-    "category": "denial-of-service",
-    "affected_element_ids": [
       "process:deploy-controller"
     ],
     "claim": "An attacker floods the deploy controller until the estate's polls fail and no new release can reach any store.",
@@ -295,21 +265,6 @@
   {
     "category": "elevation-of-privilege",
     "affected_element_ids": [
-      "flow:entity:developer>process:build-runner>manual-rebuild",
-      "process:store-server"
-    ],
-    "claim": "Any developer turns code of their own choosing into the software running in 1,200 stores by triggering the manual rebuild, a path the source states requires no merge and receives no review.",
-    "tier": "must-find",
-    "severity": {
-      "likelihood": "medium",
-      "impact": "high"
-    },
-    "notes": "The case's signature shape: authority flows upward through the build, so the weakest gate on the input side is the real authority over the estate.",
-    "verb": "abuse-grant"
-  },
-  {
-    "category": "elevation-of-privilege",
-    "affected_element_ids": [
       "process:build-runner",
       "process:store-server"
     ],
@@ -320,22 +275,6 @@
       "impact": "high"
     },
     "notes": "The runner concentrates both halves of the deploy path, so the build environment is effectively a higher-privilege zone than the estate it feeds.",
-    "verb": "escalate"
-  },
-  {
-    "category": "elevation-of-privilege",
-    "affected_element_ids": [
-      "flow:process:store-server>process:deploy-controller>poll-current-release",
-      "flow:process:store-server>store:image-registry>pull-image",
-      "process:store-server"
-    ],
-    "claim": "An attacker who takes one store server uses whatever it presents to reach the deploy controller on the corporate network and the registry in the build environment.",
-    "tier": "expected",
-    "severity": {
-      "likelihood": "low",
-      "impact": "high"
-    },
-    "notes": "A back-office box in one of 1,200 stores is the least defensible element in the model and it is stated to reach across two boundaries. It cites the two flows it crosses on, so the image registry it reaches is part of the place and this claim does not sit at the same place as the dependency one.",
     "verb": "escalate"
   },
   {

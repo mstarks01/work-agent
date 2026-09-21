@@ -244,22 +244,6 @@
   {
     "category": "elevation-of-privilege",
     "affected_element_ids": [
-      "flow:process:schedule-importer>process:dispatch-api>post-work-orders",
-      "process:dispatch-api",
-      "boundary:production-control-plane"
-    ],
-    "claim": "An attacker on the corporate network uses the importer's token to act in the control plane, where a corporate laptop holds no rights at all.",
-    "tier": "must-find",
-    "severity": {
-      "likelihood": "medium",
-      "impact": "high"
-    },
-    "notes": "The case's central claim, and the one the privilege boundary exists to put in front of a lane: same company on both sides, and the authority is on the far side.",
-    "verb": "escalate"
-  },
-  {
-    "category": "elevation-of-privilege",
-    "affected_element_ids": [
       "flow:process:dispatch-console>process:dispatch-api>dispatch-requests",
       "process:dispatch-api"
     ],
@@ -302,21 +286,5 @@
     },
     "notes": "Drafted from Baseline 6bff717-gpt-5.6-terra-24dda4db draft T-01, ruled a relevant threat scenario by the maintainer on 2026-09-20 (audit QA-2026-09-20-01). Conditional. An unknown CORS configuration alone does not establish this; what it rests on is the API failing to authenticate and authorize the write. It is a distinct mechanism from reference 5, which it does not satisfy.",
     "verb": "inject"
-  },
-  {
-    "category": "elevation-of-privilege",
-    "affected_element_ids": [
-      "process:dispatch-console",
-      "flow:process:dispatch-console>process:dispatch-api>dispatch-requests",
-      "process:dispatch-api"
-    ],
-    "claim": "An attacker with corporate-network access to the dispatch console acquires dispatch authority, if the control plane does not authorize what the console asks of it.",
-    "tier": "expected",
-    "severity": {
-      "likelihood": "medium",
-      "impact": "high"
-    },
-    "notes": "Drafted from Baseline 6bff717-gpt-5.6-terra-24dda4db draft E-01, ruled a relevant threat scenario by the maintainer on 2026-09-20 (audit QA-2026-09-20-01). Conditional. The source separates corporate access from dispatch authority, so missing API authorization could cross that privilege boundary without riding an existing session. It is a distinct mechanism from reference 17, which it does not satisfy.",
-    "verb": "escalate"
   }
 ]

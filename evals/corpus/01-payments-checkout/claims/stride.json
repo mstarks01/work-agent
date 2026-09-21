@@ -32,21 +32,6 @@
   {
     "category": "spoofing",
     "affected_element_ids": [
-      "flow:process:storefront-api>process:order-service>submit-order",
-      "process:order-service"
-    ],
-    "claim": "Any workload that can reach the order service impersonates the storefront API on the unauthenticated gRPC channel and submits orders.",
-    "tier": "must-find",
-    "severity": {
-      "likelihood": "medium",
-      "impact": "high"
-    },
-    "notes": "Authentication is stated as none, accepted by network position — a stated absence, not an unknown.",
-    "verb": "impersonate"
-  },
-  {
-    "category": "spoofing",
-    "affected_element_ids": [
       "flow:process:order-service>store:orders-db>read-write-orders",
       "store:orders-db"
     ],
@@ -237,21 +222,6 @@
   {
     "category": "denial-of-service",
     "affected_element_ids": [
-      "process:order-service",
-      "store:orders-db"
-    ],
-    "claim": "An attacker drives enough order submissions to exhaust the order service's database connections and halt order capture.",
-    "tier": "expected",
-    "severity": {
-      "likelihood": "medium",
-      "impact": "high"
-    },
-    "notes": "Order service has one datastore dependency.",
-    "verb": "flood"
-  },
-  {
-    "category": "denial-of-service",
-    "affected_element_ids": [
       "flow:entity:shopper>process:storefront-api>place-order",
       "process:storefront-api"
     ],
@@ -263,51 +233,6 @@
     },
     "notes": "Generic but grounded: the storefront API is the single internet-facing component.",
     "verb": "flood"
-  },
-  {
-    "category": "elevation-of-privilege",
-    "affected_element_ids": [
-      "flow:process:storefront-api>process:order-service>submit-order",
-      "process:order-service"
-    ],
-    "claim": "An attacker with any foothold in the storefront tier gains order-writing privilege in the core zone, because the order service grants it on network position alone.",
-    "tier": "must-find",
-    "severity": {
-      "likelihood": "high",
-      "impact": "high"
-    },
-    "notes": "The boundary crossing plus authentication none is the highest-signal fact in this model.",
-    "verb": "escalate"
-  },
-  {
-    "category": "elevation-of-privilege",
-    "affected_element_ids": [
-      "flow:process:order-service>store:orders-db>read-write-orders",
-      "store:orders-db"
-    ],
-    "claim": "An attacker who compromises the order service inherits full read/write over every order record, because the service holds one unscoped database account.",
-    "tier": "must-find",
-    "severity": {
-      "likelihood": "medium",
-      "impact": "high"
-    },
-    "notes": "Blast radius of a single compromise; distinct from the tampering entry, which assumes the credential is already held.",
-    "verb": "abuse-grant"
-  },
-  {
-    "category": "elevation-of-privilege",
-    "affected_element_ids": [
-      "process:storefront-api",
-      "process:order-service"
-    ],
-    "claim": "An attacker who compromises the internet-facing storefront API pivots from the DMZ into the core zone.",
-    "tier": "expected",
-    "severity": {
-      "likelihood": "medium",
-      "impact": "high"
-    },
-    "notes": "The pivot itself, stated against the two processes rather than the flow between them.",
-    "verb": "escalate"
   },
   {
     "category": "spoofing",
@@ -339,5 +264,21 @@
     },
     "notes": "Drafted from Baseline 6bff717-gpt-5.6-terra-24dda4db draft T-02, ruled a relevant threat scenario by the maintainer on 2026-09-20 (audit QA-2026-09-20-01). The order service explicitly accepts unauthenticated gRPC calls from anything that reaches it, so fabricating an order is valid tampering that needs no on-path position. It is a distinct mechanism from reference 4, which it does not satisfy.",
     "verb": "inject"
+  },
+  {
+    "category": "elevation-of-privilege",
+    "affected_element_ids": [
+      "entity:shopper",
+      "process:storefront-api",
+      "store:orders-db"
+    ],
+    "claim": "A signed-in shopper retrieves or changes another shopper's order, if the storefront trusts a caller-supplied order or customer identifier without checking ownership on the server.",
+    "tier": "expected",
+    "severity": {
+      "likelihood": "medium",
+      "impact": "medium"
+    },
+    "notes": "Written by the reader during the Case Sitting of 2026-09-21 and promoted at `expected`, after every elevation claim this case carried was ruled out for filing a component's own existing grant as an escalation. Conditional: the source establishes per-shopper sessions and one shared order store, and states neither the ownership check nor the full API surface. The verb is `escalate` rather than `abuse-grant` because the shopper holds nothing that reaches another shopper's order; a caller-supplied identifier is what takes them there.",
+    "verb": "escalate"
   }
 ]

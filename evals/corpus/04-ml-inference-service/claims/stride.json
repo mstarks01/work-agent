@@ -223,36 +223,6 @@
   {
     "category": "elevation-of-privilege",
     "affected_element_ids": [
-      "store:model-registry-bucket",
-      "process:model-server"
-    ],
-    "claim": "An attacker who can write to the registry turns an unverified artifact load into code execution on the GPU nodes.",
-    "tier": "must-find",
-    "severity": {
-      "likelihood": "medium",
-      "impact": "high"
-    },
-    "notes": "Model artifacts are loaded as code; the escalation framing of the swap finding.",
-    "verb": "escalate"
-  },
-  {
-    "category": "elevation-of-privilege",
-    "affected_element_ids": [
-      "process:inference-gateway",
-      "process:model-server"
-    ],
-    "claim": "An attacker who compromises the internet-facing gateway inherits unauthenticated access to everything in the model network.",
-    "tier": "must-find",
-    "severity": {
-      "likelihood": "medium",
-      "impact": "high"
-    },
-    "notes": "The whole model network's security rests on the gateway being the only reachable path.",
-    "verb": "escalate"
-  },
-  {
-    "category": "elevation-of-privilege",
-    "affected_element_ids": [
       "entity:calling-service",
       "process:inference-gateway"
     ],

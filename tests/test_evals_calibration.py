@@ -333,7 +333,7 @@ def test_every_set_aside_pair_says_which_axis_decided_it(pairs):
     by_label = collections.Counter(pair.label for pair in pairs)
 
     assert by_label["unclear"] == 2
-    assert by_label["unsupported"] == 25
+    assert by_label["unsupported"] == 24
     assert by_label["invalid-claim"] == 1
     assert set(by_label) - set(SCORED_LABELS) == {
         "unclear",
@@ -353,7 +353,7 @@ def test_recorded_annotation_counts_are_pinned(pairs):
         annotation for pair in pairs for annotation in pair.annotations
     )
 
-    assert annotations == {"mixed": 13, "misclassified-lane": 7}
+    assert annotations == {"mixed": 12, "misclassified-lane": 6}
 
 
 def test_the_merge_direction_is_measured_over_distinct_reference_claims(pairs):
@@ -402,7 +402,7 @@ def test_the_merge_direction_refuses_a_package_with_no_contract():
 #: catalog claim set should have, and a rise in the third column would mean two
 #: rulings on one requirement in one place — one vote answering for both.
 PACKAGE_COLLISIONS = {
-    "stride": {"comparable_pairs": 324, "collisions": 3},
+    "stride": {"comparable_pairs": 247, "collisions": 2},
     "asvs": {"comparable_pairs": 21, "collisions": 0},
 }
 

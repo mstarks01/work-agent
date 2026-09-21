@@ -126,7 +126,7 @@ category.
 
 ---
 
-## Part 2 — the 17 recorded STRIDE threats
+## Part 2 — the 15 recorded STRIDE threats
 
 Only after your own list exists.
 
@@ -271,23 +271,7 @@ on either of them. That is the finding this sitting exists for.
 
 ### elevation-of-privilege
 
-**15.** An attacker with a foothold in the landing network reads the metadata database and escalates to every credential the pipeline holds.
-
-- `store:airflow-metadata-database`, `process:ingest-scheduler`
-- severity: medium/high · verb: `escalate`
-- Escalation framing of the credential concentration: one foothold to all downstream systems.
-
-> mark:
-
-**16.** An attacker who can plant a file in the landing bucket gains execution in the warehouse network through the job it triggers.
-
-- `process:spark-transform-job`, `flow:process:ingest-scheduler>process:spark-transform-job>trigger-transform`
-- severity: medium/high · verb: `escalate`
-- Data crossing into a compute zone that acts on it is the boundary crossing that matters here.
-
-> mark:
-
-**17.** An analyst uses their dataset-wide grant to reach claim data belonging to partners outside their remit.
+**15.** An analyst uses their dataset-wide grant to reach claim data belonging to partners outside their remit.
 
 - `entity:data-analyst`, `store:claims-warehouse`
 - severity: medium/medium · verb: `abuse-grant`
@@ -341,7 +325,7 @@ your missing list, your notes and a digest of each file you read:
       "opened_digests": {
       "source.md": "df7757178c394258cbcf1643e81fca5b01f324058a0841824f008e74346da2d0",
       "model.json": "3800082a9fa433aff29c46f4b0e170d578d64b05bde8186dff0d11b0252ce73d",
-      "claims/stride.json": "47ff8bbda7f4ddda4ac89fa54e207db321fccfa05d93dbe04ada85f6a7597857"
+      "claims/stride.json": "eb1019110d04efe618dc1ff58f2b9677280082403be20b306c6ac2b7ab6d719c"
       }
     }
   }

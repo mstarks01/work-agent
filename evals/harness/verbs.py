@@ -10,15 +10,15 @@ The figures are measured rather than asserted, over the whole corpus. All 244
 reference claims carry a verb. ``tests/test_evals_identity.py``'s ``FRONTIER``
 prices the rule on every error at once. Against ``endpoint subset`` alone,
 the verb adds no false split over 200 labelled pairs, and removes
-78 of the 81 false merges of
-111 candidate negatives, and 21 of the 24 false merges of 291 reference
+78 of the 69 false merges of
+92 candidate negatives, and 21 of the 24 false merges of 291 reference
 pairs. :class:`~evals.harness.identity.SubsetVerbIdentity` scores
 294/311 against the recorded labels, where element agreement alone scores
 200/311.
 
 The candidate column is the one that argues for the vocabulary. Priced on
 reference pairs alone, the element rule merges 24 of 291 and reads as
-survivable. Priced on the paraphrases a live run emits, it merges 81 of 111.
+survivable. Priced on the paraphrases a live run emits, it merges 69 of 92.
 """
 
 from __future__ import annotations
@@ -76,19 +76,6 @@ EQUIVALENT: tuple[frozenset[str], ...] = (frozenset({"forge", "inject", "plant"}
 #: :class:`~evals.harness.calibration.Disagreement` is: three is a list a person
 #: reads and acts on, and a rate is a number they cannot.
 UNSEPARATED: tuple[tuple[str, str, str], ...] = (
-    (
-        "01-payments-checkout",
-        "elevation-of-privilege",
-        (
-            "Two escalations across one boundary, and #652 ruled the merge"
-            " correct rather than a miss. Both claims name the one DMZ-to-core"
-            " pivot; one cites the flow into the order service and the process"
-            " it ends at, the other cites the two processes. A direction"
-            " separates them no better than the verb does, because the coarser"
-            " side cites no flow and so states no direction at all — the"
-            " DIRECTION table in tests/test_evals_identity.py prices that."
-        ),
-    ),
     (
         "08-sso-identity-broker",
         "repudiation",

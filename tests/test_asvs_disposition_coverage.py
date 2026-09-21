@@ -37,12 +37,12 @@ from evals.harness.reference import (
 #: disposition. Spelled per case for the reason ``CLAIMS_PER_CASE`` is.
 RECORDS_PER_CASE: dict[str, int] = {
     "01-payments-checkout": 18,
-    "04-ml-inference-service": 10,
+    "04-ml-inference-service": 9,
     "05-cookbook-queue-webapp": 7,
     "06-cookbook-online-game": 6,
     "08-sso-identity-broker": 12,
     "09-cookbook-sokify-retail": 7,
-    "10-cookbook-generic-cms": 7,
+    "10-cookbook-generic-cms": 6,
     "11-sparse-shift-scheduling": 8,
     "12-overclaiming-supplier-portal": 10,
     "13-dispatch-control-plane": 6,

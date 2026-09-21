@@ -221,21 +221,6 @@
   {
     "category": "elevation-of-privilege",
     "affected_element_ids": [
-      "flow:entity:admin>store:mysql-database>direct-administration",
-      "store:mysql-database"
-    ],
-    "claim": "An attacker who actively intercepts the admin's unencrypted session, or captures a reusable credential from it, obtains the authority of the admin's database account and bypasses the controls the CMS applies.",
-    "tier": "must-find",
-    "severity": {
-      "likelihood": "medium",
-      "impact": "high"
-    },
-    "notes": "The escalation the case is built to grade: authority is not gained inside the application but around it, and the CMS never sees the actor. The authority reaches as far as the admin's database account permits and no further.",
-    "verb": "escalate"
-  },
-  {
-    "category": "elevation-of-privilege",
-    "affected_element_ids": [
       "store:cdn-bucket",
       "flow:entity:reader>entity:cdn>asset-fetch"
     ],

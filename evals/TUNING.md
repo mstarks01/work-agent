@@ -127,7 +127,7 @@ python -m evals.harness.run calibrate --out agreement.json
 ```
 
 **Read the error directions first; they are the measurement.** The shipped
-rule has 15 false splits of 200 equivalent candidate pairs, 3 false merges of
+rule has 13 false splits of 169 equivalent candidate pairs, 2 false merges of
 111 candidate negatives and 3 false merges of 287 distinct reference pairs. A
 split hands a reviewer one unmatched finding. A merge destroys a finding and
 inflates recall, and nobody sees it happen — which is the expensive way to be
@@ -143,7 +143,7 @@ Don't tune anything until this passes. The pairs the rule refuses, and the
 pairs a label sets aside as `unclear`, `unsupported`, or `invalid-claim`, are
 counted beside the bar rather than inside it.
 
-What passing means is narrower than it looks. The 339 calibration fixtures began
+What passing means is narrower than it looks. The 288 calibration fixtures began
 agent-authored;
 review 02 read the 44 decision-boundary fixtures and a random 60 of the 295
 others. This still measures whether the rule reproduces recorded dispositions,
