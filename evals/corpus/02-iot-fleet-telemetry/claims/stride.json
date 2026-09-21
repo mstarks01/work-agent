@@ -122,13 +122,13 @@
     "affected_element_ids": [
       "store:firmware-bucket"
     ],
-    "claim": "An attacker downloads firmware images from the public bucket and reverse-engineers them to recover embedded fleet credentials or logic.",
+    "claim": "An attacker downloads firmware images from the public bucket and studies what they hold, and nothing records whether an image carries a credential or logic meant to stay secret.",
     "tier": "expected",
     "severity": {
       "likelihood": "high",
       "impact": "medium"
     },
-    "notes": "Public read is stated, not inferred; pairs with the fleet-key finding.",
+    "notes": "Public read is stated, not inferred. What the image contains is not, so the disclosure turns on that and pairs with the fleet-key finding.",
     "verb": "read"
   },
   {
