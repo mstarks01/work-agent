@@ -273,19 +273,19 @@ on either of them. That is the finding this sitting exists for.
 
 > mark:
 
-**14.** An attacker who reaches the git server's storage reads the estate's source code, since protection of what it stores is unverified.
+**14.** An attacker who reaches the git server's storage reads the estate's source, if that source is confidential and protection at rest does not stop them; the input states neither.
 
 - `store:git-server`
 - severity: low/medium · verb: `read`
-- The source names this gap explicitly in its closing line, which is the sentence most likely to be dropped in extraction.
+- The source names this gap explicitly in its closing line, which is the sentence most likely to be dropped in extraction. Being business-critical is not the same as being confidential, and the input settles neither.
 
 > mark:
 
-**15.** An attacker who reaches the image registry's storage reads the built images and whatever is baked into them, since protection at rest is unverified.
+**15.** An attacker who reaches the image registry's storage reads the built images, if anything confidential is built into them and protection at rest does not stop them; the input states neither.
 
 - `store:image-registry`
 - severity: low/medium · verb: `read`
-- Paired with the git-server claim in the same closing sentence; kept separate because they are different stores with different reachability.
+- Paired with the git-server claim in the same closing sentence; kept separate because they are different stores with different reachability. What an image carries is unrecorded rather than known to include a secret.
 
 > mark:
 
@@ -392,7 +392,7 @@ your missing list, your notes and a digest of each file you read:
       "opened_digests": {
       "source.md": "1bfb96ef3374b697ef78e76661daa3d2b227792a3b20d2d1ee1d526cde02652c",
       "model.json": "25e0fe698e23ea38d98c8cd7e80dcef804cea2e27a8e4c09b4c5f65fc1785291",
-      "claims/stride.json": "f69b5dce04e6a02d8e4cbce1a838317d28a07721e5ac6a2693720946fb43afcf"
+      "claims/stride.json": "40ce104710b497547169e68b9f6dc6512ffe7a025d975f79468955122dc5ba89"
       }
     }
   }

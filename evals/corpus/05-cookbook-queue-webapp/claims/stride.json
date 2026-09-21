@@ -121,13 +121,13 @@
     "affected_element_ids": [
       "store:database"
     ],
-    "claim": "An attacker who reaches the database storage reads application and log records, whose protection at rest is unverified.",
+    "claim": "An attacker who reaches the database storage reads the application and log records it holds, if any of them is confidential and protection at rest does not stop them; the model records neither.",
     "tier": "expected",
     "severity": {
       "likelihood": "medium",
       "impact": "medium"
     },
-    "notes": "Data classification is unknown here, so impact cannot be rated higher than medium on the facts given.",
+    "notes": "Neither the store's classification nor its protection at rest is recorded, so what a reader would obtain is unsettled on the facts given.",
     "verb": "read"
   },
   {

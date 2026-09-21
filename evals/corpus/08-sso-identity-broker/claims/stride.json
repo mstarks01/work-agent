@@ -180,13 +180,13 @@
     "affected_element_ids": [
       "store:audit-log"
     ],
-    "claim": "An attacker who reaches the audit log reads when and from where colleagues signed in, since protection at rest is unverified.",
+    "claim": "An attacker who reaches the audit log reads whatever it records of colleague sign-ins, and the source says outright that nobody wrote down what it records or whether it is protected where it sits.",
     "tier": "expected",
     "severity": {
       "likelihood": "low",
       "impact": "low"
     },
-    "notes": "Paired with the directory in the same closing sentence; kept separate because they are different stores holding different things.",
+    "notes": "Paired with the directory in the same closing sentence; kept separate because they are different stores holding different things. The source states the gap in its own words, so the unknown contents are the finding rather than an assumption about them.",
     "verb": "read"
   },
   {

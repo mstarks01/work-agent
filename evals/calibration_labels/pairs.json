@@ -447,7 +447,7 @@
     "reference_index": 8,
     "candidate_ordinal": 0,
     "fixture_id": "b76c3d4346a8",
-    "reference_claim": "An attacker downloads firmware images from the public bucket and reverse-engineers them to recover embedded fleet credentials or logic.",
+    "reference_claim": "An attacker downloads firmware images from the public bucket and studies what they hold, and nothing records whether an image carries a credential or logic meant to stay secret.",
     "reference_element_ids": [
       "store:firmware-bucket"
     ],
@@ -466,7 +466,7 @@
     "reference_index": 8,
     "candidate_ordinal": 1,
     "fixture_id": "9be94403ab5a",
-    "reference_claim": "An attacker downloads firmware images from the public bucket and reverse-engineers them to recover embedded fleet credentials or logic.",
+    "reference_claim": "An attacker downloads firmware images from the public bucket and studies what they hold, and nothing records whether an image carries a credential or logic meant to stay secret.",
     "reference_element_ids": [
       "store:firmware-bucket"
     ],
@@ -1239,7 +1239,7 @@
     "reference_index": 8,
     "candidate_ordinal": 0,
     "fixture_id": "f0daf7c86099",
-    "reference_claim": "An attacker who reaches the database storage reads application and log records, whose protection at rest is unverified.",
+    "reference_claim": "An attacker who reaches the database storage reads the application and log records it holds, if any of them is confidential and protection at rest does not stop them; the model records neither.",
     "reference_element_ids": [
       "store:database"
     ],
@@ -2424,7 +2424,7 @@
     "reference_index": 13,
     "candidate_ordinal": 0,
     "fixture_id": "a313f95ddfd1",
-    "reference_claim": "An attacker who reaches the git server's storage reads the estate's source code, since protection of what it stores is unverified.",
+    "reference_claim": "An attacker who reaches the git server's storage reads the estate's source, if that source is confidential and protection at rest does not stop them; the input states neither.",
     "reference_element_ids": [
       "store:git-server"
     ],
@@ -2443,7 +2443,7 @@
     "reference_index": 14,
     "candidate_ordinal": 0,
     "fixture_id": "0cdd8b4c1497",
-    "reference_claim": "An attacker who reaches the image registry's storage reads the built images and whatever is baked into them, since protection at rest is unverified.",
+    "reference_claim": "An attacker who reaches the image registry's storage reads the built images, if anything confidential is built into them and protection at rest does not stop them; the input states neither.",
     "reference_element_ids": [
       "store:image-registry"
     ],
@@ -2869,7 +2869,7 @@
     "reference_index": 12,
     "candidate_ordinal": 0,
     "fixture_id": "127955dbf454",
-    "reference_claim": "An attacker who reaches the audit log reads when and from where colleagues signed in, since protection at rest is unverified.",
+    "reference_claim": "An attacker who reaches the audit log reads whatever it records of colleague sign-ins, and the source says outright that nobody wrote down what it records or whether it is protected where it sits.",
     "reference_element_ids": [
       "store:audit-log"
     ],

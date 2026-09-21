@@ -282,11 +282,11 @@ on either of them. That is the finding this sitting exists for.
 
 > mark:
 
-**9.** An attacker who reaches the database storage reads application and log records, whose protection at rest is unverified.
+**9.** An attacker who reaches the database storage reads the application and log records it holds, if any of them is confidential and protection at rest does not stop them; the model records neither.
 
 - `store:database`
 - severity: medium/medium · verb: `read`
-- Data classification is unknown here, so impact cannot be rated higher than medium on the facts given.
+- Neither the store's classification nor its protection at rest is recorded, so what a reader would obtain is unsettled on the facts given.
 
 > mark:
 
@@ -386,7 +386,7 @@ your missing list, your notes and a digest of each file you read:
       "source.md": "20b0aa82c922766db2353cade33f7a26b38c60a3c7061244ef4686b7a647778b",
       "model.json": "bf3cfe67eb9ecbc49237bb6cf388bf664e1de8b54b444c8c004cdf87de5fdc46",
       "claims/asvs.json": "f4b9f4dc1da5a583e5632a316271414ec0b1e587021b861a544d5899cf1900c5",
-      "claims/stride.json": "c7358b0fcbdd5178cd88c557c7728fb4ed72dd3d3a003a7751473df53dcde0e0"
+      "claims/stride.json": "000359ed1dbb25fef8ff7156843b12c0d9e69c2181c51b9c9d48f639e4d49322"
       }
     }
   }

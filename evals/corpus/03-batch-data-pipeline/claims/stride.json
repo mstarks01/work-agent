@@ -166,13 +166,13 @@
     "affected_element_ids": [
       "flow:process:spark-transform-job>store:claims-warehouse>load-records"
     ],
-    "claim": "An attacker observing the load path reads claim records in transit, because transport encryption on it is unverified.",
+    "claim": "An attacker on the path of the load reads claim records in transit, if that path carries a segment they can observe; the model calls the flow a BigQuery API call and records no transport protection either way.",
     "tier": "expected",
     "severity": {
       "likelihood": "low",
       "impact": "high"
     },
-    "notes": "Intra-zone, so lower likelihood than the crossing flows.",
+    "notes": "Intra-zone, so lower likelihood than the crossing flows. An unrecorded `encryption_in_transit` says nobody wrote the protection down, which is not an observable segment.",
     "verb": "intercept"
   },
   {

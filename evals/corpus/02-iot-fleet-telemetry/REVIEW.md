@@ -226,11 +226,11 @@ on either of them. That is the finding this sitting exists for.
 
 > mark:
 
-**9.** An attacker downloads firmware images from the public bucket and reverse-engineers them to recover embedded fleet credentials or logic.
+**9.** An attacker downloads firmware images from the public bucket and studies what they hold, and nothing records whether an image carries a credential or logic meant to stay secret.
 
 - `store:firmware-bucket`
 - severity: high/medium · verb: `read`
-- Public read is stated, not inferred; pairs with the fleet-key finding.
+- Public read is stated, not inferred. What the image contains is not, so the disclosure turns on that and pairs with the fleet-key finding.
 
 > mark:
 
@@ -318,7 +318,7 @@ your missing list, your notes and a digest of each file you read:
       "opened_digests": {
       "source.md": "fc745e273aff8be740a814f0a9b4a45d6f3c6fe39dc7c8efa2b879d4f270ac74",
       "model.json": "fbe6f9b1304f947a2efe454df07391e4a430acf808055be11c5b3bb7911995a4",
-      "claims/stride.json": "6558f1df20c0e53415f20550f23c26b578c443059be280427d5d78af618fa173"
+      "claims/stride.json": "3e1d15ee570a17f38fee52b864b31d9af5c5fbac64c51fb4f29f670a22b5db8d"
       }
     }
   }
