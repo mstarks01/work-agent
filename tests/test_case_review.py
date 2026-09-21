@@ -50,118 +50,14 @@ from evals.review_submission import REPO_ROOT, unreviewed_cases
 #: a case nobody read rather than an exemption: unlike the lists in
 #: ``test_rule_coverage.py``
 #: and ``test_vocabulary_coverage.py``, no reason here says the omission is
-#: acceptable. They are the cases that shipped before step 6 was enforced, and
-#: the list is meant to shrink to nothing.
-UNREVIEWED: dict[str, str] = {
-    "01-payments-checkout": (
-        "21 STRIDE claims and 17 ASVS records, waiting on a re-sitting rather "
-        "than on a first reading. The sittings of 2026-09-08 and 2026-09-09 "
-        "read this case and signed four files, one of them model.json. The "
-        "reference corrections of #925 changed five fields in that file — two "
-        "protocols and the receipt archive's classification to unknown, the "
-        "order service to non-web, and an assumptions entry recording the "
-        "orders DB classification — and the #961 step 3 rulings changed three "
-        "more: the receipt archive and orders DB protocols to unknown, and "
-        "the word shared out of the orders DB authentication. So the "
-        "signature cannot match. **Something the reader read has changed**: "
-        "they read a model that stated a protocol on four flows and a shared "
-        "account, and the claims they ruled on were written against it. The "
-        "#989 flow identity migration then moved every flow ID in model.json "
-        "and in both claim files, which is a digest change and nothing more: "
-        "the same five interactions between the same endpoints under the same "
-        "labels, spelled with the endpoints' types. The #1082 ruling then moved "
-        "one ASVS disposition in claims/asvs.json: V12.3.3's transport question "
-        "routes to needs-more-prose, with needs-config kept as an alternate "
-        "route, so the record accepts strictly more than it did and no earlier "
-        "answer to it became wrong. The #1110 reword then changed one expected "
-        "STRIDE claim's sentence in claims/stride.json: the settlement-webhook "
-        "dispute now says what the input lets either side produce rather than "
-        "that no sender identity exists. That is a digest change and the same "
-        "finding at the same place, so nothing the reader ruled on moved. A "
-        "sitting over the current four files clears it."
-    ),
-    "02-iot-fleet-telemetry": (
-        "18 STRIDE claims, waiting on a re-sitting rather than on a first "
-        "reading. The sitting of 2026-09-12 read this case and signed four "
-        "files. Two of them moved. claims/asvs.json is gone, because the case "
-        "no longer declares ASVS — its precondition refutes an MQTT fleet — "
-        "and #887 tracks the lane the removed records leave unmeasured. "
-        "model.json changed under #931: Pub/Sub is now a Data Store the "
-        "gateway writes and the normalizer reads, in place of one flow from "
-        "the gateway to the normalizer, and the telemetry lake's "
-        "classification reads confidential with an assumption. **Something "
-        "the reader read has changed**: two flows and a store are new, and "
-        "no recorded mark names them. The #989 flow identity migration also "
-        "moved every flow ID in model.json and claims/stride.json, which is a "
-        "digest change alone: the same interactions between the same endpoints "
-        "under the same labels. A sitting over the current three files clears "
-        "it."
-    ),
-    "03-batch-data-pipeline": "17 STRIDE claims, unread. Declares STRIDE only.",
-    "04-ml-inference-service": (
-        "18 STRIDE claims and 10 ASVS records. One STRIDE claim asserted the "
-        "model emits training data in a case with no training pipeline; review "
-        "sitting 01 found it through a calibration pair rather than by "
-        "reading the case, so the rest of both sets is still unread."
-    ),
-    "05-cookbook-queue-webapp": (
-        "17 STRIDE claims and 7 ASVS records, unread. The ASVS records feed the "
-        "applicability matrix, which scores whether a requirement applies and "
-        "never whether the set is complete. The #1110 reword changed one "
-        "repudiation claim's sentence, which now states what the input lets "
-        "anyone produce in place of what the system lacks."
-    ),
-    "06-cookbook-online-game": (
-        "18 STRIDE claims and 6 ASVS records. Review sitting 01 relabelled a "
-        "pair against this case's fabricated-progression claim, which is the "
-        "nearest anybody has come to reading it. The ASVS records cover the "
-        "moderation website alone, which is the only part ASVS scopes itself to. "
-        "The #1110 reword changed two repudiation claim sentences, which now "
-        "state what the input lets anyone produce in place of what the system "
-        "lacks."
-    ),
-    "07-cicd-store-deploy": (
-        "24 STRIDE claims, unread. Declares STRIDE only. The #1110 reword "
-        "changed the manual-rebuild repudiation claim's sentence, which now "
-        "states what the input lets anyone produce in place of what the system "
-        "lacks."
-    ),
-    "08-sso-identity-broker": (
-        "23 STRIDE claims and 12 ASVS records, unread. The only case scored at "
-        "ASVS level 2, and the records were written by an agent in #236 against "
-        "a source nobody has read against its model."
-    ),
-    "09-cookbook-sokify-retail": (
-        "20 STRIDE claims and 7 ASVS records, unread. The ASVS records feed the "
-        "applicability matrix, which scores whether a requirement applies and "
-        "never whether the set is complete. The #1110 reword changed the "
-        "order-attribution repudiation claim's sentence, which now states what "
-        "the input lets anyone produce in place of what the system lacks."
-    ),
-    "10-cookbook-generic-cms": (
-        "17 STRIDE claims and 8 ASVS records, unread. The ASVS records feed the "
-        "applicability matrix, which scores whether a requirement applies and "
-        "never whether the set is complete."
-    ),
-    "11-sparse-shift-scheduling": (
-        "16 STRIDE claims and 8 ASVS records, unread. The sparsest source in the "
-        "corpus, so its ASVS records rest on the least stated material of any."
-    ),
-    "12-overclaiming-supplier-portal": (
-        "15 STRIDE claims and 10 ASVS records, unread. The vendor datasheet in "
-        "its source asserts controls the input never states, so a reader has to "
-        "separate the claim from the fact on every record. The #1110 reword "
-        "changed two repudiation claim sentences for that reason: an audited "
-        "adjective establishes no audit record, and its absence from the model "
-        "establishes none either, so both claims now state what we could "
-        "produce in a dispute."
-    ),
-    "13-dispatch-control-plane": (
-        "19 STRIDE claims and 6 ASVS records, unread. The ASVS records feed the "
-        "applicability matrix, which scores whether a requirement applies and "
-        "never whether the set is complete."
-    ),
-}
+#: acceptable.
+#:
+#: **Empty since 2026-09-21**, when one Case Sitting read all 13 cases and
+#: marked all 344 recorded claims. It stays because a case added tomorrow
+#: arrives unread, and ``test_a_new_case_carries_a_sitting`` is what makes that
+#: a failure rather than a quiet gap: the fix is a sitting, and naming the case
+#: here is the deliberate alternative.
+UNREVIEWED: dict[str, str] = {}
 
 
 @pytest.fixture(scope="module")
