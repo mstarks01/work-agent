@@ -293,19 +293,19 @@ on either of them. That is the finding this sitting exists for.
 
 ### repudiation
 
-**7.** A category manager denies having approved a supplier's paperwork, and the model holds no audit record we control or can produce.
+**7.** A category manager denies having approved a supplier's paperwork, and the input names no decision record that we control and could produce to rebut them.
 
 - `flow:entity:category-manager>process:supplier-portal>review-documents`, `process:supplier-portal`
 - severity: medium/medium · verb: `unattributable`
-- The datasheet says audited and the model has no audit store, because a marketing adjective is not an element. An analyst that cites an audit log here is citing something that does not exist in the model.
+- The datasheet says audited and the model has no audit store, because a marketing adjective is not an element. An analyst that cites an audit log here is citing something that does not exist in the model, and the adjective does not establish the opposite either. So the claim is what we could produce in a dispute; the decision record's contents and its identity binding are what would settle it.
 
 > mark:
 
-**8.** The vendor disputes what a given nightly extract contained when it left their platform, and nothing on our side records what arrived.
+**8.** The vendor disputes what a given nightly extract contained when it left their platform, and the input states nothing on our side that records what arrived.
 
 - `entity:portal-vendor`, `flow:entity:portal-vendor>store:landing-bucket>push-nightly-extract`
 - severity: low/medium · verb: `unattributable`
-- A dispute across an organizational boundary is the repudiation shape that matters here, and it is the boundary we have least visibility across.
+- A dispute across an organizational boundary is the repudiation shape that matters here, and it is the boundary we have least visibility across. Bucket access logs, transfer records or retained file metadata would settle it, and the source names none.
 
 > mark:
 
@@ -454,7 +454,7 @@ your missing list, your notes and a digest of each file you read:
       "source.md": "3542d5a0939da730951ce8c09de7a18d1bbc74d5e972180acacba73bfd168d41",
       "model.json": "dcfd28bad38f897c03648d173c9cfd9454673988d6d13e3cd11abed53723c036",
       "claims/asvs.json": "5e505c3078704dfc0dc35288158f3090ce00160f7e39286f66f7cd8a2e7cd48c",
-      "claims/stride.json": "f4dfd0eacd8a25321b971a260d0383e2bccca020e8f5ebffd7f75ec310f5327a"
+      "claims/stride.json": "4c0b759836dcc3bf962461ec057ba00032bcc52baaacee110f30e5fb8b5ab430"
       }
     }
   }

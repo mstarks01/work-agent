@@ -138,13 +138,13 @@
     "affected_element_ids": [
       "flow:entity:card-processor>process:storefront-api>settlement-webhook"
     ],
-    "claim": "The processor disputes a settlement the storefront recorded, and no verifiable sender identity on the webhook lets either side prove who sent it.",
+    "claim": "The processor disputes a settlement the storefront recorded, and the input states no sender identity on the webhook that either side could produce to prove who sent it.",
     "tier": "expected",
     "severity": {
       "likelihood": "medium",
       "impact": "medium"
     },
-    "notes": "Follows from unknown callback authentication; a financial dispute path.",
+    "notes": "Follows from unknown callback authentication; a financial dispute path. Retained callbacks or reconciliation records could still settle the dispute, so the claim is what the input lets either side produce rather than what the system holds.",
     "verb": "unattributable"
   },
   {

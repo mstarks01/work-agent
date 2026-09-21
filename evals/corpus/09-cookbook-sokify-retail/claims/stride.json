@@ -124,13 +124,13 @@
       "process:web-api",
       "flow:process:mobile-app>process:web-api>api-traffic"
     ],
-    "claim": "A customer denies placing an order and Sokify cannot show who submitted it, because how the API authenticates callers is unverified.",
+    "claim": "A customer denies placing an order and, on what is described, Sokify cannot show who submitted it: how the API authenticates callers is unverified and the input names no order record that binds a customer identity.",
     "tier": "must-find",
     "severity": {
       "likelihood": "medium",
       "impact": "medium"
     },
-    "notes": "The same unknown as the spoofing claim, filed for what it costs after the fact rather than for the access it grants.",
+    "notes": "The same unknown as the spoofing claim, filed for what it costs after the fact rather than for the access it grants. Customer identity binding and retained order records would settle it.",
     "verb": "unattributable"
   },
   {

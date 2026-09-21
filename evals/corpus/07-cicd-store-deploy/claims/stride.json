@@ -167,13 +167,13 @@
       "flow:entity:developer>process:build-runner>manual-rebuild",
       "process:build-runner"
     ],
-    "claim": "A build that reached the estate cannot be attributed to the developer who started it, because any developer can trigger a manual rebuild on an unreviewed path whose authentication is unverified.",
+    "claim": "A build that reached the estate may not be attributable to the developer who started it, because any developer can trigger a manual rebuild on an unreviewed path and the input does not state how that path identifies them.",
     "tier": "must-find",
     "severity": {
       "likelihood": "medium",
       "impact": "medium"
     },
-    "notes": "The source states the path is not reviewed and does not require a merge, so the git history that would otherwise carry attribution is bypassed by construction.",
+    "notes": "The source states the path is not reviewed and does not require a merge, so the git history that would otherwise carry attribution is bypassed by construction. An unreviewed rebuild is not necessarily an unattributable one: a manual-login identity and a retained rebuild record would settle it, and the source states neither.",
     "verb": "unattributable"
   },
   {
