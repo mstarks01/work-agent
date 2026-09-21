@@ -181,7 +181,7 @@
     "affected_element_ids": [
       "store:orders-db"
     ],
-    "claim": "No protection requirement follows from the order database's confidential classification.",
+    "claim": "The order database is classified confidential and nothing records which protection controls that classification requires.",
     "tier": "expected",
     "disposition": "needs-more-prose",
     "notes": "The model answers the classification half and nothing answers the controls half."

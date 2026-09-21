@@ -274,7 +274,7 @@ on either of them. That is the finding this sitting exists for.
 
 > mark:
 
-**5.** An attacker on the path of the nightly push alters the extract in transit, because the source contradicts itself over whether that transfer is encrypted.
+**5.** An attacker on the path of the nightly push alters the extract in transit, if that channel protects its integrity no further, which the source leaves unresolved.
 
 - `flow:entity:portal-vendor>store:landing-bucket>push-nightly-extract`
 - severity: medium/high · verb: `alter-in-transit`
@@ -413,7 +413,7 @@ your missing list, your notes and a digest of each file you read:
       "source.md": "3542d5a0939da730951ce8c09de7a18d1bbc74d5e972180acacba73bfd168d41",
       "model.json": "dcfd28bad38f897c03648d173c9cfd9454673988d6d13e3cd11abed53723c036",
       "claims/asvs.json": "5e505c3078704dfc0dc35288158f3090ce00160f7e39286f66f7cd8a2e7cd48c",
-      "claims/stride.json": "040c54c3d315f967270f82d12931e6303819d058bb4a9f6c3dd5aee98fc71fe8"
+      "claims/stride.json": "ef044f8203389f2d96a4842a16b35794be13be59626cb2a29808e464a4b419ee"
       }
     }
   }
