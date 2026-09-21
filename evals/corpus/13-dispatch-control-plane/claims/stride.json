@@ -247,13 +247,13 @@
       "flow:process:dispatch-console>process:dispatch-api>dispatch-requests",
       "process:dispatch-api"
     ],
-    "claim": "An attacker gets a duty engineer's browser to dispatch a crew from a page the attacker controls, because the API's allowed origins and its credential rule are unrecorded.",
+    "claim": "An attacker gets a duty engineer's browser to dispatch a crew from a page the attacker controls, if the browser attaches the engineer's session to a cross-site request the API accepts and the API checks nothing beyond it, none of which is recorded.",
     "tier": "must-find",
     "severity": {
       "likelihood": "medium",
       "impact": "high"
     },
-    "notes": "The browser holds the authority and the origin rule is what decides who may spend it, which is why an unrecorded CORS policy is an elevation rather than a header hygiene point.",
+    "notes": "The browser holds authority the corporate laptop does not, so a request it is made to send spends the control plane's rights. CORS is not the write authorization: the prerequisites are credential attachment, a method and content type the API accepts, and no further validation of the request, and none of the three is recorded.",
     "verb": "ride-session"
   },
   {

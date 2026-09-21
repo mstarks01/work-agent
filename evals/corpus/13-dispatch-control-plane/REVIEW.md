@@ -371,11 +371,11 @@ on either of them. That is the finding this sitting exists for.
 
 ### elevation-of-privilege
 
-**17.** An attacker gets a duty engineer's browser to dispatch a crew from a page the attacker controls, because the API's allowed origins and its credential rule are unrecorded.
+**17.** An attacker gets a duty engineer's browser to dispatch a crew from a page the attacker controls, if the browser attaches the engineer's session to a cross-site request the API accepts and the API checks nothing beyond it, none of which is recorded.
 
 - `flow:process:dispatch-console>process:dispatch-api>dispatch-requests`, `process:dispatch-api`
 - severity: medium/high · verb: `ride-session`
-- The browser holds the authority and the origin rule is what decides who may spend it, which is why an unrecorded CORS policy is an elevation rather than a header hygiene point.
+- The browser holds authority the corporate laptop does not, so a request it is made to send spends the control plane's rights. CORS is not the write authorization: the prerequisites are credential attachment, a method and content type the API accepts, and no further validation of the request, and none of the three is recorded.
 
 > mark:
 
@@ -445,7 +445,7 @@ your missing list, your notes and a digest of each file you read:
       "source.md": "7e370ab58f5a0138f9dd36d41cb6d3ef2b88e15594ab7995a9eb1488b157fec7",
       "model.json": "b31bc54f80f1e972ebf62c0b2c380109a67034c38cc9c15f655d36992bea9b98",
       "claims/asvs.json": "e2a9c33f73e15df69bd2a4645afa0bb6070692516af24a275100775832359970",
-      "claims/stride.json": "4661aca810c8b67513fe83ab836fd0ccaad5dd7fe93da3f9bab656bc8f72b129"
+      "claims/stride.json": "61f1dd332d82d4287d07e5cddc405c68fdcd51bd6f860e7dc253cdef013bda2d"
       }
     }
   }

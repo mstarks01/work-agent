@@ -836,7 +836,7 @@
     "reference_index": 0,
     "candidate_ordinal": 0,
     "fixture_id": "a62fc3352f6c",
-    "reference_claim": "An attacker who obtains a never-expiring API key calls the inference gateway as that team indefinitely.",
+    "reference_claim": "An attacker who obtains a calling team's API key calls the inference gateway as that team for as long as the key stays valid, and no key has ever been expired.",
     "reference_element_ids": [
       "entity:calling-service",
       "flow:entity:calling-service>process:inference-gateway>submit-inference-request"
@@ -857,7 +857,7 @@
     "reference_index": 0,
     "candidate_ordinal": 1,
     "fixture_id": "8231d30c54d7",
-    "reference_claim": "An attacker who obtains a never-expiring API key calls the inference gateway as that team indefinitely.",
+    "reference_claim": "An attacker who obtains a calling team's API key calls the inference gateway as that team for as long as the key stays valid, and no key has ever been expired.",
     "reference_element_ids": [
       "entity:calling-service",
       "flow:entity:calling-service>process:inference-gateway>submit-inference-request"
@@ -1692,7 +1692,7 @@
     "reference_index": 2,
     "candidate_ordinal": 0,
     "fixture_id": "512b19cfc41d",
-    "reference_claim": "An attacker serves a node a firmware image that impersonates an official release, because the node authenticates neither the bucket nor the image's origin.",
+    "reference_claim": "An attacker who gains write access to the firmware bucket serves a node an image it installs as an official release, if the node checks no signature on what it downloads, which is unverified.",
     "reference_element_ids": [
       "flow:entity:sensor-node>store:firmware-bucket>poll-firmware",
       "store:firmware-bucket"
@@ -1869,7 +1869,7 @@
     "reference_index": 5,
     "candidate_ordinal": 0,
     "fixture_id": "0de80dfad480",
-    "reference_claim": "An attacker inside the model network alters request payloads in flight on the unauthenticated, unencrypted forward path.",
+    "reference_claim": "An attacker inside the model network alters request payloads in flight between the gateway and the model server, if that link carries no transport protection, which is unverified.",
     "reference_element_ids": [
       "flow:process:inference-gateway>process:model-server>forward-request"
     ],
@@ -2053,7 +2053,7 @@
     "reference_index": 7,
     "candidate_ordinal": 0,
     "fixture_id": "e7990b98e734",
-    "reference_claim": "A player disputes a change to their record and the input names no log that would distinguish whether the lobby, a game server or the moderation website made it.",
+    "reference_claim": "A player disputes a change to their record and nothing distinguishes whether a game server or the moderation website made it, if neither the player database nor either writer records the actor, which is unverified.",
     "reference_element_ids": [
       "process:game-server",
       "store:player-database"
@@ -2985,7 +2985,7 @@
     "reference_index": 17,
     "candidate_ordinal": 0,
     "fixture_id": "d230afd43136",
-    "reference_claim": "An attacker destroys or replaces the signing key so that every application rejects every token at once.",
+    "reference_claim": "An attacker destroys the one signing key and the broker issues no new token for any application until the key is replaced, and nothing records how a replacement would reach the applications.",
     "reference_element_ids": [
       "process:identity-broker",
       "store:key-store"
@@ -5061,7 +5061,7 @@
     "reference_index": 4,
     "candidate_ordinal": 0,
     "fixture_id": "5b3175140ae0",
-    "reference_claim": "An attacker on the path of the nightly push alters the extract in transit, because the source contradicts itself over whether that transfer is encrypted.",
+    "reference_claim": "An attacker on the path of the nightly push alters the extract in transit, if that channel protects its integrity no further, which the source leaves unresolved.",
     "reference_element_ids": [
       "flow:entity:portal-vendor>store:landing-bucket>push-nightly-extract"
     ],
@@ -5080,7 +5080,7 @@
     "reference_index": 4,
     "candidate_ordinal": 1,
     "fixture_id": "02c27734836a",
-    "reference_claim": "An attacker on the path of the nightly push alters the extract in transit, because the source contradicts itself over whether that transfer is encrypted.",
+    "reference_claim": "An attacker on the path of the nightly push alters the extract in transit, if that channel protects its integrity no further, which the source leaves unresolved.",
     "reference_element_ids": [
       "flow:entity:portal-vendor>store:landing-bucket>push-nightly-extract"
     ],
@@ -5800,7 +5800,7 @@
     "reference_index": 16,
     "candidate_ordinal": 0,
     "fixture_id": "50000b0c26fa",
-    "reference_claim": "An attacker gets a duty engineer's browser to dispatch a crew from a page the attacker controls, because the API's allowed origins and its credential rule are unrecorded.",
+    "reference_claim": "An attacker gets a duty engineer's browser to dispatch a crew from a page the attacker controls, if the browser attaches the engineer's session to a cross-site request the API accepts and the API checks nothing beyond it, none of which is recorded.",
     "reference_element_ids": [
       "flow:process:dispatch-console>process:dispatch-api>dispatch-requests",
       "process:dispatch-api"
@@ -5821,7 +5821,7 @@
     "reference_index": 16,
     "candidate_ordinal": 1,
     "fixture_id": "2626b7742674",
-    "reference_claim": "An attacker gets a duty engineer's browser to dispatch a crew from a page the attacker controls, because the API's allowed origins and its credential rule are unrecorded.",
+    "reference_claim": "An attacker gets a duty engineer's browser to dispatch a crew from a page the attacker controls, if the browser attaches the engineer's session to a cross-site request the API accepts and the API checks nothing beyond it, none of which is recorded.",
     "reference_element_ids": [
       "flow:process:dispatch-console>process:dispatch-api>dispatch-requests",
       "process:dispatch-api"

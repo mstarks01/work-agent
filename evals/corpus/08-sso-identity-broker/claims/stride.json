@@ -252,13 +252,13 @@
       "store:key-store",
       "process:identity-broker"
     ],
-    "claim": "An attacker destroys or replaces the signing key so that every application rejects every token at once.",
+    "claim": "An attacker destroys the one signing key and the broker issues no new token for any application until the key is replaced, and nothing records how a replacement would reach the applications.",
     "tier": "expected",
     "severity": {
       "likelihood": "low",
       "impact": "high"
     },
-    "notes": "The same single-key fact that makes the confidentiality claim severe makes this one estate-wide; kept distinct from reading the key, which is a different action.",
+    "notes": "The same single-key fact that makes the confidentiality claim severe makes this one estate-wide; kept distinct from reading the key, which is a different action. Already-issued tokens keep verifying against a cached public half, so the loss is new issuance rather than instant estate-wide rejection.",
     "verb": "delete"
   },
   {
@@ -288,7 +288,7 @@
       "likelihood": "high",
       "impact": "high"
     },
-    "notes": "Three stated facts compound into one window — nightly removal, twelve-hour tokens, no revocation — and no single sentence of the source contains it, which is what makes it the hardest claim in this case to reach.",
+    "notes": "Three stated facts compound into one window \u2014 nightly removal, twelve-hour tokens, no revocation \u2014 and no single sentence of the source contains it, which is what makes it the hardest claim in this case to reach.",
     "verb": "abuse-grant"
   },
   {

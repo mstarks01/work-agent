@@ -169,11 +169,11 @@ on either of them. That is the finding this sitting exists for.
 
 > mark:
 
-**3.** An attacker serves a node a firmware image that impersonates an official release, because the node authenticates neither the bucket nor the image's origin.
+**3.** An attacker who gains write access to the firmware bucket serves a node an image it installs as an official release, if the node checks no signature on what it downloads, which is unverified.
 
 - `store:firmware-bucket`, `flow:entity:sensor-node>store:firmware-bucket>poll-firmware`
 - severity: medium/high · verb: `forge`
-- Origin authentication, as distinct from the tampering entry about modifying an image in place.
+- Origin authentication of the image, as distinct from the tampering entry about modifying an image in place. The poll runs over HTTPS, so the bucket itself is authenticated; what is unverified is whether the node checks a signature.
 
 > mark:
 
@@ -318,7 +318,7 @@ your missing list, your notes and a digest of each file you read:
       "opened_digests": {
       "source.md": "fc745e273aff8be740a814f0a9b4a45d6f3c6fe39dc7c8efa2b879d4f270ac74",
       "model.json": "fbe6f9b1304f947a2efe454df07391e4a430acf808055be11c5b3bb7911995a4",
-      "claims/stride.json": "7231cb4f89d5306db2261a4de175c0a37bfdcc9ec28e75731010007e62851153"
+      "claims/stride.json": "6558f1df20c0e53415f20550f23c26b578c443059be280427d5d78af618fa173"
       }
     }
   }

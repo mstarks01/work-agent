@@ -56,7 +56,7 @@
       "likelihood": "medium",
       "impact": "high"
     },
-    "notes": "The runbook states the file is picked up as-is, which is a stated absence of validation rather than an inferred one — the strongest grounded finding in the case.",
+    "notes": "The runbook states the file is picked up as-is, which is a stated absence of validation rather than an inferred one \u2014 the strongest grounded finding in the case.",
     "verb": "alter"
   },
   {
@@ -64,7 +64,7 @@
     "affected_element_ids": [
       "flow:entity:portal-vendor>store:landing-bucket>push-nightly-extract"
     ],
-    "claim": "An attacker on the path of the nightly push alters the extract in transit, because the source contradicts itself over whether that transfer is encrypted.",
+    "claim": "An attacker on the path of the nightly push alters the extract in transit, if that channel protects its integrity no further, which the source leaves unresolved.",
     "tier": "must-find",
     "severity": {
       "likelihood": "medium",
