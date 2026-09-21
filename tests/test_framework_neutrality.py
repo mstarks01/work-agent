@@ -263,10 +263,12 @@ DECLARED: dict[str, str] = {
         ' `frameworks=("stride",)`; this is the module behind it.'
     ),
     "evals/verify_corpus.py": (
-        "Five tables keyed by framework (record fields, record checks, lane"
-        " accessor, ASVS-only chapter check, calibration-fixture input). All"
-        " self-completing except the last, which is STRIDE's because a composed"
-        " claim identity is (#167)."
+        "Six tables keyed by framework (record fields, record checks, lane"
+        " accessor, ASVS-only chapter check, calibration-fixture input, verb"
+        " leads). All self-completing except the calibration input, which is"
+        " STRIDE's because a composed claim identity is (#167). The verb-lead"
+        " table answers `None` for a package whose claims compose no action,"
+        " which is why it stays a table rather than a STRIDE-only check."
     ),
 }
 

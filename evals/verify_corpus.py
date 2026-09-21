@@ -13,6 +13,15 @@ reads, and CI checks what the budget allows. Three checks, in
 gradeable. None of them says it grades well, and no number stands behind either
 claim until a live sweep runs.
 
+This module is also the reference set's reader for rules a package states to
+the agents that draft claims. A contract read on one side and nowhere on the
+other drifts until a person notices, which is what :func:`_escalate_leads`
+records: ``frameworks/stride/output.md`` told lane agents which of the two
+authorization verbs to write, nothing held the reference set to it, and the
+two parted over eight claims and every elevation-of-privilege record in two
+cases. A check here raises a lead and never rules a claim out; the answer is
+a person's.
+
 Run ``python evals/verify_corpus.py`` to check, and ``--write-sha`` to stamp
 each case's ``source_sha256`` from its ``source.md``.
 """
@@ -22,6 +31,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import re
 import sys
 from collections.abc import Callable, Iterator, Mapping
 from pathlib import Path
@@ -36,6 +46,7 @@ sys.path.insert(0, str(_REPO_ROOT / "src"))
 # twenty verbs twice would guarantee the two copies drift.
 sys.path.insert(0, str(_REPO_ROOT))
 
+from analysis_service.actions import FAMILIES
 from analysis_service.claims import (
     FrameworkName,
     Rating,
@@ -348,6 +359,158 @@ RECORD_CHECKS: Mapping[
 RECORD_LANE: Mapping[FrameworkName, Callable[[dict], object]] = {
     "asvs": lambda record: record.get("chapter"),
     "stride": lambda record: record.get("category"),
+}
+
+
+#: The two authorization verbs, read off the shipped family so this module
+#: cannot spell a verb the vocabulary has moved on from.
+ESCALATE, ABUSE_GRANT = FAMILIES["authorization"]
+
+#: The words that say the attacker *starts* at an element rather than arriving
+#: at one. Read by :func:`_escalate_leads`, matched case-insensitively at a word
+#: boundary against the claim sentence.
+#:
+#: **A word nobody listed costs one lead and never a claim.** That is the whole
+#: difference between this table and the two ADR 27 deleted: those read a model
+#: and ruled a requirement out of a job, so a miss lost the finding silently.
+#: This one raises a question a person answers in :data:`ESCALATE_DECLARED`, so
+#: a miss leaves a claim exactly as unexamined as it is today, and a false
+#: raise costs one line of prose.
+FOOTHOLD_WORDS: tuple[str, ...] = (
+    "compromises",
+    "compromising",
+    "compromised",
+    "takes",
+    "reaches",
+    "reaching",
+    "gets code execution",
+    "who can write to",
+    "who can plant",
+    "holding",
+    "controls",
+)
+
+_FOOTHOLD = re.compile(
+    rf"\b(?:{'|'.join(re.escape(word) for word in FOOTHOLD_WORDS)})\b",
+    re.IGNORECASE,
+)
+
+#: Reference claims that raise :func:`_escalate_leads` and are an escalation
+#: anyway, each with the reason. Keyed by the case and the elements the claim
+#: cites, which is the half of its identity a reword does not move.
+#:
+#: **Say why as a property of the claim.** An entry reading "reviewed" answers
+#: nothing the next reader can check. Name the privilege the actor reaches that
+#: the flow between the two cited elements does not carry.
+#:
+#: Empty, and that is a measurement rather than a default: the seven claims
+#: this rule was written from were all ruled out by the Case Sitting of
+#: 2026-09-21 and dropped by #1123, and no claim in the corpus raises it today.
+ESCALATE_DECLARED: Mapping[tuple[str, tuple[str, ...]], str] = {}
+
+
+def _escalate_leads(
+    case_id: str, records: list[dict], model: SystemModel
+) -> Iterator[tuple[tuple[str, tuple[str, ...]], str]]:
+    """`escalate` claims whose attacker starts where the grant already reaches.
+
+    ``frameworks/stride/output.md`` tells a lane agent which of the two
+    authorization verbs to write: where the actor holds the grant and the
+    finding is that the grant reaches further than its purpose, the verb is
+    ``abuse-grant``, **however large the harm**; ``escalate`` is for reaching
+    what the actor's position never carried. Nothing held the reference set to
+    that rule, so the rule had a reader on the drafting side and none here, and
+    the two drifted until a person read them — six claims and every
+    elevation-of-privilege record in two cases (#1125).
+
+    The condition is decidable and it is the model's, not a word's. A claim
+    raises when it cites two elements the blessed model already joins with a
+    data flow, **and** its own sentence puts the attacker at the source of that
+    flow. The model saying the source reaches the destination is precisely the
+    fact that makes the reach a grant the actor was issued.
+
+    This raises a lead and rules nothing out, which is ADR 27's rule kept in a
+    place ADR 27 does not reach: that decision governs what a *job* may
+    conclude about a live submission, and this is an offline lint over a corpus
+    a person maintains. A raised claim is answered by re-verbing it to
+    ``abuse-grant`` or by an entry in :data:`ESCALATE_DECLARED` saying why the
+    reach is an escalation after all. Neither answer is this module's to pick.
+    """
+    reaches = {(flow.source, flow.destination) for flow in model.data_flows}
+    by_id = {flow.id: flow for flow in model.data_flows}
+    for index, record in enumerate(records):
+        if not isinstance(record, dict) or record.get("verb") != ESCALATE:
+            continue
+        claim = record.get("claim")
+        cited = record.get("affected_element_ids")
+        if not isinstance(claim, str) or not isinstance(cited, list):
+            continue
+        # A cited flow stands for both its ends. Read them off the model's own
+        # flow rather than splitting the ID, which stops being right the day an
+        # ID's shape moves.
+        places: set[str] = set()
+        for element_id in cited:
+            flow = by_id.get(element_id)
+            places.update((flow.source, flow.destination) if flow else (element_id,))
+        joined = sorted(
+            (source, destination)
+            for source in places
+            for destination in places
+            if source != destination and (source, destination) in reaches
+        )
+        if not joined or not _FOOTHOLD.search(claim):
+            continue
+        pairs = "; ".join(
+            f"{source} -> {destination}" for source, destination in joined
+        )
+        # Every raise, declared or not. One reader of the condition: the caller
+        # that reports and the check that finds a spent declaration read the
+        # same keys, so a declaration cannot answer for a claim nothing raises.
+        yield (
+            (case_id, tuple(sorted(cited))),
+            (
+                f"stride[{index}] is `{ESCALATE}`, and the model already flows"
+                f" {pairs} between elements it cites, so its attacker starts where"
+                f" the grant reaches. frameworks/stride/output.md calls that"
+                f" `{ABUSE_GRANT}` however large the harm. Re-verb it, or name the"
+                " reach it does carry in ESCALATE_DECLARED"
+            ),
+        )
+
+
+def _stale_escalate_declarations(
+    raised: set[tuple[str, tuple[str, ...]]],
+) -> Iterator[str]:
+    """Declarations for a claim that no longer raises, so the table cannot rot.
+
+    A table nobody compares to what it answers for fails as quietly as the
+    branch it replaced. An entry whose claim was re-verbed, reworded onto other
+    elements or dropped is answering nothing, and the reason it carries is the
+    one thing a later reader would trust.
+    """
+    for case_id, cited in sorted(ESCALATE_DECLARED):
+        if (case_id, cited) not in raised:
+            yield (
+                f"ESCALATE_DECLARED holds {case_id} {list(cited)}, which no"
+                " longer raises the escalate lead; delete the entry"
+            )
+
+
+#: Which packages carry a verb for :func:`_escalate_leads` to read. ``asvs``
+#: takes ``None`` because its claims name a catalog requirement and compose no
+#: action, so there is no authorization verb to choose wrongly — a property of
+#: the package rather than its name, which is what makes this answer for a
+#: package nobody has written yet.
+VERB_LEADS: Mapping[
+    FrameworkName,
+    Callable[
+        [str, list[dict], SystemModel],
+        Iterator[tuple[tuple[str, tuple[str, ...]], str]],
+    ]
+    | None,
+] = {
+    "asvs": None,
+    "stride": _escalate_leads,
 }
 
 
@@ -906,8 +1069,15 @@ def lane_coverage_issues(must_find_lanes: Mapping[str, set[object]]) -> Iterator
             )
 
 
-def check_case(case_dir: Path) -> list[str]:
-    """Every mechanical failure in one case, empty if the case is sound."""
+def check_case(
+    case_dir: Path, raised: set[tuple[str, tuple[str, ...]]] | None = None
+) -> list[str]:
+    """Every mechanical failure in one case, empty if the case is sound.
+
+    ``raised`` collects the key of every claim :data:`VERB_LEADS` raised,
+    declared or not, so :func:`_stale_escalate_declarations` can find an entry
+    that answers for nothing. A caller with no interest in that passes nothing.
+    """
     problems: list[str] = [f"missing {name}" for name in missing_case_files(case_dir)]
     if problems:
         return problems
@@ -944,10 +1114,19 @@ def check_case(case_dir: Path) -> list[str]:
     options = declared_options(meta)
     for name in PACKAGES:
         path = claims_file(case_dir, name)
-        if name in options and path.is_file():
-            problems.extend(
-                _check_claims(name, _load_json(path), element_ids, options[name])
-            )
+        if name not in options or not path.is_file():
+            continue
+        records = _load_json(path)
+        problems.extend(_check_claims(name, records, element_ids, options[name]))
+
+        leads = VERB_LEADS[name]
+        if leads is None or not isinstance(records, list):
+            continue
+        for key, message in leads(case_dir.name, records, model):
+            if raised is not None:
+                raised.add(key)
+            if key not in ESCALATE_DECLARED:
+                problems.append(message)
     return problems
 
 
@@ -1200,8 +1379,9 @@ def main() -> int:
     # merge bar's second check is over the whole corpus, so it is accumulated
     # here rather than answered per case.
     must_find_lanes: dict[str, set[object]] = {}
+    raised: set[tuple[str, tuple[str, ...]]] = set()
     for case_dir in case_dirs():
-        problems = check_case(case_dir)
+        problems = check_case(case_dir, raised)
         for name in PACKAGES:
             path = claims_file(case_dir, name)
             if not path.is_file():
@@ -1217,6 +1397,10 @@ def main() -> int:
         failures += len(problems)
 
     for problem in lane_coverage_issues(must_find_lanes):
+        print(f"merge bar: {problem}")
+        failures += 1
+
+    for problem in _stale_escalate_declarations(raised):
         print(f"merge bar: {problem}")
         failures += 1
 

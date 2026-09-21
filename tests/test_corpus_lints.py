@@ -783,3 +783,156 @@ class TestTheTwoReadersOfTheIdRule:
                 assert by_prefix == derive_element_id(element), element.id
                 assert isinstance(element, DataFlow) == element.id.startswith("flow:")
         assert checked > 100
+
+
+#: The eight claims that prompted #1125, as a case, the two elements the
+#: blessed model already joins, and a sentence in the shape each one used. The
+#: Case Sitting of 2026-09-21 ruled out every one, seven as ``reject`` and one
+#: as ``duplicate``, and #1123 dropped them — so the corpus cannot hold this
+#: regression any more and the test carries it instead.
+#:
+#: The sentences are written here rather than copied, because a lint that
+#: stored the corpus's own prose would be a second reader of it. What is real
+#: is the element pair: each one is a flow in that case's shipped model, which
+#: is the half of the condition that decides.
+ESCALATE_REGRESSIONS = [
+    ("01-payments-checkout", "process:storefront-api", "process:order-service"),
+    (
+        "03-batch-data-pipeline",
+        "process:ingest-scheduler",
+        "process:spark-transform-job",
+    ),
+    ("04-ml-inference-service", "process:inference-gateway", "process:model-server"),
+    ("05-cookbook-queue-webapp", "process:web-application", "store:message-queue"),
+    ("06-cookbook-online-game", "process:game-server", "store:player-database"),
+    ("07-cicd-store-deploy", "process:store-server", "process:deploy-controller"),
+    ("09-cookbook-sokify-retail", "process:catalogue-spreadsheet", "process:web-api"),
+    ("10-cookbook-generic-cms", "entity:admin", "store:mysql-database"),
+]
+
+
+def _model_of(case_id: str):
+    case_dir = verify_corpus.CORPUS_DIR / case_id
+    model, _ = parse_and_validate(verify_corpus._load_json(case_dir / "model.json"))
+    assert model is not None
+    return model
+
+
+def _escalate_record(source: str, destination: str, claim: str) -> dict:
+    return {
+        "category": "elevation-of-privilege",
+        "affected_element_ids": [source, destination],
+        "claim": claim,
+        "tier": "must-find",
+        "severity": {"likelihood": "medium", "impact": "high"},
+        "notes": "",
+        "verb": verify_corpus.ESCALATE,
+    }
+
+
+@pytest.mark.parametrize(
+    ("case_id", "source", "destination"),
+    ESCALATE_REGRESSIONS,
+    ids=[case_id for case_id, _, _ in ESCALATE_REGRESSIONS],
+)
+def test_the_claims_that_prompted_the_rule_all_raise(case_id, source, destination):
+    """Each of #1125's eight, rebuilt on its own case's shipped model.
+
+    The reader wrote one judgement eight times — a component using the reach it
+    was already issued is blast radius, not escalation — and nothing on the
+    reference side read the rule the lane agents were given. These are the
+    inputs that were missed.
+    """
+    record = _escalate_record(
+        source, destination, f"An attacker who compromises {source} reaches everything."
+    )
+
+    leads = list(verify_corpus._escalate_leads(case_id, [record], _model_of(case_id)))
+
+    assert len(leads) == 1
+    key, message = leads[0]
+    assert key == (case_id, tuple(sorted((source, destination))))
+    assert f"{source} -> {destination}" in message
+    assert verify_corpus.ABUSE_GRANT in message
+
+
+def test_a_reach_the_model_does_not_carry_is_left_alone():
+    """The real escalation shape, and the reason the rule is the model's.
+
+    Case 07's surviving must-find has the attacker compromise the build runner
+    and reach the store servers. The model carries no flow that way — the store
+    server polls the controller — so the runner holds no issued reach to abuse,
+    which is exactly what makes it an escalation.
+    """
+    record = _escalate_record(
+        "process:build-runner",
+        "process:store-server",
+        "An attacker who compromises the build runner controls every store server.",
+    )
+
+    leads = list(
+        verify_corpus._escalate_leads(
+            "07-cicd-store-deploy", [record], _model_of("07-cicd-store-deploy")
+        )
+    )
+
+    assert leads == []
+
+
+def test_a_claim_that_does_not_place_the_attacker_at_the_source_is_left_alone():
+    """Same two elements, and a sentence that starts the attacker nowhere.
+
+    A flow between two cited elements is not on its own a wrong verb: a claim
+    can name a path without claiming the attacker begins at one end of it. The
+    foothold half is what separates them.
+    """
+    record = _escalate_record(
+        "process:web-application",
+        "store:message-queue",
+        "A legitimate user makes the worker act on another user's records.",
+    )
+
+    leads = list(
+        verify_corpus._escalate_leads(
+            "05-cookbook-queue-webapp", [record], _model_of("05-cookbook-queue-webapp")
+        )
+    )
+
+    assert leads == []
+
+
+def test_a_declaration_answers_a_lead_and_a_spent_one_is_caught(monkeypatch):
+    """The escape hatch, and the guard that stops it rotting.
+
+    A table nobody compares against what it answers for fails as quietly as the
+    branch it replaced, so a declaration whose claim no longer raises is itself
+    a failure.
+    """
+    key = (
+        "05-cookbook-queue-webapp",
+        ("process:web-application", "store:message-queue"),
+    )
+    monkeypatch.setattr(verify_corpus, "ESCALATE_DECLARED", {key: "a stated reason"})
+
+    assert list(verify_corpus._stale_escalate_declarations({key})) == []
+
+    (problem,) = verify_corpus._stale_escalate_declarations(set())
+    assert "no longer raises" in problem
+    assert "05-cookbook-queue-webapp" in problem
+
+
+def test_every_package_answers_the_verb_lead_table():
+    """Keyed by framework and checked against its registry, not by eye.
+
+    A package added without an entry here would carry no reference-side reader
+    for its own verb rule, which is the defect #1125 records. ``None`` is a
+    legal answer and says the package composes no action.
+    """
+    assert set(verify_corpus.VERB_LEADS) == set(verify_corpus.PACKAGES)
+    assert verify_corpus.VERB_LEADS["asvs"] is None
+
+
+def test_the_foothold_words_are_matched_at_a_word_boundary():
+    """`takes` must not fire on `undertakes`, which is how a word list rots."""
+    assert verify_corpus._FOOTHOLD.search("an attacker takes the server")
+    assert not verify_corpus._FOOTHOLD.search("the service undertakes a check")
