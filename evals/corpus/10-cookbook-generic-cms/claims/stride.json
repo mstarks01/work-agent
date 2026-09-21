@@ -224,13 +224,13 @@
       "store:cdn-bucket",
       "flow:entity:reader>entity:cdn>asset-fetch"
     ],
-    "claim": "An attacker who can write to the CDN bucket plants a script there, and it runs in the site's own context in the browser of each reader the site delivers it to.",
+    "claim": "An attacker who can write to the CDN bucket plants an asset there — a stylesheet or a download, which is what the source says the CDN serves — and the site delivers it to every reader as its own, because nothing records how the push to the bucket is authenticated.",
     "tier": "must-find",
     "severity": {
       "likelihood": "medium",
       "impact": "high"
     },
-    "notes": "Where the two crossings compound: write access in a zone the site does not control becomes execution inside the site's origin, and neither crossing on its own carries that.",
+    "notes": "Where the two crossings compound: write access in a zone the site does not control becomes content the site vouches for, and neither crossing on its own carries that. The source names images, stylesheets and downloads on this path and no script, so what the reader's browser then does with the asset is not settled here.",
     "verb": "plant"
   },
   {

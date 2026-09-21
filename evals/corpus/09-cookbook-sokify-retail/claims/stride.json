@@ -20,7 +20,7 @@
       "flow:process:catalogue-spreadsheet>process:web-api>sql-statements",
       "process:catalogue-spreadsheet"
     ],
-    "claim": "An attacker who obtains a copy of the catalogue spreadsheet sends SQL to the web API as the catalogue tool.",
+    "claim": "An attacker who obtains a copy of the catalogue spreadsheet sends SQL to the web API as the catalogue tool, if the file carries whatever the API accepts as that tool's identity; the source never says what that is.",
     "tier": "must-find",
     "severity": {
       "likelihood": "medium",
@@ -79,7 +79,7 @@
       "flow:process:catalogue-spreadsheet>process:web-api>sql-statements",
       "process:web-api"
     ],
-    "claim": "An attacker appends further SQL to the statements the macros send so the web API executes changes beyond prices and product copy.",
+    "claim": "An attacker appends further SQL to the statements the macros send so the web API executes changes beyond prices and product copy, if the API passes what it receives to the database without restricting it to those statements; the source says only that the macros speak SQL to it.",
     "tier": "must-find",
     "severity": {
       "likelihood": "medium",

@@ -409,7 +409,7 @@
     "reference_index": 6,
     "candidate_ordinal": 0,
     "fixture_id": "f00946fbd3dc",
-    "reference_claim": "An attacker who reaches the telemetry lake reads customer site addresses and occupancy patterns, whose protection at rest is unverified.",
+    "reference_claim": "An attacker who obtains a read grant on the telemetry lake reads customer site addresses and occupancy patterns, and nothing records who holds that grant or whether protection at rest would stop a raw copy.",
     "reference_element_ids": [
       "store:telemetry-lake"
     ],
@@ -1000,7 +1000,7 @@
     "reference_index": 8,
     "candidate_ordinal": 0,
     "fixture_id": "f42b9235c6dc",
-    "reference_claim": "An attacker who reaches the inference log reads raw end-user prompts, whose protection at rest is unverified.",
+    "reference_claim": "An attacker who obtains a read grant on the inference log reads the raw end-user prompts the source says it retains, and nothing records who holds that grant.",
     "reference_element_ids": [
       "store:inference-log"
     ],
@@ -1019,7 +1019,7 @@
     "reference_index": 8,
     "candidate_ordinal": 1,
     "fixture_id": "056df7c729e7",
-    "reference_claim": "An attacker who reaches the inference log reads raw end-user prompts, whose protection at rest is unverified.",
+    "reference_claim": "An attacker who obtains a read grant on the inference log reads the raw end-user prompts the source says it retains, and nothing records who holds that grant.",
     "reference_element_ids": [
       "store:inference-log"
     ],
@@ -1528,7 +1528,7 @@
     "reference_index": 9,
     "candidate_ordinal": 0,
     "fixture_id": "41ab0e048fec",
-    "reference_claim": "An attacker on the network path reads matchmaking and gameplay traffic, including player identifiers, because encryption on both client links is unverified.",
+    "reference_claim": "An attacker on the network path reads matchmaking and gameplay traffic, if either client link carries anything confidential over a segment they can observe; the model records the two links as bare port numbers and no transport protection either way.",
     "reference_element_ids": [
       "flow:process:game-client>process:game-server>gameplay-traffic",
       "flow:process:game-client>process:lobby>matchmaking"
@@ -1631,7 +1631,7 @@
     "reference_index": 14,
     "candidate_ordinal": 0,
     "fixture_id": "5325bbe0c6a9",
-    "reference_claim": "An attacker who gets any access to the moderation website acquires privilege over every player account it can reach.",
+    "reference_claim": "An attacker who gets access to the moderation website acts on player accounts with whatever authority it holds over the player database, which the source records as direct read and write and never bounds by role or by account.",
     "reference_element_ids": [
       "entity:customer-support-staff",
       "process:moderation-website"
@@ -2135,7 +2135,7 @@
     "reference_index": 1,
     "candidate_ordinal": 0,
     "fixture_id": "b47adfcef3c7",
-    "reference_claim": "An attacker on the retail WAN presents itself to the image registry as a store server and pulls the estate's container images.",
+    "reference_claim": "An attacker on the retail WAN presents itself to the image registry as a store server and pulls the estate's container images, if the registry identifies a puller no better than the source records a store being identified, which is not at all.",
     "reference_element_ids": [
       "flow:process:store-server>store:image-registry>pull-image",
       "store:image-registry"
@@ -2156,7 +2156,7 @@
     "reference_index": 1,
     "candidate_ordinal": 1,
     "fixture_id": "86e6a675f8c6",
-    "reference_claim": "An attacker on the retail WAN presents itself to the image registry as a store server and pulls the estate's container images.",
+    "reference_claim": "An attacker on the retail WAN presents itself to the image registry as a store server and pulls the estate's container images, if the registry identifies a puller no better than the source records a store being identified, which is not at all.",
     "reference_element_ids": [
       "flow:process:store-server>store:image-registry>pull-image",
       "store:image-registry"
@@ -2383,7 +2383,7 @@
     "reference_index": 12,
     "candidate_ordinal": 0,
     "fixture_id": "e04a399ef35e",
-    "reference_claim": "An attacker who reads the build runner's configuration recovers the shared build token and can thereafter set the estate's release.",
+    "reference_claim": "An attacker who reads wherever the build runner keeps the shared build token recovers it and can thereafter set the estate's release; the source states the runner presents the token and never says where it is kept.",
     "reference_element_ids": [
       "flow:process:build-runner>process:deploy-controller>set-current-release",
       "process:build-runner"
@@ -2403,7 +2403,7 @@
     "reference_index": 12,
     "candidate_ordinal": 1,
     "fixture_id": "c73815f3fc92",
-    "reference_claim": "An attacker who reads the build runner's configuration recovers the shared build token and can thereafter set the estate's release.",
+    "reference_claim": "An attacker who reads wherever the build runner keeps the shared build token recovers it and can thereafter set the estate's release; the source states the runner presents the token and never says where it is kept.",
     "reference_element_ids": [
       "flow:process:build-runner>process:deploy-controller>set-current-release",
       "process:build-runner"
@@ -2831,7 +2831,7 @@
     "reference_index": 10,
     "candidate_ordinal": 0,
     "fixture_id": "d7d5f0ab29fe",
-    "reference_claim": "An attacker who reaches the key store reads the signing key, since protection of what it holds at rest is unverified.",
+    "reference_claim": "An attacker who reaches the key store reads the signing key, if the store hands out the private half rather than only signing with it and protection at rest does not stop them; the source records neither.",
     "reference_element_ids": [
       "store:key-store"
     ],
@@ -3152,7 +3152,7 @@
     "reference_index": 1,
     "candidate_ordinal": 0,
     "fixture_id": "6f4475a4ff5f",
-    "reference_claim": "An attacker who obtains a copy of the catalogue spreadsheet sends SQL to the web API as the catalogue tool.",
+    "reference_claim": "An attacker who obtains a copy of the catalogue spreadsheet sends SQL to the web API as the catalogue tool, if the file carries whatever the API accepts as that tool's identity; the source never says what that is.",
     "reference_element_ids": [
       "flow:process:catalogue-spreadsheet>process:web-api>sql-statements",
       "process:catalogue-spreadsheet"
@@ -3173,7 +3173,7 @@
     "reference_index": 1,
     "candidate_ordinal": 1,
     "fixture_id": "c7208d3bdf6b",
-    "reference_claim": "An attacker who obtains a copy of the catalogue spreadsheet sends SQL to the web API as the catalogue tool.",
+    "reference_claim": "An attacker who obtains a copy of the catalogue spreadsheet sends SQL to the web API as the catalogue tool, if the file carries whatever the API accepts as that tool's identity; the source never says what that is.",
     "reference_element_ids": [
       "flow:process:catalogue-spreadsheet>process:web-api>sql-statements",
       "process:catalogue-spreadsheet"
@@ -3316,7 +3316,7 @@
     "reference_index": 5,
     "candidate_ordinal": 0,
     "fixture_id": "d0733007ea6a",
-    "reference_claim": "An attacker appends further SQL to the statements the macros send so the web API executes changes beyond prices and product copy.",
+    "reference_claim": "An attacker appends further SQL to the statements the macros send so the web API executes changes beyond prices and product copy, if the API passes what it receives to the database without restricting it to those statements; the source says only that the macros speak SQL to it.",
     "reference_element_ids": [
       "flow:process:catalogue-spreadsheet>process:web-api>sql-statements",
       "process:web-api"
@@ -3337,7 +3337,7 @@
     "reference_index": 5,
     "candidate_ordinal": 1,
     "fixture_id": "dc11f5ef4baf",
-    "reference_claim": "An attacker appends further SQL to the statements the macros send so the web API executes changes beyond prices and product copy.",
+    "reference_claim": "An attacker appends further SQL to the statements the macros send so the web API executes changes beyond prices and product copy, if the API passes what it receives to the database without restricting it to those statements; the source says only that the macros speak SQL to it.",
     "reference_element_ids": [
       "flow:process:catalogue-spreadsheet>process:web-api>sql-statements",
       "process:web-api"
@@ -4384,7 +4384,7 @@
     "reference_index": 15,
     "candidate_ordinal": 0,
     "fixture_id": "179699b824f5",
-    "reference_claim": "An attacker who can write to the CDN bucket plants a script there, and it runs in the site's own context in the browser of each reader the site delivers it to.",
+    "reference_claim": "An attacker who can write to the CDN bucket plants an asset there \u2014 a stylesheet or a download, which is what the source says the CDN serves \u2014 and the site delivers it to every reader as its own, because nothing records how the push to the bucket is authenticated.",
     "reference_element_ids": [
       "flow:entity:reader>entity:cdn>asset-fetch",
       "store:cdn-bucket"
@@ -4405,7 +4405,7 @@
     "reference_index": 15,
     "candidate_ordinal": 1,
     "fixture_id": "28dfbb048c69",
-    "reference_claim": "An attacker who can write to the CDN bucket plants a script there, and it runs in the site's own context in the browser of each reader the site delivers it to.",
+    "reference_claim": "An attacker who can write to the CDN bucket plants an asset there \u2014 a stylesheet or a download, which is what the source says the CDN serves \u2014 and the site delivers it to every reader as its own, because nothing records how the push to the bucket is authenticated.",
     "reference_element_ids": [
       "flow:entity:reader>entity:cdn>asset-fetch",
       "store:cdn-bucket"
@@ -4426,7 +4426,7 @@
     "reference_index": 15,
     "candidate_ordinal": 2,
     "fixture_id": "4ab7d66f6c54",
-    "reference_claim": "An attacker who can write to the CDN bucket plants a script there, and it runs in the site's own context in the browser of each reader the site delivers it to.",
+    "reference_claim": "An attacker who can write to the CDN bucket plants an asset there \u2014 a stylesheet or a download, which is what the source says the CDN serves \u2014 and the site delivers it to every reader as its own, because nothing records how the push to the bucket is authenticated.",
     "reference_element_ids": [
       "flow:entity:reader>entity:cdn>asset-fetch",
       "store:cdn-bucket"
@@ -4830,7 +4830,7 @@
     "reference_index": 13,
     "candidate_ordinal": 0,
     "fixture_id": "f8804ef09401",
-    "reference_claim": "An attacker prevents the weekly export from reaching the file share, so a pay run happens with no hours for a store.",
+    "reference_claim": "An attacker who can stop the scheduling service writing the weekly export leaves the payroll system with no hours to collect, and nothing records what a pay run does when the export is absent.",
     "reference_element_ids": [
       "process:scheduling-service",
       "store:file-share"
@@ -4934,7 +4934,7 @@
     "reference_index": 1,
     "candidate_ordinal": 0,
     "fixture_id": "5804cbd9c92b",
-    "reference_claim": "An attacker signs in to the portal as a category manager and approves supplier paperwork, because how category managers are authenticated is unverified.",
+    "reference_claim": "An attacker signs in to the portal as a category manager and approves supplier paperwork, if manager sign-in does not stop them; the vendor's datasheet asserts that all access is fully authenticated and the source records nothing about how a manager signs in.",
     "reference_element_ids": [
       "entity:category-manager",
       "flow:entity:category-manager>process:supplier-portal>review-documents"
@@ -4955,7 +4955,7 @@
     "reference_index": 1,
     "candidate_ordinal": 1,
     "fixture_id": "142bbc2c6bed",
-    "reference_claim": "An attacker signs in to the portal as a category manager and approves supplier paperwork, because how category managers are authenticated is unverified.",
+    "reference_claim": "An attacker signs in to the portal as a category manager and approves supplier paperwork, if manager sign-in does not stop them; the vendor's datasheet asserts that all access is fully authenticated and the source records nothing about how a manager signs in.",
     "reference_element_ids": [
       "entity:category-manager",
       "flow:entity:category-manager>process:supplier-portal>review-documents"
@@ -5202,7 +5202,7 @@
     "reference_index": 8,
     "candidate_ordinal": 0,
     "fixture_id": "c3020306efe0",
-    "reference_claim": "An attacker with access to the landing bucket reads the whole supplier extract, because whether the bucket is encrypted at rest is unverified.",
+    "reference_claim": "An attacker who obtains a read grant on the landing bucket reads the whole supplier extract, which the runbook says arrives as a plain CSV; nothing records who holds that grant or how the bucket is protected at rest.",
     "reference_element_ids": [
       "store:landing-bucket"
     ],

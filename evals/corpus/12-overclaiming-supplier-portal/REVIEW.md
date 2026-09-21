@@ -247,7 +247,7 @@ on either of them. That is the finding this sitting exists for.
 
 > mark:
 
-**2.** An attacker signs in to the portal as a category manager and approves supplier paperwork, because how category managers are authenticated is unverified.
+**2.** An attacker signs in to the portal as a category manager and approves supplier paperwork, if manager sign-in does not stop them; the vendor's datasheet asserts that all access is fully authenticated and the source records nothing about how a manager signs in.
 
 - `flow:entity:category-manager>process:supplier-portal>review-documents`, `entity:category-manager`
 - severity: medium/high · verb: `impersonate`
@@ -312,7 +312,7 @@ on either of them. That is the finding this sitting exists for.
 
 ### information-disclosure
 
-**9.** An attacker with access to the landing bucket reads the whole supplier extract, because whether the bucket is encrypted at rest is unverified.
+**9.** An attacker who obtains a read grant on the landing bucket reads the whole supplier extract, which the runbook says arrives as a plain CSV; nothing records who holds that grant or how the bucket is protected at rest.
 
 - `store:landing-bucket`
 - severity: medium/high · verb: `read`
@@ -413,7 +413,7 @@ your missing list, your notes and a digest of each file you read:
       "source.md": "3542d5a0939da730951ce8c09de7a18d1bbc74d5e972180acacba73bfd168d41",
       "model.json": "dcfd28bad38f897c03648d173c9cfd9454673988d6d13e3cd11abed53723c036",
       "claims/asvs.json": "5e505c3078704dfc0dc35288158f3090ce00160f7e39286f66f7cd8a2e7cd48c",
-      "claims/stride.json": "5eecb61287ef30d780541c4d93c0c30e4bd4e83a40d5e0ff87e752b59f7224eb"
+      "claims/stride.json": "3cbefe5e4225181a65da8a0829c30d1e1178811ecbe5004db0451ae3505ee033"
       }
     }
   }

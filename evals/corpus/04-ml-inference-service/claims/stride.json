@@ -123,7 +123,7 @@
     "affected_element_ids": [
       "store:inference-log"
     ],
-    "claim": "An attacker who reaches the inference log reads raw end-user prompts, whose protection at rest is unverified.",
+    "claim": "An attacker who obtains a read grant on the inference log reads the raw end-user prompts the source says it retains, and nothing records who holds that grant.",
     "tier": "must-find",
     "severity": {
       "likelihood": "medium",

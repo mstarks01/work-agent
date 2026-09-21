@@ -195,7 +195,7 @@
       "store:file-share",
       "process:scheduling-service"
     ],
-    "claim": "An attacker prevents the weekly export from reaching the file share, so a pay run happens with no hours for a store.",
+    "claim": "An attacker who can stop the scheduling service writing the weekly export leaves the payroll system with no hours to collect, and nothing records what a pay run does when the export is absent.",
     "tier": "must-find",
     "severity": {
       "likelihood": "low",

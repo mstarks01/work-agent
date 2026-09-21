@@ -335,11 +335,11 @@ on either of them. That is the finding this sitting exists for.
 
 ### elevation-of-privilege
 
-**16.** An attacker who can write to the CDN bucket plants a script there, and it runs in the site's own context in the browser of each reader the site delivers it to.
+**16.** An attacker who can write to the CDN bucket plants an asset there — a stylesheet or a download, which is what the source says the CDN serves — and the site delivers it to every reader as its own, because nothing records how the push to the bucket is authenticated.
 
 - `store:cdn-bucket`, `flow:entity:reader>entity:cdn>asset-fetch`
 - severity: medium/high · verb: `plant`
-- Where the two crossings compound: write access in a zone the site does not control becomes execution inside the site's origin, and neither crossing on its own carries that.
+- Where the two crossings compound: write access in a zone the site does not control becomes content the site vouches for, and neither crossing on its own carries that. The source names images, stylesheets and downloads on this path and no script, so what the reader's browser then does with the asset is not settled here.
 
 > mark:
 
@@ -401,7 +401,7 @@ your missing list, your notes and a digest of each file you read:
       "source.md": "11d2a58f0e1d5773054f0a72d222b3cc96f889cdd0206dd3656495a3d5fe8313",
       "model.json": "b65455924d2682e8d7ffd3f60cc9c5a29d7b5ff3335fbba4e5ad9ade51c1c5d0",
       "claims/asvs.json": "94a4b8bb0cc5e626225766a800eafa32eb85fe99ff00af49f5f8cc7e477ea19f",
-      "claims/stride.json": "ffbaeaf2cf98a7ffcd8e2f639f1c3bca7e398fc39cfad36ca552391ee68bd362"
+      "claims/stride.json": "1ae880a26d1852c6eac22610dcc7ccffc16c127174a39ead54a2df772ee5c2a6"
       }
     }
   }
