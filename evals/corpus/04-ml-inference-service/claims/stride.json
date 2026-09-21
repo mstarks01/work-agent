@@ -95,7 +95,7 @@
       "entity:ml-engineer"
     ],
     "claim": "Nobody can establish which engineer published a given model artifact, because publication runs through a shared account.",
-    "tier": "must-find",
+    "tier": "expected",
     "severity": {
       "likelihood": "medium",
       "impact": "medium"

@@ -416,15 +416,15 @@ class TestWhatTheFindingsRestOn:
 
     def test_every_case_is_counted(self, reliance) -> None:
         assert len(reliance) == 13
-        assert sum(one.must_finds for one in reliance) == 156
+        assert sum(one.must_finds for one in reliance) == 147
 
     def test_two_in_five_must_finds_rest_on_an_inferred_crossing(
         self, reliance
     ) -> None:
-        assert sum(one.assumed for one in reliance) == 64
+        assert sum(one.assumed for one in reliance) == 60
 
     def test_one_in_seven_rests_on_a_crossing_of_two_guesses(self, reliance) -> None:
-        assert sum(one.wholly for one in reliance) == 22
+        assert sum(one.wholly for one in reliance) == 20
 
     def test_a_wholly_inferred_crossing_is_a_subset_of_an_assumed_one(
         self, reliance

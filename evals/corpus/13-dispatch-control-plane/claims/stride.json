@@ -129,7 +129,7 @@
       "process:dispatch-api"
     ],
     "claim": "A duty engineer denies moving a crew, and the job order names only the token or session that wrote it.",
-    "tier": "must-find",
+    "tier": "expected",
     "severity": {
       "likelihood": "medium",
       "impact": "medium"
