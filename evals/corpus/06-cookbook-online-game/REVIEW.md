@@ -250,19 +250,19 @@ on either of them. That is the finding this sitting exists for.
 
 ### repudiation
 
-**7.** A support agent's action on a player account cannot be attributed to them, because nothing records who performed a moderation change.
+**7.** A support agent's action on a player account cannot be attributed to them from what is described, because the input states no record of who performed a moderation change.
 
 - `process:moderation-website`, `store:player-database`
 - severity: medium/high · verb: `unattributable`
-- A privileged tool acting directly on records with no audit path described anywhere in the model.
+- A privileged tool acting directly on records, with no audit path described anywhere in the model. The model's silence is not a system without logging, so the claim is what the description lets anyone produce; staff authentication and retained action records would settle it.
 
 > mark:
 
-**8.** A player disputes a change to their record and no log distinguishes whether the lobby, a game server or the moderation website made it.
+**8.** A player disputes a change to their record and the input names no log that would distinguish whether the lobby, a game server or the moderation website made it.
 
 - `store:player-database`, `process:game-server`
 - severity: medium/medium · verb: `unattributable`
-- Multiple writers, one store, no recorded provenance.
+- Multiple writers, one store, and no recorded provenance in the description.
 
 > mark:
 
@@ -402,7 +402,7 @@ your missing list, your notes and a digest of each file you read:
       "source.md": "17e797d0315fdd53d5acf05962ca0ae8a23e08f84779f8528ade6422c34577a3",
       "model.json": "400ad2ee53ee5b0e87c310c881be77f6cc748b7f817fc176bf8967818238c3eb",
       "claims/asvs.json": "79b1fb614daf429bf079268027870240a41c056ba1d41174eb35007f22006bf8",
-      "claims/stride.json": "2c8b0ec74170edd5d5671594ad6c2c50e699d1cd4960c61c4c5b3e34c8fb70ff"
+      "claims/stride.json": "31830dded82e283717060789608df528807231ce2e7468dd5f38098ea466fa32"
       }
     }
   }

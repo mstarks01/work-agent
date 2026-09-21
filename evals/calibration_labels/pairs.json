@@ -1861,7 +1861,7 @@
     "reference_index": 6,
     "candidate_ordinal": 0,
     "fixture_id": "a681ba7b4da0",
-    "reference_claim": "A support agent's action on a player account cannot be attributed to them, because nothing records who performed a moderation change.",
+    "reference_claim": "A support agent's action on a player account cannot be attributed to them from what is described, because the input states no record of who performed a moderation change.",
     "reference_element_ids": [
       "process:moderation-website",
       "store:player-database"
@@ -1882,7 +1882,7 @@
     "reference_index": 6,
     "candidate_ordinal": 1,
     "fixture_id": "8bd2b46f8d92",
-    "reference_claim": "A support agent's action on a player account cannot be attributed to them, because nothing records who performed a moderation change.",
+    "reference_claim": "A support agent's action on a player account cannot be attributed to them from what is described, because the input states no record of who performed a moderation change.",
     "reference_element_ids": [
       "process:moderation-website",
       "store:player-database"
@@ -2594,7 +2594,7 @@
     "reference_index": 7,
     "candidate_ordinal": 0,
     "fixture_id": "e7990b98e734",
-    "reference_claim": "A player disputes a change to their record and no log distinguishes whether the lobby, a game server or the moderation website made it.",
+    "reference_claim": "A player disputes a change to their record and the input names no log that would distinguish whether the lobby, a game server or the moderation website made it.",
     "reference_element_ids": [
       "process:game-server",
       "store:player-database"
@@ -2942,7 +2942,7 @@
     "reference_index": 11,
     "candidate_ordinal": 0,
     "fixture_id": "953d2b2e13ec",
-    "reference_claim": "A build that reached the estate cannot be attributed to the developer who started it, because any developer can trigger a manual rebuild on an unreviewed path whose authentication is unverified.",
+    "reference_claim": "A build that reached the estate may not be attributable to the developer who started it, because any developer can trigger a manual rebuild on an unreviewed path and the input does not state how that path identifies them.",
     "reference_element_ids": [
       "flow:entity:developer>process:build-runner>manual-rebuild",
       "process:build-runner"
@@ -4295,7 +4295,7 @@
     "reference_index": 8,
     "candidate_ordinal": 0,
     "fixture_id": "b1116fccb731",
-    "reference_claim": "A customer denies placing an order and Sokify cannot show who submitted it, because how the API authenticates callers is unverified.",
+    "reference_claim": "A customer denies placing an order and, on what is described, Sokify cannot show who submitted it: how the API authenticates callers is unverified and the input names no order record that binds a customer identity.",
     "reference_element_ids": [
       "flow:process:mobile-app>process:web-api>api-traffic",
       "process:web-api"
@@ -4316,7 +4316,7 @@
     "reference_index": 8,
     "candidate_ordinal": 1,
     "fixture_id": "fab3bf01f8cc",
-    "reference_claim": "A customer denies placing an order and Sokify cannot show who submitted it, because how the API authenticates callers is unverified.",
+    "reference_claim": "A customer denies placing an order and, on what is described, Sokify cannot show who submitted it: how the API authenticates callers is unverified and the input names no order record that binds a customer identity.",
     "reference_element_ids": [
       "flow:process:mobile-app>process:web-api>api-traffic",
       "process:web-api"
@@ -6140,7 +6140,7 @@
     "reference_index": 6,
     "candidate_ordinal": 0,
     "fixture_id": "a748063cc659",
-    "reference_claim": "A category manager denies having approved a supplier's paperwork, and the model holds no audit record we control or can produce.",
+    "reference_claim": "A category manager denies having approved a supplier's paperwork, and the input names no decision record that we control and could produce to rebut them.",
     "reference_element_ids": [
       "flow:entity:category-manager>process:supplier-portal>review-documents",
       "process:supplier-portal"
@@ -6161,7 +6161,7 @@
     "reference_index": 6,
     "candidate_ordinal": 1,
     "fixture_id": "8c27d5cfc280",
-    "reference_claim": "A category manager denies having approved a supplier's paperwork, and the model holds no audit record we control or can produce.",
+    "reference_claim": "A category manager denies having approved a supplier's paperwork, and the input names no decision record that we control and could produce to rebut them.",
     "reference_element_ids": [
       "flow:entity:category-manager>process:supplier-portal>review-documents",
       "process:supplier-portal"
@@ -6182,7 +6182,7 @@
     "reference_index": 7,
     "candidate_ordinal": 0,
     "fixture_id": "dc759a8945db",
-    "reference_claim": "The vendor disputes what a given nightly extract contained when it left their platform, and nothing on our side records what arrived.",
+    "reference_claim": "The vendor disputes what a given nightly extract contained when it left their platform, and the input states nothing on our side that records what arrived.",
     "reference_element_ids": [
       "entity:portal-vendor",
       "flow:entity:portal-vendor>store:landing-bucket>push-nightly-extract"

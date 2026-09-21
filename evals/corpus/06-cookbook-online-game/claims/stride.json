@@ -95,13 +95,13 @@
       "process:moderation-website",
       "store:player-database"
     ],
-    "claim": "A support agent's action on a player account cannot be attributed to them, because nothing records who performed a moderation change.",
+    "claim": "A support agent's action on a player account cannot be attributed to them from what is described, because the input states no record of who performed a moderation change.",
     "tier": "must-find",
     "severity": {
       "likelihood": "medium",
       "impact": "high"
     },
-    "notes": "A privileged tool acting directly on records with no audit path described anywhere in the model.",
+    "notes": "A privileged tool acting directly on records, with no audit path described anywhere in the model. The model's silence is not a system without logging, so the claim is what the description lets anyone produce; staff authentication and retained action records would settle it.",
     "verb": "unattributable"
   },
   {
@@ -110,13 +110,13 @@
       "store:player-database",
       "process:game-server"
     ],
-    "claim": "A player disputes a change to their record and no log distinguishes whether the lobby, a game server or the moderation website made it.",
+    "claim": "A player disputes a change to their record and the input names no log that would distinguish whether the lobby, a game server or the moderation website made it.",
     "tier": "expected",
     "severity": {
       "likelihood": "medium",
       "impact": "medium"
     },
-    "notes": "Multiple writers, one store, no recorded provenance.",
+    "notes": "Multiple writers, one store, and no recorded provenance in the description.",
     "verb": "unattributable"
   },
   {

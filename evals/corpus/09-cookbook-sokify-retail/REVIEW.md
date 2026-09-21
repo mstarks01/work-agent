@@ -305,11 +305,11 @@ on either of them. That is the finding this sitting exists for.
 
 ### repudiation
 
-**9.** A customer denies placing an order and Sokify cannot show who submitted it, because how the API authenticates callers is unverified.
+**9.** A customer denies placing an order and, on what is described, Sokify cannot show who submitted it: how the API authenticates callers is unverified and the input names no order record that binds a customer identity.
 
 - `process:web-api`, `flow:process:mobile-app>process:web-api>api-traffic`
 - severity: medium/medium · verb: `unattributable`
-- The same unknown as the spoofing claim, filed for what it costs after the fact rather than for the access it grants.
+- The same unknown as the spoofing claim, filed for what it costs after the fact rather than for the access it grants. Customer identity binding and retained order records would settle it.
 
 > mark:
 
@@ -457,7 +457,7 @@ your missing list, your notes and a digest of each file you read:
       "source.md": "603873a0d569ba3f0ac4a91a363086b54bae022cf432862d17be9eec9465e4ea",
       "model.json": "d6c0f91a9ae04bdb237850d3aff9a13c7b5c206578658d4ea44e169d8323d14d",
       "claims/asvs.json": "fbc32dc14ac8a90e9bbb2bab6801dc704f2468a03e056d992f41564c9d8de41c",
-      "claims/stride.json": "76fdfa62117b576ed28510a9466455116f8c7862ea407373202359cbd96cac24"
+      "claims/stride.json": "b51bc22b321e6e9eac87c6e50d585892cadfe6b0024940047a3de41df18b0ef1"
       }
     }
   }

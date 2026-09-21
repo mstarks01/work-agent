@@ -109,13 +109,13 @@
       "store:message-queue",
       "flow:process:web-application>store:message-queue>enqueue-job"
     ],
-    "claim": "The origin of a processed job cannot be established, because nothing records which producer enqueued it.",
+    "claim": "The origin of a processed job cannot be established from what is described, because the input states nothing that records which producer enqueued it.",
     "tier": "expected",
     "severity": {
       "likelihood": "medium",
       "impact": "medium"
     },
-    "notes": "Decoupling removes the request context that would otherwise attribute the work.",
+    "notes": "Decoupling removes the request context that would otherwise attribute the work. A producer identifier inside the message would settle it, and the source does not say whether one is carried.",
     "verb": "unattributable"
   },
   {

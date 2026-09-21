@@ -254,11 +254,11 @@ on either of them. That is the finding this sitting exists for.
 
 ### repudiation
 
-**12.** A build that reached the estate cannot be attributed to the developer who started it, because any developer can trigger a manual rebuild on an unreviewed path whose authentication is unverified.
+**12.** A build that reached the estate may not be attributable to the developer who started it, because any developer can trigger a manual rebuild on an unreviewed path and the input does not state how that path identifies them.
 
 - `flow:entity:developer>process:build-runner>manual-rebuild`, `process:build-runner`
 - severity: medium/medium · verb: `unattributable`
-- The source states the path is not reviewed and does not require a merge, so the git history that would otherwise carry attribution is bypassed by construction.
+- The source states the path is not reviewed and does not require a merge, so the git history that would otherwise carry attribution is bypassed by construction. An unreviewed rebuild is not necessarily an unattributable one: a manual-login identity and a retained rebuild record would settle it, and the source states neither.
 
 > mark:
 
@@ -424,7 +424,7 @@ your missing list, your notes and a digest of each file you read:
       "opened_digests": {
       "source.md": "1bfb96ef3374b697ef78e76661daa3d2b227792a3b20d2d1ee1d526cde02652c",
       "model.json": "25e0fe698e23ea38d98c8cd7e80dcef804cea2e27a8e4c09b4c5f65fc1785291",
-      "claims/stride.json": "fb365a853668bdfe53b73b90e1729b9901765ae2bc51550f950b1c46b8f3d509"
+      "claims/stride.json": "ed92fed571bab27711265db2c3865b67aa7b980ee87e0536e830c0819b846e16"
       }
     }
   }

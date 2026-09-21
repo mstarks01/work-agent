@@ -271,11 +271,11 @@ on either of them. That is the finding this sitting exists for.
 
 > mark:
 
-**8.** The origin of a processed job cannot be established, because nothing records which producer enqueued it.
+**8.** The origin of a processed job cannot be established from what is described, because the input states nothing that records which producer enqueued it.
 
 - `store:message-queue`, `flow:process:web-application>store:message-queue>enqueue-job`
 - severity: medium/medium · verb: `unattributable`
-- Decoupling removes the request context that would otherwise attribute the work.
+- Decoupling removes the request context that would otherwise attribute the work. A producer identifier inside the message would settle it, and the source does not say whether one is carried.
 
 > mark:
 
@@ -418,7 +418,7 @@ your missing list, your notes and a digest of each file you read:
       "source.md": "20b0aa82c922766db2353cade33f7a26b38c60a3c7061244ef4686b7a647778b",
       "model.json": "bf3cfe67eb9ecbc49237bb6cf388bf664e1de8b54b444c8c004cdf87de5fdc46",
       "claims/asvs.json": "9e4ee6be326673ba2101ed60662718b0d50ecaf6aba7218bcec702c785b033c5",
-      "claims/stride.json": "c224282bee1392b7f6fc0ad7307cea0e4d48db91ddea45bd17769bae4e378450"
+      "claims/stride.json": "ba9f2cf92f7dc4187fc92fd5621eb78cbd128f4d89ca234eef4a61a0a18885cf"
       }
     }
   }
