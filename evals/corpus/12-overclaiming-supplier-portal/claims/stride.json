@@ -94,13 +94,13 @@
       "flow:entity:category-manager>process:supplier-portal>review-documents",
       "process:supplier-portal"
     ],
-    "claim": "A category manager denies having approved a supplier's paperwork, and the model holds no audit record we control or can produce.",
+    "claim": "A category manager denies having approved a supplier's paperwork, and the input names no decision record that we control and could produce to rebut them.",
     "tier": "must-find",
     "severity": {
       "likelihood": "medium",
       "impact": "medium"
     },
-    "notes": "The datasheet says audited and the model has no audit store, because a marketing adjective is not an element. An analyst that cites an audit log here is citing something that does not exist in the model.",
+    "notes": "The datasheet says audited and the model has no audit store, because a marketing adjective is not an element. An analyst that cites an audit log here is citing something that does not exist in the model, and the adjective does not establish the opposite either. So the claim is what we could produce in a dispute; the decision record's contents and its identity binding are what would settle it.",
     "verb": "unattributable"
   },
   {
@@ -109,13 +109,13 @@
       "entity:portal-vendor",
       "flow:entity:portal-vendor>store:landing-bucket>push-nightly-extract"
     ],
-    "claim": "The vendor disputes what a given nightly extract contained when it left their platform, and nothing on our side records what arrived.",
+    "claim": "The vendor disputes what a given nightly extract contained when it left their platform, and the input states nothing on our side that records what arrived.",
     "tier": "expected",
     "severity": {
       "likelihood": "low",
       "impact": "medium"
     },
-    "notes": "A dispute across an organizational boundary is the repudiation shape that matters here, and it is the boundary we have least visibility across.",
+    "notes": "A dispute across an organizational boundary is the repudiation shape that matters here, and it is the boundary we have least visibility across. Bucket access logs, transfer records or retained file metadata would settle it, and the source names none.",
     "verb": "unattributable"
   },
   {

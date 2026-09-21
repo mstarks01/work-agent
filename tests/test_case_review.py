@@ -73,8 +73,12 @@ UNREVIEWED: dict[str, str] = {
         "one ASVS disposition in claims/asvs.json: V12.3.3's transport question "
         "routes to needs-more-prose, with needs-config kept as an alternate "
         "route, so the record accepts strictly more than it did and no earlier "
-        "answer to it became wrong. A sitting over the current "
-        "four files clears it."
+        "answer to it became wrong. The #1110 reword then changed one expected "
+        "STRIDE claim's sentence in claims/stride.json: the settlement-webhook "
+        "dispute now says what the input lets either side produce rather than "
+        "that no sender identity exists. That is a digest change and the same "
+        "finding at the same place, so nothing the reader ruled on moved. A "
+        "sitting over the current four files clears it."
     ),
     "02-iot-fleet-telemetry": (
         "18 STRIDE claims, waiting on a re-sitting rather than on a first "
@@ -103,15 +107,25 @@ UNREVIEWED: dict[str, str] = {
     "05-cookbook-queue-webapp": (
         "17 STRIDE claims and 7 ASVS records, unread. The ASVS records feed the "
         "applicability matrix, which scores whether a requirement applies and "
-        "never whether the set is complete."
+        "never whether the set is complete. The #1110 reword changed one "
+        "repudiation claim's sentence, which now states what the input lets "
+        "anyone produce in place of what the system lacks."
     ),
     "06-cookbook-online-game": (
         "18 STRIDE claims and 6 ASVS records. Review sitting 01 relabelled a "
         "pair against this case's fabricated-progression claim, which is the "
         "nearest anybody has come to reading it. The ASVS records cover the "
-        "moderation website alone, which is the only part ASVS scopes itself to."
+        "moderation website alone, which is the only part ASVS scopes itself to. "
+        "The #1110 reword changed two repudiation claim sentences, which now "
+        "state what the input lets anyone produce in place of what the system "
+        "lacks."
     ),
-    "07-cicd-store-deploy": "24 STRIDE claims, unread. Declares STRIDE only.",
+    "07-cicd-store-deploy": (
+        "24 STRIDE claims, unread. Declares STRIDE only. The #1110 reword "
+        "changed the manual-rebuild repudiation claim's sentence, which now "
+        "states what the input lets anyone produce in place of what the system "
+        "lacks."
+    ),
     "08-sso-identity-broker": (
         "23 STRIDE claims and 12 ASVS records, unread. The only case scored at "
         "ASVS level 2, and the records were written by an agent in #236 against "
@@ -120,7 +134,9 @@ UNREVIEWED: dict[str, str] = {
     "09-cookbook-sokify-retail": (
         "20 STRIDE claims and 7 ASVS records, unread. The ASVS records feed the "
         "applicability matrix, which scores whether a requirement applies and "
-        "never whether the set is complete."
+        "never whether the set is complete. The #1110 reword changed the "
+        "order-attribution repudiation claim's sentence, which now states what "
+        "the input lets anyone produce in place of what the system lacks."
     ),
     "10-cookbook-generic-cms": (
         "17 STRIDE claims and 8 ASVS records, unread. The ASVS records feed the "
@@ -134,7 +150,11 @@ UNREVIEWED: dict[str, str] = {
     "12-overclaiming-supplier-portal": (
         "15 STRIDE claims and 10 ASVS records, unread. The vendor datasheet in "
         "its source asserts controls the input never states, so a reader has to "
-        "separate the claim from the fact on every record."
+        "separate the claim from the fact on every record. The #1110 reword "
+        "changed two repudiation claim sentences for that reason: an audited "
+        "adjective establishes no audit record, and its absence from the model "
+        "establishes none either, so both claims now state what we could "
+        "produce in a dispute."
     ),
     "13-dispatch-control-plane": (
         "19 STRIDE claims and 6 ASVS records, unread. The ASVS records feed the "
