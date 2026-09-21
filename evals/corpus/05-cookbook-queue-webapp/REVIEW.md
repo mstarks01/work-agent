@@ -191,7 +191,7 @@ The narrower question, per record: **does this requirement apply to this system,
 
 > mark:
 
-## Part 3 — the 13 recorded STRIDE threats
+## Part 3 — the 14 recorded STRIDE threats
 
 Only after your own list exists.
 
@@ -328,6 +328,17 @@ on either of them. That is the finding this sitting exists for.
 
 > mark:
 
+
+### elevation-of-privilege
+
+**14.** A legitimate web user makes the worker act on another user's records, if a queued job carries a caller-chosen target and neither the web application nor the worker preserves and enforces the originating user's authorization.
+
+- `entity:browser`, `process:web-application`, `store:message-queue`, `process:background-worker-process`, `store:database`
+- severity: medium/medium · verb: `escalate`
+- Written by the reader during the Case Sitting of 2026-09-21 and promoted at `expected`, after every elevation claim this case carried was ruled out for filing a component's own existing grant as an escalation. Conditional: the job's operations, its user and target fields, and the worker's own checks are all unstated. Distinct from an unauthorized queue producer — the producer may be legitimate while the action it asks for is not. The verb is `escalate` because the user holds nothing that reaches another user's records.
+
+> mark:
+
 ---
 
 ## What was on your list and not on either of theirs
@@ -375,7 +386,7 @@ your missing list, your notes and a digest of each file you read:
       "source.md": "20b0aa82c922766db2353cade33f7a26b38c60a3c7061244ef4686b7a647778b",
       "model.json": "bf3cfe67eb9ecbc49237bb6cf388bf664e1de8b54b444c8c004cdf87de5fdc46",
       "claims/asvs.json": "9e4ee6be326673ba2101ed60662718b0d50ecaf6aba7218bcec702c785b033c5",
-      "claims/stride.json": "6ace713ac19d8068ad13fdee59320e39c193e2c1af56cc45c5334437ba29e123"
+      "claims/stride.json": "c7358b0fcbdd5178cd88c557c7728fb4ed72dd3d3a003a7751473df53dcde0e0"
       }
     }
   }

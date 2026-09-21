@@ -50,7 +50,7 @@ from evals.harness.identity import (
 from evals.harness.reference import ReferenceThreat, load_corpus
 from evals.harness.verbs import UNSEPARATED, same_action
 
-#: What element agreement alone is worth on the recorded labels, over the 311
+#: What element agreement alone is worth on the recorded labels, over the 261
 #: scored pairs that carry candidate element IDs and a verb.
 #:
 #: **Both halves are assigned now.** Until #511 only the 200 ``match``
@@ -60,16 +60,16 @@ from evals.harness.verbs import UNSEPARATED, same_action
 #: them. Every number here is quoted in #201, so moving one means updating the
 #: issue.
 MEASURED = {
-    "assigned_pairs": 311,
-    "match_pairs": 200,
-    "no_match_pairs": 111,
+    "assigned_pairs": 261,
+    "match_pairs": 169,
+    "no_match_pairs": 92,
     # The rule the record can express today: the two element sets are equal,
     # with zones dropped.
-    "equality_agreements": 200,
+    "equality_agreements": 169,
     # It splits nearly half the pairs a label calls the same, and merges a
     # fifth of the ones it calls different.
-    "false_matches": 22,
-    "false_non_matches": 89,
+    "false_matches": 20,
+    "false_non_matches": 72,
 }
 
 #: What a **direction** across the boundary is worth, which
@@ -90,16 +90,16 @@ MEASURED = {
 #: merge that survives the verb the coarser side cites no flow.
 DIRECTION = {
     # Over the corpus, what a claim yields without a new field.
-    "claims": 254,
-    "one_flow_cited": 165,
-    "several_flows_cited": 3,
-    "no_flow_cited": 86,
+    "claims": 217,
+    "one_flow_cited": 146,
+    "several_flows_cited": 2,
+    "no_flow_cited": 69,
     # Over the 3 reference merges the shipped rule makes.
     "merges_with_a_direction_on_both_sides": 0,
     "merges_that_run_opposite_ways": 0,
-    # Over the 311 scored pairs, an absent direction read each way.
-    "as_a_mismatch_new_splits": 90,
-    "as_a_mismatch_merges_recovered": 2,
+    # Over the 261 scored pairs, an absent direction read each way.
+    "as_a_mismatch_new_splits": 71,
+    "as_a_mismatch_merges_recovered": 1,
     "as_a_wildcard_new_splits": 0,
     "as_a_wildcard_merges_recovered": 0,
 }
@@ -119,19 +119,19 @@ DIRECTION = {
 #: on the candidates a run actually produces, it merges **81 of 111** — it is
 #: barely a rule at all. The verb takes that to 3 while also avoiding one split.
 FRONTIER = {
-    "equality": {"splits": 89, "candidate_merges": 22, "reference_merges": 2},
+    "equality": {"splits": 72, "candidate_merges": 20, "reference_merges": 2},
     #: The rule #201 argues for, and the only row here that is usable.
     #: It is not an element rule, so it is measured by :func:`_rules`'s
     #: verb-aware entry rather than by a shape function.
     "endpoint subset + verb": {
-        "splits": 15,
-        "candidate_merges": 3,
-        "reference_merges": 3,
+        "splits": 13,
+        "candidate_merges": 2,
+        "reference_merges": 2,
     },
-    "endpoint equality": {"splits": 60, "candidate_merges": 36, "reference_merges": 18},
-    "subset": {"splits": 42, "candidate_merges": 64, "reference_merges": 19},
-    "endpoint subset": {"splits": 14, "candidate_merges": 81, "reference_merges": 35},
-    "overlap": {"splits": 4, "candidate_merges": 83, "reference_merges": 50},
+    "endpoint equality": {"splits": 49, "candidate_merges": 33, "reference_merges": 9},
+    "subset": {"splits": 33, "candidate_merges": 54, "reference_merges": 11},
+    "endpoint subset": {"splits": 12, "candidate_merges": 69, "reference_merges": 23},
+    "overlap": {"splits": 3, "candidate_merges": 66, "reference_merges": 26},
     # 99 before the reference corrections of #925. Case 02's calibration pair
     # about disabling the Pub/Sub topic named the gateway-to-normalizer flow,
     # because the broker was not an element to name; it now names
@@ -140,8 +140,8 @@ FRONTIER = {
     # drawn from it.
     "endpoint overlap": {
         "splits": 1,
-        "candidate_merges": 98,
-        "reference_merges": 152,
+        "candidate_merges": 81,
+        "reference_merges": 105,
     },
 }
 
@@ -407,20 +407,20 @@ class TestAClaimThatNamesNoPlaceMatchesNothing:
 #: is what survives the verb. The gap between them is what the verb buys.
 VERB_MEASURED = {
     "cases": 13,
-    "within_lane_pairs": 324,
-    "subset": 35,
-    "subset_verb": 3,
+    "within_lane_pairs": 247,
+    "subset": 23,
+    "subset_verb": 2,
 }
 
 #: What :class:`~evals.harness.identity.SubsetVerbIdentity` scores against the
 #: recorded labels, on the shared bar. The first mechanical rule in this
-#: repository to clear it — ``MechanicalIdentity`` sits at 201/311 — and the
+#: repository to clear it — ``MechanicalIdentity`` sits at 169/261 — and the
 #: number the judge's retirement rests on. It is the admission gate, not the
 #: measurement: :data:`FRONTIER` carries that.
 #:
 #: Read it as ``evals/README.md`` reads every other agreement figure: the labels
 #: are agent-authored, so this measures reproduction and not correctness.
-SUBSET_VERB_AGREEMENT = {"agreements": 293, "total": 311}
+SUBSET_VERB_AGREEMENT = {"agreements": 246, "total": 261}
 
 
 def test_the_verb_separates_what_elements_alone_merge(corpus, flows_by_case):

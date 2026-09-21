@@ -24,19 +24,19 @@ from evals.harness.verbs import ACTION_VERBS, unknown_verbs
 #: verb. Spelled per case rather than as one total so that a case losing claims
 #: and another gaining them cannot cancel out.
 CLAIMS_PER_CASE: dict[str, int] = {
-    "01-payments-checkout": 23,
-    "02-iot-fleet-telemetry": 18,
-    "03-batch-data-pipeline": 17,
-    "04-ml-inference-service": 18,
-    "05-cookbook-queue-webapp": 18,
-    "06-cookbook-online-game": 18,
-    "07-cicd-store-deploy": 25,
-    "08-sso-identity-broker": 24,
-    "09-cookbook-sokify-retail": 20,
-    "10-cookbook-generic-cms": 18,
-    "11-sparse-shift-scheduling": 16,
-    "12-overclaiming-supplier-portal": 18,
-    "13-dispatch-control-plane": 21,
+    "01-payments-checkout": 19,
+    "02-iot-fleet-telemetry": 13,
+    "03-batch-data-pipeline": 15,
+    "04-ml-inference-service": 16,
+    "05-cookbook-queue-webapp": 14,
+    "06-cookbook-online-game": 15,
+    "07-cicd-store-deploy": 21,
+    "08-sso-identity-broker": 21,
+    "09-cookbook-sokify-retail": 18,
+    "10-cookbook-generic-cms": 17,
+    "11-sparse-shift-scheduling": 15,
+    "12-overclaiming-supplier-portal": 14,
+    "13-dispatch-control-plane": 19,
 }
 
 

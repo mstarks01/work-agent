@@ -52,12 +52,105 @@ from evals.review_submission import REPO_ROOT, unreviewed_cases
 #: and ``test_vocabulary_coverage.py``, no reason here says the omission is
 #: acceptable.
 #:
-#: **Empty since 2026-09-21**, when one Case Sitting read all 13 cases and
-#: marked all 344 recorded claims. It stays because a case added tomorrow
-#: arrives unread, and ``test_a_new_case_carries_a_sitting`` is what makes that
-#: a failure rather than a quiet gap: the fix is a sitting, and naming the case
-#: here is the deliberate alternative.
-UNREVIEWED: dict[str, str] = {}
+#: **Empty for one day.** The sitting of 2026-09-21 read all 13 cases and
+#: marked all 344 recorded claims; acting on those marks then changed a claim
+#: file in every case, which breaks each signature. Every entry below is the
+#: same situation and says so: the reader read the very sets they ruled out, so
+#: nothing they judged is hidden, and a second sitting over the current files
+#: clears it.
+UNREVIEWED: dict[str, str] = {
+    "01-payments-checkout": (
+        "Read on 2026-09-21 and un-read by that same sitting's own "
+        "rulings: 5 STRIDE claims dropped; one elevation-of-privilege claim added at `expected`, written by the reader in their own list and promoted after every elevation claim this case carried was ruled out. The reader read the sets they then ruled "
+        "out, so the signature cannot match and nothing they judged "
+        "has been hidden. A second sitting over the current files "
+        "clears it."
+    ),
+    "02-iot-fleet-telemetry": (
+        "Read on 2026-09-21 and un-read by that same sitting's own "
+        "rulings: 5 STRIDE claims dropped. The reader read the sets they then ruled "
+        "out, so the signature cannot match and nothing they judged "
+        "has been hidden. A second sitting over the current files "
+        "clears it."
+    ),
+    "03-batch-data-pipeline": (
+        "Read on 2026-09-21 and un-read by that same sitting's own "
+        "rulings: 2 STRIDE claims dropped. The reader read the sets they then ruled "
+        "out, so the signature cannot match and nothing they judged "
+        "has been hidden. A second sitting over the current files "
+        "clears it."
+    ),
+    "04-ml-inference-service": (
+        "Read on 2026-09-21 and un-read by that same sitting's own "
+        "rulings: 2 STRIDE claims dropped; 1 ASVS record dropped. The reader read the sets they then ruled "
+        "out, so the signature cannot match and nothing they judged "
+        "has been hidden. A second sitting over the current files "
+        "clears it."
+    ),
+    "05-cookbook-queue-webapp": (
+        "Read on 2026-09-21 and un-read by that same sitting's own "
+        "rulings: 5 STRIDE claims dropped; one elevation-of-privilege claim added at `expected`, written by the reader in their own list and promoted after every elevation claim this case carried was ruled out. The reader read the sets they then ruled "
+        "out, so the signature cannot match and nothing they judged "
+        "has been hidden. A second sitting over the current files "
+        "clears it."
+    ),
+    "06-cookbook-online-game": (
+        "Read on 2026-09-21 and un-read by that same sitting's own "
+        "rulings: 3 STRIDE claims dropped. The reader read the sets they then ruled "
+        "out, so the signature cannot match and nothing they judged "
+        "has been hidden. A second sitting over the current files "
+        "clears it."
+    ),
+    "07-cicd-store-deploy": (
+        "Read on 2026-09-21 and un-read by that same sitting's own "
+        "rulings: 4 STRIDE claims dropped. The reader read the sets they then ruled "
+        "out, so the signature cannot match and nothing they judged "
+        "has been hidden. A second sitting over the current files "
+        "clears it."
+    ),
+    "08-sso-identity-broker": (
+        "Read on 2026-09-21 and un-read by that same sitting's own "
+        "rulings: 3 STRIDE claims dropped. The reader read the sets they then ruled "
+        "out, so the signature cannot match and nothing they judged "
+        "has been hidden. A second sitting over the current files "
+        "clears it."
+    ),
+    "09-cookbook-sokify-retail": (
+        "Read on 2026-09-21 and un-read by that same sitting's own "
+        "rulings: 2 STRIDE claims dropped. The reader read the sets they then ruled "
+        "out, so the signature cannot match and nothing they judged "
+        "has been hidden. A second sitting over the current files "
+        "clears it."
+    ),
+    "10-cookbook-generic-cms": (
+        "Read on 2026-09-21 and un-read by that same sitting's own "
+        "rulings: 1 STRIDE claim dropped; 1 ASVS record dropped. The reader read the sets they then ruled "
+        "out, so the signature cannot match and nothing they judged "
+        "has been hidden. A second sitting over the current files "
+        "clears it."
+    ),
+    "11-sparse-shift-scheduling": (
+        "Read on 2026-09-21 and un-read by that same sitting's own "
+        "rulings: 1 STRIDE claim dropped. The reader read the sets they then ruled "
+        "out, so the signature cannot match and nothing they judged "
+        "has been hidden. A second sitting over the current files "
+        "clears it."
+    ),
+    "12-overclaiming-supplier-portal": (
+        "Read on 2026-09-21 and un-read by that same sitting's own "
+        "rulings: 4 STRIDE claims dropped. The reader read the sets they then ruled "
+        "out, so the signature cannot match and nothing they judged "
+        "has been hidden. A second sitting over the current files "
+        "clears it."
+    ),
+    "13-dispatch-control-plane": (
+        "Read on 2026-09-21 and un-read by that same sitting's own "
+        "rulings: 2 STRIDE claims dropped. The reader read the sets they then ruled "
+        "out, so the signature cannot match and nothing they judged "
+        "has been hidden. A second sitting over the current files "
+        "clears it."
+    ),
+}
 
 
 @pytest.fixture(scope="module")

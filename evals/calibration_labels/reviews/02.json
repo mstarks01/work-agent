@@ -406,5 +406,57 @@
       "e1f5bb04d9ab"
     ],
     "text_change_note": "The rulings of 2026-09-18 asked eight STRIDE reference claims to state the prerequisite an attack needs. Each fixture below keeps the identity the reader's manifest pins, and its reference claim now reads differently from the text recorded above. See https://github.com/mstarks01/work-agent/issues/1064. The ruling of 2026-09-21 then reworded eight STRIDE repudiation reference claims to state what cannot be produced rather than what does not exist; three of them carry a fixture this record pins. Each keeps the identity the reader's manifest pins, and the reading it was labelled against is unchanged: same lane, same verb, same element IDs. See https://github.com/mstarks01/work-agent/issues/1110."
+  },
+  "superseded_by_corpus_change": {
+    "date": "2026-09-21",
+    "issue": 226,
+    "reason": "The Case Sitting of 2026-09-21 ruled 41 reference claims out of the corpus. A fixture is labelled against a reference claim by its place, so a deleted claim deletes its fixtures: the set went from 339 to 288. This block records what that took from this review rather than letting the record quietly stop resolving.",
+    "pairs_before": 339,
+    "pairs_after": 288,
+    "fixtures_read_before": 104,
+    "fixtures_read_gone": [
+      "004824b436e3",
+      "008601e41b48",
+      "19c2e3e67c3a",
+      "26c6d7a59d9c",
+      "3a94126537e8",
+      "3c5b09a572a9",
+      "487ddf9a2538",
+      "6a74890acd13",
+      "720eeec487fd",
+      "7d5d94522e57",
+      "ae729b5676d6",
+      "c571df6de687",
+      "ca33eed1488f",
+      "d010e9ae3815",
+      "d59f62a2d745",
+      "d7a953fdc325",
+      "ef528cd6f142",
+      "f566e319e97e"
+    ],
+    "boundary_gone": [
+      "004824b436e3",
+      "19c2e3e67c3a",
+      "3a94126537e8",
+      "ae729b5676d6",
+      "c571df6de687",
+      "ca33eed1488f",
+      "d010e9ae3815",
+      "d7a953fdc325",
+      "ef528cd6f142"
+    ],
+    "random_gone": [
+      "008601e41b48",
+      "26c6d7a59d9c",
+      "3c5b09a572a9",
+      "487ddf9a2538",
+      "6a74890acd13",
+      "720eeec487fd",
+      "7d5d94522e57",
+      "d59f62a2d745",
+      "f566e319e97e"
+    ],
+    "sample_is_no_longer_reproducible": "The random sample was drawn from a population of 295 fixtures that no longer exists, so `random.Random(seed).sample` cannot be re-run against this tree. The recorded id lists and their manifest digests still verify against each other, and the surviving ids still resolve; what is gone is the draw.",
+    "place_derived_ids_did_not_survive": "A fixture_id derives from its case, its reference index and its candidate ordinal. Deleting a claim renumbers every reference above it, so a surviving id can now name a different pair. All 13 cases lost at least one claim, so no id in this record is guaranteed to mean what it meant. The manifests above are kept as the record of what was read; they are no longer a handle on today's fixtures, and text_digest_at_reidentification can answer nothing after a renumbering. A place-derived identity survives a reword and does not survive a deletion — which is the same lesson the corpus already carries about a name being authoritative and an ID following."
   }
 }

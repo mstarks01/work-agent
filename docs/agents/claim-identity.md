@@ -53,25 +53,25 @@ one version to another, and ADR 0037 is the decision.
 
 Elements alone cannot separate a read from a write against one store. The
 frontier in `tests/test_evals_identity.py` prices every rule on all three ways
-of being wrong — false splits over the 200 labelled match pairs, false merges
-over the 111 scored candidate negatives, and 3 false merges over the 291
+of being wrong — false splits over the 169 labelled match pairs, false merges
+over the 92 scored candidate negatives, and 2 false merges over the 247
 within-lane reference pairs:
 
-| Rule | False splits (of 200) | Candidate merges (of 111) | Reference merges (of 324) |
+| Rule | False splits (of 169) | Candidate merges (of 92) | Reference merges (of 247) |
 |---|---|---|---|
-| equality | 88 | 22 | 2 |
-| endpoint subset | 14 | 81 | 24 |
-| **endpoint subset + verb** | **15** | **3** | **3** |
-| overlap | 4 | 83 | 35 |
-| endpoint overlap | 1 | 98 | 129 |
+| equality | 72 | 20 | 2 |
+| endpoint subset | 12 | 69 | 23 |
+| **endpoint subset + verb** | **13** | **2** | **2** |
+| overlap | 3 | 66 | 26 |
+| endpoint overlap | 1 | 81 | 105 |
 
-No element-only row is usable: the tightest loses 89 paraphrases and the loosest
-destroys 129 findings. **The verb row is the first one that is.**
+No element-only row is usable: the tightest loses 72 paraphrases and the loosest
+destroys 105 findings. **The verb row is the first one that is.**
 
 **Read the candidate column, not the reference one.** On reference pairs alone
-`endpoint subset` merges 35 of 324 and looks survivable. On the candidate
-paraphrases a live run actually emits it merges **81 of 111** — it is barely a
-rule. The verb takes that to 3 without adding a split. That column did not exist
+`endpoint subset` merges 23 of 247 and looks survivable. On the candidate
+paraphrases a live run actually emits it merges **69 of 92** — it is barely a
+rule. The verb takes that to 2 while dropping a split. That column did not exist
 until [#511](https://github.com/mstarks01/work-agent/issues/511) assigned the
 negative half its elements and verbs; before it, every candidate merge count
 was structurally zero and the argument for the verb rested on the weaker
@@ -82,16 +82,16 @@ number.
 The columns come from **three different populations**, so none is a rate over
 what a live run emits and they do not combine into one figure.
 
-- **False splits** are candidate-vs-reference: 200 paraphrase pairs an agent
+- **False splits** are candidate-vs-reference: 169 paraphrase pairs an agent
   labelled equivalent.
-- **Candidate merges** are candidate-vs-reference too: 111 hard negatives,
+- **Candidate merges** are candidate-vs-reference too: 92 hard negatives,
   weighted toward the same element and lane with a *different attacker action*.
   This is the population a live run resembles most closely.
 - **Reference merges** are reference-vs-reference: every within-lane pair of
   distinct claims the corpus already records as two findings. It needs no label
   to interpret, because every merge is an error by construction.
 
-**Twenty-eight fixtures are not on this axis at all.** Twenty-five assert facts
+**Twenty-seven fixtures are not on this axis at all.** Twenty-four assert facts
 the **System Model** does not hold, two cannot be decided cleanly from the claim
 pair alone, and one is not a valid STRIDE threat claim. They carry
 `unsupported`, `unclear`, and `invalid-claim` dispositions respectively, sit
@@ -104,8 +104,8 @@ Scored on the shared scoreboard, through `measure_agreement`:
 
 | Rule | Agreement with the recorded labels |
 |---|---|
-| `MechanicalIdentity` (element equality) | 200/311 = 64.3% |
-| `SubsetVerbIdentity` | **293/311 = 94.2%** |
+| `MechanicalIdentity` (element equality) | 169/261 = 64.8% |
+| `SubsetVerbIdentity` | **246/261 = 94.3%** |
 
 **This is an admission gate, not a quality statement.** It clears the 90% bar,
 and the bar exists to price a *candidate* rule — one nobody has measured, which
@@ -121,10 +121,11 @@ the rule not be obviously worse than the judge before the judge could go, and
 this is the measurement that answered it. It is not a claim about accuracy, and
 nothing downstream should quote it as one.
 
-**The three merges the verb does not break** are in `verbs.UNSEPARATED`, each
-with the reason. None is a gap in the vocabulary: one is a correct merge of two
-spellings of one pivot, one is a repudiation lane where no attacker acts so no
-verb applies, and one is a corpus wording gap. Review 02 moved the disputed
+**The two merges the verb does not break** are in `verbs.UNSEPARATED`, each
+with the reason. Neither is a gap in the vocabulary: one is a repudiation lane
+where no attacker acts so no verb applies, and one is a corpus wording gap. A
+third, two spellings of one DMZ-to-core pivot in case 01, left the table when
+the Case Sitting of 2026-09-21 ruled both claims one finding written twice. Review 02 moved the disputed
 case-13 "writes"/"alters" pair to `unclear` rather than forcing it to move
 either the rule or the score.
 
@@ -138,25 +139,26 @@ answered it: a direction is not available, and it would not pay if it were.
 **A direction is not a field.** `affected_element_ids` is a list whose order no
 rule reads, so a claim naming two processes says nothing about which way the
 attacker moves between them. Only a claim naming a **Data Flow** states a
-direction, through that flow's endpoints. 165 of the 254 corpus claims name
-exactly one flow; 3 name several and 86 name none, and neither of those yields
+direction, through that flow's endpoints. 146 of the 217 corpus claims name
+exactly one flow; 2 name several and 69 name none, and neither of those yields
 the single direction a comparison needs.
 
-**The merge that raised the question runs one way, not two.** Case 01's two
-`escalate` claims both name the DMZ-to-core pivot. One cites the flow into the
-order service and the process it ends at, the other cites the two processes.
-The corpus already treats them as adjacent, so the merge is correct.
+**The merge that raised the question is gone, and the answer is not.** Case
+01's two `escalate` claims both named the DMZ-to-core pivot, and the Case
+Sitting of 2026-09-21 ruled them one finding written twice, so both left the
+corpus. The surviving merges are priced the same way below, and the reading
+below is what decided #652 rather than that one pair.
 
 **Neither reading of an absent direction is usable.** Both are priced over the
 labelled pairs the shipped rule merges today:
 
-| An absent direction read as | New false splits, of the 185 merged correctly | Candidate merges recovered, of 3 |
+| An absent direction read as | New false splits, of the 156 merged correctly | Candidate merges recovered, of 2 |
 |---|---:|---:|
-| a mismatch | 90 | 2 |
+| a mismatch | 71 | 1 |
 | a wildcard | 0 | 0 |
 
 Read as a mismatch, a direction destroys half of what the rule gets right. Read
-as a wildcard it changes nothing, because in all three surviving merges the
+as a wildcard it changes nothing, because in both surviving merges the
 coarser side cites no flow. `tests/test_evals_identity.py` asserts both numbers
 and the flow-citation counts, so a blessing pass that re-cites claims against
 flows reopens the question by failing.
@@ -341,7 +343,7 @@ no reviewer sees it go. So every package carries a collision rule, and
 
 | Package | Comparable reference pairs | Collisions |
 |---|---|---|
-| `stride` | 291 | 3 |
+| `stride` | 247 | 2 |
 | `asvs` | 21 | 0 |
 
 ASVS's denominator is small because the chapter separates almost everything
@@ -367,8 +369,8 @@ The rule is the only matcher a scored sweep has. A `match` is a recall hit; a
 `no-match` leaves the finding unmatched, and its fingerprint is looked up in
 the vote ledger — `rejected`, `pooled`, `open`, `unvoted` or `stale`, the last
 being a vote cast on an argument this run has moved past. Nothing asks a
-model. The rule's known error costs are the record above: 15 of 200 labelled
-matches split, 3 of 111 candidate negatives merged, 3 of 324 reference pairs
+model. The rule's known error costs are the record above: 13 of 169 labelled
+matches split, 2 of 92 candidate negatives merged, 2 of 247 reference pairs
 merged. A split surfaces as an unvoted finding in the queue rather than
 vanishing. A merge does not surface at all, which is why the candidate merge
 column is the one to watch.
