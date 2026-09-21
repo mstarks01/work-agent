@@ -208,36 +208,6 @@
   {
     "category": "elevation-of-privilege",
     "affected_element_ids": [
-      "store:airflow-metadata-database",
-      "process:ingest-scheduler"
-    ],
-    "claim": "An attacker with a foothold in the landing network reads the metadata database and escalates to every credential the pipeline holds.",
-    "tier": "must-find",
-    "severity": {
-      "likelihood": "medium",
-      "impact": "high"
-    },
-    "notes": "Escalation framing of the credential concentration: one foothold to all downstream systems.",
-    "verb": "escalate"
-  },
-  {
-    "category": "elevation-of-privilege",
-    "affected_element_ids": [
-      "process:spark-transform-job",
-      "flow:process:ingest-scheduler>process:spark-transform-job>trigger-transform"
-    ],
-    "claim": "An attacker who can plant a file in the landing bucket gains execution in the warehouse network through the job it triggers.",
-    "tier": "must-find",
-    "severity": {
-      "likelihood": "medium",
-      "impact": "high"
-    },
-    "notes": "Data crossing into a compute zone that acts on it is the boundary crossing that matters here.",
-    "verb": "escalate"
-  },
-  {
-    "category": "elevation-of-privilege",
-    "affected_element_ids": [
       "entity:data-analyst",
       "store:claims-warehouse"
     ],

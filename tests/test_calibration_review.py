@@ -5,7 +5,6 @@ from __future__ import annotations
 import hashlib
 import json
 import math
-import random
 from pathlib import Path
 
 from evals.harness.calibration import load_pairs
@@ -34,34 +33,65 @@ def _hypergeometric_probability(
     )
 
 
-def test_review_02_manifests_resolve_and_random_sample_reproduces():
-    review = json.loads(REVIEW_PATH.read_text())
-    pairs = load_pairs()
-    ids = [pair.fixture_id for pair in pairs]
-    by_id = dict(zip(ids, pairs, strict=True))
+def test_review_02_manifests_still_verify_against_themselves():
+    """What a superseded reading still owes: its own arithmetic.
 
-    assert len(ids) == len(set(ids)) == review["fixture_snapshot"]["pairs"]
+    The draw itself is gone. The Case Sitting of 2026-09-21 deleted 41 reference
+    claims, and a fixture is labelled against a claim by its place, so 51
+    fixtures went with them — 18 of them fixtures a person had read. The sample
+    was drawn from a population of 295 that no longer exists, so
+    ``random.Random(seed).sample`` cannot be re-run here and this test no longer
+    pretends it can.
+
+    What survives is checkable and is checked: the seed still hashes to its
+    recorded digest, each manifest still digests to the value beside it, the two
+    manifests are still disjoint, and every id the record says survives does.
+    ``superseded_by_corpus_change`` carries the loss, and
+    :func:`test_the_superseded_block_matches_the_tree` holds it to the corpus.
+    """
+    review = json.loads(REVIEW_PATH.read_text())
+    by_id = {pair.fixture_id: pair for pair in load_pairs()}
 
     boundary = review["boundary_review"]
     sample = review["random_review"]
+    gone = set(review["superseded_by_corpus_change"]["boundary_gone"]) | set(
+        review["superseded_by_corpus_change"]["random_gone"]
+    )
+
     assert hashlib.sha256(sample["seed"].encode()).hexdigest() == sample["seed_sha256"]
     assert len(boundary["fixture_ids"]) == boundary["pairs"] == 44
     assert _manifest_digest(boundary["fixture_ids"]) == boundary["manifest_sha256"]
-    assert set(boundary["fixture_ids"]) <= by_id.keys()
-    assert set(sample["fixture_ids"]) <= by_id.keys()
+    assert _manifest_digest(sample["fixture_ids"]) == sample["manifest_sha256"]
     assert set(boundary["fixture_ids"]).isdisjoint(sample["fixture_ids"])
+    assert sample["population_pairs"] == 295
 
-    population = [
+    survived = set(boundary["fixture_ids"] + sample["fixture_ids"]) - gone
+    assert survived <= by_id.keys()
+
+
+def test_the_superseded_block_matches_the_tree():
+    """The recorded loss is derived from the corpus, not asserted over it."""
+    review = json.loads(REVIEW_PATH.read_text())
+    block = review["superseded_by_corpus_change"]
+    now = {pair.fixture_id for pair in load_pairs()}
+    reidentification = review["reidentification"]
+
+    assert block["pairs_after"] == len(now)
+    assert block["fixtures_read_gone"] == sorted(
         fixture_id
-        for fixture_id in ids
-        if fixture_id not in set(boundary["fixture_ids"])
-    ]
-    reproduced = random.Random(sample["seed"]).sample(
-        population, sample["sample_pairs"]
+        for fixture_id in reidentification["text_digest_at_reidentification"]
+        if fixture_id not in now
     )
-    assert len(population) == sample["population_pairs"] == 295
-    assert reproduced == sample["fixture_ids"]
-    assert _manifest_digest(reproduced) == sample["manifest_sha256"]
+    assert block["boundary_gone"] == sorted(
+        fixture_id
+        for fixture_id in review["boundary_review"]["fixture_ids"]
+        if fixture_id not in now
+    )
+    assert block["random_gone"] == sorted(
+        fixture_id
+        for fixture_id in review["random_review"]["fixture_ids"]
+        if fixture_id not in now
+    )
 
 
 def test_review_02_reidentification_maps_every_pinned_fixture():
@@ -80,38 +110,39 @@ def test_review_02_reidentification_maps_every_pinned_fixture():
     }
 
 
-def test_a_reworded_reference_claim_is_declared_rather_than_silent():
-    """A reviewed fixture keeps its identity when its words change, and says so.
+def test_the_record_says_its_place_derived_ids_stopped_resolving():
+    """A place-derived id survives a reword and does not survive a deletion.
 
-    The identity reads the fixture's place, so rewording a claim no longer
-    detaches the fixture from the record of the reading. What it must never do
-    is pass unremarked: the review file carries the text digest each reviewed
-    fixture held at the re-identification, and every fixture whose text has
-    moved since is named in ``text_changed_since_reidentification``.
+    A ``fixture_id`` is derived from its case, its reference index and its
+    candidate ordinal. Rewording a claim leaves all three where they are;
+    deleting one renumbers every reference above it, so a surviving id can name
+    a different pair. Every case in this corpus has had a claim deleted, so no
+    id in this record is a handle on today's fixtures and no digest comparison
+    over them means anything.
+
+    The record owes one thing in that state: to say so. That is what this
+    asserts. The manifests stay as the record of what a person read.
     """
     review = json.loads(REVIEW_PATH.read_text())
-    reidentification = review["reidentification"]
-    by_id = {pair.fixture_id: pair for pair in load_pairs()}
+    block = review["superseded_by_corpus_change"]
 
-    recorded = reidentification["text_digest_at_reidentification"]
-    moved = {
-        fixture_id
-        for fixture_id, digest in recorded.items()
-        if _text_digest(by_id[fixture_id]) != digest
-    }
-    assert moved == set(reidentification["text_changed_since_reidentification"])
+    assert block["place_derived_ids_did_not_survive"]
+    assert review["reidentification"]["text_digest_at_reidentification"]
 
 
 def test_review_02_changed_random_labels_are_applied():
     review = json.loads(REVIEW_PATH.read_text())
-    pairs = {pair.fixture_id: pair for pair in load_pairs()}
     outcome = review["random_review"]["outcome"]
 
     assert outcome["agreements_with_original_primary_label"] == 58
     assert outcome["disagreements_with_original_primary_label"] == 2
-    assert {
-        pairs[fixture_id].label for fixture_id in outcome["changed_fixture_ids"]
-    } == {outcome["changed_to"]}
+    # The ids no longer resolve to the pairs they were recorded against — see
+    # test_the_record_says_its_place_derived_ids_stopped_resolving — so what is
+    # checkable is the record's own arithmetic, not the label behind each id.
+    assert (
+        len(outcome["changed_fixture_ids"])
+        == outcome["disagreements_with_original_primary_label"]
+    )
 
 
 def test_review_02_exact_interval_is_reproducible():

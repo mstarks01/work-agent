@@ -204,7 +204,7 @@ The narrower question, per record: **does this requirement apply to this system,
 
 > mark:
 
-## Part 3 — the 16 recorded STRIDE threats
+## Part 3 — the 15 recorded STRIDE threats
 
 Only after your own list exists.
 
@@ -357,14 +357,6 @@ on either of them. That is the finding this sitting exists for.
 
 > mark:
 
-**16.** An attacker on the internal network calls the scheduling service directly and performs rota writes the web app would not have allowed.
-
-- `process:scheduling-service`, `flow:process:scheduling-web-app>process:scheduling-service>rota-requests`
-- severity: low/high · verb: `escalate`
-- The service is where writes actually happen, which the source says outright; whether it re-checks anything the app checked is undocumented.
-
-> mark:
-
 ---
 
 ## What was on your list and not on either of theirs
@@ -412,7 +404,7 @@ your missing list, your notes and a digest of each file you read:
       "source.md": "2507fd3081003c1c94427ef81dcea36f6ca92f5358c965789b49ec4af89b6a60",
       "model.json": "252800813f3b60ff0937689d594ee0d29879b84595259d16ef4cd8f64e1e72f1",
       "claims/asvs.json": "320bf0d16aba7d873f9b2e77a5db19f7cab07403b5dc19c85adc70a718a67783",
-      "claims/stride.json": "68c933a86331d8f0e25efa504ba54b19ba65dfd6d8fe5cc7e972548ea06d09a8"
+      "claims/stride.json": "1fd7421ed1e0b5f5bd81a6a59ab491c20c710919901e7162a7dd74c66d4d200d"
       }
     }
   }

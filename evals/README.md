@@ -63,7 +63,7 @@ row (`BLESSING.md` step 7).
 
 So every agreement figure the suite produces is **self-consistency, not
 accuracy**: it measures how closely a rule reproduces the recorded
-dispositions. That includes the 90% bar. A rule at 94.2% agrees with those
+dispositions. That includes the 90% bar. A rule at 94.3% agrees with those
 dispositions 94.5% of the time; the calibration review records are the only
 evidence that those label opinions have been checked.
 
@@ -89,11 +89,11 @@ destroys a finding and inflates recall, and nobody sees it happen. The three
 denominators are different populations and none is a rate over what a live run
 emits.
 
-Equivalently by population: 14 false splits over 200 equivalent candidate pairs,
-3 false merges over 111 candidate negatives, and 3 false merges over 324
+Equivalently by population: 14 false splits over 169 equivalent candidate pairs,
+2 false merges over 92 candidate negatives, and 2 false merges over 247
 distinct reference pairs.
 
-The 339 calibration fixtures retain their original order and reference claims.
+The 288 calibration fixtures retain their original order and reference claims.
 The candidate merge column arrived with
 [#511](https://github.com/mstarks01/work-agent/issues/511), which assigned the
 negative half the elements and verbs the rule reads. Before it every candidate
@@ -231,7 +231,7 @@ somewhere else.
 | `harness/calibration.py` | Rule-vs-label agreement over the labelled fixtures — the scoreboard any rule change must clear. |
 | `harness/verbs.py` | The closed vocabulary of attacker actions, and what counts as one action. |
 | `harness/exemplar_verbs.py` | Which actions a package's shipped exemplars demonstrate against which its reference sets grade, and the exemplar pairs that name one place and two actions. Reads text and blessed models only, so it costs no provider call. |
-| `harness/identity.py` | Claim identity from the fields a claim carries. `SubsetVerbIdentity` has 15 false splits of 200, 3 false merges of 111 and 3 false merges of 324, with no model call. |
+| `harness/identity.py` | Claim identity from the fields a claim carries. `SubsetVerbIdentity` has 13 false splits of 169, 2 false merges of 92 and 2 false merges of 247, with no model call. |
 | `harness/fingerprint.py` | A **Claim**'s identity as a versioned value code computes. No model call. |
 | `harness/flow_ids.py` | A **Data Flow**'s identity moved to a newer version: the old-to-new mapping each case's graph implies, every dependent reference rewritten under it, and each vote carried only where the change is one-to-one. Refuses a mapping it cannot decide rather than half-renaming a case. `run.py migrate-flow-ids`. |
 | `harness/ledger.py` | The append-only record of what a **person** decided about a finding. One file per voter, named by the GitHub login. |

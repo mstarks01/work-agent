@@ -327,7 +327,7 @@ statement about the shipped one. They are not ground truth: review records say
 which subsets people have read, and the bar says only how closely the identity
 rule reproduces the recorded dispositions.
 
-The current set has 339 fixtures; changing that count moves every quoted
+The current set has 288 fixtures; changing that count moves every quoted
 denominator and must update the pinned figures with it.
 
 - **Label within a category only** — the prefilter means cross-category pairs

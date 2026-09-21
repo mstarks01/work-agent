@@ -46,21 +46,6 @@
   {
     "category": "tampering",
     "affected_element_ids": [
-      "store:message-queue",
-      "process:background-worker-process"
-    ],
-    "claim": "An attacker places a poisoned message on the queue and the worker processes it as legitimate work.",
-    "tier": "must-find",
-    "severity": {
-      "likelihood": "medium",
-      "impact": "high"
-    },
-    "notes": "The canonical queue-decoupling threat: the worker's input is only as trustworthy as write access to the queue.",
-    "verb": "plant"
-  },
-  {
-    "category": "tampering",
-    "affected_element_ids": [
       "store:web-application-config",
       "process:web-application"
     ],
@@ -87,21 +72,6 @@
     },
     "notes": "Records and their own audit log share one store — tampering with one covers the other.",
     "verb": "alter"
-  },
-  {
-    "category": "repudiation",
-    "affected_element_ids": [
-      "store:database",
-      "process:background-worker-process"
-    ],
-    "claim": "An attacker who compromises the worker erases or edits the log records that would show what it did, because the logs live in the same database the worker writes.",
-    "tier": "must-find",
-    "severity": {
-      "likelihood": "medium",
-      "impact": "high"
-    },
-    "notes": "The strongest finding available from the diagram: no separation between the audit record and the audited actor.",
-    "verb": "delete"
   },
   {
     "category": "repudiation",
@@ -206,51 +176,6 @@
     "verb": "flood"
   },
   {
-    "category": "denial-of-service",
-    "affected_element_ids": [
-      "store:database",
-      "process:background-worker-process"
-    ],
-    "claim": "An attacker submits work that makes the worker exhaust database capacity, stalling both job processing and logging.",
-    "tier": "expected",
-    "severity": {
-      "likelihood": "low",
-      "impact": "medium"
-    },
-    "notes": "Shared store means one saturation affects the audit trail too.",
-    "verb": "flood"
-  },
-  {
-    "category": "elevation-of-privilege",
-    "affected_element_ids": [
-      "process:web-application",
-      "store:message-queue"
-    ],
-    "claim": "An attacker who compromises the internet-facing web application uses its queue credentials to reach the backend tier.",
-    "tier": "must-find",
-    "severity": {
-      "likelihood": "medium",
-      "impact": "high"
-    },
-    "notes": "The queue is the only path across the tier boundary, so it is the escalation route by construction.",
-    "verb": "escalate"
-  },
-  {
-    "category": "elevation-of-privilege",
-    "affected_element_ids": [
-      "process:background-worker-process",
-      "store:database"
-    ],
-    "claim": "An attacker who gets code execution in the worker inherits whatever database privilege its credentials carry, which is unverified and may be unrestricted.",
-    "tier": "must-find",
-    "severity": {
-      "likelihood": "medium",
-      "impact": "high"
-    },
-    "notes": "Job content is attacker-influenceable via the queue, so worker execution is a realistic starting point.",
-    "verb": "abuse-grant"
-  },
-  {
     "category": "repudiation",
     "affected_element_ids": [
       "process:background-worker-process",
@@ -265,5 +190,23 @@
     },
     "notes": "Drafted from Baseline 6bff717-gpt-5.6-terra-24dda4db draft R-01, ruled a relevant threat scenario by the maintainer on 2026-09-20 (audit QA-2026-09-20-01). Conditional. The worker writes to the database that holds the application's log records; where its permissions include modifying existing rows, rewriting evidence enables repudiation just as deletion does. It is a distinct mechanism from reference 6, which it does not satisfy.",
     "verb": "alter"
+  },
+  {
+    "category": "elevation-of-privilege",
+    "affected_element_ids": [
+      "entity:browser",
+      "process:web-application",
+      "store:message-queue",
+      "process:background-worker-process",
+      "store:database"
+    ],
+    "claim": "A legitimate web user makes the worker act on another user's records, if a queued job carries a caller-chosen target and neither the web application nor the worker preserves and enforces the originating user's authorization.",
+    "tier": "expected",
+    "severity": {
+      "likelihood": "medium",
+      "impact": "medium"
+    },
+    "notes": "Written by the reader during the Case Sitting of 2026-09-21 and promoted at `expected`, after every elevation claim this case carried was ruled out for filing a component's own existing grant as an escalation. Conditional: the job's operations, its user and target fields, and the worker's own checks are all unstated. Distinct from an unauthorized queue producer — the producer may be legitimate while the action it asks for is not. The verb is `escalate` because the user holds nothing that reaches another user's records.",
+    "verb": "escalate"
   }
 ]

@@ -17,21 +17,6 @@
   {
     "category": "spoofing",
     "affected_element_ids": [
-      "flow:entity:franchise-identity-provider>process:identity-broker>vouch-for-colleague",
-      "entity:franchise-identity-provider"
-    ],
-    "claim": "The franchise identity provider vouches for someone who is not a franchise colleague and the broker signs them in as that person, since nothing records which colleagues it may vouch for.",
-    "tier": "must-find",
-    "severity": {
-      "likelihood": "medium",
-      "impact": "high"
-    },
-    "notes": "A stated gap rather than an unknown: the source says outright that the restriction has not been written down, which is what makes this grounded rather than speculative.",
-    "verb": "impersonate"
-  },
-  {
-    "category": "spoofing",
-    "affected_element_ids": [
       "flow:entity:colleague>process:identity-broker>sign-in",
       "entity:colleague"
     ],
@@ -146,21 +131,6 @@
       "impact": "medium"
     },
     "notes": "The source raises the franchise coverage question itself, which is the clearest signal in the text that this is the attribution gap worth reporting.",
-    "verb": "unattributable"
-  },
-  {
-    "category": "repudiation",
-    "affected_element_ids": [
-      "process:store-admin-console",
-      "flow:entity:colleague>process:store-admin-console>change-prices-and-void"
-    ],
-    "claim": "A price change or a void cannot be tied to the store it belongs to, because the console never establishes which store the token holder is from.",
-    "tier": "must-find",
-    "severity": {
-      "likelihood": "high",
-      "impact": "medium"
-    },
-    "notes": "High likelihood because it is the described steady state rather than an attack condition, and it is the accountability face of the case's central authorization gap.",
     "verb": "unattributable"
   },
   {
@@ -320,21 +290,6 @@
     },
     "notes": "Three stated facts compound into one window — nightly removal, twelve-hour tokens, no revocation — and no single sentence of the source contains it, which is what makes it the hardest claim in this case to reach.",
     "verb": "abuse-grant"
-  },
-  {
-    "category": "elevation-of-privilege",
-    "affected_element_ids": [
-      "entity:franchise-identity-provider",
-      "process:store-admin-console"
-    ],
-    "claim": "An attacker who controls the franchise provider reaches internal applications on the corporate network, because a sign-in it vouches for is treated like any other.",
-    "tier": "expected",
-    "severity": {
-      "likelihood": "low",
-      "impact": "high"
-    },
-    "notes": "The one crossing in this model where trust is granted to a party rather than to a network position, which is the shape this case exists to grade.",
-    "verb": "escalate"
   },
   {
     "category": "spoofing",

@@ -77,18 +77,5 @@
     "tier": "expected",
     "disposition": "needs-config",
     "notes": "The submitter says the mechanism and its strength are not stated."
-  },
-  {
-    "chapter": "authorization",
-    "requirement": "V8.2.1",
-    "affected_element_ids": [
-      "entity:admin",
-      "entity:reader",
-      "process:web-server"
-    ],
-    "claim": "Nothing states what separates reader access from administrator access.",
-    "tier": "expected",
-    "disposition": "needs-code",
-    "notes": "Two human entities reach the same web server and no rule is named."
   }
 ]

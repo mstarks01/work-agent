@@ -133,7 +133,7 @@ category.
 
 ---
 
-## Part 2 — the 10 recorded ASVS records
+## Part 2 — the 9 recorded ASVS records
 
 The narrower question, per record: **does this requirement apply to this system, and does the input show it satisfied?** An ASVS claim rules applicability and never a pass.
 
@@ -215,26 +215,16 @@ The narrower question, per record: **does this requirement apply to this system,
 > mark:
 
 
-### security-logging-and-error-handling
-
-**A9.** `V16.2.5` — Nothing states what of an inference request is written to the confidential request log.
-
-- `process:inference-gateway`, `store:inference-log`, `flow:process:inference-gateway>store:inference-log>write-request-log`
-- The log is confidential and its content is never described. What reaches the log comes from the call site or from the logging configuration, so either route settles it.
-
-> mark:
-
-
 ### configuration
 
-**A10.** `V13.3.2` — Nothing states what limits the model server's registry service account.
+**A9.** `V13.3.2` — Nothing states what limits the model server's registry service account.
 
 - `process:model-server`, `store:model-registry-bucket`
 - A service account is named and its scope is not.
 
 > mark:
 
-## Part 3 — the 18 recorded STRIDE threats
+## Part 3 — the 16 recorded STRIDE threats
 
 Only after your own list exists.
 
@@ -387,23 +377,7 @@ on either of them. That is the finding this sitting exists for.
 
 ### elevation-of-privilege
 
-**16.** An attacker who can write to the registry turns an unverified artifact load into code execution on the GPU nodes.
-
-- `store:model-registry-bucket`, `process:model-server`
-- severity: medium/high · verb: `escalate`
-- Model artifacts are loaded as code; the escalation framing of the swap finding.
-
-> mark:
-
-**17.** An attacker who compromises the internet-facing gateway inherits unauthenticated access to everything in the model network.
-
-- `process:inference-gateway`, `process:model-server`
-- severity: medium/high · verb: `escalate`
-- The whole model network's security rests on the gateway being the only reachable path.
-
-> mark:
-
-**18.** A caller uses its key to reach models or capabilities its team was never entitled to, because the key authenticates without scoping what it may invoke.
+**16.** A caller uses its key to reach models or capabilities its team was never entitled to, because the key authenticates without scoping what it may invoke.
 
 - `entity:calling-service`, `process:inference-gateway`
 - severity: medium/medium · verb: `abuse-grant`
@@ -457,8 +431,8 @@ your missing list, your notes and a digest of each file you read:
       "opened_digests": {
       "source.md": "3da14d8d61e45baa73b0a7ee2b6935b0da3c1d47c62fdf9cb30ef4a09d6c67b6",
       "model.json": "4f4193d4b0435635054b15c8671a2184acac80c9377c98a0b41ad0064e926f1a",
-      "claims/asvs.json": "e57cbcaae94bab0af36e361174b7c71a6b27f7564f4f616d9cda8eb24d91fa2b",
-      "claims/stride.json": "3c266c4f193ac011357c62709d2457e256610c29d02e498e0f4adf69fbfde5e1"
+      "claims/asvs.json": "1a0a97c5fd8c9fad554a2105db197e86c13bf4f15e326dca21ee6a63a6f123d0",
+      "claims/stride.json": "ac51009a473f85f43dd01647bcb79b1a1a9a64f42b5ce191b279ef4c71036429"
       }
     }
   }
