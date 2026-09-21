@@ -72,10 +72,10 @@
       "store:message-queue",
       "flow:process:web-application>store:message-queue>enqueue-job"
     ],
-    "claim": "Every link except the browser one states no transport protection at all.",
+    "claim": "The browser link is the only one marked encrypted, and nothing records what transport protection the web application's link to the queue carries.",
     "tier": "expected",
-    "disposition": "gap-from-prose",
-    "notes": "The submitter marks one link as the only encrypted one, which settles the others."
+    "disposition": "needs-more-prose",
+    "notes": "The submitter marks one link as the only encrypted one. That says nothing about the rest, so the internal links are unrecorded rather than unencrypted."
   },
   {
     "chapter": "authentication",

@@ -425,11 +425,11 @@ on either of them. That is the finding this sitting exists for.
 
 > mark:
 
-**18.** An attacker destroys or replaces the signing key so that every application rejects every token at once.
+**18.** An attacker destroys the one signing key and the broker issues no new token for any application until the key is replaced, and nothing records how a replacement would reach the applications.
 
 - `store:key-store`, `process:identity-broker`
 - severity: low/high · verb: `delete`
-- The same single-key fact that makes the confidentiality claim severe makes this one estate-wide; kept distinct from reading the key, which is a different action.
+- The same single-key fact that makes the confidentiality claim severe makes this one estate-wide; kept distinct from reading the key, which is a different action. Already-issued tokens keep verifying against a cached public half, so the loss is new issuance rather than instant estate-wide rejection.
 
 > mark:
 
@@ -510,7 +510,7 @@ your missing list, your notes and a digest of each file you read:
       "source.md": "36115502847aa04640666b0dd9f458881e6f7f8968e4d499b58983b3403dc721",
       "model.json": "963ee0bee098fc3d83caa04610b2967c3a61ccc650e7fbd18b47b6b756354163",
       "claims/asvs.json": "5fbdf49a4d299d911b4597850d39d5ac6a8ddfb751fc2de23a668c6001cb171a",
-      "claims/stride.json": "a2c75d4d60a1bc87feafbef20246162b3cfd1a6fa48b7b68173d96f258b25931"
+      "claims/stride.json": "b7c58f72f50eb0f3ae85f3e06e9521ee060769ce463d2e45c7c6e0761e9787dc"
       }
     }
   }

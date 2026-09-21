@@ -258,11 +258,11 @@ on either of them. That is the finding this sitting exists for.
 
 > mark:
 
-**8.** A player disputes a change to their record and the input names no log that would distinguish whether the lobby, a game server or the moderation website made it.
+**8.** A player disputes a change to their record and nothing distinguishes whether a game server or the moderation website made it, if neither the player database nor either writer records the actor, which is unverified.
 
 - `store:player-database`, `process:game-server`
 - severity: medium/medium · verb: `unattributable`
-- Multiple writers, one store, and no recorded provenance in the description.
+- Two writers, one store: the game servers and the moderation website. The lobby only reads. Whether any audit record names the actor is unverified.
 
 > mark:
 
@@ -378,7 +378,7 @@ your missing list, your notes and a digest of each file you read:
       "source.md": "17e797d0315fdd53d5acf05962ca0ae8a23e08f84779f8528ade6422c34577a3",
       "model.json": "400ad2ee53ee5b0e87c310c881be77f6cc748b7f817fc176bf8967818238c3eb",
       "claims/asvs.json": "79b1fb614daf429bf079268027870240a41c056ba1d41174eb35007f22006bf8",
-      "claims/stride.json": "713c169321f02a3ad73b852da9e26bfc5cbd73e37e7a3f792827d5a4a5402e58"
+      "claims/stride.json": "cfd79aebf8e5b5a17a4802fb39a664b426e1ab900377c44ab3f334fbb771b3e9"
       }
     }
   }

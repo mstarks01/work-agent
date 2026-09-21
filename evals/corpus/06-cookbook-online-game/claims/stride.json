@@ -110,13 +110,13 @@
       "store:player-database",
       "process:game-server"
     ],
-    "claim": "A player disputes a change to their record and the input names no log that would distinguish whether the lobby, a game server or the moderation website made it.",
+    "claim": "A player disputes a change to their record and nothing distinguishes whether a game server or the moderation website made it, if neither the player database nor either writer records the actor, which is unverified.",
     "tier": "expected",
     "severity": {
       "likelihood": "medium",
       "impact": "medium"
     },
-    "notes": "Multiple writers, one store, and no recorded provenance in the description.",
+    "notes": "Two writers, one store: the game servers and the moderation website. The lobby only reads. Whether any audit record names the actor is unverified.",
     "verb": "unattributable"
   },
   {
@@ -145,7 +145,7 @@
       "likelihood": "medium",
       "impact": "medium"
     },
-    "notes": "Both links are recorded as bare port numbers — the model gives no transport protection at all.",
+    "notes": "Both links are recorded as bare port numbers \u2014 the model gives no transport protection at all.",
     "verb": "intercept"
   },
   {

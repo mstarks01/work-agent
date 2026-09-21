@@ -5,13 +5,13 @@
       "flow:entity:calling-service>process:inference-gateway>submit-inference-request",
       "entity:calling-service"
     ],
-    "claim": "An attacker who obtains a never-expiring API key calls the inference gateway as that team indefinitely.",
+    "claim": "An attacker who obtains a calling team's API key calls the inference gateway as that team for as long as the key stays valid, and no key has ever been expired.",
     "tier": "must-find",
     "severity": {
       "likelihood": "high",
       "impact": "high"
     },
-    "notes": "Bearer credential with no expiry on an internet-facing endpoint; compromise is permanent until noticed.",
+    "notes": "Bearer credential on an internet-facing endpoint. No key has ever been expired, so how long a stolen one stays valid is unverified.",
     "verb": "use-credential"
   },
   {
@@ -79,13 +79,13 @@
     "affected_element_ids": [
       "flow:process:inference-gateway>process:model-server>forward-request"
     ],
-    "claim": "An attacker inside the model network alters request payloads in flight on the unauthenticated, unencrypted forward path.",
+    "claim": "An attacker inside the model network alters request payloads in flight between the gateway and the model server, if that link carries no transport protection, which is unverified.",
     "tier": "expected",
     "severity": {
       "likelihood": "medium",
       "impact": "medium"
     },
-    "notes": "Same flow as the spoofing entry; the lane difference is modifying content versus assuming identity.",
+    "notes": "Same flow as the spoofing entry; the lane difference is modifying content versus assuming identity. The flow states no authentication, and its encryption is unknown rather than absent.",
     "verb": "alter-in-transit"
   },
   {

@@ -174,10 +174,10 @@ The narrower question, per record: **does this requirement apply to this system,
 
 ### secure-communication
 
-**A6.** `V12.3.3` — Every link except the browser one states no transport protection at all.
+**A6.** `V12.3.3` — The browser link is the only one marked encrypted, and nothing records what transport protection the web application's link to the queue carries.
 
 - `process:web-application`, `store:message-queue`, `flow:process:web-application>store:message-queue>enqueue-job`
-- The submitter marks one link as the only encrypted one, which settles the others.
+- The submitter marks one link as the only encrypted one. That says nothing about the rest, so the internal links are unrecorded rather than unencrypted.
 
 > mark:
 
@@ -385,7 +385,7 @@ your missing list, your notes and a digest of each file you read:
       "opened_digests": {
       "source.md": "20b0aa82c922766db2353cade33f7a26b38c60a3c7061244ef4686b7a647778b",
       "model.json": "bf3cfe67eb9ecbc49237bb6cf388bf664e1de8b54b444c8c004cdf87de5fdc46",
-      "claims/asvs.json": "9e4ee6be326673ba2101ed60662718b0d50ecaf6aba7218bcec702c785b033c5",
+      "claims/asvs.json": "f4b9f4dc1da5a583e5632a316271414ec0b1e587021b861a544d5899cf1900c5",
       "claims/stride.json": "c7358b0fcbdd5178cd88c557c7728fb4ed72dd3d3a003a7751473df53dcde0e0"
       }
     }

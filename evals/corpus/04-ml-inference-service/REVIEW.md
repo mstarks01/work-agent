@@ -150,7 +150,7 @@ The narrower question, per record: **does this requirement apply to this system,
 
 ### file-handling
 
-**A2.** `V5.2.1` — Nothing limits the size or type of a model artifact published into the registry.
+**A2.** `V5.2.1` — Nothing records what size or type limits apply to a model artifact an engineer publishes into the registry.
 
 - `entity:ml-engineer`, `store:model-registry-bucket`, `flow:entity:ml-engineer>store:model-registry-bucket>publish-artifact`
 - An artifact upload path exists; feature:file-upload has a subject here.
@@ -242,11 +242,11 @@ on either of them. That is the finding this sitting exists for.
 
 ### spoofing
 
-**1.** An attacker who obtains a never-expiring API key calls the inference gateway as that team indefinitely.
+**1.** An attacker who obtains a calling team's API key calls the inference gateway as that team for as long as the key stays valid, and no key has ever been expired.
 
 - `flow:entity:calling-service>process:inference-gateway>submit-inference-request`, `entity:calling-service`
 - severity: high/high · verb: `use-credential`
-- Bearer credential with no expiry on an internet-facing endpoint; compromise is permanent until noticed.
+- Bearer credential on an internet-facing endpoint. No key has ever been expired, so how long a stolen one stays valid is unverified.
 
 > mark:
 
@@ -285,11 +285,11 @@ on either of them. That is the finding this sitting exists for.
 
 > mark:
 
-**6.** An attacker inside the model network alters request payloads in flight on the unauthenticated, unencrypted forward path.
+**6.** An attacker inside the model network alters request payloads in flight between the gateway and the model server, if that link carries no transport protection, which is unverified.
 
 - `flow:process:inference-gateway>process:model-server>forward-request`
 - severity: medium/medium · verb: `alter-in-transit`
-- Same flow as the spoofing entry; the lane difference is modifying content versus assuming identity.
+- Same flow as the spoofing entry; the lane difference is modifying content versus assuming identity. The flow states no authentication, and its encryption is unknown rather than absent.
 
 > mark:
 
@@ -431,8 +431,8 @@ your missing list, your notes and a digest of each file you read:
       "opened_digests": {
       "source.md": "3da14d8d61e45baa73b0a7ee2b6935b0da3c1d47c62fdf9cb30ef4a09d6c67b6",
       "model.json": "4f4193d4b0435635054b15c8671a2184acac80c9377c98a0b41ad0064e926f1a",
-      "claims/asvs.json": "1a0a97c5fd8c9fad554a2105db197e86c13bf4f15e326dca21ee6a63a6f123d0",
-      "claims/stride.json": "ac51009a473f85f43dd01647bcb79b1a1a9a64f42b5ce191b279ef4c71036429"
+      "claims/asvs.json": "0cb9e82391d0647fccc20a8d022b8e3a6287058ee2086b86999f1bab22cf7254",
+      "claims/stride.json": "7eeb90c41bac1fd4b3b40dbb8a997e1eca71d5aca71a9ab29fcff1ac28560905"
       }
     }
   }

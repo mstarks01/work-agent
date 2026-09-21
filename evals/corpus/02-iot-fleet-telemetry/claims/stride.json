@@ -35,13 +35,13 @@
       "store:firmware-bucket",
       "flow:entity:sensor-node>store:firmware-bucket>poll-firmware"
     ],
-    "claim": "An attacker serves a node a firmware image that impersonates an official release, because the node authenticates neither the bucket nor the image's origin.",
+    "claim": "An attacker who gains write access to the firmware bucket serves a node an image it installs as an official release, if the node checks no signature on what it downloads, which is unverified.",
     "tier": "expected",
     "severity": {
       "likelihood": "medium",
       "impact": "high"
     },
-    "notes": "Origin authentication, as distinct from the tampering entry about modifying an image in place.",
+    "notes": "Origin authentication of the image, as distinct from the tampering entry about modifying an image in place. The poll runs over HTTPS, so the bucket itself is authenticated; what is unverified is whether the node checks a signature.",
     "verb": "forge"
   },
   {

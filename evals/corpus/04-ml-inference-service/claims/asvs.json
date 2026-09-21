@@ -18,7 +18,7 @@
       "store:model-registry-bucket",
       "flow:entity:ml-engineer>store:model-registry-bucket>publish-artifact"
     ],
-    "claim": "Nothing limits the size or type of a model artifact published into the registry.",
+    "claim": "Nothing records what size or type limits apply to a model artifact an engineer publishes into the registry.",
     "tier": "must-find",
     "disposition": "needs-config",
     "notes": "An artifact upload path exists; feature:file-upload has a subject here."
