@@ -139,7 +139,7 @@
       "flow:process:game-client>process:lobby>matchmaking",
       "flow:process:game-client>process:game-server>gameplay-traffic"
     ],
-    "claim": "An attacker on the network path reads matchmaking and gameplay traffic, including player identifiers, because encryption on both client links is unverified.",
+    "claim": "An attacker on the network path reads matchmaking and gameplay traffic, if either client link carries anything confidential over a segment they can observe; the model records the two links as bare port numbers and no transport protection either way.",
     "tier": "must-find",
     "severity": {
       "likelihood": "medium",
@@ -214,7 +214,7 @@
       "process:moderation-website",
       "entity:customer-support-staff"
     ],
-    "claim": "An attacker who gets any access to the moderation website acquires privilege over every player account it can reach.",
+    "claim": "An attacker who gets access to the moderation website acts on player accounts with whatever authority it holds over the player database, which the source records as direct read and write and never bounds by role or by account.",
     "tier": "must-find",
     "severity": {
       "likelihood": "medium",

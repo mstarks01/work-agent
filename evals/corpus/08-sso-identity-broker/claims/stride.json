@@ -152,7 +152,7 @@
     "affected_element_ids": [
       "store:key-store"
     ],
-    "claim": "An attacker who reaches the key store reads the signing key, since protection of what it holds at rest is unverified.",
+    "claim": "An attacker who reaches the key store reads the signing key, if the store hands out the private half rather than only signing with it and protection at rest does not stop them; the source records neither.",
     "tier": "must-find",
     "severity": {
       "likelihood": "low",

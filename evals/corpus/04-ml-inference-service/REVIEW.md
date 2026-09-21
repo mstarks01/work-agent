@@ -315,7 +315,7 @@ on either of them. That is the finding this sitting exists for.
 
 ### information-disclosure
 
-**9.** An attacker who reaches the inference log reads raw end-user prompts, whose protection at rest is unverified.
+**9.** An attacker who obtains a read grant on the inference log reads the raw end-user prompts the source says it retains, and nothing records who holds that grant.
 
 - `store:inference-log`
 - severity: medium/high · verb: `read`
@@ -432,7 +432,7 @@ your missing list, your notes and a digest of each file you read:
       "source.md": "3da14d8d61e45baa73b0a7ee2b6935b0da3c1d47c62fdf9cb30ef4a09d6c67b6",
       "model.json": "4f4193d4b0435635054b15c8671a2184acac80c9377c98a0b41ad0064e926f1a",
       "claims/asvs.json": "0cb9e82391d0647fccc20a8d022b8e3a6287058ee2086b86999f1bab22cf7254",
-      "claims/stride.json": "9566dee674a4e5338870062012a299c2a15f171d6089e2d65c85062c962b10fb"
+      "claims/stride.json": "4b06c341425cf393763433d12f7f1da917a689e465e4233aeb1c8566c9f8a3b3"
       }
     }
   }

@@ -243,7 +243,7 @@ on either of them. That is the finding this sitting exists for.
 
 > mark:
 
-**2.** An attacker who obtains a copy of the catalogue spreadsheet sends SQL to the web API as the catalogue tool.
+**2.** An attacker who obtains a copy of the catalogue spreadsheet sends SQL to the web API as the catalogue tool, if the file carries whatever the API accepts as that tool's identity; the source never says what that is.
 
 - `flow:process:catalogue-spreadsheet>process:web-api>sql-statements`, `process:catalogue-spreadsheet`
 - severity: medium/high · verb: `impersonate`
@@ -278,7 +278,7 @@ on either of them. That is the finding this sitting exists for.
 
 > mark:
 
-**6.** An attacker appends further SQL to the statements the macros send so the web API executes changes beyond prices and product copy.
+**6.** An attacker appends further SQL to the statements the macros send so the web API executes changes beyond prices and product copy, if the API passes what it receives to the database without restricting it to those statements; the source says only that the macros speak SQL to it.
 
 - `flow:process:catalogue-spreadsheet>process:web-api>sql-statements`, `process:web-api`
 - severity: medium/high · verb: `inject`
@@ -441,7 +441,7 @@ your missing list, your notes and a digest of each file you read:
       "source.md": "603873a0d569ba3f0ac4a91a363086b54bae022cf432862d17be9eec9465e4ea",
       "model.json": "d6c0f91a9ae04bdb237850d3aff9a13c7b5c206578658d4ea44e169d8323d14d",
       "claims/asvs.json": "fbc32dc14ac8a90e9bbb2bab6801dc704f2468a03e056d992f41564c9d8de41c",
-      "claims/stride.json": "6194ef9f4206ffe21462a84929133f5b0882ebdd51c19e7e0bf147cff1edf01d"
+      "claims/stride.json": "71c75f70cf87ac895092976827d5846fdb9389127c1a1812838761d2e9def4c8"
       }
     }
   }

@@ -210,7 +210,7 @@ on either of them. That is the finding this sitting exists for.
 
 ### information-disclosure
 
-**7.** An attacker who reaches the telemetry lake reads customer site addresses and occupancy patterns, whose protection at rest is unverified.
+**7.** An attacker who obtains a read grant on the telemetry lake reads customer site addresses and occupancy patterns, and nothing records who holds that grant or whether protection at rest would stop a raw copy.
 
 - `store:telemetry-lake`
 - severity: medium/high · verb: `read`
@@ -318,7 +318,7 @@ your missing list, your notes and a digest of each file you read:
       "opened_digests": {
       "source.md": "fc745e273aff8be740a814f0a9b4a45d6f3c6fe39dc7c8efa2b879d4f270ac74",
       "model.json": "fbe6f9b1304f947a2efe454df07391e4a430acf808055be11c5b3bb7911995a4",
-      "claims/stride.json": "3e1d15ee570a17f38fee52b864b31d9af5c5fbac64c51fb4f29f670a22b5db8d"
+      "claims/stride.json": "4bbdff1899c5f4965f3e95d9dfdfa740d80aeea62082430cdaaf822770084068"
       }
     }
   }

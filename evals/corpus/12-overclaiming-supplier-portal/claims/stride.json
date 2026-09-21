@@ -20,7 +20,7 @@
       "flow:entity:category-manager>process:supplier-portal>review-documents",
       "entity:category-manager"
     ],
-    "claim": "An attacker signs in to the portal as a category manager and approves supplier paperwork, because how category managers are authenticated is unverified.",
+    "claim": "An attacker signs in to the portal as a category manager and approves supplier paperwork, if manager sign-in does not stop them; the vendor's datasheet asserts that all access is fully authenticated and the source records nothing about how a manager signs in.",
     "tier": "must-find",
     "severity": {
       "likelihood": "medium",
@@ -123,7 +123,7 @@
     "affected_element_ids": [
       "store:landing-bucket"
     ],
-    "claim": "An attacker with access to the landing bucket reads the whole supplier extract, because whether the bucket is encrypted at rest is unverified.",
+    "claim": "An attacker who obtains a read grant on the landing bucket reads the whole supplier extract, which the runbook says arrives as a plain CSV; nothing records who holds that grant or how the bucket is protected at rest.",
     "tier": "must-find",
     "severity": {
       "likelihood": "medium",

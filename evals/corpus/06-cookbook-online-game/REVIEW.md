@@ -277,7 +277,7 @@ on either of them. That is the finding this sitting exists for.
 
 > mark:
 
-**10.** An attacker on the network path reads matchmaking and gameplay traffic, including player identifiers, because encryption on both client links is unverified.
+**10.** An attacker on the network path reads matchmaking and gameplay traffic, if either client link carries anything confidential over a segment they can observe; the model records the two links as bare port numbers and no transport protection either way.
 
 - `flow:process:game-client>process:lobby>matchmaking`, `flow:process:game-client>process:game-server>gameplay-traffic`
 - severity: medium/medium · verb: `intercept`
@@ -323,7 +323,7 @@ on either of them. That is the finding this sitting exists for.
 
 ### elevation-of-privilege
 
-**15.** An attacker who gets any access to the moderation website acquires privilege over every player account it can reach.
+**15.** An attacker who gets access to the moderation website acts on player accounts with whatever authority it holds over the player database, which the source records as direct read and write and never bounds by role or by account.
 
 - `process:moderation-website`, `entity:customer-support-staff`
 - severity: medium/high · verb: `abuse-grant`
@@ -378,7 +378,7 @@ your missing list, your notes and a digest of each file you read:
       "source.md": "17e797d0315fdd53d5acf05962ca0ae8a23e08f84779f8528ade6422c34577a3",
       "model.json": "400ad2ee53ee5b0e87c310c881be77f6cc748b7f817fc176bf8967818238c3eb",
       "claims/asvs.json": "79b1fb614daf429bf079268027870240a41c056ba1d41174eb35007f22006bf8",
-      "claims/stride.json": "c8872f79f677e8bc174ecd4ba79f5f0257e0eb1c296c8b3a8580ed6d1c61e859"
+      "claims/stride.json": "cb81b3309388f7b4113cd2d77a0ed739ecb82ed056facc5727d8f2164b236700"
       }
     }
   }

@@ -20,7 +20,7 @@
       "flow:process:store-server>store:image-registry>pull-image",
       "store:image-registry"
     ],
-    "claim": "An attacker on the retail WAN presents itself to the image registry as a store server and pulls the estate's container images.",
+    "claim": "An attacker on the retail WAN presents itself to the image registry as a store server and pulls the estate's container images, if the registry identifies a puller no better than the source records a store being identified, which is not at all.",
     "tier": "must-find",
     "severity": {
       "likelihood": "medium",
@@ -182,7 +182,7 @@
       "process:build-runner",
       "flow:process:build-runner>process:deploy-controller>set-current-release"
     ],
-    "claim": "An attacker who reads the build runner's configuration recovers the shared build token and can thereafter set the estate's release.",
+    "claim": "An attacker who reads wherever the build runner keeps the shared build token recovers it and can thereafter set the estate's release; the source states the runner presents the token and never says where it is kept.",
     "tier": "must-find",
     "severity": {
       "likelihood": "medium",

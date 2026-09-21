@@ -168,7 +168,7 @@ on either of them. That is the finding this sitting exists for.
 
 > mark:
 
-**2.** An attacker on the retail WAN presents itself to the image registry as a store server and pulls the estate's container images.
+**2.** An attacker on the retail WAN presents itself to the image registry as a store server and pulls the estate's container images, if the registry identifies a puller no better than the source records a store being identified, which is not at all.
 
 - `flow:process:store-server>store:image-registry>pull-image`, `store:image-registry`
 - severity: medium/medium · verb: `impersonate`
@@ -265,7 +265,7 @@ on either of them. That is the finding this sitting exists for.
 
 ### information-disclosure
 
-**13.** An attacker who reads the build runner's configuration recovers the shared build token and can thereafter set the estate's release.
+**13.** An attacker who reads wherever the build runner keeps the shared build token recovers it and can thereafter set the estate's release; the source states the runner presents the token and never says where it is kept.
 
 - `process:build-runner`, `flow:process:build-runner>process:deploy-controller>set-current-release`
 - severity: medium/high · verb: `recover-credential`
@@ -392,7 +392,7 @@ your missing list, your notes and a digest of each file you read:
       "opened_digests": {
       "source.md": "1bfb96ef3374b697ef78e76661daa3d2b227792a3b20d2d1ee1d526cde02652c",
       "model.json": "25e0fe698e23ea38d98c8cd7e80dcef804cea2e27a8e4c09b4c5f65fc1785291",
-      "claims/stride.json": "40ce104710b497547169e68b9f6dc6512ffe7a025d975f79468955122dc5ba89"
+      "claims/stride.json": "c5692a4a3a37392eb40f62efb8c2a41222650c6b82bc69345eeb4194ee7fceaa"
       }
     }
   }

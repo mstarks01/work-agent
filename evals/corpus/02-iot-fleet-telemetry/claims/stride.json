@@ -94,7 +94,7 @@
     "affected_element_ids": [
       "store:telemetry-lake"
     ],
-    "claim": "An attacker who reaches the telemetry lake reads customer site addresses and occupancy patterns, whose protection at rest is unverified.",
+    "claim": "An attacker who obtains a read grant on the telemetry lake reads customer site addresses and occupancy patterns, and nothing records who holds that grant or whether protection at rest would stop a raw copy.",
     "tier": "must-find",
     "severity": {
       "likelihood": "medium",
