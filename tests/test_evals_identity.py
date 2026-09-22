@@ -107,17 +107,19 @@ DIRECTION = {
 #: The frontier, all three ways of being wrong at once.
 #:
 #: - ``splits`` counts the 200 ``match`` pairs a rule calls different.
-#: - ``candidate_merges`` counts the 111 scored ``no-match`` pairs it calls the
-#:   same. These are candidate paraphrases, which is the population a live run
-#:   emits, and they were unmeasurable before #511 assigned them elements and
-#:   verbs.
-#: - ``reference_merges`` counts the 287 within-lane pairs of distinct corpus
-#:   claims it calls the same. Every one is an error by construction.
+#: - ``candidate_merges`` counts the scored ``no-match`` pairs it calls the
+#:   same, ``no_match_pairs`` of them. These are candidate paraphrases, which is
+#:   the population a live run emits, and they were unmeasurable before #511
+#:   assigned them elements and verbs.
+#: - ``reference_merges`` counts the within-lane pairs of distinct corpus claims
+#:   it calls the same, ``within_lane_pairs`` of them. Every one is an error by
+#:   construction.
 #:
-#: **The candidate column is why the verb is not optional.** Read on reference
-#: pairs alone, ``endpoint subset`` merges 23 of 287 and looks survivable. Read
-#: on the candidates a run actually produces, it merges **81 of 111** — it is
-#: barely a rule at all. The verb takes that to 3 while also avoiding one split.
+#: **The candidate column is why the verb is not optional.** Every figure that
+#: says so is in the table below and in ``SUBSET_VERB_AGREEMENT``, so read the
+#: two rows rather than a sentence beside them: ``endpoint subset`` looks
+#: survivable on reference pairs and is barely a rule on the candidates a run
+#: produces, and the verb closes that for one further split.
 FRONTIER = {
     "equality": {"splits": 72, "candidate_merges": 20, "reference_merges": 5},
     #: The rule #201 argues for, and the only row here that is usable.
