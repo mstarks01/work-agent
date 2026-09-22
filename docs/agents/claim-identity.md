@@ -292,6 +292,36 @@ A re-key moves the fingerprint and leaves both digests alone: they say what a
 past reviewer was shown, and recomputing them would rewrite that record rather
 than move it.
 
+## An identity outlives the claim that held it
+
+When a blessing pass drops a claim its fingerprint is free again, and a later
+addition can land on it. A **Case Sitting** mark stores only a key, so
+`current_marks` re-keys the reader's old ruling onto the new text and the gate
+reads as affirmed by a person who never saw it. That is what #1134 did to case
+12's compromised-vendor claim, at `must-find`, and #1135 repaired by moving the
+claim to the place its own sentence names.
+
+**No check over the tree alone can see it.** The discriminator is which claims
+are *new*, and the tree does not carry that. At the commit that shipped the
+defect every case was unread and 304 claims legitimately carried a mark, so a
+rule reading only the corpus and the merged submissions names 305 findings where
+there is one.
+
+So it is a preflight against a base revision, not a gate:
+
+```
+uv run python -m evals.harness.run corpus-preflight --base <revision>
+```
+
+**Run it before the addition lands, because the evidence expires.** Once the next
+sitting merges, every claim carries a mark and an inherited one is
+indistinguishable from an earned one. #1136 marked all 331, and after it nothing
+in the tree could have found #1134's defect.
+
+A hit is a ruling for the maintainer and never automatically a duplicate: the
+reader's reasoning may be about a mechanism the new claim does not use, which is
+exactly how #1135 was settled.
+
 ## What this buys, in reviewer minutes
 
 A vote is spent once and kept forever, because it hangs on a fingerprint rather

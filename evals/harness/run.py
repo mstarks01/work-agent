@@ -79,6 +79,7 @@ from evals.harness import (
     modes,
     oracle,
     pairing,
+    preflight,
     queue,
     replay,
     roster,
@@ -2394,6 +2395,12 @@ COMMANDS: dict[str, Command] = {
         " graph nodes each one owns (no credentials)",
         run=audit.command_phases,
         arguments=audit.phase_arguments,
+    ),
+    "corpus-preflight": Command(
+        help="name every reference claim added since --base that lands on an"
+        " identity a merged sitting already marked (no credentials)",
+        run=preflight.command_preflight,
+        arguments=preflight.arguments,
     ),
 }
 
