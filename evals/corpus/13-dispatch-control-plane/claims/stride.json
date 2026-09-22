@@ -286,5 +286,20 @@
     },
     "notes": "Drafted from Baseline 6bff717-gpt-5.6-terra-24dda4db draft T-01, ruled a relevant threat scenario by the maintainer on 2026-09-20 (audit QA-2026-09-20-01). Conditional. An unknown CORS configuration alone does not establish this; what it rests on is the API failing to authenticate and authorize the write. It is a distinct mechanism from reference 5, which it does not satisfy.",
     "verb": "inject"
+  },
+  {
+    "category": "information-disclosure",
+    "affected_element_ids": [
+      "flow:process:dispatch-console>process:dispatch-api>dispatch-requests",
+      "flow:process:dispatch-console>process:dispatch-api>live-job-status"
+    ],
+    "claim": "An attacker-controlled page uses a duty engineer's browser to read dispatch information through the engineer's authority, which over HTTP requires the browser to attach usable credentials and the API to permit credentialed response access from the attacker's origin, and over WebSocket requires usable session credentials on the handshake and acceptance of the attacker's origin without effective authorization against cross-site use.",
+    "tier": "must-find",
+    "severity": {
+      "likelihood": "medium",
+      "impact": "high"
+    },
+    "notes": "Provenance: own-list 13.2 and 13.3, 2026-09-21; drafted by the maintainer on 2026-09-22. The list preceded the full marks set but followed exposure to earlier corpus findings; it was not blind. Maintainer merged own-list 13.2 and 13.3; both flow IDs are retained. HTTP CORS response permissions do not govern WebSocket handshakes. Credential attachment, browser reachability and the relevant origin checks are separate prerequisites. Authentication and data returned are unspecified. Distinct from reference 16's forged state-changing request. In either case the browser must reach the internal API, and the response or stream must expose the information; that shared prerequisite sits here rather than in the claim, which the 500-character bound on the field caps.",
+    "verb": "ride-session"
   }
 ]

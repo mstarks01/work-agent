@@ -261,5 +261,35 @@
     },
     "notes": "The classic escalation shape: a path scoped by intent rather than by a control, reaching whatever authority the API holds over the database.",
     "verb": "abuse-grant"
+  },
+  {
+    "category": "elevation-of-privilege",
+    "affected_element_ids": [
+      "entity:customer",
+      "process:web-api"
+    ],
+    "claim": "A customer sends the web API the catalogue operations the marketing spreadsheet sends, changing prices and product copy, if the API decides what a caller may do no more finely than it decides who the caller is; the source says the macros speak SQL to the same API the app calls and records no role separation.",
+    "tier": "must-find",
+    "severity": {
+      "likelihood": "medium",
+      "impact": "high"
+    },
+    "notes": "Provenance: own-list 09.5, 2026-09-21; drafted by the maintainer on 2026-09-22. The list preceded the full marks set but followed exposure to earlier corpus findings; it was not blind. Conditional role-authorization bypass on the shared API. Distinct from posing as the catalogue tool at reference 1 and accessing customer records through that tool at reference 17. No role-check implementation is stated.",
+    "verb": "escalate"
+  },
+  {
+    "category": "spoofing",
+    "affected_element_ids": [
+      "flow:process:web-api>process:sims>order-handover",
+      "process:sims"
+    ],
+    "claim": "An attacker who reaches the SIMS handover interface submits orders as though the web API sent them, and SIMS writes delivery addresses and sends fax confirmations for those fabricated orders if caller authentication and order validation do not reject them.",
+    "tier": "expected",
+    "severity": {
+      "likelihood": "medium",
+      "impact": "high"
+    },
+    "notes": "Provenance: own-list 09.9, 2026-09-21; drafted by the maintainer on 2026-09-22. The list preceded the full marks set but followed exposure to earlier corpus findings; it was not blind. The API-to-SIMS handover is explicit; caller authentication and order validation are unknown, not absent. Reference 6 addresses tampering at the same handover.",
+    "verb": "impersonate"
   }
 ]

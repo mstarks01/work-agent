@@ -221,7 +221,7 @@ The narrower question, per record: **does this requirement apply to this system,
 
 > mark:
 
-## Part 3 — the 14 recorded STRIDE threats
+## Part 3 — the 19 recorded STRIDE threats
 
 Only after your own list exists.
 
@@ -366,6 +366,55 @@ on either of them. That is the finding this sitting exists for.
 
 > mark:
 
+**15.** A signed-in supplier invokes a category manager's review action and approves their own compliance paperwork if the portal fails to enforce reviewer authorization on that action.
+
+- `flow:entity:category-manager>process:supplier-portal>review-documents`, `process:supplier-portal`
+- severity: medium/high · verb: `escalate`
+- Provenance: own-list 12.3, 2026-09-21; drafted by the maintainer on 2026-09-22. The list preceded the full marks set but followed exposure to earlier corpus findings; it was not blind. Authentication does not establish reviewer authorization. Role enforcement is unknown, not shown absent. Distinct from cross-supplier document access at reference 13.
+
+> mark:
+
+
+### repudiation
+
+**16.** A supplier who can replace an uploaded document after approval can dispute which content was approved if the portal retains neither the approved version nor a verifiable link between that version and the approval record.
+
+- `store:document-store`, `process:supplier-portal`
+- severity: medium/medium · verb: `unattributable`
+- Provenance: own-list 12.4, 2026-09-21; drafted by the maintainer on 2026-09-22. The list preceded the full marks set but followed exposure to earlier corpus findings; it was not blind. Retained in the maintainer's repudiation identity: the issue is evidence of approved content, not merely changing a file. Post-approval replacement, version retention and approval binding are unknown. Distinct from reference 6's denial of having approved; reference 5 covers document tampering.
+
+> mark:
+
+
+### tampering
+
+**17.** An attacker with write access to the landing bucket substitutes an earlier genuine nightly extract, and the supplier master service restores stale supplier values if it accepts the replay and its update semantics overwrite newer records.
+
+- `store:landing-bucket`, `flow:process:supplier-master-service>store:landing-bucket>load-extract`
+- severity: medium/medium · verb: `replay`
+- Provenance: own-list 12.6, 2026-09-21; drafted by the maintainer on 2026-09-22. The list preceded the full marks set but followed exposure to earlier corpus findings; it was not blind. Distinct from modifying the extract at reference 3. A plain CSV picked up as-is proves neither missing freshness validation nor overwrite semantics; both remain prerequisites.
+
+> mark:
+
+**18.** A vendor whose platform an attacker controls pushes a nightly extract on the genuine channel carrying supplier records that are false, and the supplier master service writes them into the supplier database, if nothing on our side checks a record against anything but the file it arrived in; the source describes no such check.
+
+- `entity:portal-vendor`, `flow:entity:portal-vendor>store:landing-bucket>push-nightly-extract`
+- severity: medium/high · verb: `plant`
+- Provenance: own-list 12.7, 2026-09-21; drafted by the maintainer on 2026-09-22. The list preceded the full marks set but followed exposure to earlier corpus findings; it was not blind. Authentic delivery can carry false records from a compromised vendor. Distinct from vendor impersonation at reference 2. Feasible independent validation and reconciliation depend on the records; no such controls are described. Vendor marketing is not proof of compromise or missing controls.
+
+> mark:
+
+
+### denial-of-service
+
+**19.** A signed-in supplier uploads excessive numbers or sizes of documents, denying other suppliers the ability to submit paperwork if shared storage or processing limits are exhausted and per-supplier limits do not contain the workload.
+
+- `process:supplier-portal`, `store:document-store`, `flow:entity:supplier>process:supplier-portal>upload-documents`
+- severity: medium/medium · verb: `flood`
+- Provenance: own-list 12.9, 2026-09-21; drafted by the maintainer on 2026-09-22. The list preceded the full marks set but followed exposure to earlier corpus findings; it was not blind. Supplier quotas, storage capacity and workload isolation are unknown. File-size limits alone do not address many small uploads. Distinct from general vendor outage at reference 11 and interruption of the nightly load at reference 12; overlaps the ASVS file-size question.
+
+> mark:
+
 ---
 
 ## What was on your list and not on either of theirs
@@ -413,7 +462,7 @@ your missing list, your notes and a digest of each file you read:
       "source.md": "3542d5a0939da730951ce8c09de7a18d1bbc74d5e972180acacba73bfd168d41",
       "model.json": "dcfd28bad38f897c03648d173c9cfd9454673988d6d13e3cd11abed53723c036",
       "claims/asvs.json": "5e505c3078704dfc0dc35288158f3090ce00160f7e39286f66f7cd8a2e7cd48c",
-      "claims/stride.json": "3cbefe5e4225181a65da8a0829c30d1e1178811ecbe5004db0451ae3505ee033"
+      "claims/stride.json": "b4706241bed8df01dd1dcd1e16ab5a2a47fd0458ecb42b51948b07b3ff8af270"
       }
     }
   }

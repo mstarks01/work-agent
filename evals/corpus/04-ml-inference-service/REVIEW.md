@@ -224,7 +224,7 @@ The narrower question, per record: **does this requirement apply to this system,
 
 > mark:
 
-## Part 3 — the 16 recorded STRIDE threats
+## Part 3 — the 17 recorded STRIDE threats
 
 Only after your own list exists.
 
@@ -385,6 +385,17 @@ on either of them. That is the finding this sitting exists for.
 
 > mark:
 
+
+### information-disclosure
+
+**17.** An attacker on the calling-service-to-gateway path reads the API key and end-user text if transport confidentiality is absent or ineffective, and reuses a captured key while it remains valid if no additional caller binding prevents reuse.
+
+- `flow:entity:calling-service>process:inference-gateway>submit-inference-request`
+- severity: medium/high · verb: `intercept`
+- Provenance: own-list 04.9, 2026-09-21; drafted by the maintainer on 2026-09-22. The list preceded the full marks set but followed exposure to earlier corpus findings; it was not blind. Demoted from must-find to expected: transport protection is undocumented, not stated absent. Keys have never been expired; the source does not say they cannot expire or be revoked. This concerns the external caller link, unlike reference 11's internal link.
+
+> mark:
+
 ---
 
 ## What was on your list and not on either of theirs
@@ -432,7 +443,7 @@ your missing list, your notes and a digest of each file you read:
       "source.md": "3da14d8d61e45baa73b0a7ee2b6935b0da3c1d47c62fdf9cb30ef4a09d6c67b6",
       "model.json": "4f4193d4b0435635054b15c8671a2184acac80c9377c98a0b41ad0064e926f1a",
       "claims/asvs.json": "0cb9e82391d0647fccc20a8d022b8e3a6287058ee2086b86999f1bab22cf7254",
-      "claims/stride.json": "4b06c341425cf393763433d12f7f1da917a689e465e4233aeb1c8566c9f8a3b3"
+      "claims/stride.json": "4a8a17637e863c3dfc81b84a252f1587ab25eb3d0841c2960c64619cf52266e5"
       }
     }
   }

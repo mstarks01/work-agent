@@ -210,7 +210,7 @@ The narrower question, per record: **does this requirement apply to this system,
 
 > mark:
 
-## Part 3 — the 19 recorded STRIDE threats
+## Part 3 — the 20 recorded STRIDE threats
 
 Only after your own list exists.
 
@@ -398,6 +398,17 @@ on either of them. That is the finding this sitting exists for.
 
 > mark:
 
+
+### information-disclosure
+
+**20.** An attacker-controlled page uses a duty engineer's browser to read dispatch information through the engineer's authority, which over HTTP requires the browser to attach usable credentials and the API to permit credentialed response access from the attacker's origin, and over WebSocket requires usable session credentials on the handshake and acceptance of the attacker's origin without effective authorization against cross-site use.
+
+- `flow:process:dispatch-console>process:dispatch-api>dispatch-requests`, `flow:process:dispatch-console>process:dispatch-api>live-job-status`
+- severity: medium/high · verb: `ride-session`
+- Provenance: own-list 13.2 and 13.3, 2026-09-21; drafted by the maintainer on 2026-09-22. The list preceded the full marks set but followed exposure to earlier corpus findings; it was not blind. Maintainer merged own-list 13.2 and 13.3; both flow IDs are retained. HTTP CORS response permissions do not govern WebSocket handshakes. Credential attachment, browser reachability and the relevant origin checks are separate prerequisites. Authentication and data returned are unspecified. Distinct from reference 16's forged state-changing request. In either case the browser must reach the internal API, and the response or stream must expose the information; that shared prerequisite sits here rather than in the claim, which the 500-character bound on the field caps.
+
+> mark:
+
 ---
 
 ## What was on your list and not on either of theirs
@@ -445,7 +456,7 @@ your missing list, your notes and a digest of each file you read:
       "source.md": "7e370ab58f5a0138f9dd36d41cb6d3ef2b88e15594ab7995a9eb1488b157fec7",
       "model.json": "b31bc54f80f1e972ebf62c0b2c380109a67034c38cc9c15f655d36992bea9b98",
       "claims/asvs.json": "e2a9c33f73e15df69bd2a4645afa0bb6070692516af24a275100775832359970",
-      "claims/stride.json": "96fd0c1807f954dadb74dcf68b7597c409e32f76898cb72cb1dd5389b4f9388a"
+      "claims/stride.json": "707f050fcada8b0089b8762bb210da900bde56c19e7652678b0f1de1af351b02"
       }
     }
   }

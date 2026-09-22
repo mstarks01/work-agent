@@ -234,5 +234,19 @@
     },
     "notes": "Authorization scope on a multi-tenant gateway is unspecified; report as unverified.",
     "verb": "abuse-grant"
+  },
+  {
+    "category": "information-disclosure",
+    "affected_element_ids": [
+      "flow:entity:calling-service>process:inference-gateway>submit-inference-request"
+    ],
+    "claim": "An attacker on the calling-service-to-gateway path reads the API key and end-user text if transport confidentiality is absent or ineffective, and reuses a captured key while it remains valid if no additional caller binding prevents reuse.",
+    "tier": "expected",
+    "severity": {
+      "likelihood": "medium",
+      "impact": "high"
+    },
+    "notes": "Provenance: own-list 04.9, 2026-09-21; drafted by the maintainer on 2026-09-22. The list preceded the full marks set but followed exposure to earlier corpus findings; it was not blind. Demoted from must-find to expected: transport protection is undocumented, not stated absent. Keys have never been expired; the source does not say they cannot expire or be revoked. This concerns the external caller link, unlike reference 11's internal link.",
+    "verb": "intercept"
   }
 ]

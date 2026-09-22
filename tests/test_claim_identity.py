@@ -90,6 +90,24 @@ UNSEPARATED: dict[str, str] = {
     "13-dispatch-control-plane | elevation-of-privilege | process:dispatch-api, process:dispatch-console": (
         "A cross-site request the browser is made to send, and script served from the console's own origin, are `ride-session` and `inject`. Origin policy answers the first and content control answers the second, so the verb separates them."
     ),
+    "02-iot-fleet-telemetry | tampering | entity:sensor-node, store:firmware-bucket": (
+        "Planting a malicious image in the bucket and putting an older genuine one back are `plant` and `replay`. Signature verification answers the first and a version or anti-rollback check answers the second, which is why a fleet that checks signatures is still open to the second. The verb separates them."
+    ),
+    "05-cookbook-queue-webapp | denial-of-service | process:background-worker-process, store:message-queue": (
+        "Filling the queue until the worker cannot keep up and consuming jobs in order to discard them are `flood` and `delete`. Admission and capacity control answer the first and consumer authorization answers the second; the first leaves the work queued and the second removes it. The verb separates them."
+    ),
+    "11-sparse-shift-scheduling | tampering | entity:payroll-system, store:file-share": (
+        "Altering the export while it sits on the share and substituting an earlier genuine export are `alter` and `replay`. A check on the file's own integrity answers the first and a period or freshness check answers the second, so the first control leaves the second open. The verb separates them."
+    ),
+    "12-overclaiming-supplier-portal | tampering | entity:portal-vendor, store:landing-bucket": (
+        "Altering the nightly push on its path and a compromised vendor sending false records over it are `alter-in-transit` and `plant`. Transport integrity answers the first and independent validation of a record answers the second, because the second arrives authentic. The verb separates them."
+    ),
+    "12-overclaiming-supplier-portal | tampering | process:supplier-master-service, store:landing-bucket": (
+        "Modifying the extract before the loader reads it and substituting an earlier genuine extract are `alter` and `replay`. File integrity answers the first and a freshness check answers the second. The verb separates them."
+    ),
+    "13-dispatch-control-plane | information-disclosure | process:dispatch-api, process:dispatch-console": (
+        "Reading the live status stream from the corporate network and reading a response through an engineer's own browser session are `intercept` and `ride-session`. Transport protection answers the first and origin policy answers the second, so TLS alone leaves the second open. The verb separates them."
+    ),
 }
 
 

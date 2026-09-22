@@ -7,20 +7,21 @@ disagree, :class:`~evals.harness.identity.SubsetVerbIdentity` splits a pair
 whose elements match, and the scorer counts the finding as a miss and an
 over-report at once.
 
-## The measurement, over STRIDE's 18 exemplars and 244 reference claims
+## The measurement, over STRIDE's 18 exemplars and 242 reference claims
 
-50 of 244 reference claims, which is 20%, name a verb no exemplar in their lane
+58 of 242 reference claims, which is 24%, name a verb no exemplar in their lane
 demonstrates. 26 of those are ``must-find``. All 13 cases carry at least one.
 
 They split into two populations, and each wants a different answer:
 
-* 35 near misses. The lane demonstrates the verb's family but not the member, so
+* 44 near misses. The lane demonstrates the verb's family but not the member, so
   the agent has a wrong neighbour to reach for. ``use-credential`` appears
   twelve times against ``guess-credential``, ``disable`` nine times against
-  ``flood``, and ``plant`` six times against ``alter``.
-* 15 with no neighbour. The lane never demonstrates that family at all.
+  ``flood``, ``plant`` seven times against ``alter`` and ``alter-in-transit``,
+  and ``replay`` six times against ``forge``.
+* 14 with no neighbour. The lane never demonstrates that family at all.
   ``denial-of-service`` holds most of them: its three exemplars all demonstrate
-  ``flood``, and the corpus asks for four integrity verbs in that lane.
+  ``flood``, and the corpus asks for ``delete`` and ``inject`` in that lane.
 
 One further reading is over the exemplars alone. STRIDE ships no
 :class:`Collision`: no lane holds two exemplars whose element sets nest under

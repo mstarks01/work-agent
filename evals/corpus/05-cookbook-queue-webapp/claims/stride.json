@@ -70,7 +70,7 @@
       "likelihood": "medium",
       "impact": "high"
     },
-    "notes": "Records and their own audit log share one store — tampering with one covers the other.",
+    "notes": "Records and their own audit log share one store \u2014 tampering with one covers the other.",
     "verb": "alter"
   },
   {
@@ -206,7 +206,81 @@
       "likelihood": "medium",
       "impact": "medium"
     },
-    "notes": "Written by the reader during the Case Sitting of 2026-09-21 and promoted at `expected`, after every elevation claim this case carried was ruled out for filing a component's own existing grant as an escalation. Conditional: the job's operations, its user and target fields, and the worker's own checks are all unstated. Distinct from an unauthorized queue producer — the producer may be legitimate while the action it asks for is not. The verb is `escalate` because the user holds nothing that reaches another user's records.",
+    "notes": "Written by the reader during the Case Sitting of 2026-09-21 and promoted at `expected`, after every elevation claim this case carried was ruled out for filing a component's own existing grant as an escalation. Conditional: the job's operations, its user and target fields, and the worker's own checks are all unstated. Distinct from an unauthorized queue producer \u2014 the producer may be legitimate while the action it asks for is not. The verb is `escalate` because the user holds nothing that reaches another user's records.",
     "verb": "escalate"
+  },
+  {
+    "category": "tampering",
+    "affected_element_ids": [
+      "flow:process:web-application>store:message-queue>enqueue-job",
+      "flow:process:background-worker-process>store:message-queue>consume-job"
+    ],
+    "claim": "An attacker inside the backend tier alters a job in flight on the link to the queue or the link out of it, so the worker performs work nobody asked for, if those links carry no integrity protection; the source marks the browser link as the one encrypted link and says nothing about these two.",
+    "tier": "expected",
+    "severity": {
+      "likelihood": "low",
+      "impact": "high"
+    },
+    "notes": "Provenance: own-list 05.5, 2026-09-21; drafted by the maintainer on 2026-09-22. The list preceded the full marks set but followed exposure to earlier corpus findings; it was not blind. Conditional integrity attack on the queue links; their transport protection is unknown. Reference 9 addresses disclosure on those links. Only the browser link is explicitly marked encrypted.",
+    "verb": "alter-in-transit"
+  },
+  {
+    "category": "information-disclosure",
+    "affected_element_ids": [
+      "store:message-queue"
+    ],
+    "claim": "An attacker who reaches the queue reads the jobs waiting on it and learns what the application is doing and for whom, if a job carries anything confidential and nothing restricts which consumer may read; the source states neither.",
+    "tier": "expected",
+    "severity": {
+      "likelihood": "medium",
+      "impact": "medium"
+    },
+    "notes": "Provenance: own-list 05.6, 2026-09-21; drafted by the maintainer on 2026-09-22. The list preceded the full marks set but followed exposure to earlier corpus findings; it was not blind. Reading half of own-list 05.6, split by the maintainer. Confidential job content and unauthorized consumer access are both conditional. Reference 9 concerns interception in transit rather than reading queued data.",
+    "verb": "read"
+  },
+  {
+    "category": "denial-of-service",
+    "affected_element_ids": [
+      "store:message-queue",
+      "flow:process:background-worker-process>store:message-queue>consume-job"
+    ],
+    "claim": "An attacker able to consume from the queue takes jobs and acknowledges them without doing the work, preventing legitimate processing if consumer authorization allows this access and the queue removes acknowledged jobs without an effective recovery mechanism.",
+    "tier": "expected",
+    "severity": {
+      "likelihood": "medium",
+      "impact": "high"
+    },
+    "notes": "Provenance: own-list 05.6, 2026-09-21; drafted by the maintainer on 2026-09-22. The list preceded the full marks set but followed exposure to earlier corpus findings; it was not blind. Discarding half of own-list 05.6, split by the maintainer. Queue acknowledgement and recovery semantics are unspecified. Do not infer that the application reports success. Distinct from worker flooding at reference 10.",
+    "verb": "delete"
+  },
+  {
+    "category": "tampering",
+    "affected_element_ids": [
+      "store:message-queue",
+      "process:background-worker-process"
+    ],
+    "claim": "An attacker able to resubmit a genuine job causes the worker to repeat its business operation if replay detection and idempotency controls do not prevent duplicate effects.",
+    "tier": "expected",
+    "severity": {
+      "likelihood": "medium",
+      "impact": "medium"
+    },
+    "notes": "Provenance: own-list 05.7, 2026-09-21; drafted by the maintainer on 2026-09-22. The list preceded the full marks set but followed exposure to earlier corpus findings; it was not blind. Distinct from inventing a job at reference 1. Producer authentication alone need not reject a replay by an accepted producer; the attacker still needs a resubmission path. Replay checks and operation semantics are unknown.",
+    "verb": "replay"
+  },
+  {
+    "category": "tampering",
+    "affected_element_ids": [
+      "store:worker-config",
+      "process:background-worker-process"
+    ],
+    "claim": "An attacker with write access to the worker config redirects database operations to a service they control if that config governs the endpoint and the worker does not independently restrict or authenticate the destination, and also obtains reusable credentials if the authentication protocol reveals them to that service.",
+    "tier": "expected",
+    "severity": {
+      "likelihood": "medium",
+      "impact": "high"
+    },
+    "notes": "Provenance: own-list 05.10, 2026-09-21; drafted by the maintainer on 2026-09-22. The list preceded the full marks set but followed exposure to earlier corpus findings; it was not blind. Demoted from must-find to expected: the source establishes settings and database credentials in worker config, but not endpoint control or credential disclosure on redirection. Parallel to reference 3's web-config scenario, subject to these prerequisites.",
+    "verb": "alter"
   }
 ]

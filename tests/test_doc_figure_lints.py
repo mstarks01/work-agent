@@ -257,7 +257,10 @@ FIGURES: tuple[Figure, ...] = (
                     " merges of {cand_of} and {merges} false merges of"
                     " {merge_of}"
                 ),
-                1,
+                # Two: the headline sentence and the harness table's row. The
+                # headline was stale and the lint could not see it, because the
+                # wrap split the rendered string across two lines.
+                2,
             ),
             (
                 "evals/TUNING.md",

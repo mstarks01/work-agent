@@ -204,7 +204,7 @@ The narrower question, per record: **does this requirement apply to this system,
 
 > mark:
 
-## Part 3 — the 15 recorded STRIDE threats
+## Part 3 — the 17 recorded STRIDE threats
 
 Only after your own list exists.
 
@@ -357,6 +357,28 @@ on either of them. That is the finding this sitting exists for.
 
 > mark:
 
+
+### tampering
+
+**16.** An attacker with write access to the file share replaces the current payroll export with an earlier genuine one, and payroll processes stale data as current if it does not verify the expected export period and reject replayed exports.
+
+- `store:file-share`, `flow:entity:payroll-system>store:file-share>collect-payroll-export`
+- severity: medium/high · verb: `replay`
+- Provenance: own-list 11.7, 2026-09-21; drafted by the maintainer on 2026-09-22. The list preceded the full marks set but followed exposure to earlier corpus findings; it was not blind. Distinct from altering the current export at reference 4. Integrity of a genuine file alone does not establish freshness. Merely naming the period is insufficient unless the collector checks it; export schema and replay defenses are unknown.
+
+> mark:
+
+
+### information-disclosure
+
+**17.** An attacker on the internal network reads colleague names, contact details and availability as the scheduling service writes them to the rota database, or reads a whole store's payroll export as it is written to the file share, if those links carry no transport protection; the source says nobody documented whether any of it is encrypted.
+
+- `flow:process:scheduling-service>store:rota-database>read-write-rotas`, `flow:process:scheduling-service>store:file-share>write-payroll-export`
+- severity: low/high · verb: `intercept`
+- Provenance: own-list 11.8, 2026-09-21; drafted by the maintainer on 2026-09-22. The list preceded the full marks set but followed exposure to earlier corpus findings; it was not blind. The source explicitly says encryption is undocumented; it does not name an unencrypted state. Reference 11 addresses the colleague link, and references 9 and 10 address data at rest. Exact payroll fields are unspecified.
+
+> mark:
+
 ---
 
 ## What was on your list and not on either of theirs
@@ -404,7 +426,7 @@ your missing list, your notes and a digest of each file you read:
       "source.md": "2507fd3081003c1c94427ef81dcea36f6ca92f5358c965789b49ec4af89b6a60",
       "model.json": "252800813f3b60ff0937689d594ee0d29879b84595259d16ef4cd8f64e1e72f1",
       "claims/asvs.json": "320bf0d16aba7d873f9b2e77a5db19f7cab07403b5dc19c85adc70a718a67783",
-      "claims/stride.json": "be1fceb39c07ffe4c627b2151fb7d51fd6bd76c37e0b99a7c636462d3c65a6a7"
+      "claims/stride.json": "566d8dd8f9248b9eb8e35934320d3270ed86b4bc6a294fdb55a81198ab254ed8"
       }
     }
   }

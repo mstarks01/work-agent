@@ -145,7 +145,7 @@
       "likelihood": "medium",
       "impact": "medium"
     },
-    "notes": "Both links are recorded as bare port numbers — the model gives no transport protection at all.",
+    "notes": "Both links are recorded as bare port numbers \u2014 the model gives no transport protection at all.",
     "verb": "intercept"
   },
   {
@@ -222,5 +222,34 @@
     },
     "notes": "No role separation inside the tool is described; the blast radius is the whole player base.",
     "verb": "abuse-grant"
+  },
+  {
+    "category": "spoofing",
+    "affected_element_ids": [
+      "flow:process:lobby>process:game-server>hand-over-match"
+    ],
+    "claim": "An attacker who can reach a game server sends it a match hand-over of their own making, choosing who is in the match and under which player identifiers, if the game server checks nothing about the caller or the hand-over; the source records no authentication on that link.",
+    "tier": "must-find",
+    "severity": {
+      "likelihood": "medium",
+      "impact": "high"
+    },
+    "notes": "Provenance: own-list 06.4, 2026-09-21; drafted by the maintainer on 2026-09-22. The list preceded the full marks set but followed exposure to earlier corpus findings; it was not blind. The lobby-to-server handover is explicit; authentication and handover validation are unspecified. Reachability of a game server does not itself establish access to an accepted handover interface. Distinct from player-facing impersonation.",
+    "verb": "forge"
+  },
+  {
+    "category": "information-disclosure",
+    "affected_element_ids": [
+      "flow:process:moderation-website>store:player-database>read-write-players",
+      "flow:entity:customer-support-staff>process:moderation-website>moderate-accounts"
+    ],
+    "claim": "An attacker who can observe the corporate link to the moderation website, or its link to the player database, reads player account records and the moderation decisions taken on them, if those links carry no transport protection; the source records none either way.",
+    "tier": "expected",
+    "severity": {
+      "likelihood": "low",
+      "impact": "high"
+    },
+    "notes": "Provenance: own-list 06.9, 2026-09-21; drafted by the maintainer on 2026-09-22. The list preceded the full marks set but followed exposure to earlier corpus findings; it was not blind. Conditional interception of support and database traffic. The moderation site reads and writes player records, but transport protection and exact response contents are unknown. Reference 9 addresses the two client links.",
+    "verb": "intercept"
   }
 ]
