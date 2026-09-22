@@ -131,10 +131,19 @@ class TestABaseItCannotRead:
         assert "finding(s) added" not in capsys.readouterr().out
 
     def test_a_base_it_can_read_still_answers(self, capsys):
-        code = preflight.command_preflight(self._args("HEAD~1"))
+        """``HEAD``, never ``HEAD~1``.
 
-        assert code == 0
-        assert "finding(s) added since HEAD~1" in capsys.readouterr().out
+        CI checks out one commit, so a clone here may carry no parent — and
+        this test first named ``HEAD~1``, which the refusal above then caught
+        for exactly the right reason and failed the suite. The base a readable
+        case needs is a revision that exists, and ``HEAD`` is the one every
+        checkout has. What separates the two paths is the count line, which the
+        refusal never prints, so that is what this reads rather than an exit
+        code a dirty tree can move.
+        """
+        preflight.command_preflight(self._args("HEAD"))
+
+        assert "finding(s) added since HEAD" in capsys.readouterr().out
 
     def test_the_error_type_is_exported(self):
         """A caller that drives this in-process needs the type by name."""
