@@ -135,7 +135,7 @@ category.
 
 ---
 
-## Part 2 — the 13 recorded STRIDE threats
+## Part 2 — the 16 recorded STRIDE threats
 
 Only after your own list exists.
 
@@ -272,6 +272,39 @@ on either of them. That is the finding this sitting exists for.
 
 > mark:
 
+
+### tampering
+
+**14.** An attacker with write access to the firmware bucket replaces the current image with an older genuine image containing a known weakness, and nodes install that vulnerable version if they accept the image and lack an effective anti-rollback check.
+
+- `store:firmware-bucket`, `entity:sensor-node`
+- severity: medium/high · verb: `replay`
+- Provenance: own-list 02.4, 2026-09-21; drafted by the maintainer on 2026-09-22. The list preceded the full marks set but followed exposure to earlier corpus findings; it was not blind. Distinct from reference 3: a genuine older image may pass signature verification. Installation eligibility and anti-rollback enforcement are unknown; not every polling node necessarily downgrades.
+
+> mark:
+
+
+### denial-of-service
+
+**15.** An attacker repeatedly downloads images from the public-read firmware bucket, increasing delivery charges and potentially preventing genuine updates if shared delivery limits are exhausted or cost controls suspend delivery.
+
+- `store:firmware-bucket`, `flow:entity:sensor-node>store:firmware-bucket>poll-firmware`
+- severity: medium/medium · verb: `flood`
+- Provenance: own-list 02.8, 2026-09-21; drafted by the maintainer on 2026-09-22. The list preceded the full marks set but followed exposure to earlier corpus findings; it was not blind. Public read establishes anonymous download access, not the absence of quotas or rate limits. Charges do not themselves establish an outage; update denial depends on shared limits or suspension. Distinct from reading image contents at reference 8.
+
+> mark:
+
+
+### tampering
+
+**16.** An attacker able to submit readings accepted by the gateway supplies crafted values that the normalizer turns into invalid derived values in the lake, if domain and range validation do not reject them.
+
+- `process:telemetry-normalizer`, `store:telemetry-lake`
+- severity: medium/medium · verb: `plant`
+- Provenance: own-list 02.10, 2026-09-21; drafted by the maintainer on 2026-09-22. The list preceded the full marks set but followed exposure to earlier corpus findings; it was not blind. Content-integrity scenario, distinct from volume flooding at reference 11. Gateway acceptance and ineffective domain validation are prerequisites. The separate consumer-crash outcome is omitted to keep this tampering claim focused.
+
+> mark:
+
 ---
 
 ## What was on your list and not on either of theirs
@@ -318,7 +351,7 @@ your missing list, your notes and a digest of each file you read:
       "opened_digests": {
       "source.md": "fc745e273aff8be740a814f0a9b4a45d6f3c6fe39dc7c8efa2b879d4f270ac74",
       "model.json": "fbe6f9b1304f947a2efe454df07391e4a430acf808055be11c5b3bb7911995a4",
-      "claims/stride.json": "4bbdff1899c5f4965f3e95d9dfdfa740d80aeea62082430cdaaf822770084068"
+      "claims/stride.json": "bbfeb0506efa547ce96225331ee0cd2b845d7fb7a23e3be94995949c88b8f5a4"
       }
     }
   }

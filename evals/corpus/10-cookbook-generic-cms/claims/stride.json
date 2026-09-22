@@ -224,7 +224,7 @@
       "store:cdn-bucket",
       "flow:entity:reader>entity:cdn>asset-fetch"
     ],
-    "claim": "An attacker who can write to the CDN bucket plants an asset there — a stylesheet or a download, which is what the source says the CDN serves — and the site delivers it to every reader as its own, because nothing records how the push to the bucket is authenticated.",
+    "claim": "An attacker who can write to the CDN bucket plants an asset there \u2014 a stylesheet or a download, which is what the source says the CDN serves \u2014 and the site delivers it to every reader as its own, because nothing records how the push to the bucket is authenticated.",
     "tier": "must-find",
     "severity": {
       "likelihood": "medium",
@@ -248,5 +248,21 @@
     },
     "notes": "Drafted from Baseline 6bff717-gpt-5.6-terra-24dda4db draft S-03, ruled a relevant threat scenario by the maintainer on 2026-09-20 (audit QA-2026-09-20-01). Conditional. Direct MySQL administration exists and its authentication is unspecified, so missing authentication could permit administrative impersonation without stealing a credential. Lacking a unique identity alone would not establish unauthorized access. It is a distinct mechanism from reference 0, which it does not satisfy.",
     "verb": "impersonate"
+  },
+  {
+    "category": "tampering",
+    "affected_element_ids": [
+      "process:web-server",
+      "store:mysql-database",
+      "entity:reader"
+    ],
+    "claim": "A commenter submits content that the CMS keeps and later serves to other readers, and their browsers treat it as markup or script rather than text, if nothing encodes or sanitizes a comment on the way out; the source says the database holds comments and states no such handling.",
+    "tier": "must-find",
+    "severity": {
+      "likelihood": "medium",
+      "impact": "high"
+    },
+    "notes": "Provenance: own-list 10.10, 2026-09-21; drafted by the maintainer on 2026-09-22. The list preceded the full marks set but followed exposure to earlier corpus findings; it was not blind. Stored comments are explicit; serving attacker-controlled comments to another reader and unsafe rendering remain prerequisites. A prior reference claim is not independent evidence of rendering behavior. Context-appropriate encoding or sanitization may prevent execution.",
+    "verb": "inject"
   }
 ]

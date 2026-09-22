@@ -217,7 +217,7 @@ The narrower question, per record: **does this requirement apply to this system,
 
 > mark:
 
-## Part 3 — the 18 recorded STRIDE threats
+## Part 3 — the 20 recorded STRIDE threats
 
 Only after your own list exists.
 
@@ -394,6 +394,25 @@ on either of them. That is the finding this sitting exists for.
 
 > mark:
 
+**19.** A customer sends the web API the catalogue operations the marketing spreadsheet sends, changing prices and product copy, if the API decides what a caller may do no more finely than it decides who the caller is; the source says the macros speak SQL to the same API the app calls and records no role separation.
+
+- `entity:customer`, `process:web-api`
+- severity: medium/high · verb: `escalate`
+- Provenance: own-list 09.5, 2026-09-21; drafted by the maintainer on 2026-09-22. The list preceded the full marks set but followed exposure to earlier corpus findings; it was not blind. Conditional role-authorization bypass on the shared API. Distinct from posing as the catalogue tool at reference 1 and accessing customer records through that tool at reference 17. No role-check implementation is stated.
+
+> mark:
+
+
+### spoofing
+
+**20.** An attacker who reaches the SIMS handover interface submits orders as though the web API sent them, and SIMS writes delivery addresses and sends fax confirmations for those fabricated orders if caller authentication and order validation do not reject them.
+
+- `flow:process:web-api>process:sims>order-handover`, `process:sims`
+- severity: medium/high · verb: `impersonate`
+- Provenance: own-list 09.9, 2026-09-21; drafted by the maintainer on 2026-09-22. The list preceded the full marks set but followed exposure to earlier corpus findings; it was not blind. The API-to-SIMS handover is explicit; caller authentication and order validation are unknown, not absent. Reference 6 addresses tampering at the same handover.
+
+> mark:
+
 ---
 
 ## What was on your list and not on either of theirs
@@ -441,7 +460,7 @@ your missing list, your notes and a digest of each file you read:
       "source.md": "603873a0d569ba3f0ac4a91a363086b54bae022cf432862d17be9eec9465e4ea",
       "model.json": "d6c0f91a9ae04bdb237850d3aff9a13c7b5c206578658d4ea44e169d8323d14d",
       "claims/asvs.json": "fbc32dc14ac8a90e9bbb2bab6801dc704f2468a03e056d992f41564c9d8de41c",
-      "claims/stride.json": "71c75f70cf87ac895092976827d5846fdb9389127c1a1812838761d2e9def4c8"
+      "claims/stride.json": "3c6cc2581eae539e4ac135dd37a0f933a2a8082f6bcf9cdf65112ab58c0ce5d8"
       }
     }
   }

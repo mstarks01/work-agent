@@ -126,7 +126,7 @@ category.
 
 ---
 
-## Part 2 — the 15 recorded STRIDE threats
+## Part 2 — the 17 recorded STRIDE threats
 
 Only after your own list exists.
 
@@ -279,6 +279,28 @@ on either of them. That is the finding this sitting exists for.
 
 > mark:
 
+
+### tampering
+
+**16.** An attacker with upload access places an earlier genuine partner extract in the landing bucket, and the nightly run duplicates claim records or overwrites newer values with stale ones if batch freshness and replay controls are ineffective and the load semantics permit that result.
+
+- `store:landing-bucket`, `process:ingest-scheduler`
+- severity: medium/high · verb: `replay`
+- Provenance: own-list 03.4, 2026-09-21; drafted by the maintainer on 2026-09-22. The list preceded the full marks set but followed exposure to earlier corpus findings; it was not blind. Distinct from altered file contents at reference 3 and partner impersonation at reference 1. The source states that the scheduler reads whatever is present, but does not establish append versus overwrite semantics or replay defenses.
+
+> mark:
+
+
+### denial-of-service
+
+**17.** A partner uploads many small files, causing the scheduler to request a Spark transform job for each, so genuine processing is delayed or denied if job admission, concurrency limits and resource isolation do not contain the resulting workload.
+
+- `flow:process:ingest-scheduler>process:spark-transform-job>trigger-transform`
+- severity: medium/high · verb: `flood`
+- Provenance: own-list 03.5, 2026-09-21; drafted by the maintainer on 2026-09-22. The list preceded the full marks set but followed exposure to earlier corpus findings; it was not blind. The source explicitly starts a transform job per file. Distinct from one enormous or malformed file at reference 12. File count can exhaust processing capacity; exhaustion of the entire warehouse network is not established.
+
+> mark:
+
 ---
 
 ## What was on your list and not on either of theirs
@@ -325,7 +347,7 @@ your missing list, your notes and a digest of each file you read:
       "opened_digests": {
       "source.md": "df7757178c394258cbcf1643e81fca5b01f324058a0841824f008e74346da2d0",
       "model.json": "3800082a9fa433aff29c46f4b0e170d578d64b05bde8186dff0d11b0252ce73d",
-      "claims/stride.json": "4290e0c248a443aec11030a6a6762f5205f0639225dc3b04c77be1e3fb841ff1"
+      "claims/stride.json": "a2578768e3e3ee80f491cad4286d7baaa926de991e8c4220ea28cf823e6d7135"
       }
     }
   }

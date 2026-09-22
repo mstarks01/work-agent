@@ -70,7 +70,7 @@
       "likelihood": "low",
       "impact": "high"
     },
-    "notes": "The metadata database is a control plane, not just a data store — worth its own finding.",
+    "notes": "The metadata database is a control plane, not just a data store \u2014 worth its own finding.",
     "verb": "alter"
   },
   {
@@ -202,7 +202,7 @@
       "likelihood": "medium",
       "impact": "medium"
     },
-    "notes": "Silent staleness rather than visible downtime — the failure mode analysts under-report on pipelines.",
+    "notes": "Silent staleness rather than visible downtime \u2014 the failure mode analysts under-report on pipelines.",
     "verb": "disable"
   },
   {
@@ -219,5 +219,34 @@
     },
     "notes": "Authorization scope, distinct from the disclosure entry about which columns are readable.",
     "verb": "abuse-grant"
+  },
+  {
+    "category": "tampering",
+    "affected_element_ids": [
+      "store:landing-bucket",
+      "process:ingest-scheduler"
+    ],
+    "claim": "An attacker with upload access places an earlier genuine partner extract in the landing bucket, and the nightly run duplicates claim records or overwrites newer values with stale ones if batch freshness and replay controls are ineffective and the load semantics permit that result.",
+    "tier": "expected",
+    "severity": {
+      "likelihood": "medium",
+      "impact": "high"
+    },
+    "notes": "Provenance: own-list 03.4, 2026-09-21; drafted by the maintainer on 2026-09-22. The list preceded the full marks set but followed exposure to earlier corpus findings; it was not blind. Distinct from altered file contents at reference 3 and partner impersonation at reference 1. The source states that the scheduler reads whatever is present, but does not establish append versus overwrite semantics or replay defenses.",
+    "verb": "replay"
+  },
+  {
+    "category": "denial-of-service",
+    "affected_element_ids": [
+      "flow:process:ingest-scheduler>process:spark-transform-job>trigger-transform"
+    ],
+    "claim": "A partner uploads many small files, causing the scheduler to request a Spark transform job for each, so genuine processing is delayed or denied if job admission, concurrency limits and resource isolation do not contain the resulting workload.",
+    "tier": "expected",
+    "severity": {
+      "likelihood": "medium",
+      "impact": "high"
+    },
+    "notes": "Provenance: own-list 03.5, 2026-09-21; drafted by the maintainer on 2026-09-22. The list preceded the full marks set but followed exposure to earlier corpus findings; it was not blind. The source explicitly starts a transform job per file. Distinct from one enormous or malformed file at reference 12. File count can exhaust processing capacity; exhaustion of the entire warehouse network is not established.",
+    "verb": "flood"
   }
 ]
