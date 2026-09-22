@@ -1,5 +1,7 @@
 """Tests for prompt composition and the shared Markdown loader."""
 
+from typing import get_args
+
 import pytest
 
 from analysis_service.assertions import REGISTRY
@@ -11,6 +13,8 @@ from analysis_service.markdown_loader import (
 from analysis_service.prompts import (
     PROMPT_BODY_NAMES,
     PROMPT_SECTION_HEADINGS,
+    REFERENCE_FORMS,
+    Stage,
     compose_analyze_prompt,
     compose_assert_prompt,
     compose_critic_prompt,
@@ -191,8 +195,18 @@ class TestThePredicateTableSpeaksItsStageSpelling:
         assert f"| `network-membership` | component | {spelling} |" in rendered
         assert "the name of a" not in rendered
 
+    def test_the_table_answers_for_every_stage_and_no_more(self):
+        """The table against the type that names its keys.
+
+        ``render_predicates`` takes no default, so a composer must name its
+        stage; this is the other half, and it fails when the type grows a
+        stage the table cannot spell rather than at render time in a shipped
+        prompt.
+        """
+        assert set(REFERENCE_FORMS) == set(get_args(Stage))
+
     def test_every_composer_renders_a_stage_the_table_holds(self, loader):
-        """A stage added tomorrow raises here rather than taking a default."""
+        """Each composer names its own stage, because there is no default."""
         for compose in (
             compose_facts_prompt,
             compose_rows_prompt,

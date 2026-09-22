@@ -18,15 +18,16 @@ Version 1 reads what a claim carries today: framework, lane, and the
 endpoint-resolved **Element** IDs. It has a measured cost.
 ``tests/test_evals_identity.py``'s ``endpoint subset`` row prices element
 agreement alone at 12 false splits of 169, 69 false merges of 92 candidate
-negatives, and 23 false merges of 287 reference pairs.
+negatives, and the reference merges the frontier table in
+``docs/agents/claim-identity.md`` carries. That table is the one reader of the
+reference column, so this module states it nowhere.
 
-Version 2 adds the action verb, which closes most of that gap without adding a
-false split, and it takes the candidate merges from 69 to 2. Read the candidate
-column rather than the reference one: on reference pairs alone the verb removes
-twenty of 23 and version 1 looks survivable, and on the paraphrases a live run
-emits it removes 78 of 81.
-:class:`~evals.harness.identity.SubsetVerbIdentity` scores 294/311 against the
-recorded labels, where element agreement alone scores 201/311.
+Version 2 adds the action verb, and it takes the candidate merges from 69 to 2.
+It takes the false splits from 12 to 13 over 169 labelled pairs, which is the
+whole price. Read the candidate column rather than the reference one: on
+reference pairs alone version 1 reads as survivable.
+Scored against the recorded labels, the verb rule agrees on 246/261.
+Element agreement alone agrees on 169/261.
 
 Version 2 is the default. :class:`~analysis_service.claims.Claim` carries the
 verb, and :class:`~analysis_service.frameworks.stride.record.DraftThreat`
