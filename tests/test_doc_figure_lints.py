@@ -220,6 +220,17 @@ def _direction() -> Mapping[str, object]:
     }
 
 
+def _stride_reference_claims() -> Mapping[str, object]:
+    """How many reference claims the corpus records for STRIDE.
+
+    Three module docstrings argue from this count, so all three are claimed
+    below. A corpus addition moves the number, and a docstring nobody claims
+    goes on stating whatever it was written with.
+    """
+    corpus = load_corpus(verify_corpus.CORPUS_DIR)
+    return {"value": sum(len(case.references.get("stride", ())) for case in corpus)}
+
+
 def _corpus() -> Mapping[str, object]:
     count = len(verify_corpus.case_dirs())
     return {"value": count, "word": WORDS.get(count, str(count))}
@@ -320,13 +331,44 @@ FIGURES: tuple[Figure, ...] = (
                 1,
             ),
             (
+                "evals/harness/fingerprint.py",
+                (
+                    "the false splits from {floor_splits} to {splits} over"
+                    " {split_of} labelled pairs"
+                ),
+                1,
+            ),
+            # A template spans a whole sentence, never a fragment of one. One
+            # that starts mid-sentence governs the half it covers and leaves
+            # the arithmetic in front of it alone, so the figure moves, the
+            # lint passes, and the sentence around it stops adding up.
+            (
                 "evals/harness/verbs.py",
-                ("{floor_cand_merges} false merges of\n{cand_of} candidate negatives"),
+                (
+                    "the false merges from {floor_cand_merges} to {cand_merges}"
+                    " over {cand_of} candidate negatives"
+                ),
+                1,
+            ),
+            (
+                "evals/harness/verbs.py",
+                (
+                    "the false splits from {floor_splits} to {splits} over"
+                    " {split_of} labelled pairs"
+                ),
                 1,
             ),
             (
                 "evals/harness/verbs.py",
                 "merges {floor_cand_merges} of {cand_of}",
+                1,
+            ),
+            (
+                "docs/agents/claim-identity.md",
+                (
+                    "The verb takes that to {cand_merges}, and it costs one"
+                    " split to do it \u2014 {floor_splits} becomes {splits}"
+                ),
                 1,
             ),
         ),
@@ -379,6 +421,43 @@ FIGURES: tuple[Figure, ...] = (
                     "| `MechanicalIdentity` (element equality) |"
                     " {floor_agreed}/{floor_total} = {floor_percent}% |"
                 ),
+                1,
+            ),
+            (
+                "evals/harness/verbs.py",
+                "the verb rule agrees on {agreed}/{total}",
+                1,
+            ),
+            (
+                "evals/harness/verbs.py",
+                "Element agreement alone agrees on {floor_agreed}/{floor_total}",
+                1,
+            ),
+            (
+                "evals/harness/fingerprint.py",
+                "the verb rule agrees on {agreed}/{total}",
+                1,
+            ),
+            (
+                "evals/harness/fingerprint.py",
+                "Element agreement alone agrees on {floor_agreed}/{floor_total}",
+                1,
+            ),
+        ),
+    ),
+    Figure(
+        name="the corpus's STRIDE reference claims",
+        compute=_stride_reference_claims,
+        claims=(
+            ("evals/harness/verbs.py", "all {value} reference claims carry a verb", 1),
+            (
+                "evals/harness/exemplar_verbs.py",
+                "18 exemplars and {value} reference claims",
+                1,
+            ),
+            (
+                "evals/harness/exemplar_verbs.py",
+                "of {value} reference claims, which is",
                 1,
             ),
         ),
