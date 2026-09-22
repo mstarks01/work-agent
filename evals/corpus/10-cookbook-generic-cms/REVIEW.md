@@ -182,7 +182,7 @@ The narrower question, per record: **does this requirement apply to this system,
 
 > mark:
 
-## Part 3 — the 17 recorded STRIDE threats
+## Part 3 — the 18 recorded STRIDE threats
 
 Only after your own list exists.
 
@@ -354,6 +354,17 @@ on either of them. That is the finding this sitting exists for.
 
 > mark:
 
+
+### tampering
+
+**18.** A commenter submits content that the CMS keeps and later serves to other readers, and their browsers treat it as markup or script rather than text, if nothing encodes or sanitizes a comment on the way out; the source says the database holds comments and states no such handling.
+
+- `process:web-server`, `store:mysql-database`, `entity:reader`
+- severity: medium/high · verb: `inject`
+- Provenance: own-list 10.10, 2026-09-21; drafted by the maintainer on 2026-09-22. The list preceded the full marks set but followed exposure to earlier corpus findings; it was not blind. Stored comments are explicit; serving attacker-controlled comments to another reader and unsafe rendering remain prerequisites. A prior reference claim is not independent evidence of rendering behavior. Context-appropriate encoding or sanitization may prevent execution.
+
+> mark:
+
 ---
 
 ## What was on your list and not on either of theirs
@@ -401,7 +412,7 @@ your missing list, your notes and a digest of each file you read:
       "source.md": "11d2a58f0e1d5773054f0a72d222b3cc96f889cdd0206dd3656495a3d5fe8313",
       "model.json": "b65455924d2682e8d7ffd3f60cc9c5a29d7b5ff3335fbba4e5ad9ade51c1c5d0",
       "claims/asvs.json": "94a4b8bb0cc5e626225766a800eafa32eb85fe99ff00af49f5f8cc7e477ea19f",
-      "claims/stride.json": "1ae880a26d1852c6eac22610dcc7ccffc16c127174a39ead54a2df772ee5c2a6"
+      "claims/stride.json": "a1c33bccbe54c5298af5ac049486a85dc0426efec4943563acf7e2ab8e42dbd8"
       }
     }
   }

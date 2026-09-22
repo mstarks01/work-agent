@@ -68,42 +68,42 @@ UNREVIEWED: dict[str, str] = {
     ),
     "02-iot-fleet-telemetry": (
         "Read on 2026-09-21 and un-read by that same sitting's own "
-        "rulings: the `unsure` must-find claims reworded to state the premise they rest on, because the reader marked them `unsure` and their notes name a local fact the input never carried; 5 STRIDE claims dropped. The reader read the sets they then ruled "
+        "rulings: the `unsure` must-find claims reworded to state the premise they rest on, because the reader marked them `unsure` and their notes name a local fact the input never carried; 5 STRIDE claims dropped; 3 STRIDE claims added on 2026-09-22, 3 at `expected`, converted from the threats the reader wrote in their own list during the same sitting and found no reference row for, and tiered by the maintainer. The reader wrote every one of them, so a second sitting rules on words they authored rather than on anything new to them. The reader read the sets they then ruled "
         "out, so the signature cannot match and nothing they judged "
         "has been hidden. A second sitting over the current files "
         "clears it."
     ),
     "03-batch-data-pipeline": (
         "Read on 2026-09-21 and un-read by that same sitting's own "
-        "rulings: one repudiation claim retiered to `expected`, because the reader marked it `unsure` and their note says a description cannot settle it; 2 STRIDE claims dropped. The reader read the sets they then ruled "
+        "rulings: one repudiation claim retiered to `expected`, because the reader marked it `unsure` and their note says a description cannot settle it; 2 STRIDE claims dropped; 2 STRIDE claims added on 2026-09-22, 2 at `expected`, converted from the threats the reader wrote in their own list during the same sitting and found no reference row for, and tiered by the maintainer. The reader wrote every one of them, so a second sitting rules on words they authored rather than on anything new to them. The reader read the sets they then ruled "
         "out, so the signature cannot match and nothing they judged "
         "has been hidden. A second sitting over the current files "
         "clears it."
     ),
     "04-ml-inference-service": (
         "Read on 2026-09-21 and un-read by that same sitting's own "
-        "rulings: the `unsure` must-find claims reworded to state the premise they rest on, because the reader marked them `unsure` and their notes name a local fact the input never carried; one repudiation claim retiered to `expected`, because the reader marked it `unsure` and their note says a description cannot settle it; 2 STRIDE claims dropped; 1 ASVS record dropped. The reader read the sets they then ruled "
+        "rulings: the `unsure` must-find claims reworded to state the premise they rest on, because the reader marked them `unsure` and their notes name a local fact the input never carried; one repudiation claim retiered to `expected`, because the reader marked it `unsure` and their note says a description cannot settle it; 2 STRIDE claims dropped; 1 ASVS record dropped; 1 STRIDE claim added on 2026-09-22, 1 at `expected`, converted from the threats the reader wrote in their own list during the same sitting and found no reference row for, and tiered by the maintainer. The reader wrote every one of them, so a second sitting rules on words they authored rather than on anything new to them. The reader read the sets they then ruled "
         "out, so the signature cannot match and nothing they judged "
         "has been hidden. A second sitting over the current files "
         "clears it."
     ),
     "05-cookbook-queue-webapp": (
         "Read on 2026-09-21 and un-read by that same sitting's own "
-        "rulings: 5 STRIDE claims dropped; one elevation-of-privilege claim added at `expected`, written by the reader in their own list and promoted after every elevation claim this case carried was ruled out. The reader read the sets they then ruled "
+        "rulings: 5 STRIDE claims dropped; one elevation-of-privilege claim added at `expected`, written by the reader in their own list and promoted after every elevation claim this case carried was ruled out; 5 STRIDE claims added on 2026-09-22, 5 at `expected`, converted from the threats the reader wrote in their own list during the same sitting and found no reference row for, and tiered by the maintainer. The reader wrote every one of them, so a second sitting rules on words they authored rather than on anything new to them. The reader read the sets they then ruled "
         "out, so the signature cannot match and nothing they judged "
         "has been hidden. A second sitting over the current files "
         "clears it."
     ),
     "06-cookbook-online-game": (
         "Read on 2026-09-21 and un-read by that same sitting's own "
-        "rulings: the `unsure` must-find claims reworded to state the premise they rest on, because the reader marked them `unsure` and their notes name a local fact the input never carried; one repudiation claim retiered to `expected`, because the reader marked it `unsure` and their note says a description cannot settle it; 3 STRIDE claims dropped. The reader read the sets they then ruled "
+        "rulings: the `unsure` must-find claims reworded to state the premise they rest on, because the reader marked them `unsure` and their notes name a local fact the input never carried; one repudiation claim retiered to `expected`, because the reader marked it `unsure` and their note says a description cannot settle it; 3 STRIDE claims dropped; 2 STRIDE claims added on 2026-09-22, 1 at `must-find` and 1 at `expected`, converted from the threats the reader wrote in their own list during the same sitting and found no reference row for, and tiered by the maintainer. The reader wrote every one of them, so a second sitting rules on words they authored rather than on anything new to them. The reader read the sets they then ruled "
         "out, so the signature cannot match and nothing they judged "
         "has been hidden. A second sitting over the current files "
         "clears it."
     ),
     "07-cicd-store-deploy": (
         "Read on 2026-09-21 and un-read by that same sitting's own "
-        "rulings: the `unsure` must-find claims reworded to state the premise they rest on, because the reader marked them `unsure` and their notes name a local fact the input never carried; one repudiation claim retiered to `expected`, because the reader marked it `unsure` and their note says a description cannot settle it; 4 STRIDE claims dropped. The reader read the sets they then ruled "
+        "rulings: the `unsure` must-find claims reworded to state the premise they rest on, because the reader marked them `unsure` and their notes name a local fact the input never carried; one repudiation claim retiered to `expected`, because the reader marked it `unsure` and their note says a description cannot settle it; 4 STRIDE claims dropped; 1 STRIDE claim added on 2026-09-22, 1 at `expected`, converted from the threats the reader wrote in their own list during the same sitting and found no reference row for, and tiered by the maintainer. The reader wrote every one of them, so a second sitting rules on words they authored rather than on anything new to them. The reader read the sets they then ruled "
         "out, so the signature cannot match and nothing they judged "
         "has been hidden. A second sitting over the current files "
         "clears it."
@@ -117,35 +117,35 @@ UNREVIEWED: dict[str, str] = {
     ),
     "09-cookbook-sokify-retail": (
         "Read on 2026-09-21 and un-read by that same sitting's own "
-        "rulings: the `unsure` must-find claims reworded to state the premise they rest on, because the reader marked them `unsure` and their notes name a local fact the input never carried; one repudiation claim retiered to `expected`, because the reader marked it `unsure` and their note says a description cannot settle it; 2 STRIDE claims dropped. The reader read the sets they then ruled "
+        "rulings: the `unsure` must-find claims reworded to state the premise they rest on, because the reader marked them `unsure` and their notes name a local fact the input never carried; one repudiation claim retiered to `expected`, because the reader marked it `unsure` and their note says a description cannot settle it; 2 STRIDE claims dropped; 2 STRIDE claims added on 2026-09-22, 1 at `must-find` and 1 at `expected`, converted from the threats the reader wrote in their own list during the same sitting and found no reference row for, and tiered by the maintainer. The reader wrote every one of them, so a second sitting rules on words they authored rather than on anything new to them. The reader read the sets they then ruled "
         "out, so the signature cannot match and nothing they judged "
         "has been hidden. A second sitting over the current files "
         "clears it."
     ),
     "10-cookbook-generic-cms": (
         "Read on 2026-09-21 and un-read by that same sitting's own "
-        "rulings: the `unsure` must-find claims reworded to state the premise they rest on, because the reader marked them `unsure` and their notes name a local fact the input never carried; one repudiation claim retiered to `expected`, because the reader marked it `unsure` and their note says a description cannot settle it; 1 STRIDE claim dropped; 1 ASVS record dropped. The reader read the sets they then ruled "
+        "rulings: the `unsure` must-find claims reworded to state the premise they rest on, because the reader marked them `unsure` and their notes name a local fact the input never carried; one repudiation claim retiered to `expected`, because the reader marked it `unsure` and their note says a description cannot settle it; 1 STRIDE claim dropped; 1 ASVS record dropped; 1 STRIDE claim added on 2026-09-22, 1 at `must-find`, converted from the threats the reader wrote in their own list during the same sitting and found no reference row for, and tiered by the maintainer. The reader wrote every one of them, so a second sitting rules on words they authored rather than on anything new to them. The reader read the sets they then ruled "
         "out, so the signature cannot match and nothing they judged "
         "has been hidden. A second sitting over the current files "
         "clears it."
     ),
     "11-sparse-shift-scheduling": (
         "Read on 2026-09-21 and un-read by that same sitting's own "
-        "rulings: the `unsure` must-find claims reworded to state the premise they rest on, because the reader marked them `unsure` and their notes name a local fact the input never carried; one repudiation claim retiered to `expected`, because the reader marked it `unsure` and their note says a description cannot settle it; 1 STRIDE claim dropped. The reader read the sets they then ruled "
+        "rulings: the `unsure` must-find claims reworded to state the premise they rest on, because the reader marked them `unsure` and their notes name a local fact the input never carried; one repudiation claim retiered to `expected`, because the reader marked it `unsure` and their note says a description cannot settle it; 1 STRIDE claim dropped; 2 STRIDE claims added on 2026-09-22, 2 at `expected`, converted from the threats the reader wrote in their own list during the same sitting and found no reference row for, and tiered by the maintainer. The reader wrote every one of them, so a second sitting rules on words they authored rather than on anything new to them. The reader read the sets they then ruled "
         "out, so the signature cannot match and nothing they judged "
         "has been hidden. A second sitting over the current files "
         "clears it."
     ),
     "12-overclaiming-supplier-portal": (
         "Read on 2026-09-21 and un-read by that same sitting's own "
-        "rulings: the `unsure` must-find claims reworded to state the premise they rest on, because the reader marked them `unsure` and their notes name a local fact the input never carried; one repudiation claim retiered to `expected`, because the reader marked it `unsure` and their note says a description cannot settle it; 4 STRIDE claims dropped. The reader read the sets they then ruled "
+        "rulings: the `unsure` must-find claims reworded to state the premise they rest on, because the reader marked them `unsure` and their notes name a local fact the input never carried; one repudiation claim retiered to `expected`, because the reader marked it `unsure` and their note says a description cannot settle it; 4 STRIDE claims dropped; 5 STRIDE claims added on 2026-09-22, 2 at `must-find` and 3 at `expected`, converted from the threats the reader wrote in their own list during the same sitting and found no reference row for, and tiered by the maintainer. The reader wrote every one of them, so a second sitting rules on words they authored rather than on anything new to them. The reader read the sets they then ruled "
         "out, so the signature cannot match and nothing they judged "
         "has been hidden. A second sitting over the current files "
         "clears it."
     ),
     "13-dispatch-control-plane": (
         "Read on 2026-09-21 and un-read by that same sitting's own "
-        "rulings: one repudiation claim retiered to `expected`, because the reader marked it `unsure` and their note says a description cannot settle it; 2 STRIDE claims dropped. The reader read the sets they then ruled "
+        "rulings: one repudiation claim retiered to `expected`, because the reader marked it `unsure` and their note says a description cannot settle it; 2 STRIDE claims dropped; 1 STRIDE claim added on 2026-09-22, 1 at `must-find`, converted from the threats the reader wrote in their own list during the same sitting and found no reference row for, and tiered by the maintainer. The reader wrote every one of them, so a second sitting rules on words they authored rather than on anything new to them. The reader read the sets they then ruled "
         "out, so the signature cannot match and nothing they judged "
         "has been hidden. A second sitting over the current files "
         "clears it."

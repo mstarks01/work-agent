@@ -191,7 +191,7 @@ The narrower question, per record: **does this requirement apply to this system,
 
 > mark:
 
-## Part 3 — the 14 recorded STRIDE threats
+## Part 3 — the 19 recorded STRIDE threats
 
 Only after your own list exists.
 
@@ -339,6 +339,58 @@ on either of them. That is the finding this sitting exists for.
 
 > mark:
 
+
+### tampering
+
+**15.** An attacker inside the backend tier alters a job in flight on the link to the queue or the link out of it, so the worker performs work nobody asked for, if those links carry no integrity protection; the source marks the browser link as the one encrypted link and says nothing about these two.
+
+- `flow:process:web-application>store:message-queue>enqueue-job`, `flow:process:background-worker-process>store:message-queue>consume-job`
+- severity: low/high · verb: `alter-in-transit`
+- Provenance: own-list 05.5, 2026-09-21; drafted by the maintainer on 2026-09-22. The list preceded the full marks set but followed exposure to earlier corpus findings; it was not blind. Conditional integrity attack on the queue links; their transport protection is unknown. Reference 9 addresses disclosure on those links. Only the browser link is explicitly marked encrypted.
+
+> mark:
+
+
+### information-disclosure
+
+**16.** An attacker who reaches the queue reads the jobs waiting on it and learns what the application is doing and for whom, if a job carries anything confidential and nothing restricts which consumer may read; the source states neither.
+
+- `store:message-queue`
+- severity: medium/medium · verb: `read`
+- Provenance: own-list 05.6, 2026-09-21; drafted by the maintainer on 2026-09-22. The list preceded the full marks set but followed exposure to earlier corpus findings; it was not blind. Reading half of own-list 05.6, split by the maintainer. Confidential job content and unauthorized consumer access are both conditional. Reference 9 concerns interception in transit rather than reading queued data.
+
+> mark:
+
+
+### denial-of-service
+
+**17.** An attacker able to consume from the queue takes jobs and acknowledges them without doing the work, preventing legitimate processing if consumer authorization allows this access and the queue removes acknowledged jobs without an effective recovery mechanism.
+
+- `store:message-queue`, `flow:process:background-worker-process>store:message-queue>consume-job`
+- severity: medium/high · verb: `delete`
+- Provenance: own-list 05.6, 2026-09-21; drafted by the maintainer on 2026-09-22. The list preceded the full marks set but followed exposure to earlier corpus findings; it was not blind. Discarding half of own-list 05.6, split by the maintainer. Queue acknowledgement and recovery semantics are unspecified. Do not infer that the application reports success. Distinct from worker flooding at reference 10.
+
+> mark:
+
+
+### tampering
+
+**18.** An attacker able to resubmit a genuine job causes the worker to repeat its business operation if replay detection and idempotency controls do not prevent duplicate effects.
+
+- `store:message-queue`, `process:background-worker-process`
+- severity: medium/medium · verb: `replay`
+- Provenance: own-list 05.7, 2026-09-21; drafted by the maintainer on 2026-09-22. The list preceded the full marks set but followed exposure to earlier corpus findings; it was not blind. Distinct from inventing a job at reference 1. Producer authentication alone need not reject a replay by an accepted producer; the attacker still needs a resubmission path. Replay checks and operation semantics are unknown.
+
+> mark:
+
+**19.** An attacker with write access to the worker config redirects database operations to a service they control if that config governs the endpoint and the worker does not independently restrict or authenticate the destination, and also obtains reusable credentials if the authentication protocol reveals them to that service.
+
+- `store:worker-config`, `process:background-worker-process`
+- severity: medium/high · verb: `alter`
+- Provenance: own-list 05.10, 2026-09-21; drafted by the maintainer on 2026-09-22. The list preceded the full marks set but followed exposure to earlier corpus findings; it was not blind. Demoted from must-find to expected: the source establishes settings and database credentials in worker config, but not endpoint control or credential disclosure on redirection. Parallel to reference 3's web-config scenario, subject to these prerequisites.
+
+> mark:
+
 ---
 
 ## What was on your list and not on either of theirs
@@ -386,7 +438,7 @@ your missing list, your notes and a digest of each file you read:
       "source.md": "20b0aa82c922766db2353cade33f7a26b38c60a3c7061244ef4686b7a647778b",
       "model.json": "bf3cfe67eb9ecbc49237bb6cf388bf664e1de8b54b444c8c004cdf87de5fdc46",
       "claims/asvs.json": "f4b9f4dc1da5a583e5632a316271414ec0b1e587021b861a544d5899cf1900c5",
-      "claims/stride.json": "000359ed1dbb25fef8ff7156843b12c0d9e69c2181c51b9c9d48f639e4d49322"
+      "claims/stride.json": "0bb62439ccf1943fa52c8057d1b34b285756cdd9d3e74405202a999c836d1877"
       }
     }
   }

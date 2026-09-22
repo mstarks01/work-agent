@@ -142,7 +142,7 @@ category.
 
 ---
 
-## Part 2 — the 21 recorded STRIDE threats
+## Part 2 — the 22 recorded STRIDE threats
 
 Only after your own list exists.
 
@@ -346,6 +346,17 @@ on either of them. That is the finding this sitting exists for.
 
 > mark:
 
+
+### denial-of-service
+
+**22.** A developer starts manual rebuilds of `main` one after another until the build runner has no capacity for the builds a merge starts, if nothing limits how many a person may run at once; the source says any developer can kick off a rebuild by hand and records no such limit.
+
+- `flow:entity:developer>process:build-runner>manual-rebuild`, `process:build-runner`
+- severity: medium/medium · verb: `flood`
+- Provenance: own-list 07.5, 2026-09-21; drafted by the maintainer on 2026-09-22. The list preceded the full marks set but followed exposure to earlier corpus findings; it was not blind. The source explicitly allows any developer to rebuild main manually. Resource limits and scheduling fairness are unknown. This does not imply building arbitrary unmerged code.
+
+> mark:
+
 ---
 
 ## What was on your list and not on either of theirs
@@ -392,7 +403,7 @@ your missing list, your notes and a digest of each file you read:
       "opened_digests": {
       "source.md": "1bfb96ef3374b697ef78e76661daa3d2b227792a3b20d2d1ee1d526cde02652c",
       "model.json": "25e0fe698e23ea38d98c8cd7e80dcef804cea2e27a8e4c09b4c5f65fc1785291",
-      "claims/stride.json": "c5692a4a3a37392eb40f62efb8c2a41222650c6b82bc69345eeb4194ee7fceaa"
+      "claims/stride.json": "f9d27b02fa328c7dd9cecc44019ed2d63756e4c87d9a26de8f449450b58bc226"
       }
     }
   }

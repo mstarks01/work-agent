@@ -25,18 +25,18 @@ from evals.harness.verbs import ACTION_VERBS, unknown_verbs
 #: and another gaining them cannot cancel out.
 CLAIMS_PER_CASE: dict[str, int] = {
     "01-payments-checkout": 19,
-    "02-iot-fleet-telemetry": 13,
-    "03-batch-data-pipeline": 15,
-    "04-ml-inference-service": 16,
-    "05-cookbook-queue-webapp": 14,
-    "06-cookbook-online-game": 15,
-    "07-cicd-store-deploy": 21,
+    "02-iot-fleet-telemetry": 16,
+    "03-batch-data-pipeline": 17,
+    "04-ml-inference-service": 17,
+    "05-cookbook-queue-webapp": 19,
+    "06-cookbook-online-game": 17,
+    "07-cicd-store-deploy": 22,
     "08-sso-identity-broker": 21,
-    "09-cookbook-sokify-retail": 18,
-    "10-cookbook-generic-cms": 17,
-    "11-sparse-shift-scheduling": 15,
-    "12-overclaiming-supplier-portal": 14,
-    "13-dispatch-control-plane": 19,
+    "09-cookbook-sokify-retail": 20,
+    "10-cookbook-generic-cms": 18,
+    "11-sparse-shift-scheduling": 17,
+    "12-overclaiming-supplier-portal": 19,
+    "13-dispatch-control-plane": 20,
 }
 
 

@@ -189,5 +189,50 @@
     },
     "notes": "SSO is stated but authorization scope is not; report as unverified rather than absent.",
     "verb": "abuse-grant"
+  },
+  {
+    "category": "tampering",
+    "affected_element_ids": [
+      "store:firmware-bucket",
+      "entity:sensor-node"
+    ],
+    "claim": "An attacker with write access to the firmware bucket replaces the current image with an older genuine image containing a known weakness, and nodes install that vulnerable version if they accept the image and lack an effective anti-rollback check.",
+    "tier": "expected",
+    "severity": {
+      "likelihood": "medium",
+      "impact": "high"
+    },
+    "notes": "Provenance: own-list 02.4, 2026-09-21; drafted by the maintainer on 2026-09-22. The list preceded the full marks set but followed exposure to earlier corpus findings; it was not blind. Distinct from reference 3: a genuine older image may pass signature verification. Installation eligibility and anti-rollback enforcement are unknown; not every polling node necessarily downgrades.",
+    "verb": "replay"
+  },
+  {
+    "category": "denial-of-service",
+    "affected_element_ids": [
+      "store:firmware-bucket",
+      "flow:entity:sensor-node>store:firmware-bucket>poll-firmware"
+    ],
+    "claim": "An attacker repeatedly downloads images from the public-read firmware bucket, increasing delivery charges and potentially preventing genuine updates if shared delivery limits are exhausted or cost controls suspend delivery.",
+    "tier": "expected",
+    "severity": {
+      "likelihood": "medium",
+      "impact": "medium"
+    },
+    "notes": "Provenance: own-list 02.8, 2026-09-21; drafted by the maintainer on 2026-09-22. The list preceded the full marks set but followed exposure to earlier corpus findings; it was not blind. Public read establishes anonymous download access, not the absence of quotas or rate limits. Charges do not themselves establish an outage; update denial depends on shared limits or suspension. Distinct from reading image contents at reference 8.",
+    "verb": "flood"
+  },
+  {
+    "category": "tampering",
+    "affected_element_ids": [
+      "process:telemetry-normalizer",
+      "store:telemetry-lake"
+    ],
+    "claim": "An attacker able to submit readings accepted by the gateway supplies crafted values that the normalizer turns into invalid derived values in the lake, if domain and range validation do not reject them.",
+    "tier": "expected",
+    "severity": {
+      "likelihood": "medium",
+      "impact": "medium"
+    },
+    "notes": "Provenance: own-list 02.10, 2026-09-21; drafted by the maintainer on 2026-09-22. The list preceded the full marks set but followed exposure to earlier corpus findings; it was not blind. Content-integrity scenario, distinct from volume flooding at reference 11. Gateway acceptance and ineffective domain validation are prerequisites. The separate consumer-crash outcome is omitted to keep this tampering claim focused.",
+    "verb": "plant"
   }
 ]

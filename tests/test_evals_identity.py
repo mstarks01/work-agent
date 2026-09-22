@@ -90,10 +90,10 @@ MEASURED = {
 #: merge that survives the verb the coarser side cites no flow.
 DIRECTION = {
     # Over the corpus, what a claim yields without a new field.
-    "claims": 217,
-    "one_flow_cited": 146,
-    "several_flows_cited": 2,
-    "no_flow_cited": 69,
+    "claims": 242,
+    "one_flow_cited": 159,
+    "several_flows_cited": 5,
+    "no_flow_cited": 78,
     # Over the 3 reference merges the shipped rule makes.
     "merges_with_a_direction_on_both_sides": 0,
     "merges_that_run_opposite_ways": 0,
@@ -119,7 +119,7 @@ DIRECTION = {
 #: on the candidates a run actually produces, it merges **81 of 111** — it is
 #: barely a rule at all. The verb takes that to 3 while also avoiding one split.
 FRONTIER = {
-    "equality": {"splits": 72, "candidate_merges": 20, "reference_merges": 2},
+    "equality": {"splits": 72, "candidate_merges": 20, "reference_merges": 5},
     #: The rule #201 argues for, and the only row here that is usable.
     #: It is not an element rule, so it is measured by :func:`_rules`'s
     #: verb-aware entry rather than by a shape function.
@@ -128,10 +128,10 @@ FRONTIER = {
         "candidate_merges": 2,
         "reference_merges": 2,
     },
-    "endpoint equality": {"splits": 49, "candidate_merges": 33, "reference_merges": 9},
-    "subset": {"splits": 33, "candidate_merges": 54, "reference_merges": 11},
-    "endpoint subset": {"splits": 12, "candidate_merges": 69, "reference_merges": 23},
-    "overlap": {"splits": 3, "candidate_merges": 66, "reference_merges": 26},
+    "endpoint equality": {"splits": 49, "candidate_merges": 33, "reference_merges": 15},
+    "subset": {"splits": 33, "candidate_merges": 54, "reference_merges": 18},
+    "endpoint subset": {"splits": 12, "candidate_merges": 69, "reference_merges": 37},
+    "overlap": {"splits": 3, "candidate_merges": 66, "reference_merges": 40},
     # 99 before the reference corrections of #925. Case 02's calibration pair
     # about disabling the Pub/Sub topic named the gateway-to-normalizer flow,
     # because the broker was not an element to name; it now names
@@ -141,7 +141,7 @@ FRONTIER = {
     "endpoint overlap": {
         "splits": 1,
         "candidate_merges": 81,
-        "reference_merges": 105,
+        "reference_merges": 144,
     },
 }
 
@@ -407,8 +407,8 @@ class TestAClaimThatNamesNoPlaceMatchesNothing:
 #: is what survives the verb. The gap between them is what the verb buys.
 VERB_MEASURED = {
     "cases": 13,
-    "within_lane_pairs": 247,
-    "subset": 23,
+    "within_lane_pairs": 317,
+    "subset": 37,
     "subset_verb": 2,
 }
 

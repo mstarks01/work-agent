@@ -152,7 +152,11 @@ LANES_OF_VERB: dict[str, tuple[StrideCategory, ...]] = {
     "inject": ("tampering", "elevation-of-privilege", "denial-of-service"),
     "plant": ("tampering", "spoofing", "elevation-of-privilege", "denial-of-service"),
     "replay": ("spoofing", "tampering"),
-    "ride-session": ("spoofing", "elevation-of-privilege"),
+    # Information disclosure for the reason ``abuse-grant`` carries it: what
+    # the rider does through the session decides the lane, and reading back a
+    # response the victim was entitled to is disclosure rather than a reach
+    # past their privilege. A credentialed cross-origin read is the shape.
+    "ride-session": ("spoofing", "elevation-of-privilege", "information-disclosure"),
 }
 
 

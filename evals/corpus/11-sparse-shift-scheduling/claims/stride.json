@@ -218,5 +218,35 @@
     },
     "notes": "Both roles are stated to use the same app, and no authorization rule between them is stated anywhere. This is the finding that follows from the shared-app fact rather than from any missing control.",
     "verb": "abuse-grant"
+  },
+  {
+    "category": "tampering",
+    "affected_element_ids": [
+      "store:file-share",
+      "flow:entity:payroll-system>store:file-share>collect-payroll-export"
+    ],
+    "claim": "An attacker with write access to the file share replaces the current payroll export with an earlier genuine one, and payroll processes stale data as current if it does not verify the expected export period and reject replayed exports.",
+    "tier": "expected",
+    "severity": {
+      "likelihood": "medium",
+      "impact": "high"
+    },
+    "notes": "Provenance: own-list 11.7, 2026-09-21; drafted by the maintainer on 2026-09-22. The list preceded the full marks set but followed exposure to earlier corpus findings; it was not blind. Distinct from altering the current export at reference 4. Integrity of a genuine file alone does not establish freshness. Merely naming the period is insufficient unless the collector checks it; export schema and replay defenses are unknown.",
+    "verb": "replay"
+  },
+  {
+    "category": "information-disclosure",
+    "affected_element_ids": [
+      "flow:process:scheduling-service>store:rota-database>read-write-rotas",
+      "flow:process:scheduling-service>store:file-share>write-payroll-export"
+    ],
+    "claim": "An attacker on the internal network reads colleague names, contact details and availability as the scheduling service writes them to the rota database, or reads a whole store's payroll export as it is written to the file share, if those links carry no transport protection; the source says nobody documented whether any of it is encrypted.",
+    "tier": "expected",
+    "severity": {
+      "likelihood": "low",
+      "impact": "high"
+    },
+    "notes": "Provenance: own-list 11.8, 2026-09-21; drafted by the maintainer on 2026-09-22. The list preceded the full marks set but followed exposure to earlier corpus findings; it was not blind. The source explicitly says encryption is undocumented; it does not name an unencrypted state. Reference 11 addresses the colleague link, and references 9 and 10 address data at rest. Exact payroll fields are unspecified.",
+    "verb": "intercept"
   }
 ]

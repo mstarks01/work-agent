@@ -56,7 +56,7 @@
       "likelihood": "medium",
       "impact": "high"
     },
-    "notes": "The runbook states the file is picked up as-is, which is a stated absence of validation rather than an inferred one — the strongest grounded finding in the case.",
+    "notes": "The runbook states the file is picked up as-is, which is a stated absence of validation rather than an inferred one \u2014 the strongest grounded finding in the case.",
     "verb": "alter"
   },
   {
@@ -205,5 +205,81 @@
     },
     "notes": "Many suppliers share one vendor-hosted product and the source states nothing about isolation between them. Fully compliant is the phrase most likely to be mistaken for an answer to this.",
     "verb": "abuse-grant"
+  },
+  {
+    "category": "elevation-of-privilege",
+    "affected_element_ids": [
+      "flow:entity:category-manager>process:supplier-portal>review-documents",
+      "process:supplier-portal"
+    ],
+    "claim": "A signed-in supplier invokes a category manager's review action and approves their own compliance paperwork if the portal fails to enforce reviewer authorization on that action.",
+    "tier": "must-find",
+    "severity": {
+      "likelihood": "medium",
+      "impact": "high"
+    },
+    "notes": "Provenance: own-list 12.3, 2026-09-21; drafted by the maintainer on 2026-09-22. The list preceded the full marks set but followed exposure to earlier corpus findings; it was not blind. Authentication does not establish reviewer authorization. Role enforcement is unknown, not shown absent. Distinct from cross-supplier document access at reference 13.",
+    "verb": "escalate"
+  },
+  {
+    "category": "repudiation",
+    "affected_element_ids": [
+      "store:document-store",
+      "process:supplier-portal"
+    ],
+    "claim": "A supplier who can replace an uploaded document after approval can dispute which content was approved if the portal retains neither the approved version nor a verifiable link between that version and the approval record.",
+    "tier": "expected",
+    "severity": {
+      "likelihood": "medium",
+      "impact": "medium"
+    },
+    "notes": "Provenance: own-list 12.4, 2026-09-21; drafted by the maintainer on 2026-09-22. The list preceded the full marks set but followed exposure to earlier corpus findings; it was not blind. Retained in the maintainer's repudiation identity: the issue is evidence of approved content, not merely changing a file. Post-approval replacement, version retention and approval binding are unknown. Distinct from reference 6's denial of having approved; reference 5 covers document tampering.",
+    "verb": "unattributable"
+  },
+  {
+    "category": "tampering",
+    "affected_element_ids": [
+      "store:landing-bucket",
+      "flow:process:supplier-master-service>store:landing-bucket>load-extract"
+    ],
+    "claim": "An attacker with write access to the landing bucket substitutes an earlier genuine nightly extract, and the supplier master service restores stale supplier values if it accepts the replay and its update semantics overwrite newer records.",
+    "tier": "expected",
+    "severity": {
+      "likelihood": "medium",
+      "impact": "medium"
+    },
+    "notes": "Provenance: own-list 12.6, 2026-09-21; drafted by the maintainer on 2026-09-22. The list preceded the full marks set but followed exposure to earlier corpus findings; it was not blind. Distinct from modifying the extract at reference 3. A plain CSV picked up as-is proves neither missing freshness validation nor overwrite semantics; both remain prerequisites.",
+    "verb": "replay"
+  },
+  {
+    "category": "tampering",
+    "affected_element_ids": [
+      "entity:portal-vendor",
+      "flow:entity:portal-vendor>store:landing-bucket>push-nightly-extract"
+    ],
+    "claim": "A vendor whose platform an attacker controls pushes a nightly extract on the genuine channel carrying supplier records that are false, and the supplier master service writes them into the supplier database, if nothing on our side checks a record against anything but the file it arrived in; the source describes no such check.",
+    "tier": "must-find",
+    "severity": {
+      "likelihood": "medium",
+      "impact": "high"
+    },
+    "notes": "Provenance: own-list 12.7, 2026-09-21; drafted by the maintainer on 2026-09-22. The list preceded the full marks set but followed exposure to earlier corpus findings; it was not blind. Authentic delivery can carry false records from a compromised vendor. Distinct from vendor impersonation at reference 2. Feasible independent validation and reconciliation depend on the records; no such controls are described. Vendor marketing is not proof of compromise or missing controls.",
+    "verb": "plant"
+  },
+  {
+    "category": "denial-of-service",
+    "affected_element_ids": [
+      "process:supplier-portal",
+      "store:document-store",
+      "flow:entity:supplier>process:supplier-portal>upload-documents"
+    ],
+    "claim": "A signed-in supplier uploads excessive numbers or sizes of documents, denying other suppliers the ability to submit paperwork if shared storage or processing limits are exhausted and per-supplier limits do not contain the workload.",
+    "tier": "expected",
+    "severity": {
+      "likelihood": "medium",
+      "impact": "medium"
+    },
+    "notes": "Provenance: own-list 12.9, 2026-09-21; drafted by the maintainer on 2026-09-22. The list preceded the full marks set but followed exposure to earlier corpus findings; it was not blind. Supplier quotas, storage capacity and workload isolation are unknown. File-size limits alone do not address many small uploads. Distinct from general vendor outage at reference 11 and interruption of the nightly load at reference 12; overlaps the ASVS file-size question.",
+    "verb": "flood"
   }
 ]

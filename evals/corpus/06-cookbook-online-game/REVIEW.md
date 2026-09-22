@@ -178,7 +178,7 @@ The narrower question, per record: **does this requirement apply to this system,
 
 > mark:
 
-## Part 3 — the 15 recorded STRIDE threats
+## Part 3 — the 17 recorded STRIDE threats
 
 Only after your own list exists.
 
@@ -331,6 +331,28 @@ on either of them. That is the finding this sitting exists for.
 
 > mark:
 
+
+### spoofing
+
+**16.** An attacker who can reach a game server sends it a match hand-over of their own making, choosing who is in the match and under which player identifiers, if the game server checks nothing about the caller or the hand-over; the source records no authentication on that link.
+
+- `flow:process:lobby>process:game-server>hand-over-match`
+- severity: medium/high · verb: `forge`
+- Provenance: own-list 06.4, 2026-09-21; drafted by the maintainer on 2026-09-22. The list preceded the full marks set but followed exposure to earlier corpus findings; it was not blind. The lobby-to-server handover is explicit; authentication and handover validation are unspecified. Reachability of a game server does not itself establish access to an accepted handover interface. Distinct from player-facing impersonation.
+
+> mark:
+
+
+### information-disclosure
+
+**17.** An attacker who can observe the corporate link to the moderation website, or its link to the player database, reads player account records and the moderation decisions taken on them, if those links carry no transport protection; the source records none either way.
+
+- `flow:process:moderation-website>store:player-database>read-write-players`, `flow:entity:customer-support-staff>process:moderation-website>moderate-accounts`
+- severity: low/high · verb: `intercept`
+- Provenance: own-list 06.9, 2026-09-21; drafted by the maintainer on 2026-09-22. The list preceded the full marks set but followed exposure to earlier corpus findings; it was not blind. Conditional interception of support and database traffic. The moderation site reads and writes player records, but transport protection and exact response contents are unknown. Reference 9 addresses the two client links.
+
+> mark:
+
 ---
 
 ## What was on your list and not on either of theirs
@@ -378,7 +400,7 @@ your missing list, your notes and a digest of each file you read:
       "source.md": "17e797d0315fdd53d5acf05962ca0ae8a23e08f84779f8528ade6422c34577a3",
       "model.json": "400ad2ee53ee5b0e87c310c881be77f6cc748b7f817fc176bf8967818238c3eb",
       "claims/asvs.json": "79b1fb614daf429bf079268027870240a41c056ba1d41174eb35007f22006bf8",
-      "claims/stride.json": "cb81b3309388f7b4113cd2d77a0ed739ecb82ed056facc5727d8f2164b236700"
+      "claims/stride.json": "d73f4e1c73347ca077f365f3cf313fa1afa037e3dc5e12091afa1e57f8bd9b52"
       }
     }
   }
