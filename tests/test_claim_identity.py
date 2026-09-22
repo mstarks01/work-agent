@@ -99,9 +99,6 @@ UNSEPARATED: dict[str, str] = {
     "11-sparse-shift-scheduling | tampering | entity:payroll-system, store:file-share": (
         "Altering the export while it sits on the share and substituting an earlier genuine export are `alter` and `replay`. A check on the file's own integrity answers the first and a period or freshness check answers the second, so the first control leaves the second open. The verb separates them."
     ),
-    "12-overclaiming-supplier-portal | tampering | entity:portal-vendor, store:landing-bucket": (
-        "Altering the nightly push on its path and a compromised vendor sending false records over it are `alter-in-transit` and `plant`. Transport integrity answers the first and independent validation of a record answers the second, because the second arrives authentic. The verb separates them."
-    ),
     "12-overclaiming-supplier-portal | tampering | process:supplier-master-service, store:landing-bucket": (
         "Modifying the extract before the loader reads it and substituting an earlier genuine extract are `alter` and `replay`. File integrity answers the first and a freshness check answers the second. The verb separates them."
     ),

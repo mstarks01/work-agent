@@ -128,10 +128,10 @@ FRONTIER = {
         "candidate_merges": 2,
         "reference_merges": 2,
     },
-    "endpoint equality": {"splits": 49, "candidate_merges": 33, "reference_merges": 15},
-    "subset": {"splits": 33, "candidate_merges": 54, "reference_merges": 18},
-    "endpoint subset": {"splits": 12, "candidate_merges": 69, "reference_merges": 37},
-    "overlap": {"splits": 3, "candidate_merges": 66, "reference_merges": 40},
+    "endpoint equality": {"splits": 49, "candidate_merges": 33, "reference_merges": 14},
+    "subset": {"splits": 33, "candidate_merges": 54, "reference_merges": 17},
+    "endpoint subset": {"splits": 12, "candidate_merges": 69, "reference_merges": 36},
+    "overlap": {"splits": 3, "candidate_merges": 66, "reference_merges": 39},
     # 99 before the reference corrections of #925. Case 02's calibration pair
     # about disabling the Pub/Sub topic named the gateway-to-normalizer flow,
     # because the broker was not an element to name; it now names
@@ -141,7 +141,7 @@ FRONTIER = {
     "endpoint overlap": {
         "splits": 1,
         "candidate_merges": 81,
-        "reference_merges": 144,
+        "reference_merges": 143,
     },
 }
 
@@ -408,7 +408,7 @@ class TestAClaimThatNamesNoPlaceMatchesNothing:
 VERB_MEASURED = {
     "cases": 13,
     "within_lane_pairs": 317,
-    "subset": 37,
+    "subset": 36,
     "subset_verb": 2,
 }
 

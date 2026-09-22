@@ -60,16 +60,16 @@ within-lane reference pairs:
 | Rule | False splits (of 169) | Candidate merges (of 92) | Reference merges (of 317) |
 |---|---|---|---|
 | equality | 72 | 20 | 5 |
-| endpoint subset | 12 | 69 | 37 |
+| endpoint subset | 12 | 69 | 36 |
 | **endpoint subset + verb** | **13** | **2** | **2** |
-| overlap | 3 | 66 | 40 |
-| endpoint overlap | 1 | 81 | 144 |
+| overlap | 3 | 66 | 39 |
+| endpoint overlap | 1 | 81 | 143 |
 
 No element-only row is usable: the tightest loses 72 paraphrases and the loosest
-destroys 144 findings. **The verb row is the first one that is.**
+destroys 143 findings. **The verb row is the first one that is.**
 
 **Read the candidate column, not the reference one.** On reference pairs alone
-`endpoint subset` merges 37 of 317 and looks survivable. On the candidate
+`endpoint subset` merges 36 of 317 and looks survivable. On the candidate
 paraphrases a live run actually emits it merges **69 of 92** — it is barely a
 rule. The verb takes that to 2 while dropping a split. That column did not exist
 until [#511](https://github.com/mstarks01/work-agent/issues/511) assigned the
