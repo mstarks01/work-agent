@@ -63,9 +63,10 @@ row (`BLESSING.md` step 7).
 
 So every agreement figure the suite produces is **self-consistency, not
 accuracy**: it measures how closely a rule reproduces the recorded
-dispositions. That includes the 90% bar. A rule at 94.3% agrees with those
-dispositions 94.5% of the time; the calibration review records are the only
-evidence that those label opinions have been checked.
+dispositions. That includes the 90% bar. A rule at 94.3% reproduces those
+dispositions and says nothing about whether they are right; the calibration
+review records are the only evidence that those label opinions have been
+checked.
 
 **Two live sweeps exist, and neither is a quality standard.** The service has
 been swept live twice: `claude-opus-4-6` on 2026-08-14 (12 cases) and
@@ -98,10 +99,10 @@ The 288 calibration fixtures retain their original order and reference claims.
 The candidate merge column arrived with
 [#511](https://github.com/mstarks01/work-agent/issues/511), which assigned the
 negative half the elements and verbs the rule reads. Before it every candidate
-merge count was structurally zero. A further 28 fixtures are set aside before
-identity scoring: 25 `unsupported`, 2 `unclear`, and 1 `invalid-claim`. The
-matcher therefore answers 311 fixtures, refuses none, and agrees with 294
-(94.5%). Diagnostic `mixed` and `misclassified-lane` annotations preserve
+merge count was structurally zero. A further 27 fixtures are set aside before
+identity scoring: 24 `unsupported`, 2 `unclear`, and 1 `invalid-claim`. The
+matcher therefore answers 261 fixtures, refuses none, and agrees with 246
+of them. Diagnostic `mixed` and `misclassified-lane` annotations preserve
 secondary observations without moving that denominator.
 
 Whether an unmatched finding is real is a question about prose, and a

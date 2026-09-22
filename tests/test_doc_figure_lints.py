@@ -231,6 +231,88 @@ def _stride_reference_claims() -> Mapping[str, object]:
     return {"value": sum(len(case.references.get("stride", ())) for case in corpus)}
 
 
+def _exemplar_verbs() -> Mapping[str, object]:
+    """What the corpus asks for that no exemplar in its lane demonstrates.
+
+    ``exemplar_verbs.py`` argues from every one of these, and each is a
+    property of the corpus and the shipped exemplars together, so a case added
+    tomorrow moves them.
+    """
+    from collections import Counter
+
+    from evals.harness.exemplar_verbs import corpus_undemonstrated, lane_verbs
+
+    rows = corpus_undemonstrated(load_corpus(verify_corpus.CORPUS_DIR))
+    near = [row for row in rows if row.siblings]
+    alone = [row for row in rows if not row.siblings]
+    by_verb = Counter(row.verb for row in near)
+    by_lane = Counter(row.lane for row in alone)
+    widest, widest_count = by_lane.most_common(1)[0]
+    return {
+        "exemplars": sum(len(lane.exemplars) for lane in lane_verbs("stride")),
+        "undemonstrated": len(rows),
+        "must_find": sum(1 for row in rows if row.tier == "must-find"),
+        "cases": len({row.case for row in rows}),
+        "near": len(near),
+        "alone": len(alone),
+        "first": by_verb.most_common(1)[0][1],
+        "second": by_verb.most_common(2)[1][1],
+        "third": by_verb.most_common(3)[2][1],
+        "widest_lane": widest,
+        "widest_count": widest_count,
+    }
+
+
+def _dispositions() -> Mapping[str, object]:
+    """The fixtures held out of identity scoring, and why each one is.
+
+    The three dispositions are the reason the answered denominator is smaller
+    than the fixture count, so a guide stating one states all of them.
+    """
+    from collections import Counter
+
+    labels = Counter(pair.label for pair in load_pairs())
+    scored = labels["match"] + labels["no-match"]
+    return {
+        "aside": sum(labels.values()) - scored,
+        "unsupported": labels["unsupported"],
+        "unclear": labels["unclear"],
+        "invalid": labels["invalid-claim"],
+        "answered": scored,
+    }
+
+
+def _frontier() -> Mapping[str, object]:
+    """Every row of the frontier, as ``tests/test_evals_identity.py`` pins it.
+
+    Read off that module rather than measured again here. It asserts ``FRONTIER``
+    against a live measurement, so the chain runs guide to ``FRONTIER`` to the
+    corpus with one reader at each hop; measuring it a second time here would
+    be the third.
+    """
+    from tests.test_evals_identity import FRONTIER
+
+    values: dict[str, object] = {}
+    for name, row in FRONTIER.items():
+        key = name.replace(" + ", "_").replace(" ", "_")
+        values[f"{key}_splits"] = row["splits"]
+        values[f"{key}_cand"] = row["candidate_merges"]
+        values[f"{key}_ref"] = row["reference_merges"]
+    return values
+
+
+def _fan_out_burst() -> Mapping[str, object]:
+    """The widest fan-out, and the input burst it implies at a stated rate.
+
+    One figure rather than two, because the product is what the sentence
+    argues from: a lane added to the widest package moves the burst, and a
+    guide that updated the count alone would state a total nothing derives.
+    """
+    lanes = widest_fan_out()
+    per_lane = 14
+    return {"lanes": lanes, "per_lane": per_lane, "burst": lanes * per_lane}
+
+
 def _corpus() -> Mapping[str, object]:
     count = len(verify_corpus.case_dirs())
     return {"value": count, "word": WORDS.get(count, str(count))}
@@ -254,7 +336,14 @@ FIGURES: tuple[Figure, ...] = (
         name="the identity rule's two error directions",
         compute=_error_directions,
         claims=(
-            ("evals/README.md", "splits over {split_of} equivalent candidate pairs", 1),
+            (
+                "evals/README.md",
+                (
+                    "Equivalently by population: {splits} false splits over"
+                    " {split_of} equivalent candidate pairs"
+                ),
+                1,
+            ),
             (
                 "evals/README.md",
                 "{cand_merges} false merges over {cand_of} candidate",
@@ -473,12 +562,127 @@ FIGURES: tuple[Figure, ...] = (
             ("evals/harness/verbs.py", "all {value} reference claims carry a verb", 1),
             (
                 "evals/harness/exemplar_verbs.py",
-                "18 exemplars and {value} reference claims",
+                "the corpus holds {value} reference claims",
+                1,
+            ),
+        ),
+    ),
+    Figure(
+        name="the verbs no exemplar demonstrates",
+        compute=_exemplar_verbs,
+        claims=(
+            (
+                "evals/harness/exemplar_verbs.py",
+                "STRIDE ships {exemplars} exemplars",
                 1,
             ),
             (
                 "evals/harness/exemplar_verbs.py",
-                "of {value} reference claims, which is",
+                (
+                    "{undemonstrated} of those claims name a verb no exemplar"
+                    " in their lane demonstrates."
+                ),
+                1,
+            ),
+            (
+                "evals/harness/exemplar_verbs.py",
+                (
+                    "{must_find} of the {undemonstrated} are ``must-find``, and"
+                    " all {cases} cases carry at least one."
+                ),
+                1,
+            ),
+            (
+                "evals/harness/exemplar_verbs.py",
+                "* {near} near misses.",
+                1,
+            ),
+            (
+                "evals/harness/exemplar_verbs.py",
+                (
+                    "``use-credential`` accounts for {first} of them,"
+                    " ``disable`` for {second}, and\n  ``plant`` and ``replay``"
+                    " for {third} each."
+                ),
+                1,
+            ),
+            (
+                "evals/harness/exemplar_verbs.py",
+                "* {alone} with no neighbour.",
+                1,
+            ),
+            (
+                "evals/harness/exemplar_verbs.py",
+                (
+                    "``{widest_lane}`` holds the largest share, {widest_count}"
+                    " of {alone}:"
+                ),
+                1,
+            ),
+        ),
+    ),
+    Figure(
+        name="the fixtures held out of identity scoring",
+        compute=_dispositions,
+        claims=(
+            (
+                "evals/README.md",
+                (
+                    "A further {aside} fixtures are set aside before\n"
+                    "identity scoring: {unsupported} `unsupported`,"
+                    " {unclear} `unclear`, and {invalid} `invalid-claim`."
+                ),
+                1,
+            ),
+            (
+                "evals/README.md",
+                "answers {answered} fixtures, refuses none, and agrees with",
+                1,
+            ),
+        ),
+    ),
+    Figure(
+        name="every row of the identity frontier",
+        compute=_frontier,
+        claims=(
+            (
+                "docs/agents/claim-identity.md",
+                ("| equality | {equality_splits} | {equality_cand} | {equality_ref} |"),
+                1,
+            ),
+            (
+                "docs/agents/claim-identity.md",
+                (
+                    "| endpoint subset | {endpoint_subset_splits} |"
+                    " {endpoint_subset_cand} | {endpoint_subset_ref} |"
+                ),
+                1,
+            ),
+            (
+                "docs/agents/claim-identity.md",
+                ("| overlap | {overlap_splits} | {overlap_cand} | {overlap_ref} |"),
+                1,
+            ),
+            (
+                "docs/agents/claim-identity.md",
+                (
+                    "| endpoint overlap | {endpoint_overlap_splits} |"
+                    " {endpoint_overlap_cand} | {endpoint_overlap_ref} |"
+                ),
+                1,
+            ),
+        ),
+    ),
+    Figure(
+        name="the widest fan-out's input burst",
+        compute=_fan_out_burst,
+        claims=(
+            (
+                "evals/TUNING.md",
+                (
+                    "\u2014 {lanes} today \u2014 and at roughly {per_lane}K\n"
+                    "input per lane it is a **~{burst}K token burst"
+                ),
                 1,
             ),
         ),

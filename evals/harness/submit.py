@@ -503,6 +503,27 @@ def _check_your_file_appends(root: Path, author: str) -> Check:
     return _check("your file only appends, and adds something", problems)
 
 
+def _voters_table(raw: str) -> dict[str, Any] | None:
+    """The ``voters`` table out of one roster's raw TOML, or ``None``.
+
+    **The one reader of what a roster's voters table is.** Two checks ask it of
+    the same file and each has to handle the same two shapes: ``voters`` need
+    not be present, and it need not be a table. ``voters = "ada"`` is legal
+    TOML, and a scalar has no ``.get`` and iterates as its characters. A caller
+    that reads the file itself gets one of those right and ships the other.
+
+    ``None`` says the file holds a ``voters`` that is not a table, which is a
+    fact a caller reports rather than a reason to stop. A missing ``voters`` is
+    an empty table, because a roster with no voters names no standing and that
+    is the same answer.
+
+    Raises whatever :func:`tomllib.loads` raises. The two callers handle an
+    unreadable roster differently, so that decision stays with them.
+    """
+    table = tomllib.loads(raw).get("voters", {})
+    return table if isinstance(table, dict) else None
+
+
 def _roster_delta(base_raw: str | None, live: Path) -> list[str]:
     """Every roster line this PR changes, for the reviewer to read.
 
@@ -521,15 +542,11 @@ def _roster_delta(base_raw: str | None, live: Path) -> list[str]:
     if base_raw is None:
         return []
     try:
-        was = tomllib.loads(base_raw).get("voters", {})
-        now = tomllib.loads(live.read_text(encoding="utf-8")).get("voters", {})
+        was = _voters_table(base_raw)
+        now = _voters_table(live.read_text(encoding="utf-8"))
     except (OSError, tomllib.TOMLDecodeError, UnicodeDecodeError):
         return []  # the check below reports an unreadable roster
-    # The table itself, not only its entries. `voters = "abc"` is legal TOML and
-    # is the same defect one level up from the entry guard below: `set(was)`
-    # would iterate its characters and `was.get` does not exist. The loader
-    # reports it; this note only has to survive it.
-    if not isinstance(was, dict) or not isinstance(now, dict):
+    if was is None or now is None:
         return ["voters: the roster's own table is not a table"]
     notes = []
     for login in sorted(set(was) | set(now)):
@@ -570,8 +587,13 @@ def _check_no_self_raise(root: Path, author: str) -> Check:
         now = roster.load(live).standing_of(author) if live.exists() else None
         was = None
         if base_raw is not None:
-            table = tomllib.loads(base_raw).get("voters", {})
-            entry = table.get(author, {})
+            # Through the one reader, so a base roster whose ``voters`` is a
+            # scalar leaves ``was`` unknown rather than raising out of this
+            # whole preflight. Unknown is the safe answer here: it ranks as
+            # ``contributor``, so a line raising itself to ``maintainer`` is
+            # still refused, and :func:`_roster_delta` states the malformed
+            # table in the notes below.
+            entry = (_voters_table(base_raw) or {}).get(author, {})
             was = entry.get("standing") if isinstance(entry, dict) else None
         if now is not None and _RANK[now] > _RANK.get(was or "contributor", 0):
             problems.append(

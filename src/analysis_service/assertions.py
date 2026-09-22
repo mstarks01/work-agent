@@ -1734,7 +1734,18 @@ class AssertionProposal(BaseModel):
 
     subject_type: SubjectType
     subject: str = Field(min_length=1, max_length=300)
-    predicate: str = Field(min_length=1, max_length=60)
+    # The registry's own names, on the rule :class:`Assumption` follows: a model
+    # asked for a bounded string eventually writes prose into it, and the gate
+    # that reads this field checks it against ``REGISTRY`` a layer later. The
+    # enum is a schema fact and not a validator, so a value outside the set
+    # stays a refusal naming this row rather than a schema fault condemning the
+    # whole object. The set is static, which is what puts it here: a
+    # configurable one is stated in the prompt instead.
+    predicate: str = Field(
+        min_length=1,
+        max_length=60,
+        json_schema_extra={"enum": [*sorted(REGISTRY)]},
+    )
     value: str = Field(min_length=1, max_length=MAX_VALUE_CHARS)
     reason: UnknownReason | None = None
     scope: list[Qualifier] = Field(default_factory=list, max_length=MAX_QUALIFIERS)
