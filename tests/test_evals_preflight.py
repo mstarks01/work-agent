@@ -13,6 +13,7 @@ added ones.
 
 from __future__ import annotations
 
+import argparse
 from pathlib import Path
 
 from evals.harness import preflight, run
@@ -95,3 +96,52 @@ class TestTheIdentitiesComeFromTheSharedReader:
 
 def test_the_command_is_reachable():
     assert run.COMMANDS["corpus-preflight"].run is preflight.command_preflight
+
+
+class TestABaseItCannotRead:
+    """A revision this clone does not carry is not a case the change adds.
+
+    Both answers reach the same place — a case with no base has every claim
+    counted as an addition — so a mistyped `--base` would report the whole
+    corpus as new and name every mark on it. `git ls-tree` tells the two apart
+    in its exit code, and this drives the revision that proved it rather than a
+    simpler one written afterwards.
+    """
+
+    UNREADABLE = "deadbeefdeadbeef"
+
+    def _args(self, base):
+        return argparse.Namespace(base=base, root=preflight.REPO_ROOT)
+
+    def test_an_unreadable_revision_is_refused_by_name(self, capsys):
+        code = preflight.command_preflight(self._args(self.UNREADABLE))
+
+        assert code == 1
+        assert self.UNREADABLE in capsys.readouterr().err
+
+    def test_it_never_reports_the_whole_corpus_as_added(self, capsys):
+        """The shape of the defect, not only its exit code.
+
+        Reporting `added` at all is what made the failure readable as an
+        answer: the command printed a count over every claim in the corpus and
+        listed a ruling for each one.
+        """
+        preflight.command_preflight(self._args(self.UNREADABLE))
+
+        assert "finding(s) added" not in capsys.readouterr().out
+
+    def test_a_base_it_can_read_still_answers(self, capsys):
+        code = preflight.command_preflight(self._args("HEAD~1"))
+
+        assert code == 0
+        assert "finding(s) added since HEAD~1" in capsys.readouterr().out
+
+    def test_the_error_type_is_exported(self):
+        """A caller that drives this in-process needs the type by name."""
+        assert "PreflightError" in preflight.__all__
+        assert issubclass(preflight.PreflightError, RuntimeError)
+
+
+def test_the_repo_root_default_is_a_checkout():
+    """`--root` defaults to this clone, which the tests above lean on."""
+    assert (preflight.REPO_ROOT / ".git").exists()
