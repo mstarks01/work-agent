@@ -87,7 +87,13 @@ from analysis_service.prompts import (
     lane_exemplars_doc,
 )
 from analysis_service.skills import estimate_tokens
-from analysis_service.system_model import ELEMENT_ID, mentioned_ids
+from analysis_service.system_model import (
+    ELEMENT_ID,
+    FLOW_ID_VERSION,
+    FlowIdError,
+    flow_id_version,
+    mentioned_ids,
+)
 from analysis_service.token_caps import (
     COMPOSED_ANALYZE_CAP,
     COMPOSED_EXTRACT_COMPACT_CAP,
@@ -1141,6 +1147,90 @@ def test_the_output_contract_states_what_the_service_does(framework, phrase):
         f" keeps the first draft under a repeated ID and records the rest;"
         f" a contract saying otherwise hides a partial loss."
     )
+
+
+#: How ``prompts/extract.md`` writes the flow-ID shape, and the parts that fill
+#: its placeholders. The pattern is prose a person maintains and the rule is
+#: code, so the two are compared by *building* an ID rather than by matching
+#: strings: the placeholders take real endpoint IDs and a real label slug, and
+#: what comes out either is a flow ID of the shipped version or is not.
+#:
+#: ADR 0037 replaced version 1, whose shape dropped the endpoints' type prefixes
+#: so an entity and a process of one name derived one ID (#989). The prompt went
+#: on stating version 1 for as long as nothing here read it.
+_FLOW_PATTERN = re.compile(r"flows are `([^`]+)`")
+_FLOW_PARTS = {
+    "<source-id>": "entity:customer",
+    "<destination-id>": "process:web-app",
+    "<label>": "requests",
+}
+
+
+def test_the_prompt_states_the_flow_id_shape_the_service_writes():
+    """The stated pattern, filled in, is an ID of the version that ships.
+
+    A sentence naming a superseded shape teaches a model an ID the gate then
+    rewrites. That costs nothing while normalization holds — which is what
+    experiment ``QA-2026-09-22-01-E1`` measured — and the sentence is still
+    false, and the next reader of it has no way to know.
+    """
+    found = _FLOW_PATTERN.search(loader.load("extract"))
+    assert found, (
+        "prompts/extract.md no longer states a flow-ID pattern as ``flows are"
+        " `...`.`` Either it moved, and this lint has to follow it, or it went"
+        " away and the model is told nothing about the shape."
+    )
+
+    stated = found.group(1)
+    filled = stated
+    for placeholder, part in _FLOW_PARTS.items():
+        filled = filled.replace(placeholder, part)
+
+    assert "<" not in filled, (
+        f"the stated pattern {stated!r} carries a placeholder this lint cannot"
+        f" fill: it knows {sorted(_FLOW_PARTS)}. Add the new one here with the"
+        " part that fills it."
+    )
+    try:
+        version = flow_id_version(filled)
+    except FlowIdError as error:
+        raise AssertionError(
+            f"prompts/extract.md states {stated!r}, which fills to {filled!r}"
+            f" and is not a flow ID any version of the rule writes: {error}"
+        ) from error
+
+    assert version == FLOW_ID_VERSION, (
+        f"prompts/extract.md states {stated!r}, which is version {version}."
+        f" The service writes version {FLOW_ID_VERSION}."
+    )
+
+
+@pytest.mark.parametrize("name", PROMPT_BODY_NAMES + PROMPT_DELTA_NAMES)
+def test_every_flow_id_a_prompt_shows_is_one_the_service_writes(name):
+    """A worked example is read harder than a pattern, so it is held harder.
+
+    Only complete IDs: a span carrying a placeholder is the pattern above, and
+    a bare ``flow:`` prefix in prose names no ID at all.
+    """
+    shown = [
+        found
+        for found in re.findall(r"flow:[A-Za-z0-9:>_-]+", loader.load(name))
+        if found.count(":") > 1
+    ]
+    wrong = {one: flow_id_version(one) for one in shown if _version_or_none(one)}
+
+    assert all(version == FLOW_ID_VERSION for version in wrong.values()), (
+        f"prompts/{name}.md shows {sorted(k for k, v in wrong.items() if v != FLOW_ID_VERSION)},"
+        f" which is not version {FLOW_ID_VERSION}. A model copies the example."
+    )
+
+
+def _version_or_none(flow_id: str) -> int | None:
+    """The version that wrote one ID, or ``None`` where no rule did."""
+    try:
+        return flow_id_version(flow_id)
+    except FlowIdError:
+        return None
 
 
 # ---------------------------------------------------------------------------
