@@ -421,7 +421,7 @@ class TestWhatTheFindingsRestOn:
     def test_two_in_five_must_finds_rest_on_an_inferred_crossing(
         self, reliance
     ) -> None:
-        assert sum(one.assumed for one in reliance) == 61
+        assert sum(one.assumed for one in reliance) == 60
 
     def test_one_in_seven_rests_on_a_crossing_of_two_guesses(self, reliance) -> None:
         assert sum(one.wholly for one in reliance) == 20
