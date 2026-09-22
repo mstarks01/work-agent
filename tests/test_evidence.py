@@ -24,12 +24,14 @@ from analysis_service.assertions import (
     catalog_coverage,
 )
 from analysis_service.claims import (
+    ASSERTION_GROUNDS,
     CONDITIONAL_GROUNDS,
     GROUND_TERM_MAX_CHARS,
     Ground,
 )
 from analysis_service.critic import critic_view
 from analysis_service.evidence import (
+    ASSERTION_GLOSSES,
     absent_evidence_ref,
     crossing_evidence_ref,
     evidence_catalog,
@@ -1276,3 +1278,16 @@ class TestWhatTheAssertionPassReached:
         counted = catalog_coverage(held, valid_model())
 
         assert counted.own_subjects == 1 and counted.settled == 0
+
+
+def test_every_assertion_ground_kind_has_a_gloss():
+    """The table against the set that names its keys.
+
+    ``_gloss`` dispatches assertion grounds through
+    :data:`~analysis_service.evidence.ASSERTION_GLOSSES`, and a kind in
+    :data:`~analysis_service.claims.ASSERTION_GROUNDS` with no entry would fall
+    past the dispatch and read as an unstated attribute. That is a wrong
+    sentence in a lane agent's catalog rather than a raise, so the comparison
+    is here.
+    """
+    assert set(ASSERTION_GLOSSES) == set(ASSERTION_GROUNDS)

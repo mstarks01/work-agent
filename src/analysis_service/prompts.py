@@ -35,6 +35,9 @@ therefore share the longest possible cacheable prefix.
 from __future__ import annotations
 
 import re
+from collections.abc import Mapping
+from types import MappingProxyType
+from typing import Literal
 
 from analysis_service.assertions import REGISTRY, Predicate, referent_type
 from analysis_service.compact import COMPACT_FORMAT, FULL_FORMAT
@@ -291,6 +294,11 @@ def _element_words(element_type: type) -> str:
     return re.sub(r"(?<!^)(?=[A-Z])", " ", element_type.__name__)
 
 
+#: Which composer is rendering the predicate table. A closed set, so a stage
+#: nobody has written reads as a type error here rather than as a wrong sentence
+#: in a shipped prompt.
+Stage = Literal["bundle", "catalog", "batch"]
+
 #: How a ``reference`` predicate's value is spelled, per stage that renders the
 #: table. **A table rather than one sentence**, because the answer differs by
 #: stage and the single sentence was wrong at every one of them: it said "the
@@ -303,22 +311,29 @@ def _element_words(element_type: type) -> str:
 #: operation may reach a thing it is adding or one the model already holds.
 #:
 #: Keyed by the composer that renders it, so a stage added tomorrow raises here
-#: rather than inheriting whichever sentence happened to be first.
-REFERENCE_FORMS: dict[str, str] = {
-    "bundle": "the handle of a {referent}",
-    "catalog": "the ID of a {referent}",
-    "batch": "the handle or the element ID of a {referent}",
-}
+#: rather than inheriting whichever sentence happened to be first. **No default
+#: anywhere**, for the same reason: a composer that says nothing about its stage
+#: inherits one spelling in silence, which is the failure this table answers
+#: rather than a shorter way to call it.
+REFERENCE_FORMS: Mapping[Stage, str] = MappingProxyType(
+    {
+        "bundle": "the handle of a {referent}",
+        "catalog": "the ID of a {referent}",
+        "batch": "the handle or the element ID of a {referent}",
+    }
+)
 
 
-def render_predicates(stage: str = "catalog") -> str:
+def render_predicates(stage: Stage) -> str:
     """The predicate registry as the table a model reads.
 
     One row per predicate, in registry order: what it means, which subjects it
     takes, and what its value may be. A ``term`` predicate lists its own words
     beside the two every predicate admits; a ``reference`` one names what it
     points at, in the spelling ``stage``'s own resolver reads
-    (:data:`REFERENCE_FORMS`); free text says so.
+    (:data:`REFERENCE_FORMS`); free text says so. ``stage`` is required, because
+    the spelling differs at every one of them and no composer may inherit
+    another's.
 
     A ``stated_only`` predicate says so in the same row. That is a registry
     field the gate reads — it refuses an ``inferred`` basis on a predicate
@@ -354,7 +369,7 @@ def render_predicates(stage: str = "catalog") -> str:
     return "\n".join(rows)
 
 
-def _value_form(predicate: Predicate, stage: str) -> str:
+def _value_form(predicate: Predicate, stage: Stage) -> str:
     """How one predicate's value is written, for the rendered table."""
     if predicate.value == "term":
         return ", ".join(f"`{term}`" for term in sorted(predicate.terms))

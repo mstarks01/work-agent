@@ -70,7 +70,8 @@ class of guess this module exists to remove.
 
 from __future__ import annotations
 
-from collections.abc import Iterable, Mapping, Sequence
+from collections.abc import Callable, Iterable, Mapping, Sequence
+from types import MappingProxyType
 from typing import Any, NamedTuple
 
 from analysis_service.analysis import (
@@ -89,6 +90,7 @@ from analysis_service.assertions import (
     settled,
 )
 from analysis_service.claims import (
+    ASSERTION_GROUNDS,
     GROUND_TERM_MAX_CHARS,
     REFERENCE_MAX_CHARS,
     AnalysisMarks,
@@ -339,7 +341,7 @@ def _one_ground_issue(
                 f" {ground.flow_id!r}, which is not a decided boundary crossing"
             )
         return ""
-    if ground.kind in ("assertion", "unknown-assertion"):
+    if ground.kind in ASSERTION_GROUNDS:
         held = catalog.get(ground.assertion)
         if held is None:
             return (
@@ -579,10 +581,8 @@ def _gloss(
         return "crosses a trust boundary"
     if ground.kind == "absent-attribute":
         return f"`{ground.attribute}` stated absent"
-    if ground.kind == "assertion":
-        return _assertion_gloss(rows[ground.assertion], subjects)
-    if ground.kind == "unknown-assertion":
-        return _open_question_gloss(rows[ground.assertion], subjects)
+    if ground.kind in ASSERTION_GROUNDS:
+        return ASSERTION_GLOSSES[ground.kind](rows[ground.assertion], subjects)
     return f"`{ground.attribute}` never stated"
 
 
@@ -628,6 +628,23 @@ def _assertion_gloss(row: Assertion, subjects: Mapping[str, Subject]) -> str:
         f", where {qualifier.kind} is {qualifier.value}" for qualifier in row.scope
     )
     return f"`{row.predicate}` {row.basis} {value} {about}{scope}"
+
+
+#: How each assertion ground reads, keyed by its kind.
+#:
+#: **A table rather than a branch**, and keyed by
+#: :data:`~analysis_service.claims.ASSERTION_GROUNDS`: a kind added to that set
+#: raises here, where a branch would let it fall through to the attribute
+#: sentence below and gloss a resolved row as an unstated attribute.
+#: ``tests/test_evidence.py`` compares the keys against the set.
+ASSERTION_GLOSSES: Mapping[str, Callable[[Assertion, Mapping[str, Subject]], str]] = (
+    MappingProxyType(
+        {
+            "assertion": _assertion_gloss,
+            "unknown-assertion": _open_question_gloss,
+        }
+    )
+)
 
 
 class Resolution(NamedTuple):

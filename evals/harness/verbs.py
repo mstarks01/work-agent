@@ -6,19 +6,22 @@ that validates a shipped model has to ship with it. This module is the
 measurement's half. It says which verbs count as one action for matching, and
 records what the rule cannot do.
 
-The figures are measured rather than asserted, over the whole corpus. All 244
-reference claims carry a verb. ``tests/test_evals_identity.py``'s ``FRONTIER``
-prices the rule on every error at once. Against ``endpoint subset`` alone,
-the verb adds no false split over 200 labelled pairs, and removes
-78 of the 69 false merges of
-92 candidate negatives, and 21 of the 24 false merges of 291 reference
-pairs. :class:`~evals.harness.identity.SubsetVerbIdentity` scores
-294/311 against the recorded labels, where element agreement alone scores
-200/311.
+The figures are measured rather than asserted, over the whole corpus, and
+all 242 reference claims carry a verb. ``tests/test_evals_identity.py``'s
+``FRONTIER`` prices the rule on every error at once, and the frontier table in
+``docs/agents/claim-identity.md`` carries every row of it. That table is also
+the one reader of the reference-merge column, which this module therefore
+states nowhere.
+
+Against ``endpoint subset`` alone, the verb moves the two columns below.
+It takes the false merges from 69 to 2 over 92 candidate negatives.
+It takes the false splits from 12 to 13 over 169 labelled pairs.
+Scored against the recorded labels, the verb rule agrees on 246/261.
+Element agreement alone agrees on 169/261.
 
 The candidate column is the one that argues for the vocabulary. Priced on
-reference pairs alone, the element rule merges 24 of 291 and reads as
-survivable. Priced on the paraphrases a live run emits, it merges 69 of 92.
+reference pairs alone the element rule reads as survivable. Priced on the
+paraphrases a live run emits, it merges 69 of 92.
 """
 
 from __future__ import annotations
