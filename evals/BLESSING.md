@@ -200,6 +200,11 @@ Write one entry per threat, against the corrected model's element IDs:
 - **Tier honestly.** `must-find` means *if the tool misses this, it doesn't
   work*. If everything is must-find the bar is unreachable; if nothing is, it's
   meaningless.
+- **Check what the identity held before.** A dropped claim's fingerprint is free
+  again, and a new claim landing on it inherits that claim's mark. Run
+  `run.py corpus-preflight --base <revision>` before the addition lands — after
+  the next sitting the inherited mark is indistinguishable from an earned one.
+  See `docs/agents/claim-identity.md`.
 - **Severity is `likelihood` and `impact` only** — the band is derived from the
   shipped matrix, so never write one.
 - **Keep same-element threats in different lanes distinct.** Reading a flow
