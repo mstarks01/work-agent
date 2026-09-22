@@ -46,7 +46,9 @@ class Report:
     ]  # different-typed elements sharing one name slug
     elements_analyzed: int
     model_repair: ModelRepair | None  # what the repair pass could change, and did
-    assertions: AssertionRecord | None  # the assertion catalog the lanes read, and the rows refused
+    assertions: (
+        AssertionRecord | None
+    )  # the assertion catalog the lanes read, and the rows refused
     analysis_context: (
         AnalysisContext | None
     )  # what informed the analysis (never what proves it)

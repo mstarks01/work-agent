@@ -144,10 +144,12 @@ pairs a label sets aside as `unclear`, `unsupported`, or `invalid-claim`, are
 counted beside the bar rather than inside it.
 
 What passing means is narrower than it looks. The 288 calibration fixtures began
-agent-authored;
-review 02 read the 44 decision-boundary fixtures and a random 60 of the 295
-others. This still measures whether the rule reproduces recorded dispositions,
-not whether either is externally right. See the top of [README.md](README.md).
+agent-authored, and review 02 read a part of the set as it stood on 2026-09-02:
+every decision-boundary fixture, and a random sample of the rest.
+`evals/calibration_labels/REVIEW-02.md` carries that sitting's own counts, which
+are a record of what it read rather than a figure about the set today. This
+still measures whether the rule reproduces recorded dispositions, not whether
+either is externally right. See the top of [README.md](README.md).
 
 A rule change is a re-keying event, not a dependency bump: bump the fingerprint
 version, run `rekey`, and the whole vote ledger recomputes under the new rule

@@ -25,7 +25,6 @@ catalog requirement is read here exactly as one composing it from an action.
 from __future__ import annotations
 
 import argparse
-import json
 import subprocess
 import tempfile
 from collections.abc import Mapping
@@ -34,14 +33,20 @@ from pathlib import Path
 
 from evals.harness.reference import load_case
 from evals.harness.sitting import current_marks, mark_targets, prepare
+from evals.review_submission import iter_submissions
 
 __all__ = [
     "Inherited",
+    "PreflightError",
     "arguments",
     "command_preflight",
     "inherited_rulings",
     "keys_of",
 ]
+
+
+class PreflightError(RuntimeError):
+    """A base revision this command cannot read, naming the path and the reason."""
 
 
 @dataclass(frozen=True)
@@ -115,7 +120,15 @@ def _case_at(revision: str, case: str, root: Path, into: Path) -> Path | None:
             check=False,
         )
         if blob.returncode:
-            continue
+            # `git ls-tree` just listed this path, so a failure here is a
+            # broken read rather than an absent file. Skipping it would drop
+            # claims out of the base and report every one of them as an
+            # addition, which is the answer this command exists to give
+            # correctly.
+            raise PreflightError(
+                f"{revision}:{name} is listed at that revision and cannot be"
+                f" read: {blob.stderr.decode('utf-8', 'replace').strip()}"
+            )
         target = case_dir / Path(name).relative_to(f"evals/corpus/{case}")
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_bytes(blob.stdout)
@@ -123,17 +136,23 @@ def _case_at(revision: str, case: str, root: Path, into: Path) -> Path | None:
 
 
 def _merged_marks(root: Path, case_dir: Path) -> dict[str, str]:
-    """Every merged sitting's marks on one case, re-keyed to today's identities."""
+    """Every merged sitting's marks on one case, re-keyed to today's identities.
+
+    Read through :func:`~evals.review_submission.iter_submissions`, which is
+    the loader every other consumer of these files already uses. A submission
+    arrives by pull request, so what a hand-edited one may hold is the
+    producer's question rather than the shape the merged files happen to carry:
+    a top level that is not a table has no ``cases``, and a ``cases`` entry that
+    is not one has no ``marks``. The loader answers for both and refuses with a
+    message naming the file, where a second reader spelled here would answer for
+    whichever shape its author thought of.
+    """
     prepared = prepare(case_dir)
     marks: dict[str, str] = {}
-    for path in sorted((root / "evals" / "review" / "submissions").glob("*.json")):
-        block = (
-            json.loads(path.read_text(encoding="utf-8"))
-            .get("cases", {})
-            .get(case_dir.name)
-        )
-        if block:
-            marks.update(current_marks(prepared, block.get("marks", {})))
+    for _, envelope in iter_submissions(root):
+        answers = envelope.cases.get(case_dir.name)
+        if answers is not None:
+            marks.update(current_marks(prepared, answers.marks))
     return marks
 
 
