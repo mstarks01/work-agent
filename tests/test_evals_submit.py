@@ -321,6 +321,61 @@ class TestTheRosterDeltaIsShownToTheReviewer:
         assert notes == ("ada: added as 'contributor'",)
 
 
+class TestABaseRosterWhoseVotersIsNotATable:
+    """`voters = "ada"` at the base revision, which is legal TOML.
+
+    Both roster checks read that file, and each has to handle the same two
+    shapes. `_roster_delta` did and `_check_no_self_raise` did not, so the
+    scalar reached `.get` and an `AttributeError` left the whole preflight —
+    the failure `voters.toml`'s own note already records from the entry level.
+    Both read `submit._voters_table` now, and these drive the shape that proved
+    it rather than a simpler one written afterwards.
+    """
+
+    BASE = 'version = 1\nvoters = "ada"\n'
+
+    def _live(self, tmp_path, standing):
+        path = tmp_path / submit.ROSTER_FILE
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(
+            f'version = 1\n\n[voters.ada]\nstanding = "{standing}"\n',
+            encoding="utf-8",
+        )
+        return tmp_path
+
+    def test_the_check_survives_it_and_names_it(self, tmp_path, monkeypatch):
+        monkeypatch.setattr(submit, "base_text", lambda root, rel: self.BASE)
+
+        check = submit._check_no_self_raise(self._live(tmp_path, "contributor"), "ada")
+
+        assert check.passed
+        assert "the roster's own table is not a table" in check.notes[0]
+
+    def test_an_unknown_prior_standing_still_refuses_a_self_raise(
+        self, tmp_path, monkeypatch
+    ):
+        """The safe answer for a standing nobody can read.
+
+        A malformed base roster says nothing about what `ada` held, and
+        ranking that as `contributor` is what keeps the one edit #320 refuses
+        refused. Reading it as `maintainer` would let a broken base wave a
+        promotion through.
+        """
+        monkeypatch.setattr(submit, "base_text", lambda root, rel: self.BASE)
+
+        check = submit._check_no_self_raise(self._live(tmp_path, "maintainer"), "ada")
+
+        assert not check.passed
+
+    def test_the_reader_answers_for_every_shape_the_file_can_hold(self):
+        """Absent, a table, and a scalar — the three `tomllib` can return."""
+        assert submit._voters_table("version = 1\n") == {}
+        assert submit._voters_table('[voters.ada]\nstanding = "contributor"\n') == {
+            "ada": {"standing": "contributor"}
+        }
+        assert submit._voters_table(self.BASE) is None
+
+
 class TestSelfRegistration:
     """A first-timer's roster line writes itself (#320's self-registration)."""
 
