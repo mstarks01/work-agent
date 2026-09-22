@@ -277,7 +277,28 @@ FIGURES: tuple[Figure, ...] = (
                 "evals/TUNING.md",
                 (
                     "{splits} false splits of {split_of} equivalent candidate"
-                    " pairs, {cand_merges} false merges of"
+                    " pairs, {cand_merges} false merges of\n{cand_of} candidate"
+                    " negatives and {merges} false merges of {merge_of} distinct"
+                    " reference pairs"
+                ),
+                1,
+            ),
+            (
+                "evals/VOTING.md",
+                (
+                    "An element-only rule merges {floor_cand_merges} of"
+                    " {cand_of} candidates where the\n     shipped rule merges"
+                    " {cand_merges}."
+                ),
+                1,
+            ),
+            (
+                "evals/VOTING.md",
+                (
+                    "takes the\n     candidate merges from {floor_cand_merges}"
+                    " to {cand_merges}, and it takes the false splits from"
+                    " {floor_splits} to {splits}\n     over {split_of} labelled"
+                    " pairs"
                 ),
                 1,
             ),
