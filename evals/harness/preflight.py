@@ -26,16 +26,19 @@ from __future__ import annotations
 
 import argparse
 import subprocess
+import sys
 import tempfile
 from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
 
+from evals.harness.provenance import REPO_ROOT
 from evals.harness.reference import load_case
 from evals.harness.sitting import current_marks, mark_targets, prepare
-from evals.review_submission import iter_submissions
+from evals.review_submission import ReviewSubmissionError, iter_submissions
 
 __all__ = [
+    "REPO_ROOT",
     "Inherited",
     "PreflightError",
     "arguments",
@@ -100,6 +103,14 @@ def _case_at(revision: str, case: str, root: Path, into: Path) -> Path | None:
 
     Returns ``None`` where the revision carried no such case, which is the
     answer for a case the change adds outright.
+
+    **A revision this clone cannot read is not that**, and the two have to be
+    told apart here, because every claim of a case with no base reads as an
+    addition. A mistyped ``--base`` would otherwise report the whole corpus as
+    new and name every mark on it, which is the answer this command exists to
+    give correctly. ``git ls-tree`` says which it is in its exit code: empty
+    output and success is an absent case, and a failure is an unreadable
+    revision.
     """
     listing = subprocess.run(
         ["git", "ls-tree", "-r", "--name-only", revision, f"evals/corpus/{case}/"],
@@ -108,6 +119,10 @@ def _case_at(revision: str, case: str, root: Path, into: Path) -> Path | None:
         text=True,
         check=False,
     )
+    if listing.returncode:
+        raise PreflightError(
+            f"cannot read {revision!r} in this checkout: {listing.stderr.strip()}"
+        )
     names = [line for line in listing.stdout.splitlines() if line.strip()]
     if not names:
         return None
@@ -165,28 +180,38 @@ def arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument(
         "--root",
         type=Path,
-        default=Path(__file__).resolve().parents[2],
+        default=REPO_ROOT,
         help="the repository root (default: this checkout)",
     )
 
 
 def command_preflight(args: argparse.Namespace) -> int:
+    """Name every addition landing on a marked identity. No credentials.
+
+    A base it cannot read is reported rather than raised, on the rule
+    ``run.py``'s own corpus handler states: the message names the revision or
+    the file, and a traceback over it names neither.
+    """
     root = Path(args.root).resolve()
     corpus = root / "evals" / "corpus"
     found: list[Inherited] = []
     added = 0
-    with tempfile.TemporaryDirectory() as raw:
-        scratch = Path(raw)
-        for case_dir in sorted(p for p in corpus.iterdir() if p.is_dir()):
-            current = keys_of(case_dir)
-            was = _case_at(args.base, case_dir.name, root, scratch)
-            base = keys_of(was) if was is not None else {}
-            added += len(set(current) - set(base))
-            found.extend(
-                inherited_rulings(
-                    case_dir.name, current, base, _merged_marks(root, case_dir)
+    try:
+        with tempfile.TemporaryDirectory() as raw:
+            scratch = Path(raw)
+            for case_dir in sorted(p for p in corpus.iterdir() if p.is_dir()):
+                current = keys_of(case_dir)
+                was = _case_at(args.base, case_dir.name, root, scratch)
+                base = keys_of(was) if was is not None else {}
+                added += len(set(current) - set(base))
+                found.extend(
+                    inherited_rulings(
+                        case_dir.name, current, base, _merged_marks(root, case_dir)
+                    )
                 )
-            )
+    except (PreflightError, ReviewSubmissionError) as error:
+        print(f"cannot run the preflight: {error}", file=sys.stderr)
+        return 1
     print(f"{added} finding(s) added since {args.base}")
     for one in found:
         print(f"\n{one.case}: {one.fingerprint}")
