@@ -18,6 +18,7 @@ for that reason.
 from __future__ import annotations
 
 import argparse
+import dataclasses
 import json
 from pathlib import Path
 
@@ -102,6 +103,56 @@ class TestThePhaseTable:
         for phase, entry in audit.PHASES.items():
             assert phase in printed
             assert entry.question in printed
+
+
+class TestTheRowAndItsFieldsAreOneList:
+    """`Experiment` spells its fields four times, and only one is the record.
+
+    The dataclass declares them; `to_json` writes them; `parse` reads them back;
+    `_REQUIRED` names the ones a row may not omit. A field added to the first
+    and missed by the second leaves the ledger silently, and the round trip
+    below only catches it when the fixture happens to set that field away from
+    its default. So the three derived lists are checked against the dataclass
+    rather than against each other.
+    """
+
+    def _fields(self):
+        return {field.name for field in dataclasses.fields(audit.Experiment)}
+
+    def test_the_row_writes_every_field_the_record_declares(self):
+        written = set(audit.parse(_record(), source="test").to_json())
+
+        assert written == self._fields(), (
+            "to_json and Experiment name different fields; a field it omits"
+            " never reaches the ledger file."
+        )
+
+    def test_the_loader_reads_every_field_the_row_writes(self):
+        """Every field survives a write and a read, set to a non-default value.
+
+        The round trip beside this one uses a fixture, so a field left at its
+        default round-trips through a `to_json` that drops it. This fills each
+        one first, which is what makes the trip prove anything.
+        """
+        filled = dataclasses.replace(
+            audit.parse(_record(), source="test"),
+            phase="analysis",
+            framework="stride",
+            case="01-payments-checkout",
+            reads=("evals/harness/audit.py",),
+            artifacts=("evals/runs/x.json",),
+            estimated_usd=0.5,
+            actual_usd=0.25,
+            parent="QA-x-01",
+            supersedes="QA-x-00",
+            reconsider_when="the scorer moves",
+        )
+
+        assert audit.parse(filled.to_json(), source="test") == filled
+
+    def test_every_required_field_is_one_the_record_declares(self):
+        """A required name the dataclass does not carry can never be missing."""
+        assert set(audit._REQUIRED) <= self._fields()
 
 
 class TestTheLedgerRefusals:
