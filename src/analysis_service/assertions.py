@@ -2551,9 +2551,13 @@ def contradiction_issues(
 #: would have turned two stated controls into questions. Of the 89
 #: projections whose rows all read ``unknown``, 61 carried a hedge and 28 were
 #: silent, and every one of the 89 fields already read ``unknown`` on the
-#: blessed model, so ``hedged`` changes nothing there. Its effect is on a model
-#: extraction built for itself, where a definite value can sit beside a
-#: speaker's doubt, and that is not yet measured.
+#: blessed model, so ``hedged`` changes nothing there. On models extraction
+#: built for itself — every archived proposal resolved against every archived
+#: extracted graph of its case, 1,500 pairs, the pairing ``run.py bind`` makes
+#: — 3 of 1,360 hedged projections sat over a definite value, all case 04's
+#: model server read ``internal`` where the source says its network is "meant
+#: to be" reachable only from inside and the blessed model reads ``unknown``.
+#: Each of the 3 moves the graph to the reviewed answer.
 #:
 #: Keyed by every reason and held to the literal by ``tests/test_assertions.py``,
 #: so a reason added tomorrow fails there rather than defaulting to either.

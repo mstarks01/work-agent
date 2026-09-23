@@ -1,0 +1,145 @@
+"""The frozen review population #926's support measurement is read over.
+
+Two groups. The first routes rows with the job's own readers, so a row a lane
+read is in the population whatever carried it. The second is the rule the file
+exists for: a population is frozen before any review, and never rewritten.
+"""
+
+from __future__ import annotations
+
+import argparse
+import json
+from datetime import UTC, datetime
+
+import pytest
+
+from analysis_service.assertions import (
+    ABSENT,
+    Assertion,
+    AssertionCatalog,
+    AssertionRecord,
+    CatalogIssue,
+    Subject,
+    assertion_id,
+)
+from evals.harness import population
+from evals.harness.run import COMMANDS
+from tests.test_assertions import (
+    FLOW,
+    TestTheProjectionBecomesTheGraphsValue,
+    stated,
+)
+
+MODEL = TestTheProjectionBecomesTheGraphsValue().model()
+SHOPPERS = "principal:shopper-accounts"
+
+
+def record(*entries: Assertion, issues=()) -> AssertionRecord:
+    return AssertionRecord(
+        proposed=len(entries) + len(issues),
+        catalog=AssertionCatalog(
+            subjects=[
+                Subject(id=FLOW, type="interaction", label="place order"),
+                Subject(id=SHOPPERS, type="principal", label="shopper accounts"),
+            ],
+            entries=list(entries),
+        ),
+        issues=list(issues),
+    )
+
+
+def mfa(**overrides) -> Assertion:
+    return stated(
+        **{
+            "subject": SHOPPERS,
+            "predicate": "mfa-requirement",
+            "value": ABSENT,
+            "basis": "inferred",
+            "support": [],
+            "explanation": "fixture",
+            **overrides,
+        }
+    )
+
+
+def report(held: AssertionRecord) -> dict:
+    return {
+        "assertions": held.model_dump(mode="json"),
+        "system_model": MODEL.model_dump(mode="json"),
+    }
+
+
+class TestEveryRowIsRoutedByTheJobsReaders:
+    def routes(self, held: AssertionRecord) -> dict[str, str]:
+        return {
+            row.identity: row.route
+            for row in population.population("case", held, MODEL)
+        }
+
+    def test_a_projected_and_an_offered_row_both_reach(self) -> None:
+        held = record(stated(), mfa())
+        routes = self.routes(held)
+
+        assert routes[assertion_id(stated())] == "projected"
+        assert routes[assertion_id(mfa())] == "offered"
+        assert set(routes.values()) <= population.REACHES
+
+    def test_an_unknown_is_open_and_a_conflict_is_set_aside(self) -> None:
+        silent = stated(value="unknown", reason="silent", support=[])
+        held = record(silent, mfa(), mfa(value="required"))
+        routes = self.routes(held)
+
+        assert routes[assertion_id(silent)] == "open"
+        assert routes[assertion_id(mfa())] == "set-aside"
+
+    def test_a_refused_row_is_recorded_with_its_codes(self) -> None:
+        issues = [
+            CatalogIssue(code="unverifiable-span", message="", row=3),
+            CatalogIssue(code="missing-scope", message="", row=3),
+            CatalogIssue(code="graph-contradiction", message=""),
+        ]
+        rows = population.population("case", record(issues=issues), MODEL)
+
+        (refused,) = rows
+        assert refused.route == "refused"
+        assert refused.proposed_row == 3
+        assert refused.codes == ("missing-scope", "unverifiable-span")
+
+
+class TestAPopulationIsFrozenBeforeReview:
+    def test_a_freeze_pins_the_catalog_it_was_taken_from(self) -> None:
+        held = record(stated(), mfa())
+        frozen = population.freeze(
+            {"case": report(held)}, now=datetime(2026, 9, 23, tzinfo=UTC)
+        )
+
+        assert frozen["cases"]["case"]["catalog_digest"] == (
+            population.catalog_digest(held)
+        )
+        assert len(population.reached(frozen)) == 2
+
+    def test_a_catalog_already_under_review_is_refused(self) -> None:
+        held = record(mfa(assessment="supported", assessor="human:1"))
+        with pytest.raises(population.PopulationError, match="already assessed"):
+            population.freeze({"case": report(held)})
+
+    def test_a_report_with_no_assertion_pass_is_refused(self) -> None:
+        with pytest.raises(population.PopulationError, match="no assertion pass"):
+            population.freeze({"case": {"assertions": None}})
+
+    def test_the_command_never_rewrites_a_frozen_file(self, tmp_path) -> None:
+        source = tmp_path / "case.report.json"
+        source.write_text(json.dumps(report(record(stated()))), encoding="utf-8")
+        out = tmp_path / "population.json"
+        args = argparse.Namespace(reports=[source], out=out)
+
+        assert population.command_freeze_population(args) == 0
+        first = out.read_text(encoding="utf-8")
+        assert population.command_freeze_population(args) == 1
+        assert out.read_text(encoding="utf-8") == first
+        assert set(json.loads(first)["cases"]) == {"case"}
+
+    def test_the_command_is_registered(self) -> None:
+        assert COMMANDS["freeze-population"].run is (
+            population.command_freeze_population
+        )

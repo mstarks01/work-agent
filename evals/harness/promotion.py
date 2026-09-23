@@ -53,6 +53,12 @@ from types import MappingProxyType
 from typing import Any, Literal
 
 from analysis_service.assertions import AssertionRecord
+from analysis_service.sources import text_digest
+from evals.harness import falsify
+from evals.harness.arms import ArmRun
+from evals.harness.modes import AssertionResult
+from evals.harness.reference import GoldenCase, load_corpus
+from evals.harness.replay import replay_assertions, signed_reference
 
 #: The baseline arm the budgets below were set from: one case, STRIDE only,
 #: ``analysis`` mode so the blessed model is fixed, `ANALYSIS_ASSERTIONS`
@@ -80,8 +86,7 @@ BASELINE: Mapping[str, float] = MappingProxyType(
 #: the tree, so its figures are the record rather than something to recompute.
 #:
 #: **What these gates cannot yet decide** is :data:`PENDING`: the review
-#: population, the critical fixtures, semantic support, required-fact recall
-#: and case diversity. Each is read ``inconclusive`` until it has a measurement,
+#: population, semantic support, required-fact recall and case diversity. Each is read ``inconclusive`` until it has a measurement,
 #: so no run promotes on the gates above alone. The ``sd`` gates also compare
 #: one treatment run against this one baseline run, scaled by a spread, rather
 #: than repeated arms against each other.
@@ -190,6 +195,69 @@ def support_shares(report: Mapping[str, Any]) -> Mapping[str, float] | None:
     return MappingProxyType({key: count / len(rows) for key, count in counts.items()})
 
 
+#: Where the critical fixtures read their cases and signed references.
+CORPUS = Path(__file__).resolve().parents[1] / "corpus"
+
+
+def _critical_failures(
+    artifact: Mapping[str, Any], report: Mapping[str, Any]
+) -> float | None:
+    """Critical falsification probes a job fails with nobody reviewing it.
+
+    **A property of the code, not of the run**, so it reads neither argument:
+    each of #925's corruptions is driven through the job's own gate,
+    projection and evidence catalog (:func:`~evals.harness.falsify.consumed`),
+    and a probe fails where a corrupted row reaches a lane as a fact or
+    silences a lead. The reviewed reading beside it is printed by
+    ``run.py falsify``; this gate reads the unreviewed one, because no job has
+    a reviewer.
+    """
+    found = falsify.consumed(CORPUS)
+    return len(falsify.critical_failures(found, reviewed=False))
+
+
+def _case_of(report: Mapping[str, Any]) -> GoldenCase | None:
+    """The corpus case a report was run on, by its sources' digests.
+
+    A report carries no case ID, and it does carry the sha256 of every source
+    it read, which names the case exactly and cannot drift from the text the
+    way a label or a system name can.
+    """
+    wanted = {source["sha256"] for source in report.get("input", {}).get("sources", [])}
+    if not wanted:
+        return None
+    for case in load_corpus(CORPUS):
+        if {text_digest(source.text) for source in case.sources} == wanted:
+            return case
+    return None
+
+
+def _required_fact_recall(
+    artifact: Mapping[str, Any], report: Mapping[str, Any]
+) -> float | None:
+    """Required-fact recall of the catalog this report embeds.
+
+    Read off the report rather than written into the artifact: the catalog is
+    already on the report, and an artifact key would move the artifact version
+    and re-seal every Baseline for a figure the report can answer. Graded by
+    the signed reference's own matcher through
+    :func:`~evals.harness.replay.replay_assertions` and counted by
+    :class:`~evals.harness.arms.ArmRun`, the one reader of the endpoint.
+    ``None`` for a job that ran no assertion pass or a case nobody signed.
+    """
+    record = _record(report)
+    case = _case_of(report)
+    if record is None or case is None:
+        return None
+    reference = signed_reference(CORPUS, case)
+    if reference is None:
+        return None
+    graded = replay_assertions(
+        case, reference, AssertionResult(case.id, {}, record.catalog, ())
+    )
+    return ArmRun.of(graded, reference, arm="treatment").recall
+
+
 @dataclass(frozen=True)
 class Gate:
     """One predeclared limit, and where the figure that meets it is read.
@@ -273,6 +341,22 @@ GATES: Mapping[str, Gate] = MappingProxyType(
                 " accepts may still say something its quote does not"
             ),
         ),
+        "critical-fixtures": Gate(
+            question=(
+                "does a critical corruption reach a lane as a fact, or silence"
+                " a lead, in a job nobody reviews?"
+            ),
+            read=_critical_failures,
+            unit="count",
+            limit=0,
+            direction="at-most",
+            why=(
+                "the owner's decision of 2026-09-23: zero observed failures on"
+                " the critical fixtures. When declared, six failed unreviewed and"
+                " none reviewed: a well-quoted wrong fact is stopped only by an"
+                " assessment"
+            ),
+        ),
         "must-find-coverage": Gate(
             question="does the score fall further than the spread explains?",
             read=_must_find,
@@ -315,6 +399,10 @@ class Pending:
     measures: str
     limit: str
     unset: str
+    #: Where the figure is read, where it can be yet. A pending gate with a
+    #: reader prints what it measured and stays unread, because a measurement
+    #: with no declared limit decides nothing.
+    read: Callable[[Mapping[str, Any], Mapping[str, Any]], float | None] | None = None
 
 
 #: The measurement design #926 settled on 2026-09-23 (option (c) of the
@@ -332,25 +420,11 @@ PENDING: Mapping[str, Pending] = MappingProxyType(
             ),
             limit="frozen before the first assessment",
             unset=(
-                "no population is recorded yet. Choosing the settled rows after"
-                " review could drop exactly the unsupported rows the measure"
-                " has to count"
-            ),
-        ),
-        "critical-fixtures": Pending(
-            question="do the audit's failures stay out of what consumers read?",
-            measures=(
-                "the #925 corruptions — a flipped MFA absence, support copied"
-                " onto the webhook, a stopword mechanism, and the reviewed"
-                " challenge fixtures beside them — driven through projection"
-                " and the evidence catalog, not only the gate and the recall"
-                " scorer"
-            ),
-            limit="zero observed failures",
-            unset=(
-                "`run.py falsify` accepts a loss at the gate or at the endpoint"
-                " and does not drive the production path, and `support-copied`"
-                " still reaches the graph there"
+                "`run.py freeze-population` records one and refuses a catalog"
+                " already under review, and none has been frozen: no report of"
+                " a treatment arm is in the tree to freeze. Choosing the settled"
+                " rows after review could drop exactly the unsupported rows the"
+                " measure has to count"
             ),
         ),
         "support-shares": Pending(
@@ -369,17 +443,19 @@ PENDING: Mapping[str, Pending] = MappingProxyType(
         "required-fact-recall": Pending(
             question="does the layer still find the facts the sources state?",
             measures=(
-                "required-fact recall from `run.py replay` over the reviewed"
-                " denominator, baseline arm against treatment arm on the same"
-                " cases"
+                "required-fact recall of the catalog the report embeds, graded"
+                " by the signed reference's matcher, baseline arm against"
+                " treatment arm on the same cases"
             ),
             limit="",
             unset=(
-                "recall is computed from the emission archive and not written to"
-                " a run artifact, and there is no repeated baseline to read a"
-                " regression against. Precision alone can be met by emitting few"
-                " facts, so support never promotes without this"
+                "no limit is declared and there is no repeated baseline to read"
+                " a regression against: the flag-off arm has no catalog, so the"
+                " baseline is an earlier assertion arm, not the A/B pair."
+                " Precision alone can be met by emitting few facts, so support"
+                " never promotes without this"
             ),
+            read=_required_fact_recall,
         ),
         "case-diversity": Pending(
             question="is the evidence about systems, or about one system repeated?",
@@ -497,7 +573,14 @@ def decide(
     return (
         *(read_gate(name, artifact, report, spread=spread.get(name)) for name in GATES),
         *(
-            Reading(name, "inconclusive", None, None, None, pending.unset)
+            Reading(
+                name,
+                "inconclusive",
+                None if pending.read is None else pending.read(artifact, report),
+                None,
+                None,
+                pending.unset,
+            )
             for name, pending in PENDING.items()
         ),
     )

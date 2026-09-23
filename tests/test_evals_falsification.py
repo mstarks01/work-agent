@@ -5,7 +5,8 @@ answers: every criterion has a probe or a recorded reason, and neither table
 quietly grows an entry the other does not know about. The second runs every
 probe and holds each to what it declared. The third is what the suite exists to
 stop — a falsification probe that costs nothing, and a probe mistaken for an
-arm.
+arm. The fourth drives every corruption through the job's own gate, projection
+and evidence catalog, unreviewed and reviewed.
 """
 
 from __future__ import annotations
@@ -129,6 +130,49 @@ class TestAProbeThatCostsNothingFails:
             case_id="01-payments-checkout", corrupt=falsify._mfa_enforced, loses=0
         )
         assert falsify._broke(weakened, probed["mfa-enforced"])
+
+
+@pytest.fixture(scope="module")
+def consumed() -> dict[tuple[str, bool], falsify.Consumed]:
+    return {(row.probe, row.reviewed): row for row in falsify.consumed(CORPUS)}
+
+
+class TestTheProductionPath:
+    """What a corruption does to a job, not only whether an instrument sees it."""
+
+    def test_every_critical_name_is_a_probe(self) -> None:
+        assert falsify.CRITICAL <= set(falsify.PROBES)
+
+    def test_the_perfect_reading_costs_a_job_nothing(self, consumed) -> None:
+        for reviewed in (False, True):
+            row = consumed[("perfect-reading", reviewed)]
+            assert not (row.reached or row.suppressed or row.omitted)
+
+    def test_the_copied_control_silences_the_webhook_unreviewed(self, consumed) -> None:
+        """#925's defect, measured where a lane reads it."""
+        row = consumed[("support-copied", False)]
+        assert row.reached and row.suppressed
+        assert all("settlement-webhook" in lead for lead in row.suppressed)
+
+    @pytest.mark.parametrize("name", sorted(falsify.CRITICAL))
+    def test_review_stops_every_critical_corruption(self, consumed, name) -> None:
+        """A row a reviewer set aside neither reaches a lane nor silences one."""
+        assert not consumed[(name, True)].failed
+
+    def test_a_refused_row_never_reaches_a_lane(self, consumed) -> None:
+        """The gate's refusals quarantine without a reviewer."""
+        for name in ("empty-citation", "scope-dropped", "changed-source"):
+            assert not consumed[(name, False)].failed
+
+    def test_a_missing_fact_is_charged_to_omission(self, consumed) -> None:
+        """Leads the true fact would have carried are recall's, not suppression."""
+        row = consumed[("mfa-enforced", False)]
+        assert row.omitted and not row.suppressed
+
+    def test_the_table_prints_both_readings(self, consumed) -> None:
+        printed = falsify.render_consumed(list(consumed.values()))
+        assert "suppressed, reviewed" in printed
+        assert "Critical failures:" in printed
 
 
 def _arguments():

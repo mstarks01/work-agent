@@ -23,7 +23,10 @@ from analysis_service.assertions import (
     CatalogIssue,
     Subject,
 )
+from analysis_service.sources import text_digest
 from evals.harness import promotion
+from evals.harness.reference import load_corpus
+from evals.harness.replay import signed_reference
 from evals.harness.run import COMMANDS
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -243,3 +246,48 @@ class TestTheDesignIsDeclaredBeforeItIsMeasured:
 
         for name in promotion.PENDING:
             assert f"`{name}` unread" in printed
+
+
+class TestRecallIsReadOffTheReport:
+    """Required-fact recall, from the catalog a report embeds."""
+
+    def report(self, entries) -> dict:
+        case = next(
+            case
+            for case in load_corpus(promotion.CORPUS)
+            if case.id == "01-payments-checkout"
+        )
+        reference = signed_reference(promotion.CORPUS, case)
+        assert reference is not None
+        rows = list(entries(reference))
+        record = AssertionRecord(
+            proposed=len(rows),
+            catalog=AssertionCatalog(subjects=reference.subjects, entries=rows),
+        )
+        return {
+            "input": {
+                "sources": [{"sha256": text_digest(s.text)} for s in case.sources]
+            },
+            "assertions": record.model_dump(mode="json"),
+        }
+
+    def test_a_perfect_reading_recalls_everything(self) -> None:
+        report = self.report(lambda reference: reference.entries)
+        assert promotion._required_fact_recall({}, report) == 1.0
+
+    def test_a_missing_fact_lowers_recall(self) -> None:
+        report = self.report(lambda reference: reference.entries[1:])
+        recall = promotion._required_fact_recall({}, report)
+        assert recall is not None and recall < 1.0
+
+    def test_the_pending_gate_prints_the_figure_and_stays_unread(self) -> None:
+        report = self.report(lambda reference: reference.entries)
+        artifact = TestTheTwoKindsOfGate().artifact(0.1, 0.5)
+        readings = {row.gate: row for row in promotion.decide(artifact, report)}
+
+        assert readings["required-fact-recall"].measured == 1.0
+        assert readings["required-fact-recall"].verdict == "inconclusive"
+
+    def test_a_report_from_no_corpus_case_is_unread(self) -> None:
+        report = {"input": {"sources": [{"sha256": "0" * 64}]}}
+        assert promotion._required_fact_recall({}, report) is None

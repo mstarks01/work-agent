@@ -80,6 +80,7 @@ from evals.harness import (
     modes,
     oracle,
     pairing,
+    population,
     preflight,
     promotion,
     queue,
@@ -2392,6 +2393,12 @@ COMMANDS: dict[str, Command] = {
         " run (no credentials)",
         run=promotion.command_gates,
         arguments=promotion.arguments,
+    ),
+    "freeze-population": Command(
+        help="record which assertion rows reached a lane, before any support"
+        " review, so the review cannot select around them (#926, no credentials)",
+        run=population.command_freeze_population,
+        arguments=population.arguments,
     ),
     "oracle": Command(
         help="put a perfect reading of every signed case through the"

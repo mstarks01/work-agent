@@ -271,7 +271,10 @@ the same rule the asset vocabulary and the **Ground** kinds already follow.
   `hedged` row now qualifies a definite extracted value the way a conflict
   does, quoting the hedge where it has one. `silent`, `unmeasured` and
   `truncated` rows still leave the attribute: the pass not finding an answer
-  is weaker evidence than a value extraction stated.
+  is weaker evidence than a value extraction stated. Measured over the 1,500
+  pairings of archived proposals with archived extracted graphs: 3 of 1,360
+  hedged projections sat over a definite extracted value, and all 3 moved the
+  graph to the value the reviewed model holds.
 - **The `assumptions` list.** An **Assumption** stays the record of a value this
   service inferred into a graph attribute. The catalog's `inferred` basis covers
   predicates the graph has no field for. When a predicate's projection becomes

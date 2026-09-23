@@ -41,12 +41,18 @@ from pathlib import Path
 from types import MappingProxyType
 
 from analysis_service.assertions import (
+    ABSENT,
     Assertion,
     AssertionCatalog,
+    AssertionRecord,
     Subject,
+    apply_projection,
     assertion_id,
     gate_issues,
+    settled,
 )
+from analysis_service.claims import ATTRIBUTE_GROUNDS
+from analysis_service.evidence import evidence_catalog
 from analysis_service.system_model import (
     SystemModel,
     flow_id_version,
@@ -838,8 +844,240 @@ def render(found: Sequence[Outcome]) -> str:
     return "\n".join(lines) + "\n"
 
 
+# --- The production path -----------------------------------------------------
+#
+# The two instruments above ask whether a corruption is *visible*. #926 also
+# asks what it does to a job: whether a corrupted row reaches what a lane reads,
+# and whether it erases a lead the uncorrupted reading offered. That is a third
+# reader, and it is the job's own code rather than a copy of it:
+# :meth:`AssertionRecord.over` quarantines, :func:`apply_projection` writes the
+# graph, and :func:`evidence_catalog` builds the table a lane cites from.
+
+#: The probes whose corruption is one of #925's defects or the same shape as
+#: one: a stated fact flipped, moved onto the wrong subject, emptied of meaning
+#: or of its citation, answered with a different control, or widened past its
+#: scope. The owner's decision on 2026-09-23 requires **zero observed failures**
+#: here, read by ``critical-fixtures`` in :mod:`evals.harness.promotion`.
+#:
+#: ``absence-inferred`` is not here: its corrupted row carries the true value
+#: under the basis ``inferred``, and reaching a lane labelled as an inference
+#: is what ADR 0036 asks of one. ``paraphrase`` and ``valid-inference`` are
+#: positive controls, and the rest corrupt the graph rather than a fact.
+CRITICAL: frozenset[str] = frozenset(
+    {
+        "mfa-enforced",
+        "support-copied",
+        "empty-citation",
+        "stopword-mechanism",
+        "control-name-elsewhere",
+        "signature-is-not-authentication",
+        "destination-is-not-authentication",
+        "scope-dropped",
+        "changed-source",
+    }
+)
+
+#: Who assesses the corrupted rows in the reviewed reading. Not a model: the
+#: fixture itself knows which rows it corrupted.
+FIXTURE_REVIEWER = "reviewer:falsification-fixture"
+
+
+@dataclass(frozen=True)
+class Consumed:
+    """What one corrupted reading does to a job.
+
+    ``reached`` is every corrupted row the job settles, so a lane reads it
+    through the graph or the evidence table as a fact.
+
+    Lost leads are split by what lost them, against the same reading with the
+    corrupted rows simply left out. ``suppressed`` is a lead that reading
+    offers and this one does not: **the wrong row itself silenced it**, which is
+    #925's defect — a copied control removing the webhook's uncertainty.
+    ``omitted`` is a lead the perfect reading offered that leaving the rows out
+    already loses: the true fact was never extracted, which required-fact
+    recall charges and no production reader can recover.
+
+    ``reviewed`` says whether the corrupted rows were assessed ``unsupported``
+    first, which is what a review would do and what no job does on its own.
+    """
+
+    probe: str
+    reviewed: bool
+    reached: tuple[str, ...]
+    suppressed: tuple[str, ...]
+    omitted: tuple[str, ...]
+
+    @property
+    def failed(self) -> bool:
+        """Whether a corrupted row reached a lane as a fact, or silenced a lead."""
+        return bool(self.reached or self.suppressed)
+
+
+def consumer_view(
+    catalog: AssertionCatalog, model: SystemModel, sources: Mapping[str, str]
+) -> tuple[AssertionCatalog, frozenset[str]]:
+    """What a job reads from this catalog: the rows it keeps, and its leads.
+
+    The job's own sequence, with nothing re-derived: the gate quarantines, the
+    projection writes the graph, and the evidence catalog is built over both.
+
+    **A lead is named by what it is about**, an element's attribute or a
+    subject's predicate, not by its evidence key. A stated absence that becomes
+    an open question on the same attribute is still a lead a lane can raise; a
+    lead with nothing left on its attribute is one it cannot.
+    """
+    record = AssertionRecord.over(
+        catalog, model, sources, proposed=len(catalog.entries)
+    )
+    projected, _ = apply_projection(model, record.catalog)
+    evidence = evidence_catalog(projected, record.catalog)
+    rows = {assertion_id(entry): entry for entry in record.catalog.entries}
+    leads = set()
+    for key, ground in evidence.items():
+        if ground.kind in ATTRIBUTE_GROUNDS:
+            leads.add(f"{ground.element_id}.{ground.attribute}")
+        elif ground.kind == "unknown-assertion" or (
+            ground.kind == "assertion" and rows[key].value == ABSENT
+        ):
+            leads.add(f"{rows[key].subject}.{rows[key].predicate}")
+    return record.catalog, frozenset(leads)
+
+
+def consume_probe(
+    name: str, case: GoldenCase, reference: SignedReference, *, reviewed: bool
+) -> Consumed:
+    """Drive one probe's corruption through the job, reviewed or not."""
+    corrupted = PROBES[name].corrupt(reference, case)
+    subjects = (
+        reference.subjects if corrupted.subjects is None else list(corrupted.subjects)
+    )
+    changed = [entry for entry in corrupted.entries if entry not in reference.entries]
+    if reviewed:
+        marked = {
+            assertion_id(entry): entry.model_copy(
+                update={"assessment": "unsupported", "assessor": FIXTURE_REVIEWER}
+            )
+            for entry in changed
+        }
+        entries = [
+            marked.get(assertion_id(entry), entry) for entry in corrupted.entries
+        ]
+    else:
+        entries = list(corrupted.entries)
+    model = case.model if corrupted.model is None else corrupted.model
+    base_sources = {source.label: source.text for source in case.sources}
+    sources = base_sources if corrupted.sources is None else dict(corrupted.sources)
+
+    _, perfect = consumer_view(
+        AssertionCatalog(subjects=reference.subjects, entries=list(reference.entries)),
+        case.model,
+        base_sources,
+    )
+    _, without = consumer_view(
+        AssertionCatalog(
+            subjects=subjects,
+            entries=[entry for entry in corrupted.entries if entry not in changed],
+        ),
+        model,
+        sources,
+    )
+    kept, leads = consumer_view(
+        AssertionCatalog(subjects=subjects, entries=entries), model, sources
+    )
+    corrupt_ids = {assertion_id(entry) for entry in changed}
+    return Consumed(
+        probe=name,
+        reviewed=reviewed,
+        reached=tuple(
+            sorted(
+                assertion_id(entry)
+                for entry in settled(kept)
+                if assertion_id(entry) in corrupt_ids
+            )
+        ),
+        suppressed=tuple(sorted(without - leads)),
+        omitted=tuple(sorted(perfect - without)),
+    )
+
+
+def consumed(corpus_dir: Path) -> list[Consumed]:
+    """Every probe through the job, unreviewed and then reviewed."""
+    cases = {case.id: case for case in load_corpus(corpus_dir)}
+    found = []
+    for name, probe in PROBES.items():
+        case = cases[probe.case_id]
+        reference = signed_reference(corpus_dir, case)
+        if reference is None:
+            raise KeyError(
+                f"{name} runs on {probe.case_id}, whose reference nobody signed"
+            )
+        for reviewed in (False, True):
+            found.append(consume_probe(name, case, reference, reviewed=reviewed))
+    return found
+
+
+def critical_failures(found: Sequence[Consumed], *, reviewed: bool) -> tuple[str, ...]:
+    """The critical probes that failed in one reading: a wrong row read as a
+    fact, or a lead it silenced."""
+    return tuple(
+        sorted(
+            row.probe
+            for row in found
+            if row.reviewed == reviewed and row.probe in CRITICAL and row.failed
+        )
+    )
+
+
+def render_consumed(found: Sequence[Consumed]) -> str:
+    """The production-path table, as text."""
+    by = {(row.probe, row.reviewed): row for row in found}
+    lines = [
+        "## What a corrupted reading does to a job",
+        "",
+        (
+            "Each corruption driven through the job's own gate, projection and"
+            " evidence catalog. *Reached*: corrupted rows a lane reads as"
+            " facts. *Suppressed*: leads the wrong rows themselves silenced."
+            " *Omitted*: leads lost because the true fact is missing, which"
+            " recall charges and nothing downstream can recover. *Reviewed*"
+            " assesses the corrupted rows `unsupported` first, which no job"
+            " does on its own. A critical probe fails on a reached or"
+            " suppressed row."
+        ),
+        "",
+        (
+            "| probe | critical | reached | suppressed | omitted"
+            " | reached, reviewed | suppressed, reviewed |"
+        ),
+        "| --- | --- | ---: | ---: | ---: | ---: | ---: |",
+    ]
+    for name in PROBES:
+        plain, checked = by[(name, False)], by[(name, True)]
+        lines.append(
+            f"| `{name}` | {'yes' if name in CRITICAL else ''}"
+            f" | {len(plain.reached)} | {len(plain.suppressed)}"
+            f" | {len(plain.omitted)}"
+            f" | {len(checked.reached)} | {len(checked.suppressed)} |"
+        )
+    unreviewed = critical_failures(found, reviewed=False)
+    reviewed = critical_failures(found, reviewed=True)
+    lines += [
+        "",
+        (
+            f"**Critical failures: {len(unreviewed)} unreviewed"
+            f" ({', '.join(f'`{name}`' for name in unreviewed) or 'none'}),"
+            f" {len(reviewed)} reviewed"
+            f" ({', '.join(f'`{name}`' for name in reviewed) or 'none'}).**"
+        ),
+        "",
+    ]
+    return "\n".join(lines) + "\n"
+
+
 def command_falsify(args: argparse.Namespace) -> int:
     """Run every probe. It runs no model and reads no credential."""
     found = outcomes(Path(args.corpus))
     print(render(found), end="")
+    print()
+    print(render_consumed(consumed(Path(args.corpus))), end="")
     return 0 if all(row.held for row in found) else 1
