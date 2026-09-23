@@ -75,6 +75,13 @@ That is the contract working as decided: a correct unchecked fact is shown
 with its uncertainty rather than settled. If the cost to placement is judged
 too high, the remedy is a review, not an exception in the rule.
 
+**The facts-first route takes no exception either.** Its resolver writes no
+zone: every component enters at `unknown`, and a placement fact is a catalog
+row that the same projection reads. So an unchecked placement leaves the zone
+open and is cited to the lane, on both routes. Against the archive this moves
+no figure: `run.py replay`, `run.py oracle` and `run.py bottleneck` give the
+same output before and after the change.
+
 **A reviewed report is recomputed, not rewritten.** A report checks every
 ground on load, so the reassessment is a record beside the report. A finding
 the rejected row suppressed was never written, and only a re-analysis of the

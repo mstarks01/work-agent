@@ -27,17 +27,16 @@ Three rules decide the hard cases, and each one refuses rather than guesses.
 preserved, never settled by array order: the bundle stage may decide
 coreference, and where it declined, code does not decide for it.
 
-**A component no fact places is placed nowhere.** It enters the graph at
-:data:`~analysis_service.system_model.UNKNOWN`, carrying every other fact the
-sources state about it, and it carries no
-:class:`~analysis_service.system_model.Assumption`: ADR 0039 rule 1 says
-neither the extraction nor the resolver invents a zone to satisfy the schema,
-and an assumption records a placement this service chose rather than one it
-declined to choose. A placement fact whose basis is not ``stated`` is the other
-case — a reader inferred it, so the Assumption goes on ``trust_zone`` and
-:class:`~analysis_service.system_model.BoundaryCrossing` marks the endpoint. A
-row is ``unsupported`` for what a target schema cannot express, never for a
-placement the sources do not make.
+**The resolver writes no zone.** Every component enters the graph at
+:data:`~analysis_service.system_model.UNKNOWN`, carrying every fact the sources
+state about it. A placement fact is a catalog row like any other, and the
+projection in ``prepare`` decides what it writes: ADR 0041 lets no unchecked
+row close a lead, so the lane reads an open zone and the cited row until a
+reviewer marks the row ``supported``. The graph-first route reads its placement
+rows through the same projection, so the two routes agree. ADR 0039 rule 1
+holds as well: nothing invents a zone to satisfy the schema. A row is
+``unsupported`` for what a target schema cannot express, never for a placement
+the sources do not make.
 
 **The resolver invents no Trust Boundary.** Where the bundle names no zone at
 all, the model holds none and
@@ -82,7 +81,6 @@ from analysis_service.assertions import (
 )
 from analysis_service.system_model import (
     UNKNOWN,
-    Assumption,
     DataFlow,
     DataStore,
     Element,
@@ -208,8 +206,8 @@ PLACEMENT_PREDICATES: frozenset[str] = frozenset(
 #: The element fields code fills rather than the role: identity and a flow's
 #: endpoints. Every other field a class requires takes
 #: :data:`~analysis_service.system_model.UNKNOWN`, ``trust_zone`` included —
-#: it starts there and :func:`_place` is the only thing that writes it, so an
-#: element whose placement no fact states never leaves the resolver.
+#: the resolver never writes it, and the projection writes it from a placement
+#: row a reviewer supported (:func:`_place`).
 _SET_BY_CODE: frozenset[str] = frozenset({"id", "name", "source", "destination"})
 
 #: What became of one bundle row. ``consumed`` reached the graph, ``preserved``
@@ -356,7 +354,8 @@ class FactProposal(BaseModel):
         "mention", "interaction", "principal", "credential", "artifact"
     ]
     subject: str = Field(min_length=1, max_length=300)
-    # The registry's own names, on the rule :class:`Assumption` follows: a model
+    # The registry's own names, on the rule
+    # :class:`~analysis_service.system_model.Assumption` follows: a model
     # asked for a bounded string eventually writes prose into it, and the gate
     # that reads this field checks it against ``REGISTRY`` a layer later. The
     # enum is a schema fact and not a validator, so a value outside the set
@@ -626,9 +625,9 @@ def resolve_bundle(
     repeated = _repeated_handles(bundle)
     rows: list[DispositionRow] = []
 
-    stated, competing, bases = _stated_placements(bundle, prepared, repeated)
-    zones, zoned, assumptions, unplaced = _mentions(
-        bundle, prepared, repeated, stated, competing, bases, held, rows
+    stated, competing = _stated_placements(bundle, prepared, repeated)
+    zones, zoned, unplaced = _mentions(
+        bundle, prepared, repeated, stated, competing, held, rows
     )
     flows, open_flows = _interactions(
         bundle, prepared, repeated, zoned, unplaced, held, rows
@@ -645,7 +644,7 @@ def resolve_bundle(
         ],
         data_flows=list(flows.values()),
         trust_boundaries=list(zones.values()),
-        assumptions=[*held.assumptions, *assumptions],
+        assumptions=list(held.assumptions),
     )
     proposal, record = _facts(
         bundle,
@@ -867,7 +866,7 @@ def _stated_placements(
     bundle: SourceFactBundle,
     prepared: Mapping[str, SpanSource],
     repeated: Collection[str],
-) -> tuple[Mapping[str, str], frozenset[str], Mapping[str, str]]:
+) -> tuple[Mapping[str, str], frozenset[str]]:
     """Which zone handle each mention's facts place it in, and which disagree.
 
     Read from the fact rows, because :data:`PLACEMENT_PREDICATES` is the one
@@ -876,12 +875,9 @@ def _stated_placements(
     call them a conflict — so the component is returned as competing rather
     than placed by whichever row came first.
 
-    :func:`_places` decides which rows are read at all. The third return is the
-    basis each placement rests on, so :func:`_place` can mark an inferred one:
-    a zone nobody stated is an assumption whether code chose it or a reader did.
+    :func:`_places` decides which rows are read at all.
     """
     stated: dict[str, str] = {}
-    bases: dict[str, str] = {}
     competing: set[str] = set()
     for fact in bundle.facts:
         if fact.handle in repeated or fact.predicate not in PLACEMENT_PREDICATES:
@@ -892,8 +888,7 @@ def _stated_placements(
         if held is not None and held != fact.value:
             competing.add(fact.subject)
         stated[fact.subject] = fact.value
-        bases[fact.subject] = fact.basis
-    return stated, frozenset(competing), bases
+    return stated, frozenset(competing)
 
 
 def _mentions(
@@ -902,25 +897,22 @@ def _mentions(
     repeated: Collection[str],
     stated: Mapping[str, str],
     competing: Collection[str],
-    bases: Mapping[str, str],
     held: SystemModel,
     rows: list[DispositionRow],
 ) -> tuple[
     dict[str, TrustBoundary],
     dict[str, ZonedElement],
-    list[Assumption],
     frozenset[str],
 ]:
-    """Turn every mention into a zone or a placed element, or say why not.
+    """Turn every mention into a zone or an element, or say why not.
 
-    Two passes, because placement reads the zones: the first builds every
-    element the roles decide, and the second places the zoned ones. A component
-    a fact places is placed; one no fact places enters unplaced, at
-    :data:`~analysis_service.system_model.UNKNOWN` and with no Assumption
-    beside it, however many zones the bundle names. Only a component whose
-    placement the bundle *contradicts* — competing rows, or a zone handle
-    naming nothing — stays out of the graph, because choosing between two
-    stated zones is the failure #1003 names.
+    Two passes, because the placement check reads the zones: the first builds
+    every element the roles decide, and the second checks each zoned one's
+    placement. Every component enters at
+    :data:`~analysis_service.system_model.UNKNOWN` (:func:`_place`). Only a
+    component whose placement the bundle *contradicts* — competing rows, or a
+    zone handle naming nothing — stays out of the graph, because choosing
+    between two stated zones is the failure #1003 names.
     """
     # Keyed by handle for what this bundle builds and by **Element ID** for
     # what ``base`` already held. The two shapes are disjoint —
@@ -954,16 +946,10 @@ def _mentions(
     zoned: dict[str, ZonedElement] = {
         element.id: element for element in held.zoned_elements()
     }
-    assumptions: list[Assumption] = []
     unplaced_handles: set[str] = set()
     for handle, (mention, element) in unplaced.items():
-        placed, assumption, code, message = _place(
-            mention,
-            element,
-            zones,
-            stated.get(handle, ""),
-            bases.get(handle, ""),
-            handle in competing,
+        placed, code, message = _place(
+            mention, element, zones, stated.get(handle, ""), handle in competing
         )
         if placed is None:
             unplaced_handles.add(handle)
@@ -978,8 +964,6 @@ def _mentions(
             )
             continue
         zoned[handle] = placed
-        if assumption is not None:
-            assumptions.append(assumption)
         rows.append(
             DispositionRow(
                 handle=handle,
@@ -988,7 +972,7 @@ def _mentions(
                 target=placed.id,
             )
         )
-    return zones, zoned, assumptions, frozenset(unplaced_handles)
+    return zones, zoned, frozenset(unplaced_handles)
 
 
 def _build_mention(
@@ -1072,27 +1056,25 @@ def _place(
     element: ZonedElement,
     zones: Mapping[str, TrustBoundary],
     placement: str,
-    basis: str,
     competing: bool,
-) -> tuple[ZonedElement | None, Assumption | None, str, str]:
-    """Put one component in its zone, or say why the graph cannot hold it.
+) -> tuple[ZonedElement | None, str, str]:
+    """Check one component's placement, and enter it with no zone.
 
-    **A placement comes from a fact, and this function invents none.** ADR 0039
-    rule 1: a component the sources place is placed, and one they do not is
-    unplaced. A zone chosen to fill the field reads exactly like one the text
-    stated, and every later question about that component rests on the choice.
+    **The resolver writes no zone** (ADR 0041). A placement fact is an
+    unchecked assertion, and an unchecked assertion never closes a lead. So
+    the component enters at :data:`~analysis_service.system_model.UNKNOWN`,
+    and its placement row goes to the catalog. There the projection writes the
+    zone once a reviewer marks the row ``supported``, with an Assumption where
+    the row is inferred. Until then the lane reads the open zone and the cited
+    row. Writing the zone here closed the lead that the same row, on the
+    graph-first route, leaves open.
 
-    **A zone a reader inferred is still an assumption.** Where a placement fact
-    carries a basis other than ``stated``, the reader inferred it and the graph
-    says so through an
-    :class:`~analysis_service.system_model.Assumption` on ``trust_zone``. An
-    unplaced component carries none, and the difference is the point: an
-    assumption records a placement somebody chose, and the unknown sentinel
-    records that nobody did.
+    **A contradicted placement still refuses.** Two rows placing one component
+    in two zones, or a zone handle naming nothing, keep the component out of
+    the graph, because no reader can choose between them.
     """
     if competing:
         return (
-            None,
             None,
             "competing-placement",
             (
@@ -1101,32 +1083,13 @@ def _place(
                 " which, not code"
             ),
         )
-    if placement:
-        boundary = zones.get(placement)
-        if boundary is None:
-            return (
-                None,
-                None,
-                "dangling-zone",
-                f"zone handle {placement!r} names no zone mention of this bundle",
-            )
-        assumed = (
-            None
-            if basis == "stated"
-            else Assumption(
-                assumption=f"{mention.text} sits in {boundary.name}",
-                element_id=element.id,
-                attribute="trust_zone",
-                basis=f"no source places this component; the placement is {basis}",
-            )
+    if placement and placement not in zones:
+        return (
+            None,
+            "dangling-zone",
+            f"zone handle {placement!r} names no zone mention of this bundle",
         )
-        return element.model_copy(update={"trust_zone": boundary.id}), assumed, "", ""
-    # No fact places it, so nothing here does either. The component enters
-    # unplaced rather than falling out of the model with every fact about it,
-    # and no Assumption rides along: an assumption records a placement this
-    # service *chose*, and this is where it declines to choose. A reader tells
-    # the two apart by the zone itself.
-    return element.model_copy(update={"trust_zone": UNKNOWN}), None, "", ""
+    return element.model_copy(update={"trust_zone": UNKNOWN}), "", ""
 
 
 def _interactions(
