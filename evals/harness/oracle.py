@@ -94,10 +94,14 @@ from analysis_service.system_model import (
     SystemModel,
     TrustBoundary,
 )
-from evals.harness.arms import required_rows
 from evals.harness.modes import AssertionResult
 from evals.harness.reference import GoldenCase, load_corpus
-from evals.harness.replay import SignedReference, replay_assertions, signed_reference
+from evals.harness.replay import (
+    SignedReference,
+    replay_assertions,
+    required_rows,
+    signed_reference,
+)
 
 #: Which role builds each blessed element, by the class the model holds and the
 #: ``kind`` the role fixes. A **table** rather than a branch: a class or a kind
@@ -539,12 +543,6 @@ def render(found: Sequence[CaseCharge]) -> str:
                 f" {row.predicate} — {row.why}"
             )
     return "\n".join(lines) + "\n"
-
-
-def arguments(parser: argparse.ArgumentParser) -> None:
-    parser.add_argument(
-        "--corpus", default="evals/corpus", help="the corpus directory to read"
-    )
 
 
 def command_oracle(args: argparse.Namespace) -> int:

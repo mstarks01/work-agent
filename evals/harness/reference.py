@@ -39,6 +39,7 @@ it would quietly lower the recall denominator.
 
 from __future__ import annotations
 
+import argparse
 import json
 import re
 from collections.abc import Mapping, Sequence
@@ -847,6 +848,23 @@ def _load_sources(case_dir: Path, meta: CaseMetadata) -> tuple[Source, ...]:
             )
         )
     return tuple(sources)
+
+
+#: Where the corpus sits, relative to the repository root. One spelling, so a
+#: command that reads the corpus and a command that reads it differently still
+#: default to the same tree.
+DEFAULT_CORPUS = "evals/corpus"
+
+
+def corpus_argument(parser: argparse.ArgumentParser) -> None:
+    """Add the ``--corpus`` option every corpus-reading command takes.
+
+    One home for the option, because two commands that spell the same default
+    twice are two readers of where the corpus is.
+    """
+    parser.add_argument(
+        "--corpus", default=DEFAULT_CORPUS, help="the corpus directory to read"
+    )
 
 
 def load_corpus(corpus_dir: Path | str) -> tuple[GoldenCase, ...]:

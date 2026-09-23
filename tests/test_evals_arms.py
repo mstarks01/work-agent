@@ -58,7 +58,6 @@ from evals.harness.arms import (
     macro_recall,
     paired_difference,
     report,
-    required_rows,
     row_tally,
     shown_tokens,
     subject_kind,
@@ -68,7 +67,12 @@ from evals.harness.arms import (
     wrong_rate,
 )
 from evals.harness.modes import AssertionResult
-from evals.harness.replay import PRODUCED_FATES, ROW_FATES, SignedReference
+from evals.harness.replay import (
+    PRODUCED_FATES,
+    ROW_FATES,
+    SignedReference,
+    required_rows,
+)
 from tests.factories import PROJECT_ROOT
 from tests.test_deployment import VERTEX_ENV
 from tests.test_facts_route import FRAMEWORKS
@@ -169,7 +173,13 @@ class TestTheArmsTable:
 
 
 class TestTheEndpoint:
-    """What the denominator counts, and what a run recovers out of it."""
+    """What the denominator counts, and what a run recovers out of it.
+
+    The denominator rule lives beside the signed reference it reads, in
+    :mod:`evals.harness.replay`, because the arm endpoint, the ceiling
+    instrument and the pooled replay reading are three readers of it. Its
+    tests stay here, with the endpoint they define.
+    """
 
     def test_the_denominator_is_the_stated_rows(self) -> None:
         held = reference(
