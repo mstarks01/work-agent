@@ -64,7 +64,6 @@ from analysis_service.assertions import (
     MAX_SPANS,
     MAX_VALUE_CHARS,
     REGISTRY,
-    UNPROJECTED,
     AssertionCatalog,
     AssertionProposal,
     AssertionRecord,
@@ -77,6 +76,7 @@ from analysis_service.assertions import (
     SubjectType,
     UnknownReason,
     ambiguous_quote,
+    projected_attribute,
     span_source,
     spans_for,
 )
@@ -1407,9 +1407,11 @@ def _facts(
     ``unsupported`` where the registry holds no such predicate, ``rejected``
     for every other reason.
 
-    A row the catalog kept is ``consumed`` where its predicate projects into a
-    graph field and ``preserved`` where it does not, which is the split
-    :data:`~analysis_service.assertions.UNPROJECTED` already rules.
+    A row the catalog kept is ``consumed`` where it reaches a graph field and
+    ``preserved`` where it does not, which is the split
+    :func:`~analysis_service.assertions.projected_attribute` already rules — per
+    row, because a mechanism on a component reaches no field its predicate
+    names on a flow.
     """
     proposals: list[AssertionProposal] = []
     handles: list[str] = []
@@ -1483,7 +1485,9 @@ def _facts(
                 handle=handle,
                 kind="fact",
                 disposition=(
-                    "preserved" if row.predicate in UNPROJECTED else "consumed"
+                    "consumed"
+                    if projected_attribute(row.predicate, row.subject)
+                    else "preserved"
                 ),
                 target=row.subject,
             )

@@ -43,12 +43,14 @@ There are only facts the agent is being shown anyway.
 
 A fourth family arrives with the job's **Assertion** catalog, where the job ran
 one. ``assertion:<predicate>~<subject>~<scope>~<value>`` is the row's own
-computed identity, used verbatim, and it is offered for a settled row of a
-predicate the graph has no field for — a second factor stated absent, a
-credential stated shared — because those facts reach no attribute a rule could
-read. A predicate with a graph field stays cited through that field: one fact,
-one reader (ADR 0036). Which rows settle is
-:func:`~analysis_service.assertions.settled`'s one rule, so a conflict, an
+computed identity, used verbatim, and it is offered for a settled row the
+graph does not already carry — a second factor stated absent, a credential
+stated shared, a mechanism on a component with no ``authentication`` field, a
+control stated only for administrators — because those facts reach no
+attribute a rule could read. A row whose projection the graph holds stays
+cited through that attribute: one fact, one reader (ADR 0036). Which rows those
+are is :func:`~analysis_service.assertions.offered`'s one rule, and which rows
+settle is :func:`~analysis_service.assertions.settled`'s, so a conflict, an
 unsupported row or a legacy one is never in the table, and a claim can never
 rest on one.
 
@@ -82,15 +84,18 @@ from analysis_service.analysis import (
 from analysis_service.assertions import (
     ABSENT,
     GRAPH_BOUND,
-    UNPROJECTED,
     Assertion,
     AssertionCatalog,
+    Projection,
     Subject,
+    apply_projection,
     assertion_id,
-    settled,
+    offered,
+    projected_attribute,
 )
 from analysis_service.claims import (
     ASSERTION_GROUNDS,
+    ATTRIBUTE_GROUNDS,
     GROUND_TERM_MAX_CHARS,
     REFERENCE_MAX_CHARS,
     AnalysisMarks,
@@ -174,9 +179,9 @@ def evidence_catalog(
     is offered there, in the words that say it is a question.
 
     A third enumeration follows where the job carried an assertion pass:
-    every settled row of a predicate in
-    :data:`~analysis_service.assertions.UNPROJECTED`, in the catalog's own
-    order. ``None`` is a job that ran no such pass, and it is the same catalog
+    every row :func:`~analysis_service.assertions.offered` returns — settled,
+    and not already carried by the attribute its projection wrote — in the
+    catalog's own order. ``None`` is a job that ran no such pass, and it is the same catalog
     as before the layer existed; an empty catalog is a pass that settled
     nothing, which offers the same rows and says so on the report.
 
@@ -215,25 +220,72 @@ def evidence_catalog(
         catalog.update(
             {
                 assertion_id(row): Ground(kind="assertion", assertion=assertion_id(row))
-                for row in settled(assertions)
-                if row.predicate in UNPROJECTED
+                for row in offered(assertions, model)
             }
         )
         # The open questions, after the settled rows and never merged with
         # them. A row reaches here when its value is the unknown sentinel and
-        # its predicate has no graph field: the one class of fact that had no
-        # offer of any kind, because the attribute enumeration above walks
-        # elements and this row's subject may be a principal.
+        # it reaches no graph field: the one class of fact that had no offer
+        # of any kind, because the attribute enumeration above walks elements
+        # and this row's subject may be a principal.
         catalog.update(
             {
                 assertion_id(row): Ground(
                     kind="unknown-assertion", assertion=assertion_id(row)
                 )
                 for row in assertions.entries
-                if row.predicate in UNPROJECTED and row.value == UNKNOWN
+                if row.value == UNKNOWN
+                and not projected_attribute(row.predicate, row.subject)
             }
         )
     return catalog
+
+
+def prepared_view(
+    model: SystemModel, assertions: AssertionCatalog
+) -> tuple[SystemModel, tuple[Projection, ...], EvidenceCatalog]:
+    """The model a job's lanes read, what moved it, and the evidence it offers.
+
+    **The one reader of "what does analysis preparation make of this catalog".**
+    ``prepare`` calls it, and so does every instrument that asks what a
+    catalog does to a job — ``run.py falsify``'s production path and the
+    reassessment after a review — so a guarantee tested through one is the
+    guarantee the other runs. The projection is applied first because a zone
+    predicate moves ``trust_zone``, and the evidence is derived from the model
+    it produced.
+    """
+    projected, applied = apply_projection(model, assertions)
+    return projected, applied, evidence_catalog(projected, assertions)
+
+
+def lead_topics(
+    evidence: EvidenceCatalog, assertions: AssertionCatalog | None = None
+) -> frozenset[str]:
+    """What this evidence offers a lane as an open question or an absence.
+
+    **The one reader of "is this still a lead".** A lead is named by what it
+    is about — ``element.attribute`` for an attribute, ``subject.predicate``
+    for an assertion row — never by its reference, so a stated absence that
+    becomes an open question on the same attribute is still a lead a lane can
+    raise, and a lead with nothing left on its topic is one it cannot. The
+    falsification instrument and the post-review reassessment both ask it.
+    """
+    rows = (
+        {}
+        if assertions is None
+        else {assertion_id(entry): entry for entry in assertions.entries}
+    )
+    found = set()
+    for ref, ground in evidence.items():
+        if ground.kind in ATTRIBUTE_GROUNDS:
+            found.add(f"{ground.element_id}.{ground.attribute}")
+        elif ref in rows and (
+            ground.kind == "unknown-assertion"
+            or (ground.kind == "assertion" and rows[ref].value == ABSENT)
+        ):
+            row = rows[ref]
+            found.add(f"{row.subject}.{row.predicate}")
+    return frozenset(found)
 
 
 def _attribute_entry(element: Element, attribute: str) -> tuple[str, Ground] | None:
@@ -477,8 +529,8 @@ def render_rows(catalog: AssertionCatalog) -> str:
     """Every assertion row as a table, keyed by the identity a patch names.
 
     Not :func:`render_catalog`, which is what a **Lane Agent** may *cite*: that
-    table holds settled rows of predicates the graph has no field for, because
-    a fact with a field is cited through the field. #1003's review pass asks a
+    table holds settled rows the graph does not already carry, because a fact
+    the graph carries is cited through its attribute. #1003's review pass asks a
     different question — what has this job recorded, and is any of it on the
     wrong subject — so it reads every row, unsettled ones included, and needs
     the identity a ``retract-assertion`` operation names.
@@ -627,7 +679,21 @@ def _assertion_gloss(row: Assertion, subjects: Mapping[str, Subject]) -> str:
     scope = "".join(
         f", where {qualifier.kind} is {qualifier.value}" for qualifier in row.scope
     )
-    return f"`{row.predicate}` {row.basis} {value} {about}{scope}"
+    return f"`{row.predicate}` {row.basis} {value} {about}{scope}{_reviewed(row)}"
+
+
+def _reviewed(row: Assertion) -> str:
+    """Whether anybody checked this row, in the words a lane reads.
+
+    **An unchecked row informs a conditional finding and settles nothing
+    alone** (#926, the owner's decision of 2026-09-23), so the table says which
+    rows those are rather than leaving a lane to assume every cited fact was
+    verified. A settled row is either unchecked or supported; the other two
+    assessments keep a row from settling, so they never reach this gloss.
+    """
+    if row.assessment == "supported":
+        return f" — checked by {row.assessor}"
+    return " — unchecked"
 
 
 #: How each assertion ground reads, keyed by its kind.

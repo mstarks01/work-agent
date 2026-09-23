@@ -20,6 +20,7 @@ from analysis_service.assertions import (
     AssertionCatalog,
     Qualifier,
     Subject,
+    apply_projection,
     assertion_id,
     catalog_coverage,
 )
@@ -37,6 +38,7 @@ from analysis_service.evidence import (
     evidence_catalog,
     ground_gloss,
     ground_issues,
+    lead_topics,
     render_catalog,
     render_element_roster,
     resolve_proposals,
@@ -63,6 +65,7 @@ SHOPPERS = Subject(id="principal:shoppers", type="principal", label="shopper acc
 COOKIE = Subject(
     id="credential:session-cookie", type="credential", label="session cookie"
 )
+LOGIN = Subject(id=LOGIN_FLOW, type="interaction", label="login")
 
 
 def row(**overrides):
@@ -354,19 +357,36 @@ class TestEvidenceCatalog:
         assert evidence_catalog(model, None) == evidence_catalog(model)
         assert evidence_catalog(model, assertions()) == evidence_catalog(model)
 
-    def test_a_predicate_with_a_graph_field_is_cited_through_the_field(self):
-        """One fact, one reader: a mechanism reaches every rule through
-        ``authentication``, so a second entry for it would be a second reader
-        of one fact, and the two could disagree."""
+    def test_a_row_the_graph_carries_is_cited_through_the_field(self):
+        """One fact, one reader: a projected mechanism reaches every rule
+        through ``authentication``, so a second entry for it would be a second
+        reader of one fact, and the two could disagree."""
         mechanism = row(
             subject=LOGIN_FLOW,
             predicate="authentication-mechanism",
             value="email and password",
         )
-        catalog = evidence_catalog(valid_model(), assertions(mechanism))
+        held = assertions(mechanism, subjects=(LOGIN,))
+        model, applied = apply_projection(valid_model(), held)
+        catalog = evidence_catalog(model, held)
 
+        assert [projection.reason for projection in applied] == ["stated"]
         assert "authentication-mechanism" not in UNPROJECTED
         assert assertion_id(mechanism) not in catalog
+
+    def test_a_row_the_graph_does_not_carry_is_cited_as_itself(self):
+        """The same row over a model that does not hold its value: routing is
+        by what reached the graph, never by the predicate's name (#926)."""
+        mechanism = row(
+            subject=LOGIN_FLOW,
+            predicate="authentication-mechanism",
+            value="email and password",
+        )
+        catalog = evidence_catalog(
+            valid_model(), assertions(mechanism, subjects=(LOGIN,))
+        )
+
+        assert assertion_id(mechanism) in catalog
 
     @pytest.mark.parametrize(
         "unsettled",
@@ -1291,3 +1311,12 @@ def test_every_assertion_ground_kind_has_a_gloss():
     is here.
     """
     assert set(ASSERTION_GLOSSES) == set(ASSERTION_GROUNDS)
+
+
+def test_lead_topics_without_a_catalog_skips_an_assertion_ground():
+    """A row ground names its topic through the catalog; with none, it names none."""
+    evidence = {
+        "assertion:x": Ground(kind="unknown-assertion", assertion="assertion:x"),
+    }
+
+    assert lead_topics(evidence) == frozenset()

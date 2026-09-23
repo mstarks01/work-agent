@@ -40,6 +40,7 @@ from pydantic import (
 
 from analysis_service.assertions import (
     PROJECTION_VERSION,
+    REJECTING,
     AssertionRecord,
     CatalogCoverage,
     catalog_coverage,
@@ -296,6 +297,37 @@ SCHEMA_VERSION = "3.0"
 DEFAULT_DISCLAIMER = (
     "AI-generated security analysis. Not reviewed by a human security analyst."
 )
+
+
+def assertion_disclosure(record: AssertionRecord) -> str:
+    """What a reader of the report is owed about the facts analysis rested on.
+
+    **Required by #926's contract, and not sufficient for it** (the owner's
+    decision of 2026-09-23). An unchecked assertion informs conditional
+    analysis only, and a review can reject one afterwards; a reader who does
+    not know how many of the report's facts anybody checked cannot weigh a
+    finding that rests on one. The guarantees themselves are enforced in the
+    projection and the evidence catalog; this sentence says they applied.
+    """
+    entries = record.catalog.entries
+    checked = sum(1 for entry in entries if entry.assessment == "supported")
+    rejected = sum(1 for entry in entries if entry.assessment in REJECTING)
+    unchecked = len(entries) - checked - rejected
+    return (
+        f"Source-backed assertions: {len(entries)}; {checked} checked by a"
+        f" reviewer, {rejected} rejected by a reviewer and used for nothing,"
+        f" {unchecked} unchecked. An unchecked assertion informs conditional"
+        " findings only and never closes an open question; a quoted source is"
+        " not proof of what the deployed system does."
+    )
+
+
+def disclaimer_for(record: AssertionRecord | None) -> str:
+    """The envelope's disclaimer, with the assertion disclosure where one ran."""
+    if record is None:
+        return DEFAULT_DISCLAIMER
+    return f"{DEFAULT_DISCLAIMER} {assertion_disclosure(record)}"
+
 
 # One value in a report's per-tier sampling clear block. Wide on purpose: it is
 # every scalar type a resolved sampling param can hold, and the block is a

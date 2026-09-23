@@ -43,10 +43,13 @@ from types import MappingProxyType
 from analysis_service.assertions import (
     Assertion,
     AssertionCatalog,
+    AssertionRecord,
     Subject,
     assertion_id,
     gate_issues,
+    settled,
 )
+from analysis_service.evidence import lead_topics, prepared_view
 from analysis_service.system_model import (
     SystemModel,
     flow_id_version,
@@ -666,9 +669,11 @@ PROBES: Mapping[str, Probe] = MappingProxyType(
             _changed_source,
             refuses=("stale-digest",),
             note=(
-                "the gate notices, and there is nothing further to invalidate:"
-                " every `Assertion.assessment` in this service is `unchecked`,"
-                " so no support assessment rests on the text that moved"
+                "the gate notices and quarantines the row before any reader sees"
+                " it (`AssertionRecord.over`), so an unchecked fact on moved text"
+                " is neither projected nor cited; no support assessment rests on"
+                " the text, because every `Assertion.assessment` in this service"
+                " is `unchecked`"
             ),
         ),
         "valid-inference": Probe(
@@ -836,8 +841,273 @@ def render(found: Sequence[Outcome]) -> str:
     return "\n".join(lines) + "\n"
 
 
+# --- The production path -----------------------------------------------------
+#
+# The two instruments above ask whether a corruption is *visible*. #926 also
+# asks what it does to a job: whether a corrupted row reaches what a lane reads,
+# and whether it erases a lead the uncorrupted reading offered. That is a third
+# reader, and it is the job's own code rather than a copy of it:
+# :meth:`AssertionRecord.over` quarantines, and :func:`prepared_view` writes the
+# graph and builds the table a lane cites from, as ``prepare`` does.
+
+#: The probes whose corruption is one of #925's defects or the same shape as
+#: one: a stated fact flipped, moved onto the wrong subject, emptied of meaning
+#: or of its citation, answered with a different control, or widened past its
+#: scope. The owner's decision on 2026-09-23 requires **zero observed failures**
+#: here, read by ``critical-fixtures`` in :mod:`evals.harness.promotion`.
+#:
+#: ``absence-inferred`` is not here: its corrupted row carries the true value
+#: under the basis ``inferred``, and reaching a lane labelled as an inference
+#: is what ADR 0036 asks of one. ``paraphrase`` and ``valid-inference`` are
+#: positive controls, and the rest corrupt the graph rather than a fact.
+CRITICAL: frozenset[str] = frozenset(
+    {
+        "mfa-enforced",
+        "support-copied",
+        "empty-citation",
+        "stopword-mechanism",
+        "control-name-elsewhere",
+        "signature-is-not-authentication",
+        "destination-is-not-authentication",
+        "scope-dropped",
+        "changed-source",
+    }
+)
+
+#: Who assesses the corrupted rows in the reviewed reading. Not a model: the
+#: fixture itself knows which rows it corrupted.
+FIXTURE_REVIEWER = "reviewer:falsification-fixture"
+
+
+@dataclass(frozen=True)
+class Consumed:
+    """What one corrupted reading does to a job.
+
+    ``reached`` is every corrupted row the job settles, so a lane reads it
+    through the graph or the evidence table as a fact.
+
+    Lost leads are split by what lost them, against the same reading with the
+    corrupted rows simply left out. ``suppressed`` is a lead that reading
+    offers and this one does not: **the wrong row itself silenced it**, which is
+    #925's defect — a copied control removing the webhook's uncertainty.
+    ``omitted`` is a lead the perfect reading offered that leaving the rows out
+    already loses: the true fact was never extracted, which required-fact
+    recall charges and no production reader can recover.
+
+    ``reviewed`` says whether the corrupted rows were assessed ``unsupported``
+    first, which is what a review would do and what no job does on its own.
+    """
+
+    probe: str
+    reviewed: bool
+    reached: tuple[str, ...]
+    suppressed: tuple[str, ...]
+    omitted: tuple[str, ...]
+
+    @property
+    def failed(self) -> bool:
+        """Whether this reading breaks the guarantee its review state carries.
+
+        **Two guarantees, one per review state** (the owner's decision of
+        2026-09-23, option (iii)). Unreviewed, an unchecked row may reach a
+        lane — it informs conditional analysis, glossed ``unchecked`` — but it
+        may not silence a lead. Reviewed, **no reviewer-rejected fact reaches
+        analysis**: a row marked ``unsupported`` supports no conclusion at all.
+        That is the promise, and not "no wrong fact": a review can miss one.
+        """
+        if self.reviewed:
+            return bool(self.reached or self.suppressed)
+        return bool(self.suppressed)
+
+
+def consumer_view(
+    catalog: AssertionCatalog, model: SystemModel, sources: Mapping[str, str]
+) -> tuple[AssertionCatalog, frozenset[str]]:
+    """What a job reads from this catalog: the rows it keeps, and its leads.
+
+    The job's own sequence, with nothing re-derived: the gate quarantines, the
+    projection writes the graph, and the evidence catalog is built over both.
+
+    **A lead is named by what it is about**, an element's attribute or a
+    subject's predicate, not by its evidence key. A stated absence that becomes
+    an open question on the same attribute is still a lead a lane can raise; a
+    lead with nothing left on its attribute is one it cannot.
+    """
+    record = AssertionRecord.over(
+        catalog, model, sources, proposed=len(catalog.entries)
+    )
+    _, _, evidence = prepared_view(model, record.catalog)
+    return record.catalog, lead_topics(evidence, record.catalog)
+
+
+@dataclass(frozen=True)
+class Reading:
+    """One probe's corrupted catalog as a job would receive it.
+
+    ``catalog`` is the corrupted rows, with the corrupted ones assessed
+    ``unsupported`` where the reading is reviewed; ``without`` is the same
+    reading with the corrupted rows left out, which is what a lead lost to
+    omission is measured against. ``changed`` names the corrupted rows.
+    """
+
+    catalog: AssertionCatalog
+    without: AssertionCatalog
+    model: SystemModel
+    sources: Mapping[str, str]
+    changed: frozenset[str]
+
+
+def reading(
+    name: str, case: GoldenCase, reference: SignedReference, *, reviewed: bool
+) -> Reading:
+    """One probe's corruption, ready for analysis preparation.
+
+    **The one builder of a corrupted job input.** :func:`consume_probe` and
+    ``tests/test_release_blockers.py`` both drive it, so the release blockers
+    test through ``prepare`` exactly the catalogs this instrument measures.
+    """
+    corrupted = PROBES[name].corrupt(reference, case)
+    subjects = (
+        reference.subjects if corrupted.subjects is None else list(corrupted.subjects)
+    )
+    changed = [entry for entry in corrupted.entries if entry not in reference.entries]
+    entries = list(corrupted.entries)
+    if reviewed:
+        marked = {
+            assertion_id(entry): entry.model_copy(
+                update={"assessment": "unsupported", "assessor": FIXTURE_REVIEWER}
+            )
+            for entry in changed
+        }
+        entries = [marked.get(assertion_id(entry), entry) for entry in entries]
+    return Reading(
+        catalog=AssertionCatalog(subjects=subjects, entries=entries),
+        without=AssertionCatalog(
+            subjects=subjects,
+            entries=[entry for entry in corrupted.entries if entry not in changed],
+        ),
+        model=case.model if corrupted.model is None else corrupted.model,
+        sources=(
+            {source.label: source.text for source in case.sources}
+            if corrupted.sources is None
+            else dict(corrupted.sources)
+        ),
+        changed=frozenset(assertion_id(entry) for entry in changed),
+    )
+
+
+def consume_probe(
+    name: str, case: GoldenCase, reference: SignedReference, *, reviewed: bool
+) -> Consumed:
+    """Drive one probe's corruption through the job, reviewed or not."""
+    built = reading(name, case, reference, reviewed=reviewed)
+    _, perfect = consumer_view(
+        AssertionCatalog(subjects=reference.subjects, entries=list(reference.entries)),
+        case.model,
+        {source.label: source.text for source in case.sources},
+    )
+    _, without = consumer_view(built.without, built.model, built.sources)
+    kept, leads = consumer_view(built.catalog, built.model, built.sources)
+    return Consumed(
+        probe=name,
+        reviewed=reviewed,
+        reached=tuple(
+            sorted(
+                assertion_id(entry)
+                for entry in settled(kept)
+                if assertion_id(entry) in built.changed
+            )
+        ),
+        suppressed=tuple(sorted(without - leads)),
+        omitted=tuple(sorted(perfect - without)),
+    )
+
+
+def consumed(corpus_dir: Path) -> list[Consumed]:
+    """Every probe through the job, unreviewed and then reviewed."""
+    cases = {case.id: case for case in load_corpus(corpus_dir)}
+    found = []
+    for name, probe in PROBES.items():
+        case = cases[probe.case_id]
+        reference = signed_reference(corpus_dir, case)
+        if reference is None:
+            raise KeyError(
+                f"{name} runs on {probe.case_id}, whose reference nobody signed"
+            )
+        for reviewed in (False, True):
+            found.append(consume_probe(name, case, reference, reviewed=reviewed))
+    return found
+
+
+def critical_failures(found: Sequence[Consumed], *, reviewed: bool) -> tuple[str, ...]:
+    """The critical probes whose reading broke its guarantee (see
+    :attr:`Consumed.failed`)."""
+    return tuple(
+        sorted(
+            row.probe
+            for row in found
+            if row.reviewed == reviewed and row.probe in CRITICAL and row.failed
+        )
+    )
+
+
+def render_consumed(found: Sequence[Consumed]) -> str:
+    """The production-path table, as text."""
+    by = {(row.probe, row.reviewed): row for row in found}
+    lines = [
+        "## What a corrupted reading does to a job",
+        "",
+        (
+            "Each corruption driven through the job's own gate, projection and"
+            " evidence catalog. *Reached*: corrupted rows a lane reads as"
+            " facts. *Suppressed*: leads the wrong rows themselves silenced."
+            " *Omitted*: leads lost because the true fact is missing, which"
+            " recall charges and nothing downstream can recover. *Reviewed*"
+            " assesses the corrupted rows `unsupported` first, which no job"
+            " does on its own. A critical probe fails unreviewed on a"
+            " suppressed lead, and reviewed on any row that still reaches a"
+            " lane: no reviewer-rejected fact reaches analysis."
+        ),
+        "",
+        (
+            "| probe | critical | reached | suppressed | omitted"
+            " | reached, reviewed | suppressed, reviewed |"
+        ),
+        "| --- | --- | ---: | ---: | ---: | ---: | ---: |",
+    ]
+    for name in PROBES:
+        plain, checked = by[(name, False)], by[(name, True)]
+        lines.append(
+            f"| `{name}` | {'yes' if name in CRITICAL else ''}"
+            f" | {len(plain.reached)} | {len(plain.suppressed)}"
+            f" | {len(plain.omitted)}"
+            f" | {len(checked.reached)} | {len(checked.suppressed)} |"
+        )
+    unreviewed = critical_failures(found, reviewed=False)
+    reviewed = critical_failures(found, reviewed=True)
+    lines += [
+        "",
+        (
+            f"**Critical failures: {len(unreviewed)} unreviewed"
+            f" ({', '.join(f'`{name}`' for name in unreviewed) or 'none'}),"
+            f" {len(reviewed)} reviewed"
+            f" ({', '.join(f'`{name}`' for name in reviewed) or 'none'}).**"
+        ),
+        "",
+    ]
+    return "\n".join(lines) + "\n"
+
+
 def command_falsify(args: argparse.Namespace) -> int:
-    """Run every probe. It runs no model and reads no credential."""
+    """Run every probe. It runs no model and reads no credential.
+
+    Fails when a probe's gate outcome breaks or a critical probe breaks its
+    guarantee in either review state: the second is a release blocker.
+    """
     found = outcomes(Path(args.corpus))
+    read = consumed(Path(args.corpus))
     print(render(found), end="")
-    return 0 if all(row.held for row in found) else 1
+    print()
+    print(render_consumed(read), end="")
+    broken = any(critical_failures(read, reviewed=state) for state in (False, True))
+    return 0 if all(row.held for row in found) and not broken else 1

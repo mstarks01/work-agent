@@ -25,10 +25,13 @@ from analysis_service import critic, graph
 from analysis_service.assertions import (
     ABSENT,
     Assertion,
+    AssertionCatalog,
     AssertionProposal,
     AssertionRecord,
     CatalogProposal,
+    Subject,
     assertion_id,
+    support_span,
 )
 from analysis_service.binding import NodeBinding
 from analysis_service.claims import (
@@ -531,6 +534,53 @@ def test_prepare_records_what_the_resolver_refused(domain_loader, package_loader
     assert output["assertion_count"] == 0
     assert output["assertions_refused"] == 1
     assert "assertion:" not in ctx.state[graph.STATE_EVIDENCE_CATALOG]
+
+
+def test_prepare_reads_no_row_the_gate_refused(domain_loader, package_loaders):
+    """A parked record whose source text moved under a span reaches no reader.
+
+    #926's implementation audit drove exactly this: the record said
+    ``stale-digest``, the row still projected into ``authentication``, and the
+    node reported nothing refused.
+    """
+    login = "flow:entity:customer>process:web-app>login"
+    moved = Assertion(
+        subject=login,
+        predicate="authentication-mechanism",
+        value="a browser login",
+        basis="stated",
+        support=[
+            support_span(
+                "customers log in from the browser",
+                DEFAULT_DESCRIPTION_LABEL,
+                DESCRIPTION_TEXT,
+            )
+        ],
+    )
+    parked = AssertionRecord(
+        proposed=1,
+        catalog=AssertionCatalog(
+            subjects=[Subject(id=login, type="interaction", label="login")],
+            entries=[moved],
+        ),
+    )
+    ctx = FakeContext(
+        **{
+            graph.STATE_ASSERTION_CATALOG: parked.model_dump(mode="json"),
+            graph.STATE_SOURCE_TEXTS: {
+                DEFAULT_DESCRIPTION_LABEL: DESCRIPTION_TEXT + " It changed."
+            },
+        }
+    )
+    output = prepare_with_assertions(ctx, valid_model(), domain_loader, package_loaders)
+
+    record = AssertionRecord.model_validate(ctx.state[graph.STATE_ASSERTION_CATALOG])
+    assert [issue.code for issue in record.issues] == ["stale-digest"]
+    assert record.catalog.entries == []
+    assert output["assertions_refused"] == 1
+    # ``prepare`` puts the model back only when a projection moved it.
+    assert graph.STATE_VALID_MODEL not in ctx.state
+    assert assertion_id(moved) not in ctx.state[graph.STATE_EVIDENCE_CATALOG]
 
 
 def test_prepare_fails_the_job_on_a_silent_assertion_node(

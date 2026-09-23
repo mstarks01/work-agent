@@ -99,15 +99,15 @@ from analysis_service.assertions import (
     REGISTRY,
     SPAN_REFUSALS,
     UNKNOWN,
-    UNPROJECTED,
     Assertion,
     AssertionCatalog,
     AssertionRecord,
     CatalogProposal,
+    apply_projection,
     assertion_id,
     identity_parts,
+    offered,
     referent_type,
-    settled,
     snap_subject,
 )
 from analysis_service.grounding import normalize
@@ -1016,9 +1016,16 @@ class BindingReplay:
         }
 
 
-def _offered(record: AssertionRecord) -> int:
-    """How many rows the evidence catalog would offer a lane from this record."""
-    return sum(row.predicate in UNPROJECTED for row in settled(record.catalog))
+def _offered(record: AssertionRecord, model: SystemModel) -> int:
+    """How many rows the evidence catalog would offer a lane from this record.
+
+    Asked of the model the lanes would read — ``model`` with the record's
+    projection applied, as ``prepare`` applies it — through
+    :func:`~analysis_service.assertions.offered`, the evidence catalog's own
+    reader, so this count and the table a lane sees cannot disagree.
+    """
+    projected, _ = apply_projection(model, record.catalog)
+    return len(offered(record.catalog, projected))
 
 
 def bind_assertions(
@@ -1060,7 +1067,9 @@ def bind_assertions(
     proposed = CatalogProposal.model_validate(proposal.proposal)
     blessed = AssertionRecord.of(proposed, case.model, sources)
     if extraction.extracted is None:
-        return BindingReplay(case.id, graph, False, (), 0, _offered(blessed))
+        return BindingReplay(
+            case.id, graph, False, (), 0, _offered(blessed, case.model)
+        )
     extracted = AssertionRecord.of(proposed, extraction.extracted, sources)
     refused_blessed = {issue.row for issue in blessed.issues if issue.row is not None}
     refused_extracted = {
@@ -1102,8 +1111,8 @@ def bind_assertions(
         graph=graph,
         parsed=True,
         rows=tuple(rows),
-        offered=_offered(extracted),
-        offered_blessed=_offered(blessed),
+        offered=_offered(extracted, extraction.extracted),
+        offered_blessed=_offered(blessed, case.model),
     )
 
 

@@ -320,13 +320,14 @@ def apply_patch(
             if operation.kind == "retract-assertion" and operation.handle not in refused
         ],
     )
-    catalog = merged(retracted, resolution.record.catalog)
+    catalog, cut = merged(retracted, resolution.record.catalog)
     built = AssertionRecord.over(
         catalog,
         resolution.model,
         sources,
         proposed=record.proposed + resolution.record.proposed,
-        issues=[*record.issues, *resolution.record.issues],
+        issues=[*record.issues, *resolution.record.issues, *cut],
+        quarantined=[*record.quarantined, *resolution.record.quarantined],
     )
 
     broken = _gate_refusals(resolution.model, catalog, sources)
