@@ -457,6 +457,10 @@ class AssertionReplay:
     #: overlaps ``rows`` by construction — a row the strict matcher found is
     #: stated on that fact too — so :attr:`credited` is what a reader counts.
     aligned: frozenset[str] = frozenset()
+    #: The reference rows :func:`required_rows` counts, carried here so that
+    #: every reader of a graded sweep reaches the denominator through the one
+    #: rule rather than re-deriving which rows are stated.
+    required: frozenset[str] = frozenset()
 
     @property
     def counts(self) -> Counter[str]:
@@ -465,6 +469,18 @@ class AssertionReplay:
     @property
     def produced_counts(self) -> Counter[str]:
         return Counter(self.produced.values())
+
+    @property
+    def recovered(self) -> int:
+        """Required rows this run answered with the right value at the right scope.
+
+        The numerator of required-fact recall, over the denominator
+        :attr:`required` holds. A reading of the same fates the counts report,
+        narrowed to the rows the denominator counts.
+        """
+        return sum(
+            row.fate == "found" for row in self.rows if row.reference in self.required
+        )
 
     @property
     def credited(self) -> frozenset[str]:
@@ -484,6 +500,8 @@ class AssertionReplay:
             "produced_counts": {
                 fate: self.produced_counts[fate] for fate in PRODUCED_FATES
             },
+            "required": len(self.required),
+            "recovered": self.recovered,
             "rejected": self.rejected,
             "issues": list(self.issues),
             "rows": [row.to_json() for row in self.rows],
@@ -611,6 +629,32 @@ class SignedReference:
     @property
     def subjects(self) -> list[Any]:
         return self.catalog.subjects
+
+
+def required_rows(reference: SignedReference) -> tuple[str, ...]:
+    """Every reference row the primary endpoint's denominator counts.
+
+    **Explicitly stated**, which is the endpoint's own wording: the source says
+    the thing, and what it says is a value rather than the unknown sentinel. A
+    stated *absence* is one of these — "no MFA" is a fact the source states, and
+    the one this layer exists to keep — while an ``unknown`` row records a
+    question the source raised and left open, and a route that leaves it open
+    has lost nothing.
+
+    A justified inference is out too. #1003's primary endpoint is stated facts
+    and so is #926's Phase 6 denominator, and inference recall is reported
+    beside them rather than mixed into either.
+
+    It sits here, beside the signed reference it reads, because it is a
+    property of that reference rather than of any one comparison: the arm
+    endpoint, the ceiling instrument and this module's own pooled reading
+    are three readers of one rule.
+    """
+    return tuple(
+        assertion_id(entry)
+        for entry in reference.entries
+        if entry.basis == "stated" and entry.value != UNKNOWN
+    )
 
 
 def signed_reference(corpus_dir: Path, case: GoldenCase) -> SignedReference | None:
@@ -844,6 +888,7 @@ def replay_assertions(
         rejected=len({issue.row for issue in result.issues if issue.row is not None}),
         issues=tuple(f"{issue.code}: {issue.message}" for issue in result.issues),
         aligned=aligned_rows(reference, result),
+        required=frozenset(required_rows(reference)),
     )
 
 
@@ -1259,7 +1304,13 @@ def _spread(sweeps: Sequence[SweepReplay]) -> dict[str, Any]:
 
 
 def pooled_assertions(sweeps: Sequence[SweepReplay]) -> dict[str, Any]:
-    """Every assertion fate over a set of sweeps, and the rows omitted most."""
+    """Every assertion fate over a set of sweeps, the endpoint, and the rows omitted most.
+
+    ``found`` counts every reference row a run answered; ``recovered`` counts
+    only the rows ``required`` holds. The two differ by the inferred and
+    unknown rows, which a route loses nothing by leaving open, so a reader
+    comparing runs reads the second pair.
+    """
     counts: Counter[str] = Counter()
     produced: Counter[str] = Counter()
     per_row: dict[str, Counter[str]] = defaultdict(Counter)
@@ -1267,9 +1318,13 @@ def pooled_assertions(sweeps: Sequence[SweepReplay]) -> dict[str, Any]:
     rejected = 0
     emissions = 0
     relabelled = 0
+    required = 0
+    recovered = 0
     for sweep in sweeps:
         for replay in sweep.assertions:
             emissions += 1
+            required += len(replay.required)
+            recovered += replay.recovered
             rejected += replay.rejected
             counts.update(replay.counts)
             produced.update(replay.produced_counts)
@@ -1282,6 +1337,11 @@ def pooled_assertions(sweeps: Sequence[SweepReplay]) -> dict[str, Any]:
         "sweeps": len(sweeps),
         "emissions": emissions,
         "fates": {fate: counts[fate] for fate in ROW_FATES},
+        # Required-fact recall, pooled over every emission: the denominator is
+        # each case's stated rows and never the run's, so a sweep that produced
+        # nothing for a case recovers none of it rather than leaving the sum.
+        "required": required,
+        "recovered": recovered,
         # The pair #1015 settles: ``found`` is the strict reading, and this is
         # what the same runs stated on the same fact under another flow label.
         # Reported beside the fates and never folded into them.
@@ -1490,6 +1550,12 @@ def _render_assertions(pool: dict[str, Any], targets: int) -> None:
         f"  found {pool['found']} strictly, +{pool['relabelled']} stated under"
         " another flow label"
     )
+    # Required-fact recall: the endpoint #926's Phase 6 and #1003 both read.
+    # ``found`` above counts every reference row, inferred and unknown ones
+    # included; this counts only the stated rows the denominator holds.
+    required, recovered = pool["required"], pool["recovered"]
+    share = f"{recovered / required:.3f}" if required else "-"
+    print(f"  required-fact recall: {recovered}/{required} = {share}")
     produced = ", ".join(f"{fate} {pool['produced'][fate]}" for fate in PRODUCED_FATES)
     print(f"  produced rows: {produced}")
     if pool["targets"]:

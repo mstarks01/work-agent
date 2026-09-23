@@ -71,6 +71,7 @@ from evals.harness import (
     consent,
     envelope,
     extraction_losses,
+    falsify,
     flow_ids,
     instruction,
     instruction_delta,
@@ -149,6 +150,7 @@ from evals.harness.provenance import (
 from evals.harness.reference import (
     CorpusError,
     GoldenCase,
+    corpus_argument,
     corpus_refusal,
     flows_by_case,
     load_corpus,
@@ -2378,11 +2380,17 @@ COMMANDS: dict[str, Command] = {
         run=bottleneck.command_bottleneck,
         arguments=bottleneck.arguments,
     ),
+    "falsify": Command(
+        help="corrupt a perfect reading one way per probe and read what it"
+        " costs the gate and the endpoint (#926, no credentials)",
+        run=falsify.command_falsify,
+        arguments=corpus_argument,
+    ),
     "oracle": Command(
         help="put a perfect reading of every signed case through the"
         " deterministic path and charge each loss to a stage (no credentials)",
         run=oracle.command_oracle,
-        arguments=oracle.arguments,
+        arguments=corpus_argument,
     ),
     "experiments": Command(
         help="what a prior quality audit already tested, and whether the tree"

@@ -90,7 +90,6 @@ from analysis_service.system_model import (
 )
 from analysis_service.validation import validate
 from evals.harness.alignment import Alignment, align
-from evals.harness.arms import required_rows
 from evals.harness.artifact import load_artifact
 from evals.harness.bundle import heads_from_reports
 from evals.harness.modes import AssertionResult
@@ -101,6 +100,7 @@ from evals.harness.replay import (
     ReferenceRowFate,
     SignedReference,
     replay_assertions,
+    required_rows,
     signed_reference,
 )
 from evals.harness.score_arms import SPEC, parse_spec
