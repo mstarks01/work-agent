@@ -15,8 +15,10 @@ import pytest
 
 from analysis_service.system_model import ModelIndex
 from evals.harness import losses
+from evals.harness.content import prose, structural
+from evals.harness.fingerprint import key_claim
 from evals.harness.identity import SubsetVerbIdentity, endpoint_form, endpoint_subset
-from evals.harness.ledger import Ledger
+from evals.harness.ledger import Ledger, cast
 from evals.harness.losses import CAUSES, attribute_case, pooled
 from evals.harness.reference import load_case
 from evals.harness.scorer import score_case
@@ -56,10 +58,41 @@ def merge_flows(merge_case):
     return ModelIndex.of(merge_case.model).flow_endpoints
 
 
-def charge(case, flows, drafts, produced, unreconciled=()):
-    score = score_case(case, produced, SubsetVerbIdentity({case.id: flows}), Ledger())
+def charge(case, flows, drafts, produced, unreconciled=(), votes=None):
+    score = score_case(
+        case, produced, SubsetVerbIdentity({case.id: flows}), votes or Ledger()
+    )
     block = Block(produced, unreconciled_rulings=unreconciled)
     return attribute_case(case, score, drafts, produced, flows, block)
+
+
+def accepted(case, claim, flows):
+    """A ledger holding one ``up`` vote on ``claim``, keyed as the scorer keys it.
+
+    Built through :func:`~evals.harness.ledger.cast` and
+    :func:`~evals.harness.fingerprint.key_claim`, which are the callers the
+    scorer itself uses. Composing the fingerprint here would make this test a
+    second reader of which version keys a claim, and it would agree with the
+    scorer until the rule moved.
+    """
+    value, components = key_claim(
+        "stride",
+        case.id,
+        claim.category,
+        tuple(claim.affected_element_ids),
+        flows,
+        verb=claim.verb,
+    )
+    vote = cast(
+        components,
+        case.id,
+        "up",
+        "tester",
+        content=structural(claim),
+        prose=prose(claim),
+    )
+    assert vote.fingerprint == value
+    return Ledger([vote])
 
 
 def at(reference, sequence, verb):
@@ -75,6 +108,34 @@ def at(reference, sequence, verb):
 
 def by_index(charged):
     return {loss.reference_index: loss for loss in charged.losses}
+
+
+def _one_element_over(case, flows):
+    """A reference index, and a draft whose place overlaps it without containing it.
+
+    One resolved element the reference names plus one it does not, which is the
+    shape ``_nearby`` looks for and the containment test refuses.
+    """
+    references = case.stride_claims()
+    index, reference = next(
+        (position, claim)
+        for position, claim in enumerate(references)
+        if len(endpoint_form(claim.affected_element_ids, flows)) >= 2
+    )
+    place = sorted(endpoint_form(reference.affected_element_ids, flows))
+    stranger = next(
+        element.id
+        for element in case.model.elements()
+        if element.id not in place and not element.id.startswith(("boundary:", "flow:"))
+    )
+    draft = draft_threat(
+        1,
+        reference.category,
+        "one element over",
+        element_ids=[place[0], stranger],
+        verb=reference.verb,
+    )
+    return index, draft
 
 
 def test_a_surviving_claim_at_the_place_with_another_verb_is_a_verb_loss(case, flows):
@@ -324,28 +385,8 @@ class TestADisplacedRow:
     """A ``place`` or ``unled`` row says whether the lane wrote one element over."""
 
     def test_a_draft_sharing_one_element_but_not_the_place_is_named(self, case, flows):
-        references = case.stride_claims()
-        index, reference = next(
-            (i, claim)
-            for i, claim in enumerate(references)
-            if len(endpoint_form(claim.affected_element_ids, flows)) >= 2
-        )
-        place = sorted(endpoint_form(reference.affected_element_ids, flows))
-        # One resolved element the reference names plus one it does not, so the
-        # draft's place overlaps the reference's and neither contains the other.
-        stranger = next(
-            element.id
-            for element in case.model.elements()
-            if element.id not in place
-            and not element.id.startswith(("boundary:", "flow:"))
-        )
-        draft = draft_threat(
-            1,
-            reference.category,
-            "one element over",
-            element_ids=[place[0], stranger],
-            verb=reference.verb,
-        )
+        index, draft = _one_element_over(case, flows)
+        reference = case.stride_claims()[index]
         assert not endpoint_subset(
             reference.affected_element_ids, draft.affected_element_ids, flows
         )
@@ -356,6 +397,51 @@ class TestADisplacedRow:
         assert loss.displaced_draft_id == draft.id
         assert charged.displaced_by_cause[loss.cause] >= 1
         assert pooled([charged])["displaced"] >= 1
+
+    def test_the_ledger_answer_on_that_draft_rides_beside_it(self, case, flows):
+        """``displaced_standing`` separates a real finding from a refused one.
+
+        Both spell ``place`` on the row, and the 2026-09-22 audit had to join
+        the ledger by hand to tell them apart.
+        """
+        index, draft = _one_element_over(case, flows)
+        claim = promote(draft)
+
+        # One draft can sit one element over from several references, so the
+        # pooled counts are per row rather than per draft.
+        unvoted = charge(case, flows, [draft], [claim])
+        rows = pooled([unvoted])["displaced"]
+        assert by_index(unvoted)[index].displaced_standing == "unvoted"
+        assert pooled([unvoted])["displaced_standing"] == {"unvoted": rows}
+
+        voted = charge(
+            case, flows, [draft], [claim], votes=accepted(case, claim, flows)
+        )
+        assert by_index(voted)[index].displaced_standing == "pooled"
+        assert pooled([voted])["displaced_standing"] == {"pooled": rows}
+
+    def test_the_standing_is_the_scorer_s_own_and_never_a_second_lookup(
+        self, case, flows
+    ):
+        """Every row's standing is the one the scorer recorded, or nothing.
+
+        The field may not invent an answer: a displaced draft the scorer
+        matched to a reference of its own is absent from ``unlisted``, and
+        ``unvoted`` there would claim a person declined a question nobody put.
+        """
+        index, draft = _one_element_over(case, flows)
+        claim = promote(draft)
+        produced = [claim]
+        score = score_case(
+            case, produced, SubsetVerbIdentity({case.id: flows}), Ledger()
+        )
+        charged = charge(case, flows, [draft], produced)
+        recorded = {threat.threat_id: threat.standing for threat in score.unlisted}
+
+        assert by_index(charged)[index].displaced_draft_id == draft.id
+        for loss in charged.losses:
+            expected = recorded.get(loss.displaced_draft_id)
+            assert loss.displaced_standing == expected
 
     def test_a_lane_that_wrote_nothing_nearby_names_no_draft(self, case, flows):
         charged = charge(case, flows, [], [])

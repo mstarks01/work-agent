@@ -69,7 +69,7 @@ from analysis_service.claims import FrameworkAnalysis
 from analysis_service.frameworks.stride.record import DraftThreat
 from evals.harness.identity import FlowMap, endpoint_form, endpoint_subset
 from evals.harness.reference import GoldenCase
-from evals.harness.scorer import CaseScore
+from evals.harness.scorer import CaseScore, Standing
 from evals.harness.triggers import case_trigger_recall
 from evals.harness.verbs import same_action
 
@@ -134,6 +134,20 @@ class Loss:
     #: reference: the lane went silent there. Always absent on the other three
     #: causes, which already name the draft at the place.
     displaced_draft_id: str | None = None
+    #: The vote ledger's answer on ``displaced_draft_id``, read from the
+    #: scorer's own :attr:`~evals.harness.scorer.CaseScore.unlisted` by draft
+    #: ID rather than keyed again here: the scorer already asked the ledger for
+    #: every unmatched claim, and a second lookup would be a second reader of
+    #: which version keys a claim. ``None`` where the row names no displaced
+    #: draft, and where that draft matched a reference of its own, so nobody
+    #: was ever asked about it.
+    #:
+    #: This is what separates two defects a ``place`` row otherwise spells the
+    #: same way. ``pooled`` means a person read the neighbouring claim and
+    #: accepted it, so the lane found something real and wrote it one element
+    #: over. ``rejected`` means the lane wrote something a person refused. The
+    #: 2026-09-22 audit had to join the ledger by hand to tell those apart.
+    displaced_standing: Standing | None = None
 
     def to_json(self) -> dict[str, Any]:
         return {
@@ -147,6 +161,7 @@ class Loss:
             "place_relation": self.place_relation,
             "re_ask": list(self.re_ask),
             "displaced_draft_id": self.displaced_draft_id,
+            "displaced_standing": self.displaced_standing,
         }
 
 
@@ -294,6 +309,11 @@ def attribute_case(
     # ``lane_accuracy`` cannot disagree about which misses are misfiled.
     misfiled = {error.reference_index: error for error in score.lane_errors}
     by_id = {claim.id: claim for claim in produced}
+    # The ledger's answer per unmatched claim, as the scorer recorded it. Read
+    # rather than keyed again, for the reason ``misfiled`` above gives: the
+    # fingerprint rule has one reader, and a claim the scorer matched to a
+    # reference of its own is absent here because nobody was asked about it.
+    standings = {threat.threat_id: threat.standing for threat in score.unlisted}
     losses: list[Loss] = []
     for index in score.missed:
         reference = references[index]
@@ -386,6 +406,9 @@ def attribute_case(
                 cause,
                 verb,
                 displaced_draft_id=nearby.id if nearby is not None else None,
+                displaced_standing=(
+                    standings.get(nearby.id) if nearby is not None else None
+                ),
             )
         )
     return CaseLosses(case=case.id, losses=tuple(losses))
@@ -397,6 +420,8 @@ def pooled(rows: Sequence[CaseLosses]) -> dict[str, Any]:
     must_find: Counter[str] = Counter()
     re_asked: Counter[str] = Counter()
     displaced: Counter[str] = Counter()
+    displaced_standing: Counter[str] = Counter()
+    displaced_standing_must_find: Counter[str] = Counter()
     kinds: Counter[str] = Counter()
     pairs: Counter[tuple[str, str]] = Counter()
     pairs_must_find: Counter[tuple[str, str]] = Counter()
@@ -411,6 +436,9 @@ def pooled(rows: Sequence[CaseLosses]) -> dict[str, Any]:
                 kinds.update(loss.re_ask)
             if loss.displaced_draft_id is not None:
                 displaced[loss.cause] += 1
+                standing = loss.displaced_standing or "matched"
+                displaced_standing[standing] += 1
+                displaced_standing_must_find[standing] += loss.must_find
             if loss.cause == "verb" and loss.draft_verb is not None:
                 pair = (loss.reference_verb, loss.draft_verb)
                 pairs[pair] += 1
@@ -435,6 +463,15 @@ def pooled(rows: Sequence[CaseLosses]) -> dict[str, Any]:
         # ``unled`` row is a finding the lane reached with no lead at all.
         "displaced_by_cause": {cause: displaced[cause] for cause in CAUSES},
         "displaced": sum(displaced.values()),
+        # What a person said about the claim the lane wrote instead. ``pooled``
+        # is the reading that matters: somebody accepted the neighbouring
+        # finding, so the lane saw the system and chose another place. The key
+        # ``matched`` is the displaced draft that answered a reference of its
+        # own, which the ledger was never asked about.
+        "displaced_standing": dict(sorted(displaced_standing.items())),
+        "displaced_standing_must_find": dict(
+            sorted(displaced_standing_must_find.items())
+        ),
         "by_re_ask_kind": dict(sorted(kinds.items())),
         # The verb rows by how the two places relate. An ``equal`` row is the
         # strongest verb claim there is: one place, spelled the same way, two
@@ -503,6 +540,15 @@ def render(rows: Sequence[CaseLosses]) -> None:
                 for cause in ("place", "unled")
             )
             + f") and {silent - totals['displaced']} have none in the lane nearby"
+        )
+        print(
+            "  what a person said about the draft written instead: "
+            + ", ".join(
+                f"{standing} {count} (must-find"
+                f" {totals['displaced_standing_must_find'][standing]})"
+                for standing, count in totals["displaced_standing"].items()
+            )
+            + " — pooled is the lane finding something real at another place"
         )
     if totals["by_cause"]["verb"]:
         print(
