@@ -217,7 +217,12 @@ REGISTRY_VERSION = 6
 #: no longer projects as ``stated``; and two compatible values keep the
 #: attribute and are cited as rows instead. :data:`PROJECTION_EFFECT` is the
 #: table.
-PROJECTION_VERSION = 3
+#:
+#: Version 4 separates a hedge from silence. Rows that all read ``unknown``
+#: left the attribute alone whatever their reason; a source that *said* it was
+#: unsure now writes a qualified ``unknown`` over a definite extracted value,
+#: and silence still does not (#926).
+PROJECTION_VERSION = 4
 
 #: The value that says a source stated this fact is **not there**. A positive
 #: statement about an absence, which :attr:`Assertion.basis` then attributes:
@@ -2287,6 +2292,7 @@ ProjectionReason = Literal[
     "stated",
     "absent",
     "unknown",
+    "hedged",
     "scoped",
     "several-values",
     "several-predicates",
@@ -2528,14 +2534,26 @@ def contradiction_issues(
 #: cited never appeared (#926). The rows themselves stay cited where
 #: :func:`offered` finds them settled.
 #:
+#: ``hedged`` qualifies too: every row reads :data:`UNKNOWN` and at least one
+#: says a speaker voiced the doubt, so the sources stated that the control is
+#: uncertain, and a definite value extraction wrote beside that is the
+#: substitution this layer exists to stop.
+#:
 #: ``leave`` keeps what extraction wrote. ``unknown`` is rows that all read
-#: :data:`UNKNOWN`; ``legacy`` is rows imported from before this layer, which
+#: :data:`UNKNOWN` for a reason that is not a hedge — silence, a predicate
+#: nobody asked about, a bound that stopped the work — which says the pass did
+#: not find an answer, not that the sources gave none; ``legacy`` is rows imported from before this layer, which
 #: are that attribute spelled again; ``compatible`` is several values that all
 #: hold, which one string cannot carry and which :func:`offered` cites as rows.
 #: Measured over the 103 archived assertion records against their blessed
 #: models, the two ``several-predicates`` projections were both a mechanism and
 #: the credential it presents, and are ``compatible`` here: qualifying them
-#: would have turned two stated controls into questions.
+#: would have turned two stated controls into questions. Of the 89
+#: projections whose rows all read ``unknown``, 61 carried a hedge and 28 were
+#: silent, and every one of the 89 fields already read ``unknown`` on the
+#: blessed model, so ``hedged`` changes nothing there. Its effect is on a model
+#: extraction built for itself, where a definite value can sit beside a
+#: speaker's doubt, and that is not yet measured.
 #:
 #: Keyed by every reason and held to the literal by ``tests/test_assertions.py``,
 #: so a reason added tomorrow fails there rather than defaulting to either.
@@ -2545,6 +2563,7 @@ PROJECTION_EFFECT: Mapping[str, Literal["write", "qualify", "leave"]] = (
             "stated": "write",
             "absent": "write",
             "unknown": "leave",
+            "hedged": "qualify",
             "scoped": "qualify",
             "several-values": "qualify",
             "several-predicates": "qualify",
@@ -2582,6 +2601,7 @@ QUALIFIED_SPELLING: Mapping[str, Literal["prose", "bare"]] = MappingProxyType(
 #: qualifies.
 _QUALIFIED_BECAUSE: Mapping[str, str] = MappingProxyType(
     {
+        "hedged": "the sources voice uncertainty about this",
         "scoped": "stated only for part of what this carries",
         "several-values": "the sources state values that cannot all hold",
         "several-predicates": "the sources state facts that cannot all hold",
@@ -2693,17 +2713,19 @@ def qualified(
     """
     if QUALIFIED_SPELLING[projection.attribute] == "bare":
         return UNKNOWN
-    stated = []
+    stated: list[str] = []
     for entry in sorted(rows, key=_merge_rank):
         if entry.value == UNKNOWN:
+            if entry.reason == "hedged":
+                stated.extend(f'"{span.quote}"' for span in entry.support)
             continue
         value = _written(entry.value, subjects)
         value = ABSENT_WORD if value == ABSENT else value
         scope = ", ".join(f"{q.kind} {q.value}" for q in entry.scope)
         stated.append(f"{value} ({scope})" if scope else value)
-    text = (
-        f"{UNKNOWN}; {_QUALIFIED_BECAUSE[projection.reason]}:"
-        f" {'; '.join(dict.fromkeys(stated))}"
+    said = "; ".join(dict.fromkeys(stated))
+    text = f"{UNKNOWN}; {_QUALIFIED_BECAUSE[projection.reason]}" + (
+        f": {said}" if said else ""
     )
     return text if len(text) <= MAX_VALUE_CHARS else text[: MAX_VALUE_CHARS - 1] + "…"
 
@@ -2786,6 +2808,11 @@ def _projected(
         return Projection(element_id, attribute, value, reason, ids)
 
     if not valued:
+        # A speaker who voiced doubt is the sources answering "we do not
+        # know"; a row the pass could not fill is the sources not answering.
+        # Only the first outranks a definite value extraction wrote.
+        if any(entry.reason == "hedged" for _, entry in rows):
+            return projected(UNKNOWN, "hedged")
         return projected(UNKNOWN, "unknown")
     if not stated:
         # Rows somebody set aside are a question the catalog raised about this

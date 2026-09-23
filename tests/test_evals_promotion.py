@@ -1,10 +1,12 @@
 """#926's predeclared promotion gates: what they read, and what they refuse to read.
 
-Four groups. The first holds every gate against a real archived artifact, so a
+Five groups. The first holds every gate against a real archived artifact, so a
 gate cannot read a key nothing writes. The second drives the two readings the
 table is built around — a resource gate one pair answers, and a quality gate
 that stays unread until repeats measure a spread. The third is the rule the
-whole table rests on: an absent figure is not a zero.
+whole table rests on: an absent figure is not a zero. The fourth keeps span
+validity apart from semantic support, and the fifth holds the measurement
+design #926 settled as gates nobody can read until it is measured.
 """
 
 from __future__ import annotations
@@ -136,7 +138,7 @@ class TestTheTwoKindsOfGate:
 
     def test_the_decision_reads_every_gate(self) -> None:
         readings = promotion.decide(self.artifact(0.1, 0.5), {})
-        assert {row.gate for row in readings} == set(promotion.GATES)
+        assert {row.gate for row in readings} == {*promotion.GATES, *promotion.PENDING}
 
 
 class TestAnAbsentFigureIsNotAZero:
@@ -150,7 +152,7 @@ class TestAnAbsentFigureIsNotAZero:
         assert reading.verdict == "inconclusive"
         assert reading.measured is None
 
-    @pytest.mark.parametrize("gate", ["structural-refusals", "unsupported-assertions"])
+    @pytest.mark.parametrize("gate", ["structural-refusals"])
     def test_a_report_that_ran_no_assertion_pass_is_unread(self, sealed, gate) -> None:
         artifact, _ = sealed
         reading = promotion.read_gate(gate, artifact, {})
@@ -195,30 +197,49 @@ class TestSupportIsNotSpanValidity:
 
         assert reading.measured == 0.25
 
-    def test_an_unassessed_catalog_leaves_support_unread(self) -> None:
-        """Every row located its quote and nobody checked what it says."""
-        reading = promotion.read_gate(
-            "unsupported-assertions", {}, _report(_row(), proposed=1)
-        )
-
-        assert reading.verdict == "inconclusive"
-        assert reading.measured is None
-
-    def test_an_assessed_catalog_is_read(self) -> None:
+    def test_the_four_support_states_are_reported_together(self) -> None:
         rows = [
-            _row(assessment="supported", assessor="human:1"),
-            _row(value="token", assessment="unsupported", assessor="human:1"),
+            _row(),
+            _row(value="token", assessment="supported", assessor="human:1"),
+            _row(value="mtls", assessment="unsupported", assessor="human:1"),
+            _row(value="key", assessment="unresolved", assessor="human:1"),
         ]
-        reading = promotion.read_gate(
-            "unsupported-assertions", {}, _report(*rows, proposed=2)
-        )
+        shares = promotion.support_shares(_report(*rows, proposed=4))
 
-        assert reading.measured == 0.5
-        assert reading.verdict == "fail"
+        assert shares is not None
+        assert tuple(shares) == promotion.SUPPORT_STATES
+        assert dict(shares) == dict.fromkeys(promotion.SUPPORT_STATES, 0.25)
 
-    def test_an_unread_gate_is_named_in_the_report(self, sealed) -> None:
+    def test_no_catalog_has_no_shares(self) -> None:
+        assert promotion.support_shares({}) is None
+
+
+class TestTheDesignIsDeclaredBeforeItIsMeasured:
+    """Option (c) of #926's support-gate decision, as gates nobody can read."""
+
+    def test_a_pending_gate_is_never_also_a_declared_one(self) -> None:
+        assert not set(promotion.PENDING) & set(promotion.GATES)
+
+    @pytest.mark.parametrize("name", sorted(promotion.PENDING))
+    def test_a_pending_gate_says_what_it_waits_for(self, name) -> None:
+        pending = promotion.PENDING[name]
+        assert pending.question and pending.measures and pending.unset
+
+    def test_no_support_threshold_is_declared_without_a_reason(self) -> None:
+        """Neither 10% unsupported nor 20% unresolved had a rationale."""
+        assert promotion.PENDING["support-shares"].limit == ""
+        assert "unsupported-assertions" not in promotion.GATES
+
+    def test_a_pending_gate_is_read_as_unread(self, sealed) -> None:
+        artifact, report = sealed
+        readings = {row.gate: row for row in promotion.decide(artifact, report)}
+
+        for name in promotion.PENDING:
+            assert readings[name].verdict == "inconclusive"
+
+    def test_the_rendered_table_names_every_pending_gate(self, sealed) -> None:
         artifact, report = sealed
         printed = promotion.render(promotion.decide(artifact, report))
 
-        assert "unread" in printed
-        assert "`backs-claims` unread" in printed
+        for name in promotion.PENDING:
+            assert f"`{name}` unread" in printed

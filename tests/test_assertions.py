@@ -1511,7 +1511,8 @@ class TestWhatAProjectionWillNotReach:
 PROJECTIONS: dict[str, str] = {
     "stated": "one unscoped value is the value it holds",
     "absent": "a stated absence is the word the graph reads as absent",
-    "unknown": "only unknown rows leave the attribute unsettled",
+    "unknown": "only unknown rows, none of them a hedge, leave it unsettled",
+    "hedged": "only unknown rows, and a speaker voiced the doubt",
     "scoped": "a string cannot carry the qualifier the source attached",
     "several-values": "picking between two values would drop one",
     "several-predicates": "two predicates' facts on one field cannot both hold",
@@ -2013,6 +2014,66 @@ class TestTheImplementationAudit:
 
         assert [p.reason for p in applied] == ["several-values"]
         assert updated.processes[0].trust_zone == UNKNOWN
+
+    # --- A hedge is not silence (#926 review of this branch) ---
+
+    def hedge(self, **overrides):
+        return stated(
+            **{
+                "value": UNKNOWN,
+                "reason": "hedged",
+                "support": span_for("we have not rolled out MFA"),
+                **overrides,
+            }
+        )
+
+    def test_a_hedge_qualifies_a_definite_value(self):
+        """The sources said they are unsure; extraction's value does not stand."""
+        held = catalog([self.hedge()])
+        updated, applied = apply_projection(self.model(), held)
+
+        assert [p.reason for p in applied] == ["hedged"]
+        written = self._flow(updated).authentication
+        assert written.startswith(f"{UNKNOWN}; the sources voice uncertainty")
+        assert '"we have not rolled out MFA"' in written
+        assert unknown_evidence_ref(FLOW, "authentication") in evidence_catalog(
+            updated, held
+        )
+
+    def test_a_hedge_without_words_still_qualifies(self):
+        updated, _ = apply_projection(self.model(), catalog([self.hedge(support=[])]))
+
+        assert self._flow(updated).authentication == (
+            f"{UNKNOWN}; the sources voice uncertainty about this"
+        )
+
+    @pytest.mark.parametrize("reason", ["silent", "unmeasured", "truncated"])
+    def test_silence_leaves_the_attribute(self, reason):
+        """The pass not finding an answer is not the sources giving none."""
+        held = catalog([self.hedge(reason=reason, support=[])])
+        updated, applied = apply_projection(self.model(), held)
+
+        assert [p.reason for p in project(held)] == ["unknown"]
+        assert applied == ()
+        assert self._flow(updated).authentication == "session cookie"
+
+    def test_one_hedge_among_silent_rows_is_a_hedge(self):
+        held = catalog(
+            [
+                self.hedge(),
+                self.hedge(
+                    reason="silent",
+                    support=[],
+                    scope=[Qualifier(kind="principal", value="admins")],
+                ),
+            ]
+        )
+        assert [p.reason for p in project(held)] == ["hedged"]
+
+    def test_a_stated_value_outranks_a_hedge(self):
+        """A value beside a doubt is the ordinary stated projection."""
+        held = catalog([stated(), self.hedge()])
+        assert [p.reason for p in project(held)] == ["stated"]
 
     # --- 5: legacy is never support, for the projection either ---
 

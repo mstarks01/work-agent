@@ -79,12 +79,12 @@ BASELINE: Mapping[str, float] = MappingProxyType(
 #: The pair's artifacts sit under the gitignored ``evals/runs/`` and are not in
 #: the tree, so its figures are the record rather than something to recompute.
 #:
-#: **What these gates cannot yet decide.** No gate reads required-fact recall,
-#: which is the extraction's own factual endpoint and is computed by
-#: ``run.py replay`` from the emission archive rather than written to a run
-#: artifact; and the ``sd`` gates compare one treatment run against this one
-#: baseline run, scaled by a spread, rather than repeated arms against each
-#: other. Both are #926's to settle before a promotion is read off this table.
+#: **What these gates cannot yet decide** is :data:`PENDING`: the review
+#: population, the critical fixtures, semantic support, required-fact recall
+#: and case diversity. Each is read ``inconclusive`` until it has a measurement,
+#: so no run promotes on the gates above alone. The ``sd`` gates also compare
+#: one treatment run against this one baseline run, scaled by a spread, rather
+#: than repeated arms against each other.
 BASELINE_RUN = (
     "2026-09-23, case 01-payments-checkout, evals/runs/20260923T-assertions-ab/off.json"
 )
@@ -145,7 +145,8 @@ def _refused_share(
     nothing. Before #926's audit this divided the issue count and called it the
     unsupported-assertion rate, which it is not — a row can quote the source
     exactly and state something the quote does not say, and the gate passes
-    it. :func:`_unsupported_share` is that question.
+    it. :func:`support_shares` reports that question and :data:`PENDING`
+    holds its gate.
     """
     record = _record(report)
     if record is None or not record.proposed:
@@ -153,27 +154,40 @@ def _refused_share(
     return record.refused_rows() / record.proposed
 
 
-def _unsupported_share(
-    artifact: Mapping[str, Any], report: Mapping[str, Any]
-) -> float | None:
-    """Rows a reviewer found unsupported, over the rows anybody assessed.
+#: The four states a row's support can be in, reported together. ``unreviewed``
+#: is ``unchecked``: nobody has looked. Reported as one set because any one of
+#: them read alone can hide the others — a low unsupported share over a sample
+#: that is mostly ``unresolved`` or ``unreviewed`` measures nothing.
+SUPPORT_STATES: tuple[str, ...] = (
+    "supported",
+    "unsupported",
+    "unresolved",
+    "unreviewed",
+)
 
-    **Semantic support, and nothing in this service measures it yet.** Every
-    row's ``assessment`` is ``unchecked`` until a reviewer or an external check
-    writes one (ADR 0034), so this reads ``None`` — unread, not zero — on every
-    run today. A located quote is not support, and a gate that read span
-    validity as support passed a flipped MFA answer, a webhook carrying a
-    receipt store's credential and a mechanism spelled ``the of and a``.
+
+def support_shares(report: Mapping[str, Any]) -> Mapping[str, float] | None:
+    """Each support state's share of the report's catalog rows, or ``None``.
+
+    **Semantic support, reported and not gated.** A located quote is not
+    support: the gate that read span validity as support passed a flipped MFA
+    answer, a webhook carrying a receipt store's credential and a mechanism
+    spelled ``the of and a``. Every row is ``unreviewed`` until a reviewer
+    writes an assessment (ADR 0034), and no threshold on these shares has an
+    acceptance rationale yet — see :data:`PENDING`'s ``support-shares``.
+
+    Read over every row the record kept, until ``review-population`` freezes
+    the rows it should be read over.
     """
     record = _record(report)
-    if record is None:
+    if record is None or not record.catalog.entries:
         return None
-    assessed = [
-        entry for entry in record.catalog.entries if entry.assessment != "unchecked"
-    ]
-    if not assessed:
-        return None
-    return sum(entry.assessment != "supported" for entry in assessed) / len(assessed)
+    rows = record.catalog.entries
+    state = {"unchecked": "unreviewed"}
+    counts = dict.fromkeys(SUPPORT_STATES, 0)
+    for entry in rows:
+        counts[state.get(entry.assessment, entry.assessment)] += 1
+    return MappingProxyType({key: count / len(rows) for key, count in counts.items()})
 
 
 @dataclass(frozen=True)
@@ -221,7 +235,7 @@ GATES: Mapping[str, Gate] = MappingProxyType(
             question=(
                 "does the summed node time grow beyond the budget? Summed node"
                 " time, not a job's wall time: the pair measured 2.08x summed"
-                " and 3.31x wall, and no artifact records the wall time"
+                " and 3.31x wall, and no artifact records the wall time."
             ),
             read=_node_seconds,
             unit="ratio",
@@ -259,18 +273,6 @@ GATES: Mapping[str, Gate] = MappingProxyType(
                 " accepts may still say something its quote does not"
             ),
         ),
-        "unsupported-assertions": Gate(
-            question="what share of assessed rows did a reviewer find unsupported?",
-            read=_unsupported_share,
-            unit="count",
-            limit=0.10,
-            direction="at-most",
-            why=(
-                "declared 2026-09-23, before any row has been assessed, at the"
-                " structural gate's tenth. Unread until reviewed assessments"
-                " exist, so no run promotes on span validity alone"
-            ),
-        ),
         "must-find-coverage": Gate(
             question="does the score fall further than the spread explains?",
             read=_must_find,
@@ -292,6 +294,106 @@ GATES: Mapping[str, Gate] = MappingProxyType(
             direction="at-least",
             against="reference_coverage",
             why="the same rule on the wider denominator",
+        ),
+    }
+)
+
+
+@dataclass(frozen=True)
+class Pending:
+    """A gate the promotion needs and that has no declared limit yet.
+
+    Written down now so the design is fixed before the evidence arrives, and
+    read as ``inconclusive`` by :func:`decide`, so a run cannot promote while
+    one is open. ``limit`` is the rule where one is already justified and
+    ``""`` where none is; ``unset`` says what has to exist before a number can
+    be chosen, so the number is chosen before the measurement rather than
+    after it.
+    """
+
+    question: str
+    measures: str
+    limit: str
+    unset: str
+
+
+#: The measurement design #926 settled on 2026-09-23 (option (c) of the
+#: support-gate decision, with the owner's corrections), as gates nobody can
+#: read yet. A name here is never also in :data:`GATES`.
+PENDING: Mapping[str, Pending] = MappingProxyType(
+    {
+        "review-population": Pending(
+            question="which rows is semantic support measured over?",
+            measures=(
+                "every row that would have reached a consumer — projected into"
+                " the graph or offered as evidence — plus every row the gate"
+                " refused, per case, recorded with the catalog it came from"
+                " before any reviewer looks"
+            ),
+            limit="frozen before the first assessment",
+            unset=(
+                "no population is recorded yet. Choosing the settled rows after"
+                " review could drop exactly the unsupported rows the measure"
+                " has to count"
+            ),
+        ),
+        "critical-fixtures": Pending(
+            question="do the audit's failures stay out of what consumers read?",
+            measures=(
+                "the #925 corruptions — a flipped MFA absence, support copied"
+                " onto the webhook, a stopword mechanism, and the reviewed"
+                " challenge fixtures beside them — driven through projection"
+                " and the evidence catalog, not only the gate and the recall"
+                " scorer"
+            ),
+            limit="zero observed failures",
+            unset=(
+                "`run.py falsify` accepts a loss at the gate or at the endpoint"
+                " and does not drive the production path, and `support-copied`"
+                " still reaches the graph there"
+            ),
+        ),
+        "support-shares": Pending(
+            question="how much of the review population is actually supported?",
+            measures=(
+                "supported, unsupported, unresolved and unreviewed shares of the"
+                " frozen population, reported together (`support_shares`)"
+            ),
+            limit="",
+            unset=(
+                "no row has been assessed, and neither a 10% unsupported nor a"
+                " 20% unresolved ceiling has an acceptance rationale. A limit is"
+                " set from a reason, before the first assessment, or not at all"
+            ),
+        ),
+        "required-fact-recall": Pending(
+            question="does the layer still find the facts the sources state?",
+            measures=(
+                "required-fact recall from `run.py replay` over the reviewed"
+                " denominator, baseline arm against treatment arm on the same"
+                " cases"
+            ),
+            limit="",
+            unset=(
+                "recall is computed from the emission archive and not written to"
+                " a run artifact, and there is no repeated baseline to read a"
+                " regression against. Precision alone can be met by emitting few"
+                " facts, so support never promotes without this"
+            ),
+        ),
+        "case-diversity": Pending(
+            question="is the evidence about systems, or about one system repeated?",
+            measures=(
+                "distinct cases, and held-out sources through #744, behind every"
+                " figure above; repeats of one case measure run-to-run spread"
+                " and are never counted as further systems"
+            ),
+            limit="",
+            unset=(
+                "one case carries every run so far. Rows from one case and"
+                " repeats of it are correlated, so a sample-size rule such as a"
+                " Wilson bound over-counts them"
+            ),
         ),
     }
 )
@@ -388,9 +490,16 @@ def decide(
     *,
     spread: Mapping[str, float] = MappingProxyType({}),
 ) -> tuple[Reading, ...]:
-    """Every gate, read. ``spread`` maps a gate name to its repeat spread."""
-    return tuple(
-        read_gate(name, artifact, report, spread=spread.get(name)) for name in GATES
+    """Every gate, read, then every :data:`PENDING` gate as unread.
+
+    ``spread`` maps a gate name to its repeat spread.
+    """
+    return (
+        *(read_gate(name, artifact, report, spread=spread.get(name)) for name in GATES),
+        *(
+            Reading(name, "inconclusive", None, None, None, pending.unset)
+            for name, pending in PENDING.items()
+        ),
     )
 
 
@@ -409,13 +518,18 @@ def render(readings: Sequence[Reading]) -> str:
         "| --- | --- | ---: | ---: | ---: | ---: |",
     ]
     for row in readings:
-        gate = GATES[row.gate]
         baseline = "—" if row.baseline is None else f"{row.baseline:.4g}"
         against = "—" if row.against_limit is None else f"{row.against_limit:.3f}"
         measured = "—" if row.measured is None else f"{row.measured:.4g}"
+        gate = GATES.get(row.gate)
+        limit = (
+            f"{gate.direction} {gate.limit} ({gate.unit})"
+            if gate is not None
+            else PENDING[row.gate].limit or "undeclared"
+        )
         lines.append(
             f"| `{row.gate}` | {row.verdict} | {measured} | {baseline}"
-            f" | {against} | {gate.direction} {gate.limit} ({gate.unit}) |"
+            f" | {against} | {limit} |"
         )
     unread = [row for row in readings if row.verdict == "inconclusive"]
     failed = [row for row in readings if row.verdict == "fail"]
@@ -467,4 +581,10 @@ def command_gates(args: argparse.Namespace) -> int:
         return 1
     readings = decide(artifact, report, spread=spread)
     print(render(readings), end="")
+    shares = support_shares(report)
+    if shares is not None:
+        print(
+            "\nSupport over every kept row, reported and not gated: "
+            + ", ".join(f"{state} {shares[state]:.0%}" for state in SUPPORT_STATES)
+        )
     return 0 if all(row.verdict == "pass" for row in readings) else 1

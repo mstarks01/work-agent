@@ -264,6 +264,14 @@ the same rule the asset vocabulary and the **Ground** kinds already follow.
   projection and for `settled`. A row the gate refuses is quarantined from the
   catalog before any reader sees it, including a row whose source text moved
   under its span.
+
+  **Projection version 4 separates a hedge from silence.** Rows that all read
+  `unknown` left the attribute alone whatever their reason. A speaker who
+  voiced doubt is the sources stating that a control is uncertain, so a
+  `hedged` row now qualifies a definite extracted value the way a conflict
+  does, quoting the hedge where it has one. `silent`, `unmeasured` and
+  `truncated` rows still leave the attribute: the pass not finding an answer
+  is weaker evidence than a value extraction stated.
 - **The `assumptions` list.** An **Assumption** stays the record of a value this
   service inferred into a graph attribute. The catalog's `inferred` basis covers
   predicates the graph has no field for. When a predicate's projection becomes
