@@ -50,6 +50,7 @@ from analysis_service.assertions import (
 from analysis_service.system_model import (
     SystemModel,
     flow_id_version,
+    flow_label,
     make_flow_id,
     parse_flow_id,
 )
@@ -212,9 +213,10 @@ class Probe:
     the endpoint counting, and ``fates`` is what the matcher must say about the
     rows it touched, in the order ``Corruption.touched`` names them.
 
-    ``refuses`` is the gate codes the corrupted catalog must raise. A probe
-    declaring neither a loss nor a refusal is a positive control, and
-    :attr:`control` is how the suite tells the two apart.
+    ``refuses`` is the gate codes the corrupted catalog must raise, and
+    ``elements`` the fate of each blessed element the corrupted graph no longer
+    holds. A probe declaring none of these and no fate but ``found`` is a
+    positive control, and :attr:`control` is how the suite tells the two apart.
 
     ``credits`` is how many touched rows the looser, label-dropping reading
     answers where the strict one does not (#1015). It is a reading reported
@@ -265,8 +267,8 @@ def _find(
     """The one signed row a probe names, or a refusal saying what it asked for.
 
     ``flow`` matches a **Data Flow** subject by its label, read with
-    :func:`~analysis_service.system_model.parse_flow_id` rather than by
-    splitting the ID.
+    :func:`~analysis_service.system_model.flow_label` rather than by splitting
+    the ID.
     """
     for entry in reference.entries:
         if entry.predicate != predicate:
@@ -283,9 +285,13 @@ def _find(
 
 
 def _label(subject: str) -> str:
-    """One flow subject's label, or ``""`` for a subject that is not a flow."""
+    """One flow subject's label, or ``""`` for a subject that is not a flow.
+
+    :func:`~analysis_service.system_model.flow_label` is the one reader of what
+    a flow calls itself, so this asks it rather than splitting the ID.
+    """
     try:
-        return parse_flow_id(subject, flow_id_version(subject)).label
+        return flow_label(subject)
     except (KeyError, ValueError):
         return ""
 
@@ -361,6 +367,7 @@ def _renamed_model(case: GoldenCase, flow_id: str, label: str) -> SystemModel:
 
 
 def _perfect(reference: SignedReference, case: GoldenCase) -> Corruption:
+    """No corruption at all: the reading every other probe is a corruption of."""
     return Corruption(tuple(reference.entries))
 
 
