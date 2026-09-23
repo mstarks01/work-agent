@@ -65,7 +65,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass, field
 from typing import Any, Literal
 
-from analysis_service.claims import FrameworkAnalysis
+from analysis_service.claims import ASSERTION_GROUNDS, FrameworkAnalysis
 from analysis_service.frameworks.stride.record import DraftThreat
 from evals.harness.identity import FlowMap, endpoint_form, endpoint_subset
 from evals.harness.reference import GoldenCase
@@ -166,9 +166,64 @@ class Loss:
 
 
 @dataclass(frozen=True)
+class AssertionBacking:
+    """How much of one case's *find* rested on the **Assertion** catalog.
+
+    The crossing the 2026-09-23 audit could not make. Every row of
+    :class:`CaseLosses` is a reference nothing found; this is the other side —
+    the references a catalog row did find — and without it the table has misses
+    and no control.
+
+    It is computed here rather than beside the grounds instrument for a reason
+    the ``score`` path makes concrete: grounds are a fact about a run and are
+    never recomputed on a re-score, so a crossing published there would read
+    empty on the only path this repository can run for free. The loss pass has
+    the claims and the score in hand, and is recomputed every time.
+
+    ``resting`` counts claims rather than grounds, because one claim citing two
+    rows is one finding the layer contributed to. Which kinds count is
+    :data:`~analysis_service.claims.ASSERTION_GROUNDS`, read rather than spelled
+    here, so a kind added to that set reaches this number too.
+    """
+
+    #: Claims carrying at least one assertion ground.
+    resting: int = 0
+    #: Of those, the ones the scorer assigned to a reference.
+    matched: int = 0
+    #: Of those matches, the ones against a must-find reference.
+    must_find: int = 0
+
+    def to_json(self) -> dict[str, Any]:
+        return {
+            "resting": self.resting,
+            "matched": self.matched,
+            "must_find": self.must_find,
+        }
+
+
+def _backing(score: CaseScore, produced: Sequence[DraftThreat]) -> AssertionBacking:
+    """One case's crossing, from the claims the report kept and the score's pairs."""
+    resting = {
+        claim.id
+        for claim in produced
+        if any(ground.kind in ASSERTION_GROUNDS for ground in claim.grounds)
+    }
+    pairs = [pair for pair in score.matched if pair.threat_id in resting]
+    return AssertionBacking(
+        resting=len(resting),
+        matched=len(pairs),
+        must_find=sum(1 for pair in pairs if pair.must_find),
+    )
+
+
+@dataclass(frozen=True)
 class CaseLosses:
     case: str
     losses: tuple[Loss, ...] = field(default_factory=tuple)
+    #: What the assertion layer found in this case, beside what was lost. Zero
+    #: on every deployment that ran no assertion node, and that *is* the
+    #: reading: the layer backed nothing.
+    assertion_backed: AssertionBacking = field(default_factory=AssertionBacking)
 
     @property
     def by_cause(self) -> dict[str, int]:
@@ -195,6 +250,7 @@ class CaseLosses:
             "by_cause": self.by_cause,
             "re_asked_by_cause": self.re_asked_by_cause,
             "displaced_by_cause": self.displaced_by_cause,
+            "assertion_backed": self.assertion_backed.to_json(),
             "losses": [loss.to_json() for loss in self.losses],
         }
 
@@ -411,7 +467,11 @@ def attribute_case(
                 ),
             )
         )
-    return CaseLosses(case=case.id, losses=tuple(losses))
+    return CaseLosses(
+        case=case.id,
+        losses=tuple(losses),
+        assertion_backed=_backing(score, produced),
+    )
 
 
 def pooled(rows: Sequence[CaseLosses]) -> dict[str, Any]:
@@ -463,6 +523,12 @@ def pooled(rows: Sequence[CaseLosses]) -> dict[str, Any]:
         # ``unled`` row is a finding the lane reached with no lead at all.
         "displaced_by_cause": {cause: displaced[cause] for cause in CAUSES},
         "displaced": sum(displaced.values()),
+        # The find side. Pooled rather than averaged, like every count here.
+        "assertion_backed": {
+            "resting": sum(row.assertion_backed.resting for row in rows),
+            "matched": sum(row.assertion_backed.matched for row in rows),
+            "must_find": sum(row.assertion_backed.must_find for row in rows),
+        },
         # What a person said about the claim the lane wrote instead. ``pooled``
         # is the reading that matters: somebody accepted the neighbouring
         # finding, so the lane saw the system and chose another place. The key
@@ -549,6 +615,14 @@ def render(rows: Sequence[CaseLosses]) -> None:
                 for standing, count in totals["displaced_standing"].items()
             )
             + " — pooled is the lane finding something real at another place"
+        )
+    backed = totals["assertion_backed"]
+    if backed["resting"]:
+        print(
+            f"  the assertion layer backed {backed['matched']} of the"
+            f" {backed['resting']} claim(s) that rest on a catalog row,"
+            f" {backed['must_find']} of them a must-find — the find side of the"
+            " table above"
         )
     if totals["by_cause"]["verb"]:
         print(

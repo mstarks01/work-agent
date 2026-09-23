@@ -13,6 +13,7 @@ from pathlib import Path
 
 import pytest
 
+from analysis_service.claims import Ground
 from analysis_service.system_model import ModelIndex
 from evals.harness import losses
 from evals.harness.content import prose, structural
@@ -735,3 +736,99 @@ def test_a_displaced_draft_is_named_the_same_way_in_either_order(case, flows):
     assert forward[led].cause == "place"
     assert forward[led].displaced_draft_id is not None
     assert forward[led].displaced_draft_id == reversed_[led].displaced_draft_id
+
+
+class TestWhatTheAssertionLayerBacked:
+    """The find side of the table (`QA-2026-09-22-02`).
+
+    Every loss row is a reference nothing found. This is the other side: the
+    references a catalog row did find. Without it the table has misses and no
+    control, which is why the 2026-09-23 audit could not price the layer.
+    """
+
+    @staticmethod
+    def resting_on_a_row(reference, sequence=1):
+        """A draft at the reference's place, grounded on an assertion row."""
+        return at(reference, sequence, reference.verb).model_copy(
+            update={
+                "grounds": [
+                    Ground(
+                        kind="assertion",
+                        assertion="assertion:mfa-requirement~principal:a~~required",
+                    )
+                ]
+            }
+        )
+
+    def test_a_claim_resting_on_a_row_that_matched_is_counted(self, case, flows):
+        reference = case.stride_claims()[0]
+        draft = self.resting_on_a_row(reference)
+        charged = charge(case, flows, [draft], [promote(draft)])
+
+        backed = charged.assertion_backed
+        assert backed.resting == 1
+        assert backed.matched == 1
+        assert backed.must_find == reference.must_find
+        assert pooled([charged])["assertion_backed"]["matched"] == 1
+
+    def test_a_claim_resting_on_a_row_that_matched_nothing_is_not_a_find(
+        self, case, flows
+    ):
+        """Resting counts the claim; matched counts only what answered a reference."""
+        stranger = draft_threat(
+            9, "spoofing", "Nothing the corpus lists.", element_ids=["entity:shopper"]
+        ).model_copy(
+            update={"grounds": [Ground(kind="assertion", assertion="assertion:x~y~~z")]}
+        )
+        charged = charge(case, flows, [stranger], [promote(stranger)])
+
+        assert charged.assertion_backed.resting == 1
+        assert charged.assertion_backed.matched == 0
+
+    def test_an_unknown_row_counts_because_the_set_is_read_not_spelled(
+        self, case, flows
+    ):
+        """``ASSERTION_GROUNDS`` holds both kinds, and this reads it rather than listing one."""
+        reference = case.stride_claims()[0]
+        draft = at(reference, 1, reference.verb).model_copy(
+            update={
+                "grounds": [
+                    Ground(kind="unknown-assertion", assertion="assertion:x~y~~z")
+                ]
+            }
+        )
+        charged = charge(case, flows, [draft], [promote(draft)])
+
+        assert charged.assertion_backed.resting == 1
+        assert charged.assertion_backed.matched == 1
+
+    def test_a_run_with_no_assertion_node_reads_a_measured_zero(self, case, flows):
+        """Zero is the reading, not an absence: the layer backed nothing.
+
+        Every sweep this repository has archived reads this, because none ran
+        with ``ANALYSIS_ASSERTIONS`` set.
+        """
+        reference = case.stride_claims()[0]
+        draft = at(reference, 1, reference.verb)
+        charged = charge(case, flows, [draft], [promote(draft)])
+
+        assert charged.assertion_backed == losses.AssertionBacking()
+        assert charged.to_json()["assertion_backed"] == {
+            "resting": 0,
+            "matched": 0,
+            "must_find": 0,
+        }
+        assert pooled([charged])["assertion_backed"] == {
+            "resting": 0,
+            "matched": 0,
+            "must_find": 0,
+        }
+
+    def test_it_rides_inside_the_instrument_s_own_keys(self, case, flows):
+        """A new top-level artifact key moves ``ARTIFACT_VERSION`` and re-seals every Baseline."""
+        reference = case.stride_claims()[0]
+        draft = self.resting_on_a_row(reference)
+        block = losses.artifact([charge(case, flows, [draft], [promote(draft)])])
+
+        assert set(block) == {"losses", "losses_aggregate"}
+        assert block["losses_aggregate"]["assertion_backed"]["matched"] == 1
