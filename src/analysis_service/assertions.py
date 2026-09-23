@@ -107,6 +107,7 @@ __all__ = [
     "REGISTRY",
     "REGISTRY_VERSION",
     "SETTLING_REASONS",
+    "SPAN_REFUSALS",
     "UNIVERSAL_TERMS",
     "UNPROJECTED",
     "Answer",
@@ -721,6 +722,27 @@ CatalogIssueCode = Literal[
 GATE_REFUSALS: frozenset[str] = frozenset(get_args(CatalogIssueCode)) - {
     "graph-contradiction"
 }
+
+#: The refusals that say a row's **span** did not hold, as against its value,
+#: its shape or its subject. A quote that does not locate in the source it
+#: names, one that locates in several places, a source the catalog does not
+#: carry, and text that has moved under a span already taken from it.
+#:
+#: **Span validity is a different question from semantic support**, and #926
+#: asks for the two apart: a row can cite text that locates exactly and still
+#: say something the text does not support, and a reader pooling the two
+#: cannot tell a run that quotes badly from one that reasons badly.
+#: ``too-many-spans`` is not here — it is a bound on how many spans a row may
+#: carry, not a judgement on any one of them — and neither is
+#: ``unsupported-assertion``, which says a row cited nothing at all.
+SPAN_REFUSALS: frozenset[str] = frozenset(
+    {
+        "unverifiable-span",
+        "ambiguous-span",
+        "dangling-source",
+        "stale-digest",
+    }
+)
 
 
 class CatalogIssue(BaseModel):
