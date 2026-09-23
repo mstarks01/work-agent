@@ -66,6 +66,15 @@ class TestEveryProbeHolds:
         assert perfect.recovered == perfect.required
         assert perfect.refused == ()
 
+    def test_a_changed_source_is_refused_without_touching_the_catalog(
+        self, probed
+    ) -> None:
+        """The corruption is entirely in what the submitter wrote afterwards."""
+        row = probed["changed-source"]
+
+        assert row.refused == ("stale-digest",)
+        assert row.recovered == row.required
+
     def test_the_command_reports_every_probe(self, capsys) -> None:
         assert falsify.command_falsify(_arguments()) == 0
         printed = capsys.readouterr().out
@@ -77,6 +86,11 @@ class TestEveryProbeHolds:
 
 class TestAProbeThatCostsNothingFails:
     """The one thing this suite cannot let through."""
+
+    def test_a_partly_reached_criterion_says_what_it_misses(self) -> None:
+        """A criterion with several halves names the ones no corruption reaches."""
+        partial = {name for name, probe in falsify.PROBES.items() if probe.note}
+        assert partial == {"identity-and-provenance", "changed-source"}
 
     def test_only_the_positive_controls_cost_nothing(self) -> None:
         controls = {name for name, probe in falsify.PROBES.items() if probe.control}
@@ -94,13 +108,20 @@ class TestAProbeThatCostsNothingFails:
         """Two corruptions the endpoint scores as clean runs, and why.
 
         `empty-citation` removes a span the matcher never reads, so the gate is
-        the only reader that can refuse it. `deleted-parallel-interaction`
+        the only reader that can refuse it. `identity-and-provenance` and
+        `changed-source` corrupt a citation the same way — the words a row
+        rests on, not the fact it states. `deleted-parallel-interaction`
         deletes an interaction whose every signed fact is a hedged unknown, and
         the endpoint's denominator is the stated rows, so the loss reads in the
         row and element fates and never in recall.
         """
         blind = {name for name, probe in falsify.PROBES.items() if probe.endpoint_blind}
-        assert blind == {"empty-citation", "deleted-parallel-interaction"}
+        assert blind == {
+            "empty-citation",
+            "deleted-parallel-interaction",
+            "identity-and-provenance",
+            "changed-source",
+        }
 
     def test_a_probe_that_stops_costing_is_a_failure(self, probed) -> None:
         """A declaration the outcome no longer meets breaks, rather than relaxing."""

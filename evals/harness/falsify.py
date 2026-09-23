@@ -125,7 +125,7 @@ CRITERIA: Mapping[str, str] = MappingProxyType(
             " not required."
         ),
         "valid-inference": ("Clearly marked valid inferences are preserved."),
-        "same-name-two-environments": (
+        "identity-and-provenance": (
             "Two same-named services in different environments, repeated"
             " quotations, and multiple sources for one attribute retain correct"
             " identity and provenance."
@@ -151,18 +151,6 @@ CRITERIA: Mapping[str, str] = MappingProxyType(
 #: charge, and three of these are decided before either one reads a catalog.
 UNPROBED: Mapping[str, str] = MappingProxyType(
     {
-        "same-name-two-environments": (
-            "No corpus case holds two same-named services in different"
-            " environments, so a probe would corrupt a fixture nobody signed."
-            " The repeated-quotation half is the gate's `ambiguous-span`, held"
-            " by tests/test_assertions.py."
-        ),
-        "changed-source": (
-            "The gate's `stale-digest` decides it, and no assessment reads it"
-            " yet: every `Assertion.assessment` in this service is `unchecked`,"
-            " so there is no support assessment for a changed source to"
-            " invalidate. Held by tests/test_assertions.py."
-        ),
         "output-limit": (
             "The gate's `too-many-assertions` and `too-many-spans` decide it"
             " over a catalog no reference is the size of. Held by"
@@ -170,9 +158,11 @@ UNPROBED: Mapping[str, str] = MappingProxyType(
         ),
         "reviewed-shapes": (
             "The signed reference is the reviewed expectation: a hedged"
-            " unknown, a silent unknown and a self-correction are each a row in"
-            " it, and `perfect-reading` is what says the instruments read them"
-            " as the reviewer ruled."
+            " unknown and a silent unknown are each a row in it, and"
+            " `perfect-reading` is what says the instruments read them as the"
+            " reviewer ruled. Two of the shapes have no fixture at all — no"
+            " case carries a speaker's self-correction, and every case carries"
+            " exactly one source, so two sources cannot conflict."
         ),
     }
 )
@@ -203,6 +193,10 @@ class Corruption:
     #: one. ``None`` leaves the reference's own, which is what every probe that
     #: moves no subject runs against.
     subjects: tuple[Subject, ...] | None = None
+    #: The sources the catalog is gated against, where the corruption changes
+    #: what a submitter wrote after the rows were taken from it. ``None``
+    #: leaves the case's own.
+    sources: Mapping[str, str] | None = None
 
 
 @dataclass(frozen=True)
@@ -231,6 +225,10 @@ class Probe:
     refuses: tuple[str, ...] = ()
     credits: int = 0
     elements: tuple[str, ...] = ()
+    #: What this probe's criterion asks for that the probe does not reach. A
+    #: criterion with several halves is answered in part by one corruption, and
+    #: the half nobody probes says so here rather than in nothing.
+    note: str = ""
 
     @property
     def control(self) -> bool:
@@ -532,6 +530,40 @@ def _paraphrase(reference: SignedReference, case: GoldenCase) -> Corruption:
     )
 
 
+def _repeated_quotation(reference: SignedReference, case: GoldenCase) -> Corruption:
+    """One row's span cut back to words the source says five times.
+
+    A quote that locates in several places locates nowhere in particular, and
+    a row resting on one has not said which sentence supports it. The gate
+    calls that ``ambiguous-span``, and the row's value is left right so that
+    nothing but the citation is wrong.
+    """
+    row = _find(reference, "network-membership", subject="process:order-service")
+    span = row.support[0]
+    return _one(
+        reference,
+        row,
+        row.model_copy(
+            update={"support": [span.model_copy(update={"quote": "the order service"})]}
+        ),
+    )
+
+
+def _changed_source(reference: SignedReference, case: GoldenCase) -> Corruption:
+    """The source edited after the rows were taken from it.
+
+    Every span pins the text it was read from by digest, so a source that
+    moves afterwards is visible rather than silently re-read. The catalog is
+    untouched: the corruption is entirely in what the submitter wrote.
+    """
+    sources = {source.label: source.text for source in case.sources}
+    label = next(iter(sources))
+    return Corruption(
+        tuple(reference.entries),
+        sources={label: sources[label] + "\n\nAdded after the rows were taken."},
+    )
+
+
 def _valid_inference(reference: SignedReference, case: GoldenCase) -> Corruption:
     """Every inferred row restated as inferred, with its explanation kept."""
     return Corruption(
@@ -617,6 +649,28 @@ PROBES: Mapping[str, Probe] = MappingProxyType(
         "paraphrase": Probe(
             "01-payments-checkout", _paraphrase, loses=1, fates=("worded",)
         ),
+        "identity-and-provenance": Probe(
+            "01-payments-checkout",
+            _repeated_quotation,
+            refuses=("ambiguous-span",),
+            fates=("found",),
+            note=(
+                "the repeated-quotation half only. No corpus case holds two"
+                " same-named services in different environments, and every"
+                " case carries exactly one source, so neither of the other two"
+                " halves can be corrupted into existence"
+            ),
+        ),
+        "changed-source": Probe(
+            "01-payments-checkout",
+            _changed_source,
+            refuses=("stale-digest",),
+            note=(
+                "the gate notices, and there is nothing further to invalidate:"
+                " every `Assertion.assessment` in this service is `unchecked`,"
+                " so no support assessment rests on the text that moved"
+            ),
+        ),
         "valid-inference": Probe(
             "01-payments-checkout",
             _valid_inference,
@@ -661,7 +715,11 @@ def run_probe(name: str, case: GoldenCase, reference: SignedReference) -> Outcom
     )
     catalog = AssertionCatalog(subjects=subjects, entries=list(corrupted.entries))
     model = case.model if corrupted.model is None else corrupted.model
-    sources = {source.label: source.text for source in case.sources}
+    sources = (
+        {source.label: source.text for source in case.sources}
+        if corrupted.sources is None
+        else dict(corrupted.sources)
+    )
     refused = sorted({issue.code for issue in gate_issues(catalog, model, sources)})
     graded = replay_assertions(
         case, reference, AssertionResult(case.id, {}, catalog, ())
@@ -770,6 +828,9 @@ def render(found: Sequence[Outcome]) -> str:
     for row in broken:
         for why in row.broke:
             lines.append(f"- `{row.probe}`: {why}")
+    for name, probe in PROBES.items():
+        if probe.note:
+            lines.append(f"- `{name}` reaches part of its criterion: {probe.note}")
     for name, why in sorted(UNPROBED.items()):
         lines.append(f"- no probe for `{name}`: {why}")
     return "\n".join(lines) + "\n"
