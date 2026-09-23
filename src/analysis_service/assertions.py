@@ -62,7 +62,7 @@ from __future__ import annotations
 
 import hashlib
 import json
-from collections.abc import Collection, Mapping, Sequence
+from collections.abc import Collection, Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from types import MappingProxyType
 from typing import Literal, NamedTuple, get_args
@@ -96,6 +96,7 @@ from analysis_service.validation import validate
 
 __all__ = [
     "ABSENT",
+    "CATALOG_REFUSALS",
     "GATE_REFUSALS",
     "MAX_ASSERTIONS",
     "MAX_PREMISES",
@@ -103,9 +104,12 @@ __all__ = [
     "MAX_QUOTE_CHARS",
     "MAX_SPANS",
     "MAX_SUBJECTS",
+    "PROJECTION_EFFECT",
     "PROJECTION_VERSION",
+    "QUALIFIED_SPELLING",
     "REGISTRY",
     "REGISTRY_VERSION",
+    "REJECTING",
     "SETTLING_REASONS",
     "SPAN_REFUSALS",
     "UNIVERSAL_TERMS",
@@ -127,6 +131,7 @@ __all__ = [
     "ProjectionReason",
     "Qualifier",
     "QualifierKind",
+    "Quarantined",
     "QuoteProposal",
     "SpanSource",
     "Standing",
@@ -134,6 +139,7 @@ __all__ = [
     "SubjectType",
     "SupportSpan",
     "UnknownReason",
+    "admissible",
     "answer",
     "apply_projection",
     "assertion_id",
@@ -142,8 +148,12 @@ __all__ = [
     "conflicts",
     "contradiction_issues",
     "contradictions",
+    "offered",
     "project",
+    "projected_attribute",
     "projection_fields",
+    "qualified",
+    "quarantine",
     "referent_type",
     "resolve_catalog",
     "settled",
@@ -202,7 +212,24 @@ REGISTRY_VERSION = 6
 #: there rather than on the envelope: a job that ran no assertion pass projected
 #: nothing, and a version recorded for a projection that never ran is a fact
 #: with no consequence.
-PROJECTION_VERSION = 2
+#:
+#: Version 3 stops a declining projection from leaving a definite attribute
+#: authoritative (#926). A conflict, a scoped value and a row a reviewer set
+#: aside now write a qualified ``unknown`` into the attribute; a ``legacy`` row
+#: no longer projects as ``stated``; and two compatible values keep the
+#: attribute and are cited as rows instead. :data:`PROJECTION_EFFECT` is the
+#: table.
+#:
+#: Version 5 keeps an unchecked row from closing a lead: where the attribute
+#: reads unknown or absent, a stated value from rows nobody marked
+#: ``supported`` writes a qualified ``unknown`` rather than the control
+#: (:func:`_unchecked_over_lead`).
+#:
+#: Version 4 separates a hedge from silence. Rows that all read ``unknown``
+#: left the attribute alone whatever their reason; a source that *said* it was
+#: unsure now writes a qualified ``unknown`` over a definite extracted value,
+#: and silence still does not (#926).
+PROJECTION_VERSION = 5
 
 #: The value that says a source stated this fact is **not there**. A positive
 #: statement about an absence, which :attr:`Assertion.basis` then attributes:
@@ -648,15 +675,14 @@ class Assertion(BaseModel):
     #: extractor's own confidence is not an assessment (ADR 0034), and no
     #: sitting imports one yet, so every value here is the default.
     #:
-    #: **Whoever writes the first real one owes the staleness rule.** An
-    #: assessment is a judgement about particular source text, and the text it
-    #: was made against is pinned only on the row's ``support`` spans, by
-    #: ``SupportSpan.digest``. ``settled`` reads the assessment and never the
-    #: spans, so an assessment made against text that has since changed would
-    #: keep a row citable on evidence that no longer says it. The gate reports
-    #: the changed text as ``stale-digest``, and nothing carries that as far as
-    #: the assessment. That is a gap with no consequence while every value is
-    #: ``unchecked``, and a defect the first producer introduces.
+    #: **Changed text takes the row with it.** An assessment is a judgement
+    #: about particular source text, and the text it was made against is pinned
+    #: only on the row's ``support`` spans, by ``SupportSpan.digest``. The gate
+    #: reports text that has moved as ``stale-digest`` and
+    #: :meth:`AssertionRecord.over` quarantines the row, so neither an
+    #: unchecked row nor an assessed one is read on evidence that no longer
+    #: says it. What stays open is *keeping* an assessment across an edit that
+    #: left its spans intact, which the first producer of one decides.
     assessment: Assessment = "unchecked"
     #: Who assessed the support, and which version of them. Required once
     #: ``assessment`` moves off ``unchecked``.
@@ -707,21 +733,34 @@ CatalogIssueCode = Literal[
     # attribute beside it states the opposite, which is the defect this layer
     # was built to make visible rather than one to drop a fact over.
     "graph-contradiction",
+    # Not a refused row either. Rows merged into one identity cited more
+    # passages between them than a row carries, and the row kept the first
+    # :data:`MAX_SPANS`; this names how many it did not keep.
+    "support-truncated",
 ]
 
 
-#: Every code the gate raises over a row, which is every code but one.
+#: Every code that refuses a row, which is every code but two.
 #:
-#: :data:`CatalogIssueCode` holds what a report's ``assertions.issues`` can say,
-#: and ``graph-contradiction`` is the one entry that is not a refusal: the row
-#: stands, stays settled and stays citable, and the finding is about the graph
-#: attribute beside it. Spelled as a set rather than left to a reader to
-#: remember, because ``tests/test_assertions.py`` holds the gate's fixture table
-#: to exactly these, and a new code that is a refusal must fail there rather
-#: than quietly join the exception.
+#: :data:`CatalogIssueCode` holds what a report's ``assertions.issues`` can say.
+#: ``graph-contradiction`` is not a refusal: the row stands, stays settled and
+#: stays citable, and the finding is about the graph attribute beside it.
+#: ``support-truncated`` is not one either: the row stands on the spans it kept,
+#: and the finding is about the ones it did not. Spelled as a set rather than
+#: left to a reader to remember, because ``tests/test_assertions.py`` holds the
+#: gate's fixture table to exactly these, and a new code that is a refusal must
+#: fail there rather than quietly join the exception.
 GATE_REFUSALS: frozenset[str] = frozenset(get_args(CatalogIssueCode)) - {
-    "graph-contradiction"
+    "graph-contradiction",
+    "support-truncated",
 }
+
+#: The refusals of a whole catalog rather than of a row in it: a catalog keyed
+#: by another registry, or one over a count bound. Nothing in such a catalog
+#: can be read, so :func:`quarantine` keeps none of it.
+CATALOG_REFUSALS: frozenset[str] = frozenset(
+    {"wrong-registry-version", "too-many-assertions", "too-many-subjects"}
+)
 
 #: The refusals that say a row's **span** did not hold, as against its value,
 #: its shape or its subject. A quote that does not locate in the source it
@@ -761,6 +800,17 @@ class CatalogIssue(BaseModel):
     row: int | None = None
 
 
+class Quarantined(BaseModel):
+    """One built row the gate removed, and the codes that removed it."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    #: The row's identity, or ``""`` for a row whose predicate the registry
+    #: does not hold, which has none.
+    identity: str
+    codes: list[CatalogIssueCode] = Field(min_length=1)
+
+
 class AssertionRecord(BaseModel):
     """What one job's assertion pass produced, kept on the **Report**.
 
@@ -788,6 +838,10 @@ class AssertionRecord(BaseModel):
     proposed: int = Field(ge=0)
     catalog: AssertionCatalog
     issues: list[CatalogIssue] = Field(default_factory=list)
+    #: Every built row the gate removed from ``catalog``, as :func:`quarantine`
+    #: reports it. The issues name a subject where a refusal is about one, and
+    #: only this list says which rows that took.
+    quarantined: list[Quarantined] = Field(default_factory=list)
     projection_version: int = Field(default=PROJECTION_VERSION, ge=1)
 
     @classmethod
@@ -824,6 +878,7 @@ class AssertionRecord(BaseModel):
         *,
         proposed: int,
         issues: Sequence[CatalogIssue] = (),
+        quarantined: Sequence[Quarantined] = (),
     ) -> AssertionRecord:
         """One record over a catalog something else built, with the gate run on it.
 
@@ -834,13 +889,49 @@ class AssertionRecord(BaseModel):
 
         ``issues`` is what its builder already refused, kept in front of what
         the gate says now, so a reader sees a row lost in construction apart
-        from a fault in what was built.
+        from a fault in what was built. ``quarantined`` is what an earlier gate
+        removed, carried the same way.
+
+        **A refusal quarantines, it does not only report.** The catalog on the
+        record is what every consumer reads, so a row the gate refuses leaves
+        it here, through :func:`quarantine`, before any reader sees it. Before
+        this, a row whose source text had moved under its span was recorded
+        ``stale-digest`` and still projected into the graph and cited (#926).
+        Dropping a row can strand another — an inference whose premise went —
+        so the rows are gated again until the gate refuses nothing. The graph
+        comparison runs once, over what survives, because it is not a refusal.
         """
+        found: list[CatalogIssue] = []
+        removed = list(quarantined)
+        admitted = catalog
+        while refusals := catalog_issues(admitted, model=model, sources=sources):
+            found.extend(refusals)
+            admitted, dropped = quarantine(admitted, refusals)
+            removed.extend(dropped)
         return cls(
             proposed=proposed,
-            catalog=catalog,
-            issues=[*issues, *gate_issues(catalog, model, sources)],
+            catalog=admitted,
+            issues=[*issues, *found, *contradiction_issues(admitted, model)],
+            quarantined=removed,
         )
+
+    def refused_rows(self) -> int:
+        """How many rows were refused, by whichever pass refused them.
+
+        **The one reader of "how many rows did this record lose".** The
+        resolver names the proposed row it dropped (:attr:`CatalogIssue.row`),
+        so each is counted once however many reasons it drew. The gate's
+        removals are counted off :attr:`quarantined`, the rows
+        :func:`quarantine` actually took, because a refusal of one subject
+        takes every row about it. A refusal of the whole catalog loses every
+        proposed row. ``support-truncated`` and ``graph-contradiction`` refuse
+        nothing and are not counted.
+        """
+        refusals = [issue for issue in self.issues if issue.code in GATE_REFUSALS]
+        if any(issue.code in CATALOG_REFUSALS for issue in refusals):
+            return self.proposed
+        rows = {issue.row for issue in refusals if issue.row is not None}
+        return len(rows) + len(self.quarantined)
 
 
 @dataclass(frozen=True)
@@ -1060,7 +1151,76 @@ def gate_issues(
     ]
 
 
-def merged(held: AssertionCatalog, found: AssertionCatalog) -> AssertionCatalog:
+def quarantine(
+    catalog: AssertionCatalog, refusals: Sequence[CatalogIssue]
+) -> tuple[AssertionCatalog, tuple[Quarantined, ...]]:
+    """The catalog without every row ``refusals`` names, and each row it removed.
+
+    **The one reader of "which rows does a refusal remove".** A refusal names
+    what it is about: a whole catalog (:data:`CATALOG_REFUSALS`), which keeps
+    nothing; a row, by its identity; or a subject, which takes every row about
+    it or pointing at it, because a row cannot be read without its subject. A
+    row whose predicate is unregistered has no identity and goes by that.
+
+    **Fails closed.** Refusals this cannot place on a row — nothing named, or
+    naming nothing the catalog holds — would leave the catalog unchanged and
+    the refusal unanswered, so the whole catalog goes instead. That also makes
+    :meth:`AssertionRecord.over`'s loop end: every round either shrinks the
+    catalog or empties it.
+
+    Each removed row carries the codes that named it, or every code of the
+    round where the whole catalog goes, so no reader re-derives this rule.
+    """
+    codes = {issue.code for issue in refusals}
+    everything = tuple(
+        Quarantined(identity=_identity(entry), codes=sorted(codes))
+        for entry in catalog.entries
+    )
+    if codes & CATALOG_REFUSALS:
+        return AssertionCatalog(), everything
+    by_row: dict[str, set[CatalogIssueCode]] = {}
+    by_subject: dict[str, set[CatalogIssueCode]] = {}
+    for issue in refusals:
+        if issue.assertion:
+            by_row.setdefault(issue.assertion, set()).add(issue.code)
+        elif issue.subject and issue.code != "unknown-predicate":
+            by_subject.setdefault(issue.subject, set()).add(issue.code)
+    kept = []
+    removed = []
+    for entry in catalog.entries:
+        if entry.predicate not in REGISTRY:
+            reasons: set[CatalogIssueCode] = {"unknown-predicate"}
+        else:
+            reasons = (
+                by_row.get(assertion_id(entry), set())
+                | by_subject.get(entry.subject, set())
+                | by_subject.get(entry.value, set())
+            )
+        if reasons:
+            removed.append(
+                Quarantined(identity=_identity(entry), codes=sorted(reasons))
+            )
+        else:
+            kept.append(entry)
+    labels = {
+        subject.id: subject
+        for subject in catalog.subjects
+        if subject.id not in by_subject
+    }
+    left = _catalog(kept, labels)
+    if left == catalog:
+        return AssertionCatalog(), everything
+    return left, tuple(removed)
+
+
+def _identity(entry: Assertion) -> str:
+    """The row's identity, or ``""`` where its predicate is unregistered."""
+    return assertion_id(entry) if entry.predicate in REGISTRY else ""
+
+
+def merged(
+    held: AssertionCatalog, found: AssertionCatalog
+) -> tuple[AssertionCatalog, list[CatalogIssue]]:
     """Two catalogs as one, by the rule :func:`resolve_catalog` already merges by.
 
     **The one reader of "these rows and those rows are one catalog".** Rows
@@ -1073,14 +1233,18 @@ def merged(held: AssertionCatalog, found: AssertionCatalog) -> AssertionCatalog:
     table carrying it would say the catalog is about something it is silent on.
     ``held``'s spelling of a subject stands where both name one, because the
     caller's existing labels are the ones a report already printed.
+
+    The issues are the ``support-truncated`` cuts :func:`_bounded` made, for
+    the caller to record: a merge that crosses the span bound keeps the fact.
     """
     kept: dict[str, Assertion] = {}
     for entry in (*held.entries, *found.entries):
         identity = assertion_id(entry)
         standing = kept.get(identity)
         kept[identity] = entry if standing is None else _merge(standing, entry)
+    entries, cut = _bounded(kept.values())
     labels = {subject.id: subject for subject in (*found.subjects, *held.subjects)}
-    return _catalog(list(kept.values()), labels)
+    return _catalog(entries, labels), cut
 
 
 def without(catalog: AssertionCatalog, identities: Collection[str]) -> AssertionCatalog:
@@ -1196,13 +1360,16 @@ def projection_fields() -> Mapping[str, str]:
     )
 
 
-#: The predicates the graph has no field for. **Where a fact is cited is a
-#: property of the predicate**: a predicate with a graph field reaches every
-#: reader through that field, so a second entry for it would be a second reader
-#: of one fact.
-#: A predicate here has no such field, so its rows are cited as themselves,
-#: through the **Evidence Catalog** (ADR 0036). Read off :data:`REGISTRY`, so
-#: a predicate added tomorrow is classified by its field and never listed.
+#: The predicates the graph has no field for, on any element. Read off
+#: :data:`REGISTRY`, so a predicate added tomorrow is classified by its field
+#: and never listed.
+#:
+#: **Not the routing rule.** Whether a row reaches a graph field is a property
+#: of the row — :func:`projected_attribute` — and whether it is cited as itself
+#: is :func:`offered`'s. A predicate outside this set still reaches nothing on
+#: an element type without its field, and ADR 0036's first reading, which
+#: routed by predicate, left such a row with neither a projection nor an
+#: evidence entry (#926).
 UNPROJECTED: frozenset[str] = frozenset(
     name for name, predicate in REGISTRY.items() if not predicate.projects_into
 )
@@ -1270,11 +1437,31 @@ def settled(catalog: AssertionCatalog) -> tuple[Assertion, ...]:
     return tuple(
         entry
         for entry in catalog.entries
-        if entry.predicate in REGISTRY
+        if admissible(entry)
         and entry.value != UNKNOWN
+        and (entry.subject, entry.predicate, _scope_key(entry.scope)) not in disputed
+    )
+
+
+def admissible(entry: Assertion) -> bool:
+    """Whether one row, on its own, may state its value to any reader.
+
+    **The one reader of "does this row's basis and assessment count".**
+    :func:`settled` asks it before looking for disagreement, and
+    :func:`project` asks it before a row may supply a graph attribute, so the
+    evidence a lane cites and the attribute a rule reads cannot disagree about
+    which rows count. Before this, :func:`project` filtered on the assessment
+    alone and wrote a ``legacy`` row into the graph as ``stated`` while
+    :func:`settled` refused the same row (#926).
+
+    A row is admissible when its predicate is registered, its basis is support
+    of some kind — ``legacy`` never is (ADR 0034 rule 6) — and its assessment is
+    one :data:`PROJECTS_UNDER` admits.
+    """
+    return (
+        entry.predicate in REGISTRY
         and entry.basis != "legacy"
         and PROJECTS_UNDER[entry.assessment]
-        and (entry.subject, entry.predicate, _scope_key(entry.scope)) not in disputed
     )
 
 
@@ -1862,12 +2049,47 @@ def resolve_catalog(
         held = kept.get(identity)
         kept[identity] = entry if held is None else _merge(held, entry)
 
+    entries, cut = _bounded(kept.values())
+    issues.extend(cut)
+
     # Through :func:`_catalog`, so how a subject table is derived from rows is
     # written down once. It also drops a subject whose only row the gate then
     # refused: the subject was recorded while the row was being built, and a
     # table naming something no row is about says the catalog holds a fact it
     # does not.
-    return _catalog(list(kept.values()), subjects), issues
+    return _catalog(entries, subjects), issues
+
+
+def _bounded(
+    entries: Iterable[Assertion],
+) -> tuple[list[Assertion], list[CatalogIssue]]:
+    """Each row cut to :data:`MAX_SPANS`, and a ``support-truncated`` issue per cut.
+
+    **The one reader of "what happens when merged rows cross the span bound".**
+    Rows of one identity each passed the bound alone and may cross it
+    together. The merged row keeps the first spans and the cut is recorded,
+    rather than refusing a fact for being stated too often or keeping eight
+    spans with nothing to say a ninth was cited. :func:`resolve_catalog` and
+    :func:`merged` both call it. The proposal the emission archive keeps still
+    carries every quote.
+    """
+    kept = []
+    issues = []
+    for entry in entries:
+        if len(entry.support) > MAX_SPANS:
+            issues.append(
+                CatalogIssue(
+                    code="support-truncated",
+                    message=f"rows stating this fact cited {len(entry.support)}"
+                    f" passages between them; the row keeps the first"
+                    f" {MAX_SPANS} and drops {len(entry.support) - MAX_SPANS}",
+                    subject=entry.subject,
+                    assertion=assertion_id(entry),
+                )
+            )
+            entry = entry.model_copy(update={"support": entry.support[:MAX_SPANS]})
+        kept.append(entry)
+    return kept, issues
 
 
 def _prepare(sources: Mapping[str, str]) -> Mapping[str, SpanSource]:
@@ -2098,8 +2320,12 @@ def _merge(held: Assertion, found: Assertion) -> Assertion:
     Before this rule the first row's basis stood, and one pair of rows read
     ``inferred`` or ``stated`` by arrival order (#961).
 
-    The joined spans are cut at :data:`MAX_SPANS`, the one bound a merge can
-    cross: each row passed it alone, and the first row's spans come first.
+    **The joined spans are not cut here.** :data:`MAX_SPANS` is the one bound a
+    merge can cross, since each row passed it alone, and a cut made here was
+    silent: nine rows citing nine passages became one row citing eight and no
+    issue said so (#926). Every caller cuts what it merged through
+    :func:`_bounded`, which records ``support-truncated``. The first row's
+    spans come first, so a cut keeps them.
     """
     first, second = sorted((held, found), key=_merge_rank)
     spans = list(first.support)
@@ -2108,7 +2334,7 @@ def _merge(held: Assertion, found: Assertion) -> Assertion:
             spans.append(span)
     return first.model_copy(
         update={
-            "support": spans[:MAX_SPANS],
+            "support": spans,
             "exclusive": held.exclusive or found.exclusive,
         }
     )
@@ -2129,10 +2355,13 @@ ProjectionReason = Literal[
     "stated",
     "absent",
     "unknown",
+    "hedged",
     "scoped",
     "several-values",
     "several-predicates",
+    "compatible",
     "unsupported",
+    "legacy",
 ]
 
 #: Whether a row under each :data:`Assessment` states its value for the graph.
@@ -2145,6 +2374,11 @@ ProjectionReason = Literal[
 #: projecting by default.
 PROJECTS_UNDER: Mapping[str, bool] = MappingProxyType(
     {"unchecked": True, "supported": True, "unsupported": False, "unresolved": False}
+)
+
+#: The assessments that set a row aside: every one :data:`PROJECTS_UNDER` refuses.
+REJECTING: frozenset[str] = frozenset(
+    assessment for assessment, projects in PROJECTS_UNDER.items() if not projects
 )
 
 
@@ -2183,23 +2417,26 @@ def project(catalog: AssertionCatalog) -> tuple[Projection, ...]:
     the catalog says nothing about it, and a projection that filled it would be
     asserting silence rather than reporting it.
 
-    A row whose assessment is one :data:`PROJECTS_UNDER` refuses is set aside:
-    it neither supplies the value nor counts as a second one. An attribute
-    only such rows reach writes ``unknown`` with the reason ``unsupported``,
-    and the rows are still named, so a reader sees what was set aside.
+    A row :func:`admissible` refuses is set aside: it neither supplies the
+    value nor counts as a second one. An attribute only such rows reach writes
+    ``unknown`` with the reason ``unsupported``, or ``legacy`` where every one
+    of them was imported from before this layer, and the rows are still named,
+    so a reader sees what was set aside. Two values that can both hold — see
+    :func:`_compatible` — read ``compatible`` rather than as a disagreement.
+
+    What each reason then does to the graph is :data:`PROJECTION_EFFECT`'s.
 
     Sorted by element then attribute, so two readings of one catalog agree on
     order.
     """
-    fields = projection_fields()
     subjects = {subject.id: subject for subject in catalog.subjects}
     grouped: dict[tuple[str, str], list[tuple[str, Assertion]]] = {}
     for entry in catalog.entries:
-        attribute = fields.get(entry.predicate, "")
+        attribute = projected_attribute(entry.predicate, entry.subject)
         held = subjects.get(entry.subject)
         if held is None or held.type not in GRAPH_BOUND:
             continue
-        if attribute and attribute in _attributes_of(entry.subject):
+        if attribute:
             grouped.setdefault((entry.subject, attribute), []).append(
                 (assertion_id(entry), entry)
             )
@@ -2351,31 +2588,111 @@ def contradiction_issues(
     ]
 
 
-#: The projection reasons under which a projected value replaces the graph's
-#: own. Both are the catalog answering: the sources stated the value, or stated
-#: that the control is not there.
+#: What each :data:`ProjectionReason` does to the graph attribute it names.
 #:
-#: **Every other reason declines, and a decline leaves the attribute alone.**
-#: :func:`project` writes ``unknown`` when the rows do not fit one string —
-#: a conflict, two values, two predicates, a scoped value, a row set aside.
-#: Writing that ``unknown`` into the graph would erase what extraction stated
-#: and put nothing in its place. Measured over the archived assertion sweeps:
-#: applying every projection would have replaced 55 stated attributes with
-#: ``unknown``, against 7 it corrected. Applying only these two corrects the 7
-#: and erases none.
-SETTLING_REASONS: frozenset[str] = frozenset({"stated", "absent"})
+#: ``write`` replaces the attribute with the projected value: the sources
+#: stated the value, or stated that the control is not there.
+#:
+#: ``qualify`` replaces it with a qualified ``unknown`` that names what the
+#: rows state (:func:`qualified`). The catalog holds rows about this attribute
+#: and they do not settle it in one unscoped value — a conflict, a value stated
+#: only for some scope, a row a reviewer set aside. **Leaving the attribute
+#: alone there made the extraction's independent value authoritative over rows
+#: that say it is not settled**, and the uncertainty evidence a lane would have
+#: cited never appeared (#926). The rows themselves stay cited where
+#: :func:`offered` finds them settled.
+#:
+#: ``hedged`` qualifies too: every row reads :data:`UNKNOWN` and at least one
+#: says a speaker voiced the doubt, so the sources stated that the control is
+#: uncertain, and a definite value extraction wrote beside that is the
+#: substitution this layer exists to stop.
+#:
+#: ``leave`` keeps what extraction wrote. ``unknown`` is rows that all read
+#: :data:`UNKNOWN` for a reason that is not a hedge — silence, a predicate
+#: nobody asked about, a bound that stopped the work — which says the pass did
+#: not find an answer, not that the sources gave none; ``legacy`` is rows imported from before this layer, which
+#: are that attribute spelled again; ``compatible`` is several values that all
+#: hold, which one string cannot carry and which :func:`offered` cites as rows.
+#: Measured over the 103 archived assertion records against their blessed
+#: models, the two ``several-predicates`` projections were both a mechanism and
+#: the credential it presents, and are ``compatible`` here: qualifying them
+#: would have turned two stated controls into questions. Of the 89
+#: projections whose rows all read ``unknown``, 61 carried a hedge and 28 were
+#: silent, and every one of the 89 fields already read ``unknown`` on the
+#: blessed model, so ``hedged`` changes nothing there. On models extraction
+#: built for itself — every archived proposal resolved against every archived
+#: extracted graph of its case, 1,500 pairs, the pairing ``run.py bind`` makes
+#: — 3 of 1,360 hedged projections sat over a definite value, all case 04's
+#: model server read ``internal`` where the source says its network is "meant
+#: to be" reachable only from inside and the blessed model reads ``unknown``.
+#: Each of the 3 moves the graph to the reviewed answer.
+#:
+#: Keyed by every reason and held to the literal by ``tests/test_assertions.py``,
+#: so a reason added tomorrow fails there rather than defaulting to either.
+PROJECTION_EFFECT: Mapping[str, Literal["write", "qualify", "leave"]] = (
+    MappingProxyType(
+        {
+            "stated": "write",
+            "absent": "write",
+            "unknown": "leave",
+            "hedged": "qualify",
+            "scoped": "qualify",
+            "several-values": "qualify",
+            "several-predicates": "qualify",
+            "compatible": "leave",
+            "unsupported": "qualify",
+            "legacy": "leave",
+        }
+    )
+)
+
+#: The projection reasons under which the catalog answers an attribute: its
+#: projected value is the attribute's value. Read off :data:`PROJECTION_EFFECT`.
+SETTLING_REASONS: frozenset[str] = frozenset(
+    reason for reason, effect in PROJECTION_EFFECT.items() if effect == "write"
+)
+
+#: How a qualified ``unknown`` is spelled in each attribute a predicate
+#: projects into. ``prose`` fields hold a sentence, so the qualification names
+#: what the rows state after the sentinel; ``bare`` fields hold a closed term or
+#: an **Element ID**, and anything after the sentinel there is a value the
+#: schema or the validity gate refuses. Keyed by the graph field and held to
+#: :func:`projection_fields` by ``tests/test_assertions.py``.
+QUALIFIED_SPELLING: Mapping[str, Literal["prose", "bare"]] = MappingProxyType(
+    {
+        "authentication": "prose",
+        "encryption_in_transit": "prose",
+        "encryption_at_rest": "prose",
+        "data_classification": "prose",
+        "exposure": "bare",
+        "trust_zone": "bare",
+    }
+)
+
+#: What a qualified ``unknown`` says happened, keyed by every reason that
+#: qualifies.
+_QUALIFIED_BECAUSE: Mapping[str, str] = MappingProxyType(
+    {
+        "hedged": "the sources voice uncertainty about this",
+        "scoped": "stated only for part of what this carries",
+        "several-values": "the sources state values that cannot all hold",
+        "several-predicates": "the sources state facts that cannot all hold",
+        "unsupported": "a reviewer set the stated value aside",
+    }
+)
 
 
 def apply_projection(
     model: SystemModel, catalog: AssertionCatalog
 ) -> tuple[SystemModel, tuple[Projection, ...]]:
-    """The model with each settled projection written into its attribute.
+    """The model with each projection :data:`PROJECTION_EFFECT` applies written in.
 
     **The migration ADR 0034 defers to Phase 4, taken one reader at a time.**
     The catalog becomes authoritative for a migrated fact and the element
-    attribute becomes a value code computes — but only where the catalog
-    actually answers. Where :func:`project` declines, the attribute extraction
-    wrote stands and the rows stay in the catalog for a reader to see.
+    attribute becomes a value code computes. Where the catalog answers, its
+    value is written; where its rows say the attribute is not settled in one
+    value, a qualified ``unknown`` is written; and where it has nothing to say
+    beyond what extraction wrote, the attribute stands.
 
     Returns the model and the projections that were applied, so a caller can
     record what moved rather than diff two models to find out.
@@ -2396,7 +2713,7 @@ def apply_projection(
     applied = tuple(
         projection
         for projection in project(catalog)
-        if projection.reason in SETTLING_REASONS
+        if PROJECTION_EFFECT[projection.reason] != "leave"
     )
     if not applied:
         return model, ()
@@ -2421,12 +2738,30 @@ def _projected_model(
     updated = model.model_copy(deep=True)
     elements = {element.id: element for element in updated.elements()}
     rows = {assertion_id(entry): entry for entry in catalog.entries}
+    subjects = {subject.id: subject for subject in catalog.subjects}
     for projection in applied:
         element = elements.get(projection.element_id)
         if element is None or not hasattr(element, projection.attribute):
             continue
+        if PROJECTION_EFFECT[projection.reason] == "qualify":
+            setattr(
+                element,
+                projection.attribute,
+                qualified(projection, [rows[ref] for ref in projection.rows], subjects),
+            )
+            continue
+        behind = [rows[ref] for ref in projection.rows if ref in rows]
+        if _unchecked_over_lead(
+            projection, getattr(element, projection.attribute), behind
+        ):
+            setattr(
+                element,
+                projection.attribute,
+                qualified(projection, behind, subjects, because=UNCHECKED_BECAUSE),
+            )
+            continue
         setattr(element, projection.attribute, projection.value)
-        bases = {rows[ref].basis for ref in projection.rows if ref in rows}
+        bases = {entry.basis for entry in behind}
         if "inferred" in bases and not any(
             entry.element_id == projection.element_id
             and entry.attribute == projection.attribute
@@ -2442,6 +2777,124 @@ def _projected_model(
                 )
             )
     return updated
+
+
+#: What a qualified ``unknown`` says when an unchecked row would have turned a
+#: lead into a stated control. See :func:`_unchecked_over_lead`.
+UNCHECKED_BECAUSE = "the sources state this and no reviewer has checked it"
+
+
+def _unchecked_over_lead(
+    projection: Projection, held: object, rows: Sequence[Assertion]
+) -> bool:
+    """Whether writing this projection would let an unchecked row close a lead.
+
+    **The unreviewed half of #926's contract** (the owner's decision of
+    2026-09-23, option (iii)): an unchecked assertion informs conditional
+    analysis and never becomes a verified control. So where the attribute
+    reads as a lead — never stated, or stated absent — and the projection
+    would make it a stated control, it is written as a qualified ``unknown``
+    naming the value instead. The lead stays in the Evidence Catalog, and the
+    row, no longer carried by the attribute, is cited as itself with its
+    review status in the gloss (:func:`offered`).
+
+    A row a reviewer marked ``supported`` may close the lead; that is what a
+    review is for. Measured, and recorded with its cost in ADR 0041: of 3,705
+    stated projections over 1,500 archived proposal/graph pairings, 140 are
+    held back — 51 corrections, and 89 exposures and zones the blessed model
+    agrees with, which reach the lane as cited unchecked rows instead. A stated absence over an unknown still writes, because an
+    absence is itself a lead. A stated control over a stated one closes
+    nothing, whichever is right, so it is left to the projection.
+    """
+    if control_state(projection.value) != "stated":
+        return False
+    if control_state(str(held)) == "stated":
+        return False
+    return not any(entry.assessment == "supported" for entry in rows)
+
+
+def qualified(
+    projection: Projection,
+    rows: Sequence[Assertion],
+    subjects: Mapping[str, Subject],
+    *,
+    because: str = "",
+) -> str:
+    """The ``unknown`` a qualifying projection writes, with what the rows state.
+
+    Leads with the sentinel, so :func:`~analysis_service.analysis.control_state`
+    reads the attribute as unsettled and the **Evidence Catalog** offers it as
+    a question. What follows is the loss the projection could not fit in one
+    value — each row's value and scope — so a reader of the attribute alone
+    still sees the facts behind it. Cut at the field's bound; the rows stay in
+    the catalog whole.
+
+    Only :func:`admissible` rows are named. The attribute reaches every lane
+    through the rendered model, so a value a reviewer set aside, written here,
+    would reach analysis after review (ADR 0041).
+    """
+    if QUALIFIED_SPELLING[projection.attribute] == "bare":
+        return UNKNOWN
+    stated: list[str] = []
+    for entry in sorted(filter(admissible, rows), key=_merge_rank):
+        if entry.value == UNKNOWN:
+            if entry.reason == "hedged":
+                stated.extend(f'"{span.quote}"' for span in entry.support)
+            continue
+        value = _written(entry.value, subjects)
+        value = ABSENT_WORD if value == ABSENT else value
+        scope = ", ".join(f"{q.kind} {q.value}" for q in entry.scope)
+        stated.append(f"{value} ({scope})" if scope else value)
+    said = "; ".join(dict.fromkeys(stated))
+    text = f"{UNKNOWN}; {because or _QUALIFIED_BECAUSE[projection.reason]}" + (
+        f": {said}" if said else ""
+    )
+    return text if len(text) <= MAX_VALUE_CHARS else text[: MAX_VALUE_CHARS - 1] + "…"
+
+
+def projected_attribute(predicate: str, subject: str) -> str:
+    """The graph attribute a row of ``predicate`` about ``subject`` reaches, or ``""``.
+
+    **The one reader of "does this row reach a graph field".** A predicate
+    names a field and a field belongs to an element type, so the answer is a
+    property of the row, never of the predicate alone: ``authentication-mechanism``
+    reaches ``authentication`` on a **Data Flow** and nothing on a **Process**,
+    and a credential a principal presents reaches nothing at all. Routing by
+    predicate once left a legal row on a Process with neither a projection nor
+    an evidence entry (#926). :func:`project` and :func:`offered` both ask this.
+    """
+    attribute = projection_fields().get(predicate, "")
+    return attribute if attribute and attribute in _attributes_of(subject) else ""
+
+
+def offered(catalog: AssertionCatalog, model: SystemModel) -> tuple[Assertion, ...]:
+    """The settled rows a lane cites as themselves, in catalog order.
+
+    **The one reader of "which rows does the Evidence Catalog carry".** A
+    settled row is cited as itself unless the graph already carries it: its
+    row reaches an attribute (:func:`projected_attribute`), that attribute's
+    projection writes the catalog's value (:data:`SETTLING_REASONS`), and the
+    model in front of the reader holds that value. Everything else a settled
+    row says would otherwise reach no reader — a fact about a principal, a
+    mechanism on a Process, a scoped control, one of two compatible values, or
+    a row whose projection :func:`apply_projection` discarded.
+
+    Asked of the model rather than of whether a projection ran, so a report
+    re-checked on load and the job that wrote it agree without either
+    recording which projections were applied.
+    """
+    held = {element.id: element for element in model.elements()}
+    carried = {
+        identity
+        for projection in project(catalog)
+        if projection.reason in SETTLING_REASONS
+        and (element := held.get(projection.element_id)) is not None
+        and getattr(element, projection.attribute, None) == projection.value
+        for identity in projection.rows
+    }
+    return tuple(
+        entry for entry in settled(catalog) if assertion_id(entry) not in carried
+    )
 
 
 def _attributes_of(element_id: str) -> frozenset[str]:
@@ -2471,25 +2924,52 @@ def _projected(
     """One attribute's projected value, and the reason it reads that way."""
     ids = tuple(sorted(identity for identity, _ in rows))
     valued = [entry for _, entry in rows if entry.value != UNKNOWN]
-    stated = [entry for entry in valued if PROJECTS_UNDER[entry.assessment]]
+    stated = [entry for entry in valued if admissible(entry)]
 
     def projected(value: str, reason: ProjectionReason) -> Projection:
         return Projection(element_id, attribute, value, reason, ids)
 
     if not valued:
+        # A speaker who voiced doubt is the sources answering "we do not
+        # know"; a row the pass could not fill is the sources not answering.
+        # Only the first outranks a definite value extraction wrote.
+        if any(entry.reason == "hedged" for _, entry in rows):
+            return projected(UNKNOWN, "hedged")
         return projected(UNKNOWN, "unknown")
     if not stated:
+        # Rows somebody set aside are a question the catalog raised about this
+        # attribute; rows imported from before this layer are the attribute
+        # itself, spelled again, and say nothing new about it.
+        if all(entry.basis == "legacy" for entry in valued):
+            return projected(UNKNOWN, "legacy")
         return projected(UNKNOWN, "unsupported")
-    if len({entry.predicate for entry in stated}) > 1:
-        return projected(UNKNOWN, "several-predicates")
-    if len({entry.value for entry in stated}) > 1:
-        return projected(UNKNOWN, "several-values")
     if any(entry.scope for entry in stated):
         return projected(UNKNOWN, "scoped")
+    if len({(entry.predicate, entry.value) for entry in stated}) > 1:
+        if _compatible(stated):
+            return projected(UNKNOWN, "compatible")
+        if len({entry.predicate for entry in stated}) > 1:
+            return projected(UNKNOWN, "several-predicates")
+        return projected(UNKNOWN, "several-values")
     value = _written(stated[0].value, subjects)
     if value == ABSENT:
         return projected(ABSENT_WORD, "absent")
     return projected(value, "stated")
+
+
+def _compatible(rows: Sequence[Assertion]) -> bool:
+    """Whether several unscoped values under one attribute can all hold at once.
+
+    They can when every predicate behind them admits several values and none of
+    them is :data:`ABSENT`: a connection authenticated by an API token and
+    presenting that token states one control twice, and mutual TLS beside a
+    bearer token states two. A stated absence beside any positive value is a
+    contradiction, and so is a second value of a predicate that holds one.
+    """
+    return all(
+        REGISTRY[entry.predicate].multiplicity == "many" and entry.value != ABSENT
+        for entry in rows
+    )
 
 
 def _written(value: str, subjects: Mapping[str, Subject]) -> str:

@@ -15,15 +15,19 @@ from pydantic import ValidationError
 
 from analysis_service.analysis import ABSENT_WORD
 from analysis_service.assertions import (
+    _QUALIFIED_BECAUSE,
     ABSENT,
     BASIS_RANK,
+    CATALOG_REFUSALS,
     GATE_REFUSALS,
     GRAPH_BOUND,
     MAX_ASSERTIONS,
     MAX_QUOTE_CHARS,
     MAX_SPANS,
     MAX_SUBJECTS,
+    PROJECTION_EFFECT,
     PROJECTS_UNDER,
+    QUALIFIED_SPELLING,
     REGISTRY,
     REGISTRY_VERSION,
     SUBJECT_PREFIXES,
@@ -32,6 +36,7 @@ from analysis_service.assertions import (
     Assertion,
     AssertionCatalog,
     AssertionProposal,
+    AssertionRecord,
     Assessment,
     Basis,
     CatalogIssueCode,
@@ -43,6 +48,7 @@ from analysis_service.assertions import (
     Subject,
     SubjectType,
     _named,
+    admissible,
     answer,
     apply_projection,
     assertion_id,
@@ -50,8 +56,12 @@ from analysis_service.assertions import (
     conflicts,
     contradiction_issues,
     contradictions,
+    merged,
+    offered,
     project,
+    projected_attribute,
     projection_fields,
+    quarantine,
     referent_type,
     resolve_catalog,
     settled,
@@ -61,6 +71,7 @@ from analysis_service.assertions import (
     support_span,
 )
 from analysis_service.claims import Ground
+from analysis_service.evidence import evidence_catalog, unknown_evidence_ref
 from analysis_service.system_model import UNKNOWN, SystemModel, all_attribute_names
 
 SOURCE_LABEL = "System description"
@@ -624,9 +635,10 @@ class TestWhatTheGateRefuses:
         """
         assert set(REFUSALS) == GATE_REFUSALS
 
-    def test_the_one_code_outside_the_gate_is_the_one_that_drops_no_row(self):
+    def test_the_codes_outside_the_gate_are_the_ones_that_drop_no_row(self):
         assert set(get_args(CatalogIssueCode)) - GATE_REFUSALS == {
-            "graph-contradiction"
+            "graph-contradiction",
+            "support-truncated",
         }
 
     @pytest.mark.parametrize(
@@ -1339,8 +1351,9 @@ class TestTheProjection:
         (projected,) = project(self.rows(scoped))
         assert (projected.value, projected.reason) == (UNKNOWN, "scoped")
 
-    def test_two_predicates_feeding_one_field_project_to_unknown(self):
-        """A mechanism and the credential it presents share `authentication`."""
+    def test_two_compatible_predicates_on_one_field_are_compatible(self):
+        """A mechanism and the credential it presents share `authentication`,
+        and both hold: the projection declines without calling it a conflict."""
         mechanism = self.row(predicate="authentication-mechanism", value="a password")
         credential = self.row(
             predicate="credential-presented", value="credential:session-cookie"
@@ -1357,8 +1370,28 @@ class TestTheProjection:
         (projected,) = project(held)
         assert (projected.attribute, projected.reason) == (
             "authentication",
-            "several-predicates",
+            "compatible",
         )
+
+    def test_a_stated_absence_beside_a_presented_credential_is_several_predicates(
+        self,
+    ):
+        """No mechanism, and a credential presented: the two cannot both hold."""
+        mechanism = self.row(predicate="authentication-mechanism", value=ABSENT)
+        credential = self.row(
+            predicate="credential-presented", value="credential:session-cookie"
+        )
+        held = AssertionCatalog(
+            subjects=[
+                *subjects((FLOW, "interaction", "place order")),
+                *subjects(
+                    ("credential:session-cookie", "credential", "session cookie")
+                ),
+            ],
+            entries=[mechanism, credential],
+        )
+        (projected,) = project(held)
+        assert projected.reason == "several-predicates"
 
     def test_an_unknown_row_projects_the_sentinel(self):
         silent = self.row(value=UNKNOWN, reason="silent", support=[])
@@ -1478,11 +1511,14 @@ class TestWhatAProjectionWillNotReach:
 PROJECTIONS: dict[str, str] = {
     "stated": "one unscoped value is the value it holds",
     "absent": "a stated absence is the word the graph reads as absent",
-    "unknown": "only unknown rows leave the attribute unsettled",
+    "unknown": "only unknown rows, none of them a hedge, leave it unsettled",
+    "hedged": "only unknown rows, and a speaker voiced the doubt",
     "scoped": "a string cannot carry the qualifier the source attached",
     "several-values": "picking between two values would drop one",
-    "several-predicates": "one string cannot carry two predicates' facts",
+    "several-predicates": "two predicates' facts on one field cannot both hold",
+    "compatible": "several values that all hold, which one string cannot carry",
     "unsupported": "a row found unsupported, or left unresolved, states nothing",
+    "legacy": "a row imported from before this layer is never support",
 }
 
 
@@ -1742,10 +1778,11 @@ class TestAGraphAttributeAndItsRowsStatingOpposites:
 class TestTheProjectionBecomesTheGraphsValue:
     """ADR 0034's migration, applied where the catalog answers and nowhere else.
 
-    What it must *not* do carries the weight. A projection that declines writes
-    ``unknown``, and writing that into the graph erases what extraction stated
-    and puts nothing in its place — measured at 55 such erasures against 7
-    corrections over the archived sweeps.
+    What it must *not* do carries the weight. A projection with nothing to add —
+    rows all unknown, rows imported as legacy, values that all hold — leaves
+    what extraction wrote. One whose rows say the attribute is *not settled* —
+    a conflict, a scope, a row set aside — writes a qualified ``unknown``
+    rather than leave a definite value authoritative over them (#926).
     """
 
     def catalog_of(
@@ -1816,8 +1853,9 @@ class TestTheProjectionBecomesTheGraphsValue:
         assert self._flow(updated).authentication == ABSENT_WORD
         assert [entry.reason for entry in applied] == ["absent"]
 
-    def test_a_declining_projection_leaves_the_attribute_alone(self):
-        """Two predicates on one attribute: the catalog cannot fit one string."""
+    def test_a_compatible_projection_leaves_the_attribute_alone(self):
+        """Two predicates on one attribute that both hold: one string cannot
+        carry both, and the graph's own value contradicts neither."""
         held = catalog(
             [
                 stated(),
@@ -1878,3 +1916,347 @@ class TestTheProjectionBecomesTheGraphsValue:
 
         assert updated.processes[0].trust_zone == "boundary:app"
         assert applied == ()
+
+
+def test_every_projection_reason_has_an_effect():
+    """``PROJECTION_EFFECT`` answers ``ProjectionReason``, with nothing left over."""
+    assert set(PROJECTION_EFFECT) == set(get_args(ProjectionReason))
+
+
+def test_every_qualifying_reason_says_what_happened():
+    """A reason that qualifies, with no words for the qualification, would
+    raise at the first projection that reached it."""
+    assert set(_QUALIFIED_BECAUSE) == {
+        reason for reason, effect in PROJECTION_EFFECT.items() if effect == "qualify"
+    }
+
+
+def test_every_projected_field_says_how_a_qualified_unknown_is_spelled():
+    """A field a predicate projects into, with no spelling, would raise at the
+    first conflict on it rather than here."""
+    assert set(QUALIFIED_SPELLING) == set(projection_fields().values())
+
+
+class TestTheImplementationAudit:
+    """The seven defects #926's implementation audit reproduced, one class each.
+
+    Each test is the audit's own reproduction, kept as the regression test: a
+    row the gate refused still reached the graph, a row the projection could not
+    fit left a definite value standing over it, a legal row reached no reader,
+    and a bound was crossed in silence.
+    """
+
+    model = TestTheProjectionBecomesTheGraphsValue.model
+
+    def _flow(self, model):
+        return model.data_flows[0]
+
+    def _cites(self, model, held, row):
+        return assertion_id(row) in evidence_catalog(model, held)
+
+    # --- 2: a projection that does not settle leaves no definite value ---
+
+    @pytest.mark.parametrize(
+        ("entries", "reason"),
+        [
+            ([stated(), stated(value=ABSENT)], "several-values"),
+            ([stated(scope=[Qualifier(kind="principal", value="admins")])], "scoped"),
+            ([stated(assessment="unsupported", assessor="human:test")], "unsupported"),
+        ],
+        ids=["conflict", "scoped", "unsupported"],
+    )
+    def test_an_unsettled_projection_writes_a_qualified_unknown(self, entries, reason):
+        updated, applied = apply_projection(self.model(), catalog(entries))
+
+        (projection,) = applied
+        assert projection.reason == reason
+        written = self._flow(updated).authentication
+        assert written.startswith(f"{UNKNOWN}; ")
+        assert unknown_evidence_ref(FLOW, "authentication") in evidence_catalog(
+            updated, catalog(entries)
+        )
+
+    def test_a_qualified_unknown_names_what_the_rows_state(self):
+        scoped = stated(scope=[Qualifier(kind="principal", value="admins")])
+        updated, _ = apply_projection(self.model(), catalog([scoped]))
+
+        assert "email and password (principal admins)" in (
+            self._flow(updated).authentication
+        )
+
+    def test_a_scoped_row_is_cited_as_itself(self):
+        """The attribute cannot carry it, so the table does."""
+        scoped = stated(scope=[Qualifier(kind="principal", value="admins")])
+        held = catalog([scoped])
+        updated, _ = apply_projection(self.model(), held)
+
+        assert self._cites(updated, held, scoped)
+
+    def test_a_bare_field_qualifies_to_the_sentinel_alone(self):
+        """``trust_zone`` holds an Element ID, so nothing may follow the word."""
+        rows = (("process:storefront-api", "component", "storefront API"),)
+        held = catalog(
+            [
+                stated(
+                    subject="process:storefront-api",
+                    predicate="network-membership",
+                    value=zone,
+                )
+                for zone in ("boundary:app", "boundary:internet")
+            ],
+            rows=(
+                *rows,
+                ("boundary:app", "zone", "app"),
+                ("boundary:internet", "zone", "internet"),
+            ),
+        )
+        updated, applied = apply_projection(self.model(), held)
+
+        assert [p.reason for p in applied] == ["several-values"]
+        assert updated.processes[0].trust_zone == UNKNOWN
+
+    # --- A hedge is not silence (#926 review of this branch) ---
+
+    def hedge(self, **overrides):
+        return stated(
+            **{
+                "value": UNKNOWN,
+                "reason": "hedged",
+                "support": span_for("we have not rolled out MFA"),
+                **overrides,
+            }
+        )
+
+    def test_a_hedge_qualifies_a_definite_value(self):
+        """The sources said they are unsure; extraction's value does not stand."""
+        held = catalog([self.hedge()])
+        updated, applied = apply_projection(self.model(), held)
+
+        assert [p.reason for p in applied] == ["hedged"]
+        written = self._flow(updated).authentication
+        assert written.startswith(f"{UNKNOWN}; the sources voice uncertainty")
+        assert '"we have not rolled out MFA"' in written
+        assert unknown_evidence_ref(FLOW, "authentication") in evidence_catalog(
+            updated, held
+        )
+
+    def test_a_hedge_without_words_still_qualifies(self):
+        updated, _ = apply_projection(self.model(), catalog([self.hedge(support=[])]))
+
+        assert self._flow(updated).authentication == (
+            f"{UNKNOWN}; the sources voice uncertainty about this"
+        )
+
+    @pytest.mark.parametrize("reason", ["silent", "unmeasured", "truncated"])
+    def test_silence_leaves_the_attribute(self, reason):
+        """The pass not finding an answer is not the sources giving none."""
+        held = catalog([self.hedge(reason=reason, support=[])])
+        updated, applied = apply_projection(self.model(), held)
+
+        assert [p.reason for p in project(held)] == ["unknown"]
+        assert applied == ()
+        assert self._flow(updated).authentication == "session cookie"
+
+    def test_one_hedge_among_silent_rows_is_a_hedge(self):
+        held = catalog(
+            [
+                self.hedge(),
+                self.hedge(
+                    reason="silent",
+                    support=[],
+                    scope=[Qualifier(kind="principal", value="admins")],
+                ),
+            ]
+        )
+        assert [p.reason for p in project(held)] == ["hedged"]
+
+    def test_a_stated_value_outranks_a_hedge(self):
+        """A value beside a doubt is the ordinary stated projection."""
+        held = catalog([stated(), self.hedge()])
+        assert [p.reason for p in project(held)] == ["stated"]
+
+    # --- 5: legacy is never support, for the projection either ---
+
+    def test_a_legacy_row_does_not_project(self):
+        held = catalog([stated(basis="legacy", support=[])])
+        updated, applied = apply_projection(self.model(), held)
+
+        assert [p.reason for p in project(held)] == ["legacy"]
+        assert applied == ()
+        assert self._flow(updated).authentication == "session cookie"
+
+    @pytest.mark.parametrize("basis", sorted(get_args(Basis)))
+    @pytest.mark.parametrize("assessment", sorted(get_args(Assessment)))
+    def test_the_projection_and_settled_agree_on_which_rows_count(
+        self, basis, assessment
+    ):
+        """One eligibility rule, asked by both, over every basis and assessment."""
+        row = stated(
+            basis=basis,
+            assessment=assessment,
+            assessor="" if assessment == "unchecked" else "human:test",
+            support=[] if basis == "legacy" else stated().support,
+            explanation="" if basis in ("stated", "legacy") else "because",
+        )
+        (projection,) = project(catalog([row]))
+
+        assert (
+            (projection.reason == "stated")
+            == admissible(row)
+            == bool(settled(catalog([row])))
+        )
+
+    # --- 3: a refusal quarantines the row before any reader sees it ---
+
+    def test_a_stale_row_is_not_projected_or_cited(self):
+        moved = {label: text + " changed" for label, text in SOURCES.items()}
+        record = AssertionRecord.over(
+            catalog([stated()]), self.model(), moved, proposed=1
+        )
+
+        assert codes(record.issues) == ["stale-digest"]
+        assert record.catalog.entries == []
+        assert record.refused_rows() == 1
+        assert apply_projection(self.model(), record.catalog)[1] == ()
+
+    def test_a_dropped_premise_strands_the_inference_on_it(self):
+        """Quarantine runs to a fixed point: a row resting on a refused one goes."""
+        premise = stated(support=[])
+        inference = stated(
+            value="company SSO",
+            basis="inferred",
+            support=[],
+            explanation="rests on the first",
+            premises=[assertion_id(premise)],
+        )
+        record = AssertionRecord.over(
+            catalog([premise, inference]), self.model(), SOURCES, proposed=2
+        )
+
+        assert record.catalog.entries == []
+        assert set(codes(record.issues)) == {
+            "unsupported-assertion",
+            "dangling-premise",
+        }
+
+    @pytest.mark.parametrize("code", sorted(CATALOG_REFUSALS))
+    def test_a_refused_catalog_keeps_nothing(self, code):
+        _, held, reads = REFUSALS[code]
+        kept, _ = quarantine(held, catalog_issues(held, **reads))
+        assert kept.entries == []
+
+    def test_a_refused_subject_counts_every_row_it_takes(self):
+        """One ``dangling-binding`` names a subject, and both rows about it go."""
+        ghost = "flow:entity:shopper>process:storefront-api>ghost"
+        held = catalog(
+            [stated(subject=ghost), stated(subject=ghost, value="company SSO")],
+            rows=((ghost, "interaction", "ghost"),),
+        )
+        record = AssertionRecord.over(held, self.model(), SOURCES, proposed=2)
+
+        assert record.catalog.entries == []
+        assert record.refused_rows() == 2
+        assert [row.identity for row in record.quarantined] == [
+            assertion_id(entry) for entry in held.entries
+        ]
+        assert {tuple(row.codes) for row in record.quarantined} == {
+            ("dangling-binding",)
+        }
+
+    def test_a_graph_contradiction_quarantines_nothing(self):
+        record = AssertionRecord.over(
+            catalog([stated(value=ABSENT)]), self.model(), SOURCES, proposed=1
+        )
+
+        assert codes(record.issues) == ["graph-contradiction"]
+        assert len(record.catalog.entries) == 1
+        assert record.refused_rows() == 0
+
+    # --- 4: a legal row reaches a reader whether or not its field exists ---
+
+    def test_a_mechanism_on_a_component_is_cited_as_itself(self):
+        row = stated(subject="process:storefront-api")
+        held = catalog(
+            [row], rows=(("process:storefront-api", "component", "storefront API"),)
+        )
+
+        assert catalog_issues(held, model=self.model(), sources=SOURCES) == []
+        assert projected_attribute(row.predicate, row.subject) == ""
+        assert project(held) == ()
+        assert self._cites(self.model(), held, row)
+
+    def test_a_projected_row_the_graph_holds_is_not_cited_twice(self):
+        held = catalog([stated()])
+        updated, _ = apply_projection(self.model(), held)
+
+        assert self._flow(updated).authentication == "email and password"
+        assert offered(held, updated) == ()
+
+    def test_a_projected_row_the_graph_does_not_hold_is_cited(self):
+        """A projection discarded whole leaves its rows with no other reader."""
+        held = catalog([stated()])
+
+        assert offered(held, self.model()) == (stated(),)
+
+    def test_compatible_rows_are_cited_as_themselves(self):
+        mechanism = stated()
+        credential = stated(
+            predicate="credential-presented", value="credential:session-cookie"
+        )
+        held = catalog(
+            [mechanism, credential],
+            rows=(
+                (FLOW, "interaction", "place order"),
+                ("credential:session-cookie", "credential", "session cookie"),
+            ),
+        )
+        updated, _ = apply_projection(self.model(), held)
+
+        assert self._flow(updated).authentication == "session cookie"
+        assert offered(held, updated) == (mechanism, credential)
+
+    # --- 6: a merge that crosses the span bound says so ---
+
+    def test_a_merge_past_the_span_bound_is_recorded(self):
+        passages = [
+            f"Segment {index} says password authentication applies."
+            for index in range(MAX_SPANS + 1)
+        ]
+        rows = [
+            AssertionProposal(
+                subject_type="interaction",
+                subject=FLOW,
+                predicate="authentication-mechanism",
+                value="password",
+                basis="stated",
+                quotes=[QuoteProposal(source_label="test", quote=passage)],
+            )
+            for passage in passages
+        ]
+        record = AssertionRecord.of(
+            CatalogProposal(assertions=rows), self.model(), {"test": " ".join(passages)}
+        )
+
+        (entry,) = record.catalog.entries
+        assert len(entry.support) == MAX_SPANS
+        assert codes(record.issues) == ["support-truncated"]
+        assert record.refused_rows() == 0
+
+    def test_a_merge_outside_the_resolver_cuts_as_the_resolver_does(self):
+        """``merged`` cuts and records, so a patch adding a ninth quote to a
+        fact keeps the fact rather than rolling the batch back."""
+        many = [
+            f"Segment {index} says password authentication applies."
+            for index in range(MAX_SPANS + 1)
+        ]
+        text = " ".join(many)
+        rows = [stated(support=[support_span(quote, "test", text)]) for quote in many]
+        joined = catalog(rows[:1])
+        cut = []
+        for row in rows[1:]:
+            joined, cut = merged(joined, catalog([row]))
+
+        (entry,) = joined.entries
+        assert len(entry.support) == MAX_SPANS
+        assert codes(cut) == ["support-truncated"]
+        assert catalog_issues(joined) == []

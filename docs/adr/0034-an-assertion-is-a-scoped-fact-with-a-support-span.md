@@ -245,6 +245,36 @@ the same rule the asset vocabulary and the **Ground** kinds already follow.
   way. The projected model is put back on the session's valid-model key, so the
   model a lane agent reads, the model the report embeds and the model a ground
   resolves against are one value. It runs only where the assertion pass ran.
+
+  **Amended by #926's implementation audit (projection version 3).** "The
+  graph keeps its own value where the catalog declines" was two cases with one
+  answer. Where the catalog has nothing to add — every row reads `unknown`,
+  every row is `legacy`, or several values all hold (`compatible`) — the
+  attribute stands. Where its rows say the attribute is *not settled in one
+  value* — a conflict, a value stated only for a scope, a row a reviewer set
+  aside — the old attribute stood as a definite control over rows that say it
+  is not one, and no uncertainty evidence appeared. Those now write a
+  qualified `unknown` naming what the rows state, so the attribute reads as a
+  question and the rows stay citable (`PROJECTION_EFFECT`). The 55 erasures
+  measured above were attributes extracted independently of the catalog;
+  against the blessed models of the 103 archived assertion records, no
+  projection qualifies, and the two that would have declined as
+  `several-predicates` are `compatible` and keep their value. `legacy` rows no
+  longer project as `stated`: `admissible` is the one eligibility rule for the
+  projection and for `settled`. A row the gate refuses is quarantined from the
+  catalog before any reader sees it, including a row whose source text moved
+  under its span.
+
+  **Projection version 4 separates a hedge from silence.** Rows that all read
+  `unknown` left the attribute alone whatever their reason. A speaker who
+  voiced doubt is the sources stating that a control is uncertain, so a
+  `hedged` row now qualifies a definite extracted value the way a conflict
+  does, quoting the hedge where it has one. `silent`, `unmeasured` and
+  `truncated` rows still leave the attribute: the pass not finding an answer
+  is weaker evidence than a value extraction stated. Measured over the 1,500
+  pairings of archived proposals with archived extracted graphs: 3 of 1,360
+  hedged projections sat over a definite extracted value, and all 3 moved the
+  graph to the value the reviewed model holds.
 - **The `assumptions` list.** An **Assumption** stays the record of a value this
   service inferred into a graph attribute. The catalog's `inferred` basis covers
   predicates the graph has no field for. When a predicate's projection becomes

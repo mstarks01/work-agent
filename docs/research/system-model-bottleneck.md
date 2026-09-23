@@ -240,6 +240,16 @@ afterwards. `cause` names which of the three the loss belongs to.
 | `operations-and-classification` | structured meaning survives into its actual consumer | structural | yes | none |
 | `failed-correction` | the original supported facts survive a correction that fails | structural | yes | none |
 
+> **Amended by ADR 0041 (2026-09-23).** A facts-first graph starts every
+> attribute at `unknown`, and an unchecked assertion no longer closes a lead.
+> `unknown-placement`, `parallel-interfaces`, `operations-and-classification`
+> and `failed-correction` therefore survive as **catalog** rather than
+> structural: every wanted fact is still kept and cited to the lane, glossed
+> `unchecked`, beside the open question it would otherwise have closed, and
+> none reaches a rule as a control until a reviewer marks it `supported`. The
+> property each asks for — kept, distinct, not lost to a failed correction —
+> still holds. The table above records the reading before that decision.
+
 ### 3.1 The one shape the schema cannot hold
 
 `same-name` is the only fixture whose hand-written construction the gate

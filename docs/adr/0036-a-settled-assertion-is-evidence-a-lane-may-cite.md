@@ -58,11 +58,23 @@ either side until an adjudication is recorded. An `unsupported` or
 consumer asks about one subject under one predicate, and it reads `settled`
 rather than the rows, so no consumer decides for itself which rows count.
 
-**2. Where a fact is cited is a property of its predicate.** A predicate with
-a graph field reaches every reader through that field, so a second entry for
-it would be a second reader of one fact, and the two could disagree. Only
-`UNPROJECTED` predicates are offered through the catalog. The set is read off
-the registry, so a predicate added tomorrow is classified by its field.
+**2. Where a fact is cited is a property of the row, and of what reached the
+graph.** A row the graph already carries — its projection wrote the catalog's
+value into the attribute and the model holds it — reaches every reader through
+that field, so a second entry for it would be a second reader of one fact, and
+the two could disagree. Every other settled row is offered through the
+catalog. `assertions.offered` is that reader, and `assertions.projected_attribute`
+says whether a row reaches a field at all.
+
+*Amended by #926's implementation audit.* This rule first read "a property of
+its predicate", and offered only `UNPROJECTED` predicates. A predicate names a
+field and a field belongs to one element type, so a legal
+`authentication-mechanism` row on a **Process**, or a `credential-presented`
+row on a principal, reached neither a projection nor the catalog. Over the 103
+archived assertion records against their blessed models, 43 such rows reached
+no reader, and four more — two pairs of compatible values on one flow's
+`authentication` — were lost the same way. A scoped control is too, whenever
+one is stated.
 
 **3. The reference is the identity.** ADR 0034 rule 4 made an assertion's ID
 a pure function of its four identifying parts, recomputed by every reader.
