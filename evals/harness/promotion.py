@@ -44,12 +44,15 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
 import sys
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from types import MappingProxyType
 from typing import Any, Literal
+
+from analysis_service.assertions import AssertionRecord
 
 #: The baseline arm the budgets below were set from: one case, STRIDE only,
 #: ``analysis`` mode so the blessed model is fixed, `ANALYSIS_ASSERTIONS`
@@ -68,6 +71,20 @@ BASELINE: Mapping[str, float] = MappingProxyType(
 
 #: When the baseline was measured, and by which pair. A budget is a fact about
 #: a day's tree: read this before quoting one.
+#:
+#: **These limits were written after that pair's treatment arm was read**, and
+#: several ``why`` fields quote it. They are fixed from here on for the runs
+#: that follow, and they are not evidence that the first pair met a limit
+#: declared before it: a pair that set a limit cannot also be tested by it.
+#: The pair's artifacts sit under the gitignored ``evals/runs/`` and are not in
+#: the tree, so its figures are the record rather than something to recompute.
+#:
+#: **What these gates cannot yet decide.** No gate reads required-fact recall,
+#: which is the extraction's own factual endpoint and is computed by
+#: ``run.py replay`` from the emission archive rather than written to a run
+#: artifact; and the ``sd`` gates compare one treatment run against this one
+#: baseline run, scaled by a spread, rather than repeated arms against each
+#: other. Both are #926's to settle before a promotion is read off this table.
 BASELINE_RUN = (
     "2026-09-23, case 01-payments-checkout, evals/runs/20260923T-assertions-ab/off.json"
 )
@@ -113,14 +130,50 @@ def _backed(artifact: Mapping[str, Any], report: Mapping[str, Any]) -> float | N
     return None if backed is None else backed["matched"]
 
 
+def _record(report: Mapping[str, Any]) -> AssertionRecord | None:
+    held = report.get("assertions")
+    return None if not held else AssertionRecord.model_validate(held)
+
+
 def _refused_share(
     artifact: Mapping[str, Any], report: Mapping[str, Any]
 ) -> float | None:
-    """Refused rows over rows proposed, which is the unsupported-assertion rate."""
-    record = report.get("assertions")
-    if not record or not record.get("proposed"):
+    """Rows the gate refused over rows proposed: a **structural** refusal rate.
+
+    Distinct rows, through :meth:`~AssertionRecord.refused_rows`, never a count
+    of issues: one row draws several reasons, and a graph contradiction refuses
+    nothing. Before #926's audit this divided the issue count and called it the
+    unsupported-assertion rate, which it is not — a row can quote the source
+    exactly and state something the quote does not say, and the gate passes
+    it. :func:`_unsupported_share` is that question.
+    """
+    record = _record(report)
+    if record is None or not record.proposed:
         return None
-    return len(record.get("issues", [])) / record["proposed"]
+    return record.refused_rows() / record.proposed
+
+
+def _unsupported_share(
+    artifact: Mapping[str, Any], report: Mapping[str, Any]
+) -> float | None:
+    """Rows a reviewer found unsupported, over the rows anybody assessed.
+
+    **Semantic support, and nothing in this service measures it yet.** Every
+    row's ``assessment`` is ``unchecked`` until a reviewer or an external check
+    writes one (ADR 0034), so this reads ``None`` — unread, not zero — on every
+    run today. A located quote is not support, and a gate that read span
+    validity as support passed a flipped MFA answer, a webhook carrying a
+    receipt store's credential and a mechanism spelled ``the of and a``.
+    """
+    record = _record(report)
+    if record is None:
+        return None
+    assessed = [
+        entry for entry in record.catalog.entries if entry.assessment != "unchecked"
+    ]
+    if not assessed:
+        return None
+    return sum(entry.assessment != "supported" for entry in assessed) / len(assessed)
 
 
 @dataclass(frozen=True)
@@ -165,7 +218,11 @@ GATES: Mapping[str, Gate] = MappingProxyType(
             ),
         ),
         "latency": Gate(
-            question="does a job take longer than the budget allows?",
+            question=(
+                "does the summed node time grow beyond the budget? Summed node"
+                " time, not a job's wall time: the pair measured 2.08x summed"
+                " and 3.31x wall, and no artifact records the wall time"
+            ),
             read=_node_seconds,
             unit="ratio",
             limit=2.50,
@@ -189,7 +246,7 @@ GATES: Mapping[str, Gate] = MappingProxyType(
                 " a report, whatever it costs. The pair measured 4"
             ),
         ),
-        "unsupported-assertions": Gate(
+        "structural-refusals": Gate(
             question="what share of proposed rows does the gate refuse?",
             read=_refused_share,
             unit="count",
@@ -198,7 +255,20 @@ GATES: Mapping[str, Gate] = MappingProxyType(
             why=(
                 "the pair measured 0 of 15. A tenth is the point at which the"
                 " node is writing rows the gate cannot accept rather than"
-                " occasionally overreaching"
+                " occasionally overreaching. A structural rate: a row the gate"
+                " accepts may still say something its quote does not"
+            ),
+        ),
+        "unsupported-assertions": Gate(
+            question="what share of assessed rows did a reviewer find unsupported?",
+            read=_unsupported_share,
+            unit="count",
+            limit=0.10,
+            direction="at-most",
+            why=(
+                "declared 2026-09-23, before any row has been assessed, at the"
+                " structural gate's tenth. Unread until reviewed assessments"
+                " exist, so no run promotes on span validity alone"
             ),
         ),
         "must-find-coverage": Gate(
@@ -249,6 +319,18 @@ def _ratio(measured: float, baseline: float) -> float | None:
     return None if not baseline else measured / baseline
 
 
+def _in_spreads(difference: float, spread: float) -> float:
+    """A difference in standard deviations of the repeat spread.
+
+    **A measured spread of zero is a measurement**, not a missing one: repeats
+    that agreed exactly say any difference at all is outside the noise. Read as
+    falsy, it left a gate ``inconclusive`` however many identical repeats ran.
+    """
+    if spread:
+        return difference / spread
+    return 0.0 if difference == 0 else math.copysign(math.inf, difference)
+
+
 def read_gate(
     name: str,
     artifact: Mapping[str, Any],
@@ -280,9 +362,9 @@ def read_gate(
     elif gate.unit == "ratio":
         assert baseline is not None
         value = _ratio(measured, baseline)
-    elif spread:
+    elif spread is not None:
         assert baseline is not None
-        value = (measured - baseline) / spread
+        value = _in_spreads(measured - baseline, spread)
     else:
         return Reading(
             name,

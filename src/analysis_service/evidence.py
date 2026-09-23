@@ -43,12 +43,14 @@ There are only facts the agent is being shown anyway.
 
 A fourth family arrives with the job's **Assertion** catalog, where the job ran
 one. ``assertion:<predicate>~<subject>~<scope>~<value>`` is the row's own
-computed identity, used verbatim, and it is offered for a settled row of a
-predicate the graph has no field for — a second factor stated absent, a
-credential stated shared — because those facts reach no attribute a rule could
-read. A predicate with a graph field stays cited through that field: one fact,
-one reader (ADR 0036). Which rows settle is
-:func:`~analysis_service.assertions.settled`'s one rule, so a conflict, an
+computed identity, used verbatim, and it is offered for a settled row the
+graph does not already carry — a second factor stated absent, a credential
+stated shared, a mechanism on a component with no ``authentication`` field, a
+control stated only for administrators — because those facts reach no
+attribute a rule could read. A row whose projection the graph holds stays
+cited through that attribute: one fact, one reader (ADR 0036). Which rows those
+are is :func:`~analysis_service.assertions.offered`'s one rule, and which rows
+settle is :func:`~analysis_service.assertions.settled`'s, so a conflict, an
 unsupported row or a legacy one is never in the table, and a claim can never
 rest on one.
 
@@ -82,12 +84,12 @@ from analysis_service.analysis import (
 from analysis_service.assertions import (
     ABSENT,
     GRAPH_BOUND,
-    UNPROJECTED,
     Assertion,
     AssertionCatalog,
     Subject,
     assertion_id,
-    settled,
+    offered,
+    projected_attribute,
 )
 from analysis_service.claims import (
     ASSERTION_GROUNDS,
@@ -174,9 +176,9 @@ def evidence_catalog(
     is offered there, in the words that say it is a question.
 
     A third enumeration follows where the job carried an assertion pass:
-    every settled row of a predicate in
-    :data:`~analysis_service.assertions.UNPROJECTED`, in the catalog's own
-    order. ``None`` is a job that ran no such pass, and it is the same catalog
+    every row :func:`~analysis_service.assertions.offered` returns — settled,
+    and not already carried by the attribute its projection wrote — in the
+    catalog's own order. ``None`` is a job that ran no such pass, and it is the same catalog
     as before the layer existed; an empty catalog is a pass that settled
     nothing, which offers the same rows and says so on the report.
 
@@ -215,22 +217,22 @@ def evidence_catalog(
         catalog.update(
             {
                 assertion_id(row): Ground(kind="assertion", assertion=assertion_id(row))
-                for row in settled(assertions)
-                if row.predicate in UNPROJECTED
+                for row in offered(assertions, model)
             }
         )
         # The open questions, after the settled rows and never merged with
         # them. A row reaches here when its value is the unknown sentinel and
-        # its predicate has no graph field: the one class of fact that had no
-        # offer of any kind, because the attribute enumeration above walks
-        # elements and this row's subject may be a principal.
+        # it reaches no graph field: the one class of fact that had no offer
+        # of any kind, because the attribute enumeration above walks elements
+        # and this row's subject may be a principal.
         catalog.update(
             {
                 assertion_id(row): Ground(
                     kind="unknown-assertion", assertion=assertion_id(row)
                 )
                 for row in assertions.entries
-                if row.predicate in UNPROJECTED and row.value == UNKNOWN
+                if row.value == UNKNOWN
+                and not projected_attribute(row.predicate, row.subject)
             }
         )
     return catalog
@@ -477,8 +479,8 @@ def render_rows(catalog: AssertionCatalog) -> str:
     """Every assertion row as a table, keyed by the identity a patch names.
 
     Not :func:`render_catalog`, which is what a **Lane Agent** may *cite*: that
-    table holds settled rows of predicates the graph has no field for, because
-    a fact with a field is cited through the field. #1003's review pass asks a
+    table holds settled rows the graph does not already carry, because a fact
+    the graph carries is cited through its attribute. #1003's review pass asks a
     different question — what has this job recorded, and is any of it on the
     wrong subject — so it reads every row, unsettled ones included, and needs
     the identity a ``retract-assertion`` operation names.

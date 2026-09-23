@@ -1752,13 +1752,7 @@ def prepare_analysis(
             "knowledge_doc_count": knowledge_count,
             "preconditions": preconditions,
             "assertion_count": None if record is None else len(record.catalog.entries),
-            "assertions_refused": (
-                None
-                if record is None
-                else len(
-                    {issue.row for issue in record.issues if issue.row is not None}
-                )
-            ),
+            "assertions_refused": (None if record is None else record.refused_rows()),
         },
     )
 

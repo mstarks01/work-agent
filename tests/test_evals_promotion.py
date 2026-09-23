@@ -1,6 +1,6 @@
 """#926's predeclared promotion gates: what they read, and what they refuse to read.
 
-Three groups. The first holds every gate against a real archived artifact, so a
+Four groups. The first holds every gate against a real archived artifact, so a
 gate cannot read a key nothing writes. The second drives the two readings the
 table is built around — a resource gate one pair answers, and a quality gate
 that stays unread until repeats measure a spread. The third is the rule the
@@ -14,10 +14,18 @@ from pathlib import Path
 
 import pytest
 
+from analysis_service.assertions import (
+    Assertion,
+    AssertionCatalog,
+    AssertionRecord,
+    CatalogIssue,
+    Subject,
+)
 from evals.harness import promotion
 from evals.harness.run import COMMANDS
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
+FLOW = "flow:entity:shopper>process:storefront-api>place-order"
 #: A sealed Baseline: `analysis` mode, scored, with its reports beside it. It
 #: predates `AssertionBacking`, which is what makes it the right artifact to
 #: hold the readers against — a gate must survive an artifact older than itself.
@@ -113,6 +121,19 @@ class TestTheTwoKindsOfGate:
         assert inside.verdict == "pass"
         assert outside.verdict == "fail"
 
+    def test_a_measured_zero_spread_is_a_scale(self) -> None:
+        """Repeats that agreed exactly are a measurement, not a missing one."""
+        baseline = promotion.BASELINE["must_find_coverage"]
+        same = promotion.read_gate(
+            "must-find-coverage", self.artifact(0.1, baseline), {}, spread=0.0
+        )
+        lower = promotion.read_gate(
+            "must-find-coverage", self.artifact(0.1, baseline - 0.05), {}, spread=0.0
+        )
+
+        assert same.verdict == "pass"
+        assert lower.verdict == "fail"
+
     def test_the_decision_reads_every_gate(self) -> None:
         readings = promotion.decide(self.artifact(0.1, 0.5), {})
         assert {row.gate for row in readings} == set(promotion.GATES)
@@ -129,11 +150,71 @@ class TestAnAbsentFigureIsNotAZero:
         assert reading.verdict == "inconclusive"
         assert reading.measured is None
 
-    def test_a_report_that_ran_no_assertion_pass_is_unread(self, sealed) -> None:
+    @pytest.mark.parametrize("gate", ["structural-refusals", "unsupported-assertions"])
+    def test_a_report_that_ran_no_assertion_pass_is_unread(self, sealed, gate) -> None:
         artifact, _ = sealed
-        reading = promotion.read_gate("unsupported-assertions", artifact, {})
+        reading = promotion.read_gate(gate, artifact, {})
 
         assert reading.verdict == "inconclusive"
+
+
+def _report(*entries: Assertion, proposed: int, issues=()) -> dict:
+    subject = Subject(id=FLOW, type="interaction", label="place order")
+    record = AssertionRecord(
+        proposed=proposed,
+        catalog=AssertionCatalog(subjects=[subject], entries=list(entries)),
+        issues=list(issues),
+    )
+    return {"assertions": record.model_dump(mode="json")}
+
+
+def _row(**overrides) -> Assertion:
+    fields = {
+        "subject": FLOW,
+        "predicate": "authentication-mechanism",
+        "value": "password",
+        "basis": "inferred",
+        "explanation": "fixture",
+    }
+    return Assertion(**{**fields, **overrides})
+
+
+class TestSupportIsNotSpanValidity:
+    """#926's audit: the gate called span validity the unsupported rate."""
+
+    def test_the_structural_rate_counts_rows_not_reasons(self) -> None:
+        """One row, three reasons, and a contradiction that refuses nothing."""
+        issues = [
+            CatalogIssue(code=code, message="", row=0)
+            for code in ("unverifiable-span", "ambiguous-span", "missing-scope")
+        ]
+        issues.append(CatalogIssue(code="graph-contradiction", message=""))
+        reading = promotion.read_gate(
+            "structural-refusals", {}, _report(proposed=4, issues=issues)
+        )
+
+        assert reading.measured == 0.25
+
+    def test_an_unassessed_catalog_leaves_support_unread(self) -> None:
+        """Every row located its quote and nobody checked what it says."""
+        reading = promotion.read_gate(
+            "unsupported-assertions", {}, _report(_row(), proposed=1)
+        )
+
+        assert reading.verdict == "inconclusive"
+        assert reading.measured is None
+
+    def test_an_assessed_catalog_is_read(self) -> None:
+        rows = [
+            _row(assessment="supported", assessor="human:1"),
+            _row(value="token", assessment="unsupported", assessor="human:1"),
+        ]
+        reading = promotion.read_gate(
+            "unsupported-assertions", {}, _report(*rows, proposed=2)
+        )
+
+        assert reading.measured == 0.5
+        assert reading.verdict == "fail"
 
     def test_an_unread_gate_is_named_in_the_report(self, sealed) -> None:
         artifact, report = sealed

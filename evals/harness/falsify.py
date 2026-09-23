@@ -666,9 +666,11 @@ PROBES: Mapping[str, Probe] = MappingProxyType(
             _changed_source,
             refuses=("stale-digest",),
             note=(
-                "the gate notices, and there is nothing further to invalidate:"
-                " every `Assertion.assessment` in this service is `unchecked`,"
-                " so no support assessment rests on the text that moved"
+                "the gate notices and quarantines the row before any reader sees"
+                " it (`AssertionRecord.over`), so an unchecked fact on moved text"
+                " is neither projected nor cited; no support assessment rests on"
+                " the text, because every `Assertion.assessment` in this service"
+                " is `unchecked`"
             ),
         ),
         "valid-inference": Probe(
