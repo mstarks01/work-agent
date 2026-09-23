@@ -116,7 +116,7 @@ required facts than every representational loss measured here put together.
 | Selected by | nothing; it is the default | `ANALYSIS_FACTS_FIRST_EXTRACTION`, `ANALYSIS_FACTS_SPLIT_EXTRACTION` |
 | The model emits | a **System Model** | a **Source Fact Bundle** in local handles |
 | Identity decided by | the model, then rewritten from the name | code, from the mention's text |
-| Placement decided by | the model | a fact row, or the sole zone, or nothing |
+| Placement decided by | the model | a placement row a reviewer supported, through the projection; otherwise nothing |
 | Assertion rows | a second `assert` call, under `ANALYSIS_ASSERTIONS` | composed from the bundle by `resolve_bundle` |
 | Prose fields | written by the model | never written: a mention carries a name and no description |
 

@@ -27,12 +27,14 @@ from analysis_service.assertions import (
     CatalogProposal,
     QuoteProposal,
     ambiguous_quote,
+    assertion_id,
     conflicts,
     project,
     projection_fields,
     resolve_catalog,
     span_source,
 )
+from analysis_service.evidence import prepared_view
 from analysis_service.factbundle import (
     BUNDLE_VERSION,
     GRAPH_REFERENTS,
@@ -57,6 +59,7 @@ from analysis_service.factbundle import (
     resolve_bundle,
     unstated_fields,
 )
+from analysis_service.reassess import Verdict, reviewed
 from analysis_service.system_model import UNKNOWN, Element, SystemModel
 from analysis_service.validation import validate
 
@@ -125,6 +128,15 @@ def worker_bundle(**kwargs: object) -> SourceFactBundle:
 def resolved(bundle: SourceFactBundle, sources: dict[str, str] | None = None):
     """Resolve one bundle against the default source."""
     return resolve_bundle(bundle, sources if sources is not None else {LABEL: NOTE})
+
+
+def placement_rows(resolution: Resolution, element_id: str) -> list:
+    """The catalog rows that place one element."""
+    return [
+        entry
+        for entry in resolution.record.catalog.entries
+        if entry.subject == element_id and entry.predicate in PLACEMENT_PREDICATES
+    ]
 
 
 def row_for(resolution: Resolution, handle: str):
@@ -364,12 +376,50 @@ class TestRoles:
 class TestPlacement:
     """Where a component sits: stated, inferred by a reader, or nowhere."""
 
-    def test_a_stated_zone_is_the_zone(self) -> None:
+    def test_an_unchecked_zone_is_cited_and_leaves_the_zone_open(self) -> None:
+        """ADR 0041: the resolver writes no zone, and neither does an unchecked
+        row. The lane reads the open zone and the cited placement row, as it
+        does for the same row on the graph-first route."""
         resolution = resolved(worker_bundle())
         found = resolution.model.get("process:worker")
-        assert found is not None
-        assert found.trust_zone == "boundary:core-network"
+        assert found is not None and found.trust_zone == UNKNOWN
         assert resolution.model.assumptions == []
+
+        model, _, evidence = prepared_view(resolution.model, resolution.record.catalog)
+        (row,) = placement_rows(resolution, "process:worker")
+
+        assert getattr(model.get("process:worker"), "trust_zone", None) == UNKNOWN
+        assert "unknown:process:worker:trust_zone" in evidence
+        assert assertion_id(row) in evidence
+
+    @pytest.mark.parametrize(
+        ("basis", "assumed"), [("stated", False), ("inferred", True)]
+    )
+    def test_a_supported_zone_is_the_zone(self, basis, assumed) -> None:
+        """A review closes the lead, and an inferred zone says it was inferred."""
+        bundle = worker_bundle()
+        bundle.facts[0] = bundle.facts[0].model_copy(
+            update={"basis": basis, "explanation": "fixture"}
+        )
+        resolution = resolved(bundle)
+        (row,) = placement_rows(resolution, "process:worker")
+        supported = reviewed(
+            resolution.record.catalog,
+            {assertion_id(row): Verdict("supported", "human:reviewer")},
+        )
+
+        model, _, evidence = prepared_view(resolution.model, supported)
+
+        assert (
+            getattr(model.get("process:worker"), "trust_zone", None)
+            == "boundary:core-network"
+        )
+        assert "unknown:process:worker:trust_zone" not in evidence
+        assert assumed == any(
+            assumption.element_id == "process:worker"
+            and assumption.attribute == "trust_zone"
+            for assumption in model.assumptions
+        )
 
     def test_a_component_no_fact_places_is_placed_nowhere(self) -> None:
         """ADR 0039 rule 1: the resolver invents no zone to satisfy the schema.
