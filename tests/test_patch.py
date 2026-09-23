@@ -217,7 +217,12 @@ class TestAdding:
             applied(result, handle)
         added = result.model.get("process:worker")
         assert isinstance(added, ZonedElement)
-        assert added.trust_zone == "boundary:core-network"
+        # The placement is an unchecked row: kept in the catalog, and written
+        # into the zone only once a reviewer supports it (ADR 0041).
+        assert added.trust_zone == "unknown"
+        assert ("process:worker", "network-membership") in {
+            (entry.subject, entry.predicate) for entry in result.record.catalog.entries
+        }
         assert validate(result.model, sources=SOURCES) == []
 
     def test_the_addition_keeps_what_the_graph_already_held(self) -> None:
