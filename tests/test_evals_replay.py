@@ -17,9 +17,12 @@ import pytest
 
 from analysis_service.assertions import (
     ABSENT,
+    GATE_REFUSALS,
+    SPAN_REFUSALS,
     UNKNOWN,
     Assertion,
     AssertionCatalog,
+    CatalogIssue,
     Subject,
     assertion_id,
     identity_parts,
@@ -831,6 +834,62 @@ class TestTheEndpointRidesWithTheFates:
         assert pooled["required"] == len(graded.required)
         assert pooled["recovered"] == graded.recovered
         assert graded.to_json()["required"] == len(graded.required)
+
+
+class TestSpanValidityIsReadApartFromSupport:
+    """#926 asks for three readings, not one number.
+
+    A run can quote badly, reason badly, or have had nobody check either. The
+    fate table is the second question; these are the first and the third.
+    """
+
+    @pytest.fixture(scope="class")
+    def golden(self):
+        return case("01")
+
+    @pytest.fixture(scope="class")
+    def reference(self, golden):
+        catalog = replay.signed_reference(CORPUS, golden)
+        if catalog is None:
+            pytest.skip("case 01's facts are unsigned, so nothing grades a proposal")
+        return catalog
+
+    def graded(self, golden, reference, issues=()):
+        produced = AssertionCatalog(
+            subjects=reference.subjects, entries=list(reference.entries)
+        )
+        result = AssertionResult(golden.id, {}, produced, tuple(issues))
+        return replay.replay_assertions(golden, reference, result)
+
+    def test_a_clean_run_refuses_no_span(self, golden, reference):
+        graded = self.graded(golden, reference)
+
+        assert graded.span_refusals == 0
+        assert graded.produced_rows == len(reference.entries)
+
+    def test_a_span_refusal_is_counted_apart_from_every_other_kind(
+        self, golden, reference
+    ):
+        issues = [
+            CatalogIssue(code="ambiguous-span", message="twice"),
+            CatalogIssue(code="missing-scope", message="no qualifier"),
+        ]
+
+        graded = self.graded(golden, reference, issues)
+
+        assert graded.span_refusals == 1
+        assert graded.refusals == {"ambiguous-span": 1, "missing-scope": 1}
+
+    def test_every_span_refusal_is_a_gate_refusal(self):
+        """A code outside the gate's own vocabulary would count nothing."""
+        assert SPAN_REFUSALS <= GATE_REFUSALS
+
+    def test_nothing_writes_a_support_assessment(self, golden, reference):
+        """The coverage is zero, and a zero nobody reports reads as unasked."""
+        graded = self.graded(golden, reference)
+
+        assert graded.assessed_rows == 0
+        assert graded.to_json()["assessed_rows"] == 0
 
 
 class TestBothReadingsArriveTogether:

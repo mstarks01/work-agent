@@ -97,6 +97,7 @@ from analysis_service.assertions import (
     ABSENT,
     GRAPH_BOUND,
     REGISTRY,
+    SPAN_REFUSALS,
     UNKNOWN,
     UNPROJECTED,
     Assertion,
@@ -461,6 +462,18 @@ class AssertionReplay:
     #: every reader of a graded sweep reaches the denominator through the one
     #: rule rather than re-deriving which rows are stated.
     required: frozenset[str] = frozenset()
+    #: Every gate refusal by code, so a reader can ask which kind of refusal
+    #: this run took. ``issues`` renders them for a person; this is the same
+    #: facts as data, because parsing a rendered line back into a code is a
+    #: second reader of what the gate said.
+    refusals: Mapping[str, int] = field(default_factory=dict)
+    #: How many rows the run produced, and how many carry a support assessment
+    #: somebody made. The second is the **support-assessment coverage** #926
+    #: asks to see apart from semantic support: nothing in this service writes
+    #: an assessment, so it reads zero, and a zero nobody reports looks like a
+    #: question nobody asked.
+    produced_rows: int = 0
+    assessed_rows: int = 0
 
     @property
     def counts(self) -> Counter[str]:
@@ -469,6 +482,17 @@ class AssertionReplay:
     @property
     def produced_counts(self) -> Counter[str]:
         return Counter(self.produced.values())
+
+    @property
+    def span_refusals(self) -> int:
+        """Refusals that say a span did not hold, apart from every other kind.
+
+        **Span validity, not semantic support.** A row whose quote locates
+        exactly can still say what the quote does not support, and the fates
+        above are where that is read. These are the rows whose citation itself
+        failed.
+        """
+        return sum(self.refusals.get(code, 0) for code in SPAN_REFUSALS)
 
     @property
     def recovered(self) -> int:
@@ -503,6 +527,10 @@ class AssertionReplay:
             "required": len(self.required),
             "recovered": self.recovered,
             "rejected": self.rejected,
+            "refusals": dict(self.refusals),
+            "span_refusals": self.span_refusals,
+            "produced_rows": self.produced_rows,
+            "assessed_rows": self.assessed_rows,
             "issues": list(self.issues),
             "rows": [row.to_json() for row in self.rows],
             "produced": dict(self.produced),
@@ -889,6 +917,11 @@ def replay_assertions(
         issues=tuple(f"{issue.code}: {issue.message}" for issue in result.issues),
         aligned=aligned_rows(reference, result),
         required=frozenset(required_rows(reference)),
+        refusals=Counter(issue.code for issue in result.issues),
+        produced_rows=len(result.catalog.entries),
+        assessed_rows=sum(
+            entry.assessment != "unchecked" for entry in result.catalog.entries
+        ),
     )
 
 
@@ -1320,11 +1353,17 @@ def pooled_assertions(sweeps: Sequence[SweepReplay]) -> dict[str, Any]:
     relabelled = 0
     required = 0
     recovered = 0
+    spans = 0
+    produced_rows = 0
+    assessed = 0
     for sweep in sweeps:
         for replay in sweep.assertions:
             emissions += 1
             required += len(replay.required)
             recovered += replay.recovered
+            spans += replay.span_refusals
+            produced_rows += replay.produced_rows
+            assessed += replay.assessed_rows
             rejected += replay.rejected
             counts.update(replay.counts)
             produced.update(replay.produced_counts)
@@ -1350,6 +1389,13 @@ def pooled_assertions(sweeps: Sequence[SweepReplay]) -> dict[str, Any]:
         "basis_overstated": overstated,
         "produced": {fate: produced[fate] for fate in PRODUCED_FATES},
         "rejected": rejected,
+        # Span validity and support-assessment coverage, reported apart from
+        # the fates above, which are the semantic-support reading. #926 asks
+        # for the three separately: a run can quote badly, reason badly, or
+        # have had nobody check either, and one number cannot say which.
+        "span_refusals": spans,
+        "rows": produced_rows,
+        "assessed": assessed,
         "targets": [
             {"row": row, "losses": sum(fates.values()), "by_fate": dict(fates)}
             for row, fates in sorted(
@@ -1556,6 +1602,15 @@ def _render_assertions(pool: dict[str, Any], targets: int) -> None:
     required, recovered = pool["required"], pool["recovered"]
     share = f"{recovered / required:.3f}" if required else "-"
     print(f"  required-fact recall: {recovered}/{required} = {share}")
+    # The two readings #926 asks to see apart from the fates above, which are
+    # the semantic-support half.
+    print(
+        f"  span validity: {pool['span_refusals']} refusal(s) over"
+        f" {pool['rows']} produced row(s)"
+    )
+    print(
+        f"  support assessments: {pool['assessed']} of {pool['rows']} row(s) carry one"
+    )
     produced = ", ".join(f"{fate} {pool['produced'][fate]}" for fate in PRODUCED_FATES)
     print(f"  produced rows: {produced}")
     if pool["targets"]:
