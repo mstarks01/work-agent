@@ -218,11 +218,16 @@ REGISTRY_VERSION = 6
 #: attribute and are cited as rows instead. :data:`PROJECTION_EFFECT` is the
 #: table.
 #:
+#: Version 5 keeps an unchecked row from closing a lead: where the attribute
+#: reads unknown or absent, a stated value from rows nobody marked
+#: ``supported`` writes a qualified ``unknown`` rather than the control
+#: (:func:`_unchecked_over_lead`).
+#:
 #: Version 4 separates a hedge from silence. Rows that all read ``unknown``
 #: left the attribute alone whatever their reason; a source that *said* it was
 #: unsure now writes a qualified ``unknown`` over a definite extracted value,
 #: and silence still does not (#926).
-PROJECTION_VERSION = 4
+PROJECTION_VERSION = 5
 
 #: The value that says a source stated this fact is **not there**. A positive
 #: statement about an absence, which :attr:`Assertion.basis` then attributes:
@@ -2682,8 +2687,18 @@ def _projected_model(
                 qualified(projection, [rows[ref] for ref in projection.rows], subjects),
             )
             continue
+        behind = [rows[ref] for ref in projection.rows if ref in rows]
+        if _unchecked_over_lead(
+            projection, getattr(element, projection.attribute), behind
+        ):
+            setattr(
+                element,
+                projection.attribute,
+                qualified(projection, behind, subjects, because=UNCHECKED_BECAUSE),
+            )
+            continue
         setattr(element, projection.attribute, projection.value)
-        bases = {rows[ref].basis for ref in projection.rows if ref in rows}
+        bases = {entry.basis for entry in behind}
         if "inferred" in bases and not any(
             entry.element_id == projection.element_id
             and entry.attribute == projection.attribute
@@ -2701,10 +2716,46 @@ def _projected_model(
     return updated
 
 
+#: What a qualified ``unknown`` says when an unchecked row would have turned a
+#: lead into a stated control. See :func:`_unchecked_over_lead`.
+UNCHECKED_BECAUSE = "the sources state this and no reviewer has checked it"
+
+
+def _unchecked_over_lead(
+    projection: Projection, held: object, rows: Sequence[Assertion]
+) -> bool:
+    """Whether writing this projection would let an unchecked row close a lead.
+
+    **The unreviewed half of #926's contract** (the owner's decision of
+    2026-09-23, option (iii)): an unchecked assertion informs conditional
+    analysis and never becomes a verified control. So where the attribute
+    reads as a lead — never stated, or stated absent — and the projection
+    would make it a stated control, it is written as a qualified ``unknown``
+    naming the value instead. The lead stays in the Evidence Catalog, and the
+    row, no longer carried by the attribute, is cited as itself with its
+    review status in the gloss (:func:`offered`).
+
+    A row a reviewer marked ``supported`` may close the lead; that is what a
+    review is for. Measured, and recorded with its cost in ADR 0041: of 3,705
+    stated projections over 1,500 archived proposal/graph pairings, 140 are
+    held back — 51 corrections, and 89 exposures and zones the blessed model
+    agrees with, which reach the lane as cited unchecked rows instead. A stated absence over an unknown still writes, because an
+    absence is itself a lead. A stated control over a stated one closes
+    nothing, whichever is right, so it is left to the projection.
+    """
+    if control_state(projection.value) != "stated":
+        return False
+    if control_state(str(held)) == "stated":
+        return False
+    return not any(entry.assessment == "supported" for entry in rows)
+
+
 def qualified(
     projection: Projection,
     rows: Sequence[Assertion],
     subjects: Mapping[str, Subject],
+    *,
+    because: str = "",
 ) -> str:
     """The ``unknown`` a qualifying projection writes, with what the rows state.
 
@@ -2728,7 +2779,7 @@ def qualified(
         scope = ", ".join(f"{q.kind} {q.value}" for q in entry.scope)
         stated.append(f"{value} ({scope})" if scope else value)
     said = "; ".join(dict.fromkeys(stated))
-    text = f"{UNKNOWN}; {_QUALIFIED_BECAUSE[projection.reason]}" + (
+    text = f"{UNKNOWN}; {because or _QUALIFIED_BECAUSE[projection.reason]}" + (
         f": {said}" if said else ""
     )
     return text if len(text) <= MAX_VALUE_CHARS else text[: MAX_VALUE_CHARS - 1] + "…"

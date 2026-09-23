@@ -130,7 +130,6 @@ from analysis_service.assertions import (
     AssertionCatalog,
     AssertionRecord,
     CatalogProposal,
-    apply_projection,
 )
 from analysis_service.basis import unbased_controls
 from analysis_service.candidates import generate_candidates
@@ -163,6 +162,7 @@ from analysis_service.critic import (
 from analysis_service.domains import select_domain_packs
 from analysis_service.evidence import (
     evidence_catalog,
+    prepared_view,
     render_catalog,
     render_element_roster,
     render_rows,
@@ -216,6 +216,7 @@ from analysis_service.report import (
     ModelRepair,
     NodeRun,
     Report,
+    disclaimer_for,
 )
 from analysis_service.retry import TRUNCATION_REMEDY
 from analysis_service.sampling import (
@@ -1151,6 +1152,7 @@ class Analysis:
             elements_analyzed=len(self.system_model.elements()),
             model_repair=self.model_repair,
             assertions=self.assertions,
+            disclaimer=disclaimer_for(self.assertions),
             analysis_context=self.context(pipeline.instruction_sha256),
             execution=ExecutionEnvelope(
                 identity_version=IDENTITY_VERSION,
@@ -1618,12 +1620,13 @@ def prepare_analysis(
         # embedded model and the model a ground resolves against stay one
         # value. A zone predicate projects into ``trust_zone``, so the
         # crossings below are derived after this and never before.
-        model, projected = apply_projection(model, held)
+        model, projected, catalog = prepared_view(model, held)
         if projected:
             valid_model = model.model_dump(mode="json")
             state.put(STATE_VALID_MODEL, valid_model)
+    else:
+        catalog = evidence_catalog(model)
     crossings = model.boundary_crossings()
-    catalog = evidence_catalog(model, held)
     packs = select_domain_packs(model)
 
     options = state.get(STATE_FRAMEWORK_OPTIONS) or {}

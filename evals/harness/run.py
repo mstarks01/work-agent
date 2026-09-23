@@ -2400,6 +2400,12 @@ COMMANDS: dict[str, Command] = {
         run=population.command_freeze_population,
         arguments=population.arguments,
     ),
+    "reassess": Command(
+        help="apply a reviewer's verdicts to one report and write the rows"
+        " rejected, findings withdrawn and leads reopened (#926, no credentials)",
+        run=population.command_reassess,
+        arguments=population.reassess_arguments,
+    ),
     "oracle": Command(
         help="put a perfect reading of every signed case through the"
         " deterministic path and charge each loss to a stage (no credentials)",

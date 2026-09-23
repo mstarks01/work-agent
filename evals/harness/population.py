@@ -16,6 +16,13 @@ population the owner's decision of 2026-09-23 fixes; the rest are recorded
 beside them so a reviewer sees what the job did not use as well.
 
 Nothing here assesses anything, and it runs no model.
+
+**After the review**, ``run.py reassess`` applies a reviewer's verdicts to one
+report through :func:`~analysis_service.reassess.reassess` and writes what the
+review changed — rows rejected, findings withdrawn, leads reopened — beside the
+report. The verdicts name the catalog digest they were written against, and a
+verdict file for another catalog is refused rather than applied to rows its
+reviewer never saw.
 """
 
 from __future__ import annotations
@@ -38,6 +45,8 @@ from analysis_service.assertions import (
     offered,
     settled,
 )
+from analysis_service.reassess import Verdict, reassess
+from analysis_service.report import Report
 from analysis_service.system_model import SystemModel
 
 Route = Literal["projected", "offered", "open", "set-aside", "refused"]
@@ -204,5 +213,57 @@ def command_freeze_population(args: argparse.Namespace) -> int:
     print(
         f"froze {len(reached(frozen))} row(s) a lane read, across"
         f" {len(frozen['cases'])} case(s), to {args.out}"
+    )
+    return 0
+
+
+def reassess_arguments(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument("report", type=Path, help="the reviewed report (*.report.json)")
+    parser.add_argument(
+        "verdicts",
+        type=Path,
+        help="JSON: catalog_digest, and verdicts keyed by assertion identity,"
+        " each an assessment and an assessor",
+    )
+    parser.add_argument(
+        "--out", type=Path, required=True, help="where to write the reassessment"
+    )
+
+
+def command_reassess(args: argparse.Namespace) -> int:
+    """Recompute a report under a review. It runs no model and writes no report."""
+    try:
+        report = Report.model_validate_json(args.report.read_text(encoding="utf-8"))
+        review = json.loads(args.verdicts.read_text(encoding="utf-8"))
+        if report.assertions is None:
+            raise PopulationError("the report ran no assertion pass")
+        digest = catalog_digest(report.assertions)
+        if review.get("catalog_digest") != digest:
+            raise PopulationError(
+                "the verdicts were written against another catalog"
+                f" ({review.get('catalog_digest')!r}, this report's is {digest!r})"
+            )
+        verdicts = {
+            identity: Verdict(held["assessment"], held["assessor"])
+            for identity, held in review["verdicts"].items()
+        }
+        result = reassess(report, verdicts)
+    except (OSError, KeyError, ValueError) as error:
+        print(f"cannot reassess: {error}", file=sys.stderr)
+        return 1
+    written = {
+        "catalog_digest": digest,
+        "rejected": list(result.rejected),
+        "withdrawn": [asdict(row) for row in result.withdrawn],
+        "reopened": list(result.reopened),
+        "projections": [asdict(row) for row in result.projections],
+        "record": result.record.model_dump(mode="json"),
+        "system_model": result.model.model_dump(mode="json"),
+    }
+    args.out.write_text(json.dumps(written, indent=2) + "\n", encoding="utf-8")
+    print(
+        f"{len(result.rejected)} row(s) rejected, {len(result.withdrawn)}"
+        f" finding(s) withdrawn, {len(result.reopened)} lead(s) reopened for"
+        f" re-analysis; written to {args.out}"
     )
     return 0

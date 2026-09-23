@@ -35,6 +35,14 @@ existed, or a job that ran no assertion pass, leaves the gate over that figure
 *unread* rather than failing it. A gate that read an absence as a measurement
 would refuse a promotion for a reason nobody measured.
 
+**What a promotion needs** (the owner's decision of 2026-09-23): the two
+behavioural guarantees (``critical-fixtures``), reviewed semantic accuracy
+over a frozen population (``support-shares``), required-fact recall, and the
+report-quality gates. The report's disclosure of its review state is required
+as well and is not a substitute for any of them. None of this needs a truth
+detector: each guarantee is about what the job does with a row's review
+state, not about whether the row is true.
+
 Nothing here decides the promotion. It reports which gates passed, which
 failed, and which nobody can read yet — and a run with an unread gate is not a
 promotion, which is a reading a person makes.
@@ -202,18 +210,19 @@ CORPUS = Path(__file__).resolve().parents[1] / "corpus"
 def _critical_failures(
     artifact: Mapping[str, Any], report: Mapping[str, Any]
 ) -> float | None:
-    """Critical falsification probes a job fails with nobody reviewing it.
+    """Critical probes that break the guarantee of their review state.
 
-    **A property of the code, not of the run**, so it reads neither argument:
-    each of #925's corruptions is driven through the job's own gate,
-    projection and evidence catalog (:func:`~evals.harness.falsify.consumed`),
-    and a probe fails where a corrupted row reaches a lane as a fact or
-    silences a lead. The reviewed reading beside it is printed by
-    ``run.py falsify``; this gate reads the unreviewed one, because no job has
-    a reviewer.
+    **A property of the code, not of the run**, so it reads neither argument.
+    Each of #925's corruptions is driven through analysis preparation
+    (:func:`~evals.harness.falsify.consumed`) twice. Unreviewed, it fails if a
+    corrupted row silences a lead; reviewed, if a reviewer-rejected row still
+    reaches analysis at all. ``tests/test_release_blockers.py`` holds the same
+    two guarantees through ``prepare_analysis`` as release blockers.
     """
     found = falsify.consumed(CORPUS)
-    return len(falsify.critical_failures(found, reviewed=False))
+    return len(falsify.critical_failures(found, reviewed=False)) + len(
+        falsify.critical_failures(found, reviewed=True)
+    )
 
 
 def _case_of(report: Mapping[str, Any]) -> GoldenCase | None:
@@ -343,18 +352,18 @@ GATES: Mapping[str, Gate] = MappingProxyType(
         ),
         "critical-fixtures": Gate(
             question=(
-                "does a critical corruption reach a lane as a fact, or silence"
-                " a lead, in a job nobody reviews?"
+                "does an unchecked row silence a lead, or a reviewer-rejected"
+                " row reach analysis?"
             ),
             read=_critical_failures,
             unit="count",
             limit=0,
             direction="at-most",
             why=(
-                "the owner's decision of 2026-09-23: zero observed failures on"
-                " the critical fixtures. When declared, six failed unreviewed and"
-                " none reviewed: a well-quoted wrong fact is stopped only by an"
-                " assessment"
+                "the owner's decision of 2026-09-23, option (iii): zero failures"
+                " on the critical fixtures under each guarantee. The promise is"
+                " that no reviewer-rejected fact reaches analysis, not that no"
+                " wrong fact does: a review can miss one"
             ),
         ),
         "must-find-coverage": Gate(
@@ -428,7 +437,10 @@ PENDING: Mapping[str, Pending] = MappingProxyType(
             ),
         ),
         "support-shares": Pending(
-            question="how much of the review population is actually supported?",
+            question=(
+                "how accurate are the facts analysis rested on, by review?"
+                " (reviewed semantic accuracy)"
+            ),
             measures=(
                 "supported, unsupported, unresolved and unreviewed shares of the"
                 " frozen population, reported together (`support_shares`)"

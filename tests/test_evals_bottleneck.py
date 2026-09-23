@@ -57,20 +57,27 @@ ARMS = REPO_ROOT / "evals" / "emissions" / "20260917T-arms-luna-pro"
 #: What each fixture was observed to do, as the research record states it.
 #: ``cause`` is which of the three readings the loss belongs to, and ``met``
 #: says whether every wanted fact reached a graph attribute a rule reads.
+#:
+#: **ADR 0041 moved four.** A facts-first graph starts every attribute at
+#: ``unknown``, and an unchecked row no longer closes a lead, so a fact that
+#: reached the attribute before now reaches the lane as a cited unchecked row
+#: beside the open question: ``catalog`` rather than ``structural``. Each is
+#: still kept; none reaches a rule as a control until a reviewer supports it.
 OBSERVED: dict[str, tuple[str, bool]] = {
     # The adapter kept this shape once ADR 0039 rule 1 let a component enter
     # the graph unplaced: nothing has to choose a zone, so the licence server
-    # and every fact about it survive an unstated placement.
-    "unknown-placement": ("none", True),
+    # and every fact about it survive an unstated placement. The transport fact
+    # is unchecked, so it is cited rather than written (ADR 0041).
+    "unknown-placement": ("consumer", False),
     "conflicting-placement": ("adapter", False),
     "store-and-process": ("adapter", False),
     "distinct-subjects": ("consumer", False),
     "same-name": ("schema", False),
-    "parallel-interfaces": ("none", True),
+    "parallel-interfaces": ("consumer", False),
     "scope-and-polarity": ("consumer", False),
     "hedge-and-conflict": ("consumer", False),
-    "operations-and-classification": ("none", True),
-    "failed-correction": ("none", True),
+    "operations-and-classification": ("consumer", False),
+    "failed-correction": ("consumer", False),
 }
 
 
@@ -166,9 +173,11 @@ class TestTheShapesThatSurvive:
     """The four that reach a reader, and the one whose correction fails safely."""
 
     def test_two_interfaces_between_one_pair_stay_separate(self) -> None:
+        """Each interface keeps its own fact, wherever a lane reads it."""
         found = diagnose(fixture_of("parallel-interfaces"))
 
-        assert set(found.survivals.values()) == {"structural"}
+        assert set(found.survivals.values()) <= {"structural", "catalog"}
+        assert len(found.survivals) == 2
 
     def test_a_disagreement_is_kept_and_derived(self) -> None:
         found = diagnose(fixture_of("hedge-and-conflict"))
@@ -179,7 +188,7 @@ class TestTheShapesThatSurvive:
         found = diagnose(fixture_of("failed-correction"))
 
         assert found.rolled_back is True
-        assert set(found.survivals.values()) == {"structural"}
+        assert set(found.survivals.values()) <= {"structural", "catalog"}
 
     def test_the_account_and_the_person_stay_two_subjects(self) -> None:
         fixture = fixture_of("distinct-subjects")

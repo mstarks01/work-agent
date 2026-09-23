@@ -86,13 +86,16 @@ from analysis_service.assertions import (
     GRAPH_BOUND,
     Assertion,
     AssertionCatalog,
+    Projection,
     Subject,
+    apply_projection,
     assertion_id,
     offered,
     projected_attribute,
 )
 from analysis_service.claims import (
     ASSERTION_GROUNDS,
+    ATTRIBUTE_GROUNDS,
     GROUND_TERM_MAX_CHARS,
     REFERENCE_MAX_CHARS,
     AnalysisMarks,
@@ -236,6 +239,52 @@ def evidence_catalog(
             }
         )
     return catalog
+
+
+def prepared_view(
+    model: SystemModel, assertions: AssertionCatalog
+) -> tuple[SystemModel, tuple[Projection, ...], EvidenceCatalog]:
+    """The model a job's lanes read, what moved it, and the evidence it offers.
+
+    **The one reader of "what does analysis preparation make of this catalog".**
+    ``prepare`` calls it, and so does every instrument that asks what a
+    catalog does to a job — ``run.py falsify``'s production path and the
+    reassessment after a review — so a guarantee tested through one is the
+    guarantee the other runs. The projection is applied first because a zone
+    predicate moves ``trust_zone``, and the evidence is derived from the model
+    it produced.
+    """
+    projected, applied = apply_projection(model, assertions)
+    return projected, applied, evidence_catalog(projected, assertions)
+
+
+def lead_topics(
+    evidence: EvidenceCatalog, assertions: AssertionCatalog | None = None
+) -> frozenset[str]:
+    """What this evidence offers a lane as an open question or an absence.
+
+    **The one reader of "is this still a lead".** A lead is named by what it
+    is about — ``element.attribute`` for an attribute, ``subject.predicate``
+    for an assertion row — never by its reference, so a stated absence that
+    becomes an open question on the same attribute is still a lead a lane can
+    raise, and a lead with nothing left on its topic is one it cannot. The
+    falsification instrument and the post-review reassessment both ask it.
+    """
+    rows = (
+        {}
+        if assertions is None
+        else {assertion_id(entry): entry for entry in assertions.entries}
+    )
+    found = set()
+    for ref, ground in evidence.items():
+        if ground.kind in ATTRIBUTE_GROUNDS:
+            found.add(f"{ground.element_id}.{ground.attribute}")
+        elif ground.kind == "unknown-assertion" or (
+            ground.kind == "assertion" and ref in rows and rows[ref].value == ABSENT
+        ):
+            row = rows[ref]
+            found.add(f"{row.subject}.{row.predicate}")
+    return frozenset(found)
 
 
 def _attribute_entry(element: Element, attribute: str) -> tuple[str, Ground] | None:
@@ -629,7 +678,21 @@ def _assertion_gloss(row: Assertion, subjects: Mapping[str, Subject]) -> str:
     scope = "".join(
         f", where {qualifier.kind} is {qualifier.value}" for qualifier in row.scope
     )
-    return f"`{row.predicate}` {row.basis} {value} {about}{scope}"
+    return f"`{row.predicate}` {row.basis} {value} {about}{scope}{_reviewed(row)}"
+
+
+def _reviewed(row: Assertion) -> str:
+    """Whether anybody checked this row, in the words a lane reads.
+
+    **An unchecked row informs a conditional finding and settles nothing
+    alone** (#926, the owner's decision of 2026-09-23), so the table says which
+    rows those are rather than leaving a lane to assume every cited fact was
+    verified. A settled row is either unchecked or supported; the other two
+    assessments keep a row from settling, so they never reach this gloss.
+    """
+    if row.assessment == "supported":
+        return f" — checked by {row.assessor}"
+    return " — unchecked"
 
 
 #: How each assertion ground reads, keyed by its kind.

@@ -143,3 +143,50 @@ class TestAPopulationIsFrozenBeforeReview:
         assert COMMANDS["freeze-population"].run is (
             population.command_freeze_population
         )
+
+
+class TestReassessingAReport:
+    """``run.py reassess``: a review applied, and a stray one refused."""
+
+    def write(self, tmp_path, digest=None):
+        from tests.test_reassess import ABSENCE, REVIEWER, report
+
+        held = report()
+        path = tmp_path / "case.report.json"
+        path.write_text(held.model_dump_json(), encoding="utf-8")
+        assert held.assertions is not None
+        verdicts = tmp_path / "verdicts.json"
+        verdicts.write_text(
+            json.dumps(
+                {
+                    "catalog_digest": digest
+                    or population.catalog_digest(held.assertions),
+                    "verdicts": {
+                        assertion_id(ABSENCE): {
+                            "assessment": "unsupported",
+                            "assessor": REVIEWER,
+                        }
+                    },
+                }
+            ),
+            encoding="utf-8",
+        )
+        out = tmp_path / "reassessed.json"
+        return argparse.Namespace(report=path, verdicts=verdicts, out=out)
+
+    def test_a_review_is_applied_and_written(self, tmp_path) -> None:
+        args = self.write(tmp_path)
+
+        assert population.command_reassess(args) == 0
+        written = json.loads(args.out.read_text(encoding="utf-8"))
+        assert len(written["rejected"]) == 1
+        assert len(written["withdrawn"]) == 1
+
+    def test_verdicts_for_another_catalog_are_refused(self, tmp_path) -> None:
+        args = self.write(tmp_path, digest="0" * 64)
+
+        assert population.command_reassess(args) == 1
+        assert not args.out.exists()
+
+    def test_the_command_is_registered(self) -> None:
+        assert COMMANDS["reassess"].run is population.command_reassess

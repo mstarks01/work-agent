@@ -148,15 +148,20 @@ class TestTheProductionPath:
             row = consumed[("perfect-reading", reviewed)]
             assert not (row.reached or row.suppressed or row.omitted)
 
-    def test_the_copied_control_silences_the_webhook_unreviewed(self, consumed) -> None:
-        """#925's defect, measured where a lane reads it."""
+    def test_the_copied_control_informs_without_silencing(self, consumed) -> None:
+        """#925's defect, measured where a lane reads it: the copied row reaches
+        the lane, unchecked, and the webhook's question stays open."""
         row = consumed[("support-copied", False)]
-        assert row.reached and row.suppressed
-        assert all("settlement-webhook" in lead for lead in row.suppressed)
+        assert row.reached and not row.suppressed
+
+    @pytest.mark.parametrize("name", sorted(falsify.CRITICAL))
+    def test_no_unchecked_row_silences_a_lead(self, consumed, name) -> None:
+        """A release blocker: the unreviewed guarantee."""
+        assert not consumed[(name, False)].failed
 
     @pytest.mark.parametrize("name", sorted(falsify.CRITICAL))
     def test_review_stops_every_critical_corruption(self, consumed, name) -> None:
-        """A row a reviewer set aside neither reaches a lane nor silences one."""
+        """A release blocker: no reviewer-rejected fact reaches analysis."""
         assert not consumed[(name, True)].failed
 
     def test_a_refused_row_never_reaches_a_lane(self, consumed) -> None:
