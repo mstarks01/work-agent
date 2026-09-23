@@ -51,9 +51,7 @@ from typing import Any
 
 from analysis_service.assertions import (
     SUBJECT_PREFIXES,
-    UNKNOWN,
     AssertionCatalog,
-    assertion_id,
 )
 from analysis_service.deployment import (
     ASSERTIONS_VAR,
@@ -82,6 +80,7 @@ from evals.harness.replay import (
     UNRULED,
     AssertionReplay,
     SignedReference,
+    required_rows,
     signed_reference,
 )
 
@@ -208,26 +207,6 @@ def subject_kind(subject: str) -> str:
     return KIND_OF_PREFIX.get(subject.split(":", 1)[0], "")
 
 
-def required_rows(reference: SignedReference) -> tuple[str, ...]:
-    """Every reference row the primary endpoint's denominator counts.
-
-    **Explicitly stated**, which is the endpoint's own wording: the source says
-    the thing, and what it says is a value rather than the unknown sentinel. A
-    stated *absence* is one of these — "no MFA" is a fact the source states, and
-    the one this layer exists to keep — while an ``unknown`` row records a
-    question the source raised and left open, and a route that leaves it open
-    has lost nothing.
-
-    A justified inference is out too. #1003's primary endpoint is stated facts,
-    and inference recall is reported beside it rather than mixed into it.
-    """
-    return tuple(
-        assertion_id(entry)
-        for entry in reference.entries
-        if entry.basis == "stated" and entry.value != UNKNOWN
-    )
-
-
 @dataclass(frozen=True)
 class ArmRun:
     """One arm's run of one case: what it recovered, and what it cost.
@@ -316,7 +295,7 @@ class ArmRun:
         where it computes the fates, so no caller can build an ``ArmRun``
         carrying the strict figure and an empty aligned one (#1015).
         """
-        required = frozenset(required_rows(reference))
+        required = replay.required
         fates: dict[str, int] = dict.fromkeys(ROW_FATES, 0)
         for row in replay.rows:
             if row.reference in required:
