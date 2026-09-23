@@ -755,6 +755,84 @@ class TestEveryReferenceRowTakesOneFate:
             )
 
 
+class TestTheEndpointRidesWithTheFates:
+    """Required-fact recall, read where the fates are read.
+
+    The denominator is a property of the signed reference, so a graded sweep
+    carries it and every reader — the arm endpoint, the ceiling instrument, the
+    pooled replay reading — answers one rule. These hold the pair apart from
+    the fate counts, which count the inferred and unknown rows too.
+    """
+
+    @pytest.fixture(scope="class")
+    def golden(self):
+        return case("01")
+
+    @pytest.fixture(scope="class")
+    def reference(self, golden):
+        catalog = replay.signed_reference(CORPUS, golden)
+        if catalog is None:
+            pytest.skip("case 01's facts are unsigned, so nothing grades a proposal")
+        return catalog
+
+    def graded(self, golden, reference, entries):
+        produced = AssertionCatalog(subjects=reference.subjects, entries=list(entries))
+        result = AssertionResult(golden.id, {"assertions": []}, produced, ())
+        return replay.replay_assertions(golden, reference, result)
+
+    def test_a_perfect_run_recovers_every_required_row(self, golden, reference):
+        graded = self.graded(golden, reference, reference.entries)
+
+        assert graded.required == frozenset(replay.required_rows(reference))
+        assert graded.recovered == len(graded.required)
+
+    def test_the_denominator_is_narrower_than_the_fates(self, golden, reference):
+        """An inferred row and an unknown one are found and never required."""
+        graded = self.graded(golden, reference, reference.entries)
+
+        assert graded.counts["found"] > graded.recovered
+
+    def test_a_missing_required_row_lowers_the_numerator(self, golden, reference):
+        dropped = next(
+            entry
+            for entry in reference.entries
+            if assertion_id(entry) in set(replay.required_rows(reference))
+        )
+        entries = [entry for entry in reference.entries if entry is not dropped]
+
+        graded = self.graded(golden, reference, entries)
+
+        assert graded.recovered == len(graded.required) - 1
+
+    def test_a_missing_unrequired_row_does_not(self, golden, reference):
+        required = set(replay.required_rows(reference))
+        dropped = next(
+            entry for entry in reference.entries if assertion_id(entry) not in required
+        )
+        entries = [entry for entry in reference.entries if entry is not dropped]
+
+        graded = self.graded(golden, reference, entries)
+
+        assert graded.recovered == len(graded.required)
+
+    def test_the_pooled_reading_reports_the_endpoint(self, golden, reference):
+        graded = self.graded(golden, reference, reference.entries)
+        sweep = replay.SweepReplay(
+            artifact="one.json",
+            arm=replay.arm_of(load_artifact(ARMS / "arm-A.json")),
+            commit="0" * 40,
+            clean=True,
+            corpus_digest="",
+            assertions=(graded,),
+        )
+
+        pooled = replay.pooled_assertions([sweep])
+
+        assert pooled["required"] == len(graded.required)
+        assert pooled["recovered"] == graded.recovered
+        assert graded.to_json()["required"] == len(graded.required)
+
+
 class TestBothReadingsArriveTogether:
     """#1015's ruling: the strict fates and the aligned reading are one result.
 
