@@ -81,6 +81,7 @@ from evals.harness import (
     oracle,
     pairing,
     preflight,
+    promotion,
     queue,
     replay,
     roster,
@@ -2385,6 +2386,12 @@ COMMANDS: dict[str, Command] = {
         " costs the gate and the endpoint (#926, no credentials)",
         run=falsify.command_falsify,
         arguments=corpus_argument,
+    ),
+    "gates": Command(
+        help="read #926's predeclared promotion gates against one treatment"
+        " run (no credentials)",
+        run=promotion.command_gates,
+        arguments=promotion.arguments,
     ),
     "oracle": Command(
         help="put a perfect reading of every signed case through the"
