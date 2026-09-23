@@ -162,6 +162,17 @@ class TestAnAbsentFigureIsNotAZero:
 
         assert reading.verdict == "inconclusive"
 
+    def test_a_record_this_schema_refuses_is_unread(self, sealed) -> None:
+        """An archived record from another schema is an unread gate, not a crash."""
+        artifact, _ = sealed
+        report = _report(_row(), proposed=1)
+        report["assertions"]["written_by_an_older_tree"] = True
+        readings = {row.gate: row for row in promotion.decide(artifact, report)}
+
+        for gate in ("structural-refusals", "required-fact-recall"):
+            assert readings[gate].verdict == "inconclusive"
+            assert "does not validate" in readings[gate].why
+
 
 def _report(*entries: Assertion, proposed: int, issues=()) -> dict:
     subject = Subject(id=FLOW, type="interaction", label="place order")

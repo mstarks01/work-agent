@@ -279,8 +279,9 @@ def lead_topics(
     for ref, ground in evidence.items():
         if ground.kind in ATTRIBUTE_GROUNDS:
             found.add(f"{ground.element_id}.{ground.attribute}")
-        elif ground.kind == "unknown-assertion" or (
-            ground.kind == "assertion" and ref in rows and rows[ref].value == ABSENT
+        elif ref in rows and (
+            ground.kind == "unknown-assertion"
+            or (ground.kind == "assertion" and rows[ref].value == ABSENT)
         ):
             row = rows[ref]
             found.add(f"{row.subject}.{row.predicate}")

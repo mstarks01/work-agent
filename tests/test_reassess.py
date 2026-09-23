@@ -7,10 +7,13 @@ did to the model, the evidence and the findings.
 
 from __future__ import annotations
 
+from typing import get_args
+
 import pytest
 
 from analysis_service.assertions import (
     ABSENT,
+    PROJECTS_UNDER,
     Assertion,
     AssertionCatalog,
     AssertionRecord,
@@ -92,6 +95,7 @@ def test_a_rejected_projection_reopens_its_lead(assessment) -> None:
     flow = next(flow for flow in result.model.data_flows if flow.id == LOGIN)
 
     assert flow.authentication.startswith("unknown; a reviewer set")
+    assert MECHANISM.value not in flow.authentication
     assert assertion_id(MECHANISM) not in result.evidence
     assert f"{LOGIN}.authentication" in result.reopened
 
@@ -103,6 +107,20 @@ def test_a_supported_row_may_close_a_lead() -> None:
     flow = next(flow for flow in result.model.data_flows if flow.id == LOGIN)
 
     assert flow.authentication == "a hardware token"
+    assert result.withdrawn == ()
+
+
+def test_a_finding_on_a_row_the_review_supports_stands() -> None:
+    """The supported mechanism moves into the attribute and out of the
+    evidence; the finding that cited it still rests on a fact."""
+    threat = sample_threat(
+        grounds=[Ground(kind="assertion", assertion=assertion_id(MECHANISM))]
+    )
+    cited = sample_report(threats=[threat], assertions=report().assertions)
+    verdicts = {assertion_id(MECHANISM): Verdict("supported", REVIEWER)}
+    result = reassess(cited, verdicts)
+
+    assert assertion_id(MECHANISM) not in result.evidence
     assert result.withdrawn == ()
 
 
@@ -146,6 +164,23 @@ class TestTheReportDisclosesReview:
         from analysis_service.report import DEFAULT_DISCLAIMER, disclaimer_for
 
         assert disclaimer_for(None) == DEFAULT_DISCLAIMER
+
+    @pytest.mark.parametrize("assessment", get_args(Assessment))
+    def test_the_disclosure_rejects_what_the_projection_refuses(
+        self, assessment
+    ) -> None:
+        """One rule: a row the projection refuses is a row the report calls
+        rejected, read off ``PROJECTS_UNDER`` rather than a second list."""
+        from analysis_service.report import disclaimer_for
+
+        row = ABSENCE.model_copy(
+            update={"assessment": assessment, "assessor": REVIEWER}
+        )
+        catalog = AssertionCatalog(subjects=[SHOPPERS], entries=[row])
+        text = disclaimer_for(AssertionRecord(proposed=1, catalog=catalog))
+        rejected = 0 if PROJECTS_UNDER[assessment] else 1
+
+        assert f"{rejected} rejected" in text
 
     def test_the_disclosure_counts_each_review_state(self) -> None:
         from analysis_service.report import disclaimer_for

@@ -38,6 +38,7 @@ from pathlib import Path
 from typing import Any, Literal
 
 from analysis_service.assertions import (
+    GATE_REFUSALS,
     UNKNOWN,
     AssertionRecord,
     apply_projection,
@@ -71,7 +72,7 @@ class PopulationRow:
     case: str
     route: Route
     #: The row's identity, or ``""`` for a proposed row the resolver refused
-    #: before it had one.
+    #: before it had one, or a quarantined row with an unregistered predicate.
     identity: str
     #: What refused it, for a ``refused`` row.
     codes: tuple[str, ...] = ()
@@ -113,20 +114,20 @@ def population(
             route = "set-aside"
         rows.append(PopulationRow(case, route, identity))
 
-    refused: dict[tuple[int | None, str], set[str]] = {}
+    # The resolver's refusals name a proposed row; the gate's removals are
+    # the rows `quarantine` took, one entry each, whatever the issue named.
+    dropped: dict[int, set[str]] = {}
     for issue in record.issues:
-        if issue.code == "graph-contradiction" or issue.code == "support-truncated":
-            continue
-        key = (issue.row, "" if issue.row is not None else issue.assertion or "")
-        refused.setdefault(key, set()).add(issue.code)
-    for (index, identity), codes in sorted(
-        refused.items(), key=lambda item: (item[0][0] is None, item[0])
-    ):
+        if issue.row is not None and issue.code in GATE_REFUSALS:
+            dropped.setdefault(issue.row, set()).add(issue.code)
+    for index, codes in sorted(dropped.items()):
         rows.append(
-            PopulationRow(
-                case, "refused", identity, tuple(sorted(codes)), proposed_row=index
-            )
+            PopulationRow(case, "refused", "", tuple(sorted(codes)), proposed_row=index)
         )
+    rows.extend(
+        PopulationRow(case, "refused", removed.identity, tuple(sorted(removed.codes)))
+        for removed in record.quarantined
+    )
     return tuple(rows)
 
 
@@ -230,6 +231,28 @@ def reassess_arguments(parser: argparse.ArgumentParser) -> None:
     )
 
 
+def parsed_verdicts(held: object) -> dict[str, Verdict]:
+    """A verdict file's ``verdicts`` object, each entry checked for its shape.
+
+    Each entry is an object holding a string ``assessment`` and a string
+    ``assessor``. Whether the assessment is one a review may write is
+    :func:`~analysis_service.reassess.reviewed`'s question, not this one.
+    """
+    if not isinstance(held, dict):
+        raise PopulationError("`verdicts` is not an object keyed by assertion identity")
+    verdicts = {}
+    for identity, entry in held.items():
+        if not isinstance(entry, dict) or not all(
+            isinstance(entry.get(field), str) for field in ("assessment", "assessor")
+        ):
+            raise PopulationError(
+                f"{identity}: a verdict is an object with a string `assessment`"
+                " and a string `assessor`"
+            )
+        verdicts[identity] = Verdict(entry["assessment"], entry["assessor"])
+    return verdicts
+
+
 def command_reassess(args: argparse.Namespace) -> int:
     """Recompute a report under a review. It runs no model and writes no report."""
     try:
@@ -237,18 +260,16 @@ def command_reassess(args: argparse.Namespace) -> int:
         review = json.loads(args.verdicts.read_text(encoding="utf-8"))
         if report.assertions is None:
             raise PopulationError("the report ran no assertion pass")
+        if not isinstance(review, dict):
+            raise PopulationError("the verdict file is not a JSON object")
         digest = catalog_digest(report.assertions)
         if review.get("catalog_digest") != digest:
             raise PopulationError(
                 "the verdicts were written against another catalog"
                 f" ({review.get('catalog_digest')!r}, this report's is {digest!r})"
             )
-        verdicts = {
-            identity: Verdict(held["assessment"], held["assessor"])
-            for identity, held in review["verdicts"].items()
-        }
-        result = reassess(report, verdicts)
-    except (OSError, KeyError, ValueError) as error:
+        result = reassess(report, parsed_verdicts(review.get("verdicts")))
+    except (OSError, ValueError) as error:
         print(f"cannot reassess: {error}", file=sys.stderr)
         return 1
     written = {

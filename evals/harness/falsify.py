@@ -1099,9 +1099,15 @@ def render_consumed(found: Sequence[Consumed]) -> str:
 
 
 def command_falsify(args: argparse.Namespace) -> int:
-    """Run every probe. It runs no model and reads no credential."""
+    """Run every probe. It runs no model and reads no credential.
+
+    Fails when a probe's gate outcome breaks or a critical probe breaks its
+    guarantee in either review state: the second is a release blocker.
+    """
     found = outcomes(Path(args.corpus))
+    read = consumed(Path(args.corpus))
     print(render(found), end="")
     print()
-    print(render_consumed(consumed(Path(args.corpus))), end="")
-    return 0 if all(row.held for row in found) else 1
+    print(render_consumed(read), end="")
+    broken = any(critical_failures(read, reviewed=state) for state in (False, True))
+    return 0 if all(row.held for row in found) and not broken else 1

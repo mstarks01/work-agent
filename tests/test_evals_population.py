@@ -26,6 +26,7 @@ from evals.harness import population
 from evals.harness.run import COMMANDS
 from tests.test_assertions import (
     FLOW,
+    SOURCES,
     TestTheProjectionBecomesTheGraphsValue,
     stated,
 )
@@ -104,6 +105,26 @@ class TestEveryRowIsRoutedByTheJobsReaders:
         assert refused.route == "refused"
         assert refused.proposed_row == 3
         assert refused.codes == ("missing-scope", "unverifiable-span")
+
+    def test_a_refused_subject_records_every_row_it_took(self) -> None:
+        """A refusal naming a subject is one issue and two refused rows."""
+        ghost = "flow:entity:shopper>process:storefront-api>ghost"
+        entries = [stated(subject=ghost), stated(subject=ghost, value="company SSO")]
+        held = AssertionRecord.over(
+            AssertionCatalog(
+                subjects=[Subject(id=ghost, type="interaction", label="ghost")],
+                entries=entries,
+            ),
+            MODEL,
+            SOURCES,
+            proposed=2,
+        )
+        rows = population.population("case", held, MODEL)
+
+        assert [row.identity for row in rows] == [
+            assertion_id(entry) for entry in entries
+        ]
+        assert {row.codes for row in rows} == {("dangling-binding",)}
 
 
 class TestAPopulationIsFrozenBeforeReview:
@@ -187,6 +208,38 @@ class TestReassessingAReport:
 
         assert population.command_reassess(args) == 1
         assert not args.out.exists()
+
+    @pytest.mark.parametrize(
+        "verdicts",
+        [
+            None,
+            [],
+            {"assertion:x": "unsupported"},
+            {"assertion:x": {}},
+            {"assertion:x": {"assessment": "unsupported", "assessor": 7}},
+        ],
+    )
+    def test_a_malformed_verdict_is_refused_with_a_message(
+        self, verdicts, tmp_path, capsys
+    ) -> None:
+        args = self.write(tmp_path)
+        review = json.loads(args.verdicts.read_text(encoding="utf-8"))
+        args.verdicts.write_text(
+            json.dumps({**review, "verdicts": verdicts}), encoding="utf-8"
+        )
+
+        assert population.command_reassess(args) == 1
+        assert "cannot reassess" in capsys.readouterr().err
+        assert not args.out.exists()
+
+    def test_a_verdict_file_that_is_not_an_object_is_refused(
+        self, tmp_path, capsys
+    ) -> None:
+        args = self.write(tmp_path)
+        args.verdicts.write_text("[]", encoding="utf-8")
+
+        assert population.command_reassess(args) == 1
+        assert "not a JSON object" in capsys.readouterr().err
 
     def test_the_command_is_registered(self) -> None:
         assert COMMANDS["reassess"].run is population.command_reassess

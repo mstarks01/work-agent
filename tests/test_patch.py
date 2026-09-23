@@ -16,11 +16,14 @@ import pytest
 from pydantic import BaseModel
 
 from analysis_service.assertions import (
+    MAX_SPANS,
     Assertion,
     AssertionCatalog,
     AssertionRecord,
+    Quarantined,
     Subject,
     assertion_id,
+    support_span,
 )
 from analysis_service.factbundle import (
     FactProposal,
@@ -547,6 +550,53 @@ class TestCorrections:
         assert [
             (entry.predicate, entry.value) for entry in result.record.catalog.entries
         ] == [("storage-encryption", "AES-256")]
+
+    def test_a_ninth_quote_for_a_held_fact_is_cut_not_rolled_back(self) -> None:
+        """The fact already cites the most spans a row keeps; one more quote
+        for it is recorded as ``support-truncated``, as the resolver does."""
+        model, record = base()
+        (row,) = record.catalog.entries
+        cited = [
+            support_span(text, LABEL, NOTE)
+            for text in (
+                "A worker",
+                "worker in",
+                "in the core",
+                "the core network",
+                "core network reads",
+                "reads jobs",
+                "jobs from",
+                "from a queue",
+            )
+        ]
+        assert len(cited) == MAX_SPANS
+        full = record.model_copy(
+            update={
+                "catalog": record.catalog.model_copy(
+                    update={"entries": [row.model_copy(update={"support": cited})]}
+                )
+            }
+        )
+        result = apply_patch(
+            PatchBatch(operations=[place("o1", "store:queue")]), model, full, SOURCES
+        )
+
+        assert not result.rolled_back
+        (entry,) = result.record.catalog.entries
+        assert len(entry.support) == MAX_SPANS
+        assert "support-truncated" in {issue.code for issue in result.record.issues}
+
+    def test_a_patch_keeps_the_rows_an_earlier_gate_removed(self) -> None:
+        """``refused_rows`` counts off ``quarantined``, so a patch carries it."""
+        model, record = base()
+        removed = Quarantined(identity="assertion:gone", codes=["stale-digest"])
+        held = record.model_copy(update={"quarantined": [removed]})
+        result = apply_patch(
+            PatchBatch(operations=[place("o1", "store:queue")]), model, held, SOURCES
+        )
+
+        assert not result.rolled_back
+        assert result.record.quarantined == [removed]
 
 
 class TestRollback:

@@ -174,7 +174,12 @@ def test_no_reviewer_rejected_fact_reaches_analysis(name) -> None:
             continue
         attribute = projected_attribute(entry.predicate, entry.subject)
         if attribute and entry.subject in by_id:
-            assert getattr(by_id[entry.subject], attribute) != entry.value
+            held = str(getattr(by_id[entry.subject], attribute))
+            assert held != entry.value
+            # A qualified unknown is prose a lane reads, so the rejected value
+            # may not ride along in it either.
+            if entry.value not in (ABSENT, UNKNOWN) and held.startswith(UNKNOWN):
+                assert entry.value not in held, (entry.subject, held)
 
 
 @pytest.mark.parametrize("name", CRITICAL)

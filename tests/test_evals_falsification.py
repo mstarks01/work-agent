@@ -11,6 +11,7 @@ and evidence catalog, unreviewed and reviewed.
 
 from __future__ import annotations
 
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
@@ -83,6 +84,27 @@ class TestEveryProbeHolds:
             assert f"`{name}`" in printed
         for name in falsify.UNPROBED:
             assert f"no probe for `{name}`" in printed
+
+    @pytest.mark.parametrize("reviewed", [False, True])
+    def test_the_command_fails_on_a_critical_failure(
+        self, reviewed, monkeypatch, capsys
+    ) -> None:
+        """A broken release blocker is a failing exit, not a line in a table."""
+        real = falsify.consumed
+        name = min(falsify.CRITICAL)
+
+        def broken(corpus_dir):
+            return [
+                replace(row, suppressed=("lead",))
+                if (row.probe, row.reviewed) == (name, reviewed)
+                else row
+                for row in real(corpus_dir)
+            ]
+
+        monkeypatch.setattr(falsify, "consumed", broken)
+
+        assert falsify.command_falsify(_arguments()) == 1
+        assert f"`{name}`" in capsys.readouterr().out.split("Critical failures")[1]
 
 
 class TestAProbeThatCostsNothingFails:

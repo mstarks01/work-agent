@@ -61,7 +61,7 @@ from analysis_service.assertions import (
     project,
     projected_attribute,
     projection_fields,
-    quarantined,
+    quarantine,
     referent_type,
     resolve_catalog,
     settled,
@@ -2142,7 +2142,26 @@ class TestTheImplementationAudit:
     @pytest.mark.parametrize("code", sorted(CATALOG_REFUSALS))
     def test_a_refused_catalog_keeps_nothing(self, code):
         _, held, reads = REFUSALS[code]
-        assert quarantined(held, catalog_issues(held, **reads)).entries == []
+        kept, _ = quarantine(held, catalog_issues(held, **reads))
+        assert kept.entries == []
+
+    def test_a_refused_subject_counts_every_row_it_takes(self):
+        """One ``dangling-binding`` names a subject, and both rows about it go."""
+        ghost = "flow:entity:shopper>process:storefront-api>ghost"
+        held = catalog(
+            [stated(subject=ghost), stated(subject=ghost, value="company SSO")],
+            rows=((ghost, "interaction", "ghost"),),
+        )
+        record = AssertionRecord.over(held, self.model(), SOURCES, proposed=2)
+
+        assert record.catalog.entries == []
+        assert record.refused_rows() == 2
+        assert [row.identity for row in record.quarantined] == [
+            assertion_id(entry) for entry in held.entries
+        ]
+        assert {tuple(row.codes) for row in record.quarantined} == {
+            ("dangling-binding",)
+        }
 
     def test_a_graph_contradiction_quarantines_nothing(self):
         record = AssertionRecord.over(
@@ -2223,8 +2242,9 @@ class TestTheImplementationAudit:
         assert codes(record.issues) == ["support-truncated"]
         assert record.refused_rows() == 0
 
-    def test_a_merge_outside_the_resolver_is_left_for_the_gate(self):
-        """``merged`` does not cut, so the patch route refuses rather than loses."""
+    def test_a_merge_outside_the_resolver_cuts_as_the_resolver_does(self):
+        """``merged`` cuts and records, so a patch adding a ninth quote to a
+        fact keeps the fact rather than rolling the batch back."""
         many = [
             f"Segment {index} says password authentication applies."
             for index in range(MAX_SPANS + 1)
@@ -2232,9 +2252,11 @@ class TestTheImplementationAudit:
         text = " ".join(many)
         rows = [stated(support=[support_span(quote, "test", text)]) for quote in many]
         joined = catalog(rows[:1])
+        cut = []
         for row in rows[1:]:
-            joined = merged(joined, catalog([row]))
+            joined, cut = merged(joined, catalog([row]))
 
         (entry,) = joined.entries
-        assert len(entry.support) == MAX_SPANS + 1
-        assert "too-many-spans" in codes(catalog_issues(joined))
+        assert len(entry.support) == MAX_SPANS
+        assert codes(cut) == ["support-truncated"]
+        assert catalog_issues(joined) == []

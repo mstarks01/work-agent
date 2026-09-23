@@ -60,6 +60,8 @@ from pathlib import Path
 from types import MappingProxyType
 from typing import Any, Literal
 
+from pydantic import ValidationError
+
 from analysis_service.assertions import AssertionRecord
 from analysis_service.sources import text_digest
 from evals.harness import falsify
@@ -143,9 +145,33 @@ def _backed(artifact: Mapping[str, Any], report: Mapping[str, Any]) -> float | N
     return None if backed is None else backed["matched"]
 
 
+class UnreadableRecord(ValueError):
+    """A report whose assertion record this tree's schema refuses."""
+
+
 def _record(report: Mapping[str, Any]) -> AssertionRecord | None:
     held = report.get("assertions")
-    return None if not held else AssertionRecord.model_validate(held)
+    if not held:
+        return None
+    try:
+        return AssertionRecord.model_validate(held)
+    except ValidationError as error:
+        raise UnreadableRecord(
+            "the report's assertion record does not validate under this tree's"
+            f" schema ({error.error_count()} errors), which is not a zero"
+        ) from error
+
+
+def _measure(
+    read: Callable[[Mapping[str, Any], Mapping[str, Any]], float | None],
+    artifact: Mapping[str, Any],
+    report: Mapping[str, Any],
+) -> tuple[float | None, str]:
+    """What ``read`` measured, or ``None`` and why the report could not be read."""
+    try:
+        return read(artifact, report), ""
+    except UnreadableRecord as error:
+        return None, str(error)
 
 
 def _refused_share(
@@ -536,7 +562,7 @@ def read_gate(
     retrospective choice this table exists to prevent.
     """
     gate = GATES[name]
-    measured = gate.read(artifact, report)
+    measured, unreadable = _measure(gate.read, artifact, report)
     baseline = BASELINE[gate.against] if gate.against else None
     if measured is None:
         return Reading(
@@ -545,7 +571,7 @@ def read_gate(
             None,
             baseline,
             None,
-            "the artifact carries no such figure, which is not a zero",
+            unreadable or "the artifact carries no such figure, which is not a zero",
         )
     if gate.unit == "count":
         value: float | None = measured
@@ -582,19 +608,21 @@ def decide(
 
     ``spread`` maps a gate name to its repeat spread.
     """
+    unread = []
+    for name, pending in PENDING.items():
+        measured, unreadable = (
+            (None, "")
+            if pending.read is None
+            else _measure(pending.read, artifact, report)
+        )
+        unread.append(
+            Reading(
+                name, "inconclusive", measured, None, None, unreadable or pending.unset
+            )
+        )
     return (
         *(read_gate(name, artifact, report, spread=spread.get(name)) for name in GATES),
-        *(
-            Reading(
-                name,
-                "inconclusive",
-                None if pending.read is None else pending.read(artifact, report),
-                None,
-                None,
-                pending.unset,
-            )
-            for name, pending in PENDING.items()
-        ),
+        *unread,
     )
 
 

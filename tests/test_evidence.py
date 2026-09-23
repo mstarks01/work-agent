@@ -38,6 +38,7 @@ from analysis_service.evidence import (
     evidence_catalog,
     ground_gloss,
     ground_issues,
+    lead_topics,
     render_catalog,
     render_element_roster,
     resolve_proposals,
@@ -1310,3 +1311,12 @@ def test_every_assertion_ground_kind_has_a_gloss():
     is here.
     """
     assert set(ASSERTION_GLOSSES) == set(ASSERTION_GROUNDS)
+
+
+def test_lead_topics_without_a_catalog_skips_an_assertion_ground():
+    """A row ground names its topic through the catalog; with none, it names none."""
+    evidence = {
+        "assertion:x": Ground(kind="unknown-assertion", assertion="assertion:x"),
+    }
+
+    assert lead_topics(evidence) == frozenset()

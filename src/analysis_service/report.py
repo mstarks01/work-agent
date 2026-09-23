@@ -40,6 +40,7 @@ from pydantic import (
 
 from analysis_service.assertions import (
     PROJECTION_VERSION,
+    REJECTING,
     AssertionRecord,
     CatalogCoverage,
     catalog_coverage,
@@ -310,9 +311,7 @@ def assertion_disclosure(record: AssertionRecord) -> str:
     """
     entries = record.catalog.entries
     checked = sum(1 for entry in entries if entry.assessment == "supported")
-    rejected = sum(
-        1 for entry in entries if entry.assessment in ("unsupported", "unresolved")
-    )
+    rejected = sum(1 for entry in entries if entry.assessment in REJECTING)
     unchecked = len(entries) - checked - rejected
     return (
         f"Source-backed assertions: {len(entries)}; {checked} checked by a"

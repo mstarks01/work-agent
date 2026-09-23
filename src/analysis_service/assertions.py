@@ -62,7 +62,7 @@ from __future__ import annotations
 
 import hashlib
 import json
-from collections.abc import Collection, Mapping, Sequence
+from collections.abc import Collection, Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from types import MappingProxyType
 from typing import Literal, NamedTuple, get_args
@@ -109,6 +109,7 @@ __all__ = [
     "QUALIFIED_SPELLING",
     "REGISTRY",
     "REGISTRY_VERSION",
+    "REJECTING",
     "SETTLING_REASONS",
     "SPAN_REFUSALS",
     "UNIVERSAL_TERMS",
@@ -130,6 +131,7 @@ __all__ = [
     "ProjectionReason",
     "Qualifier",
     "QualifierKind",
+    "Quarantined",
     "QuoteProposal",
     "SpanSource",
     "Standing",
@@ -151,7 +153,7 @@ __all__ = [
     "projected_attribute",
     "projection_fields",
     "qualified",
-    "quarantined",
+    "quarantine",
     "referent_type",
     "resolve_catalog",
     "settled",
@@ -755,7 +757,7 @@ GATE_REFUSALS: frozenset[str] = frozenset(get_args(CatalogIssueCode)) - {
 
 #: The refusals of a whole catalog rather than of a row in it: a catalog keyed
 #: by another registry, or one over a count bound. Nothing in such a catalog
-#: can be read, so :func:`quarantined` keeps none of it.
+#: can be read, so :func:`quarantine` keeps none of it.
 CATALOG_REFUSALS: frozenset[str] = frozenset(
     {"wrong-registry-version", "too-many-assertions", "too-many-subjects"}
 )
@@ -798,6 +800,17 @@ class CatalogIssue(BaseModel):
     row: int | None = None
 
 
+class Quarantined(BaseModel):
+    """One built row the gate removed, and the codes that removed it."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    #: The row's identity, or ``""`` for a row whose predicate the registry
+    #: does not hold, which has none.
+    identity: str
+    codes: list[CatalogIssueCode] = Field(min_length=1)
+
+
 class AssertionRecord(BaseModel):
     """What one job's assertion pass produced, kept on the **Report**.
 
@@ -825,6 +838,10 @@ class AssertionRecord(BaseModel):
     proposed: int = Field(ge=0)
     catalog: AssertionCatalog
     issues: list[CatalogIssue] = Field(default_factory=list)
+    #: Every built row the gate removed from ``catalog``, as :func:`quarantine`
+    #: reports it. The issues name a subject where a refusal is about one, and
+    #: only this list says which rows that took.
+    quarantined: list[Quarantined] = Field(default_factory=list)
     projection_version: int = Field(default=PROJECTION_VERSION, ge=1)
 
     @classmethod
@@ -861,6 +878,7 @@ class AssertionRecord(BaseModel):
         *,
         proposed: int,
         issues: Sequence[CatalogIssue] = (),
+        quarantined: Sequence[Quarantined] = (),
     ) -> AssertionRecord:
         """One record over a catalog something else built, with the gate run on it.
 
@@ -871,11 +889,12 @@ class AssertionRecord(BaseModel):
 
         ``issues`` is what its builder already refused, kept in front of what
         the gate says now, so a reader sees a row lost in construction apart
-        from a fault in what was built.
+        from a fault in what was built. ``quarantined`` is what an earlier gate
+        removed, carried the same way.
 
         **A refusal quarantines, it does not only report.** The catalog on the
         record is what every consumer reads, so a row the gate refuses leaves
-        it here, through :func:`quarantined`, before any reader sees it. Before
+        it here, through :func:`quarantine`, before any reader sees it. Before
         this, a row whose source text had moved under its span was recorded
         ``stale-digest`` and still projected into the graph and cited (#926).
         Dropping a row can strand another — an inference whose premise went —
@@ -883,14 +902,17 @@ class AssertionRecord(BaseModel):
         comparison runs once, over what survives, because it is not a refusal.
         """
         found: list[CatalogIssue] = []
+        removed = list(quarantined)
         admitted = catalog
         while refusals := catalog_issues(admitted, model=model, sources=sources):
             found.extend(refusals)
-            admitted = quarantined(admitted, refusals)
+            admitted, dropped = quarantine(admitted, refusals)
+            removed.extend(dropped)
         return cls(
             proposed=proposed,
             catalog=admitted,
             issues=[*issues, *found, *contradiction_issues(admitted, model)],
+            quarantined=removed,
         )
 
     def refused_rows(self) -> int:
@@ -898,21 +920,18 @@ class AssertionRecord(BaseModel):
 
         **The one reader of "how many rows did this record lose".** The
         resolver names the proposed row it dropped (:attr:`CatalogIssue.row`),
-        and the gate names the built row it quarantined by identity, so each is
-        counted once however many reasons it drew. A refusal of the whole
-        catalog loses every proposed row. ``support-truncated`` and
-        ``graph-contradiction`` refuse nothing and are not counted.
+        so each is counted once however many reasons it drew. The gate's
+        removals are counted off :attr:`quarantined`, the rows
+        :func:`quarantine` actually took, because a refusal of one subject
+        takes every row about it. A refusal of the whole catalog loses every
+        proposed row. ``support-truncated`` and ``graph-contradiction`` refuse
+        nothing and are not counted.
         """
         refusals = [issue for issue in self.issues if issue.code in GATE_REFUSALS]
         if any(issue.code in CATALOG_REFUSALS for issue in refusals):
             return self.proposed
         rows = {issue.row for issue in refusals if issue.row is not None}
-        built = {
-            issue.assertion or issue.subject
-            for issue in refusals
-            if issue.row is None and (issue.assertion or issue.subject)
-        }
-        return len(rows) + len(built)
+        return len(rows) + len(self.quarantined)
 
 
 @dataclass(frozen=True)
@@ -1132,10 +1151,10 @@ def gate_issues(
     ]
 
 
-def quarantined(
+def quarantine(
     catalog: AssertionCatalog, refusals: Sequence[CatalogIssue]
-) -> AssertionCatalog:
-    """The catalog without every row ``refusals`` names, and no subject left behind.
+) -> tuple[AssertionCatalog, tuple[Quarantined, ...]]:
+    """The catalog without every row ``refusals`` names, and each row it removed.
 
     **The one reader of "which rows does a refusal remove".** A refusal names
     what it is about: a whole catalog (:data:`CATALOG_REFUSALS`), which keeps
@@ -1148,38 +1167,60 @@ def quarantined(
     the refusal unanswered, so the whole catalog goes instead. That also makes
     :meth:`AssertionRecord.over`'s loop end: every round either shrinks the
     catalog or empties it.
+
+    Each removed row carries the codes that named it, or every code of the
+    round where the whole catalog goes, so no reader re-derives this rule.
     """
     codes = {issue.code for issue in refusals}
-    if codes & CATALOG_REFUSALS:
-        return AssertionCatalog()
-    rows = {issue.assertion for issue in refusals if issue.assertion}
-    subjects = {
-        issue.subject
-        for issue in refusals
-        if issue.assertion is None
-        and issue.subject
-        and issue.code != "unknown-predicate"
-    }
-    kept = [
-        entry
+    everything = tuple(
+        Quarantined(identity=_identity(entry), codes=sorted(codes))
         for entry in catalog.entries
-        if entry.predicate in REGISTRY
-        and assertion_id(entry) not in rows
-        and entry.subject not in subjects
-        and entry.value not in subjects
-    ]
+    )
+    if codes & CATALOG_REFUSALS:
+        return AssertionCatalog(), everything
+    by_row: dict[str, set[CatalogIssueCode]] = {}
+    by_subject: dict[str, set[CatalogIssueCode]] = {}
+    for issue in refusals:
+        if issue.assertion:
+            by_row.setdefault(issue.assertion, set()).add(issue.code)
+        elif issue.subject and issue.code != "unknown-predicate":
+            by_subject.setdefault(issue.subject, set()).add(issue.code)
+    kept = []
+    removed = []
+    for entry in catalog.entries:
+        if entry.predicate not in REGISTRY:
+            reasons: set[CatalogIssueCode] = {"unknown-predicate"}
+        else:
+            reasons = (
+                by_row.get(assertion_id(entry), set())
+                | by_subject.get(entry.subject, set())
+                | by_subject.get(entry.value, set())
+            )
+        if reasons:
+            removed.append(
+                Quarantined(identity=_identity(entry), codes=sorted(reasons))
+            )
+        else:
+            kept.append(entry)
     labels = {
         subject.id: subject
         for subject in catalog.subjects
-        if subject.id not in subjects
+        if subject.id not in by_subject
     }
     left = _catalog(kept, labels)
     if left == catalog:
-        return AssertionCatalog()
-    return left
+        return AssertionCatalog(), everything
+    return left, tuple(removed)
 
 
-def merged(held: AssertionCatalog, found: AssertionCatalog) -> AssertionCatalog:
+def _identity(entry: Assertion) -> str:
+    """The row's identity, or ``""`` where its predicate is unregistered."""
+    return assertion_id(entry) if entry.predicate in REGISTRY else ""
+
+
+def merged(
+    held: AssertionCatalog, found: AssertionCatalog
+) -> tuple[AssertionCatalog, list[CatalogIssue]]:
     """Two catalogs as one, by the rule :func:`resolve_catalog` already merges by.
 
     **The one reader of "these rows and those rows are one catalog".** Rows
@@ -1192,14 +1233,18 @@ def merged(held: AssertionCatalog, found: AssertionCatalog) -> AssertionCatalog:
     table carrying it would say the catalog is about something it is silent on.
     ``held``'s spelling of a subject stands where both name one, because the
     caller's existing labels are the ones a report already printed.
+
+    The issues are the ``support-truncated`` cuts :func:`_bounded` made, for
+    the caller to record: a merge that crosses the span bound keeps the fact.
     """
     kept: dict[str, Assertion] = {}
     for entry in (*held.entries, *found.entries):
         identity = assertion_id(entry)
         standing = kept.get(identity)
         kept[identity] = entry if standing is None else _merge(standing, entry)
+    entries, cut = _bounded(kept.values())
     labels = {subject.id: subject for subject in (*found.subjects, *held.subjects)}
-    return _catalog(list(kept.values()), labels)
+    return _catalog(entries, labels), cut
 
 
 def without(catalog: AssertionCatalog, identities: Collection[str]) -> AssertionCatalog:
@@ -2004,16 +2049,34 @@ def resolve_catalog(
         held = kept.get(identity)
         kept[identity] = entry if held is None else _merge(held, entry)
 
-    # Rows of one identity each passed the span bound alone and may cross it
-    # together. The merged row keeps the first spans and the cut is recorded,
-    # rather than refusing a fact for being stated too often or keeping eight
-    # spans with nothing to say a ninth was cited. The proposal the emission
-    # archive keeps still carries every quote.
-    for identity, entry in kept.items():
+    entries, cut = _bounded(kept.values())
+    issues.extend(cut)
+
+    # Through :func:`_catalog`, so how a subject table is derived from rows is
+    # written down once. It also drops a subject whose only row the gate then
+    # refused: the subject was recorded while the row was being built, and a
+    # table naming something no row is about says the catalog holds a fact it
+    # does not.
+    return _catalog(entries, subjects), issues
+
+
+def _bounded(
+    entries: Iterable[Assertion],
+) -> tuple[list[Assertion], list[CatalogIssue]]:
+    """Each row cut to :data:`MAX_SPANS`, and a ``support-truncated`` issue per cut.
+
+    **The one reader of "what happens when merged rows cross the span bound".**
+    Rows of one identity each passed the bound alone and may cross it
+    together. The merged row keeps the first spans and the cut is recorded,
+    rather than refusing a fact for being stated too often or keeping eight
+    spans with nothing to say a ninth was cited. :func:`resolve_catalog` and
+    :func:`merged` both call it. The proposal the emission archive keeps still
+    carries every quote.
+    """
+    kept = []
+    issues = []
+    for entry in entries:
         if len(entry.support) > MAX_SPANS:
-            kept[identity] = entry.model_copy(
-                update={"support": entry.support[:MAX_SPANS]}
-            )
             issues.append(
                 CatalogIssue(
                     code="support-truncated",
@@ -2021,16 +2084,12 @@ def resolve_catalog(
                     f" passages between them; the row keeps the first"
                     f" {MAX_SPANS} and drops {len(entry.support) - MAX_SPANS}",
                     subject=entry.subject,
-                    assertion=identity,
+                    assertion=assertion_id(entry),
                 )
             )
-
-    # Through :func:`_catalog`, so how a subject table is derived from rows is
-    # written down once. It also drops a subject whose only row the gate then
-    # refused: the subject was recorded while the row was being built, and a
-    # table naming something no row is about says the catalog holds a fact it
-    # does not.
-    return _catalog(list(kept.values()), subjects), issues
+            entry = entry.model_copy(update={"support": entry.support[:MAX_SPANS]})
+        kept.append(entry)
+    return kept, issues
 
 
 def _prepare(sources: Mapping[str, str]) -> Mapping[str, SpanSource]:
@@ -2264,10 +2323,9 @@ def _merge(held: Assertion, found: Assertion) -> Assertion:
     **The joined spans are not cut here.** :data:`MAX_SPANS` is the one bound a
     merge can cross, since each row passed it alone, and a cut made here was
     silent: nine rows citing nine passages became one row citing eight and no
-    issue said so (#926). :func:`resolve_catalog` cuts what it merged and
-    records ``support-truncated``; a merge anywhere else leaves the row over the
-    bound for the gate to refuse as ``too-many-spans``. The first row's spans
-    come first, so a cut keeps them.
+    issue said so (#926). Every caller cuts what it merged through
+    :func:`_bounded`, which records ``support-truncated``. The first row's
+    spans come first, so a cut keeps them.
     """
     first, second = sorted((held, found), key=_merge_rank)
     spans = list(first.support)
@@ -2316,6 +2374,11 @@ ProjectionReason = Literal[
 #: projecting by default.
 PROJECTS_UNDER: Mapping[str, bool] = MappingProxyType(
     {"unchecked": True, "supported": True, "unsupported": False, "unresolved": False}
+)
+
+#: The assessments that set a row aside: every one :data:`PROJECTS_UNDER` refuses.
+REJECTING: frozenset[str] = frozenset(
+    assessment for assessment, projects in PROJECTS_UNDER.items() if not projects
 )
 
 
@@ -2765,11 +2828,15 @@ def qualified(
     value — each row's value and scope — so a reader of the attribute alone
     still sees the facts behind it. Cut at the field's bound; the rows stay in
     the catalog whole.
+
+    Only :func:`admissible` rows are named. The attribute reaches every lane
+    through the rendered model, so a value a reviewer set aside, written here,
+    would reach analysis after review (ADR 0041).
     """
     if QUALIFIED_SPELLING[projection.attribute] == "bare":
         return UNKNOWN
     stated: list[str] = []
-    for entry in sorted(rows, key=_merge_rank):
+    for entry in sorted(filter(admissible, rows), key=_merge_rank):
         if entry.value == UNKNOWN:
             if entry.reason == "hedged":
                 stated.extend(f'"{span.quote}"' for span in entry.support)

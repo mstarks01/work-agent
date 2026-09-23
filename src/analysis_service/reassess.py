@@ -33,11 +33,13 @@ from dataclasses import dataclass
 from typing import get_args
 
 from analysis_service.assertions import (
+    REJECTING,
     AssertionCatalog,
     AssertionRecord,
     Assessment,
     Projection,
     assertion_id,
+    settled,
 )
 from analysis_service.evidence import (
     EvidenceCatalog,
@@ -48,9 +50,6 @@ from analysis_service.evidence import (
 )
 from analysis_service.report import Report
 from analysis_service.system_model import SystemModel
-
-#: The assessments that reject a row: it supports no definite conclusion.
-REJECTING: frozenset[str] = frozenset({"unsupported", "unresolved"})
 
 
 class ReviewError(ValueError):
@@ -134,10 +133,20 @@ def reassess(report: Report, verdicts: Mapping[str, Verdict]) -> Reassessment:
     before = report.assertions.catalog
     after = reviewed(before, verdicts)
     model, projections, evidence = prepared_view(report.system_model, after)
+    # A row the review settles may leave the evidence because the attribute
+    # now carries it, and a finding citing it still rests on a fact.
+    standing = {assertion_id(entry) for entry in settled(after)}
     withdrawn = []
     for block in report.analyses:
         for claim in block.all_claims():
-            reasons = ground_issues([claim], model, after)
+            open_grounds = [
+                ground
+                for ground in claim.grounds
+                if not (ground.kind == "assertion" and ground.assertion in standing)
+            ]
+            reasons = ground_issues(
+                [claim.model_copy(update={"grounds": open_grounds})], model, after
+            )
             if reasons:
                 withdrawn.append(
                     Withdrawn(claim.id, str(block.framework), tuple(reasons))
