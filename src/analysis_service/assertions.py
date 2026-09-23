@@ -197,8 +197,10 @@ REGISTRY_VERSION = 6
 #:
 #: Bumped whenever a predicate's ``projects_into`` moves, or when :func:`project`
 #: changes which rows reach an attribute or what it writes when they do not fit.
-#: Recorded in :class:`~analysis_service.report.ExecutionEnvelope`, because
-#: nothing else in a report says which rules turned rows into attributes.
+#: Recorded on :class:`AssertionRecord`, whose docstring holds the reason it is
+#: there rather than on the envelope: a job that ran no assertion pass projected
+#: nothing, and a version recorded for a projection that never ran is a fact
+#: with no consequence.
 PROJECTION_VERSION = 2
 
 #: The value that says a source stated this fact is **not there**. A positive
