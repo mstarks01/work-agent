@@ -12,6 +12,7 @@ design #926 settled as gates nobody can read until it is measured.
 from __future__ import annotations
 
 import json
+import re
 from pathlib import Path
 
 import pytest
@@ -238,9 +239,9 @@ class TestTheDesignIsDeclaredBeforeItIsMeasured:
         pending = promotion.PENDING[name]
         assert pending.question and pending.measures and pending.unset
 
-    def test_no_support_threshold_is_declared_without_a_reason(self) -> None:
-        """Neither 10% unsupported nor 20% unresolved had a rationale."""
-        assert promotion.PENDING["support-shares"].limit == ""
+    def test_the_support_shares_take_no_threshold(self) -> None:
+        """The owner declared none before the first assessment, 2026-09-24."""
+        assert not re.search(r"\d", promotion.PENDING["support-shares"].limit)
         assert "unsupported-assertions" not in promotion.GATES
 
     def test_a_pending_gate_is_read_as_unread(self, sealed) -> None:
