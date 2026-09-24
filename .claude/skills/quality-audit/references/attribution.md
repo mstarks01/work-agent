@@ -64,9 +64,13 @@ never production performance and never go in a scored comparison.
 
 `oracle` and `bottleneck` implement the first of these. `lane-replay` is the
 seam for the second: it rebuilds one lane's request from the captured
-`<case>.lanes.json`, so a substituted lead is one changed key and one call. The
-others need a capture or a replay seam that may not exist yet — when one does
-not, that is an extension ticket, not a reason to guess.
+`<case>.lanes.json`, so a substituted lead is one changed key and one call.
+`descendants` implements the third and fourth at no cost: it injects a
+candidate into a lane's archived proposals, runs the fan-in again, and bounds
+what the critic would keep (`lower` rejects every draft no critic ruled on,
+`upper` accepts it). The critic and reporting rows need a critic call or an
+assembly replay, and neither is built — that is an extension ticket, not a
+reason to guess.
 
 To compare a whole route against a corrected input, rather than one stage,
 use `references/three-conditions.md`. It holds the three conditions, the
