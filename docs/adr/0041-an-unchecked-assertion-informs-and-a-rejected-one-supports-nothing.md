@@ -58,18 +58,33 @@ is needed to keep either.**
 **An unchecked fact can no longer turn a question into a control, and that
 has a measured price.** Against the 103 archived catalogs on their blessed
 models, no projection falls in this case. Against extracted graphs it does.
-The measurement pairs every archived proposal with every archived extracted
-graph of its case, 1,500 pairs, the pairing `run.py bind` makes. Of 3,705
-stated projections, 140 now write a qualified `unknown`:
+`run.py guard-cost` pairs every archived proposal with every archived
+extracted graph of its case, 1,500 pairs, the pairing `run.py bind` makes. It
+projects each catalog twice, with the guard on and off. 602 of the pairs are
+over a graph today's gate refuses. No job projects onto such a graph, so the
+guard costs nothing there, although it fires 78 times on them. Over the other
+898 pairs:
 
-- **51 are corrections.** The extracted graph read a flow's authentication as
-  `none`, an unchecked row stated a mechanism, and the blessed model reads
-  `unknown`.
-- **89 withhold a value the blessed model agrees with**: 63 exposures and 26
-  zone placements. Each reaches the lane as a cited, unchecked row beside an
-  open question instead of as the attribute. A zone left `unknown` also leaves
-  its crossings undecided (ADR 0039), so those are leads rather than derived
-  facts until a reviewer marks the row `supported`.
+- **44 values are held back**: 38 exposures and 6 zone placements, and the
+  blessed model agrees with each one. Each reaches the lane as a cited,
+  unchecked row beside an open question instead of as the attribute. A zone
+  left `unknown` also leaves its crossings undecided (ADR 0039): decided
+  crossings fall from 1,114 to 1,102.
+- **18 are corrections.** Extraction read a flow's authentication as `none`,
+  an unchecked row stated a mechanism, and the blessed model reads `unknown`.
+  The guard writes the qualified `unknown`. Without the guard, the projected
+  model fails the gate, every projection of the pair is dropped, and `none`
+  stands.
+- **Candidates:** 47 are lost, all from three STRIDE rules that read a stated
+  exposure or zone, and 31 are gained. One must-find loses every candidate
+  that led to it: in case 09, a customer sends the web API the catalogue
+  operations, in 11 pairs. The match is by lane and a shared element, so this
+  is an upper bound, and the lane still reads the exposure lead and the cited
+  row.
+
+A ceiling of one must-find in one case is inside the corpus spread of 3.37
+must-finds (`evals/TUNING.md`), so this cost gets no paid run: a sweep could
+not tell it from the spread between runs.
 
 That is the contract working as decided: a correct unchecked fact is shown
 with its uncertainty rather than settled. If the cost to placement is judged
