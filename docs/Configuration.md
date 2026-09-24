@@ -1113,6 +1113,43 @@ name first.** Nothing echoes these values back, and a set-but-empty value *is*
 caught (`ANALYSIS_RETRY_ATTEMPTS=` raises `is set but empty`) — it is only a
 misspelled *name* that passes unnoticed.
 
+### Optional passes
+
+Five variables add a pass to the graph or change how the sources are read. All
+of them are off by default, so a deployment that sets none of them runs the
+graph it has always run. A variable is on only when it is `1`, `true`, `yes` or
+`on`; any other value, or no value, is off. A change takes effect at the next
+restart.
+
+| Variable | Status | What it does |
+| --- | --- | --- |
+| `ANALYSIS_ASSERTIONS` | supported | Runs the assertion pass on every job (see below). |
+| `ANALYSIS_COMPACT_EXTRACTION` | experiment (#938) | Extraction writes a compact form that code expands into the same system model. |
+| `ANALYSIS_FACTS_FIRST_EXTRACTION` | experiment (#1003) | Extraction reads source facts first and code builds the model from them. It writes its own assertion rows, so it cannot be combined with `ANALYSIS_ASSERTIONS`. |
+| `ANALYSIS_FACTS_SPLIT_EXTRACTION` | experiment (#1003) | The facts-first reading, split over two calls. It replaces the variable above. |
+| `ANALYSIS_SOURCE_REVIEW` | experiment (#1003) | A bounded second read of the sources against the model and the catalog. It needs a route that produces a catalog: `ANALYSIS_ASSERTIONS` or `ANALYSIS_FACTS_FIRST_EXTRACTION`. |
+
+Use the experiments only to measure them. Their results are recorded on the
+issues named in the table.
+
+**The assertion pass.** With `ANALYSIS_ASSERTIONS` on, an `assert` node runs
+after the model passes its validity check and before the lanes start. It reads
+the same sources as extraction and records what they state as **assertions**:
+one row for each fact, with its subject, its value, and the quote that supports
+it. Code checks each quote against the source text and drops a row whose quote
+it cannot find. See [Concepts](Concepts.md#assertion) for what the rows do.
+
+- **Cost and time.** The pass adds one call on the `base` tier to every job,
+  and the lanes wait for it, so it adds to the job's wall-clock time as well as
+  to its charge.
+- **Node map.** The node runs on the tier that `assert` names in the `[nodes]`
+  table of `model_tiers.toml`. The shipped file maps it to `base`. A tiers file
+  with no `assert` entry fails at startup, whether the pass is on or off.
+- **Report.** A report from a job with the pass on carries an `assertions`
+  block: the catalog of rows and the rows code refused. With the pass off, the
+  block is `null`. See [Report Schema](Report-Schema.md).
+- **Rollback.** Unset the variable and restart. Nothing stored changes shape.
+
 ### Provider environment
 
 Each tier's vendor determines what credentials it needs; see
