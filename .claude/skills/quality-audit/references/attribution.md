@@ -68,9 +68,11 @@ seam for the second: it rebuilds one lane's request from the captured
 `descendants` implements the third and fourth at no cost: it injects a
 candidate into a lane's archived proposals, runs the fan-in again, and bounds
 what the critic would keep (`lower` rejects every draft no critic ruled on,
-`upper` accepts it). The critic and reporting rows need a critic call or an
-assembly replay, and neither is built — that is an extension ticket, not a
-reason to guess.
+`upper` accepts it). `assembly` implements the reporting row: it names a
+ruled draft the report omits, and assembles the rest again from the rulings
+the report carries. The critic row needs a critic call; `critic_review` makes
+one over a signed fixture set, and nothing yet makes one over an archived
+case's drafts.
 
 To compare a whole route against a corrected input, rather than one stage,
 use `references/three-conditions.md`. It holds the three conditions, the

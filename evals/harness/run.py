@@ -66,6 +66,7 @@ from analysis_service.report import (
 )
 from evals.harness import (
     arms,
+    assembly,
     audit,
     bottleneck,
     comparison,
@@ -2450,6 +2451,13 @@ COMMANDS: dict[str, Command] = {
         " run (no credentials)",
         run=promotion.command_gates,
         arguments=promotion.arguments,
+    ),
+    "assembly": Command(
+        help="assemble every archived block again from its drafts and the"
+        " rulings its report carries, and name any ruled draft the report"
+        " omits (#1091, no credentials)",
+        run=assembly.command_assembly,
+        arguments=assembly.arguments,
     ),
     "descendants": Command(
         help="run a sweep's fan-in again over its archived proposals, with"
