@@ -67,13 +67,18 @@ def test_the_catalog_is_the_signed_reference_and_no_model_wrote_it(case):  # noq
     }
     served = {run.node: run.model for run in report.nodes}
     assert served[ASSERT_NODE] is None, "no provider answered the assert node"
+    requested = {run.node: run.requested_model for run in report.nodes}
+    assert requested[ASSERT_NODE] == EVAL_MODEL, "the route the tier configured"
+    # The report is written to disk after a sweep, and every node's route is
+    # parsed on the way; a bare name there cost the first paid run its report.
+    assert type(report).model_validate_json(report.model_dump_json()) == report
     assert all(model for node, model in served.items() if node.startswith("analyze_"))
     assert report.analyses[0].claims, "the lanes and the critic still ran"
 
 
 def test_the_signed_model_refuses_to_answer_with_nothing():
     """A route that forgot to set the case's rows fails, never answers empty."""
-    llm = modes.SignedFactsLlm(model=modes.SIGNED_FACTS_MODEL)
+    llm = modes.SignedFactsLlm(model=EVAL_MODEL)
 
     async def ask():
         async for _ in llm.generate_content_async(None):
