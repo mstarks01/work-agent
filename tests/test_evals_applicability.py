@@ -134,11 +134,21 @@ class Block:
     it would let the scorer pass against a report nothing can emit.
     """
 
-    def __init__(self, claims, scope=(), rejected_claims=(), unreconciled_rulings=()):
+    def __init__(
+        self,
+        claims,
+        scope=(),
+        rejected_claims=(),
+        unreconciled_rulings=(),
+        dropped_claims=(),
+        unresolved_references=(),
+    ):
         self.claims = list(claims)
         self.scope = list(scope)
         self.rejected_claims = list(rejected_claims)
         self.unreconciled_rulings = list(unreconciled_rulings)
+        self.dropped_claims = list(dropped_claims)
+        self.unresolved_references = list(unresolved_references)
 
     #: The real readers, bound onto the fake rather than reimplemented here. A
     #: second copy of "which problems name this claim" is exactly the shape
