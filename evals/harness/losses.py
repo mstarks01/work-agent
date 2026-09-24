@@ -1,4 +1,4 @@
-"""What lost each STRIDE reference a run missed: the verb, the critic, the place, or no lead.
+"""What lost each STRIDE reference a run missed: the verb, the fan-in, the critic, the place, or no lead.
 
 The scorer says *which* references a run missed. This says *why*, from the
 same rulings, so a fix carries its ceiling before anybody pays for a run: an
@@ -10,7 +10,7 @@ below records one observation per miss rather than every contributor. On
 with no such number; read off the Baseline afterwards, its ceiling was five
 must-finds of 129, inside the run-to-run band.
 
-Five causes, decided in this order for one missed reference:
+Seven causes, decided in this order for one missed reference:
 
 * ``verb``: a surviving claim in the reference's lane cites the same place —
   one endpoint-resolved element set contains the other, the identity rule's
@@ -32,6 +32,17 @@ Five causes, decided in this order for one missed reference:
   a verb; charging it to ``place`` hid it behind the lane's silence.
 * ``critic``: no surviving claim cites the place, but a draft the critic
   rejected did, with the reference's action. The finding was written and killed.
+* ``fan-in``: no draft cites the place, but the lane *proposed* a claim there
+  with the reference's action. The finding was written and lost before the
+  critic saw it, in one of two ways, which :data:`FanInEffect` names. The fan-in
+  **removed** the proposal — a reference outside the catalog, a quote the
+  source does not carry, a claim left citing nothing — or it kept a draft and
+  **narrowed** its elements off the reference's place, which is #441's rule
+  that a claim cites only what its grounds reach. The row names the proposal's
+  title, the draft where one was kept, and the reasons the block's own marks
+  recorded. Read off the lane's archived proposals, so a sweep that archived
+  none cannot tell this cause from ``place`` or ``unled``;
+  :attr:`CaseLosses.proposals_read` says which a row is.
 * ``place``: a candidate rule led the lane to the reference's elements and no
   draft cites them. The lead did not take.
 * ``unled``: no rule fired on the reference's elements and no draft cites
@@ -61,11 +72,11 @@ has no loss to charge, and an unlisted draft is the queue's to judge.
 from __future__ import annotations
 
 from collections import Counter
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
-from typing import Any, Literal
+from typing import Any, Literal, get_args
 
-from analysis_service.claims import ASSERTION_GROUNDS, FrameworkAnalysis
+from analysis_service.claims import ASSERTION_GROUNDS, DroppedClaim, FrameworkAnalysis
 from analysis_service.frameworks.stride.record import DraftThreat
 from evals.harness.identity import FlowMap, endpoint_form, endpoint_subset
 from evals.harness.reference import GoldenCase
@@ -74,8 +85,21 @@ from evals.harness.triggers import case_trigger_recall
 from evals.harness.verbs import same_action
 
 #: The causes a miss is charged to, in the order they are decided.
-Cause = Literal["verb", "merged", "misfiled", "critic", "place", "unled"]
-CAUSES: tuple[Cause, ...] = ("verb", "merged", "misfiled", "critic", "place", "unled")
+Cause = Literal["verb", "merged", "misfiled", "critic", "fan-in", "place", "unled"]
+CAUSES: tuple[Cause, ...] = (
+    "verb",
+    "merged",
+    "misfiled",
+    "critic",
+    "fan-in",
+    "place",
+    "unled",
+)
+
+#: What the fan-in did to a proposal a ``fan-in`` row names. ``removed``: no
+#: draft carries the proposal's title and action. ``narrowed``: a draft does,
+#: and the fan-in cut the elements that put it at the reference's place.
+FanInEffect = Literal["removed", "narrowed"]
 
 #: How a named draft's endpoint-resolved place stands to the reference's. The
 #: element half of the identity rule accepts containment either way, so a draft
@@ -148,6 +172,14 @@ class Loss:
     #: over. ``rejected`` means the lane wrote something a person refused. The
     #: 2026-09-22 audit had to join the ledger by hand to tell those apart.
     displaced_standing: Standing | None = None
+    #: For a ``fan-in`` row: the title of the lane's proposal at the place,
+    #: what the fan-in did to it, and why, read from the block's own marks —
+    #: the ``dropped_claims`` reason for a removal, and one entry per element
+    #: cut from a narrowed draft, from ``unresolved_references``. Empty where
+    #: the fan-in left no mark, which is itself worth reading.
+    proposal_title: str | None = None
+    fan_in_effect: FanInEffect | None = None
+    fan_in_reasons: tuple[str, ...] = ()
 
     def to_json(self) -> dict[str, Any]:
         return {
@@ -162,6 +194,9 @@ class Loss:
             "re_ask": list(self.re_ask),
             "displaced_draft_id": self.displaced_draft_id,
             "displaced_standing": self.displaced_standing,
+            "proposal_title": self.proposal_title,
+            "fan_in_effect": self.fan_in_effect,
+            "fan_in_reasons": list(self.fan_in_reasons),
         }
 
 
@@ -224,6 +259,10 @@ class CaseLosses:
     #: on every deployment that ran no assertion node, and that *is* the
     #: reading: the layer backed nothing.
     assertion_backed: AssertionBacking = field(default_factory=AssertionBacking)
+    #: Whether the lane proposals were archived and read. ``False`` means the
+    #: ``fan-in`` cause could not be decided here, and a ``place`` or ``unled``
+    #: row may be a proposal the fan-in removed.
+    proposals_read: bool = False
 
     @property
     def by_cause(self) -> dict[str, int]:
@@ -247,6 +286,7 @@ class CaseLosses:
     def to_json(self) -> dict[str, Any]:
         return {
             "case": self.case,
+            "proposals_read": self.proposals_read,
             "by_cause": self.by_cause,
             "re_asked_by_cause": self.re_asked_by_cause,
             "displaced_by_cause": self.displaced_by_cause,
@@ -263,6 +303,35 @@ def _at_place(
         draft
         for draft in drafts
         if endpoint_subset(reference_ids, draft.affected_element_ids, flows)
+    ]
+
+
+def _proposed_at(
+    reference_ids: Sequence[str],
+    lane_batch: object,
+    verb: str,
+    flows: FlowMap,
+) -> list[Mapping[str, Any]]:
+    """The lane's proposals at the reference's place with the reference's action.
+
+    A proposal is the lane's output before any check, so every shape it can
+    take is read: a batch that is not an object, a ``claims`` entry that is not
+    a list, a claim missing its elements or its verb. Each of those is a
+    proposal the fan-in removed for its shape and cannot be at a place, so it
+    is skipped rather than raised on.
+    """
+    claims = lane_batch.get("claims") if isinstance(lane_batch, dict) else None
+    if not isinstance(claims, list):
+        return []
+    return [
+        claim
+        for claim in claims
+        if isinstance(claim, dict)
+        and isinstance(claim.get("verb"), str)
+        and isinstance(claim.get("affected_element_ids"), list)
+        and all(isinstance(ref, str) for ref in claim["affected_element_ids"])
+        and same_action(claim["verb"], verb)
+        and endpoint_subset(reference_ids, claim["affected_element_ids"], flows)
     ]
 
 
@@ -341,8 +410,14 @@ def attribute_case(
     produced: Sequence[DraftThreat],
     flows: FlowMap,
     block: FrameworkAnalysis,
+    *,
+    proposed: Mapping[str, Any] | None,
 ) -> CaseLosses:
     """Charge each of one case's misses to its cause.
+
+    ``proposed`` is the lanes' archived STRIDE proposals, keyed by lane, or
+    ``None`` for a sweep that archived none, which leaves the ``fan-in`` cause
+    undecided and says so on the row.
 
     ``drafts`` are the pre-critic drafts and ``produced`` the report's claims,
     the two sides :mod:`evals.harness.critic_yield` already scores; a draft in
@@ -370,6 +445,14 @@ def attribute_case(
     # fingerprint rule has one reader, and a claim the scorer matched to a
     # reference of its own is absent here because nobody was asked about it.
     standings = {threat.threat_id: threat.standing for threat in score.unlisted}
+    # Keyed by the title as the drop mark cut it, through the mark's own cut,
+    # so a long proposal title finds its mark.
+    dropped = {mark.title: mark.reason for mark in block.dropped_claims}
+    cut_from: dict[str, list[str]] = {}
+    for mark in block.unresolved_references:
+        cut_from.setdefault(mark.claim_id, []).append(
+            f"{mark.element_id}: {mark.reason}"
+        )
     losses: list[Loss] = []
     for index in score.missed:
         reference = references[index]
@@ -452,6 +535,54 @@ def attribute_case(
                 )
             )
             continue
+        proposed_here = _proposed_at(
+            reference.affected_element_ids,
+            (proposed or {}).get(lane),
+            verb,
+            flows,
+        )
+        if proposed_here:
+            proposal = min(proposed_here, key=lambda claim: str(claim.get("title", "")))
+            title = str(proposal.get("title", ""))
+            # The draft the fan-in made of this proposal, if it kept one: the
+            # fan-in keeps a proposal's title and action, and assigns the ID.
+            kept = sorted(
+                (
+                    draft
+                    for draft in drafts
+                    if draft.category == lane
+                    and draft.title == title
+                    and same_action(draft.verb, verb)
+                ),
+                key=lambda draft: draft.id,
+            )
+            if kept:
+                effect: FanInEffect = "narrowed"
+                reasons = tuple(cut_from.get(kept[0].id, ()))
+            else:
+                effect = "removed"
+                cut = DroppedClaim.of(claim_id="-", title=title, reason="-").title
+                reasons = (dropped[cut],) if cut in dropped else ()
+            losses.append(
+                Loss(
+                    index,
+                    lane,
+                    index in must_find,
+                    "fan-in",
+                    verb,
+                    draft_id=kept[0].id if kept else None,
+                    draft_verb=proposal["verb"],
+                    place_relation=_relation(
+                        reference.affected_element_ids,
+                        proposal["affected_element_ids"],
+                        flows,
+                    ),
+                    proposal_title=title,
+                    fan_in_effect=effect,
+                    fan_in_reasons=reasons,
+                )
+            )
+            continue
         cause: Cause = "place" if hits[index].rule_ids else "unled"
         nearby = _nearby(reference.affected_element_ids, in_lane, flows)
         losses.append(
@@ -471,6 +602,7 @@ def attribute_case(
         case=case.id,
         losses=tuple(losses),
         assertion_backed=_backing(score, produced),
+        proposals_read=proposed is not None,
     )
 
 
@@ -487,9 +619,12 @@ def pooled(rows: Sequence[CaseLosses]) -> dict[str, Any]:
     pairs_must_find: Counter[tuple[str, str]] = Counter()
     relations: Counter[str] = Counter()
     relations_must_find: Counter[str] = Counter()
+    effects: Counter[str] = Counter()
     for row in rows:
         for loss in row.losses:
             totals[loss.cause] += 1
+            if loss.fan_in_effect is not None:
+                effects[loss.fan_in_effect] += 1
             must_find[loss.cause] += loss.must_find
             if loss.re_ask:
                 re_asked[loss.cause] += 1
@@ -508,7 +643,15 @@ def pooled(rows: Sequence[CaseLosses]) -> dict[str, Any]:
                     relations_must_find[loss.place_relation] += loss.must_find
     return {
         "cases": len(rows),
+        # How many cases could decide ``fan-in``. A zero there over cases that
+        # archived no proposals is not a measurement of the fan-in.
+        "proposals_read": sum(row.proposals_read for row in rows),
         "losses": sum(totals.values()),
+        # The ``fan-in`` rows by what the fan-in did: a proposal it removed, or
+        # a draft it narrowed off the reference's place. Two different fixes.
+        "fan_in_by_effect": {
+            effect: effects[effect] for effect in get_args(FanInEffect)
+        },
         "by_cause": {cause: totals[cause] for cause in CAUSES},
         "must_find_by_cause": {cause: must_find[cause] for cause in CAUSES},
         # The subset of each cause's misses whose ruling came out of a re-ask,

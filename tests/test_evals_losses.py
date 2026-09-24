@@ -13,7 +13,13 @@ from pathlib import Path
 
 import pytest
 
-from analysis_service.claims import Ground
+from analysis_service.claims import (
+    BEYOND_GROUNDS,
+    DROPPED_TITLE_MAX_CHARS,
+    DroppedClaim,
+    Ground,
+    UnresolvedReference,
+)
 from analysis_service.system_model import ModelIndex
 from evals.harness import losses
 from evals.harness.content import prose, structural
@@ -59,12 +65,29 @@ def merge_flows(merge_case):
     return ModelIndex.of(merge_case.model).flow_endpoints
 
 
-def charge(case, flows, drafts, produced, unreconciled=(), votes=None):
+def charge(
+    case,
+    flows,
+    drafts,
+    produced,
+    unreconciled=(),
+    votes=None,
+    proposed=None,
+    dropped=(),
+    cut=(),
+):
     score = score_case(
         case, produced, SubsetVerbIdentity({case.id: flows}), votes or Ledger()
     )
-    block = Block(produced, unreconciled_rulings=unreconciled)
-    return attribute_case(case, score, drafts, produced, flows, block)
+    block = Block(
+        produced,
+        unreconciled_rulings=unreconciled,
+        dropped_claims=dropped,
+        unresolved_references=cut,
+    )
+    return attribute_case(
+        case, score, drafts, produced, flows, block, proposed=proposed
+    )
 
 
 def accepted(case, claim, flows):
@@ -832,3 +855,158 @@ class TestWhatTheAssertionLayerBacked:
 
         assert set(block) == {"losses", "losses_aggregate"}
         assert block["losses_aggregate"]["assertion_backed"]["matched"] == 1
+
+
+def proposed_at(reference, verb, title="proposed at the place"):
+    """The lanes' archived proposals, holding one claim at the reference's place."""
+    return {
+        reference.category: {
+            "claims": [
+                {
+                    "title": title,
+                    "verb": verb,
+                    "affected_element_ids": list(reference.affected_element_ids),
+                }
+            ]
+        }
+    }
+
+
+class TestAFanInDrop:
+    """A finding the lane wrote and the fan-in removed before the critic (#1091)."""
+
+    def test_a_proposal_no_draft_kept_is_charged_to_the_fan_in(self, case, flows):
+        reference = case.stride_claims()[0]
+        mark = DroppedClaim.of(
+            claim_id="x", title="proposed at the place", reason="quote not in source"
+        )
+
+        charged = charge(
+            case,
+            flows,
+            [],
+            [],
+            proposed=proposed_at(reference, reference.verb),
+            dropped=[mark],
+        )
+
+        loss = by_index(charged)[0]
+        assert loss.cause == "fan-in"
+        assert loss.fan_in_effect == "removed"
+        assert loss.proposal_title == "proposed at the place"
+        assert loss.fan_in_reasons == ("quote not in source",)
+        assert loss.place_relation == "equal"
+        assert charged.proposals_read
+
+    def test_a_sweep_with_no_proposals_cannot_decide_it_and_says_so(self, case, flows):
+        charged = charge(case, flows, [], [], proposed=None)
+
+        assert "fan-in" not in {loss.cause for loss in charged.losses}
+        assert not charged.proposals_read
+        assert pooled([charged])["proposals_read"] == 0
+
+    def test_a_proposal_under_another_action_is_not_this_finding(self, case, flows):
+        reference = case.stride_claims()[0]
+        other = "guess-credential" if reference.verb != "guess-credential" else "replay"
+
+        charged = charge(case, flows, [], [], proposed=proposed_at(reference, other))
+
+        assert by_index(charged)[0].cause in {"place", "unled"}
+
+    def test_a_draft_the_critic_killed_is_charged_before_the_fan_in(self, case, flows):
+        """The critic saw the finding, so the fan-in did not lose it."""
+        reference = case.stride_claims()[0]
+        killed = at(reference, 1, reference.verb)
+
+        charged = charge(
+            case,
+            flows,
+            [killed],
+            [],
+            proposed=proposed_at(reference, reference.verb),
+        )
+
+        assert by_index(charged)[0].cause == "critic"
+
+    def test_a_long_title_finds_its_mark_through_the_marks_own_cut(self, case, flows):
+        reference = case.stride_claims()[0]
+        title = "t" * (DROPPED_TITLE_MAX_CHARS + 40)
+        mark = DroppedClaim.of(claim_id="x", title=title, reason="unknown reference")
+
+        charged = charge(
+            case,
+            flows,
+            [],
+            [],
+            proposed=proposed_at(reference, reference.verb, title=title),
+            dropped=[mark],
+        )
+
+        assert by_index(charged)[0].fan_in_reasons == ("unknown reference",)
+
+    def test_a_removal_with_no_mark_names_no_reason(self, case, flows):
+        reference = case.stride_claims()[0]
+
+        charged = charge(
+            case, flows, [], [], proposed=proposed_at(reference, reference.verb)
+        )
+
+        loss = by_index(charged)[0]
+        assert loss.cause == "fan-in"
+        assert loss.fan_in_reasons == ()
+
+    def test_a_draft_narrowed_off_the_place_names_the_cut_element(self, case, flows):
+        """#441's bound keeps the draft and cuts what its grounds do not reach."""
+        references = case.stride_claims()
+        index, reference = 0, references[0]
+        lost = reference.affected_element_ids[0]
+        elsewhere = next(
+            element.id
+            for element in case.model.elements()
+            if element.id not in reference.affected_element_ids
+        )
+        narrowed = draft_threat(
+            1,
+            reference.category,
+            "proposed at the place",
+            element_ids=[elsewhere],
+            verb=reference.verb,
+        )
+        mark = UnresolvedReference(
+            claim_id=narrowed.id, element_id=lost, reason=BEYOND_GROUNDS
+        )
+
+        charged = charge(
+            case,
+            flows,
+            [narrowed],
+            [promote(narrowed)],
+            proposed=proposed_at(reference, reference.verb),
+            cut=[mark],
+        )
+
+        loss = by_index(charged)[index]
+        assert loss.cause == "fan-in"
+        assert loss.fan_in_effect == "narrowed"
+        assert loss.draft_id == narrowed.id
+        assert loss.fan_in_reasons == (f"{lost}: {BEYOND_GROUNDS}",)
+        assert pooled([charged])["fan_in_by_effect"]["narrowed"] == 1
+
+    @pytest.mark.parametrize(
+        "batch",
+        [
+            "not an object",
+            {"claims": "not a list"},
+            {"claims": ["not an object"]},
+            {"claims": [{"affected_element_ids": ["x"]}]},
+            {"claims": [{"verb": "spoof", "affected_element_ids": [1]}]},
+        ],
+    )
+    def test_every_shape_a_lane_can_emit_is_read_not_raised_on(
+        self, case, flows, batch
+    ):
+        reference = case.stride_claims()[0]
+
+        charged = charge(case, flows, [], [], proposed={reference.category: batch})
+
+        assert by_index(charged)[0].cause in {"place", "unled"}

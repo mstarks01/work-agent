@@ -74,11 +74,13 @@ leakage controls and the table that says what each result supports.
 
 A scored artifact carries both, and they are where a ceiling comes from.
 
-**`losses`** is STRIDE's, and charges each missed reference to one of six
+**`losses`** is STRIDE's, and charges each missed reference to one of seven
 causes, decided in this order: `verb` (a claim cites the same place with
 another action), `merged`, `misfiled` (right finding, wrong lane), `critic` (a
 draft cited it and was rejected), `place` (a rule led there, nothing was
-drafted), `unled` (nothing sent the lane there). See `evals/harness/losses.py`.
+drafted), `unled` (nothing sent the lane there). `fan-in` sits between
+`critic` and `place`: the lane proposed the finding, and the fan-in removed it
+or narrowed its elements off the place. See `evals/harness/losses.py`.
 
 **`attribution`** is ASVS's, and charges each wrong requirement to a stage. See
 `evals/harness/attribution.py`. Extraction is deliberately not a stage there: a
@@ -95,6 +97,7 @@ those against the re-ask.
 | --- | --- | --- |
 | `verb` | an exemplar or an equivalence edit | the `verb` rows in that lane |
 | `unled` | a candidate rule | the `unled` rows |
+| `fan-in` | a grounding change in the lane, or a change to the fan-in rule its `fan_in_reasons` name | the `fan-in` rows, split by `fan_in_effect` |
 | `place` | a prompt or a rule that leads the lane further | the `place` rows |
 | `critic` | a critic prompt or an evidence change | the `critic` rows, split by `re_ask` |
 | `misfiled` | a routing fix | the `misfiled` rows |
