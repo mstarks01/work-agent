@@ -379,6 +379,14 @@ scope, reference notes and prior cases. The proposals say what a lane
 answered; the lane file says what it was asked, so a lane that wrote nothing
 at a place can be read against the leads it had.
 
+A case that fails inside the graph writes `artifact.reports/<case>.failure.json`
+instead of a report. It holds the fault's `repr` under `error`, and under
+`state` every key the graph's nodes wrote before the fault: the drafts, the
+critic's rulings and the marks. The job's source text is not in it. A critic
+that fails its gate after its re-ask is a failure of that case only, so the
+sweep records it and runs the next case. `score` and `replay` do not read this
+file.
+
 Every mode that runs `extract` also writes `artifact.reports/<case>.extraction.json`:
 what the node emitted under `raw`, the model and gate verdict beside it, and
 under `repair` what the repair node returned where the gate sent the first

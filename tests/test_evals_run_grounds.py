@@ -23,16 +23,20 @@ from pydantic import Field
 
 import analysis_service.fan_in as fan_in_module
 import analysis_service.graph as graph_module
+from analysis_service.critic import CriticOutputError
 from analysis_service.deployment import Deployment
 from analysis_service.fan_in import DraftJoinError
 from analysis_service.frameworks.stride.record import STRIDE_CATEGORIES
 from analysis_service.graph import (
     ENTRY_PREPARE,
+    STATE_INPUT_TEXT,
     analyze_node_name,
     tier_node_by_graph_node,
 )
 from analysis_service.sampling import load_sampling
 from evals.harness import modes
+from evals.harness.archive import kind_of
+from evals.harness.bundle import reports_dir, write_failures
 from evals.harness.coverage import aggregate_coverage, coverage_totals
 from evals.harness.reference import load_case
 from evals.harness.run import _run_mode
@@ -146,6 +150,7 @@ def sweep(
     *,
     trailing: int = 0,
     in_flight: int = 1,
+    critic_first: list[str] | None = None,
 ) -> Any:
     """Two cases through one pipeline: the first optionally broken, then a clean one.
 
@@ -155,6 +160,8 @@ def sweep(
     ``trailing`` appends further clean cases after those two. A sweep that
     stops on its last case leaves nothing behind it, so proving that the cases
     *after* a stop are named takes a case after the stop.
+
+    ``critic_first`` replaces the critic's replies on the first case.
     """
     label = case.sources[0].label
     first = spoofing_first
@@ -184,7 +191,11 @@ def sweep(
             reply=_reply_for(case, graph_node),
             lane_replies=_lane_replies(case, graph_node),
             queued=_queued_for(case, graph_node, first),
-            first_replies=_critic_first(case, graph_node, first),
+            first_replies=(
+                critic_first
+                if critic_first is not None and graph_node == "critic_stride"
+                else _critic_first(case, graph_node, first)
+            ),
         )
 
     pipeline = modes.build_eval_pipeline(
@@ -463,7 +474,44 @@ def test_every_measured_fault_is_one_the_failure_recorder_can_classify():
     from evals.harness.grounds import CAUGHT
     from evals.harness.run import MEASURED
 
-    assert set(MEASURED) == {modes.EvalRunError, *CAUGHT}
+    assert set(MEASURED) == {modes.EvalRunError, CriticOutputError, *CAUGHT}
+
+
+def test_a_critic_that_fails_its_gate_is_captured_and_the_sweep_continues(
+    monkeypatch, case, tmp_path
+):
+    """#1097: a critic gate failure is a measurement, and it leaves a record.
+
+    The critic drops a draft, and its re-ask drops it too, so ``fail_review``
+    raises. The case is a failure, the next case still runs, and the file
+    beside the artifact holds the drafts and the rulings the gate refused.
+    """
+    silent_on_spoofing = json.dumps(
+        {
+            "claims": [
+                scripted_ruling(case, category)
+                for category in STRIDE_CATEGORIES
+                if category != "spoofing"
+            ]
+        }
+    )
+
+    run = sweep(monkeypatch, case, None, critic_first=[silent_on_spoofing])
+
+    assert run.stopped_before == ()
+    assert [entry.case_id for entry in run.grounds] == ["case-second"]
+    assert run.payloads[0]["run_failure"].startswith(f"{case.id}: ")
+    assert list(run.failed_states) == [case.id]
+    captured = run.failed_states[case.id]
+    assert captured["error"].startswith("CriticOutputError(")
+    assert {"drafts_stride", "reviewed_stride"} <= captured["state"].keys()
+    assert STATE_INPUT_TEXT not in captured["state"]
+
+    out = tmp_path / "sweep.json"
+    write_failures(str(out), run.failed_states)
+    written = reports_dir(out) / f"{case.id}.failure.json"
+    assert json.loads(written.read_text("utf-8")) == json.loads(json.dumps(captured))
+    assert kind_of(written.name) == "failure"
 
 
 class TestCasesInFlight:
