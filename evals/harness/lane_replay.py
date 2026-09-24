@@ -154,8 +154,12 @@ def command_lane_replay(args: argparse.Namespace) -> int:
         f" {repo_commit().commit}"
     )
     lane = lane_of(args.framework, args.lane)
+    spent: list[float | None] = []
     call = node_call(
-        Deployment.from_env(), lane.node_name, schemas_for(args.framework).proposals
+        Deployment.from_env(),
+        lane.node_name,
+        schemas_for(args.framework).proposals,
+        spent,
     )
     batch = asyncio.run(
         replay(
@@ -170,6 +174,11 @@ def command_lane_replay(args: argparse.Namespace) -> int:
     dumped = batch.model_dump(mode="json")
     for claim in dumped["claims"]:
         print(f"- {claim.get('title')} | {claim.get('affected_element_ids')}")
+    charged = [charge for charge in spent if charge is not None]
+    print(
+        f"spent: ${sum(charged):.4f} reported"
+        + ("" if len(charged) == len(spent) else "; the provider reported no charge")
+    )
     if args.out:
         args.out.write_text(json.dumps(dumped, indent=2) + "\n", encoding="utf-8")
     return 0
