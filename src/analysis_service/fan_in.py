@@ -438,6 +438,33 @@ def _resolve_element_references(
     return _ReferenceCheck(drafts, unresolved, dropped)
 
 
+#: How far, in hops through the graph, a claim's elements may sit from the
+#: places its grounds name, and how far a ground may sit from the claim's
+#: elements before it is out of scope. One number for both checks, because
+#: they read one relation (#441).
+#:
+#: Two hops keep the element a threat lands on when the grounds cite the flow
+#: that leads there: a repudiation claim grounded on the flow that carries an
+#: action keeps the store that holds its record. Replaying the four STRIDE
+#: Baselines' archived proposals (QA-2026-09-24-02-E7), two hops matched 5
+#: must-finds that one hop cut, all the reference's own finding, at a mean
+#: element_jaccard of 0.413 against 0.420. An unbounded reach matched one more
+#: and keeps no bound at all.
+BOUND_HOPS = 2
+
+
+def within_bound(index: ModelIndex, places: Collection[str]) -> frozenset[str]:
+    """``places`` and every element :data:`BOUND_HOPS` hops from them.
+
+    The one reader of the bound, for both the element check and the ground
+    check.
+    """
+    reach = frozenset(places)
+    for _ in range(BOUND_HOPS):
+        reach = index.reach(reach)
+    return reach
+
+
 def _bound_of(
     claim: Claim,
     known_ids: Collection[str],
@@ -446,8 +473,8 @@ def _bound_of(
 ) -> frozenset[str]:
     """The element IDs a claim may cite, from its grounds or from its prose.
 
-    A catalogued ground names an element or a flow, and the bound is one hop
-    from those (:meth:`~analysis_service.system_model.ModelIndex.reach`). A
+    A catalogued ground names an element or a flow, and the bound is
+    :data:`BOUND_HOPS` hops from those (:func:`within_bound`). A
     claim resting on quotes alone names none, so its bound is exactly what its
     own prose cites — the same resolution
     :func:`mentioned_ids` gives coverage — with no hop, since a description
@@ -458,7 +485,7 @@ def _bound_of(
         *(ground_places(ground, assertions) for ground in claim.grounds)
     )
     if places:
-        return index.reach(places)
+        return within_bound(index, places)
     return frozenset(
         resolved
         for mention in mentioned_ids(claim.description)
@@ -473,7 +500,7 @@ def _bound_element_references(
 
     The prompts say reach belongs in the description and
     ``affected_element_ids`` is what the action lands on. This is that rule in
-    code (#441): an ID more than one hop from every place the grounds name is
+    code (#441): an ID more than :data:`BOUND_HOPS` hops from every place the grounds name is
     dropped with :data:`BEYOND_GROUNDS` as its reason, on the same terms as an
     ID the model does not contain, and a claim left with none is dropped.
     """
@@ -526,7 +553,8 @@ def _scope_grounds(
 
     The other half of :func:`_bound_element_references`, and read by the same
     relation: a ground is in scope when one of the claim's elements is within
-    one hop of a place it names (:func:`~analysis_service.evidence.ground_places`).
+    :data:`BOUND_HOPS` hops of a place it names
+    (:func:`~analysis_service.evidence.ground_places`, :func:`within_bound`).
     Without it, a claim citing a fact about one flow could name a disjoint
     element and pass, as long as another ground reached that element (#926).
 
@@ -547,7 +575,7 @@ def _scope_grounds(
             for ground in claim.grounds
             if affected
             and (places := ground_places(ground, assertions))
-            and not index.reach(places) & affected
+            and not within_bound(index, places) & affected
         ]
         if not outside:
             drafts.append(claim)

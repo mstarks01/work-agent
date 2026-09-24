@@ -371,6 +371,46 @@ all of them.
 """
 
 
+#: A process three hops from the login flow the sample draft's grounds name:
+#: it reads the orders store, which is itself two hops from the login. So it
+#: sits past the fan-in bound (:data:`~analysis_service.fan_in.BOUND_HOPS`).
+REPORTING_JOB = "process:reporting-job"
+
+
+def three_hop_model(source_label: str = DEFAULT_DESCRIPTION_LABEL) -> SystemModel:
+    """:func:`valid_model` with a reporting job that reads the orders store."""
+    model = valid_model(source_label)
+    job = Process(
+        id=REPORTING_JOB,
+        name="Reporting Job",
+        technology="cron",
+        trust_zone="boundary:internal-network",
+        exposure="unknown",
+        interface_kind="non-web",
+        source_excerpt="orders are stored in Postgres",
+        source_label=source_label,
+    )
+    read = DataFlow(
+        id=f"flow:{REPORTING_JOB}>store:orders-db>read-orders",
+        name="Read Orders",
+        source=REPORTING_JOB,
+        destination="store:orders-db",
+        protocol="unknown",
+        authentication="unknown",
+        data_description="orders",
+        encryption_in_transit="unknown",
+        operations="read",
+        source_excerpt="orders are stored in Postgres",
+        source_label=source_label,
+    )
+    return model.model_copy(
+        update={
+            "processes": [*model.processes, job],
+            "data_flows": [*model.data_flows, read],
+        }
+    )
+
+
 def valid_model(source_label: str = DEFAULT_DESCRIPTION_LABEL) -> SystemModel:
     """The shared gate-passing model.
 

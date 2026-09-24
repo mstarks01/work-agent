@@ -553,9 +553,10 @@ and the claim stands on the elements that resolved. A claim that named elements
 and lost every one is in `dropped_claims` instead.
 
 `reason` is empty when the model does not contain the ID. It reads `more than
-one hop from every place the claim's grounds name` when the ID exists and the
-claim's own grounds do not reach it: a cited flow reaches its two endpoints, a
-cited element reaches its flows and their far ends, and nothing further. A
+two hops from every place the claim's grounds name` when the ID exists and the
+claim's own grounds do not reach it. One hop takes a cited flow to its two
+endpoints, and a cited element to its flows and their far ends; the bound is
+two such hops, and nothing further. A
 claim resting on quotes alone is bounded by the IDs its own description cites,
 with no hop. Reach belongs in the description; `affected_element_ids` is what
 the action lands on.
