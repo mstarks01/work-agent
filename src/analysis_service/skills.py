@@ -114,21 +114,18 @@ def compose_lane_skills(
 
 
 def compose_critic_skills(loader: MarkdownLoader, package: FrameworkPackage) -> str:
-    """One package's critic skill text: rubric, critic text, lane digest.
+    """One package's critic skill text: critic text and lane digest.
 
-    No threat catalogs, mitigations, or domain packs — verdicts anchor to
-    System Model facts, not generative material.
+    No threat catalogs, mitigations, domain packs or severity rubric —
+    verdicts anchor to System Model facts, not generative material, and the
+    critic rates no severity.
 
     The package's own ``critic.md`` is what makes the three verdict states mean
     this framework's question rather than another's. The service keeps the
     states, the field rules and the review seam; the package says what
     ``confirmed`` asserts.
     """
-    parts = []
-    if package.carries_severity():
-        parts.append(loader.load(SEVERITY_RUBRIC_DOC))
-    parts.append(loader.load(CRITIC_DOC))
-    parts.append(lane_boundary_digest(loader, package))
+    parts = [loader.load(CRITIC_DOC), lane_boundary_digest(loader, package)]
     return "\n\n".join(part.strip() for part in parts) + "\n"
 
 
