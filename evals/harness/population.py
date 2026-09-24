@@ -41,6 +41,7 @@ from analysis_service.assertions import (
     GATE_REFUSALS,
     UNKNOWN,
     AssertionRecord,
+    CatalogProposal,
     apply_projection,
     assertion_id,
     offered,
@@ -49,6 +50,11 @@ from analysis_service.assertions import (
 from analysis_service.reassess import Verdict, reassess
 from analysis_service.report import Report
 from analysis_service.system_model import SystemModel
+from evals.harness.artifact import load_artifact
+from evals.harness.bundle import assertions_from_reports
+from evals.harness.reference import GoldenCase, load_corpus
+
+CORPUS = Path(__file__).resolve().parents[1] / "corpus"
 
 Route = Literal["projected", "offered", "open", "set-aside", "refused"]
 
@@ -182,12 +188,63 @@ def arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument(
         "reports",
         type=Path,
+        nargs="*",
+        help="report files (*.report.json)",
+    )
+    parser.add_argument(
+        "--assertions",
+        type=Path,
         nargs="+",
-        help="report files (*.report.json); the case is the file's stem",
+        default=[],
+        help="assertion-mode sweep artifacts, each with its .reports/ dir; each"
+        " case's catalog is resolved on the case's reviewed model",
+    )
+    parser.add_argument(
+        "--corpus",
+        type=Path,
+        default=CORPUS,
+        help="corpus root, for the models and sources an assertion sweep read",
     )
     parser.add_argument(
         "--out", type=Path, required=True, help="where to write the population"
     )
+
+
+def label(path: Path) -> str:
+    """The key a report is frozen under: its path, without the suffix.
+
+    The run as well as the case, because two runs of one case are two
+    populations, and a key by case alone let the second overwrite the first.
+    """
+    return str(path.with_name(path.name.removesuffix(".report.json")))
+
+
+def assertion_reports(
+    path: Path, cases: Sequence[GoldenCase]
+) -> dict[str, dict[str, Any]]:
+    """One assertion-mode sweep's catalogs, in the shape :func:`freeze` reads.
+
+    The sweep keeps each case's proposal, not the gate's record, so the
+    record is rebuilt here by :meth:`~AssertionRecord.of` on the case's
+    reviewed model and sources, the inputs the ``assert`` node read. That
+    runs the same resolver and quarantine as a job, so a refused row is
+    counted by the same reader either way.
+    """
+    held = [case for case in cases if case.id in load_artifact(path).cases]
+    by_id = {case.id: case for case in held}
+    reports = {}
+    for case_id, result in assertions_from_reports(path, held).items():
+        case = by_id[case_id]
+        record = AssertionRecord.of(
+            CatalogProposal.model_validate(result.proposal),
+            case.model,
+            {source.label: source.text for source in case.sources},
+        )
+        reports[f"{path.with_suffix('')}/{case_id}"] = {
+            "assertions": record.model_dump(mode="json"),
+            "system_model": case.model.model_dump(mode="json"),
+        }
+    return reports
 
 
 def command_freeze_population(args: argparse.Namespace) -> int:
@@ -200,11 +257,15 @@ def command_freeze_population(args: argparse.Namespace) -> int:
         return 1
     try:
         reports = {
-            path.name.removesuffix(".report.json"): json.loads(
-                path.read_text(encoding="utf-8")
-            )
+            label(path): json.loads(path.read_text(encoding="utf-8"))
             for path in args.reports
         }
+        if args.assertions:
+            cases = load_corpus(args.corpus)
+            for path in args.assertions:
+                reports.update(assertion_reports(path, cases))
+        if not reports:
+            raise PopulationError("name at least one report or assertion sweep")
         frozen = freeze(reports)
     except (OSError, ValueError) as error:
         print(f"cannot freeze: {error}", file=sys.stderr)

@@ -10,6 +10,7 @@ from __future__ import annotations
 import argparse
 import json
 from datetime import UTC, datetime
+from pathlib import Path
 
 import pytest
 
@@ -152,13 +153,15 @@ class TestAPopulationIsFrozenBeforeReview:
         source = tmp_path / "case.report.json"
         source.write_text(json.dumps(report(record(stated()))), encoding="utf-8")
         out = tmp_path / "population.json"
-        args = argparse.Namespace(reports=[source], out=out)
+        args = argparse.Namespace(
+            reports=[source], assertions=[], corpus=population.CORPUS, out=out
+        )
 
         assert population.command_freeze_population(args) == 0
         first = out.read_text(encoding="utf-8")
         assert population.command_freeze_population(args) == 1
         assert out.read_text(encoding="utf-8") == first
-        assert set(json.loads(first)["cases"]) == {"case"}
+        assert set(json.loads(first)["cases"]) == {str(tmp_path / "case")}
 
     def test_the_command_is_registered(self) -> None:
         assert COMMANDS["freeze-population"].run is (
@@ -243,3 +246,41 @@ class TestReassessingAReport:
 
     def test_the_command_is_registered(self) -> None:
         assert COMMANDS["reassess"].run is population.command_reassess
+
+
+class TestAnAssertionSweepIsFrozenToo:
+    """``freeze-population --assertions``: the cheap runs' catalogs, by run and case."""
+
+    SWEEP = (
+        Path(__file__).resolve().parents[1]
+        / "evals/emissions/20260916T-assert-holdouts/luna-after-r1.json"
+    )
+
+    def test_every_case_of_a_sweep_is_frozen_with_its_rows(self, tmp_path) -> None:
+        out = tmp_path / "population.json"
+        args = argparse.Namespace(
+            reports=[], assertions=[self.SWEEP], corpus=population.CORPUS, out=out
+        )
+
+        assert population.command_freeze_population(args) == 0
+        frozen = json.loads(out.read_text(encoding="utf-8"))
+        assert len(frozen["cases"]) == 4
+        for key, held in frozen["cases"].items():
+            assert key.startswith(str(self.SWEEP.with_suffix("")))
+            assert held["rows"]
+
+    def test_two_runs_of_one_case_are_two_populations(self, tmp_path) -> None:
+        held = report(record(stated(), mfa()))
+        paths = []
+        for run in ("off", "on"):
+            path = tmp_path / run / "case.report.json"
+            path.parent.mkdir()
+            path.write_text(json.dumps(held), encoding="utf-8")
+            paths.append(path)
+        out = tmp_path / "population.json"
+        args = argparse.Namespace(
+            reports=paths, assertions=[], corpus=population.CORPUS, out=out
+        )
+
+        assert population.command_freeze_population(args) == 0
+        assert len(json.loads(out.read_text(encoding="utf-8"))["cases"]) == 2
