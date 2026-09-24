@@ -26,14 +26,12 @@ import json
 import sys
 from pathlib import Path
 
-from google.genai import types
-
 from analysis_service.deployment import Deployment
 from analysis_service.frameworks import PACKAGES, FrameworkName, schemas_for
 from analysis_service.markdown_loader import MarkdownLoader
 from evals.critic_review.loading import REPO_ROOT, corpus_model, load_fixtures
 from evals.critic_review.model import CriticFixture
-from evals.critic_review.replay import replay
+from evals.critic_review.replay import replay, user_turn
 from evals.harness.node_call import node_call
 
 
@@ -98,14 +96,12 @@ def main(argv: list[str] | None = None) -> int:
     package = PACKAGES[framework]
     model = corpus_model(_one_case(fixtures))
     # The node's own route, sampling and output schema, through the one helper
-    # every replay uses, so what reaches the provider has the shape a real
-    # critic call has. The user turn is the single word this replay has always
-    # sent; a real critic receives its fan-in's summary, which the fixture set
-    # does not carry.
+    # every replay uses, and the user turn a real critic receives: its fan-in's
+    # summary, built by the function the merge node returns it from.
     node = node_call(
         Deployment.from_env(), _critic_node(framework), schemas_for(framework).rulings
     )
-    turn = types.Content(role="user", parts=[types.Part(text="Rule.")])
+    turn = user_turn(fixtures, package)
 
     async def call(instruction: str) -> str:
         return await node(instruction, turn)

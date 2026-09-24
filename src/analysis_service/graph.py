@@ -1997,13 +1997,25 @@ def merge_drafts(
     )
     return _routed(
         ROUTE_REVIEW if merged.drafts else ROUTE_SETTLED,
-        {
-            "framework": nodes.name,
-            "draft_count": len(merged.drafts),
-            "unverified_count": len(merged.marks.unverified_grounds),
-            "unresolved_mention_count": len(merged.marks.unresolved_mentions),
-        },
+        merge_summary(nodes.name, merged.drafts, merged.marks),
     )
+
+
+def merge_summary(
+    framework: FrameworkName, drafts: Sequence[Claim], marks: AnalysisMarks
+) -> dict[str, Any]:
+    """What the ``merge`` node outputs, and so the user turn its critic receives.
+
+    ADK hands a node's output to the next node through ``to_user_content``, so
+    this dictionary is the critic's user turn. The one reader of that shape: the
+    node returns it, and the critic replay builds its request from it.
+    """
+    return {
+        "framework": framework,
+        "draft_count": len(drafts),
+        "unverified_count": len(marks.unverified_grounds),
+        "unresolved_mention_count": len(marks.unresolved_mentions),
+    }
 
 
 def route_review(
