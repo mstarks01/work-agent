@@ -409,7 +409,13 @@ def test_the_net_kill_count_agrees_with_the_loss_instrument(case):
     produced = [promote(saved)]
     scored = score_case_with_yield(case, [killed, saved], produced, matcher, Ledger())
     charged = attribute_case(
-        case, scored.score, [killed, saved], produced, flows, Block(produced)
+        case,
+        scored.score,
+        [killed, saved],
+        produced,
+        flows,
+        Block(produced),
+        proposed=None,
     )
 
     critic_rows = [loss for loss in charged.losses if loss.cause == "critic"]

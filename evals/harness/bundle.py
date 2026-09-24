@@ -338,7 +338,18 @@ def runs_from_reports(artifact: Path, cases: Sequence[GoldenCase]) -> dict[str, 
             )
             for framework, claims in raw.items()
         }
-        runs[case.id] = modes.AnalysisRun(report=report, drafts=drafts)
+        # The lanes' proposals where the sweep archived them: `losses` reads
+        # them for the `fan-in` cause, and a sweep from before they were kept
+        # leaves that cause undecided rather than refused.
+        proposals_path = directory / f"{case.id}.proposals.json"
+        proposals = (
+            json.loads(proposals_path.read_text(encoding="utf-8"))
+            if proposals_path.exists()
+            else {}
+        )
+        runs[case.id] = modes.AnalysisRun(
+            report=report, drafts=drafts, proposals=proposals
+        )
     if not runs:
         raise modes.EvalRunError(
             f"{directory} carries no report for any case in the artifact"

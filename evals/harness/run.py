@@ -640,7 +640,13 @@ def _score_runs(
         # block's own record of how its first critic pass failed.
         charged.append(
             losses.attribute_case(
-                case, entry.score, drafts, produced, flows_by_case[case.id], block
+                case,
+                entry.score,
+                drafts,
+                produced,
+                flows_by_case[case.id],
+                block,
+                proposed=runs[case.id].proposals.get("stride"),
             )
         )
     return (
