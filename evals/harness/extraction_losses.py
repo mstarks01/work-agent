@@ -98,8 +98,10 @@ class ReferenceFate:
     must_find: bool | None
     #: The reference's elements no element of the extracted model stands for,
     #: read off the alignment rather than the exact ID, so an element found
-    #: under a reader's alias is carried and not missing (#961). Only on an
-    #: ``extraction`` fate of a package whose references name elements.
+    #: under a reader's alias is carried and not missing (#961). On an
+    #: ``extraction`` or a ``downstream`` fate of a package whose references
+    #: name elements: a reference both runs missed can have lost its place at
+    #: extraction as well, and :attr:`extraction_contributed` says so.
     missing_elements: tuple[str, ...] = ()
     #: ``<element>.<attribute>: <blessed> -> <extracted>`` for every scored
     #: attribute that differs on a reference element the model did carry.
@@ -136,6 +138,25 @@ class ReferenceFate:
         return "held_the_place"
 
     @property
+    def extraction_contributed(self) -> str | None:
+        """On a ``downstream`` loss, what the extracted model also lacked, or ``None``.
+
+        A reference both runs missed is charged to the lanes by
+        :mod:`evals.harness.losses`, and the end-to-end run may have lost it at
+        extraction as well: two phases contributed, and a row that named only
+        one would hide the other. Kept apart from :attr:`lacked`, which reads an
+        ``extraction`` fate alone, so the figures that already rest on it do
+        not move.
+        """
+        if self.fate != "downstream" or not self.extraction_read:
+            return None
+        if self.missing_elements:
+            return "element_missing"
+        if self.differing_attributes:
+            return "attribute_differs"
+        return None
+
+    @property
     def held_the_place(self) -> bool:
         """An ``extraction`` loss on a measured model that carried the place unchanged."""
         return self.lacked == "held_the_place"
@@ -148,6 +169,7 @@ class ReferenceFate:
             "missing_elements": list(self.missing_elements),
             "differing_attributes": list(self.differing_attributes),
             "lacked": self.lacked,
+            "extraction_contributed": self.extraction_contributed,
             "held_the_place": self.held_the_place,
         }
 
@@ -351,7 +373,7 @@ def _case_handoff(
         fate = _fate(reference, found, blessed)
         missing: tuple[str, ...] = ()
         differing: tuple[str, ...] = ()
-        if fate == "extraction" and extraction is not None:
+        if fate in ("extraction", "downstream") and extraction is not None:
             missing, differing = _lacked(claim.affected_element_ids, extraction)
         rows.append(
             ReferenceFate(
@@ -371,12 +393,15 @@ def pooled(rows: Sequence[CaseHandoff]) -> dict[str, Any]:
     totals: Counter[str] = Counter()
     must_find: Counter[str] = Counter()
     lacked: Counter[str] = Counter()
+    contributed: Counter[str] = Counter()
     for row in rows:
         for entry in row.fates:
             totals[entry.fate] += 1
             must_find[entry.fate] += bool(entry.must_find)
             if entry.lacked is not None:
                 lacked[entry.lacked] += 1
+            if entry.extraction_contributed is not None:
+                contributed[entry.extraction_contributed] += 1
     return {
         "cases": len(rows),
         "references": sum(totals.values()),
@@ -385,6 +410,9 @@ def pooled(rows: Sequence[CaseHandoff]) -> dict[str, Any]:
         # What the extracted model lacked at each extraction loss, one kind
         # per row, off :attr:`ReferenceFate.lacked`.
         "extraction_lacked": {kind: lacked[kind] for kind in LACKED_KINDS},
+        # The downstream losses extraction also contributed to: two phases on
+        # one reference, off :attr:`ReferenceFate.extraction_contributed`.
+        "downstream_extraction_contributed": dict(sorted(contributed.items())),
         "cases_with_crossings_mismatch": sum(
             1
             for row in rows
@@ -449,6 +477,14 @@ def render(rows: Sequence[CaseHandoff], warnings: Sequence[str]) -> None:
         + "; extraction losses lacked: "
         + ", ".join(
             f"{kind} {count}" for kind, count in totals["extraction_lacked"].items()
+        )
+        + "; downstream losses extraction also contributed to: "
+        + (
+            ", ".join(
+                f"{kind} {count}"
+                for kind, count in totals["downstream_extraction_contributed"].items()
+            )
+            or "none"
         )
         + " (instrument, non-gating)"
     )

@@ -179,6 +179,40 @@ class TestWhatTheModelLacked:
         assert flow_id in rows[0].extraction.missing
         assert pooled(rows)["extraction_lacked"]["element_missing"] == 1
 
+    def test_a_loss_both_runs_share_still_names_what_extraction_lost(
+        self,
+        tmp_path,
+        sampling,  # noqa: F811
+        case,
+    ):
+        """The multi-phase fixture: the lanes lost it, and so did extraction."""
+        index, flow_id = flow_reference(case)
+        n = len(case.stride_claims())
+        end, analysis = pair(
+            tmp_path,
+            provenance(sampling),
+            end_matched=[],
+            analysis_matched=[],
+            references=n,
+        )
+        write_report_model(end, CASE, without_flow(case.model, flow_id))
+        runs = load_runs([end, analysis])
+        rows = attribute_handoff(
+            runs[0], runs[1], {CASE: case}, {CASE: extracted_model(end, CASE)}
+        )
+        row = {e.reference: e for e in rows[0].fates}[str(index)]
+
+        assert row.fate == "downstream"
+        assert row.lacked is None, "lacked reads an extraction fate alone"
+        assert row.extraction_contributed == "element_missing"
+        assert row.missing_elements == (flow_id,)
+        citing = sum(
+            1 for claim in case.stride_claims() if flow_id in claim.affected_element_ids
+        )
+        assert pooled(rows)["downstream_extraction_contributed"] == {
+            "element_missing": citing
+        }
+
     def test_an_invented_control_is_named_where_the_reference_cites_the_flow(
         self,
         tmp_path,
