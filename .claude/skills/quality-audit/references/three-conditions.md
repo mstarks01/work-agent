@@ -177,9 +177,17 @@ mechanism cheaply. Then measure the benefit to an ordinary end-to-end report,
 and confirm it on fresh, frozen cases with independent repeats at a declared
 budget (#1093).
 
-**Oracle-assisted conditions never qualify a promotion.** `corrected-extraction`
-and `direct-facts` read signed material. A promotion reads the shipped route
-on material the change never saw.
+**Oracle-assisted conditions never qualify a promotion of the route.**
+`corrected-extraction` and `direct-facts` read signed material. A promotion
+reads the shipped route on material the change never saw.
+
+**One exception: a gate that isolates one flag.** A gate that holds the signed
+model fixed to compare one switch on and off may read `analysis` mode, because
+the fixed model is its control, and not a claim about the route. The
+`ANALYSIS_ASSERTIONS` gates in `evals/harness/promotion.py` (#926) are the case
+the maintainer accepted on 2026-09-24. Such a gate decides the flag only. A
+claim that the whole route improved still needs the ordinary pipeline on fresh
+cases.
 
 Declare beforehand what gain is material and which trade-offs are acceptable. A
 recall gain with more unsupported output, or with too much review burden, is
