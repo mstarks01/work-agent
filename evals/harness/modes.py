@@ -28,11 +28,16 @@ from __future__ import annotations
 
 import re
 from collections import Counter
-from collections.abc import Callable, Iterable, Mapping, Sequence
+from collections.abc import AsyncGenerator, Callable, Iterable, Mapping, Sequence
+from contextvars import ContextVar
 from dataclasses import dataclass, field, replace
 from datetime import UTC, datetime
 from types import MappingProxyType
 from typing import Any, Literal, NamedTuple, get_args
+
+from google.adk.models.base_llm import BaseLlm
+from google.adk.models.llm_response import LlmResponse
+from google.genai import types
 
 from analysis_service.analysis import (
     comparable_asset_tags,
@@ -59,6 +64,7 @@ from analysis_service.basis import (
 from analysis_service.basis import (
     Coverage as BasisCoverage,
 )
+from analysis_service.binding import build_tier_adapters, make_resolve_model
 from analysis_service.claims import (
     Claim,
     FrameworkName,
@@ -68,6 +74,7 @@ from analysis_service.deployment import Deployment
 from analysis_service.execution import GraphExecutor, GraphFailed, GraphRun
 from analysis_service.frameworks.stride.record import DraftThreat
 from analysis_service.graph import (
+    ASSERT_NODE,
     ENTRY_ASSERT_ONLY,
     ENTRY_EXTRACT,
     ENTRY_EXTRACT_ONLY,
@@ -91,6 +98,7 @@ from analysis_service.graph import (
     Pipeline,
     Rejected,
     result_of,
+    tier_node_by_graph_node,
 )
 from analysis_service.report import (
     FrameworkSelection,
@@ -2279,6 +2287,92 @@ async def run_analysis(case: GoldenCase, pipeline: Pipeline) -> AnalysisRun:
     return _run_from_graph(case, graph_run, pipeline)
 
 
+#: The ``assert`` node's answer on the ``direct-facts`` route: the case's signed
+#: proposal. A context variable because one pipeline serves every case of a
+#: sweep and each case runs as its own task, so the answer is set per case and
+#: read by :class:`SignedFactsLlm` inside that task.
+SIGNED_PROPOSAL: ContextVar[CatalogProposal | None] = ContextVar(
+    "signed_proposal", default=None
+)
+
+#: The name :class:`SignedFactsLlm` carries. It reports no served build, so
+#: the node run records no served identity, the way a deterministic node's
+#: does: no provider answered. The artifact's ``mode`` says where the rows
+#: came from.
+SIGNED_FACTS_MODEL = "signed-reference-facts"
+
+
+class SignedFactsLlm(BaseLlm):
+    """The ``assert`` node's model on the ``direct-facts`` route.
+
+    It answers with the case's signed ``facts.json`` rows as a proposal, so the
+    rest of the graph — the resolver, the gate, the projection, the evidence
+    catalog, the lanes, the critic and the report — runs exactly as it runs
+    behind a real ``assert`` call. It costs nothing and reports no usage.
+    """
+
+    async def generate_content_async(
+        self, llm_request: Any, stream: bool = False
+    ) -> AsyncGenerator[LlmResponse, None]:
+        proposal = SIGNED_PROPOSAL.get()
+        if proposal is None:
+            raise EvalRunError(
+                "the direct-facts route ran with no signed proposal set; the"
+                " assert node would have answered with nothing"
+            )
+        yield LlmResponse(
+            content=types.Content(
+                role="model", parts=[types.Part(text=proposal.model_dump_json())]
+            ),
+        )
+
+
+def build_direct_facts_pipeline(
+    deployment: Deployment,
+    frameworks: Sequence[FrameworkName],
+    shipped: ModelResolver | None = None,
+) -> Pipeline:
+    """The analysis-mode graph with the assertion pass on, answered by signed facts.
+
+    The ``direct-facts`` condition of the quality-audit skill's diagnostic: the
+    blessed model, as in ``analysis`` mode, *and* every signed source fact as
+    an assertion row, so a fact the System Model has no field for still reaches
+    the lanes as a citable row. Every node but ``assert`` runs on its shipped
+    tier adapter; ``shipped`` replaces those adapters for an offline test,
+    which has no credentials for the check building them runs.
+    """
+    deployment = replace(deployment, assertions=True)
+    if shipped is None:
+        adapters = build_tier_adapters(
+            deployment.tiers,
+            deployment.sampling,
+            deployment.resilience,
+            env=deployment.env,
+        )
+        shipped = make_resolve_model(adapters, deployment.tiers)
+    signed_node = tier_node_by_graph_node(frameworks)[ASSERT_NODE]
+
+    def resolve(node: str) -> str | BaseLlm:
+        return (
+            SignedFactsLlm(model=SIGNED_FACTS_MODEL)
+            if node == signed_node
+            else shipped(node)
+        )
+
+    return deployment.pipeline(frameworks, entry=ENTRY_PREPARE, resolve_model=resolve)
+
+
+async def run_direct_facts(
+    case: GoldenCase, pipeline: Pipeline, proposal: CatalogProposal
+) -> AnalysisRun:
+    """The ``direct-facts`` mode: ``analysis`` mode, with ``proposal`` as the catalog."""
+    token = SIGNED_PROPOSAL.set(proposal)
+    try:
+        return await run_analysis(case, pipeline)
+    finally:
+        SIGNED_PROPOSAL.reset(token)
+
+
 async def run_end_to_end(case: GoldenCase, pipeline: Pipeline) -> AnalysisRun:
     """Mode 3: text in, report out — the integration smoke test."""
     graph_run = await run_graph(
@@ -2379,6 +2473,11 @@ MODE_ENTRIES: dict[str, Entry] = {
     "extraction": ENTRY_EXTRACT_ONLY,
     "assertions": ENTRY_ASSERT_ONLY,
     "analysis": ENTRY_PREPARE,
+    # The quality-audit skill's ``direct-facts`` condition: ``analysis`` with
+    # the case's signed facts as the assertion catalog. Built by
+    # :func:`build_direct_facts_pipeline`, because its ``assert`` node answers
+    # with those facts rather than calling a model.
+    "direct-facts": ENTRY_PREPARE,
     "end-to-end": ENTRY_EXTRACT,
     # #1003's arm mode: one arm's head, stopped at the catalog its endpoint is
     # scored on. It is the end-to-end graph with the lanes left off rather than
@@ -2400,7 +2499,7 @@ EXTRACTING_MODES: frozenset[str] = frozenset(
 #: validity gate and returns an :class:`ExtractionResult`, so a sweep of it has
 #: no report to persist and says so rather than writing an empty file
 #: ([#180](https://github.com/mstarks01/work-agent/issues/180)).
-REPORTING_MODES: frozenset[str] = frozenset({"analysis", "end-to-end"})
+REPORTING_MODES: frozenset[str] = frozenset({"analysis", "direct-facts", "end-to-end"})
 
 
 def render_extraction(scores: Sequence[ExtractionScore]) -> None:

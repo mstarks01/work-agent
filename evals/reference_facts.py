@@ -254,6 +254,15 @@ def drafted_cases(corpus_dir: Path) -> list[Path]:
     )
 
 
+def signed_proposal(facts: ReferenceFacts) -> CatalogProposal:
+    """The case's signed rows as the proposal an ``assert`` node would emit.
+
+    The one reader of that shape: the reference catalog resolves it, and the
+    ``direct-facts`` eval mode hands it to a graph in place of the node's call.
+    """
+    return CatalogProposal(assertions=[row.assertion for row in facts.rows])
+
+
 def reference_catalog(
     facts: ReferenceFacts, model: SystemModel, sources: Mapping[str, str]
 ) -> AssertionCatalog:
@@ -276,8 +285,7 @@ def reference_catalog(
     rather than go through the harness loader it refuses to check the corpus
     through.
     """
-    proposal = CatalogProposal(assertions=[row.assertion for row in facts.rows])
-    record = AssertionRecord.of(proposal, model, sources)
+    record = AssertionRecord.of(signed_proposal(facts), model, sources)
     if record.issues:
         listed = "; ".join(
             f"row {issue.row}: {issue.code}: {issue.message}"

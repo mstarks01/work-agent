@@ -105,16 +105,16 @@ Stage = Literal["analysis", "final-report"]
 #: Which stage each condition of the skill's three-condition diagnostic can be
 #: measured at. ``current-pipeline`` is the shipped route. ``corrected-extraction``
 #: feeds the signed model through the same preparation and consumers, which
-#: ``analysis`` mode already runs to a report. ``direct-facts`` feeds the signed
-#: facts to analysis without the System Model, and no route carries that
-#: output on to fan-in, criticism and the report (#1091), so it reaches the
-#: analysis stage only and a final-report reading of it is refused. A condition
-#: added here without an entry cannot be recorded at all.
+#: ``analysis`` mode already runs to a report. ``direct-facts`` adds every signed
+#: source fact as an assertion row, so a fact the System Model has no field for
+#: reaches the lanes, and the ``direct-facts`` eval mode runs it to a report;
+#: ``run.py lane-replay`` reads it at the analysis stage for one call. A
+#: condition added here without an entry cannot be recorded at all.
 CONDITION_STAGES: Mapping[ConditionName, tuple[Stage, ...]] = MappingProxyType(
     {
         "current-pipeline": ("analysis", "final-report"),
         "corrected-extraction": ("analysis", "final-report"),
-        "direct-facts": ("analysis",),
+        "direct-facts": ("analysis", "final-report"),
     }
 )
 
