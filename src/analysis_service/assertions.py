@@ -974,6 +974,11 @@ def subject_id(subject_type: str, name: str) -> str:
     question. Unscoped rows about different facts attach to one subject, and
     nothing can tell them apart: the extraction prompt names such things apart
     instead. ``tests/test_reassess.py`` holds all three.
+
+    **A name may be written as the ID it implies**, ``credential:api-key`` for
+    ``API key``, and it names the same subject: the type's own prefix is
+    dropped before the slug, so it is never doubled. Another type's prefix is
+    part of the name.
     """
     if subject_type in GRAPH_BOUND:
         raise ValueError(
@@ -982,7 +987,11 @@ def subject_id(subject_type: str, name: str) -> str:
     prefixes = SUBJECT_PREFIXES.get(subject_type)
     if prefixes is None:
         raise ValueError(f"unknown subject type {subject_type!r}")
-    return f"{next(iter(prefixes))}:{normalize_name(name)}"
+    prefix = next(iter(prefixes))
+    typed, _, rest = name.partition(":")
+    if rest and typed.strip().lower() == prefix:
+        name = rest
+    return f"{prefix}:{normalize_name(name)}"
 
 
 def assertion_id(assertion: Assertion) -> str:
