@@ -107,6 +107,20 @@ by lane, from the `place` and `unled` rows:
 Ceiling 33 must-finds of 129, and the elevation lane holds 13 of them. The
 ceiling is a price and not a bound, as `evals/TUNING.md` step 3 says.
 
+## Priced again on Baseline 6bff717
+
+Offline, 2026-09-24, in `QA-2026-09-24-03-E1`. The table above counts every
+`place` and `unled` row, but the second call reaches only a must-find whose
+place sits on a unit no draft cited. Of the 25 such must-finds on 6bff717, 8
+sit on an unanswered unit at the scorer's grain. 10 share only one element with
+one, and 7 have none near them. So the ceiling is 8 must-finds.
+
+`QA-2026-09-24-03-E2` then compared a prototype second call with a plain
+repeat, three calls a side on four must-finds in cases 01 and 07. The second
+call won on one row, tied on three, and cost about the same as a repeat. It
+recovered a miss that was variance. It did not change a place or a direction
+that the lane chose every time.
+
 ## Measurement before acceptance
 
 Five runs of case 01 each way against the control, reading matched and
