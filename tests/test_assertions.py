@@ -8,6 +8,7 @@ test per refusal, plus the three audit probes (#925) this layer answers and the
 one it deliberately does not.
 """
 
+import re
 from typing import get_args
 
 import pytest
@@ -71,6 +72,7 @@ from analysis_service.assertions import (
     support_span,
 )
 from analysis_service.claims import Ground
+from analysis_service.deployment import DEFAULT_PROMPTS_DIR
 from analysis_service.evidence import evidence_catalog, unknown_evidence_ref
 from analysis_service.system_model import UNKNOWN, SystemModel, all_attribute_names
 
@@ -201,6 +203,20 @@ class TestTheRegistryAnswersItsVocabularies:
         """
         assert projection_fields()["authentication-mechanism"] == "authentication"
         assert projection_fields()["credential-presented"] == "authentication"
+
+    def test_the_classification_tiers_are_the_extraction_contracts(self):
+        """Two readers of one field's vocabulary, held against each other.
+
+        ``extract.md`` lists the tiers the graph field takes and the predicate
+        projecting into that field carries its own copy, which the rendered
+        ``assert`` table shows. ``unknown`` is universal to every predicate, so
+        it is the one tier the registry does not repeat.
+        """
+        section = (DEFAULT_PROMPTS_DIR / "extract.md").read_text(encoding="utf-8")
+        section = section.split("### `data_classification`", 1)[1].split("###", 1)[0]
+        tiers = set(re.findall(r"^- `([a-z]+)` —", section, flags=re.MULTILINE))
+
+        assert tiers - {UNKNOWN} == REGISTRY["data-classification"].terms
 
 
 class TestSubjectIdentity:
