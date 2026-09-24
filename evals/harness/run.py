@@ -76,6 +76,7 @@ from evals.harness import (
     guard_cost,
     instruction,
     instruction_delta,
+    lane_replay,
     ledger,
     losses,
     modes,
@@ -2400,6 +2401,12 @@ COMMANDS: dict[str, Command] = {
         " run (no credentials)",
         run=promotion.command_gates,
         arguments=promotion.arguments,
+    ),
+    "lane-replay": Command(
+        help="send one lane's captured request again and print what it proposes:"
+        " a place loss read at the price of one call (#1091, one paid call)",
+        run=lane_replay.command_lane_replay,
+        arguments=lane_replay.arguments,
     ),
     "freeze-population": Command(
         help="record which assertion rows reached a lane, before any support"

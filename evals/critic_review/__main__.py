@@ -26,16 +26,15 @@ import json
 import sys
 from pathlib import Path
 
-from google.adk.models.llm_request import LlmRequest
 from google.genai import types
 
-from analysis_service.binding import build_tier_adapters
 from analysis_service.deployment import Deployment
 from analysis_service.frameworks import PACKAGES, FrameworkName, schemas_for
 from analysis_service.markdown_loader import MarkdownLoader
 from evals.critic_review.loading import REPO_ROOT, corpus_model, load_fixtures
 from evals.critic_review.model import CriticFixture
 from evals.critic_review.replay import replay
+from evals.harness.node_call import node_call
 
 
 def _one_framework(fixtures: list[CriticFixture]) -> FrameworkName:
@@ -98,50 +97,18 @@ def main(argv: list[str] | None = None) -> int:
     framework = _one_framework(fixtures)
     package = PACKAGES[framework]
     model = corpus_model(_one_case(fixtures))
-    deployment = Deployment.from_env()
-    # The tier the critic node runs on, read from the node map rather than
-    # named here: a deployment that moves the critic moves this run with it.
-    # Through ``tier_of``, which is the one reader of the two-step walk.
-    tier = deployment.tier_of(_critic_node(framework))
-    adapter = build_tier_adapters(
-        deployment.tiers,
-        deployment.sampling,
-        deployment.resilience,
-        env=deployment.env,
-    )[tier]
-
-    # The node's own sampling and the node's own output schema. ADK gives a
-    # real critic node both through its ``LlmAgent``: the tier's
-    # ``generate_content_config``, and a ``response_format`` derived from the
-    # agent's ``output_schema`` — ADK's LiteLLM adapter builds it from
-    # ``config.response_schema``. A request built without them is a shape this
-    # service never sends — ``ExecutedLlm`` says every node binds a schema and
-    # so never streams — and an unconstrained gpt-5.6 answered one with no text
-    # at all, which the replay could only report as a parse failure.
-    sampling = deployment.sampling.for_tier(tier)
-    schema = schemas_for(framework).rulings
+    # The node's own route, sampling and output schema, through the one helper
+    # every replay uses, so what reaches the provider has the shape a real
+    # critic call has. The user turn is the single word this replay has always
+    # sent; a real critic receives its fan-in's summary, which the fixture set
+    # does not carry.
+    node = node_call(
+        Deployment.from_env(), _critic_node(framework), schemas_for(framework).rulings
+    )
+    turn = types.Content(role="user", parts=[types.Part(text="Rule.")])
 
     async def call(instruction: str) -> str:
-        """One turn through the adapter the graph would have used.
-
-        The instruction goes in as the system instruction and the user turn is
-        the single word the graph's own critic turn carries, so what reaches
-        the provider has the shape a real critic call has.
-        """
-        config = sampling.to_generate_content_config()
-        config.system_instruction = instruction
-        config.response_schema = schema
-        request = LlmRequest(
-            model=adapter.model,
-            contents=[types.Content(role="user", parts=[types.Part(text="Rule.")])],
-            config=config,
-        )
-        chunks = []
-        async for response in adapter.generate_content_async(request, False):
-            for part in (response.content.parts if response.content else []) or []:
-                if part.text:
-                    chunks.append(part.text)
-        return "".join(chunks)
+        return await node(instruction, turn)
 
     score, problems = asyncio.run(
         replay(
