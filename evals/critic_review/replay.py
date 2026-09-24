@@ -31,10 +31,13 @@ from collections.abc import Awaitable, Callable, Iterable
 from dataclasses import dataclass
 from typing import Any, Protocol
 
-from analysis_service.claims import Ruling
+from google.adk.utils.content_utils import to_user_content
+from google.genai import types
+
+from analysis_service.claims import AnalysisMarks, Ruling
 from analysis_service.critic import complete_rulings, critic_view, review_issues
 from analysis_service.frameworks import FrameworkPackage, schemas_for
-from analysis_service.graph import render_fenced, rulings_of
+from analysis_service.graph import merge_summary, render_fenced, rulings_of
 from analysis_service.markdown_loader import MarkdownLoader
 from analysis_service.prompts import compose_critic_prompt
 from analysis_service.skills import compose_critic_skills
@@ -96,6 +99,21 @@ def compose(
         prompt = prompt.replace("{" + name + "}", block)
     skills = compose_critic_skills(package_loader, package)
     return f"{skills.strip()}\n\n{prompt.strip()}\n"
+
+
+def user_turn(
+    fixtures: list[CriticFixture], package: FrameworkPackage
+) -> types.Content:
+    """The user turn a critic receives over this fixture set.
+
+    ADK hands the ``merge`` node's output to the critic through
+    ``to_user_content``, and :func:`~analysis_service.graph.merge_summary` is
+    that output. The fixtures carry drafts and no fan-in marks, so the mark
+    counts in it are zero: the same gap :func:`compose` records for repaired
+    quotes, and closed the same way.
+    """
+    drafts = [_draft_of(fixture, package) for fixture in fixtures]
+    return to_user_content(merge_summary(package.name, drafts, AnalysisMarks()))
 
 
 def _draft_of(fixture: CriticFixture, package: FrameworkPackage) -> Any:
