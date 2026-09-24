@@ -641,7 +641,7 @@ class TestInteractions:
                 subject_kind="mention",
                 subject="m2",
                 predicate="data-classification",
-                value="pii",
+                value="confidential",
                 basis="stated",
                 quotes=quote(NOTE),
             )
@@ -658,7 +658,7 @@ class TestInteractions:
             (one.element_id, one.attribute, one.value)
             for one in project(resolution.record.catalog)
             if one.attribute == "data_classification"
-        ] == [("store:queue", "data_classification", "pii")]
+        ] == [("store:queue", "data_classification", "confidential")]
 
     def test_a_flow_keeps_what_the_interaction_does_to_the_data(self) -> None:
         """STRIDE's store-tampering rule skips a read-only path, and reads this.

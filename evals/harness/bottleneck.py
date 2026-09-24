@@ -1128,7 +1128,7 @@ def _operations_and_classification() -> Fixture:
                     "mention",
                     "ct",
                     "data-classification",
-                    "confidential personal data",
+                    "confidential",
                     "holds confidential personal data",
                     NOTE,
                 ),
@@ -1138,7 +1138,7 @@ def _operations_and_classification() -> Fixture:
             Want(
                 "the customer table",
                 "data-classification",
-                "confidential personal data",
+                "confidential",
                 "data_classification",
                 reader="asvs CLASSIFIED_STORE_TEST",
             ),
