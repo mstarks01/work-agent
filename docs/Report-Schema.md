@@ -836,21 +836,22 @@ class UnreconciledRuling:
     message: str  # the sentence the re-ask was asked to fix it by
 ```
 
-The eight kinds, each one a check the service already distinguishes in code:
+The nine kinds. Each is a check the service distinguishes in code, except `confirmed-on-unknown`, which only archived reports carry:
 
 | `kind` | What went wrong |
 | --- | --- |
 | `dropped` | The critic returned no ruling on a draft it was shown. |
 | `invented` | It ruled on an ID no lane agent drafted. |
 | `duplicate-id` | One ID carries more than one ruling. |
-| `confirmed-on-unknown` | A draft whose own grounds cite an unknown was ruled confirmed. |
+| `confirmed-on-unknown` | Archived reports only. A draft whose own grounds cite an unknown was ruled confirmed. Code decides the status and the critic writes none, so no review writes this kind. |
+| `dismissal-off-grounds` | A ruling names a fact in `immaterial_unknowns` that the draft's own grounds do not cite. |
 | `duplicate-on-unit` | A draft naming a catalog unit was rejected as a duplicate, which that framework decides by identifier first. |
-| `verdict-shape` | A verdict's fields disagree with its own `status`. |
+| `verdict-shape` | A rejection also names open facts, or a rejection or needs-info states no reason. |
 | `unresolved-unknown` | A `needs-info` names an element or attribute the model does not hold, or names nothing at all. |
 | `unbriefed-change` | The re-ask changed a ruling no problem named; the first pass's ruling was kept. |
 
-**Read `kind`, never the sentence.** The first seven kinds come from the first
-pass and the last from the second look, and one ruling can produce more than
+**Read `kind`, never the sentence.** `unbriefed-change` comes from the second
+look and the others from the first pass, and one ruling can produce more than
 one entry — so a consumer counting causes reads the field, and a consumer
 counting distinct rulings reads `claim_id`.
 

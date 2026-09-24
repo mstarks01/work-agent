@@ -3,6 +3,7 @@
 from typing import get_args
 
 import pytest
+from pydantic import ValidationError
 
 from analysis_service import critic
 from analysis_service.claims import (
@@ -123,8 +124,7 @@ class TestAssembleThreats:
             sample_ruling("S-01"),
             sample_ruling(
                 "S-02",
-                verdict=Verdict(
-                    status="needs-info",
+                verdict=ProposedVerdict(
                     reason="encryption at rest is unknown",
                     related_unknowns=[
                         UnknownRef(
@@ -144,8 +144,7 @@ class TestAssembleThreats:
             sample_ruling("S-01"),
             sample_ruling(
                 "S-02",
-                verdict=Verdict(
-                    status="rejected",
+                verdict=ProposedVerdict(
                     reason="duplicate of S-01",
                     rejected_because="duplicate",
                 ),
@@ -193,8 +192,7 @@ class TestAssembleThreats:
         rulings = [
             sample_ruling(
                 "S-01",
-                verdict=Verdict(
-                    status="needs-info",
+                verdict=ProposedVerdict(
                     reason="unverified control",
                     related_unknowns=[
                         UnknownRef(element_id="store:ghost", attribute="encryption")
@@ -218,8 +216,7 @@ class TestAssembleThreats:
         rulings = [
             sample_ruling(
                 "S-01",
-                verdict=Verdict(
-                    status="needs-info",
+                verdict=ProposedVerdict(
                     reason="the input does not say whether queries are parameterized",
                     related_unknowns=[
                         UnknownRef(subject="are database queries parameterized")
@@ -238,8 +235,7 @@ class TestAssembleThreats:
         rulings = [
             sample_ruling(
                 "S-01",
-                verdict=Verdict(
-                    status="needs-info",
+                verdict=ProposedVerdict(
                     reason="unsettled",
                     related_unknowns=[UnknownRef(subject="   ")],
                 ),
@@ -261,8 +257,7 @@ class TestAssembleThreats:
         rulings = [
             sample_ruling(
                 "S-01",
-                verdict=Verdict(
-                    status="needs-info",
+                verdict=ProposedVerdict(
                     reason="unsettled",
                     related_unknowns=[
                         UnknownRef(element_id="store:orders-db", attribute="exposure")
@@ -290,8 +285,7 @@ class TestAssembleThreats:
         rulings = [
             sample_ruling(
                 "S-01",
-                verdict=Verdict(
-                    status="needs-info",
+                verdict=ProposedVerdict(
                     reason="unverified control",
                     related_unknowns=[
                         UnknownRef(element_id="store:orders-db", attribute="exposure")
@@ -316,8 +310,7 @@ class TestAssembleThreats:
         rulings = [
             sample_ruling(
                 "S-01",
-                verdict=Verdict(
-                    status="needs-info",
+                verdict=ProposedVerdict(
                     reason="the note hints at a shared account",
                     related_unknowns=[
                         UnknownRef(element_id="process:web-app", attribute="notes")
@@ -333,7 +326,7 @@ class TestAssembleThreats:
 
 
 class TestVerdictShapeIsReAskableRatherThanFatal:
-    """The three rules a ``Verdict``'s own status implies, checked at this seam.
+    """The rules left between a ruling's fields, checked at this seam.
 
     Each one arrives as a :class:`ProposedVerdict`, which is what the critic
     node emits and what its ``output_schema`` therefore accepts without
@@ -350,20 +343,22 @@ class TestVerdictShapeIsReAskableRatherThanFatal:
     def _rulings(self, **verdict):
         return [sample_ruling("S-01", verdict=ProposedVerdict(**verdict))]
 
-    def test_a_needs_info_naming_no_unknown_is_reported(self, model):
+    def test_a_needs_info_without_a_reason_is_reported(self, model):
         problems = review_issues(
             [sample_draft("S-01")],
-            self._rulings(status="needs-info", reason="unclear"),
+            self._rulings(related_unknowns=[UnknownRef(subject="is it logged")]),
             model,
         )
 
-        assert "names no unknown attribute" in "; ".join(problems.messages)
+        assert "ruled needs-info and states no reason" in "; ".join(problems.messages)
 
-    def test_unknowns_on_a_verdict_that_is_not_needs_info_are_reported(self, model):
+    def test_open_facts_on_a_rejection_are_reported(self, model):
+        """A draft that fails a check rests on no open fact."""
         problems = review_issues(
             [sample_draft("S-01")],
             self._rulings(
-                status="confirmed",
+                rejected_because="reasoning",
+                reason="does not follow",
                 related_unknowns=[
                     UnknownRef(element_id="store:orders-db", attribute="technology")
                 ],
@@ -371,20 +366,24 @@ class TestVerdictShapeIsReAskableRatherThanFatal:
             model,
         )
 
-        assert "only meaningful on a needs-info verdict" in "; ".join(problems.messages)
+        assert "also names open facts" in "; ".join(problems.messages)
 
     def test_a_rejection_without_a_reason_is_reported(self, model):
         problems = review_issues(
-            [sample_draft("S-01")], self._rulings(status="rejected"), model
+            [sample_draft("S-01")],
+            self._rulings(rejected_because="reasoning"),
+            model,
         )
 
         assert "states no reason" in "; ".join(problems.messages)
 
     def test_the_threat_is_implicated_so_the_re_ask_can_read_it(self, model):
-        """Neither naming the unknown nor writing the reason can be done from an
-        ID — both are claims about a specific threat."""
+        """Writing the reason cannot be done from an ID — it is a claim about a
+        specific threat."""
         problems = review_issues(
-            [sample_draft("S-01")], self._rulings(status="rejected"), model
+            [sample_draft("S-01")],
+            self._rulings(rejected_because="reasoning"),
+            model,
         )
 
         assert problems.implicated == frozenset({"S-01"})
@@ -395,7 +394,6 @@ class TestVerdictShapeIsReAskableRatherThanFatal:
         problems = review_issues(
             [sample_draft("S-01")],
             self._rulings(
-                status="rejected",
                 rejected_because="evidence",
                 related_unknowns=[
                     UnknownRef(element_id="store:orders-db", attribute="technology")
@@ -405,25 +403,6 @@ class TestVerdictShapeIsReAskableRatherThanFatal:
         )
 
         assert len(problems.messages) == 2
-
-    def test_a_rejection_naming_no_step_is_reported(self, model):
-        """The rejected array is an audit trail, and the step is a field."""
-        problems = review_issues(
-            [sample_draft("S-01")],
-            self._rulings(status="rejected", reason="ungrounded"),
-            model,
-        )
-
-        assert "names no check in rejected_because" in "; ".join(problems.messages)
-
-    def test_a_step_on_a_verdict_that_is_not_rejected_is_reported(self, model):
-        problems = review_issues(
-            [sample_draft("S-01")],
-            self._rulings(status="confirmed", rejected_because="lane"),
-            model,
-        )
-
-        assert "only meaningful on a rejected verdict" in "; ".join(problems.messages)
 
     def test_a_malformed_threat_id_reads_as_a_drop_and_an_invention(self, model):
         """Both halves of the same typo, each nameable by the re-ask.
@@ -446,7 +425,7 @@ class TestVerdictShapeIsReAskableRatherThanFatal:
         with pytest.raises(CriticOutputError, match="states no reason"):
             assemble_claims(
                 [sample_draft("S-01")],
-                self._rulings(status="rejected"),
+                self._rulings(rejected_because="reasoning"),
                 model,
                 SCHEMAS,
             )
@@ -455,10 +434,34 @@ class TestVerdictShapeIsReAskableRatherThanFatal:
         """``ProposedVerdict`` in, ``Verdict`` out — so a threat on the report
         carries the shape the report defines, whatever the critic emitted."""
         threats, _ = assemble_claims(
-            [sample_draft("S-01")], self._rulings(status="confirmed"), model, SCHEMAS
+            [sample_draft("S-01")], self._rulings(), model, SCHEMAS
         )
 
         assert type(threats[0].verdict) is Verdict
+
+
+class TestTheFieldsDecideTheStatus:
+    """#1202: the critic answers two questions and code sets the verdict."""
+
+    def test_no_failed_check_and_no_open_fact_is_confirmed(self):
+        assert ProposedVerdict().status == "confirmed"
+
+    def test_an_open_fact_is_needs_info(self):
+        verdict = ProposedVerdict(related_unknowns=[UnknownRef(subject="is it")])
+
+        assert verdict.status == "needs-info"
+
+    def test_a_failed_check_is_rejected_whatever_else_it_names(self):
+        verdict = ProposedVerdict(
+            rejected_because="lane",
+            related_unknowns=[UnknownRef(subject="is it")],
+        )
+
+        assert verdict.status == "rejected"
+
+    def test_the_critic_cannot_write_a_status(self):
+        with pytest.raises(ValidationError):
+            ProposedVerdict.model_validate({"status": "confirmed"})
 
 
 class TestRulingsMergeOntoDrafts:
@@ -509,15 +512,11 @@ class TestRulingsMergeOntoDrafts:
         rulings = [
             sample_ruling(
                 "S-02",
-                verdict=Verdict(
-                    status="rejected", reason="dup", rejected_because="duplicate"
-                ),
+                verdict=ProposedVerdict(reason="dup", rejected_because="duplicate"),
             ),
             sample_ruling(
                 "S-01",
-                verdict=Verdict(
-                    status="rejected", reason="dup", rejected_because="duplicate"
-                ),
+                verdict=ProposedVerdict(reason="dup", rejected_because="duplicate"),
             ),
         ]
         _, rejected = assemble_claims(drafts, rulings, model, SCHEMAS)
@@ -537,8 +536,7 @@ ELEMENT_IDS = frozenset(
 class TestSnapRulings:
     def test_a_needs_info_element_snaps(self):
         ruling = sample_ruling(
-            verdict=Verdict(
-                status="needs-info",
+            verdict=ProposedVerdict(
                 reason="exposure unknown",
                 related_unknowns=[
                     UnknownRef(element_id="Process:Web-App", attribute="exposure")
@@ -559,7 +557,7 @@ class TestAnUnknownGroundMakesTheClaimConditional:
     stated, so the claim is conditional — and the critic rules on it like any
     other, because whether the argument follows from what it cites is a
     different question from whether those facts are open (#889). Code supplies
-    the pairs a ``needs-info`` hangs on and decides no verdict."""
+    the pairs a claim hangs on, and the verdict follows from them (#1202)."""
 
     @pytest.fixture
     def model(self):
@@ -577,12 +575,18 @@ class TestAnUnknownGroundMakesTheClaimConditional:
             ],
         )
 
-    def test_a_confirmation_that_dismisses_nothing_is_reported(self, model):
-        """Silence cannot confirm. A critic that never opened the question is refused."""
-        problems = review_issues([self._draft()], [sample_ruling("S-01")], model)
+    def test_a_ruling_that_dismisses_nothing_is_needs_info(self, model):
+        """Silence cannot confirm: an unknown the critic did not dismiss is one
+        the claim rests on, so code makes it ``needs-info`` on that pair."""
+        ruling = sample_ruling("S-01")
 
-        assert "immaterial_unknowns" in "; ".join(problems.messages)
-        assert problems.implicated == frozenset({"S-01"})
+        assert not review_issues([self._draft()], [ruling], model)
+        assembled = assemble_claims([self._draft()], [ruling], model, SCHEMAS)
+        verdict = assembled.claims[0].verdict
+        assert verdict.status == "needs-info"
+        assert verdict.related_unknowns == [
+            UnknownRef(element_id="store:orders-db", attribute="encryption_at_rest")
+        ]
 
     def test_a_confirmation_naming_the_unknown_as_immaterial_is_accepted(self, model):
         """The judgement the prompt asks for, in a field the seam reads.
@@ -595,7 +599,6 @@ class TestAnUnknownGroundMakesTheClaimConditional:
         ruling = sample_ruling(
             "S-01",
             verdict=ProposedVerdict(
-                status="confirmed",
                 immaterial_unknowns=[
                     UnknownRef(
                         element_id="store:orders-db", attribute="encryption_at_rest"
@@ -606,8 +609,8 @@ class TestAnUnknownGroundMakesTheClaimConditional:
 
         assert not review_issues([self._draft()], [ruling], model)
 
-    def test_a_confirmation_dismissing_only_some_names_what_is_left(self, model):
-        """The message tells a re-ask what is outstanding, not what it answered."""
+    def test_a_ruling_dismissing_only_some_rests_on_what_is_left(self, model):
+        """The claim hangs on the pairs not dismissed, and only on those."""
         draft = sample_draft(
             "S-01",
             grounds=[
@@ -626,7 +629,6 @@ class TestAnUnknownGroundMakesTheClaimConditional:
         ruling = sample_ruling(
             "S-01",
             verdict=ProposedVerdict(
-                status="confirmed",
                 immaterial_unknowns=[
                     UnknownRef(
                         element_id="store:orders-db", attribute="encryption_at_rest"
@@ -635,10 +637,11 @@ class TestAnUnknownGroundMakesTheClaimConditional:
             ),
         )
 
-        message = "; ".join(review_issues([draft], [ruling], model).messages)
+        assembled = assemble_claims([draft], [ruling], model, SCHEMAS)
 
-        assert "encryption_in_transit" in message
-        assert "encryption_at_rest" not in message
+        assert [
+            ref.attribute for ref in assembled.claims[0].verdict.related_unknowns
+        ] == ["encryption_in_transit"]
 
     def test_a_dismissal_of_a_pair_the_draft_never_cites_is_reported(self, model):
         """``immaterial_unknowns`` is a statement about this draft's own grounds.
@@ -649,9 +652,6 @@ class TestAnUnknownGroundMakesTheClaimConditional:
         element with a neighbouring attribute dismisses nothing, leaves the
         real pair outstanding, and still reads to a person as though the
         critic answered the question.
-
-        Both sentences are owed — what is outstanding, and what was named that
-        should not have been.
         """
         draft = sample_draft(
             "S-01",
@@ -666,7 +666,6 @@ class TestAnUnknownGroundMakesTheClaimConditional:
         ruling = sample_ruling(
             "S-01",
             verdict=ProposedVerdict(
-                status="confirmed",
                 immaterial_unknowns=[
                     UnknownRef(
                         element_id="store:orders-db",
@@ -679,10 +678,8 @@ class TestAnUnknownGroundMakesTheClaimConditional:
         problems = review_issues([draft], [ruling], model)
         kinds = {problem.kind for problem in problems.problems}
 
-        assert kinds == {"confirmed-on-unknown", "dismissal-off-grounds"}
-        message = "; ".join(problems.messages)
-        assert "encryption_in_transit" in message, "the stray pair is named"
-        assert "encryption_at_rest" in message, "the outstanding pair is named"
+        assert kinds == {"dismissal-off-grounds"}
+        assert "encryption_in_transit" in "; ".join(problems.messages)
 
     def test_a_dismissal_is_checked_on_every_status_not_only_a_confirmation(
         self, model
@@ -705,7 +702,6 @@ class TestAnUnknownGroundMakesTheClaimConditional:
         ruling = sample_ruling(
             "S-01",
             verdict=ProposedVerdict(
-                status="needs-info",
                 reason="open",
                 related_unknowns=[
                     UnknownRef(
@@ -750,9 +746,7 @@ class TestAnUnknownGroundMakesTheClaimConditional:
         assert [view["id"] for view in shown] == ["S-01", "S-02"]
 
     def test_a_bare_needs_info_is_completed_from_the_grounds(self, model):
-        ruling = sample_ruling(
-            "S-01", confidence="low", verdict=ProposedVerdict(status="needs-info")
-        )
+        ruling = sample_ruling("S-01", confidence="low", verdict=ProposedVerdict())
 
         assert not review_issues([self._draft()], [ruling], model)
         assembled = assemble_claims([self._draft()], [ruling], model, SCHEMAS)
@@ -772,22 +766,22 @@ class TestAnUnknownGroundMakesTheClaimConditional:
         ``confirmed`` say the claim stands without it.
 
         Both halves are asserted here, because neither proves the other: the
-        safeguard fires, and naming the row answers it.
+        row is what the claim rests on, and dismissing it confirms.
         """
         draft = sample_draft(
             "S-01",
             grounds=[Ground(kind="unknown-assertion", assertion=OPEN_ROW)],
         )
 
-        silent = review_issues([draft], [sample_ruling("S-01")], model)
+        silent = assemble_claims([draft], [sample_ruling("S-01")], model, SCHEMAS)
 
-        assert {p.kind for p in silent.problems} == {"confirmed-on-unknown"}
-        assert OPEN_ROW in "; ".join(silent.messages)
+        assert silent.claims[0].verdict.related_unknowns == [
+            UnknownRef(assertion=OPEN_ROW)
+        ]
 
         dismissed = sample_ruling(
             "S-01",
             verdict=ProposedVerdict(
-                status="confirmed",
                 immaterial_unknowns=[UnknownRef(assertion=OPEN_ROW)],
             ),
         )
@@ -811,15 +805,15 @@ class TestAnUnknownGroundMakesTheClaimConditional:
         ruling = sample_ruling(
             "S-01",
             verdict=ProposedVerdict(
-                status="confirmed",
                 immaterial_unknowns=[UnknownRef(assertion=OPEN_ROW)],
             ),
         )
 
-        message = "; ".join(review_issues([draft], [ruling], model).messages)
+        assembled = assemble_claims([draft], [ruling], model, SCHEMAS)
 
-        assert SECOND_OPEN_ROW in message
-        assert OPEN_ROW not in message.replace(SECOND_OPEN_ROW, "")
+        assert assembled.claims[0].verdict.related_unknowns == [
+            UnknownRef(assertion=SECOND_OPEN_ROW)
+        ]
 
     def test_a_needs_info_may_name_the_open_row_it_rests_on(self, model):
         """The third spelling resolves against nothing, and that is the shape.
@@ -833,7 +827,6 @@ class TestAnUnknownGroundMakesTheClaimConditional:
             "S-01",
             confidence="low",
             verdict=ProposedVerdict(
-                status="needs-info",
                 reason="the sources were asked and left it open",
                 related_unknowns=[UnknownRef(assertion=OPEN_ROW)],
             ),
@@ -851,7 +844,6 @@ class TestAnUnknownGroundMakesTheClaimConditional:
             "S-01",
             confidence="low",
             verdict=ProposedVerdict(
-                status="needs-info",
                 reason="something",
                 related_unknowns=[UnknownRef()],
             ),
@@ -893,7 +885,6 @@ class TestAnUnknownGroundMakesTheClaimConditional:
             "S-01",
             confidence="low",
             verdict=ProposedVerdict(
-                status="needs-info",
                 reason="Also depends on who can reach the store.",
                 related_unknowns=[
                     UnknownRef(element_id="store:orders-db", attribute="technology")
@@ -913,7 +904,6 @@ class TestAnUnknownGroundMakesTheClaimConditional:
         ruling = sample_ruling(
             "S-01",
             verdict=ProposedVerdict(
-                status="rejected",
                 reason="filed in the wrong lane",
                 rejected_because="lane",
             ),
@@ -1266,9 +1256,7 @@ class TestADuplicateRejectionOfAUnitBearingDraftIsMalformed:
         rulings = [
             sample_ruling(
                 draft.id,
-                verdict=ProposedVerdict(
-                    status="rejected", reason="dup", rejected_because="duplicate"
-                ),
+                verdict=ProposedVerdict(reason="dup", rejected_because="duplicate"),
             )
         ]
         problems = review_issues([draft], rulings, valid_model())
@@ -1281,9 +1269,7 @@ class TestADuplicateRejectionOfAUnitBearingDraftIsMalformed:
         rulings = [
             sample_ruling(
                 "S-01",
-                verdict=ProposedVerdict(
-                    status="rejected", reason="dup", rejected_because="duplicate"
-                ),
+                verdict=ProposedVerdict(reason="dup", rejected_because="duplicate"),
             )
         ]
         problems = review_issues([draft], rulings, valid_model())
@@ -1334,7 +1320,6 @@ PRODUCERS = {
     "dropped": ("_dropped_and_invented", "S-01"),
     "invented": ("_dropped_and_invented", "S-1"),
     "duplicate-id": ("_duplicate_id", "S-01"),
-    "confirmed-on-unknown": ("_confirmed_on_unknown", "S-01"),
     "dismissal-off-grounds": ("_dismissal_off_grounds", "S-01"),
     "duplicate-on-unit": ("_duplicate_on_unit", "v5.0.0-6.2.1"),
     "verdict-shape": ("_verdict_shape", "S-01"),
@@ -1383,19 +1368,6 @@ class TestEveryProblemCarriesItsClaimAndItsKind:
             valid_model(),
         ).problems
 
-    def _confirmed_on_unknown(self):
-        draft = sample_draft(
-            "S-01",
-            grounds=[
-                Ground(
-                    kind="unknown-attribute",
-                    element_id="store:orders-db",
-                    attribute="encryption_at_rest",
-                )
-            ],
-        )
-        return review_issues([draft], [sample_ruling("S-01")], valid_model()).problems
-
     def _dismissal_off_grounds(self):
         draft = sample_draft(
             "S-01",
@@ -1410,7 +1382,6 @@ class TestEveryProblemCarriesItsClaimAndItsKind:
         ruling = sample_ruling(
             "S-01",
             verdict=ProposedVerdict(
-                status="confirmed",
                 immaterial_unknowns=[
                     UnknownRef(
                         element_id="store:orders-db", attribute="encryption_in_transit"
@@ -1424,21 +1395,20 @@ class TestEveryProblemCarriesItsClaimAndItsKind:
         draft = self._asvs_draft()
         ruling = sample_ruling(
             draft.id,
-            verdict=ProposedVerdict(
-                status="rejected", reason="dup", rejected_because="duplicate"
-            ),
+            verdict=ProposedVerdict(reason="dup", rejected_because="duplicate"),
         )
         return review_issues([draft], [ruling], valid_model()).problems
 
     def _verdict_shape(self):
-        ruling = sample_ruling("S-01", verdict=ProposedVerdict(status="rejected"))
+        ruling = sample_ruling(
+            "S-01", verdict=ProposedVerdict(rejected_because="reasoning")
+        )
         return review_issues([sample_draft("S-01")], [ruling], valid_model()).problems
 
     def _unresolved_unknown(self):
         ruling = sample_ruling(
             "S-01",
             verdict=ProposedVerdict(
-                status="needs-info",
                 reason="unclear",
                 related_unknowns=[
                     UnknownRef(element_id="store:ghost", attribute="technology")
@@ -1451,9 +1421,7 @@ class TestEveryProblemCarriesItsClaimAndItsKind:
         first = sample_ruling("S-01").model_dump(mode="json")
         changed = sample_ruling(
             "S-01",
-            verdict=ProposedVerdict(
-                status="rejected", reason="re-decided", rejected_because="reasoning"
-            ),
+            verdict=ProposedVerdict(reason="re-decided", rejected_because="reasoning"),
         ).model_dump(mode="json")
         _, drift = critic.merge_retry([first], [changed], [], ["S-01"])
         return drift
@@ -1473,9 +1441,15 @@ class TestEveryProblemCarriesItsClaimAndItsKind:
         vocabulary does not hold cannot be recorded at all."""
         from typing import get_args
 
-        from analysis_service.claims import UnreconciledKind
+        from analysis_service.claims import (
+            ARCHIVED_UNRECONCILED_KINDS,
+            UnreconciledKind,
+        )
 
-        assert set(get_args(UnreconciledKind)) == set(PRODUCERS)
+        assert set(get_args(UnreconciledKind)) == set(PRODUCERS) | set(
+            ARCHIVED_UNRECONCILED_KINDS
+        )
+        assert not set(PRODUCERS) & ARCHIVED_UNRECONCILED_KINDS
 
     def test_the_sentences_are_still_what_the_re_ask_reads(self):
         """The prompt reads prose, so ``messages`` stays the same list of words
@@ -1483,7 +1457,11 @@ class TestEveryProblemCarriesItsClaimAndItsKind:
         problems = self._verdict_shape()
         review = review_issues(
             [sample_draft("S-01")],
-            [sample_ruling("S-01", verdict=ProposedVerdict(status="rejected"))],
+            [
+                sample_ruling(
+                    "S-01", verdict=ProposedVerdict(rejected_because="reasoning")
+                )
+            ],
             valid_model(),
         )
 

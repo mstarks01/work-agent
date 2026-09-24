@@ -220,26 +220,33 @@ class TestProposedVerdictCarriesNoRuleBetweenFields:
     this and that a raise here made unreachable.
     """
 
+    #: What the critic writes, beside the status its fields decide.
     MIS_SHAPED = (
-        {"status": "needs-info", "reason": "encryption unknown"},
-        {
-            "status": "confirmed",
-            "related_unknowns": [{"element_id": "store:orders-db", "attribute": "x"}],
-        },
-        {"status": "rejected"},
+        (
+            {
+                "rejected_because": "evidence",
+                "reason": "ruled out",
+                "related_unknowns": [
+                    {"element_id": "store:orders-db", "attribute": "x"}
+                ],
+            },
+            "rejected",
+        ),
+        ({"rejected_because": "reasoning"}, "rejected"),
+        ({"related_unknowns": [{"subject": "is it logged"}]}, "needs-info"),
     )
 
-    @pytest.mark.parametrize("verdict", MIS_SHAPED)
-    def test_the_report_shape_still_refuses_it(self, verdict):
+    @pytest.mark.parametrize(("verdict", "status"), MIS_SHAPED)
+    def test_the_report_shape_still_refuses_it(self, verdict, status):
         with pytest.raises(ValidationError):
-            Verdict.model_validate(verdict)
+            Verdict.model_validate({**verdict, "status": status})
 
-    @pytest.mark.parametrize("verdict", MIS_SHAPED)
-    def test_the_critic_facing_shape_accepts_it(self, verdict):
-        assert ProposedVerdict.model_validate(verdict).status == verdict["status"]
+    @pytest.mark.parametrize(("verdict", "status"), MIS_SHAPED)
+    def test_the_critic_facing_shape_accepts_it(self, verdict, status):
+        assert ProposedVerdict.model_validate(verdict).status == status
 
-    @pytest.mark.parametrize("verdict", MIS_SHAPED)
-    def test_it_survives_the_nodes_own_output_schema(self, verdict):
+    @pytest.mark.parametrize(("verdict", "status"), MIS_SHAPED)
+    def test_it_survives_the_nodes_own_output_schema(self, verdict, status):
         """The depth that matters. ADK validates ``output_schema`` on the way
         into state, so anything raising here is a dead job rather than a
         re-ask."""
@@ -247,7 +254,7 @@ class TestProposedVerdictCarriesNoRuleBetweenFields:
             {"claims": [{"id": "S-01", "confidence": "high", "verdict": verdict}]}
         )
 
-        assert rulings.claims[0].verdict.status == verdict["status"]
+        assert rulings.claims[0].verdict.status == status
 
     def test_a_malformed_threat_id_survives_the_node_too(self):
         """The critic copies IDs off a roster; a mistyped one is not a shape
@@ -264,7 +271,7 @@ class TestProposedVerdictCarriesNoRuleBetweenFields:
                     {
                         "id": "S-1",
                         "confidence": "high",
-                        "verdict": {"status": "confirmed"},
+                        "verdict": {},
                     }
                 ]
             }
