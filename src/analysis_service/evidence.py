@@ -90,6 +90,7 @@ from analysis_service.assertions import (
     Subject,
     apply_projection,
     assertion_id,
+    disputed,
     offered,
     projected_attribute,
 )
@@ -152,6 +153,62 @@ def crossing_evidence_ref(flow_id: str) -> str:
 def absent_element_ref(term: str) -> str:
     """How an unresolved absence is named in a mark. Never a catalog key."""
     return f"{ABSENT_ELEMENT_PREFIX}:{term}"
+
+
+#: Not a catalog prefix either. A ground about none of its claim's elements is
+#: dropped and marked under its own reference with this in front, so the mark
+#: says why the reference left rather than that it named nothing.
+OUT_OF_SCOPE_PREFIX = "out-of-scope"
+
+
+def out_of_scope_ref(ref: str) -> str:
+    """How a ground about none of its claim's elements is named in a mark."""
+    return f"{OUT_OF_SCOPE_PREFIX}:{ref}"
+
+
+def evidence_ref(ground: Ground) -> str:
+    """The catalog key :func:`evidence_catalog` files this ground under.
+
+    The inverse of the catalog, for a mark that names a ground the service
+    built rather than a reference an agent wrote. ``""`` for a quote or an
+    absence, which the catalog never holds.
+    """
+    if ground.kind == "unknown-attribute":
+        return unknown_evidence_ref(ground.element_id, ground.attribute)
+    if ground.kind == "absent-attribute":
+        return absent_evidence_ref(ground.element_id, ground.attribute)
+    if ground.kind == "derived-fact":
+        return crossing_evidence_ref(ground.flow_id)
+    if ground.kind in ASSERTION_GROUNDS:
+        return ground.assertion
+    return ""
+
+
+def ground_places(
+    ground: Ground, assertions: AssertionCatalog | None = None
+) -> frozenset[str]:
+    """The graph elements one ground is about, or none.
+
+    **The one reader of "which part of the model is this fact about".** An
+    attribute or a crossing names its element or flow
+    (:attr:`~analysis_service.claims.Ground.place`). An assertion names a row,
+    and the row answers: its subject where the subject is a graph element, and
+    its value where the value names one, as a zone does. A row about a
+    principal or a credential, a quote and an absence name no element, so they
+    return none and no scope rule can read them.
+    """
+    if ground.kind not in ASSERTION_GROUNDS:
+        return frozenset({ground.place}) if ground.place else frozenset()
+    if assertions is None:
+        return frozenset()
+    rows = {assertion_id(row): row for row in assertions.entries}
+    row = rows.get(ground.assertion)
+    if row is None:
+        return frozenset()
+    bound = {
+        subject.id for subject in assertions.subjects if subject.type in GRAPH_BOUND
+    }
+    return frozenset(ref for ref in (row.subject, row.value) if ref in bound)
 
 
 def evidence_catalog(
@@ -228,14 +285,21 @@ def evidence_catalog(
         # it reaches no graph field: the one class of fact that had no offer
         # of any kind, because the attribute enumeration above walks elements
         # and this row's subject may be a principal.
+        # A row in a conflict is a question too, and one with no graph field
+        # reaches a lane nowhere else: the model shows a disputed attribute as
+        # a qualified unknown, but a principal's second factor has no
+        # attribute to qualify.
+        open_rows = (
+            *(row for row in assertions.entries if row.value == UNKNOWN),
+            *disputed(assertions),
+        )
         catalog.update(
             {
                 assertion_id(row): Ground(
                     kind="unknown-assertion", assertion=assertion_id(row)
                 )
-                for row in assertions.entries
-                if row.value == UNKNOWN
-                and not projected_attribute(row.predicate, row.subject)
+                for row in open_rows
+                if not projected_attribute(row.predicate, row.subject)
             }
         )
     return catalog
@@ -646,10 +710,20 @@ def _open_question_gloss(row: Assertion, subjects: Mapping[str, Subject]) -> str
     sources were silent, hedged, cut off, or never measured it. That is the
     same distinction the attribute half of this table draws between *never
     stated* and *stated absent*, at the seam where the fact has no attribute.
+
+    A row with a value is open because another row disputes it
+    (:func:`~analysis_service.assertions.disputed`), so the gloss says the
+    sources disagree and names this side's value.
     """
-    return (
-        f"`{row.predicate}` {_about(row, subjects)}: not stated"
-        f"{f' ({row.reason})' if row.reason else ''}"
+    about = _about(row, subjects)
+    if row.value != UNKNOWN:
+        value = "absent" if row.value == ABSENT else f"`{row.value}`"
+        return (
+            f"`{row.predicate}` {about}: the sources disagree; this row states"
+            f" {value}{_reviewed(row)}"
+        )
+    return f"`{row.predicate}` {about}: not stated" + (
+        f" ({row.reason})" if row.reason else ""
     )
 
 

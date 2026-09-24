@@ -148,6 +148,7 @@ __all__ = [
     "conflicts",
     "contradiction_issues",
     "contradictions",
+    "disputed",
     "offered",
     "project",
     "projected_attribute",
@@ -954,6 +955,13 @@ def subject_id(subject_type: str, name: str) -> str:
     Graph-bound subjects have no call here: their ID is the **Element ID** the
     model already carries, and passing a name would invite a second spelling of
     it.
+
+    **Two things the sources name alike share this ID.** A row's scope keeps
+    them apart where it names the difference, such as an environment. Unscoped
+    rows that disagree become a conflict, which reaches the lanes as a
+    question. Unscoped rows about different facts attach to one subject, and
+    nothing can tell them apart: the extraction prompt names such things apart
+    instead. ``tests/test_reassess.py`` holds all three.
     """
     if subject_type in GRAPH_BOUND:
         raise ValueError(
@@ -1323,12 +1331,16 @@ def conflicts(catalog: AssertionCatalog) -> tuple[Conflict, ...]:
     connection authenticated by mutual TLS *and* a token — they do not, and only
     :data:`ABSENT` beside a positive value is a contradiction.
 
+    Only :func:`admissible` rows take part. A row a reviewer set aside supports
+    nothing, so it cannot dispute a row that stands either: counted here, it
+    kept the other side from settling after the review rejected it (ADR 0041).
+
     Sorted by subject, then predicate, then scope, so two runs over one catalog
     report the same order.
     """
     groups: dict[tuple[str, str, str], dict[str, None]] = {}
     for entry in catalog.entries:
-        if entry.predicate not in REGISTRY or entry.value == UNKNOWN:
+        if not admissible(entry) or entry.value == UNKNOWN:
             continue
         key = (entry.subject, entry.predicate, _scope_key(entry.scope))
         groups.setdefault(key, {})[entry.value] = None
@@ -1414,6 +1426,32 @@ class Answer:
         return tuple(entry for entry in self.settled if entry.value == value)
 
 
+def disputed(catalog: AssertionCatalog) -> tuple[Assertion, ...]:
+    """Every row that would be settled but for a disagreement, in catalog order.
+
+    **The other side of** :func:`settled`: an admissible row holding a value,
+    at a subject, predicate and scope where :func:`conflicts` finds another
+    admissible row stating something else. Neither side is a fact, and the
+    disagreement is itself a question, so the evidence catalog offers each
+    side as an open one.
+    """
+    keys = _disputed_keys(catalog)
+    return tuple(
+        entry
+        for entry in catalog.entries
+        if admissible(entry)
+        and entry.value != UNKNOWN
+        and (entry.subject, entry.predicate, _scope_key(entry.scope)) in keys
+    )
+
+
+def _disputed_keys(catalog: AssertionCatalog) -> frozenset[tuple[str, str, str]]:
+    return frozenset(
+        (conflict.subject, conflict.predicate, conflict.scope)
+        for conflict in conflicts(catalog)
+    )
+
+
 def settled(catalog: AssertionCatalog) -> tuple[Assertion, ...]:
     """Every row a consumer may rest a definite conclusion on, in catalog order.
 
@@ -1430,16 +1468,13 @@ def settled(catalog: AssertionCatalog) -> tuple[Assertion, ...]:
     conclusions rather than the source's, and every reader labels them by
     ``basis`` rather than dropping them, so an inference is visible as one.
     """
-    disputed = {
-        (conflict.subject, conflict.predicate, conflict.scope)
-        for conflict in conflicts(catalog)
-    }
+    keys = _disputed_keys(catalog)
     return tuple(
         entry
         for entry in catalog.entries
         if admissible(entry)
         and entry.value != UNKNOWN
-        and (entry.subject, entry.predicate, _scope_key(entry.scope)) not in disputed
+        and (entry.subject, entry.predicate, _scope_key(entry.scope)) not in keys
     )
 
 
