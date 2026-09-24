@@ -25,7 +25,7 @@ Run everything from the repository root, under `uv run`.
 | `python -m evals.harness.run review --voter <login> <artifacts>` | what a reviewer has waiting over a finished sweep |
 | `python -m evals.harness.run experiments` | what a prior audit already tested, and whether the tree moved under it |
 | `python -m evals.harness.run phases` | the six phases and the graph nodes each owns; `--node` answers for one node |
-| `python evals/verify_corpus.py` | the corpus lint: what each case holds and how much of it is unsigned |
+| `python evals/verify_corpus.py` | the corpus lint: what each case holds, how much of it is unsigned, and whether a verified input carries a reference answer |
 | `pytest -q` | every offline gate, including the neutrality, licence and prose lints |
 
 ## The archives these read

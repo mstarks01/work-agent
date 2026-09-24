@@ -66,6 +66,10 @@ never production performance and never go in a scored comparison.
 a capture or a replay seam that may not exist yet — when one does not, that is
 an extension ticket, not a reason to guess.
 
+To compare a whole route against a corrected input, rather than one stage,
+use `references/three-conditions.md`. It holds the three conditions, the
+leakage controls and the table that says what each result supports.
+
 ## Reading the loss blocks
 
 A scored artifact carries both, and they are where a ceiling comes from.
