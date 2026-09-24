@@ -38,9 +38,9 @@ from analysis_service.claims import (
     CLAIM_BOUND_MARKS,
     AnalysisMarks,
     FrameworkName,
+    ProposedVerdict,
     UnknownRef,
     UnresolvedMention,
-    Verdict,
 )
 from analysis_service.compact import COMPACT_FORMAT
 from analysis_service.critic import CriticOutputError
@@ -1842,7 +1842,7 @@ def _second_look(ctx, drafts, retry_rulings):
 
 def _reviewed_verdicts(ctx) -> dict[str, str]:
     return {
-        ruling["id"]: ruling["verdict"]["status"]
+        ruling["id"]: ProposedVerdict.model_validate(ruling["verdict"]).status
         for ruling in ctx.state[NODES.key("reviewed")]["claims"]
     }
 
@@ -1865,9 +1865,7 @@ def test_a_re_ask_may_change_only_the_rulings_the_problems_named():
 
     flipped = sample_ruling(
         "S-01",
-        verdict=Verdict(
-            status="rejected", reason="re-decided", rejected_because="reasoning"
-        ),
+        verdict=ProposedVerdict(reason="re-decided", rejected_because="reasoning"),
     )
     second = _second_look(ctx, drafts, [flipped, sample_ruling("T-01")])
 
@@ -2021,8 +2019,7 @@ def test_an_unresolved_unknown_sends_the_draft_it_hangs_on():
     drafts = [sample_draft("S-01")]
     ruling = sample_ruling(
         "S-01",
-        verdict=Verdict(
-            status="needs-info",
+        verdict=ProposedVerdict(
             reason="encryption unstated",
             related_unknowns=[UnknownRef(element_id="store:ghost", attribute="x")],
         ),
@@ -2115,7 +2112,7 @@ def test_assemble_splits_rulings_and_builds_the_summary():
     confirmed = sample_ruling("S-01")
     rejected = sample_ruling(
         "T-01",
-        verdict={"status": "rejected", "reason": "duplicate of S-01"},
+        verdict={"reason": "duplicate of S-01", "rejected_because": "duplicate"},
     )
     drafts = [
         sample_draft("S-01"),

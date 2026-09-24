@@ -246,7 +246,6 @@ def test_a_draft_resting_on_an_unknown_still_reaches_the_critic():
             sample_ruling(
                 "S-01",
                 verdict=ProposedVerdict(
-                    status="needs-info",
                     reason="the argument holds if the store is clear",
                 ),
             )
@@ -718,7 +717,7 @@ def test_a_malformed_critic_output_is_re_asked_once_and_then_assembled():
 def test_a_mis_shaped_verdict_is_re_asked_rather_than_killing_the_job():
     """The regression this seam exists for, end to end.
 
-    A ``needs-info`` that names no unknown is a fault, and not a *fatal* one.
+    A rejection that states no reason is a fault, and not a *fatal* one.
     A rule in ``Verdict``'s validator, which ADK runs on the way into session
     state, would make the critic node raise and take the whole
     run — six lanes of drafting and the single most expensive call in the graph
@@ -731,7 +730,7 @@ def test_a_mis_shaped_verdict_is_re_asked_rather_than_killing_the_job():
                 {
                     "id": "S-01",
                     "confidence": "high",
-                    "verdict": {"status": "needs-info", "reason": "control unverified"},
+                    "verdict": {"rejected_because": "reasoning"},
                 }
             ]
         }
@@ -746,9 +745,9 @@ def test_a_mis_shaped_verdict_is_re_asked_rather_than_killing_the_job():
     assert RECRITIC in visited
     assert CRITIC_FAILED not in visited
     # The re-ask was told which ruling, and what about it — and was shown the
-    # draft, because naming the unknown cannot be done from an ID alone.
+    # draft, because writing the reason cannot be done from an ID alone.
     re_ask = models[RECRITIC].seen[0]
-    assert "names no unknown attribute" in re_ask
+    assert "states no reason" in re_ask
     assert "S-01" in re_ask
 
 
@@ -762,11 +761,7 @@ def test_a_mistyped_ruling_id_is_re_asked_rather_than_killing_the_job():
     """
     replies = happy_replies()
     replies[CRITIC] = json.dumps(
-        {
-            "claims": [
-                {"id": "S-1", "confidence": "high", "verdict": {"status": "confirmed"}}
-            ]
-        }
+        {"claims": [{"id": "S-1", "confidence": "high", "verdict": {}}]}
     )
     replies[RECRITIC] = claims_json(sample_ruling("S-01"))
     pipeline, models = build(replies)
@@ -793,7 +788,7 @@ def test_a_verdict_still_mis_shaped_after_the_re_ask_fails_as_critic_output():
                 {
                     "id": "S-01",
                     "confidence": "high",
-                    "verdict": {"status": "rejected"},
+                    "verdict": {"rejected_because": "reasoning"},
                 }
             ]
         }

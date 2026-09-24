@@ -58,12 +58,17 @@ def test_a_replayed_answer_is_compared_draft_by_draft(recorded, case):  # noqa: 
             {
                 "id": claim.id,
                 "verdict": {
-                    "status": "rejected"
-                    if claim.id == first.id
-                    else claim.verdict.status,
                     "reason": "replayed",
                     **(
-                        {"rejected_because": "evidence"} if claim.id == first.id else {}
+                        {"rejected_because": "evidence"}
+                        if claim.id == first.id
+                        else claim.verdict.model_dump(
+                            include={
+                                "related_unknowns",
+                                "immaterial_unknowns",
+                                "rejected_because",
+                            }
+                        )
                     ),
                 },
                 "confidence": getattr(claim, "confidence", "medium"),

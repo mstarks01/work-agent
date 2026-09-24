@@ -175,69 +175,32 @@ class ReviewProblems(NamedTuple):
 
 
 def _verdict_shape_issues(rulings: Iterable[Ruling]) -> list[UnreconciledRuling]:
-    """Every ruling whose verdict's fields disagree with its own ``status``.
+    """Every completed ruling whose fields cannot make a coherent verdict.
 
-    The four rules :class:`~analysis_service.claims.Verdict` states, plus the
-    one it deliberately does not: a rejection must name the check that killed
-    it. That one is asked only here, because a report read back from before the
-    field carries no answer and ``None`` is the truthful value for it — see
-    :class:`~analysis_service.claims.Verdict`. Asked here rather than in the
-    schema. The schema is the wrong place for them twice
-    over: a provider cannot be made to enforce a dependency between fields, and
-    a validator that raises does so at the node boundary, killing the critic
-    node — one pass over every draft in the job — with the re-ask that exists
-    for exactly this class of problem still unreached.
+    The status is read off the fields, so two combinations are left to check:
+    a rejection that also names open facts, and a verdict other than
+    ``confirmed`` that states no reason. Asked here rather than in the schema,
+    because a validator that raises does so at the node boundary, killing the
+    critic node — one pass over every draft in the job — with the re-ask that
+    exists for exactly this class of problem still unreached.
 
     So they are returned, like every other problem this module finds, and the
     router sends them to ``recritic``. Each names its claim, because the fix
-    is per-ruling: a reason to write, an unknown to name, or a list to drop.
-
-    Deliberately one message per broken rule rather than one per ruling. A
-    critic that rejected a claim without a reason *and* attached unknowns to it
-    has two independent things to fix, and a merged message would leave the
-    second to be discovered on the pass that no longer exists.
+    is per-ruling: a reason to write, or a list to drop.
     """
     issues = []
     for ruling in rulings:
         verdict = ruling.verdict
-        if verdict.status == "needs-info" and not verdict.related_unknowns:
+        if verdict.rejected_because is not None and verdict.related_unknowns:
             issues.append(
                 UnreconciledRuling.of(
                     claim_id=ruling.id,
                     kind="verdict-shape",
-                    message=f"claim {ruling.id!r} is ruled needs-info but names no"
-                    " unknown attribute in related_unknowns, so nothing says"
-                    " what has to be answered",
-                )
-            )
-        if verdict.status != "needs-info" and verdict.related_unknowns:
-            issues.append(
-                UnreconciledRuling.of(
-                    claim_id=ruling.id,
-                    kind="verdict-shape",
-                    message=f"claim {ruling.id!r} is ruled {verdict.status} but carries"
-                    " related_unknowns, which is only meaningful on a"
-                    " needs-info verdict",
-                )
-            )
-        if verdict.status == "rejected" and verdict.rejected_because is None:
-            issues.append(
-                UnreconciledRuling.of(
-                    claim_id=ruling.id,
-                    kind="verdict-shape",
-                    message=f"claim {ruling.id!r} is rejected but names no check in"
-                    " rejected_because, so nothing says which of evidence,"
-                    " reasoning, lane or duplicate ended it",
-                )
-            )
-        if verdict.status != "rejected" and verdict.rejected_because is not None:
-            issues.append(
-                UnreconciledRuling.of(
-                    claim_id=ruling.id,
-                    kind="verdict-shape",
-                    message=f"claim {ruling.id!r} is ruled {verdict.status} but carries"
-                    " rejected_because, which is only meaningful on a rejected"
-                    " verdict",
+                    message=f"claim {ruling.id!r} is rejected for"
+                    f" {verdict.rejected_because} but also names open facts in"
+                    " related_unknowns: a draft that fails a check rests on no"
+                    " open fact, so drop the list, or clear rejected_because"
+                    " where the argument follows once those facts hold",
                 )
             )
         if verdict.status != "confirmed" and not verdict.reason:
@@ -363,27 +326,29 @@ def complete_rulings(
 ) -> list[Ruling]:
     """Each ruling with what the draft's grounds settle already filled in.
 
-    A ``needs-info`` ruling on a draft citing an unknown ground gains the pairs
-    in ``related_unknowns`` (beside any the critic named) and, where the critic
-    wrote none, a reason naming them. Code supplies those references because a
+    A ruling that names no failed check gains, in ``related_unknowns``, every
+    unknown ground of its draft that the critic did not dismiss in
+    ``immaterial_unknowns``, beside any open fact the critic named. Where the
+    critic wrote no reason, it gains one naming them. So a draft that rests on
+    an unstated fact reads ``needs-info`` whether or not the critic listed it,
+    and silence never confirms. Code supplies those references because a
     hand-written pair naming an attribute the model does not carry is a failure
-    the service can prevent and a critic cannot (#409). What a critic may not do
-    is confirm such a draft, which :func:`review_issues` reports.
+    the service can prevent and a critic cannot (#409).
 
     **A missing ruling is not filled in here.** Every draft is shown, so a draft
     with no ruling means the critic dropped it, and
     :func:`review_issues` routes that to the bounded re-ask. Completing it from
     the draft's own grounds would hand back an automatic verdict for a claim
-    nobody reviewed — which is the state this seam exists to leave behind, and
-    it would arrive silently, on the path where the critic failed.
+    nobody reviewed, and it would arrive silently, on the path where the critic
+    failed.
 
     A ruling on a draft the package's own table calls misfiled
-    (:meth:`~analysis_service.claims.Claim.misfiled`) becomes ``rejected`` with
-    the table's reason and ``rejected_because="lane"``, whatever the critic
-    ruled. That is the one rejection this service writes rather than reads.
+    (:meth:`~analysis_service.claims.Claim.misfiled`) becomes a ``lane``
+    rejection with the table's reason, whatever the critic ruled. That is the
+    one rejection this service writes rather than reads.
 
-    Rulings on drafts with no such ground pass through untouched, and so does a
-    ruling that names no drafted ID: the reconciliation check owns that.
+    A rejection passes through untouched, and so does a ruling that names no
+    drafted ID: the reconciliation check owns that.
     """
     by_id = {draft.id: draft.unknown_grounds() for draft in drafts}
     misfiled = {
@@ -398,7 +363,6 @@ def complete_rulings(
             # the step is `lane` by construction: the table is the lane check.
             verdict = ruling.verdict.model_copy(
                 update={
-                    "status": "rejected",
                     "reason": misfiled[ruling.id],
                     "related_unknowns": [],
                     "rejected_because": "lane",
@@ -412,7 +376,7 @@ def complete_rulings(
         # the critic just said the argument does not use.
         dismissed = ruling.verdict.dismissed_refs()
         derived = [ref for ref in by_id.get(ruling.id, []) if ref.key not in dismissed]
-        if ruling.verdict.status != "needs-info" or not derived:
+        if ruling.verdict.rejected_because is not None or not derived:
             completed.append(ruling)
             continue
         named = {ref.key for ref in ruling.verdict.related_unknowns}
@@ -474,53 +438,6 @@ def _duplicate_on_unit_issues(
     ]
 
 
-def _confirmed_on_unknown_issues(
-    drafts: Sequence[Claim], rulings: Iterable[Ruling]
-) -> list[UnreconciledRuling]:
-    """Every ``confirmed`` ruling on a draft resting on an unknown it did not dismiss.
-
-    A draft citing an open fact its argument never uses is not a conditional
-    claim, and 78% of the corpus's drafts cite one. Reading the draft's grounds
-    alone refused a ``confirmed`` on all of them, which asked the critic for a
-    judgement — does this claim *depend* on the unknown it names — and then
-    discarded the answer.
-
-    So the ruling states it, per pair. A ``confirmed`` is legal where every one
-    of the draft's unknown grounds appears in
-    :attr:`~analysis_service.claims.ProposedVerdict.immaterial_unknowns`; any
-    pair left unaccounted for is reported, and a critic that says nothing is
-    refused exactly as before. Silence cannot confirm, and a dismissal is a
-    claim somebody can check.
-
-    The message names the pairs still outstanding rather than every pair the
-    draft cites, so a re-ask is told what is missing rather than what it
-    already answered.
-    """
-    by_id = {draft.id: draft.unknown_grounds() for draft in drafts}
-    problems = []
-    for ruling in rulings:
-        if ruling.verdict.status != "confirmed":
-            continue
-        dismissed = ruling.verdict.dismissed_refs()
-        outstanding = [
-            ref for ref in by_id.get(ruling.id, []) if ref.key not in dismissed
-        ]
-        if not outstanding:
-            continue
-        problems.append(
-            UnreconciledRuling.of(
-                claim_id=ruling.id,
-                kind="confirmed-on-unknown",
-                message=f"claim {ruling.id!r} is ruled confirmed but its own grounds"
-                f" cite {_named(outstanding)} as never stated, and the ruling does"
-                " not say the claim stands without them: name each in"
-                " immaterial_unknowns where the argument does not rest on it,"
-                " or rule it needs-info, or reject it with a reason",
-            )
-        )
-    return problems
-
-
 def _dismissal_off_grounds_issues(
     drafts: Sequence[Claim], rulings: Iterable[Ruling]
 ) -> list[UnreconciledRuling]:
@@ -535,15 +452,10 @@ def _dismissal_off_grounds_issues(
 
     It matters because the dismissal is what buys a ``confirmed``. A critic
     that names a near-miss spelling — the right element and a neighbouring
-    attribute — leaves the real pair outstanding, and
-    :func:`_confirmed_on_unknown_issues` reports that. What it cannot report is
-    the entry itself, so the re-ask is told a pair is missing while the ruling
-    looks to a reader as though it answered one. Both sentences are owed.
-
-    Asked of every status, unlike the ``confirmed`` rule. A ``needs-info`` that
-    dismisses a pair the draft does not carry is the same wrong statement, and
-    ``complete_rulings`` filters ``related_unknowns`` by that set whatever the
-    verdict says.
+    attribute — leaves the real pair outstanding, and :func:`complete_rulings`
+    turns that into a ``needs-info`` on it. The entry itself is still wrong,
+    and it looks to a reader as though it answered a question, so the re-ask
+    is told.
     """
     by_id = {draft.id: {ref.key for ref in draft.unknown_grounds()} for draft in drafts}
     issues = []
@@ -678,13 +590,15 @@ def review_issues(
     on it: a falsy result means the rulings are assemblable, a truthy one is
     what the bounded re-ask is asked to fix. The critic must rule on exactly the
     drafted set — no claim invented, none dropped — with unique IDs, with each
-    verdict carrying the fields its own ``status`` calls for, and each
-    ``needs-info`` naming only unknowns the model actually contains.
+    verdict's fields making a coherent verdict, and each ``needs-info`` naming
+    only unknowns the model actually contains. It reads the rulings after
+    :func:`complete_rulings`, so the status each one reads is the one code
+    decides.
 
     **Verdict shape is checked here rather than by the schema**, and that is
     the reason this function is worth reading twice. The rules are conditional
-    on ``status``, which no provider schema can express, so they can only be
-    enforced after the fact — and enforcing them in a pydantic validator means
+    on one field's value, which no provider schema can express, so they can
+    only be enforced after the fact — and enforcing them in a pydantic validator means
     enforcing them at the node boundary, where a raise kills the critic node
     and the whole job with it. Every other problem in this list gets a bounded
     re-ask; a missing reason is not a worse fault than a dropped draft, and
@@ -713,8 +627,7 @@ def review_issues(
     ruled_ids = {ruling.id for ruling in rulings}
     dropped = sorted(drafted_ids - ruled_ids)
     per_ruling = (
-        _confirmed_on_unknown_issues(drafts, rulings)
-        + _dismissal_off_grounds_issues(drafts, rulings)
+        _dismissal_off_grounds_issues(drafts, rulings)
         + _duplicate_on_unit_issues(drafts, rulings)
         + _verdict_shape_issues(rulings)
         + _unresolved_unknown_ref_issues(rulings, system_model)
@@ -841,9 +754,10 @@ def _ruled(draft: Claim, ruling: Ruling, ruled_record: type[RuledClaim]) -> Rule
 
     The verdict is **rebuilt** rather than carried across, promoting the
     critic's unruled :class:`~analysis_service.claims.ProposedVerdict` to the
-    :class:`~analysis_service.claims.Verdict` the report defines. It cannot fail:
-    :func:`review_issues` has already passed on exactly these rulings, and its
-    three verdict checks are that model's validator asked one seam earlier. A
+    :class:`~analysis_service.claims.Verdict` the report defines, with the
+    status its fields decide. It cannot fail: :func:`review_issues` has already
+    passed on exactly these rulings, and its verdict checks are that model's
+    validator asked one seam earlier. A
     raise here would mean the two had drifted, which is why the promotion is
     left able to raise rather than coerced.
     """
@@ -854,7 +768,7 @@ def _ruled(draft: Claim, ruling: Ruling, ruled_record: type[RuledClaim]) -> Rule
     }
     return ruled_record(
         **{**draft.model_dump(), **overrides},
-        verdict=Verdict.model_validate(ruling.verdict.model_dump()),
+        verdict=Verdict(**ruling.verdict.model_dump(), status=ruling.verdict.status),
     )
 
 

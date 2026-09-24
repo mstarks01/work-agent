@@ -576,42 +576,28 @@ class Ground(BaseModel):
 REASON_MAX_CHARS = 1000
 
 
-class ProposedVerdict(BaseModel):
-    """The critic's ruling on one threat, as the critic emits it.
+class VerdictFields(BaseModel):
+    """What a critic writes about one draft, and what a report's verdict keeps.
 
-    The five fields and **no rule between them**, which is what makes this the
-    shape a provider can be asked to generate: nothing a critic writes here is
-    a shape error, so nothing it writes can fail the node on the way into
-    state. Whether the combination is *coherent* — a ``needs-info`` that names
-    what must be answered, a non-``confirmed`` that says why, a ``rejected``
-    that names the check it failed — is asked at the review seam, which can
-    send it back.
-
-    Every field's own constraint still applies. ``status`` is a closed
-    vocabulary and a ``reason`` still has a maximum length; what moved is only
-    the part that depends on another field's value.
+    The fields both :class:`ProposedVerdict` and :class:`Verdict` carry. They
+    differ only in ``status``: the critic does not write one, and the report
+    stores the one code decided.
     """
 
     model_config = ConfigDict(extra="forbid")
 
-    status: VerdictStatus
     reason: str = Field(default="", max_length=REASON_MAX_CHARS)
     related_unknowns: list[UnknownRef] = Field(default_factory=list)
     #: The unknown grounds this claim cites and does **not** rest on.
     #:
-    #: A draft may name an open fact its argument never uses, and until a
-    #: ruling could say so, every such draft was refused a ``confirmed``:
-    #: :func:`~analysis_service.critic._confirmed_on_unknown_issues` read the
-    #: draft's grounds and nothing else. That is 78% of the corpus's drafts, so
-    #: for most findings the critic's only verdicts were ``needs-info`` and
-    #: ``rejected`` — while ``prompts/critic.md`` asks it, in the same breath,
-    #: whether the claim depends on the unknown it names.
+    #: A draft may name an open fact its argument never uses, and 78% of the
+    #: corpus's drafts cite one.
     #:
-    #: **Each dismissed pair is named, and silence still refuses.** A
-    #: ``confirmed`` is legal only where every one of the draft's unknown
-    #: grounds appears here, so a critic that never opened the question cannot
-    #: confirm by omission and one that did has said which pairs and can be
-    #: measured on it. It is the observable #894 asks for.
+    #: **Each dismissed pair is named, and silence keeps the question open.**
+    #: :func:`~analysis_service.critic.complete_rulings` adds every unknown
+    #: ground not named here to ``related_unknowns``, so a draft is
+    #: ``confirmed`` only where the critic dismissed each of its unknown
+    #: grounds. A dismissal is a claim somebody can check (#894).
     immaterial_unknowns: list[UnknownRef] = Field(default_factory=list)
     rejected_because: RejectionStep | None = None
 
@@ -632,7 +618,52 @@ class ProposedVerdict(BaseModel):
         return frozenset(ref.key for ref in self.immaterial_unknowns)
 
 
-class Verdict(ProposedVerdict):
+class ProposedVerdict(VerdictFields):
+    """The critic's ruling on one draft, as the critic emits it.
+
+    **The critic does not choose the status. Code decides it from the fields**
+    (#1202). The critic answers two questions per draft, and each is a field:
+
+    * Which check the draft fails, in ``rejected_because``, or none. A draft
+      fails the ``reasoning`` check only where its argument does not follow
+      even if every open fact it depends on holds.
+    * Which open facts the argument depends on, in ``related_unknowns``, and
+      which unknown grounds it cites and does not use, in
+      ``immaterial_unknowns``. An open fact with no place in the model is a
+      ``subject``.
+
+    :attr:`status` reads the answers: a failed check is ``rejected``, an open
+    fact is ``needs-info``, and neither is ``confirmed``. A critic asked for
+    the status directly gave a different one for the same draft in about one
+    call in six, and nearly always between ``needs-info`` and ``rejected``
+    (QA-2026-09-24-02-E10, E11).
+
+    **No rule between the fields**, which is what makes this the shape a
+    provider can be asked to generate: nothing a critic writes here is a shape
+    error, so nothing it writes can fail the node on the way into state.
+    Whether the combination is coherent — a rejection that also names open
+    facts, a verdict with no reason — is asked at the review seam, which can
+    send it back.
+    """
+
+    @property
+    def status(self) -> VerdictStatus:
+        """The verdict the fields decide.
+
+        Read it on a ruling that
+        :func:`~analysis_service.critic.complete_rulings` has completed. That
+        step adds each unknown ground the critic did not dismiss to
+        ``related_unknowns``, so a draft that rests on one reads
+        ``needs-info`` even where the critic named none.
+        """
+        if self.rejected_because is not None:
+            return "rejected"
+        if self.related_unknowns:
+            return "needs-info"
+        return "confirmed"
+
+
+class Verdict(VerdictFields):
     """The critic's ruling on one threat, as the report carries it.
 
     ``needs-info`` must name the unknown attributes that caused it;
@@ -654,8 +685,9 @@ class Verdict(ProposedVerdict):
     reliably compile — the same constraint :class:`Ground` documents at length.
 
     So this class is **not what the critic emits**. It emits
-    :class:`ProposedVerdict`, which is these fields with no rule between them,
-    and :func:`~analysis_service.critic.review_issues` checks the three at the
+    :class:`ProposedVerdict`, which carries no status and no rule between its
+    fields. Code decides the status from those fields, and
+    :func:`~analysis_service.critic.review_issues` checks what is left at the
     seam that owns "is this critic output well-formed" — where a failure routes
     to the bounded ``recritic`` re-ask. Raising here instead would kill the node
     on the way into state, taking the whole job with it, and the re-ask built
@@ -666,6 +698,8 @@ class Verdict(ProposedVerdict):
     a proposal the review seam has already passed, so the check below is this
     service auditing its own construction rather than refereeing a model's.
     """
+
+    status: VerdictStatus
 
     @model_validator(mode="after")
     def _check_shape(self) -> Self:
@@ -913,11 +947,7 @@ class Claim(BaseModel):
         reason = f"The claim rests on {named}, which the input never stated."
         if len(reason) > REASON_MAX_CHARS:
             reason = f"The claim rests on {len(unknowns)} facts the input never stated."
-        verdict = ProposedVerdict(
-            status="needs-info",
-            reason=reason,
-            related_unknowns=unknowns,
-        )
+        verdict = ProposedVerdict(reason=reason, related_unknowns=unknowns)
         return Ruling(id=draft.id, verdict=verdict)
 
     @classmethod
@@ -1721,28 +1751,29 @@ UNRECONCILED_MESSAGE_MAX_CHARS = 1500
 #: hold, and a required field cannot hold it.
 UNNAMED_CLAIM = "(unnamed)"
 
-#: What went wrong with one ruling, as a closed set. Every value is a check
-#: :mod:`analysis_service.critic` already distinguishes in code, so a reader
-#: counts causes without parsing the sentence that describes one:
+#: What went wrong with one ruling, as a closed set. Every value but the ones
+#: in :data:`ARCHIVED_UNRECONCILED_KINDS` is a check
+#: :mod:`analysis_service.critic` distinguishes in code, so a reader counts
+#: causes without parsing the sentence that describes one:
 #:
 #: * ``dropped`` — the critic returned no ruling on a draft it was shown;
 #: * ``invented`` — it ruled on an ID no lane agent drafted;
 #: * ``duplicate-id`` — one ID carries more than one ruling;
-#: * ``confirmed-on-unknown`` — a draft whose own grounds cite an unknown was
-#:   ruled confirmed;
+#: * ``confirmed-on-unknown`` — archived only: see
+#:   :data:`ARCHIVED_UNRECONCILED_KINDS`;
 #: * ``duplicate-on-unit`` — a draft naming a catalog unit was rejected as a
 #:   duplicate, which that framework decides by identifier before any critic
 #:   reads it;
 #: * ``dismissal-off-grounds`` — a ruling names a pair in
 #:   ``immaterial_unknowns`` that the draft's own grounds do not cite;
-#: * ``verdict-shape`` — a verdict's fields disagree with its own ``status``;
+#: * ``verdict-shape`` — a verdict's fields cannot make a coherent verdict;
 #: * ``unresolved-unknown`` — a ``needs-info`` names an element or attribute
 #:   the model does not hold, or names nothing at all;
 #: * ``unbriefed-change`` — the re-ask changed a ruling no problem named, and
 #:   the first pass's ruling was kept.
 #:
-#: The first eight are the *first* pass's problems and the last is the second
-#: look's, which is why one field carries both: each is a way the review did
+#: The last is the second look's problem and the others are the first
+#: pass's, which is why one field carries both: each is a way the review did
 #: not reconcile, and a reader asking "did this run repair itself" wants one
 #: list rather than two.
 UnreconciledKind = Literal[
@@ -1756,6 +1787,15 @@ UnreconciledKind = Literal[
     "unresolved-unknown",
     "unbriefed-change",
 ]
+
+#: The kinds archived reports carry and no check writes. A report is re-scored
+#: from the archive, so its marks must still load. ``confirmed-on-unknown`` is
+#: a draft citing an unknown that the critic ruled confirmed. The critic writes
+#: no status, and an unknown it does not dismiss makes the claim ``needs-info``
+#: (#1202), so no ruling can take this kind.
+ARCHIVED_UNRECONCILED_KINDS: frozenset[UnreconciledKind] = frozenset(
+    {"confirmed-on-unknown"}
+)
 
 
 class UnreconciledRuling(BaseModel):

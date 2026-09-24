@@ -43,6 +43,7 @@ from analysis_service.charges import CHARGE_METADATA_KEY, UPSTREAM_METADATA_KEY
 from analysis_service.claims import (
     Ground,
     Mitigation,
+    ProposedVerdict,
     Rating,
     Severity,
     Verdict,
@@ -591,7 +592,7 @@ def sample_ruling(threat_id: str = "S-01", **overrides: Any) -> ThreatRuling:
     fields: dict[str, Any] = {
         "id": threat_id,
         "confidence": "high",
-        "verdict": Verdict(status="confirmed"),
+        "verdict": ProposedVerdict(),
     }
     fields.update(overrides)
     return ThreatRuling(**fields)
@@ -1204,7 +1205,7 @@ SCRIPTED_FRAMEWORKS: Mapping[FrameworkName, ScriptedFramework] = MappingProxyTyp
             ),
             ruling=claims_json(
                 RequirementRulingProposal.model_validate(
-                    {"id": "v5.0.0-6.2.1", "verdict": {"status": "confirmed"}}
+                    {"id": "v5.0.0-6.2.1", "verdict": {}}
                 )
             ),
         ),

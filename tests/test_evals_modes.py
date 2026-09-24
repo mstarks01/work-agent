@@ -172,7 +172,7 @@ def scripted_ruling(case, category) -> dict:
     return {
         "id": f"{CATEGORY_LETTERS[category]}-01",
         "confidence": "low" if conditional else "high",
-        "verdict": {"status": "needs-info" if conditional else "confirmed"},
+        "verdict": {},
     }
 
 

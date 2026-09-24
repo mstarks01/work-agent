@@ -4,9 +4,11 @@ This framework rules on **threats**: claims that a named attacker action against
 
 ## The three states, for this framework
 
+You do not write the state. The service reads it off your ruling's fields, as the Output section says.
+
 - **confirmed** — the threat holds. The attacker action is credible, the elements it names are the ones it acts on, and the facts it rests on are stated in the model. A confirmed threat needs no reason: the finding is the argument.
-- **needs-info** — the threat is raisable but cannot be settled, because a control it turns on is `unknown`. Name every element and attribute the threat hangs on. An `unknown` is not a missing control and never becomes one here; it is a question the submitter can answer.
-- **rejected** — the threat does not hold. The model's stated facts rule the attacker action out for an element of this shape (`evidence`); it reasons from a fact the model does not state (`reasoning`) — where a fact the model states by its shape, such as a record that names no actor, counts as stated; it is filed in a lane it does not belong to (`lane`); or another draft already covers the same attacker action against the same element (`duplicate`). Say plainly which of those it was; the rejected array is an audit trail, and a reader has to be able to tell which step killed it.
+- **needs-info** — the threat holds if the facts it turns on hold, and at least one of them is open: a control that is `unknown`, or a fact the model has no place for. Name every open fact the threat hangs on. An `unknown` is not a missing control and never becomes one here; it is a question the submitter can answer.
+- **rejected** — the threat does not hold. The model's stated facts rule the attacker action out for an element of this shape (`evidence`); its argument does not follow even when every open fact it depends on holds, or it contradicts a fact the model states (`reasoning`) — a fact the model does not state is open, and makes the threat needs-info rather than rejected; it is filed in a lane it does not belong to (`lane`); or another draft already covers the same attacker action against the same element (`duplicate`). Say plainly which of those it was; the rejected array is an audit trail, and a reader has to be able to tell which step killed it.
 
 ## What this framework does not say
 
