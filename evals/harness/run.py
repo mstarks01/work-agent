@@ -73,6 +73,7 @@ from evals.harness import (
     extraction_losses,
     falsify,
     flow_ids,
+    guard_cost,
     instruction,
     instruction_delta,
     ledger,
@@ -2405,6 +2406,12 @@ COMMANDS: dict[str, Command] = {
         " rejected, findings withdrawn and leads reopened (#926, no credentials)",
         run=population.command_reassess,
         arguments=population.reassess_arguments,
+    ),
+    "guard-cost": Command(
+        help="price what ADR 0041's guard holds back over archived proposal/graph"
+        " pairings: values, crossings, candidates and must-finds (no credentials)",
+        run=guard_cost.command_guard_cost,
+        arguments=guard_cost.arguments,
     ),
     "oracle": Command(
         help="put a perfect reading of every signed case through the"

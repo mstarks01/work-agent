@@ -2683,7 +2683,7 @@ _QUALIFIED_BECAUSE: Mapping[str, str] = MappingProxyType(
 
 
 def apply_projection(
-    model: SystemModel, catalog: AssertionCatalog
+    model: SystemModel, catalog: AssertionCatalog, *, hold_unchecked: bool = True
 ) -> tuple[SystemModel, tuple[Projection, ...]]:
     """The model with each projection :data:`PROJECTION_EFFECT` applies written in.
 
@@ -2709,6 +2709,10 @@ def apply_projection(
     was the catalog reading a stated absence where the graph read ``unknown``.
     That is the substitution this layer exists to remove, and it is the whole
     of what this function changes.
+
+    ``hold_unchecked`` is ADR 0041's guard (:func:`_unchecked_over_lead`).
+    Every job keeps it on. ``run.py guard-cost`` turns it off to measure what
+    the guard holds back.
     """
     applied = tuple(
         projection
@@ -2717,7 +2721,7 @@ def apply_projection(
     )
     if not applied:
         return model, ()
-    updated = _projected_model(model, catalog, applied)
+    updated = _projected_model(model, catalog, applied, hold_unchecked)
     # **Fail closed on the model, not on the rows.** A projected ``trust_zone``
     # is a reference, and a row naming a zone this model does not hold would
     # leave a dangling endpoint that ``boundary_crossings`` refuses — after
@@ -2732,7 +2736,10 @@ def apply_projection(
 
 
 def _projected_model(
-    model: SystemModel, catalog: AssertionCatalog, applied: tuple[Projection, ...]
+    model: SystemModel,
+    catalog: AssertionCatalog,
+    applied: tuple[Projection, ...],
+    hold_unchecked: bool,
 ) -> SystemModel:
     """``model`` with each applied projection written in, before the gate sees it."""
     updated = model.model_copy(deep=True)
@@ -2751,7 +2758,7 @@ def _projected_model(
             )
             continue
         behind = [rows[ref] for ref in projection.rows if ref in rows]
-        if _unchecked_over_lead(
+        if hold_unchecked and _unchecked_over_lead(
             projection, getattr(element, projection.attribute), behind
         ):
             setattr(
@@ -2799,10 +2806,11 @@ def _unchecked_over_lead(
     review status in the gloss (:func:`offered`).
 
     A row a reviewer marked ``supported`` may close the lead; that is what a
-    review is for. Measured, and recorded with its cost in ADR 0041: of 3,705
-    stated projections over 1,500 archived proposal/graph pairings, 140 are
-    held back — 51 corrections, and 89 exposures and zones the blessed model
-    agrees with, which reach the lane as cited unchecked rows instead. A stated absence over an unknown still writes, because an
+    review is for. ``run.py guard-cost`` measures what it holds back, and ADR
+    0041 records the reading: over the archived proposal/graph pairings a job
+    could project onto, 44 values the blessed model agrees with reach the lane
+    as cited unchecked rows instead, and 18 wrong ``none`` authentications
+    become questions. A stated absence over an unknown still writes, because an
     absence is itself a lead. A stated control over a stated one closes
     nothing, whichever is right, so it is left to the projection.
     """
