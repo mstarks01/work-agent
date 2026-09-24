@@ -192,7 +192,15 @@ __all__ = [
 #: two facts that matter — how long the window is, and that nobody can shorten
 #: it — had nowhere to go. A maintainer sitting asked for both to be preserved
 #: separately rather than folded into the categorical value (#1054).
-REGISTRY_VERSION = 6
+#:
+#: Version 7 makes ``data-classification`` a closed term: ``public``,
+#: ``internal`` or ``confidential``, the tiers ``prompts/extract.md`` gives the
+#: graph field it projects into. As free text meaning "what kind of data this
+#: component holds" it drew a list of contents on every row a reviewer read,
+#: which the signed reference, the extraction contract and ASVS's
+#: classified-store rule all read as no classification (#926). The same version
+#: gives ``network-membership`` the placement rule its graph field already has.
+REGISTRY_VERSION = 7
 
 #: The projection's version: which graph attribute each predicate is
 #: authoritative for, and what :func:`project` does when the rows do not fit one
@@ -494,15 +502,17 @@ REGISTRY: Mapping[str, Predicate] = MappingProxyType(
             value="text",
             projects_into="encryption_at_rest",
         ),
-        # Free text rather than a vocabulary, because the reader is a rule that
-        # searches the words: ASVS's CLASSIFIED_STORE_TEST looks for
-        # "confidential", "restricted", "pii" and the rest inside the attribute.
-        # A closed set here would decide, ahead of every framework, which
-        # classifications a source may state.
+        # The tiers ``prompts/extract.md`` defines for ``data_classification``,
+        # and ``tests/test_assertions.py`` holds the two lists equal. What a
+        # store holds is its description, never its tier: a source that lists
+        # the contents supports a tier as an inference, and ASVS's
+        # CLASSIFIED_STORE_TEST finds ``confidential`` in the projected field.
         "data-classification": Predicate(
-            meaning="what kind of data this component holds",
+            meaning="which sensitivity tier this component's data is in,"
+            " never a list of what it holds",
             subjects=frozenset({"component"}),
-            value="text",
+            value="term",
+            terms=frozenset({"public", "internal", "confidential"}),
             projects_into="data_classification",
         ),
         "signature-verification": Predicate(
@@ -539,7 +549,9 @@ REGISTRY: Mapping[str, Predicate] = MappingProxyType(
             projects_into="exposure",
         ),
         "network-membership": Predicate(
-            meaning="which zone this component sits in",
+            meaning="which zone a sentence about where this component runs"
+            " puts it in; its own name, what reaches it and what it talks to"
+            " or sits on place it nowhere",
             subjects=frozenset({"component"}),
             value="reference",
             refers_to=frozenset({"zone"}),
