@@ -66,6 +66,8 @@ from analysis_service.assertions import AssertionRecord
 from analysis_service.sources import text_digest
 from evals.harness import falsify
 from evals.harness.arms import ArmRun
+from evals.harness.artifact import load_artifact
+from evals.harness.bundle import assertions_from_reports
 from evals.harness.modes import AssertionResult
 from evals.harness.reference import GoldenCase, load_corpus
 from evals.harness.replay import replay_assertions, signed_reference
@@ -82,8 +84,44 @@ BASELINE: Mapping[str, float] = MappingProxyType(
         "must_find_coverage": 0.500,
         "reference_coverage": 0.526,
         "claims": 16,
+        "required_fact_recall": 0.511,
     }
 )
+
+#: The assertion-mode runs ``required_fact_recall`` is read from, one pair of
+#: files per repeat: case 01 in the first, the four holdout cases in the
+#: second. Tracked under ``evals/emissions/``, so the figure is recomputed by
+#: ``tests/test_evals_promotion.py`` rather than trusted. Declared 2026-09-24,
+#: before any treatment run is read against it.
+RECALL_RUNS: tuple[tuple[str, str], ...] = tuple(
+    (
+        f"evals/emissions/20260916T-assert-step6/luna-after-r{repeat}.json",
+        f"evals/emissions/20260916T-assert-holdouts/luna-after-r{repeat}.json",
+    )
+    for repeat in range(1, 6)
+)
+
+#: The cases :data:`RECALL_RUNS` covers. A treatment repeat is read over
+#: exactly these, because recall ranges from 0.24 to 1.0 by case.
+RECALL_CASES: frozenset[str] = frozenset(
+    {
+        "01-payments-checkout",
+        "04-ml-inference-service",
+        "09-cookbook-sokify-retail",
+        "11-sparse-shift-scheduling",
+        "13-dispatch-control-plane",
+    }
+)
+
+#: The model the ``assert`` node requested in every baseline run. Recall
+#: depends on the model — on case 01, 0.52 on this one and 0.31 on another —
+#: so a treatment on any other model is not read against this baseline.
+RECALL_MODEL = "openrouter/openai/gpt-5.6-luna"
+
+#: The standard deviation of the pooled recall over the five baseline repeats
+#: (21 to 26 of 45 required facts). Declared from the repeats rather than
+#: passed in, because the repeats exist.
+RECALL_SPREAD = 0.042
 
 #: When the baseline was measured, and by which pair. A budget is a fact about
 #: a day's tree: read this before quoting one.
@@ -96,7 +134,7 @@ BASELINE: Mapping[str, float] = MappingProxyType(
 #: the tree, so its figures are the record rather than something to recompute.
 #:
 #: **What these gates cannot yet decide** is :data:`PENDING`: the review
-#: population, semantic support, required-fact recall and case diversity. Each is read ``inconclusive`` until it has a measurement,
+#: population, semantic support and case diversity. Each is read ``inconclusive`` until it has a measurement,
 #: so no run promotes on the gates above alone. The ``sd`` gates also compare
 #: one treatment run against this one baseline run, scaled by a spread, rather
 #: than repeated arms against each other.
@@ -138,6 +176,11 @@ def _must_find(artifact: Mapping[str, Any], report: Mapping[str, Any]) -> float 
 
 def _reference(artifact: Mapping[str, Any], report: Mapping[str, Any]) -> float | None:
     return _metric(artifact, "reference_coverage")
+
+
+def _unread_here(artifact: Mapping[str, Any], report: Mapping[str, Any]) -> None:
+    """A gate whose figure one treatment report cannot give (see :func:`read_recall`)."""
+    return
 
 
 def _backed(artifact: Mapping[str, Any], report: Mapping[str, Any]) -> float | None:
@@ -405,6 +448,22 @@ GATES: Mapping[str, Gate] = MappingProxyType(
                 " limit; the spread arrives with the repeats"
             ),
         ),
+        "required-fact-recall": Gate(
+            question="does the layer still find the facts the sources state?",
+            read=_unread_here,
+            unit="sd",
+            limit=-1.0,
+            direction="at-least",
+            against="required_fact_recall",
+            why=(
+                "non-regression on the rule the coverage gates use. Read in"
+                " assertion mode on the baseline's five cases and model"
+                " (`run.py gates --recall`), because a report resolves its"
+                " catalog against its own extracted graph and would charge"
+                " binding losses to the layer. Precision alone can be met by"
+                " emitting few facts, so support never promotes without this"
+            ),
+        ),
         "reference-coverage": Gate(
             question="does reference coverage fall further than the spread explains?",
             read=_reference,
@@ -434,10 +493,6 @@ class Pending:
     measures: str
     limit: str
     unset: str
-    #: Where the figure is read, where it can be yet. A pending gate with a
-    #: reader prints what it measured and stays unread, because a measurement
-    #: with no declared limit decides nothing.
-    read: Callable[[Mapping[str, Any], Mapping[str, Any]], float | None] | None = None
 
 
 #: The measurement design #926 settled on 2026-09-23 (option (c) of the
@@ -477,23 +532,6 @@ PENDING: Mapping[str, Pending] = MappingProxyType(
                 " 20% unresolved ceiling has an acceptance rationale. A limit is"
                 " set from a reason, before the first assessment, or not at all"
             ),
-        ),
-        "required-fact-recall": Pending(
-            question="does the layer still find the facts the sources state?",
-            measures=(
-                "required-fact recall of the catalog the report embeds, graded"
-                " by the signed reference's matcher, baseline arm against"
-                " treatment arm on the same cases"
-            ),
-            limit="",
-            unset=(
-                "no limit is declared and there is no repeated baseline to read"
-                " a regression against: the flag-off arm has no catalog, so the"
-                " baseline is an earlier assertion arm, not the A/B pair."
-                " Precision alone can be met by emitting few facts, so support"
-                " never promotes without this"
-            ),
-            read=_required_fact_recall,
         ),
         "case-diversity": Pending(
             question="is the evidence about systems, or about one system repeated?",
@@ -545,6 +583,75 @@ def _in_spreads(difference: float, spread: float) -> float:
     if spread:
         return difference / spread
     return 0.0 if difference == 0 else math.copysign(math.inf, difference)
+
+
+def pooled_recall(paths: Sequence[Path]) -> float:
+    """Required-fact recall over one repeat's assertion-mode files, pooled by row.
+
+    Found rows over required rows across :data:`RECALL_CASES`, each case
+    graded by its signed reference's matcher through
+    :class:`~evals.harness.arms.ArmRun`, the one reader of the endpoint.
+    Pooled by row rather than averaged by case, so case 11's three rows weigh
+    three and case 01's fifteen weigh fifteen.
+    """
+    cases = [case for case in load_corpus(CORPUS) if case.id in RECALL_CASES]
+    found = required = 0
+    for path in paths:
+        held = [case for case in cases if case.id in load_artifact(path).cases]
+        for case_id, result in assertions_from_reports(path, held).items():
+            case = next(case for case in held if case.id == case_id)
+            reference = signed_reference(CORPUS, case)
+            if reference is None:
+                raise ValueError(f"{case_id}: no signed reference to grade against")
+            run = ArmRun.of(
+                replay_assertions(case, reference, result), reference, arm="treatment"
+            )
+            found += run.recovered
+            required += run.required
+    if not required:
+        raise ValueError("no required row in these files")
+    return found / required
+
+
+def read_recall(repeats: Sequence[Sequence[Path]]) -> Reading:
+    """``required-fact-recall`` over a treatment's repeats, or why it is unread.
+
+    Each repeat is the files that together cover :data:`RECALL_CASES`, run on
+    :data:`RECALL_MODEL`. The figure is the mean pooled recall, compared with
+    the baseline in units of :data:`RECALL_SPREAD`, which is how the baseline
+    itself was measured.
+    """
+    name = "required-fact-recall"
+    gate = GATES[name]
+    baseline = BASELINE[gate.against]
+
+    def unread(why: str) -> Reading:
+        return Reading(name, "inconclusive", None, baseline, None, why)
+
+    if not repeats:
+        return unread("no assertion-mode repeat was given (`--recall`)")
+    for paths in repeats:
+        covered = frozenset().union(*(load_artifact(path).cases for path in paths))
+        if not RECALL_CASES <= covered:
+            missing = ", ".join(sorted(RECALL_CASES - covered))
+            return unread(f"a repeat does not cover the baseline's cases ({missing})")
+        models = frozenset().union(*(_assert_models(path) for path in paths))
+        if models != {RECALL_MODEL}:
+            return unread(
+                f"a repeat ran {', '.join(sorted(models)) or 'no assert node'},"
+                f" and the baseline ran {RECALL_MODEL}"
+            )
+    measured = sum(pooled_recall(paths) for paths in repeats) / len(repeats)
+    value = _in_spreads(measured - baseline, RECALL_SPREAD)
+    passed = value >= gate.limit
+    return Reading(name, "pass" if passed else "fail", measured, baseline, value)
+
+
+def _assert_models(path: Path) -> frozenset[str]:
+    """The models the ``assert`` node requested in one sweep, from its provenance."""
+    held = json.loads(path.read_text(encoding="utf-8"))
+    runs = held.get("provenance", {}).get("node_runs", {}).get("assert", [])
+    return frozenset(run["requested_model"] for run in runs)
 
 
 def read_gate(
@@ -603,26 +710,25 @@ def decide(
     report: Mapping[str, Any],
     *,
     spread: Mapping[str, float] = MappingProxyType({}),
+    recall: Sequence[Sequence[Path]] = (),
 ) -> tuple[Reading, ...]:
     """Every gate, read, then every :data:`PENDING` gate as unread.
 
-    ``spread`` maps a gate name to its repeat spread.
+    ``spread`` maps a gate name to its repeat spread. ``recall`` is the
+    treatment's assertion-mode repeats, which ``required-fact-recall`` reads
+    in place of the report (:func:`read_recall`).
     """
-    unread = []
-    for name, pending in PENDING.items():
-        measured, unreadable = (
-            (None, "")
-            if pending.read is None
-            else _measure(pending.read, artifact, report)
-        )
-        unread.append(
-            Reading(
-                name, "inconclusive", measured, None, None, unreadable or pending.unset
-            )
-        )
     return (
-        *(read_gate(name, artifact, report, spread=spread.get(name)) for name in GATES),
-        *unread,
+        *(
+            read_recall(recall)
+            if name == "required-fact-recall"
+            else read_gate(name, artifact, report, spread=spread.get(name))
+            for name in GATES
+        ),
+        *(
+            Reading(name, "inconclusive", None, None, None, pending.unset)
+            for name, pending in PENDING.items()
+        ),
     )
 
 
@@ -632,9 +738,11 @@ def render(readings: Sequence[Reading]) -> str:
         "## The predeclared promotion gates, read",
         "",
         (
-            f"Budgets set from the baseline arm of {BASELINE_RUN}. A gate"
-            " reading `inconclusive` is one nobody can read yet, and a run with"
-            " an unread gate is not a promotion."
+            f"Budgets set from the baseline arm of {BASELINE_RUN}. Required-fact"
+            f" recall from {len(RECALL_RUNS)} assertion-mode repeats in"
+            f" {', '.join(sorted({str(Path(path).parent) for pair in RECALL_RUNS for path in pair}))}."
+            " A gate reading `inconclusive` is one nobody can read yet, and a"
+            " run with an unread gate is not a promotion."
         ),
         "",
         "| gate | verdict | measured | baseline | against limit | limit |",
@@ -688,6 +796,15 @@ def arguments(parser: argparse.ArgumentParser) -> None:
         help="JSON mapping a gate name to the standard deviation of its figure"
         " over repeats of the baseline arm",
     )
+    parser.add_argument(
+        "--recall",
+        type=Path,
+        nargs="+",
+        action="append",
+        default=[],
+        help="one treatment repeat's assertion-mode sweep files, covering the"
+        " baseline's five cases; give it once per repeat",
+    )
 
 
 def command_gates(args: argparse.Namespace) -> int:
@@ -702,8 +819,20 @@ def command_gates(args: argparse.Namespace) -> int:
     except (OSError, ValueError) as error:
         print(f"cannot read: {error}", file=sys.stderr)
         return 1
-    readings = decide(artifact, report, spread=spread)
+    try:
+        readings = decide(artifact, report, spread=spread, recall=args.recall)
+    except (OSError, ValueError) as error:
+        print(f"cannot read the recall repeats: {error}", file=sys.stderr)
+        return 1
     print(render(readings), end="")
+    measured, unreadable = _measure(_required_fact_recall, artifact, report)
+    if measured is not None:
+        print(
+            "\nRequired-fact recall of this report's own catalog, end to end,"
+            f" reported and not gated: {measured:.3f}"
+        )
+    elif unreadable:
+        print(f"\n{unreadable}")
     shares = support_shares(report)
     if shares is not None:
         print(

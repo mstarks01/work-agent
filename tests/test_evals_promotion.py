@@ -169,9 +169,8 @@ class TestAnAbsentFigureIsNotAZero:
         report["assertions"]["written_by_an_older_tree"] = True
         readings = {row.gate: row for row in promotion.decide(artifact, report)}
 
-        for gate in ("structural-refusals", "required-fact-recall"):
-            assert readings[gate].verdict == "inconclusive"
-            assert "does not validate" in readings[gate].why
+        assert readings["structural-refusals"].verdict == "inconclusive"
+        assert "does not validate" in readings["structural-refusals"].why
 
 
 def _report(*entries: Assertion, proposed: int, issues=()) -> dict:
@@ -291,14 +290,74 @@ class TestRecallIsReadOffTheReport:
         recall = promotion._required_fact_recall({}, report)
         assert recall is not None and recall < 1.0
 
-    def test_the_pending_gate_prints_the_figure_and_stays_unread(self) -> None:
+    def test_a_report_alone_never_reads_the_gate(self) -> None:
+        """The report's own figure is end to end and reported apart; the gate
+        is read in assertion mode, from ``--recall``."""
         report = self.report(lambda reference: reference.entries)
         artifact = TestTheTwoKindsOfGate().artifact(0.1, 0.5)
         readings = {row.gate: row for row in promotion.decide(artifact, report)}
 
-        assert readings["required-fact-recall"].measured == 1.0
         assert readings["required-fact-recall"].verdict == "inconclusive"
+        assert readings["required-fact-recall"].measured is None
 
     def test_a_report_from_no_corpus_case_is_unread(self) -> None:
         report = {"input": {"sources": [{"sha256": "0" * 64}]}}
         assert promotion._required_fact_recall({}, report) is None
+
+
+BASELINE_REPEATS = [
+    [REPO_ROOT / path for path in pair] for pair in promotion.RECALL_RUNS
+]
+
+
+class TestTheRecallGateIsDeclaredFromTheArchive:
+    """``required-fact-recall``: baseline, spread and limit, declared 2026-09-24."""
+
+    def test_the_declared_baseline_is_what_the_archive_reads(self) -> None:
+        import statistics
+
+        per_repeat = [promotion.pooled_recall(paths) for paths in BASELINE_REPEATS]
+
+        assert (
+            round(statistics.mean(per_repeat), 3)
+            == (promotion.BASELINE["required_fact_recall"])
+        )
+        assert round(statistics.stdev(per_repeat), 3) == promotion.RECALL_SPREAD
+
+    def test_the_baseline_runs_cover_the_declared_cases_and_model(self) -> None:
+        for paths in BASELINE_REPEATS:
+            assert (
+                frozenset().union(
+                    *(promotion.load_artifact(path).cases for path in paths)
+                )
+                == promotion.RECALL_CASES
+            )
+            for path in paths:
+                assert promotion._assert_models(path) == {promotion.RECALL_MODEL}
+
+    def test_the_baseline_read_against_itself_passes(self) -> None:
+        reading = promotion.read_recall(BASELINE_REPEATS)
+
+        assert reading.verdict == "pass"
+        assert reading.against_limit == pytest.approx(0.0, abs=0.05)
+
+    def test_a_repeat_missing_a_case_is_unread(self) -> None:
+        reading = promotion.read_recall([BASELINE_REPEATS[0][:1]])
+
+        assert reading.verdict == "inconclusive"
+        assert "does not cover" in reading.why
+
+    def test_a_repeat_on_another_model_is_unread(self, monkeypatch) -> None:
+        monkeypatch.setattr(promotion, "RECALL_MODEL", "openrouter/other")
+        reading = promotion.read_recall(BASELINE_REPEATS[:1])
+
+        assert reading.verdict == "inconclusive"
+        assert "baseline ran openrouter/other" in reading.why
+
+    def test_a_fall_of_more_than_one_spread_fails(self, monkeypatch) -> None:
+        low = promotion.BASELINE["required_fact_recall"] - 2 * promotion.RECALL_SPREAD
+        monkeypatch.setattr(promotion, "pooled_recall", lambda paths: low)
+        reading = promotion.read_recall(BASELINE_REPEATS[:1])
+
+        assert reading.verdict == "fail"
+        assert reading.against_limit == pytest.approx(-2.0)
