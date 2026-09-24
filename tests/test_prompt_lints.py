@@ -1048,9 +1048,8 @@ def test_every_computed_key_the_critic_is_shown_is_named_in_its_prompt(key):
     fails here rather than arriving undocumented.
     """
     # The shared prompt or a package's own critic text: a key a package alone
-    # rules on -- ``rated_unlike`` feeds STRIDE's rating step -- belongs in
-    # that package's file, and the neutral body has no business describing a
-    # judgement only one framework asks for.
+    # rules on belongs in that package's file, and the neutral body has no
+    # business describing a judgement only one framework asks for.
     read_by = [loader.load(CRITIC_PROMPT_NAME)] + [
         PACKAGE_LOADERS[name].load(CRITIC_DOC) for name in sorted(PACKAGES)
     ]

@@ -543,42 +543,6 @@ def duplicate_groups(
     }
 
 
-def rating_disagreements(drafts: Sequence[Claim]) -> dict[str, list[str]]:
-    """Each draft against the others with one fact pattern and another rating.
-
-    The STRIDE critic's rating step asks that identical fact patterns carry
-    identical ratings across lanes. Two drafts with the same verb and the same set of catalogued
-    grounds are one fact pattern, and whether their ``likelihood`` or
-    ``impact`` differ is a comparison of four fields, made here so the critic
-    reads the pair and only picks the rating (#444). Quotes are left out of the
-    key: two agents quoting two spans of one sentence are not two patterns.
-
-    The ratings are read through :meth:`Claim.rating_of`, so a framework that
-    grades nothing answers ``None`` and is never compared.
-    """
-    by_pattern: dict[tuple[str, frozenset[tuple[str, str, str]]], list[Claim]] = {}
-    ratings: dict[str, tuple[str, str]] = {}
-    for draft in drafts:
-        rating = type(draft).rating_of(draft)
-        if draft.verb is None or rating is None:
-            continue
-        ratings[draft.id] = rating
-        facts = frozenset(
-            (ground.kind, ground.referent, ground.attribute)
-            for ground in draft.grounds
-            if ground.kind != "quote"
-        )
-        if facts:
-            by_pattern.setdefault((draft.verb, facts), []).append(draft)
-    disagreements: dict[str, list[str]] = {}
-    for group in by_pattern.values():
-        if len({ratings[d.id] for d in group}) < 2:
-            continue
-        for draft in group:
-            disagreements[draft.id] = [d.id for d in group if d.id != draft.id]
-    return disagreements
-
-
 def review_issues(
     drafts: Sequence[Claim],
     rulings: Sequence[Ruling],
@@ -742,15 +706,13 @@ def _ruled(draft: Claim, ruling: Ruling, ruled_record: type[RuledClaim]) -> Rule
     held rather than from anything the critic emitted, so a review cannot alter
     a description or an element reference.
 
-    **What a ruling may replace is stated by the ruling's own shape, not by a
-    list here.** Every field a package's :class:`~analysis_service.claims.Ruling`
-    subclass declares beyond ``id`` and ``verdict`` is merged onto the draft, and
-    a field holding ``None`` leaves the draft's alone. That one rule covers both
-    of the things a package actually does with those fields: STRIDE's
-    ``confidence`` is a judgement the draft never had and is required, so it
-    always lands; STRIDE's ``severity`` is a draft field the calibration step may
-    replace, and its ``None`` — the common case — keeps the agent's rating and the
-    justification that argues for it together.
+    **What a ruling adds is stated by the ruling's own shape, not by a list
+    here.** Every field a package's :class:`~analysis_service.claims.Ruling`
+    subclass declares beyond ``id`` and ``verdict`` is merged onto the draft,
+    and a field holding ``None`` is left out. STRIDE's ``confidence`` and
+    ``recommendation`` are judgements the draft never had. No ruling field
+    replaces a field the agent wrote, so the agent's severity and its
+    justification always reach the report together.
 
     The verdict is **rebuilt** rather than carried across, promoting the
     critic's unruled :class:`~analysis_service.claims.ProposedVerdict` to the
@@ -838,7 +800,6 @@ _DRAFT_UNRULED_FIELDS: frozenset[str] = frozenset()
 def _ruling_view(
     drafts: Sequence[Claim],
     duplicates: Mapping[str, Sequence[str]] = MappingProxyType({}),
-    rated_unlike: Mapping[str, Sequence[str]] = MappingProxyType({}),
     repaired: Sequence[RepairedQuote] = (),
     unverified: Sequence[UnverifiedGround] = (),
     assertions: AssertionCatalog | None = None,
@@ -931,11 +892,6 @@ def _ruling_view(
         # critic not to spend a judgement on it.
         if reason := type(draft).misfiled(draft):
             view["filed_in_wrong_lane"] = reason
-        # Computed too: the other drafts with this one's fact pattern and a
-        # different rating (:func:`~analysis_service.critic.rating_disagreements`),
-        # which is the pair the rating step calibrates across.
-        if draft.id in rated_unlike:
-            view["rated_unlike"] = list(rated_unlike[draft.id])
         # The framework's own words for the unit this draft rules on, so the
         # evidence step judges the description against the requirement rather
         # than against the draft's paraphrase of it (#659). Absent for a
@@ -1012,11 +968,8 @@ def critic_view(
     """
     shown = list(drafts)
     duplicates = duplicate_groups(shown, system_model)
-    rated_unlike = rating_disagreements(shown)
     chosen = shown if only is None else [d for d in shown if d.id in only]
-    return _ruling_view(
-        chosen, duplicates, rated_unlike, repaired, unverified, assertions
-    )
+    return _ruling_view(chosen, duplicates, repaired, unverified, assertions)
 
 
 @dataclass(frozen=True)

@@ -11,7 +11,6 @@ from analysis_service.claims import (
     Ground,
     Mitigation,
     ProposedVerdict,
-    Severity,
     SeverityLevel,
     UnknownRef,
     Verdict,
@@ -486,20 +485,11 @@ class TestRulingsMergeOntoDrafts:
         assert threat.severity == draft.severity
         assert threat.severity.level == "low"
 
-    def test_a_ruling_with_severity_replaces_the_rating_and_its_justification(
-        self, model
-    ):
-        draft = sample_draft("S-01", severity=severity("low", "low"))
-        corrected = Severity(
-            likelihood="high",
-            impact="high",
-            justification="The model states the flow is unauthenticated.",
-        )
-        rulings = [sample_ruling("S-01", severity=corrected)]
-        (threat,), _ = assemble_claims([draft], rulings, model, SCHEMAS)
-        assert threat.severity.likelihood == "high"
-        assert threat.severity.justification == corrected.justification
-        assert threat.severity.level == "critical"
+    def test_a_ruling_cannot_carry_a_severity(self):
+        """The agent's rating stands: the critic's changes moved matched claims
+        away from the reference (QA-2026-09-24-02-E13)."""
+        with pytest.raises(ValidationError):
+            sample_ruling("S-01", severity=severity("high", "high"))
 
     def test_the_critics_judgements_reach_the_threat(self, model):
         rulings = [sample_ruling("S-01", confidence="medium")]
@@ -994,28 +984,6 @@ class TestAMisfiledVerbIsRejectedInCode:
         assert "denial-of-service" in rejected.verdict.reason
 
 
-class TestRatingDisagreements:
-    """#444: one fact pattern with two ratings is a comparison of four fields."""
-
-    def test_two_drafts_with_one_pattern_and_two_ratings_name_each_other(self):
-        from analysis_service.critic import rating_disagreements
-
-        drafts = [
-            sample_draft("S-01", severity=severity("medium", "high")),
-            sample_draft("S-02", severity=severity("high", "high")),
-            sample_draft("S-03", verb="replay", severity=severity("low", "low")),
-        ]
-
-        assert rating_disagreements(drafts) == {"S-01": ["S-02"], "S-02": ["S-01"]}
-
-    def test_agreeing_ratings_are_not_named(self):
-        from analysis_service.critic import rating_disagreements
-
-        drafts = [sample_draft("S-01"), sample_draft("S-02")]
-
-        assert rating_disagreements(drafts) == {}
-
-
 class TestAnAbsenceRidesTheCriticPath:
     """#412: the fifth branch names no element, and four seams assumed one did.
 
@@ -1131,15 +1099,6 @@ def test_ruling_view_says_when_a_verb_belongs_to_another_lane():
 
     assert "denial-of-service" in view["filed_in_wrong_lane"]
     assert "filed_in_wrong_lane" not in clean
-
-
-def test_ruling_view_names_the_drafts_rated_unlike():
-    """#444: the critic reads the calibration pair rather than finding it."""
-    (view,) = critic._ruling_view(
-        [sample_draft("S-01")], rated_unlike={"S-01": ["S-02"]}
-    )
-
-    assert view["rated_unlike"] == ["S-02"]
 
 
 class TestOneReviewCall:

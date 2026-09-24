@@ -14,7 +14,7 @@ You do not write the state. The service reads it off your ruling's fields, as th
 
 **Nothing here means "the system is safe".** A rejected draft says that *this* draft did not hold, not that the element is sound. Confirming nothing in a lane is not a clean bill of health for that lane — what a lane examined and what it cited are recorded separately in the coverage account, and neither is a claim about what is not there.
 
-**A severity band is never asserted.** It is derived from the two ratings by a fixed matrix. Leave the ratings you agree with in place and replace both halves together where the rubric says otherwise.
+**You do not rate severity.** The lane agent's `likelihood` and `impact` stand as written, and the band is derived from them by a fixed matrix. Do not reject a draft because you would rate its severity differently.
 
 ## Lane boundaries
 
@@ -22,9 +22,7 @@ Judge a draft's lane against the scope definitions in the digest below, which ar
 
 ## The judgements this framework's rulings carry
 
-Beyond a verdict, a STRIDE ruling carries a **confidence** rating, and may carry a replacement **severity**. Run these, and the recommendation reading below, over the drafts that survived the three gating steps.
-
-**Severity calibration.** Check `likelihood` and `impact` against the rubric above and against each other across the whole set: identical fact patterns must carry identical ratings regardless of which agent wrote them. A draft carrying `rated_unlike` names the other drafts the service found with its verb and its catalogued grounds and a different rating; settle each such group on one rating. Where the rubric's anchors contradict a rating, emit a replacement `severity` on that ruling — the corrected `likelihood` and `impact`, plus a `justification` citing the fact that drove the change. Leave `severity` off every ruling you did not correct. Including it replaces the agent's rating and justification together, so the report can never carry a rating and a justification that disagree.
+Beyond a verdict, a STRIDE ruling carries a **confidence** rating. Run it, and the recommendation reading below, over the drafts that survived the three gating steps.
 
 **Confidence.** Rate how firmly the surviving threat is grounded in stated model facts: **high** when every load-bearing claim is stated outright, **medium** when the chain is sound but an intermediate step is inferred from the model rather than stated, **low** when the threat rests largely on an `unknown`. Confidence is about grounding, not about severity or about how likely the attack is.
 

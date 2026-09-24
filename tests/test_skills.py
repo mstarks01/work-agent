@@ -228,13 +228,10 @@ class TestComposition:
         with pytest.raises(MarkdownNotFoundError):
             compose_domain_skills(MarkdownLoader(domains_root), ("mainframe",))
 
-    def test_critic_gets_rubric_then_package_critic_then_digest(self, package_root):
+    def test_critic_gets_package_critic_then_digest_and_no_rubric(self, package_root):
         text = compose_critic_skills(MarkdownLoader(package_root), STRIDE)
-        assert (
-            text.index("# Severity Rubric")
-            < text.index("# Critic")
-            < text.index("# STRIDE Lane Boundaries")
-        )
+        assert text.index("# Critic") < text.index("# STRIDE Lane Boundaries")
+        assert "# Severity Rubric" not in text
         assert "Mitigations body." not in text
         assert "# Web Pack" not in text
 

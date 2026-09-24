@@ -425,19 +425,14 @@ class ThreatProposals(ProposalBatch):
 class ThreatRuling(Ruling):
     """The critic's ruling on one draft, with STRIDE's two extra judgements.
 
-    ``severity`` is the one draft field a ruling may replace, and only where
-    the critic's severity-calibration step changed a rating. ``None`` — the
-    common case — keeps the agent's rating and justification as written.
-    Present, it replaces both together, which is what stops a corrected rating
-    from sitting beside a justification that argues for the one it replaced. It is a
-    whole :class:`~analysis_service.claims.Severity` rather than loose scalars so
-    a partial override cannot be expressed.
+    It carries no severity. The lane agent's rating stands as written: on the
+    four archived Baselines, 34 of the critic's 45 changes to a matched
+    claim's rating moved it further from the reference (QA-2026-09-24-02-E13).
     """
 
     model_config = ConfigDict(extra="forbid")
 
     confidence: Rating
-    severity: Severity | None = None
     #: The critic's reading of the draft's ``mitigations``. Optional, because a
     #: rejected threat's recommendations need none and because a reading is a
     #: judgement rather than a shape the node should fail on; ``None`` reaching
