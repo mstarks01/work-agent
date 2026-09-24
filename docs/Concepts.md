@@ -91,13 +91,54 @@ Grounds can represent:
 - a quote from a labeled source;
 - an attribute the source left unknown;
 - an attribute the source explicitly said was absent;
-- a trust-boundary crossing derived from the model; or
-- the absence of a named element from the model.
+- a trust-boundary crossing derived from the model;
+- the absence of a named element from the model; or
+- an assertion row, when the assertion pass runs (see below).
 
 Every carried claim has at least one ground. Quotes are checked against the
 source text. If a close source span can be found, code repairs the quote and
 records the change. If none of a claim's grounds can be verified, code drops
 that claim and records why.
+
+## Assertion
+
+An **assertion** is one fact a source states, recorded as a row: a subject, a
+predicate, a value, and the quote that supports it. For example: the flow from
+the shopper to the storefront uses a session cookie, and the source says so in
+these words. A closed list of predicates says which facts a row may record.
+
+Assertions come from an optional pass that is off by default. An operator turns
+it on with `ANALYSIS_ASSERTIONS`; see
+[Configuration](Configuration.md#optional-passes).
+
+The pass exists because the system model has a field for only some facts. It
+holds a flow's authentication and a store's classification, but it has no field
+for who may do what, whether a second factor is required, or where a password
+is kept. An assertion row holds any of these.
+
+What code does with a row:
+
+- **Where the system model has no field for the fact**, the lanes see the row as
+  evidence they can cite, and a claim can rest on it.
+- **Where the model has a field for it**, the row can fill the field, with one
+  limit. A row no person has checked never closes an open question: where the
+  field reads `unknown`, or says a control is absent, the field stays open and
+  names the row's value, and the lanes see the row itself, marked `unchecked`.
+  A row that states an absence still fills an `unknown` field, because an
+  absence is itself something to analyze.
+- **Where rows disagree, or the source hedges**, the field reads `unknown` and
+  says why.
+- **Each row states its basis.** `stated` means the source says it in words.
+  `inferred` means the pass concluded it from what the source says, and the row
+  gives the reasoning.
+
+No person has checked a row when the report is built, so every row starts
+`unchecked`. A reviewer can mark it `supported`, `unsupported` or `unresolved`.
+A row marked `unsupported` or `unresolved` reaches neither the evidence nor any
+field. The report itself is not rewritten after a review: a reassessment is
+computed from it and recorded beside it, and it names every finding that rested
+on a rejected row. The report states how many rows were checked, rejected and
+left unchecked.
 
 ## Proposal, claim, and verdict
 
