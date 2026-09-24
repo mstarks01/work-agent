@@ -99,6 +99,51 @@ OUTCOMES: tuple[Outcome, ...] = (
     "superseded",
 )
 
+ConditionName = Literal["current-pipeline", "corrected-extraction", "direct-facts"]
+Stage = Literal["analysis", "final-report"]
+
+#: Which stage each condition of the skill's three-condition diagnostic can be
+#: measured at. ``current-pipeline`` is the shipped route. ``corrected-extraction``
+#: feeds the signed model through the same preparation and consumers, which
+#: ``analysis`` mode already runs to a report. ``direct-facts`` feeds the signed
+#: facts to analysis without the System Model, and no route carries that
+#: output on to fan-in, criticism and the report (#1091), so it reaches the
+#: analysis stage only and a final-report reading of it is refused. A condition
+#: added here without an entry cannot be recorded at all.
+CONDITION_STAGES: Mapping[ConditionName, tuple[Stage, ...]] = MappingProxyType(
+    {
+        "current-pipeline": ("analysis", "final-report"),
+        "corrected-extraction": ("analysis", "final-report"),
+        "direct-facts": ("analysis",),
+    }
+)
+
+
+@dataclass(frozen=True)
+class Condition:
+    """What one experiment in the three-condition diagnostic fed and read.
+
+    The fields a comparison between conditions needs and the ledger's other
+    fields do not hold: which input generation read, every way it differed from
+    the shipped route, what the signed material could not put into the System
+    Model, and what the input's builder had seen of the answers.
+    """
+
+    name: ConditionName
+    #: What generation read, named so a reader can reopen it.
+    input: str
+    #: Every adapter, prompt or interface difference from ``current-pipeline``.
+    adapters: tuple[str, ...]
+    #: Source facts the System Model could not represent. Kept rather than
+    #: forced into the nearest field, because the difference is the result.
+    unrepresentable: tuple[str, ...]
+    #: Who built the input and what they had seen of the expected findings and
+    #: the observed misses. "Nothing" is an answer; silence is not.
+    exposure: str
+    #: Where the outcome was read, one of the condition's
+    #: :data:`CONDITION_STAGES`.
+    stage: Stage
+
 
 @dataclass(frozen=True)
 class PhaseEntry:
@@ -275,6 +320,9 @@ class Experiment:
     supersedes: str | None = None
     #: What would make this worth revisiting.
     reconsider_when: str = ""
+    #: The diagnostic condition, for an experiment in the three-condition
+    #: diagnostic, and ``None`` for every other experiment.
+    condition: Condition | None = None
 
     def to_json(self) -> dict[str, Any]:
         """The row as the ledger file carries it."""
@@ -299,6 +347,16 @@ class Experiment:
             "parent": self.parent,
             "supersedes": self.supersedes,
             "reconsider_when": self.reconsider_when,
+            "condition": None
+            if self.condition is None
+            else {
+                "name": self.condition.name,
+                "input": self.condition.input,
+                "adapters": list(self.condition.adapters),
+                "unrepresentable": list(self.condition.unrepresentable),
+                "exposure": self.condition.exposure,
+                "stage": self.condition.stage,
+            },
         }
 
 
@@ -364,6 +422,47 @@ def parse(row: Mapping[str, Any], *, source: str) -> Experiment:
         parent=row.get("parent"),
         supersedes=row.get("supersedes"),
         reconsider_when=row.get("reconsider_when", ""),
+        condition=_condition(row.get("condition"), where),
+    )
+
+
+def _condition(held: object, where: str) -> Condition | None:
+    """A row's diagnostic condition, checked against its vocabulary and stages."""
+    if held is None:
+        return None
+    if not isinstance(held, dict):
+        raise ExperimentError(f"{where}: condition is not an object")
+    name = held.get("name")
+    if name not in CONDITION_STAGES:
+        raise ExperimentError(
+            f"{where}: condition {name!r} is not one of {', '.join(CONDITION_STAGES)}"
+        )
+    name = held["name"]
+    stages = CONDITION_STAGES[name]
+    stage = held.get("stage")
+    if stage not in stages:
+        raise ExperimentError(
+            f"{where}: condition {name!r} is read at {', '.join(stages)},"
+            f" never at {stage!r}"
+        )
+    for text in ("input", "exposure"):
+        if not isinstance(held.get(text), str) or not held[text].strip():
+            raise ExperimentError(f"{where}: condition {name!r} has no {text}")
+    lists = {}
+    for listed in ("adapters", "unrepresentable"):
+        value = held.get(listed)
+        if not isinstance(value, list) or not all(isinstance(v, str) for v in value):
+            raise ExperimentError(
+                f"{where}: condition {name!r}: {listed} is not a list of strings"
+            )
+        lists[listed] = tuple(value)
+    return Condition(
+        name=name,
+        input=held["input"],
+        adapters=lists["adapters"],
+        unrepresentable=lists["unrepresentable"],
+        exposure=held["exposure"],
+        stage=stage,
     )
 
 
