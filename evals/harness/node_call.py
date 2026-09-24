@@ -19,6 +19,7 @@ from collections.abc import Awaitable, Callable
 from typing import Any
 
 from google.adk.models.llm_request import LlmRequest
+from google.adk.models.llm_response import LlmResponse
 from google.genai import types
 
 from analysis_service.binding import build_tier_adapters
@@ -60,11 +61,21 @@ def node_call(
         charge = None
         async for response in adapter.generate_content_async(request, False):
             charge = (response.custom_metadata or {}).get(CHARGE_METADATA_KEY, charge)
-            for part in (response.content.parts if response.content else []) or []:
-                if part.text:
-                    chunks.append(part.text)
+            chunks.append(answer_text(response))
         if spent is not None:
             spent.append(charge)
         return "".join(chunks)
 
     return call
+
+
+def answer_text(response: LlmResponse) -> str:
+    """The text of a response's answer parts, without its thought parts.
+
+    A reasoning model can return its thinking as text parts flagged
+    ``thought``, ahead of the answer. ADK leaves those out of a node's output,
+    so a replay that joined them handed the schema a paragraph of reasoning
+    in front of the JSON the graph would have parsed.
+    """
+    parts = (response.content.parts if response.content else None) or []
+    return "".join(part.text for part in parts if part.text and not part.thought)
