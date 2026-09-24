@@ -133,3 +133,23 @@ def test_the_fidelity_check_fails_on_material_the_lane_never_had(recorded, case)
     )
 
     assert instruction not in {sent for sent, _ in seen}
+
+
+def test_a_thought_part_is_not_part_of_the_answer():
+    """ADK leaves thoughts out of a node's output, so a replay must too."""
+    from google.adk.models.llm_response import LlmResponse
+    from google.genai import types
+
+    from evals.harness.node_call import answer_text
+
+    response = LlmResponse(
+        content=types.Content(
+            role="model",
+            parts=[
+                types.Part(text="**Assessing security properties**", thought=True),
+                types.Part(text='{"claims": []}'),
+            ],
+        )
+    )
+
+    assert answer_text(response) == '{"claims": []}'
