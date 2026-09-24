@@ -75,7 +75,7 @@ negative control, and the baseline names all five identity parts.
 | --- | --- | --- | --- |
 | `current-pipeline` | the model that the shipped route extracts, through the normal consumers | what does the shipped system achieve? | `run --mode end-to-end` |
 | `corrected-extraction` | the signed `model.json`, through the same preparation and consumers | how much of the loss does a corrected extraction recover? | `run --mode analysis` (#742 pairs this with the row above) |
-| `direct-facts` | the signed `facts.json`, given to analysis without the System Model projection | does a bypass of projection, preparation and consumption recover what `corrected-extraction` still lost? | **no route exists** — see below |
+| `direct-facts` | the signed `model.json` **and** every signed `facts.json` row as an assertion row the lanes can cite, so a fact reaches analysis whether or not the System Model has a field for it | does giving analysis the facts directly recover what `corrected-extraction` still lost? | `run --mode direct-facts`; `lane-replay` for one lane at the analysis stage |
 
 **Build verified input from the whole source**, never backwards from the
 expected findings. Where you can, have somebody who has not seen the expected
@@ -100,12 +100,15 @@ source, instructions, output limits and downstream handling. Record every
 adapter or prompt difference in `condition.adapters`. Meter the actual usage:
 a shared output limit gives neither equal cost nor equal context load.
 
-**`direct-facts` has no route today.** Nothing feeds the signed facts to a
-lane, and nothing carries lane output on to fan-in, criticism and the report.
-That is #1091's lane-replay seam. The ledger refuses a `direct-facts` row read
-at `final-report`, so a draft from it can never count as a report gain. Until
-the seam exists, record the condition as `blocked`, name #1091, and state the
-cost the run would have.
+**What `direct-facts` changes, exactly.** The `assert` node answers with the
+case's signed rows instead of a model call, and every later stage runs as it
+ships: the resolver, the gate, the projection, the evidence catalog, the lanes,
+the critic and the report. The lanes still read the System Model. So this
+condition tests whether facts the model cannot hold help analysis when they
+arrive as rows. It does not test analysis with no model at all. Record that
+difference in `condition.adapters`. The mode refuses a case with an unsigned
+row, and it records no served build for `assert`, because no provider
+answered.
 
 Paid calls need the user's permission, as `SKILL.md` "Money" says. Without
 permission, write the experiment and its cost estimate and stop.

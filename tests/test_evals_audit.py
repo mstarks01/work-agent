@@ -230,8 +230,14 @@ class TestTheLedgerRefusals:
                 _record(condition=_condition(name="oracle-everything")), source="test"
             )
 
-    def test_direct_facts_are_never_read_as_a_final_report(self):
-        """No route carries direct-facts output past analysis, so no report exists."""
+    def test_a_stage_the_condition_cannot_reach_is_refused(self, monkeypatch):
+        """A condition with no route to a report can never be read at one."""
+        monkeypatch.setattr(
+            audit,
+            "CONDITION_STAGES",
+            {**audit.CONDITION_STAGES, "direct-facts": ("analysis",)},
+        )
+
         with pytest.raises(audit.ExperimentError, match="never at 'final-report'"):
             audit.parse(
                 _record(

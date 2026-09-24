@@ -1059,6 +1059,7 @@ def test_every_mode_maps_to_a_graph_entry():
         "extraction": ENTRY_EXTRACT_ONLY,
         "assertions": ENTRY_ASSERT_ONLY,
         "analysis": ENTRY_PREPARE,
+        "direct-facts": ENTRY_PREPARE,
         "end-to-end": ENTRY_EXTRACT,
         "heads": ENTRY_HEAD_ONLY,
     }

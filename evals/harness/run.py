@@ -46,6 +46,7 @@ from pathlib import Path
 from typing import Any, TypeVar
 
 from analysis_service.actions import VerbError
+from analysis_service.assertions import CatalogProposal
 from analysis_service.certification import CertificationError, CertifyResult, certify
 from analysis_service.claims import (
     FrameworkName,
@@ -171,6 +172,7 @@ from evals.harness.stability import (
     load_runs,
 )
 from evals.harness.structural import report_issues
+from evals.reference_facts import load_facts, signed_proposal
 
 EVALS_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_CORPUS_DIR = EVALS_ROOT / "corpus"
@@ -250,8 +252,12 @@ async def _run_mode(
     accepted: float | None = None,
     ask: Callable[[str], str] | None = None,
     in_flight: int = 1,
+    signed: Mapping[str, CatalogProposal] | None = None,
 ) -> ModeRun:
     """Run one mode over the selected cases, collecting Tier 1 failures.
+
+    ``signed`` is each case's signed proposal, which only the ``direct-facts``
+    mode reads; :func:`signed_proposals` builds it before anything is spent.
 
     The execution identities come back too, taken from the node runs rather
     than from the report: the extraction mode produces no report, and sourcing
@@ -310,8 +316,14 @@ async def _run_mode(
     def pipeline_for(case: GoldenCase) -> Pipeline:
         frameworks = modes.select_frameworks(case, only)
         if frameworks not in pipelines:
-            pipelines[frameworks] = modes.build_eval_pipeline(
-                modes.MODE_ENTRIES[mode], deployment=deployment, frameworks=frameworks
+            pipelines[frameworks] = (
+                modes.build_direct_facts_pipeline(deployment, frameworks)
+                if mode == "direct-facts"
+                else modes.build_eval_pipeline(
+                    modes.MODE_ENTRIES[mode],
+                    deployment=deployment,
+                    frameworks=frameworks,
+                )
             )
         return pipelines[frameworks]
 
@@ -408,11 +420,14 @@ async def _run_mode(
                     issues=tuple(result.issues),
                     result=result,
                 )
-            run = (
-                await modes.run_analysis(case, pipeline)
-                if mode == "analysis"
-                else await modes.run_end_to_end(case, pipeline)
-            )
+            if mode == "direct-facts":
+                run = await modes.run_direct_facts(
+                    case, pipeline, (signed or {})[case.id]
+                )
+            elif mode == "analysis":
+                run = await modes.run_analysis(case, pipeline)
+            else:
+                run = await modes.run_end_to_end(case, pipeline)
         except modes.CaseFailure as failed:
             # The provider billed every node that finished, whether the graph
             # then failed to build its report (#707) or a later node raised
@@ -919,8 +934,40 @@ def _would_be_identity(
     }
 
 
+def signed_proposals(
+    corpus_dir: Path, cases: Sequence[GoldenCase]
+) -> dict[str, CatalogProposal]:
+    """Each case's signed facts as a proposal, or a refusal naming the unsigned.
+
+    The ``direct-facts`` mode answers ``assert`` with these rows, so a case
+    whose rows are not all signed would put an unreviewed reading in front of
+    the lanes as the verified one.
+    """
+    unsigned = [
+        case.id for case in cases if replay.unsigned_rows(corpus_dir, case) != 0
+    ]
+    if unsigned:
+        raise modes.EvalRunError(
+            f"no signed facts for {', '.join(unsigned)}; the direct-facts mode"
+            " reads only a case whose every facts.json row is signed"
+        )
+    return {
+        case.id: signed_proposal(load_facts(corpus_dir / case.id)) for case in cases
+    }
+
+
 def command_run(args: argparse.Namespace) -> int:
     cases = _select(load_corpus(args.corpus), args.case)
+    # Before anything is spent, like every check here.
+    try:
+        signed = (
+            signed_proposals(Path(args.corpus), cases)
+            if args.mode == "direct-facts"
+            else None
+        )
+    except modes.EvalRunError as refusal:
+        print(refusal, file=sys.stderr)
+        return 1
     # Before anything is spent. Both answers are free and the sweep is not, so
     # a repository that cannot say what it is about to run stops here rather
     # than 90 minutes later holding an artifact that cannot name its prompts.
@@ -960,6 +1007,7 @@ def command_run(args: argparse.Namespace) -> int:
             accepted,
             ask,
             in_flight=in_flight,
+            signed=signed,
         )
     )
     failures = mode_run.failures
