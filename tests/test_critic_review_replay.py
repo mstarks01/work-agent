@@ -17,30 +17,20 @@ from typing import get_args
 
 import pytest
 
-from analysis_service.frameworks import PACKAGES, FrameworkName, schemas_for
+from analysis_service.frameworks import PACKAGES, schemas_for
 from analysis_service.markdown_loader import MarkdownLoader
 from analysis_service.prompts import compose_critic_prompt
 from analysis_service.system_model import SystemModel
 from evals.critic_review import replay as R
 from evals.critic_review.loading import REPO_ROOT, corpus_model, load_fixtures
 from evals.critic_review.model import CriticFixture
+from evals.harness.assembly import ruling_type
 
 PACKAGE = PACKAGES["stride"]
 PACKAGE_RULINGS = schemas_for("stride").rulings
 
 
-def ruling_shape(framework: FrameworkName):
-    """The model one of this package's rulings parses into.
-
-    The batch declares ``claims``, and the element of that list is the shape
-    every reader here cares about. One spelling of that walk, because the
-    stride helpers below and the parity test at the end both take it.
-    """
-    batch = schemas_for(framework).rulings
-    return get_args(batch.model_fields["claims"].annotation)[0]
-
-
-RULING_SHAPE = ruling_shape("stride")
+RULING_SHAPE = ruling_type("stride")
 #: What this package requires of a ruling beyond the neutral two fields.
 PACKAGE_REQUIRED = {
     name: "medium"
@@ -574,7 +564,7 @@ def test_every_package_reading_carries_the_two_fields_the_replay_reads(framework
     claims recommend nothing declares no such field and is skipped — that is
     the ``None`` every row already answers.
     """
-    field = ruling_shape(framework).model_fields.get("recommendation")
+    field = ruling_type(framework).model_fields.get("recommendation")
     if field is None:
         pytest.skip(f"{framework} rulings carry no recommendation reading")
 
