@@ -71,7 +71,12 @@ from analysis_service.claims import (
 )
 from analysis_service.compact import FULL_FORMAT, parse_extraction
 from analysis_service.deployment import Deployment
-from analysis_service.execution import GraphExecutor, GraphFailed, GraphRun
+from analysis_service.execution import (
+    GraphExecutor,
+    GraphFailed,
+    GraphRun,
+    emitted_state,
+)
 from analysis_service.frameworks.stride.record import DraftThreat
 from analysis_service.graph import (
     ASSERT_NODE,
@@ -167,6 +172,9 @@ class CaseFailure(GraphFailed):
     before it reached no catalog. A head that fails is the run most worth
     reading back, because the stages say which of them lost the rows — and a
     sweep that archived nothing for it left the question unanswerable.
+
+    ``state`` is what the session held when the case failed, less the job's
+    own text: see :class:`~analysis_service.execution.GraphFailed`.
     """
 
     def __init__(
@@ -175,8 +183,9 @@ class CaseFailure(GraphFailed):
         node_runs: Sequence[NodeRun],
         extraction: ExtractionResult | None = None,
         assertion: AssertionResult | None = None,
+        state: Mapping[str, Any] | None = None,
     ) -> None:
-        super().__init__(cause, node_runs)
+        super().__init__(cause, node_runs, state)
         self.extraction = extraction
         self.assertion = assertion
 
@@ -1395,7 +1404,9 @@ async def run_graph(
         # One failure type for the sweep, whichever side of the graph's end the
         # fault sat on: what ran joins the artifact's usage before the cause is
         # classified.
-        raise CaseFailure(failed.cause, failed.node_runs) from failed.cause
+        raise CaseFailure(
+            failed.cause, failed.node_runs, state=failed.state
+        ) from failed.cause
 
 
 async def run_extraction(case: GoldenCase, pipeline: Pipeline) -> ExtractionResult:
@@ -2397,7 +2408,12 @@ def _run_from_graph(
     try:
         return _report_of(case, graph_run, pipeline, extraction)
     except Exception as exc:
-        raise CaseFailure(exc, graph_run.node_runs, extraction) from exc
+        raise CaseFailure(
+            exc,
+            graph_run.node_runs,
+            extraction,
+            state=emitted_state(graph_run.final_state),
+        ) from exc
 
 
 def _report_of(

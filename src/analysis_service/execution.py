@@ -80,12 +80,23 @@ class GraphFailed(Exception):
     a failed case from it, and the job route keeps its reservation rather than
     settling to a figure it knows is short.
     ``cause`` is the exception the caller classifies, unwrapped.
+
+    ``state`` is what the session held when the node raised, without the two
+    keys the executor seeded from the job's sources. It holds what every
+    finished node emitted, which is the only record of what the failing node
+    was given and what it wrote before it raised (#1097).
     """
 
-    def __init__(self, cause: Exception, node_runs: Sequence[NodeRun]) -> None:
+    def __init__(
+        self,
+        cause: Exception,
+        node_runs: Sequence[NodeRun],
+        state: Mapping[str, Any] | None = None,
+    ) -> None:
         super().__init__(str(cause))
         self.cause = cause
         self.node_runs = tuple(node_runs)
+        self.state = dict(state or {})
 
 
 @dataclass(frozen=True)
@@ -128,6 +139,20 @@ class _NodeFinish:
     attempts: int = 1
     reported_charge_usd: float | None = None
     served_upstream: str | None = None
+
+
+def emitted_state(state: Mapping[str, Any]) -> dict[str, Any]:
+    """A session's state without the two keys the executor seeds from the sources.
+
+    What the graph's nodes wrote, and any key a caller seeded through
+    ``extra_state``. The job's own text is left out, because the caller holds
+    it already and a copy kept with a failure is one more place it lives.
+    """
+    return {
+        key: value
+        for key, value in state.items()
+        if key not in (STATE_INPUT_TEXT, STATE_SOURCE_TEXTS)
+    }
 
 
 @dataclass(frozen=True)
@@ -363,7 +388,14 @@ class GraphExecutor:
                 app_name=self._app_name, user_id=user_id, session_id=session.id
             )
         except Exception as exc:
-            raise GraphFailed(exc, self._node_runs(finishes, started_at)) from exc
+            failed = await self._session_service.get_session(
+                app_name=self._app_name, user_id=user_id, session_id=session.id
+            )
+            raise GraphFailed(
+                exc,
+                self._node_runs(finishes, started_at),
+                emitted_state(failed.state if failed else {}),
+            ) from exc
         finally:
             await self._session_service.delete_session(
                 app_name=self._app_name, user_id=user_id, session_id=session.id

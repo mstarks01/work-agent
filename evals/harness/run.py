@@ -41,7 +41,7 @@ import json
 import math
 import sys
 from collections.abc import Callable, Mapping, Sequence
-from dataclasses import dataclass, replace
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import Any, TypeVar
 
@@ -51,6 +51,7 @@ from analysis_service.certification import CertificationError, CertifyResult, ce
 from analysis_service.claims import (
     FrameworkName,
 )
+from analysis_service.critic import CriticOutputError
 from analysis_service.deployment import Deployment
 from analysis_service.frameworks import PACKAGES
 from analysis_service.graph import Pipeline
@@ -119,6 +120,7 @@ from evals.harness.bundle import (
     stride_threats,
     write_assertions,
     write_extractions,
+    write_failures,
     write_reports,
 )
 from evals.harness.calibration import (
@@ -180,10 +182,16 @@ from evals.reference_facts import load_facts, signed_proposal
 EVALS_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_CORPUS_DIR = EVALS_ROOT / "corpus"
 
+#: The faults that are the graph refusing a case's output: a model the gate
+#: refused, and a critic whose re-ask still did not account for its drafts.
+REFUSED: tuple[type[Exception], ...] = (modes.EvalRunError, CriticOutputError)
+
 #: The faults a sweep **measures**: it records one, and runs the next case.
 #:
-#: A refused model and a draft the fan-in rejects are both rates somebody asked
-#: for, so a sweep that died on the first one would report neither. Everything
+#: A refused output and a draft the fan-in rejects are both rates somebody asked
+#: for, so a sweep that died on the first one would report neither. A critic
+#: that fails its gate on one case says nothing about the next, so it is a
+#: measurement and not a reason to stop (#1097). Everything
 #: else — a provider refusal, a timeout, a transport fault — is not a
 #: measurement, and the sweep stops on it.
 #:
@@ -191,7 +199,7 @@ DEFAULT_CORPUS_DIR = EVALS_ROOT / "corpus"
 #: question twice: once of a bare exception and once of the cause inside a
 #: :class:`~evals.harness.modes.CaseFailure`. Two readers of one rule would
 #: eventually disagree about which faults cost a sweep its artifact.
-MEASURED: tuple[type[Exception], ...] = (modes.EvalRunError, *CAUGHT)
+MEASURED: tuple[type[Exception], ...] = (*REFUSED, *CAUGHT)
 
 
 def _select(cases: Sequence[GoldenCase], wanted: Sequence[str]) -> list[GoldenCase]:
@@ -235,6 +243,10 @@ class _CaseOutcome:
     #: citation half is scored and every other one is a malformed model.
     issues: tuple[Any, ...] = ()
     error: Exception | None = None
+    #: What the session held when a graph node raised, from ``state`` on
+    #: :class:`~analysis_service.execution.GraphFailed`. Empty where the
+    #: case finished or failed outside a graph.
+    state: Mapping[str, Any] = field(default_factory=dict)
 
 
 def _batches(items: Sequence[_T], size: int) -> list[list[_T]]:
@@ -346,21 +358,27 @@ async def _run_mode(
     extractions: list[modes.ExtractionScore] = []
     rows: dict[str, list[Any]] = {}
     stopped_before: tuple[str, ...] = ()
+    failed_states: dict[str, dict[str, Any]] = {}
 
     def record_failure(case: GoldenCase, error: Exception) -> None:
         """One reader of what a failed case leaves behind, for both ways it fails."""
-        if isinstance(error, modes.EvalRunError):
-            # The graph refused this case's model. In `end-to-end` that is
+        if isinstance(error, REFUSED):
+            # The graph refused this case's output. In `end-to-end` that is
             # extraction and its one `repair` pass both failing, which is a
             # measurement — and the mode where a refused model is most
             # expected is also the most expensive per case, so losing the
             # sweep over one costs every case that already ran.
             #
             # Not routed through `classify_failure`: that reads draft-level
-            # faults off the fan-in, and a refused model never produced
-            # drafts. The message already carries the case id.
-            failures.append(str(error))
-            payloads.append({"case": case.id, "run_failure": str(error)})
+            # faults off the fan-in, and a refused output is not one. An
+            # EvalRunError's message already carries the case id.
+            message = (
+                str(error)
+                if isinstance(error, modes.EvalRunError)
+                else f"{case.id}: {error}"
+            )
+            failures.append(message)
+            payloads.append({"case": case.id, "run_failure": message})
             return
         if isinstance(error, CAUGHT):
             failure = classify_failure(case.id, error)
@@ -443,6 +461,7 @@ async def _run_mode(
                 error=failed.cause,
                 result=failed.extraction,
                 assertion_result=failed.assertion,
+                state=failed.state,
             )
         except Exception as error:  # noqa: BLE001 — every fault, so none is free
             # A refused model and a provider fault arrive the same way here and
@@ -475,6 +494,13 @@ async def _run_mode(
         if outcome.assertion_result is not None:
             resolved[case.id] = outcome.assertion_result
         if outcome.error is not None:
+            # Kept whichever way the fault is folded: the state is the only
+            # record of what the failing node was given and wrote (#1097).
+            if outcome.state:
+                failed_states[case.id] = {
+                    "error": repr(outcome.error),
+                    "state": dict(outcome.state),
+                }
             if not isinstance(outcome.error, MEASURED):
                 # Not a measurement: the provider or the transport failed, and
                 # the next case would fail the same way. Stop, but keep what
@@ -618,6 +644,7 @@ async def _run_mode(
         extractions=extractions,
         rows={name: tuple(collected) for name, collected in rows.items()},
         stopped_before=stopped_before,
+        failed_states=failed_states,
     )
 
 
@@ -1075,6 +1102,7 @@ def command_run(args: argparse.Namespace) -> int:
         Path(args.out).write_text(archive_bytes("artifact", artifact), "utf-8")
         print(f"artifact written to {args.out}")
         write_reports(args.out, args.mode, mode_run.runs)
+        write_failures(args.out, mode_run.failed_states)
         write_extractions(args.out, args.mode, mode_run.extracted)
         write_assertions(args.out, args.mode, mode_run.assertions)
 
