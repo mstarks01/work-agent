@@ -89,7 +89,9 @@ refuses a missing or unknown field by name:
 
 `name` is one of `current-pipeline`, `corrected-extraction` or `direct-facts`.
 `stage` is `analysis` or `final-report`, and the loader refuses a stage the
-condition cannot reach: `direct-facts` has no route past analysis today.
+condition cannot reach, as `CONDITION_STAGES` in `evals/harness/audit.py`
+states. A `lane-replay` reading is `analysis`; a `run --mode direct-facts`
+reading is `final-report`.
 `adapters` and `unrepresentable` may be empty lists, but they must be present,
 because an empty list says "none" and a missing field says nothing.
 

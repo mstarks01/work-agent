@@ -333,7 +333,16 @@ Live — needs credentials for whichever vendor the tiers are configured to use
 ```sh
 python -m evals.harness.run run --mode analysis --out artifact.json
 python -m evals.harness.run run --mode extraction --case 01-payments-checkout
+python -m evals.harness.run run --mode direct-facts --case 01-payments-checkout
 ```
+
+`direct-facts` is `analysis` mode with the assertion pass on, and the `assert`
+node answered by the case's signed `facts.json` rather than by a model. So
+every signed source fact reaches the lanes as a citable row beside the blessed
+model, including the facts the System Model has no field for. It is the
+quality-audit skill's third condition, it reads signed material, and so its
+figures locate a loss and never score a route. It refuses a case with an
+unsigned row before anything is spent.
 
 Scoring itself is offline: matching is the identity rule, and the standing of
 each unmatched finding comes from the vote ledger. So a finished sweep can be
