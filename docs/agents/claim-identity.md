@@ -63,10 +63,10 @@ within-lane reference pairs:
 | endpoint subset | 12 | 69 | 36 |
 | **endpoint subset + verb** | **13** | **2** | **2** |
 | overlap | 3 | 66 | 39 |
-| endpoint overlap | 1 | 81 | 143 |
+| endpoint overlap | 1 | 81 | 144 |
 
 No element-only row is usable: the tightest loses 72 paraphrases and the loosest
-destroys 143 findings. **The verb row is the first one that is.**
+destroys 144 findings. **The verb row is the first one that is.**
 
 **Read the candidate column, not the reference one.** On reference pairs alone
 `endpoint subset` merges 36 of 317 and looks survivable. On the candidate
@@ -140,8 +140,8 @@ answered it: a direction is not available, and it would not pay if it were.
 **A direction is not a field.** `affected_element_ids` is a list whose order no
 rule reads, so a claim naming two processes says nothing about which way the
 attacker moves between them. Only a claim naming a **Data Flow** states a
-direction, through that flow's endpoints. 159 of the 242 corpus claims name
-exactly one flow; 5 name several and 78 name none, and neither of those yields
+direction, through that flow's endpoints. 160 of the 242 corpus claims name
+exactly one flow; 5 name several and 77 name none, and neither of those yields
 the single direction a comparison needs.
 
 **The merge that raised the question is gone, and the answer is not.** Case

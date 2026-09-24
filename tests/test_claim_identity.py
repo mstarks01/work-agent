@@ -81,9 +81,6 @@ UNSEPARATED: dict[str, str] = {
     "01-payments-checkout | information-disclosure | process:order-service, store:orders-db": (
         "Reading PII off the unprotected connection and recovering the database password out of the process environment are `intercept` and `recover-credential` against one pair of elements. The verb separates them, which is what #201 argues it is for."
     ),
-    "07-cicd-store-deploy | tampering | process:store-server, store:image-registry": (
-        "Replacing the image at rest under its tag and altering it as a store pulls it are `plant` and `alter-in-transit` -- registry integrity against transport protection. The verb separates them."
-    ),
     "09-cookbook-sokify-retail | tampering | process:catalogue-spreadsheet, process:web-api": (
         "Driving the macros to change prices through the API, and appending further SQL to the statements those macros send, are two attacker actions against one flow: the first uses the interface as built, the second escapes it. Both are must-find, and merging them would hide the injection finding behind the price-change one. `alter` against `inject`, so the verb separates them."
     ),

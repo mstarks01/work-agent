@@ -60,7 +60,16 @@ from evals.review_submission import REPO_ROOT, unreviewed_cases
 #: maintained — :func:`~evals.review_submission.unreviewed_cases` reads the
 #: corpus and the merged submissions — so an entry here only ever says what an
 #: unread case leaves unchecked, and a case somebody has since read is spent.
-UNREVIEWED: dict[str, str] = {}
+UNREVIEWED: dict[str, str] = {
+    "07-cicd-store-deploy": (
+        "The maintainer ruled on 2026-09-24 (QA-2026-09-24-02, corrections.md)"
+        " that the planted-registry-image reference belongs at both the push"
+        " path and the pull path, and its place was widened to contain both."
+        " The reader's own reading changed by that ruling and nothing else; a"
+        " sitting has not yet marked the widened claim, so its mark no longer"
+        " binds by fingerprint."
+    ),
+}
 
 
 @pytest.fixture(scope="module")

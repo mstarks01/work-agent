@@ -213,7 +213,7 @@ on either of them. That is the finding this sitting exists for.
 
 **7.** An attacker replaces the image stored under a commit-sha tag in the registry, so store servers pull attacker content while the recorded release is unchanged.
 
-- `store:image-registry`, `process:store-server`
+- `flow:process:build-runner>store:image-registry>push-image`, `store:image-registry`, `process:store-server`
 - severity: medium/high · verb: `plant`
 - Worth keeping separate from the controller-record claim: this one leaves the release record honest, so nothing in the described system would show a change.
 
@@ -403,7 +403,7 @@ your missing list, your notes and a digest of each file you read:
       "opened_digests": {
       "source.md": "1bfb96ef3374b697ef78e76661daa3d2b227792a3b20d2d1ee1d526cde02652c",
       "model.json": "25e0fe698e23ea38d98c8cd7e80dcef804cea2e27a8e4c09b4c5f65fc1785291",
-      "claims/stride.json": "f9d27b02fa328c7dd9cecc44019ed2d63756e4c87d9a26de8f449450b58bc226"
+      "claims/stride.json": "6670a24c6470c3cad322656989c49c1a0dcaa2d356646ac0b059670679b3e42a"
       }
     }
   }
