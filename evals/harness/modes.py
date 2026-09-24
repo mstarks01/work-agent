@@ -2295,12 +2295,6 @@ SIGNED_PROPOSAL: ContextVar[CatalogProposal | None] = ContextVar(
     "signed_proposal", default=None
 )
 
-#: The name :class:`SignedFactsLlm` carries. It reports no served build, so
-#: the node run records no served identity, the way a deterministic node's
-#: does: no provider answered. The artifact's ``mode`` says where the rows
-#: came from.
-SIGNED_FACTS_MODEL = "signed-reference-facts"
-
 
 class SignedFactsLlm(BaseLlm):
     """The ``assert`` node's model on the ``direct-facts`` route.
@@ -2309,6 +2303,12 @@ class SignedFactsLlm(BaseLlm):
     rest of the graph — the resolver, the gate, the projection, the evidence
     catalog, the lanes, the critic and the report — runs exactly as it runs
     behind a real ``assert`` call. It costs nothing and reports no usage.
+
+    Its ``model`` is the route the deployment configured for the node, because
+    a node run's requested route is read off it and every reader of a route
+    parses its vendor prefix. It reports no served build, so the node run
+    records no served identity, the way a deterministic node's does: no
+    provider answered. The artifact's ``mode`` says where the rows came from.
     """
 
     async def generate_content_async(
@@ -2353,11 +2353,11 @@ def build_direct_facts_pipeline(
     signed_node = tier_node_by_graph_node(frameworks)[ASSERT_NODE]
 
     def resolve(node: str) -> str | BaseLlm:
-        return (
-            SignedFactsLlm(model=SIGNED_FACTS_MODEL)
-            if node == signed_node
-            else shipped(node)
-        )
+        configured = shipped(node)
+        if node != signed_node:
+            return configured
+        route = configured if isinstance(configured, str) else configured.model
+        return SignedFactsLlm(model=route)
 
     return deployment.pipeline(frameworks, entry=ENTRY_PREPARE, resolve_model=resolve)
 
