@@ -247,6 +247,32 @@ class TestSubjectIdentity:
             subject_id("principal", "shopper  accounts") == "principal:shopper-accounts"
         )
 
+    @pytest.mark.parametrize(
+        ("subject_type", "written"),
+        [
+            ("principal", "principal:sensor-nodes"),
+            ("principal", "Principal: sensor nodes"),
+            ("credential", "credential:pre-shared-key"),
+        ],
+    )
+    def test_a_name_written_as_its_id_keeps_one_prefix(self, subject_type, written):
+        """The ID is a legal way to name a subject, and it names the same one.
+
+        Three signed reference rows wrote a principal or a credential as its
+        ID, and each resolved to ``principal:principal-…``, a subject no
+        produced row could ever reach.
+        """
+        expected = {
+            "principal": "principal:sensor-nodes",
+            "credential": "credential:pre-shared-key",
+        }[subject_type]
+
+        assert subject_id(subject_type, written) == expected
+
+    def test_another_types_prefix_stays_in_the_name(self):
+        """Only the subject's own prefix is its ID; any other is words."""
+        assert subject_id("principal", "credential:x") == "principal:credential-x"
+
     def test_a_graph_bound_type_has_no_id_to_build(self):
         """Its ID is the element's, so a second spelling of it is refused."""
         with pytest.raises(ValueError, match="graph-bound"):
