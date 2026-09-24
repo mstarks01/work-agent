@@ -51,6 +51,7 @@ from analysis_service.claims import (
     ELEMENT_REF_MAX_CHARS,
     MAX_CLAIMS_PER_BATCH,
     MENTION_MAX_CHARS,
+    REFERENCE_MAX_CHARS,
     AnalysisMarks,
     Claim,
     DroppedClaim,
@@ -58,6 +59,7 @@ from analysis_service.claims import (
     LaneCoverage,
     ProposalBatch,
     RepairedQuote,
+    UnresolvedEvidence,
     UnresolvedMention,
     UnresolvedReference,
     UnverifiedGround,
@@ -65,9 +67,12 @@ from analysis_service.claims import (
 from analysis_service.coverage import build_coverage
 from analysis_service.evidence import (
     evidence_catalog,
+    evidence_ref,
     ground_issues,
+    ground_places,
     invalid_proposal_marks,
     known_proposals,
+    out_of_scope_ref,
     resolve_proposals,
 )
 from analysis_service.frameworks import FrameworkPackage, schemas_for
@@ -434,7 +439,10 @@ def _resolve_element_references(
 
 
 def _bound_of(
-    claim: Claim, known_ids: Collection[str], index: ModelIndex
+    claim: Claim,
+    known_ids: Collection[str],
+    index: ModelIndex,
+    assertions: AssertionCatalog | None,
 ) -> frozenset[str]:
     """The element IDs a claim may cite, from its grounds or from its prose.
 
@@ -446,7 +454,9 @@ def _bound_of(
     that names an element has already put it in reach. A claim citing nothing
     anywhere has no bound and passes untouched.
     """
-    places = {ground.place for ground in claim.grounds if ground.place}
+    places = frozenset().union(
+        *(ground_places(ground, assertions) for ground in claim.grounds)
+    )
     if places:
         return index.reach(places)
     return frozenset(
@@ -457,7 +467,7 @@ def _bound_of(
 
 
 def _bound_element_references(
-    claims: Iterable[Claim], index: ModelIndex
+    claims: Iterable[Claim], index: ModelIndex, assertions: AssertionCatalog | None
 ) -> _ReferenceCheck:
     """Drop every cited element the claim's own grounds do not reach, and mark it.
 
@@ -472,7 +482,7 @@ def _bound_element_references(
     unresolved: list[UnresolvedReference] = []
     dropped: list[DroppedClaim] = []
     for claim in claims:
-        reach = _bound_of(claim, known_ids, index)
+        reach = _bound_of(claim, known_ids, index, assertions)
         if not reach:
             drafts.append(claim)
             continue
@@ -501,6 +511,67 @@ def _bound_element_references(
         ]
         drafts.append(claim.model_copy(update={"affected_element_ids": kept}))
     return _ReferenceCheck(drafts, unresolved, dropped)
+
+
+class _ScopeCheck(NamedTuple):
+    drafts: list[Claim]
+    unresolved: list[UnresolvedEvidence]
+    dropped: list[DroppedClaim]
+
+
+def _scope_grounds(
+    claims: Iterable[Claim], index: ModelIndex, assertions: AssertionCatalog | None
+) -> _ScopeCheck:
+    """Drop every ground about none of the claim's elements, and mark it.
+
+    The other half of :func:`_bound_element_references`, and read by the same
+    relation: a ground is in scope when one of the claim's elements is within
+    one hop of a place it names (:func:`~analysis_service.evidence.ground_places`).
+    Without it, a claim citing a fact about one flow could name a disjoint
+    element and pass, as long as another ground reached that element (#926).
+
+    A dropped ground is marked under its own reference with
+    :func:`~analysis_service.evidence.out_of_scope_ref` in front, and a claim
+    left with no ground is dropped, on the terms of an unresolved reference.
+    A claim naming no element is about the whole system, and a ground naming
+    no place — a quote, an absence, a row about a principal — cannot be placed,
+    so both pass untouched.
+    """
+    drafts: list[Claim] = []
+    unresolved: list[UnresolvedEvidence] = []
+    dropped: list[DroppedClaim] = []
+    for claim in claims:
+        affected = set(claim.affected_element_ids)
+        outside = [
+            ground
+            for ground in claim.grounds
+            if affected
+            and (places := ground_places(ground, assertions))
+            and not index.reach(places) & affected
+        ]
+        if not outside:
+            drafts.append(claim)
+            continue
+        refs = [out_of_scope_ref(evidence_ref(ground)) for ground in outside]
+        kept = [ground for ground in claim.grounds if ground not in outside]
+        if not kept:
+            dropped.append(
+                DroppedClaim.of(
+                    claim_id=claim.id,
+                    title=claim.title,
+                    reason=(
+                        "cites only facts about none of its elements"
+                        f" ({', '.join(repr(ref) for ref in refs)})"
+                    ),
+                )
+            )
+            continue
+        unresolved += [
+            UnresolvedEvidence(claim_id=claim.id, reference=ref[:REFERENCE_MAX_CHARS])
+            for ref in refs
+        ]
+        drafts.append(claim.model_copy(update={"grounds": kept}))
+    return _ScopeCheck(drafts, unresolved, dropped)
 
 
 def _drop_duplicate_ids(
@@ -745,11 +816,15 @@ def join_drafts(
     issues = ground_issues(referenced.drafts, system_model, assertions)
     if issues:
         raise DraftJoinError("; ".join(issues))
-    bounded = _bound_element_references(referenced.drafts, index)
+    # The bound first: it drops elements no ground reaches, and the scope pass
+    # then drops grounds about none of the elements left. The other order lets
+    # the scope pass strip the ground a claim's elements were bounded by.
+    bounded = _bound_element_references(referenced.drafts, index, assertions)
+    scoped = _scope_grounds(bounded.drafts, index, assertions)
     checked = (
-        _verify_quotes(bounded.drafts, sources)
+        _verify_quotes(scoped.drafts, sources)
         if sources
-        else _QuoteCheck(list(bounded.drafts), [], [], [])
+        else _QuoteCheck(list(scoped.drafts), [], [], [])
     )
     kept = list(checked.drafts)
     return JoinedDrafts(
@@ -757,12 +832,14 @@ def join_drafts(
         marks=AnalysisMarks(
             unverified_grounds=checked.unverified,
             repaired_quotes=checked.repaired,
+            unresolved_evidence=scoped.unresolved,
             unresolved_references=[*referenced.unresolved, *bounded.unresolved],
             unresolved_mentions=_unresolved_mentions(kept, known_ids),
             dropped_claims=[
                 *duplicates,
                 *referenced.dropped,
                 *bounded.dropped,
+                *scoped.dropped,
                 *checked.groundless,
             ],
         ).merged_with(package.record.claim_marks(kept)),

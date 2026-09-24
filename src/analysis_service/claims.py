@@ -466,9 +466,9 @@ class Ground(BaseModel):
       row does. Only a settled row is ever catalogued
       (:func:`~analysis_service.assertions.settled`), so a conflict, an
       unsupported row or a legacy one grounds nothing.
-    * ``unknown-assertion`` — ``assertion`` alone, for a row whose value is
-      :data:`~analysis_service.system_model.UNKNOWN`: the sources were asked
-      about this fact and left it open. **The assertion layer's
+    * ``unknown-assertion`` — ``assertion`` alone, for a row the sources left
+      open: its value is :data:`~analysis_service.system_model.UNKNOWN`, or
+      another row disputes it (:func:`~analysis_service.assertions.disputed`). **The assertion layer's
       ``unknown-attribute``**, and it exists for the same reason that kind
       does. An element attribute nobody stated is offered as a fact an agent
       may raise a *conditional* claim on; a predicate with no graph field had
