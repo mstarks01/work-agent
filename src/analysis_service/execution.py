@@ -41,6 +41,7 @@ from analysis_service.frameworks import package_for
 from analysis_service.graph import (
     LANE_ARTIFACTS,
     LANE_SHARED_KEYS,
+    PREPARE_NODE,
     STATE_INPUT_TEXT,
     STATE_SOURCE_TEXTS,
     FrameworkNodes,
@@ -142,6 +143,11 @@ class GraphRun:
 
     final_state: dict[str, Any]
     node_runs: list[NodeRun]
+    #: ``prepare``'s own output. ADK hands it to every lane agent as the lane's
+    #: user turn, through ``to_user_content``, so a lane's request is its
+    #: instruction *and* this. It is an event output rather than a state key,
+    #: which is why it is kept here. ``None`` where ``prepare`` did not run.
+    prepared: Any = None
 
     def report(
         self, *, job: Job, input_ref: InputRef, pipeline: Pipeline
@@ -215,13 +221,15 @@ class GraphRun:
         ``shared`` holds the job-wide keys every lane templates
         (:data:`~analysis_service.graph.LANE_SHARED_KEYS`); ``lanes`` holds each
         lane's own artifacts, keyed by framework, then lane, then the
-        placeholder ``analyze.md`` names. Together with the prompt file at the
-        run's commit, they are the whole of a lane's instruction, so a lane that
+        placeholder ``analyze.md`` names; ``prepared`` is the user turn every
+        lane receives, as :attr:`prepared`. Together with the prompt files at
+        the run's commit, they are the whole of a lane's request, so a lane that
         wrote nothing at a place can be read against what it was shown. A key
         ``prepare`` did not write is absent rather than empty: a missing lead
         and an empty one are different facts.
         """
         return {
+            "prepared": self.prepared,
             "shared": {
                 key: self.final_state[key]
                 for key in LANE_SHARED_KEYS
@@ -319,6 +327,7 @@ class GraphExecutor:
         )
         started_at = datetime.now(UTC).timestamp()
         finishes: list[_NodeFinish] = []
+        prepared: Any = None
 
         # The session holds the rendered submission, every node's output and
         # the report, so it goes when the run does — completed, failed or
@@ -334,6 +343,8 @@ class GraphExecutor:
             ):
                 observed_at = datetime.now(UTC).timestamp()
                 for node in _finished_nodes(event, self._node_names):
+                    if node == PREPARE_NODE:
+                        prepared = event.output
                     finishes.append(
                         _NodeFinish(
                             node=node,
@@ -360,6 +371,7 @@ class GraphExecutor:
         return GraphRun(
             final_state=dict(final.state) if final else {},
             node_runs=self._node_runs(finishes, started_at),
+            prepared=prepared,
         )
 
     def _node_runs(

@@ -62,9 +62,11 @@ never production performance and never go in a scored comparison.
 | Criticism killed it | the evidence missing from the critic's input | re-run the critic on the saved candidates |
 | Reporting dropped it | a correct adjudicated result | re-assemble the report |
 
-`oracle` and `bottleneck` already implement the first of these. The others need
-a capture or a replay seam that may not exist yet — when one does not, that is
-an extension ticket, not a reason to guess.
+`oracle` and `bottleneck` implement the first of these. `lane-replay` is the
+seam for the second: it rebuilds one lane's request from the captured
+`<case>.lanes.json`, so a substituted lead is one changed key and one call. The
+others need a capture or a replay seam that may not exist yet — when one does
+not, that is an extension ticket, not a reason to guess.
 
 To compare a whole route against a corrected input, rather than one stage,
 use `references/three-conditions.md`. It holds the three conditions, the
