@@ -811,6 +811,20 @@ STATE_REJECTION = "rejection"
 # lane agents and the block rather than only the report's ``job`` field.
 STATE_FRAMEWORK_OPTIONS = "framework_options"
 
+#: The job-wide state keys ``analyze.md`` templates, which every lane of every
+#: framework reads as one value. With :data:`LANE_ARTIFACTS` and ``{lane}`` they
+#: are every placeholder the prompt declares, which ``tests/test_graph.py``
+#: holds, so :meth:`~analysis_service.execution.GraphRun.lane_material` keeps
+#: the whole of what a lane read and a key the prompt gains cannot go unkept.
+LANE_SHARED_KEYS: tuple[str, ...] = (
+    STATE_INPUT_TEXT,
+    STATE_SYSTEM_MODEL,
+    STATE_BOUNDARY_CROSSINGS,
+    STATE_EVIDENCE_CATALOG,
+    STATE_ELEMENT_ROSTER,
+    STATE_DOMAIN_SKILLS,
+)
+
 # The per-framework keys, as artifact names. Each is spelled
 # ``<artifact>_<framework>`` by :meth:`FrameworkNodes.key`, so two frameworks'
 # fan-ins never write one key.

@@ -358,6 +358,13 @@ them. `extraction` mode stops at the validity gate, produces no report, and
 says so. Expect roughly 30–80 KB per report. These files are publishable: they
 carry corpus source text, which is in this repository.
 
+Beside those two, `<case>.proposals.json` keeps what each lane agent emitted
+before the fan-in, and `<case>.lanes.json` keeps what each lane was given: the
+job-wide keys `analyze.md` templates, once, and each lane's own candidates,
+scope, reference notes and prior cases. The proposals say what a lane
+answered; the lane file says what it was asked, so a lane that wrote nothing
+at a place can be read against the leads it had.
+
 Every mode that runs `extract` also writes `artifact.reports/<case>.extraction.json`:
 what the node emitted under `raw`, the model and gate verdict beside it, and
 under `repair` what the repair node returned where the gate sent the first

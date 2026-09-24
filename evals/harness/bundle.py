@@ -156,6 +156,10 @@ def write_reports(out: str, mode: str, runs: Mapping[str, modes.AnalysisRun]) ->
         # lane answered, which the drafts no longer say.
         proposals = directory / f"{case_id}.proposals.json"
         proposals.write_text(archive_bytes("proposals", dict(run.proposals)), "utf-8")
+        # What each lane was asked, beside what it answered: without it a lane
+        # that wrote nothing at a place cannot be read against its leads.
+        lanes = directory / f"{case_id}.lanes.json"
+        lanes.write_text(archive_bytes("lanes", dict(run.lane_material)), "utf-8")
         total_bytes += path.stat().st_size + drafts.stat().st_size
     print(f"{len(runs)} report(s) written to {directory} ({total_bytes / 1024:.0f} KB)")
 
