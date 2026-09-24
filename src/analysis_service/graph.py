@@ -1498,6 +1498,11 @@ def render_model(valid_model: dict) -> str:
     return render_fenced(_without_source_fields(valid_model))
 
 
+def render_crossings(crossings: Sequence[BoundaryCrossing]) -> str:
+    """The boundary crossings as every agent reads them, fenced like the model."""
+    return render_fenced([crossing.model_dump(mode="json") for crossing in crossings])
+
+
 def _without_source_fields(valid_model: dict) -> dict:
     """The model as a reasoning view: every element's own quote removed.
 
@@ -1653,7 +1658,7 @@ def prepare_analysis(
     state.prompt(STATE_SYSTEM_MODEL, render_model(valid_model))
     state.prompt(
         STATE_BOUNDARY_CROSSINGS,
-        render_fenced([crossing.model_dump(mode="json") for crossing in crossings]),
+        render_crossings(crossings),
     )
     state.prompt(STATE_EVIDENCE_CATALOG, render_catalog(catalog, held))
     # Beside the model rather than instead of it: a lane agent reasons over the
