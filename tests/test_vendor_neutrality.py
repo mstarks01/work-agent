@@ -142,6 +142,13 @@ IN_WORD = re.compile(_ANY_VENDOR, re.IGNORECASE)
 #: An entry that is neither is a gap. Say so in the reason rather than filing it
 #: beside the legitimate ones.
 DECLARED: dict[str, str] = {
+    "evals/harness/promotion.py": (
+        "This names one vendor's own fact, and it is a record, not a dispatch."
+        " RECALL_MODEL is the model the archived baseline repeats requested,"
+        " read back from their provenance and compared with a treatment's, so"
+        " a recall measured on another model is not read against it. No code"
+        " routes by it."
+    ),
     "src/analysis_service/vendors.py": (
         "The registry. `VendorName` is the closed type every other module"
         " reads, so this is the one place the names are spelled at all."
