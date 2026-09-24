@@ -173,6 +173,10 @@ class ModeRun:
     #: reason ``INSTRUMENTS["assertions"]`` gives.
     assertion_scores: list[modes.AssertionScore] = field(default_factory=list)
     assertions: dict[str, modes.AssertionResult] = field(default_factory=dict)
+    #: What each failed case's session held when a graph node raised, keyed by
+    #: case, beside the fault's ``repr``. Written beside the artifact as
+    #: ``<case>.failure.json`` and read by nothing that scores (#1097).
+    failed_states: dict[str, dict[str, Any]] = field(default_factory=dict)
     #: Cases the sweep never attempted: the estimate gate's hold refused the
     #: spend before them (#334), or a fault the sweep cannot measure ended it
     #: before them (#886). Never a case that ran — one that ran is priced and

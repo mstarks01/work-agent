@@ -303,6 +303,27 @@ def write_extractions(
     )
 
 
+def write_failures(out: str, failed: Mapping[str, Mapping[str, Any]]) -> None:
+    """Persist what each failed case's session held when its graph node raised.
+
+    A case that fails inside the graph leaves no report, so without this file
+    the gate's message is the only record, and every look at the failure costs
+    a paid run (#1097). The file holds the fault's ``repr`` and every key the
+    graph's nodes wrote: the drafts, the critic's rulings and the marks.
+
+    The suffix is one no reader loads: ``score`` and ``replay`` read named
+    files only, so a captured failure never reads as a finished case.
+    """
+    if not failed:
+        return
+    directory = reports_dir(out)
+    directory.mkdir(parents=True, exist_ok=True)
+    for case_id, captured in sorted(failed.items()):
+        path = directory / f"{case_id}.failure.json"
+        path.write_text(archive_bytes("failure", dict(captured)), "utf-8")
+    print(f"{len(failed)} failed case(s) captured in {directory}")
+
+
 def runs_from_reports(artifact: Path, cases: Sequence[GoldenCase]) -> dict[str, Any]:
     """Read a finished sweep's saved reports and drafts back into runs.
 

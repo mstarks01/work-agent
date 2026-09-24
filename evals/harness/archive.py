@@ -11,6 +11,7 @@ file                 producer                              spelling
 ``*.drafts.json``    ``bundle.write_reports``              escaped ASCII
 ``*.proposals.json`` ``bundle.write_reports``              escaped ASCII
 ``*.lanes.json``     ``bundle.write_reports``              escaped ASCII
+``*.failure.json``   ``bundle.write_failures``             escaped ASCII
 the sweep artifact   ``run.py`` sweep, and ``run.py``      escaped ASCII
                      ``score``, which rewrites it
 ``baseline.json``    ``baseline.assemble``                 UTF-8, keys sorted
@@ -84,6 +85,7 @@ ARCHIVE_SPELLINGS: dict[str, Callable[[Any], str]] = {
     "lanes": _escaped,
     "extraction": _escaped,
     "assertions": _escaped,
+    "failure": _escaped,
     "artifact": _escaped,
     "manifest": _sorted_utf8,
 }
@@ -106,6 +108,7 @@ KIND_SUFFIXES: dict[str, str] = {
     ".lanes.json": "lanes",
     ".extraction.json": "extraction",
     ".assertions.json": "assertions",
+    ".failure.json": "failure",
 }
 
 
