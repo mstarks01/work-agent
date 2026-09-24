@@ -125,3 +125,40 @@ def test_a_sweep_with_no_lane_capture_rebuilds_the_same_request(recorded, case):
     )
 
     assert dict(seen)[instruction] == [turn]
+
+
+def test_the_replayed_rulings_are_written_completed(recorded, case, tmp_path):  # noqa: F811
+    """The file carries what a status cannot: the reason and the open facts.
+
+    A ruling that names nothing on a draft citing an unknown ground is written
+    with that ground in ``related_unknowns``, as the graph completes it.
+    """
+    out, _ = recorded
+    archived = critic_replay.load(out, case.id, "stride")
+    bare = critic_replay.parse(
+        json.dumps(
+            {
+                "claims": [
+                    {
+                        "id": claim.id,
+                        "verdict": {},
+                        "confidence": getattr(claim, "confidence", "medium"),
+                    }
+                    for claim in archived.drafts
+                ]
+            }
+        ),
+        "stride",
+    )
+    written = tmp_path / "rulings.json"
+
+    critic_replay.write_rulings(written, archived, bare)
+
+    claims = json.loads(written.read_text(encoding="utf-8"))["claims"]
+    assert [claim["id"] for claim in claims] == [d.id for d in archived.drafts]
+    conditional = [d.id for d in archived.drafts if d.unknown_grounds()]
+    assert conditional, "the recorded case carries a draft citing an unknown"
+    for claim in claims:
+        assert bool(claim["verdict"]["related_unknowns"]) == (
+            claim["id"] in conditional
+        )

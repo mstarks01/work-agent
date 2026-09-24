@@ -207,6 +207,18 @@ async def replay(
     return parse(await call(instruction, turn), archived.framework)
 
 
+def write_rulings(path: Path, archived: Archived, rulings: Sequence[Ruling]) -> None:
+    """The replayed rulings, completed as the graph completes them, as JSON.
+
+    The status a comparison prints says what moved and not why. The reason and
+    the open facts on each ruling say why, and a replay that kept only the
+    status needed a second paid call to find out.
+    """
+    settled = complete_rulings(archived.drafts, rulings)
+    payload = {"claims": [ruling.model_dump(mode="json") for ruling in settled]}
+    path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+
+
 def arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("artifact", type=Path, help="the sweep whose critic to replay")
     parser.add_argument("--case", required=True, help="the case the critic ran on")
@@ -218,6 +230,12 @@ def arguments(parser: argparse.ArgumentParser) -> None:
         required=True,
         help="required: naming it is your consent to one paid critic call. The"
         " amount, or 'unknown' on a route that prices nothing before the call",
+    )
+    parser.add_argument(
+        "--out",
+        type=Path,
+        help="also write the replayed rulings here, completed as the graph"
+        " completes them, so their reasons and open facts can be read",
     )
 
 
@@ -248,6 +266,8 @@ def command_critic_replay(args: argparse.Namespace) -> int:
             MarkdownLoader(REPO_ROOT / "prompts"),
         )
     )
+    if args.out is not None:
+        write_rulings(args.out, archived, rulings)
     rows = compare(archived, rulings)
     same = sum(row.archived == row.replayed for row in rows)
     for row in rows:
