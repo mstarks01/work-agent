@@ -212,7 +212,7 @@
         "quotes": [
           {
             "source_label": "System description",
-            "quote": "the grant is dataset-wide \u2014 we have not split member-identifying columns out"
+            "quote": "the grant is dataset-wide — we have not split member-identifying columns out"
           }
         ],
         "explanation": "",
@@ -271,17 +271,17 @@
         "value": "confidential",
         "reason": null,
         "scope": [],
-        "basis": "stated",
+        "basis": "inferred",
         "quotes": [
           {
             "source_label": "System description",
             "quote": "The extracts contain claim records with member names and dates of birth"
           }
         ],
-        "explanation": "",
+        "explanation": "The source says what the store holds, and the tier `confidential` follows from those contents; the source does not name a tier.",
         "exclusive": false
       },
-      "rationale": "The source says what the dropped files hold: named claim records with dates of birth.",
+      "rationale": "Inferred from stated contents: The extracts contain claim records with member names and dates of birth. Only a source that names the tier states it (ruled 2026-09-24, #926).",
       "reviewed_by": "mstarks01"
     },
     {
@@ -292,17 +292,17 @@
         "value": "confidential",
         "reason": null,
         "scope": [],
-        "basis": "stated",
+        "basis": "inferred",
         "quotes": [
           {
             "source_label": "System description",
             "quote": "Airflow keeps its connection strings and the partner keys in its own metadata database"
           }
         ],
-        "explanation": "",
+        "explanation": "The source says what the store holds, and the tier `confidential` follows from those contents; the source does not name a tier.",
         "exclusive": false
       },
-      "rationale": "The store holds credentials, which the source states.",
+      "rationale": "Inferred from stated contents: Airflow keeps its connection strings and the partner keys in its own metadata database. Only a source that names the tier states it (ruled 2026-09-24, #926).",
       "reviewed_by": "mstarks01"
     },
     {
@@ -313,17 +313,17 @@
         "value": "confidential",
         "reason": null,
         "scope": [],
-        "basis": "stated",
+        "basis": "inferred",
         "quotes": [
           {
             "source_label": "System description",
             "quote": "we have not split member-identifying columns out"
           }
         ],
-        "explanation": "",
+        "explanation": "The source says what the store holds, and the tier `confidential` follows from those contents; the source does not name a tier.",
         "exclusive": false
       },
-      "rationale": "The source says the warehouse carries member-identifying columns.",
+      "rationale": "Inferred from stated contents: we have not split member-identifying columns out. Only a source that names the tier states it (ruled 2026-09-24, #926).",
       "reviewed_by": "mstarks01"
     },
     {
@@ -404,7 +404,7 @@
         "explanation": "",
         "exclusive": false
       },
-      "rationale": "An explicit absence: the check is named and said not to happen. The missing check is who supplied the file, not where it was sent, and no signature is mentioned \u2014 which is why the sitting of 2026-09-18 declined both destination-verification and signature-verification and the row waited for a predicate of its own (#1053).",
+      "rationale": "An explicit absence: the check is named and said not to happen. The missing check is who supplied the file, not where it was sent, and no signature is mentioned — which is why the sitting of 2026-09-18 declined both destination-verification and signature-verification and the row waited for a predicate of its own (#1053).",
       "reviewed_by": "mstarks01"
     }
   ],

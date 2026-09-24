@@ -42,3 +42,15 @@ The maintainer's sitting on the drafted reference facts. A `change` ruling is ap
 |---|---|---|---|
 | `store:claims-warehouse` | `trust_zone` | retain `boundary:warehouse-network` as an explicit assumption | The supplied evidence does not establish this membership. The zone is retained because the schema requires one, not because the source places it. |
 
+## Ruling of 2026-09-24 (#926): a tier read off contents is inferred
+
+The maintainer ruled in a session that a `data-classification` row states its
+tier only where the source names the tier. Where the source names only what a
+store holds, the tier is an inference from those contents. The rows keep their
+value and their quote, and `reviewed_by` stays the maintainer's.
+
+| `data-classification` row | Before | After |
+|---|---|---|
+| `store:landing-bucket` | `stated` | `inferred` |
+| `store:airflow-metadata-database` | `stated` | `inferred` |
+| `store:claims-warehouse` | `stated` | `inferred` |

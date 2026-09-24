@@ -403,7 +403,7 @@ def _empty_citation(reference: SignedReference, case: GoldenCase) -> Corruption:
     The matcher cannot see this: support is not part of an identity and not
     part of the certainty three fields. The gate is the reader that can.
     """
-    row = _find(reference, "data-classification")
+    row = _find(reference, "credential-custody")
     return _one(reference, row, row.model_copy(update={"support": []}))
 
 
@@ -415,7 +415,7 @@ def _stopword_mechanism(reference: SignedReference, case: GoldenCase) -> Corrupt
 
 def _removed_assertion(reference: SignedReference, case: GoldenCase) -> Corruption:
     """One meaningful row dropped, every remaining row correct."""
-    return _one(reference, _find(reference, "data-classification"), None)
+    return _one(reference, _find(reference, "credential-custody"), None)
 
 
 def _renamed_flow(reference: SignedReference, case: GoldenCase) -> Corruption:
@@ -679,7 +679,7 @@ PROBES: Mapping[str, Probe] = MappingProxyType(
         "valid-inference": Probe(
             "01-payments-checkout",
             _valid_inference,
-            fates=("found",) * 5,
+            fates=("found",) * 6,
         ),
     }
 )

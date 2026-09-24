@@ -14,7 +14,7 @@
         "quotes": [
           {
             "source_label": "System description",
-            "quote": "The app talks to the web API over HTTP \u2014 not HTTPS"
+            "quote": "The app talks to the web API over HTTP — not HTTPS"
           }
         ],
         "explanation": "",
@@ -289,17 +289,17 @@
         "value": "confidential",
         "reason": null,
         "scope": [],
-        "basis": "stated",
+        "basis": "inferred",
         "quotes": [
           {
             "source_label": "System description",
             "quote": "name, address, and the card they paid with"
           }
         ],
-        "explanation": "",
+        "explanation": "The source says what the store holds, and the tier `confidential` follows from those contents; the source does not name a tier.",
         "exclusive": false
       },
-      "rationale": "The source lists what the database holds about a customer.",
+      "rationale": "Inferred from stated contents: name, address, and the card they paid with. Only a source that names the tier states it (ruled 2026-09-24, #926).",
       "reviewed_by": "mstarks01"
     },
     {
@@ -310,17 +310,17 @@
         "value": "confidential",
         "reason": null,
         "scope": [],
-        "basis": "stated",
+        "basis": "inferred",
         "quotes": [
           {
             "source_label": "System description",
             "quote": "only addresses go in that file, nothing else"
           }
         ],
-        "explanation": "",
+        "explanation": "The source says what the store holds, and the tier `confidential` follows from those contents; the source does not name a tier.",
         "exclusive": false
       },
-      "rationale": "The source says the file holds delivery addresses.",
+      "rationale": "Inferred from stated contents: only addresses go in that file, nothing else. Only a source that names the tier states it (ruled 2026-09-24, #926).",
       "reviewed_by": "mstarks01"
     }
   ],

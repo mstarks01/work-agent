@@ -500,17 +500,17 @@
         "value": "confidential",
         "reason": null,
         "scope": [],
-        "basis": "stated",
+        "basis": "inferred",
         "quotes": [
           {
             "source_label": "System description",
             "quote": "Orders, shopper addresses and card-last-four live in a PostgreSQL database"
           }
         ],
-        "explanation": "",
+        "explanation": "The source says what the store holds, and the tier `confidential` follows from those contents; the source does not name a tier.",
         "exclusive": false
       },
-      "rationale": "The source names what the store holds: order records, postal addresses and a card fragment.",
+      "rationale": "Inferred from stated contents: Orders, shopper addresses and card-last-four live in a PostgreSQL database. Only a source that names the tier states it (ruled 2026-09-24, #926).",
       "reviewed_by": "mstarks01"
     }
   ],
