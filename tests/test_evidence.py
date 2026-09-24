@@ -36,8 +36,10 @@ from analysis_service.evidence import (
     absent_evidence_ref,
     crossing_evidence_ref,
     evidence_catalog,
+    evidence_ref,
     ground_gloss,
     ground_issues,
+    ground_places,
     lead_topics,
     render_catalog,
     render_element_roster,
@@ -453,15 +455,20 @@ class TestEvidenceCatalog:
         assert issues and "settles that row" in issues[0]
 
     def test_a_conflict_settles_nothing_on_either_side(self):
-        """Two rows that disagree stay visible in the catalog and ground nothing:
-        a definite entry for either would be the service picking a side no
-        adjudication recorded."""
+        """Two rows that disagree are each offered as an open question and
+        neither as a fact: a settled entry for either would be the service
+        picking a side no adjudication recorded, and no entry at all left a
+        second factor with no graph field reaching no lane."""
         absent = row()
         required = row(value="required")
-        catalog = evidence_catalog(valid_model(), assertions(absent, required))
+        held = assertions(absent, required)
+        catalog = evidence_catalog(valid_model(), held)
 
-        assert assertion_id(absent) not in catalog
-        assert assertion_id(required) not in catalog
+        for side in (absent, required):
+            assert catalog[assertion_id(side)].kind == "unknown-assertion"
+        assert "the sources disagree; this row states `required`" in ground_gloss(
+            catalog[assertion_id(required)], held
+        )
 
     def test_a_scoped_row_is_offered_with_its_scope_and_answers_nothing_wider(self):
         """A second factor required for administrators is a fact — for
@@ -1320,3 +1327,41 @@ def test_lead_topics_without_a_catalog_skips_an_assertion_ground():
     }
 
     assert lead_topics(evidence) == frozenset()
+
+
+class TestWhichElementsAGroundIsAbout:
+    """``ground_places`` and ``evidence_ref``: the readers the scope rule uses."""
+
+    def test_every_catalog_entry_is_filed_under_its_own_reference(self):
+        """``evidence_ref`` inverts the catalog, for every kind it holds."""
+        catalog = assertions(
+            row(),
+            row(subject=LOGIN_FLOW, predicate="authentication-mechanism", value="mTLS"),
+            row(value=UNKNOWN, reason="silent", basis="stated"),
+            subjects=(SHOPPERS, COOKIE, LOGIN),
+        )
+        entries = evidence_catalog(valid_model(), catalog)
+
+        assert {entry.kind for entry in entries.values()} >= {
+            "unknown-attribute",
+            "derived-fact",
+            "assertion",
+            "unknown-assertion",
+        }
+        for key, ground in entries.items():
+            assert evidence_ref(ground) == key
+
+    def test_a_row_about_a_principal_names_no_place(self):
+        ground = Ground(kind="assertion", assertion=assertion_id(row()))
+
+        assert ground_places(ground, assertions(row())) == frozenset()
+
+    def test_a_row_about_a_flow_names_the_flow(self):
+        about = row(
+            subject=LOGIN_FLOW, predicate="authentication-mechanism", value="mTLS"
+        )
+        ground = Ground(kind="assertion", assertion=assertion_id(about))
+
+        assert ground_places(ground, assertions(about, subjects=(LOGIN,))) == {
+            LOGIN_FLOW
+        }

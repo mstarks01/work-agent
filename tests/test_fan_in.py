@@ -940,6 +940,69 @@ class TestTheGroundsBoundTheCitedElements:
         assert "do not reach" in dropped.reason
 
 
+class TestAGroundIsAboutTheClaimsElements:
+    """#926: a claim may not rest on a fact about an unrelated element."""
+
+    @pytest.fixture
+    def model(self):
+        return valid_model()
+
+    def test_a_ground_about_none_of_the_elements_is_dropped_and_marked(self, model):
+        """The claim is about the login; the store's encryption is two hops off."""
+        store = Ground(
+            kind="unknown-attribute",
+            element_id="store:orders-db",
+            attribute="encryption_at_rest",
+        )
+        drafts = {
+            "spoofing": [
+                sample_draft(
+                    grounds=[*sample_draft().grounds, store],
+                    affected_element_ids=[CROSSING],
+                )
+            ]
+        }
+
+        joined = join_drafts(drafts, STRIDE, model)
+
+        (draft,) = joined.drafts
+        assert store not in draft.grounds
+        (mark,) = joined.marks.unresolved_evidence
+        assert (
+            mark.reference == "out-of-scope:unknown:store:orders-db:encryption_at_rest"
+        )
+
+    def test_an_assertion_ground_bounds_the_claims_elements(self, model):
+        """The audit's reproduction: a fact about the login flow, attributed to
+        the orders store. An assertion ground named no place, so nothing
+        bounded the claim and it passed."""
+        row = Assertion(
+            subject=CROSSING,
+            predicate="authentication-mechanism",
+            value="a hardware token",
+            basis="inferred",
+            explanation="fixture",
+        )
+        catalog = AssertionCatalog(
+            subjects=[Subject(id=CROSSING, type="interaction", label="login")],
+            entries=[row],
+        )
+        drafts = {
+            "spoofing": [
+                sample_draft(
+                    grounds=[Ground(kind="assertion", assertion=assertion_id(row))],
+                    affected_element_ids=["store:orders-db"],
+                )
+            ]
+        }
+
+        joined = join_drafts(drafts, STRIDE, model, assertions=catalog)
+
+        assert joined.drafts == []
+        (dropped,) = joined.marks.dropped_claims
+        assert "do not reach" in dropped.reason
+
+
 class TestASpentBodyDeadlineFoldsNoSource:
     """The bound the fan-in actually runs under.
 

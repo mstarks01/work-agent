@@ -70,7 +70,11 @@ from analysis_service.compact import (
 )
 from analysis_service.critic import duplicate_groups
 from analysis_service.execution import GraphExecutor
-from analysis_service.fan_in import _bound_element_references, _verify_quotes
+from analysis_service.fan_in import (
+    _bound_element_references,
+    _scope_grounds,
+    _verify_quotes,
+)
 from analysis_service.frameworks import (
     PACKAGES,
     FrameworkName,
@@ -336,7 +340,11 @@ def case_index() -> None:
     _timed("ModelIndex.of: 200 processes, 400 flows", lambda: ModelIndex.of(model), 100)
     _timed(
         "_bound_element_references: 2,000 claims",
-        lambda: _bound_element_references(claims, index),
+        lambda: _bound_element_references(claims, index, None),
+    )
+    _timed(
+        "_scope_grounds: 2,000 claims",
+        lambda: _scope_grounds(claims, index, None),
     )
     _timed(
         "duplicate_groups: 2,000 claims",
