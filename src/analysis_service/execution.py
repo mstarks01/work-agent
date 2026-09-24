@@ -39,6 +39,8 @@ from analysis_service.claims import (
 )
 from analysis_service.frameworks import package_for
 from analysis_service.graph import (
+    LANE_ARTIFACTS,
+    LANE_SHARED_KEYS,
     STATE_INPUT_TEXT,
     STATE_SOURCE_TEXTS,
     FrameworkNodes,
@@ -205,6 +207,37 @@ class GraphRun:
             lane.lane: self.final_state[lane.drafts_key]
             for lane in FrameworkNodes(framework).lanes
             if lane.drafts_key in self.final_state
+        }
+
+    def lane_material(self, frameworks: Sequence[FrameworkName]) -> dict[str, Any]:
+        """What every lane read, as ``prepare`` rendered it into state.
+
+        ``shared`` holds the job-wide keys every lane templates
+        (:data:`~analysis_service.graph.LANE_SHARED_KEYS`); ``lanes`` holds each
+        lane's own artifacts, keyed by framework, then lane, then the
+        placeholder ``analyze.md`` names. Together with the prompt file at the
+        run's commit, they are the whole of a lane's instruction, so a lane that
+        wrote nothing at a place can be read against what it was shown. A key
+        ``prepare`` did not write is absent rather than empty: a missing lead
+        and an empty one are different facts.
+        """
+        return {
+            "shared": {
+                key: self.final_state[key]
+                for key in LANE_SHARED_KEYS
+                if key in self.final_state
+            },
+            "lanes": {
+                framework: {
+                    lane.lane: {
+                        name: self.final_state[lane.key(name)]
+                        for name in LANE_ARTIFACTS
+                        if lane.key(name) in self.final_state
+                    }
+                    for lane in FrameworkNodes(framework).lanes
+                }
+                for framework in frameworks
+            },
         }
 
 
