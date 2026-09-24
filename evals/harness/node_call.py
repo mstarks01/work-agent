@@ -22,14 +22,26 @@ from google.adk.models.llm_request import LlmRequest
 from google.genai import types
 
 from analysis_service.binding import build_tier_adapters
+from analysis_service.charges import CHARGE_METADATA_KEY
 from analysis_service.deployment import Deployment
 
 #: One call: the instruction and the user turn in, the model's raw text out.
 NodeCall = Callable[[str, types.Content], Awaitable[str]]
 
 
-def node_call(deployment: Deployment, graph_node: str, schema: Any) -> NodeCall:
-    """The call ``graph_node`` makes, on this deployment's route for it."""
+def node_call(
+    deployment: Deployment,
+    graph_node: str,
+    schema: Any,
+    spent: list[float | None] | None = None,
+) -> NodeCall:
+    """The call ``graph_node`` makes, on this deployment's route for it.
+
+    ``spent`` receives the charge the provider reported for each call, or
+    ``None`` where it reported none, read off the stamp
+    :mod:`analysis_service.charges` puts on the response. A replay is a paid
+    call, and its caller states what it spent rather than an estimate.
+    """
     tier = deployment.tier_of(graph_node)
     adapter = build_tier_adapters(
         deployment.tiers,
@@ -45,10 +57,14 @@ def node_call(deployment: Deployment, graph_node: str, schema: Any) -> NodeCall:
         config.response_schema = schema
         request = LlmRequest(model=adapter.model, contents=[turn], config=config)
         chunks = []
+        charge = None
         async for response in adapter.generate_content_async(request, False):
+            charge = (response.custom_metadata or {}).get(CHARGE_METADATA_KEY, charge)
             for part in (response.content.parts if response.content else []) or []:
                 if part.text:
                     chunks.append(part.text)
+        if spent is not None:
+            spent.append(charge)
         return "".join(chunks)
 
     return call
