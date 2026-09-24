@@ -153,8 +153,12 @@ def rule(claim_id: str, status: str, reason: str = "") -> dict:
     here. A helper emitting the neutral shape alone lets the replay's parser and
     the graph's drift apart while both stay green: the graph reads a
     ``ThreatRuling``, and nothing offline would hand the replay one.
+
+    The critic writes no status, so ``status`` is the one the fields decide: a
+    rejection names its check, and any other ruling leaves the verdict to the
+    draft's own unknown grounds, as :func:`surviving_status` reads them.
     """
-    verdict = {"status": status, "reason": reason}
+    verdict: dict = {"reason": reason}
     if status == "rejected":
         verdict["rejected_because"] = "reasoning"
     return {"id": claim_id, "verdict": verdict, **PACKAGE_REQUIRED}
@@ -433,11 +437,7 @@ def test_a_dismissal_is_recorded_so_relevance_can_be_read(fixtures, model):
         status = surviving_status(f) if f.expect.survives else "rejected"
         r = rule(f.draft["id"], status, "; ".join(f.expect.reason_must_name))
         if f.id == shielded.id:
-            r["verdict"] = {
-                "status": "confirmed",
-                "reason": "",
-                "immaterial_unknowns": pairs,
-            }
+            r["verdict"] = {"reason": "", "immaterial_unknowns": pairs}
         payload["claims"].append(r)
 
     score, problems = run(fixtures, model, payload)
@@ -449,8 +449,8 @@ def test_a_dismissal_is_recorded_so_relevance_can_be_read(fixtures, model):
     assert row.to_json()["dismissed_unknowns"]
 
 
-def test_a_confirmation_naming_no_pair_is_still_a_review_problem(fixtures, model):
-    """Silence cannot confirm, so the bypass the field opens is closed."""
+def test_a_ruling_naming_no_pair_is_needs_info(fixtures, model):
+    """Silence cannot confirm: an undismissed unknown ground makes it needs-info."""
     shielded = next(
         f
         for f in fixtures
@@ -459,19 +459,16 @@ def test_a_confirmation_naming_no_pair_is_still_a_review_problem(fixtures, model
     )
     payload = {
         "claims": [
-            rule(f.draft["id"], "needs-info", "open fact")
-            if f.id != shielded.id
-            else {
-                **rule(f.draft["id"], "needs-info"),
-                "verdict": {"status": "confirmed", "reason": ""},
-            }
-            for f in fixtures
+            rule(f.draft["id"], surviving_status(f), "open fact") for f in fixtures
         ]
     }
+    payload["claims"][fixtures.index(shielded)]["verdict"] = {"reason": ""}
 
-    _, problems = run(fixtures, model, payload)
+    score, problems = run(fixtures, model, payload)
+    row = {o.fixture_id: o for o in score.outcomes}[shielded.id]
 
-    assert any("immaterial_unknowns" in p for p in problems)
+    assert not problems
+    assert row.status == "needs-info"
 
 
 def test_a_killed_discriminator_is_not_reported_as_a_deficient_set(fixtures, model):

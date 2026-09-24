@@ -45,7 +45,7 @@ from google.adk.utils.instructions_utils import inject_session_state
 from google.genai import types
 
 from analysis_service.claims import AnalysisMarks, Claim, FrameworkName, Ruling
-from analysis_service.critic import critic_view
+from analysis_service.critic import complete_rulings, critic_view
 from analysis_service.deployment import Deployment
 from analysis_service.frameworks import PACKAGES, schemas_for
 from analysis_service.graph import (
@@ -175,12 +175,19 @@ class Agreement:
 
 
 def compare(archived: Archived, rulings: Sequence[Ruling]) -> list[Agreement]:
-    """Each draft's verdict status, archived against replayed."""
+    """Each draft's verdict status, archived against replayed.
+
+    The replayed rulings are completed first, as the graph completes them, so
+    the status read is the one that would have reached the report.
+    """
     block = next(
         b for b in archived.report.analyses if b.framework == archived.framework
     )
     before = {claim.id: claim.verdict.status for claim in block.all_claims()}
-    after = {ruling.id: ruling.verdict.status for ruling in rulings}
+    after = {
+        ruling.id: ruling.verdict.status
+        for ruling in complete_rulings(archived.drafts, rulings)
+    }
     return [
         Agreement(
             draft.id, before.get(draft.id, "unruled"), after.get(draft.id, "unruled")

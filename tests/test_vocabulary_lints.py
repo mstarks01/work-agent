@@ -59,6 +59,10 @@ _CONTAINERS = frozenset({"tuple", "frozenset", "set", "list", "dict", "Mapping"}
 #: suppression: the constant still has to stay a subset, which
 #: :func:`test_no_declaration_outlives_its_subset` checks.
 PARTIAL: dict[tuple[str, str], str] = {
+    ("analysis_service.claims", "ARCHIVED_UNRECONCILED_KINDS"): (
+        "the kinds only archived reports carry, which is fewer than the kinds"
+        " a live review writes"
+    ),
     ("analysis_service.graph", "CATALOGUING_ENTRIES"): (
         "the entries whose graph ends in a resolved catalog, which is fewer"
         " than the entries that exist"
