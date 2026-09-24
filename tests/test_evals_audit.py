@@ -21,6 +21,7 @@ import argparse
 import dataclasses
 import json
 from pathlib import Path
+from typing import get_args
 
 import pytest
 
@@ -51,6 +52,20 @@ def _record(**overrides) -> dict:
     }
     row.update(overrides)
     return row
+
+
+def _condition(**overrides) -> dict:
+    """One well-formed condition block, spoiled the same way."""
+    held = {
+        "name": "corrected-extraction",
+        "input": "evals/corpus/01-payments-checkout/model.json",
+        "adapters": [],
+        "unrepresentable": [],
+        "exposure": "signed by the maintainer before this audit read any miss",
+        "stage": "final-report",
+    }
+    held.update(overrides)
+    return held
 
 
 class TestThePhaseTable:
@@ -146,6 +161,14 @@ class TestTheRowAndItsFieldsAreOneList:
             parent="QA-x-01",
             supersedes="QA-x-00",
             reconsider_when="the scorer moves",
+            condition=audit.Condition(
+                name="direct-facts",
+                input="evals/corpus/01-payments-checkout/facts.json",
+                adapters=("facts rendered as a table",),
+                unrepresentable=("placement of the card processor",),
+                exposure="built by an agent that had read the case-01 misses",
+                stage="analysis",
+            ),
         )
 
         assert audit.parse(filled.to_json(), source="test") == filled
@@ -197,6 +220,43 @@ class TestTheLedgerRefusals:
         experiment = audit.parse(_record(phase=None), source="test")
 
         assert experiment.phase is None
+
+    def test_every_condition_in_the_vocabulary_has_its_stages(self):
+        assert set(audit.CONDITION_STAGES) == set(get_args(audit.ConditionName))
+
+    def test_a_condition_outside_the_table_is_refused_by_name(self):
+        with pytest.raises(audit.ExperimentError, match="oracle-everything"):
+            audit.parse(
+                _record(condition=_condition(name="oracle-everything")), source="test"
+            )
+
+    def test_direct_facts_are_never_read_as_a_final_report(self):
+        """No route carries direct-facts output past analysis, so no report exists."""
+        with pytest.raises(audit.ExperimentError, match="never at 'final-report'"):
+            audit.parse(
+                _record(
+                    condition=_condition(name="direct-facts", stage="final-report")
+                ),
+                source="test",
+            )
+
+    @pytest.mark.parametrize("field", ["input", "exposure"])
+    def test_a_condition_names_its_input_and_its_builders_exposure(self, field):
+        with pytest.raises(audit.ExperimentError, match=f"has no {field}"):
+            audit.parse(_record(condition=_condition(**{field: " "})), source="test")
+
+    def test_an_empty_adapter_list_is_an_answer(self):
+        """The shipped route has no adapter, and saying so is a legal row."""
+        row = audit.parse(_record(condition=_condition(adapters=[])), source="test")
+
+        assert row.condition is not None and row.condition.adapters == ()
+
+    def test_a_missing_adapter_list_is_refused(self):
+        held = _condition()
+        del held["adapters"]
+
+        with pytest.raises(audit.ExperimentError, match="adapters is not a list"):
+            audit.parse(_record(condition=held), source="test")
 
     def test_a_row_round_trips_through_its_own_json(self):
         experiment = audit.parse(_record(phase="criticism"), source="test")

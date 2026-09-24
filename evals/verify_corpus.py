@@ -69,6 +69,7 @@ from analysis_service.system_model import (
 )
 from analysis_service.validation import parse_and_validate
 from evals.harness.calibration import SCORED_LABELS, Label, LabelAnnotation
+from evals.harness.leakage import answer_leaks
 from evals.harness.reference import (
     MUST_FIND,
     AsvsDisposition,
@@ -1112,12 +1113,15 @@ def check_case(
     # already reported it.
     element_ids = {element.id for element in model.elements()}
     options = declared_options(meta)
+    answers: list[dict[str, Any]] = []
     for name in PACKAGES:
         path = claims_file(case_dir, name)
         if name not in options or not path.is_file():
             continue
         records = _load_json(path)
         problems.extend(_check_claims(name, records, element_ids, options[name]))
+        if isinstance(records, list):
+            answers += [record for record in records if isinstance(record, dict)]
 
         leads = VERB_LEADS[name]
         if leads is None or not isinstance(records, list):
@@ -1127,6 +1131,13 @@ def check_case(
                 raised.add(key)
             if key not in ESCALATE_DECLARED:
                 problems.append(message)
+    # The two files the audit's diagnostic conditions feed to generation.
+    verified = {
+        name: (case_dir / name).read_text(encoding="utf-8")
+        for name in ("model.json", "facts.json")
+        if (case_dir / name).is_file()
+    }
+    problems.extend(answer_leaks(answers, verified))
     return problems
 
 

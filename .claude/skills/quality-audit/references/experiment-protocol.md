@@ -32,6 +32,10 @@ and a report that states a higher claim than its rung has reached is wrong.
 A unit test is rung 1. It proves local behaviour and says nothing about how
 often a model hits the path or whether the report improved.
 
+A condition that feeds signed material to generation (`corrected-extraction`,
+`direct-facts` in `references/three-conditions.md`) never reaches rung 4 or 5.
+Its figures locate a loss, and only the shipped route can measure a gain.
+
 Report each recommendation's position explicitly:
 **suspected → reproduced → local fix verified → downstream gain measured →
 held-out gain confirmed.**

@@ -72,5 +72,26 @@ which you mean.
 **`estimated_usd` and `actual_usd`** are `null` for an offline experiment. That
 is not zero: an offline experiment has no provider cost to state.
 
+**`condition`** is `null`, except for an experiment in
+`references/three-conditions.md`. There it is an object, and the loader
+refuses a missing or unknown field by name:
+
+```json
+"condition": {
+  "name": "corrected-extraction",
+  "input": "evals/corpus/*/model.json at 817e86d",
+  "adapters": [],
+  "unrepresentable": ["case 12: the supplier's placement"],
+  "exposure": "signed by the maintainer before this audit read any miss",
+  "stage": "final-report"
+}
+```
+
+`name` is one of `current-pipeline`, `corrected-extraction` or `direct-facts`.
+`stage` is `analysis` or `final-report`, and the loader refuses a stage the
+condition cannot reach: `direct-facts` has no route past analysis today.
+`adapters` and `unrepresentable` may be empty lists, but they must be present,
+because an empty list says "none" and a missing field says nothing.
+
 **`supersedes`** names the row this one corrects. The corrected row stays in
 the ledger — it is the record of what was wrong.

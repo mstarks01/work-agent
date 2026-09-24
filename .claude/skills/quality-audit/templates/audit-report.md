@@ -69,6 +69,13 @@ State these before quoting any figure:
 
 Exact commands, in order, with the artifact paths a reader can open.
 
+## Conditions compared
+
+Only for an audit that took `references/three-conditions.md`.
+
+| Condition | Input | Adapters | Unrepresentable facts | Builder's exposure | Stage read | Result |
+| --- | --- | --- | --- | --- | --- | --- |
+
 ## Experiments recorded
 
 | ID | Hypothesis | Outcome | Cost | Row |

@@ -107,6 +107,11 @@ band gets no run; batch it.
 **8. Execute the lowest-cost discriminating test** the authorisation allows.
 `references/experiment-protocol.md` holds the ladder. Offline first, always.
 
+When important misses stay unexplained after step 4, and the evidence cannot
+tell a lost fact from a lost argument or a dropped finding, read
+`references/three-conditions.md`. Its entry test decides whether this audit
+takes that branch.
+
 **9. Record the result.** Every experiment gets a row, whatever it concluded.
 `refuted` and `null` are outcomes, not failures to hide. Write the row with
 `templates/experiment-record.md` and append it:
@@ -159,8 +164,9 @@ Before any paid sweep, run one case first and read its provenance.
 
 ## References
 
-- `references/quality-contract.md` — the seven axes, and which instrument reads each.
+- `references/quality-contract.md` — the nine axes, and which instrument reads each.
 - `references/instruments.md` — every command and archive, and what it answers.
 - `references/attribution.md` — phases, substitutions, and what attribution may not claim.
 - `references/experiment-protocol.md` — the cost ladder, execution identity, budgets.
+- `references/three-conditions.md` — where a finding is lost: the shipped route, a corrected extraction, and signed facts given directly to analysis.
 - `references/memory-and-extension.md` — the ledger, diagnostic rules, extension tickets.

@@ -1,6 +1,6 @@
 # Quality contract
 
-Seven axes. Report them apart, because a change that moves one usually moves
+Nine axes. Report them apart, because a change that moves one usually moves
 another the other way, and one combined number hides that.
 
 For each axis: what it means, which instrument reads it today, and what the
@@ -71,6 +71,33 @@ given 2, 2, 5, 5, 10 on one reading.
 node — recorded in every artifact.
 
 **Does not say:** what a cache hit cost. Meter paid requests, not calls.
+
+## 8. Valid findings outside the reference set
+
+**Reads it:** the `valid-unlisted` queue in the vote ledger, and nothing else.
+
+**Does not say:** anything where nobody has voted. Report these findings apart
+from coverage. They are not a match and they are not a miss.
+
+## 9. Review burden
+
+**Reads it:** nothing mechanical. Use a measured review time where one exists.
+Otherwise use a proxy, such as claims per report or unmatched claims to read,
+and label it as a proxy.
+
+**Does not say:** that a larger report is a better one. A coverage gain that
+doubles the reading is a trade-off, and you state it as one.
+
+## Coverage is not correctness
+
+Must-find coverage (axis 1) is a regression measure. It does not show that a
+matched finding carries a correct security argument, that a run repeats (axis
+6), or that an unmatched finding is wrong (axis 8). Report coverage beside
+axes 2, 6, 8 and 9, never alone.
+
+A target such as 90% must-find coverage is a provisional feasibility target
+against a named, reviewed reference population. It is not a promise and it
+does not measure report quality.
 
 ## Negative controls
 
