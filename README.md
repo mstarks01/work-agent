@@ -68,7 +68,8 @@ A completed report contains:
 - one block for every framework requested, in the requested order;
 - actionable claims, rejected drafts, and items that need more information;
 - grounds for every carried claim: source quotes, unknown or explicitly absent
-  attributes, derived crossings, or an element the model does not contain;
+  attributes, derived crossings, an element the model does not contain, or, when
+  the optional assertion pass runs, a fact the sources state;
 - warnings for repaired quotes, unresolved references, dropped proposals, and
   other faults that cost an entry rather than the whole report;
 - per-node timing, token use when the provider returns it, requested and served
@@ -123,6 +124,9 @@ pipeline and return the same report shape.
 - **Candidate** — a lead produced by code from the system model. It directs an
   analyzer's attention but is neither evidence nor a finding.
 - **Ground** — the evidence a claim rests on.
+- **Assertion** — one fact a source states, with the quote that supports it.
+  An optional pass records them, so a fact the system model has no field for can
+  still reach the analyzers.
 - **Critic** — the model that reviews one framework's proposed claims.
 - **Fingerprint** — a hash of the served model route and resolved sampling
   settings for one model call. It identifies that generation setup; it does not
