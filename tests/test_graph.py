@@ -75,6 +75,7 @@ from analysis_service.validation import ValidationIssue
 from tests.factories import (
     DEFAULT_FRAMEWORKS,
     DESCRIPTION_TEXT,
+    REPORTING_JOB,
     carrying,
     package_answering,
     repo_package_loaders,
@@ -83,6 +84,7 @@ from tests.factories import (
     sample_proposal,
     sample_ruling,
     sample_selection,
+    three_hop_model,
     valid_model,
 )
 from tests.test_compact import compact_fixture
@@ -1578,13 +1580,13 @@ def test_a_mark_never_outlives_the_draft_it_annotates():
         **analyze_state(
             spoofing=[
                 sample_proposal(
-                    "S-01", affected_element_ids=["process:ghost", "store:orders-db"]
+                    "S-01", affected_element_ids=["process:ghost", REPORTING_JOB]
                 )
             ]
         )
     )
 
-    graph.merge_drafts(valid_model().model_dump(mode="json"), ctx, KEYS, NODES)
+    graph.merge_drafts(three_hop_model().model_dump(mode="json"), ctx, KEYS, NODES)
 
     surviving = {draft["id"] for draft in ctx.state[NODES.key("drafts")]}
     marks = AnalysisMarks.model_validate(ctx.state[NODES.key("marks")])

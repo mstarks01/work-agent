@@ -24,8 +24,10 @@ from analysis_service.frameworks.stride import STRIDE
 from analysis_service.frameworks.stride.record import DraftThreat
 from analysis_service.sources import DEFAULT_DESCRIPTION_LABEL
 from tests.factories import (
+    REPORTING_JOB,
     sample_draft,
     sample_proposal,
+    three_hop_model,
     valid_model,
 )
 
@@ -846,15 +848,28 @@ class TestAFreeStringFromAnAgentCannotOverrunAMark:
 
 
 class TestTheGroundsBoundTheCitedElements:
-    """#441: ``affected_element_ids`` reaches one hop from the grounds' places."""
+    """#441: ``affected_element_ids`` reaches two hops from the grounds' places."""
 
     @pytest.fixture
     def model(self):
-        return valid_model()
+        return three_hop_model()
 
-    def test_an_element_two_hops_away_is_dropped_and_marked(self, model):
+    def test_an_element_three_hops_away_is_dropped_and_marked(self, model):
         from analysis_service.claims import BEYOND_GROUNDS
 
+        drafts = {
+            "spoofing": [sample_draft(affected_element_ids=[CROSSING, REPORTING_JOB])]
+        }
+
+        joined = join_drafts(drafts, STRIDE, model)
+
+        (draft,) = joined.drafts
+        assert draft.affected_element_ids == [CROSSING]
+        (mark,) = joined.marks.unresolved_references
+        assert (mark.element_id, mark.reason) == (REPORTING_JOB, BEYOND_GROUNDS)
+
+    def test_an_element_two_hops_away_is_kept(self, model):
+        """The store a login leads to: where a threat grounded on the login lands."""
         drafts = {
             "spoofing": [
                 sample_draft(affected_element_ids=[CROSSING, "store:orders-db"])
@@ -864,9 +879,8 @@ class TestTheGroundsBoundTheCitedElements:
         joined = join_drafts(drafts, STRIDE, model)
 
         (draft,) = joined.drafts
-        assert draft.affected_element_ids == [CROSSING]
-        (mark,) = joined.marks.unresolved_references
-        assert (mark.element_id, mark.reason) == ("store:orders-db", BEYOND_GROUNDS)
+        assert draft.affected_element_ids == [CROSSING, "store:orders-db"]
+        assert joined.marks.unresolved_references == []
 
     def test_a_claim_on_quotes_alone_is_bounded_by_what_its_prose_cites(self, model):
         from analysis_service.claims import BEYOND_GROUNDS
@@ -931,7 +945,7 @@ class TestTheGroundsBoundTheCitedElements:
         assert draft.affected_element_ids == ["entity:customer"]
 
     def test_a_claim_whose_grounds_reach_none_of_its_elements_is_dropped(self, model):
-        drafts = {"spoofing": [sample_draft(affected_element_ids=["store:orders-db"])]}
+        drafts = {"spoofing": [sample_draft(affected_element_ids=[REPORTING_JOB])]}
 
         joined = join_drafts(drafts, STRIDE, model)
 
@@ -945,14 +959,14 @@ class TestAGroundIsAboutTheClaimsElements:
 
     @pytest.fixture
     def model(self):
-        return valid_model()
+        return three_hop_model()
 
     def test_a_ground_about_none_of_the_elements_is_dropped_and_marked(self, model):
-        """The claim is about the login; the store's encryption is two hops off."""
+        """The claim is about the login; the reporting job is three hops off."""
         store = Ground(
             kind="unknown-attribute",
-            element_id="store:orders-db",
-            attribute="encryption_at_rest",
+            element_id=REPORTING_JOB,
+            attribute="exposure",
         )
         drafts = {
             "spoofing": [
@@ -968,9 +982,7 @@ class TestAGroundIsAboutTheClaimsElements:
         (draft,) = joined.drafts
         assert store not in draft.grounds
         (mark,) = joined.marks.unresolved_evidence
-        assert (
-            mark.reference == "out-of-scope:unknown:store:orders-db:encryption_at_rest"
-        )
+        assert mark.reference == f"out-of-scope:unknown:{REPORTING_JOB}:exposure"
 
     def test_an_assertion_ground_bounds_the_claims_elements(self, model):
         """The audit's reproduction: a fact about the login flow, attributed to
@@ -991,7 +1003,7 @@ class TestAGroundIsAboutTheClaimsElements:
             "spoofing": [
                 sample_draft(
                     grounds=[Ground(kind="assertion", assertion=assertion_id(row))],
-                    affected_element_ids=["store:orders-db"],
+                    affected_element_ids=[REPORTING_JOB],
                 )
             ]
         }
@@ -1094,11 +1106,13 @@ class TestFanIn:
         the draft's grounds and drops the draft. The mark must go with it, and
         the drop must stay.
         """
-        two_hops = "store:orders-db"
+        three_hops = REPORTING_JOB
         proposal = sample_proposal(
-            "S-01", affected_element_ids=["process:invented", two_hops]
+            "S-01", affected_element_ids=["process:invented", three_hops]
         )
-        merged = fan_in.fan_in(batches(spoofing=[proposal]), STRIDE, model, SOURCES)
+        merged = fan_in.fan_in(
+            batches(spoofing=[proposal]), STRIDE, three_hop_model(), SOURCES
+        )
 
         assert merged.drafts == []
         assert merged.marks.unresolved_references == []

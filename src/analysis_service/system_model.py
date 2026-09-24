@@ -906,9 +906,10 @@ class ModelIndex:
         """``places`` plus every element one hop away in the graph.
 
         A flow reaches its two endpoints. An element reaches the flows that
-        touch it and the elements at their far ends. Nothing further: the second
-        hop is the reach a description narrates, never the place an action
-        lands. A place the model does not contain reaches only itself.
+        touch it and the elements at their far ends, and nothing further.
+        :func:`~analysis_service.fan_in.within_bound` applies it
+        :data:`~analysis_service.fan_in.BOUND_HOPS` times for the bound on a
+        claim's elements. A place the model does not contain reaches only itself.
         """
         reach = set(places)
         for place in places:
