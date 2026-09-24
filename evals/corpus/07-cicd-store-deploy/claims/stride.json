@@ -56,7 +56,7 @@
       "likelihood": "medium",
       "impact": "medium"
     },
-    "notes": "Pushing a branch alone does not reach the estate \u2014 a merge to main is what starts a build \u2014 which is why this sits below the release-setting claims.",
+    "notes": "Pushing a branch alone does not reach the estate — a merge to main is what starts a build — which is why this sits below the release-setting claims.",
     "verb": "impersonate"
   },
   {
@@ -86,12 +86,13 @@
       "likelihood": "medium",
       "impact": "high"
     },
-    "notes": "A stated absence, not an unknown \u2014 the source says outright that the runner does not verify signatures, so this is grounded rather than needs-info.",
+    "notes": "A stated absence, not an unknown — the source says outright that the runner does not verify signatures, so this is grounded rather than needs-info.",
     "verb": "plant"
   },
   {
     "category": "tampering",
     "affected_element_ids": [
+      "flow:process:build-runner>store:image-registry>push-image",
       "store:image-registry",
       "process:store-server"
     ],
@@ -173,7 +174,7 @@
       "likelihood": "high",
       "impact": "medium"
     },
-    "notes": "High likelihood because it is not an attack condition but the described steady state \u2014 the token is stated to be the same for every pipeline.",
+    "notes": "High likelihood because it is not an attack condition but the described steady state — the token is stated to be the same for every pipeline.",
     "verb": "unattributable"
   },
   {

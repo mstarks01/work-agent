@@ -129,3 +129,20 @@ The maintainer's sitting on the drafted reference facts. A `change` ruling is ap
 | `process:build-runner` | `exposure` | `internal` to `unknown` | A separate build environment establishes separation from the corporate network, not absence of internet-facing interfaces. |
 | `process:deploy-controller` | `exposure` | `internal` to `unknown` | Corporate-network membership and retail-WAN access identify placement and an access path. They do not exclude additional public access paths. |
 | `process:store-server` | `exposure` | `internal` to `unknown` | Not receiving deployment pushes describes this workflow. It does not imply that store servers lack inbound services or are unreachable from the internet. |
+
+## Ruling of 2026-09-24 (QA-2026-09-24-02): a planted registry image has two places
+
+The maintainer ruled in a session that the STRIDE reference "An attacker
+replaces the image stored under a commit-sha tag in the registry, so store
+servers pull attacker code" (tampering, `plant`) is correctly placed both
+where the attacker acts, the build runner's push to the registry, and where
+the harm lands, the registry and the store servers that pull from it. Lane
+replays wrote this threat on the push path in 6 of 6 repeats.
+
+| Reference | Before | After |
+|---|---|---|
+| stride 6, `plant` | `store:image-registry`, `process:store-server` | `flow:process:build-runner>store:image-registry>push-image`, `store:image-registry`, `process:store-server` |
+
+The widened place contains both, so a claim at either matches under the
+identity rule's subset half. Re-scoring four Baselines and two 2026-09-24
+runs recovered this reference in two of them and lost no match anywhere.

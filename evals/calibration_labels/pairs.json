@@ -2262,6 +2262,7 @@
     "fixture_id": "36c4b4d2e4d8",
     "reference_claim": "An attacker replaces the image stored under a commit-sha tag in the registry, so store servers pull attacker content while the recorded release is unchanged.",
     "reference_element_ids": [
+      "flow:process:build-runner>store:image-registry>push-image",
       "process:store-server",
       "store:image-registry"
     ],
@@ -2282,6 +2283,7 @@
     "fixture_id": "22797e46840a",
     "reference_claim": "An attacker replaces the image stored under a commit-sha tag in the registry, so store servers pull attacker content while the recorded release is unchanged.",
     "reference_element_ids": [
+      "flow:process:build-runner>store:image-registry>push-image",
       "process:store-server",
       "store:image-registry"
     ],

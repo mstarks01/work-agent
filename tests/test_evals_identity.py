@@ -91,9 +91,9 @@ MEASURED = {
 DIRECTION = {
     # Over the corpus, what a claim yields without a new field.
     "claims": 242,
-    "one_flow_cited": 159,
+    "one_flow_cited": 160,
     "several_flows_cited": 5,
-    "no_flow_cited": 78,
+    "no_flow_cited": 77,
     # Over the 3 reference merges the shipped rule makes.
     "merges_with_a_direction_on_both_sides": 0,
     "merges_that_run_opposite_ways": 0,
@@ -130,7 +130,7 @@ FRONTIER = {
         "candidate_merges": 2,
         "reference_merges": 2,
     },
-    "endpoint equality": {"splits": 49, "candidate_merges": 33, "reference_merges": 14},
+    "endpoint equality": {"splits": 49, "candidate_merges": 33, "reference_merges": 13},
     "subset": {"splits": 33, "candidate_merges": 54, "reference_merges": 17},
     "endpoint subset": {"splits": 12, "candidate_merges": 69, "reference_merges": 36},
     "overlap": {"splits": 3, "candidate_merges": 66, "reference_merges": 39},
@@ -143,7 +143,7 @@ FRONTIER = {
     "endpoint overlap": {
         "splits": 1,
         "candidate_merges": 81,
-        "reference_merges": 143,
+        "reference_merges": 144,
     },
 }
 
