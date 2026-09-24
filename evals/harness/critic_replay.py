@@ -18,6 +18,12 @@ report's assertion catalog. The user turn is ADK's ``to_user_content`` over
 :func:`~analysis_service.graph.rulings_of`. ``tests/test_evals_critic_replay.py``
 holds the rebuilt request against the one a real graph run sent.
 
+**A sweep with no lane capture.** A sweep older than ``<case>.lanes.json``
+still holds the model its lanes read, embedded in the report, and both
+job-wide keys are rendered from that model. :func:`shared_keys` renders them
+with the functions ``prepare`` calls, and the test holds the result against a
+capture.
+
 **The prompt files are today's.** The command prints both commits.
 """
 
@@ -49,7 +55,9 @@ from analysis_service.graph import (
     FrameworkNodes,
     critic_instruction,
     merge_summary,
+    render_crossings,
     render_fenced,
+    render_model,
     rulings_of,
 )
 from analysis_service.markdown_loader import MarkdownLoader
@@ -73,13 +81,25 @@ class Archived:
     shared: dict[str, Any]
 
 
+def shared_keys(report: Report) -> dict[str, str]:
+    """The job-wide keys ``prepare`` rendered, from the model the report embeds."""
+    model = report.system_model
+    return {
+        STATE_SYSTEM_MODEL: render_model(model.model_dump(mode="json")),
+        STATE_BOUNDARY_CROSSINGS: render_crossings(model.boundary_crossings()),
+    }
+
+
 def load(artifact: Path, case_id: str, framework: FrameworkName) -> Archived:
     """The drafts, marks, report and job-wide keys one critic call read."""
     directory = reports_dir(artifact)
-    material = load_material(artifact, case_id)
     report = Report.model_validate_json(
         (directory / f"{case_id}.report.json").read_text(encoding="utf-8")
     )
+    if (directory / f"{case_id}.lanes.json").is_file():
+        shared = load_material(artifact, case_id)["shared"]
+    else:
+        shared = shared_keys(report)
     block = next((b for b in report.analyses if b.framework == framework), None)
     if block is None:
         raise EvalRunError(f"{case_id} carries no {framework} block")
@@ -97,7 +117,7 @@ def load(artifact: Path, case_id: str, framework: FrameworkName) -> Archived:
         drafts=[record.model_validate(draft) for draft in held.get(framework, [])],
         marks=marks,
         report=report,
-        shared=material["shared"],
+        shared=shared,
     )
 
 

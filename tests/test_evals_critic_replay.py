@@ -94,3 +94,29 @@ def test_an_answer_outside_the_contract_is_refused(recorded, case):  # noqa: F81
 
     with pytest.raises(ValueError, match="no 'claims'"):
         asyncio.run(critic_replay.replay(archived, call, PACKAGE_LOADER, PROMPT_LOADER))
+
+
+def test_the_job_wide_keys_render_from_the_report_as_prepare_captured(
+    recorded,  # noqa: F811
+    case,  # noqa: F811
+):
+    """A sweep with no lane capture gets the keys a capture holds."""
+    out, _ = recorded
+    captured = critic_replay.load(out, case.id, "stride")
+
+    assert critic_replay.shared_keys(captured.report) == {
+        name: captured.shared[name]
+        for name in critic_replay.shared_keys(captured.report)
+    }
+
+
+def test_a_sweep_with_no_lane_capture_rebuilds_the_same_request(recorded, case):  # noqa: F811
+    out, seen = recorded
+    (out.parent / f"{out.stem}.reports" / f"{case.id}.lanes.json").unlink()
+    archived = critic_replay.load(out, case.id, "stride")
+
+    instruction, turn = asyncio.run(
+        critic_replay.compose(archived, PACKAGE_LOADER, PROMPT_LOADER)
+    )
+
+    assert dict(seen)[instruction] == [turn]
