@@ -75,3 +75,14 @@ the same meaning. `other team's backend` is an alias for `entity:calling-service
 ## Alias rulings of 2026-09-16 (#961 step 6), signed in a session
 
 The maintainer ruled on four drafted alias rulings in `facts.json`: `calling teams`, `shared group account` and `model artifacts` accepted with the caveats each ruling records, and the publish spellings accepted as the write under the ML engineers' grant only (`within`). Two candidates were not drafted: the API key under the group account's name, and the engineers under the model server's account.
+
+## Ruling of 2026-09-24 (#926): a tier read off contents is inferred
+
+The maintainer ruled in a session that a `data-classification` row states its
+tier only where the source names the tier. Where the source names only what a
+store holds, the tier is an inference from those contents. The rows keep their
+value and their quote, and `reviewed_by` stays the maintainer's.
+
+| `data-classification` row | Before | After |
+|---|---|---|
+| `store:redis-feature-store` | `stated` | `inferred` |

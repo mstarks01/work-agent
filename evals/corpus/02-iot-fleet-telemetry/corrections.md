@@ -41,3 +41,14 @@ The maintainer's sitting on the drafted reference facts. A `change` ruling is ap
 | `store:telemetry-lake` | `trust_zone` | retain `boundary:analytics-core` as an explicit assumption | An analytics role does not establish network membership. The zone is retained because the schema requires one, not because the source places it. |
 | `store:firmware-bucket` | `trust_zone` | retain `boundary:ingest-edge` as an explicit assumption | No sentence places it. The zone is retained because the schema requires one. Public-read access is not the justification: it is an access policy and supports no placement. |
 
+## Ruling of 2026-09-24 (#926): a tier read off contents is inferred
+
+The maintainer ruled in a session that a `data-classification` row states its
+tier only where the source names the tier. Where the source names only what a
+store holds, the tier is an inference from those contents. The rows keep their
+value and their quote, and `reviewed_by` stays the maintainer's.
+
+| `data-classification` row | Before | After |
+|---|---|---|
+| `store:device-registry` | `stated` | `inferred` |
+| `store:telemetry-lake` | `stated` | `inferred` |
