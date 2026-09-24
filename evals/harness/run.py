@@ -70,6 +70,7 @@ from evals.harness import (
     bottleneck,
     comparison,
     consent,
+    descendants,
     envelope,
     extraction_losses,
     falsify,
@@ -2449,6 +2450,13 @@ COMMANDS: dict[str, Command] = {
         " run (no credentials)",
         run=promotion.command_gates,
         arguments=promotion.arguments,
+    ),
+    "descendants": Command(
+        help="run a sweep's fan-in again over its archived proposals, with"
+        " proposals injected, and bound what the critic would keep (#1091,"
+        " no credentials)",
+        run=descendants.command_descendants,
+        arguments=descendants.arguments,
     ),
     "lane-replay": Command(
         help="send one lane's captured request again and print what it proposes:"
