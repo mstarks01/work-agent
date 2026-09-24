@@ -15,9 +15,10 @@ two bounds: ``lower`` counts it rejected, ``upper`` counts it accepted. A
 reference inside ``upper`` and outside ``lower`` is one a critic call decides,
 and ``lane-replay``'s ``node_call`` is the seam that makes that one call.
 
-**What it cannot see.** Assembly is not re-run: a draft the critic accepted is
-read as reported. So a finding lost between an accepting ruling and the
-report reads here as kept.
+**What it does not re-run.** Assembly. A kept draft is read as the critic's
+ruled claim, which is what assembly makes of it: ``run.py assembly`` rebuilds
+the report of every archived STRIDE and ASVS block today's review check
+accepts, and found no claim moved and no ruled draft omitted.
 
 Scored by the STRIDE scorer, whose identity composes an action and a place, so
 it reads the proposals of a package that proposes an open claim set.
