@@ -1353,8 +1353,7 @@ class Ruling(BaseModel):
     Under this schema it cannot, and a ruling carries no element references to
     check.
 
-    A package's own subclass may add one more thing: a draft field the ruling
-    is allowed to *replace*. STRIDE's severity override is the only one today.
+    No ruling field replaces a field the agent wrote.
     """
 
     model_config = ConfigDict(extra="forbid")
