@@ -3063,6 +3063,22 @@ def analyze_instruction(
     return _instruction(skills, prompt)
 
 
+def critic_instruction(
+    package_loader: MarkdownLoader,
+    prompt_loader: MarkdownLoader,
+    package: FrameworkPackage,
+    nodes: FrameworkNodes,
+) -> str:
+    """One framework's critic instruction, as the graph builds its critic node.
+
+    Public so a replay of an archived critic call builds the same template the
+    node was given, rather than a second copy of how it is put together.
+    """
+    return _review_instruction(
+        package_loader, prompt_loader, package, nodes, compose_critic_prompt
+    )
+
+
 def _review_instruction(
     package_loader: MarkdownLoader,
     prompt_loader: MarkdownLoader,
@@ -3172,8 +3188,8 @@ def _framework_subgraph(
         critic=_llm_node(
             name=nodes.node(CRITIC_ROLE),
             tier_node=tier_nodes[nodes.node(CRITIC_ROLE)],
-            instruction=_review_instruction(
-                package_loader, prompt_loader, package, nodes, compose_critic_prompt
+            instruction=critic_instruction(
+                package_loader, prompt_loader, package, nodes
             ),
             output_schema=schemas.rulings,
             output_key=reviewed_key,

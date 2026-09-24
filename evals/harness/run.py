@@ -71,6 +71,7 @@ from evals.harness import (
     bottleneck,
     comparison,
     consent,
+    critic_replay,
     descendants,
     envelope,
     extraction_losses,
@@ -2458,6 +2459,12 @@ COMMANDS: dict[str, Command] = {
         " omits (#1091, no credentials)",
         run=assembly.command_assembly,
         arguments=assembly.arguments,
+    ),
+    "critic-replay": Command(
+        help="send one archived case's critic request again and compare its"
+        " verdicts with the archived ones (#1091, one paid call)",
+        run=critic_replay.command_critic_replay,
+        arguments=critic_replay.arguments,
     ),
     "descendants": Command(
         help="run a sweep's fan-in again over its archived proposals, with"
