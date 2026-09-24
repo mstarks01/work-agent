@@ -1540,6 +1540,13 @@ def test_merge_joins_drafts_in_canonical_order():
         "unverified_count": 0,
         "unresolved_mention_count": 0,
     }
+    # The one reader of that shape: the critic replay builds its user turn
+    # from it, so the replay's request and the graph's cannot differ.
+    drafts = [
+        STRIDE.record.model_validate(draft) for draft in ctx.state[NODES.key("drafts")]
+    ]
+    marks = AnalysisMarks.model_validate(ctx.state[NODES.key("marks")])
+    assert event.output == graph.merge_summary("stride", drafts, marks)
     # Two drafts on quotes and derived facts are the critic's to rule.
     assert event.actions.route == graph.ROUTE_REVIEW
     assert [d["id"] for d in ctx.state[NODES.key("drafts")]] == ["S-01", "T-01"]

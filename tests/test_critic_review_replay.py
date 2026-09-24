@@ -646,3 +646,18 @@ def test_the_words_behind_the_advice_verdict_are_kept(fixtures, model):
     for outcome in unsound:
         assert outcome.recommendation_note == "narrows no grant"
         assert outcome.to_json()["recommendation_note"] == "narrows no grant"
+
+
+def test_the_user_turn_is_the_merge_nodes_output_over_the_fixture_drafts(fixtures):
+    """A real critic receives its fan-in's summary, never a bare word."""
+    stride = [fixture for fixture in fixtures if fixture.framework == "stride"]
+
+    turn = R.user_turn(stride, PACKAGE)
+
+    assert turn.role == "user"
+    assert json.loads(turn.parts[0].text) == {
+        "framework": "stride",
+        "draft_count": len(stride),
+        "unverified_count": 0,
+        "unresolved_mention_count": 0,
+    }
