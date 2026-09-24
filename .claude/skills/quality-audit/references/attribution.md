@@ -70,9 +70,9 @@ candidate into a lane's archived proposals, runs the fan-in again, and bounds
 what the critic would keep (`lower` rejects every draft no critic ruled on,
 `upper` accepts it). `assembly` implements the reporting row: it names a
 ruled draft the report omits, and assembles the rest again from the rulings
-the report carries. The critic row needs a critic call; `critic_review` makes
-one over a signed fixture set, and nothing yet makes one over an archived
-case's drafts.
+the report carries. `critic-replay` implements the critic row: it sends an
+archived case's critic request again, for one call, and compares every
+draft's verdict with the archived one.
 
 To compare a whole route against a corrected input, rather than one stage,
 use `references/three-conditions.md`. It holds the three conditions, the

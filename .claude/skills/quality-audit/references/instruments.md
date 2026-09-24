@@ -53,7 +53,8 @@ operator to what they accept; see `evals/harness/consent.py` and
 `evals/TUNING.md`.
 
 `python -m evals.harness.run lane-replay <artifact> --case <case> --framework <package> --lane <lane> --accept-cost unknown`
-costs one lane call. It rebuilds the request one lane made from the sweep's
+costs one lane call. `python -m evals.harness.run critic-replay <artifact> --case <case> --framework <package> --accept-cost unknown`
+costs one critic call and compares every draft's verdict with the archived one. It rebuilds the request one lane made from the sweep's
 `<case>.lanes.json` and sends it again, so a `place` loss can be read against
 what the lane was shown. The material is the run's and the prompt files are
 this checkout's, and the command prints both commits.
