@@ -167,3 +167,15 @@ spreadsheet process is not required when they represent its behaviour.
 ## Ruling of 2026-09-16 (#961 step 6): no alias for the macros' grant
 
 The model wrote the spreadsheet's grant on `marketing` and on `customers`. Marketing operates the macros and customers are different actors; neither is a subject alias for the macros, and no alias is drafted.
+
+## Ruling of 2026-09-24 (#926): a tier read off contents is inferred
+
+The maintainer ruled in a session that a `data-classification` row states its
+tier only where the source names the tier. Where the source names only what a
+store holds, the tier is an inference from those contents. The rows keep their
+value and their quote, and `reviewed_by` stays the maintainer's.
+
+| `data-classification` row | Before | After |
+|---|---|---|
+| `store:user-database` | `stated` | `inferred` |
+| `store:delivery-address-flat-file` | `stated` | `inferred` |

@@ -304,17 +304,17 @@
         "value": "confidential",
         "reason": null,
         "scope": [],
-        "basis": "stated",
+        "basis": "inferred",
         "quotes": [
           {
             "source_label": "System description",
             "quote": "to find out which customer the node belongs to"
           }
         ],
-        "explanation": "",
+        "explanation": "The source says what the store holds, and the tier `confidential` follows from those contents; the source does not name a tier.",
         "exclusive": false
       },
-      "rationale": "The registry links a device to a customer, so it carries customer data.",
+      "rationale": "Inferred from stated contents: to find out which customer the node belongs to. Only a source that names the tier states it (ruled 2026-09-24, #926).",
       "reviewed_by": "mstarks01"
     },
     {
@@ -325,17 +325,17 @@
         "value": "confidential",
         "reason": null,
         "scope": [],
-        "basis": "stated",
+        "basis": "inferred",
         "quotes": [
           {
             "source_label": "System description",
             "quote": "The lake has site addresses and occupancy patterns in it, so it is customer data"
           }
         ],
-        "explanation": "",
+        "explanation": "The source says what the store holds, and the tier `confidential` follows from those contents; the source does not name a tier.",
         "exclusive": false
       },
-      "rationale": "The source classifies the lake's contents outright.",
+      "rationale": "Inferred from stated contents: The lake has site addresses and occupancy patterns in it, so it is customer data. Only a source that names the tier states it (ruled 2026-09-24, #926).",
       "reviewed_by": "mstarks01"
     },
     {
@@ -371,7 +371,7 @@
         "quotes": [],
         "exclusive": false
       },
-      "rationale": "The source places the normalizer \"in our analytics network\" and places the broker nowhere. It associates the broker with the gateway's onward hop \u2014 \"Readings the gateway accepts are forwarded onto Pub/Sub\" \u2014 so it takes the gateway's zone. Either placement leaves exactly one crossing on this path.",
+      "rationale": "The source places the normalizer \"in our analytics network\" and places the broker nowhere. It associates the broker with the gateway's onward hop — \"Readings the gateway accepts are forwarded onto Pub/Sub\" — so it takes the gateway's zone. Either placement leaves exactly one crossing on this path.",
       "reviewed_by": "mstarks01"
     },
     {

@@ -84,7 +84,7 @@ BASELINE: Mapping[str, float] = MappingProxyType(
         "must_find_coverage": 0.500,
         "reference_coverage": 0.526,
         "claims": 16,
-        "required_fact_recall": 0.511,
+        "required_fact_recall": 0.561,
     }
 )
 
@@ -92,7 +92,9 @@ BASELINE: Mapping[str, float] = MappingProxyType(
 #: files per repeat: case 01 in the first, the four holdout cases in the
 #: second. Tracked under ``evals/emissions/``, so the figure is recomputed by
 #: ``tests/test_evals_promotion.py`` rather than trusted. Declared 2026-09-24,
-#: before any treatment run is read against it.
+#: before any treatment run is read against it, and re-read the same day over
+#: the reference that rules a tier read off contents ``inferred``: the rule
+#: (baseline less one spread) did not move, the denominator did.
 RECALL_RUNS: tuple[tuple[str, str], ...] = tuple(
     (
         f"evals/emissions/20260916T-assert-step6/luna-after-r{repeat}.json",
@@ -119,9 +121,9 @@ RECALL_CASES: frozenset[str] = frozenset(
 RECALL_MODEL = "openrouter/openai/gpt-5.6-luna"
 
 #: The standard deviation of the pooled recall over the five baseline repeats
-#: (21 to 26 of 45 required facts). Declared from the repeats rather than
+#: (21 to 26 of 41 required facts). Declared from the repeats rather than
 #: passed in, because the repeats exist.
-RECALL_SPREAD = 0.042
+RECALL_SPREAD = 0.046
 
 #: When the baseline was measured, and by which pair. A budget is a fact about
 #: a day's tree: read this before quoting one.

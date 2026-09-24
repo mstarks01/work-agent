@@ -89,3 +89,14 @@ DMZ, and removed the zone expectation. `boundary:storefront-dmz` stays in
 is an assumption (change 10), so the replay reads the zone as a placeholder
 and not as a required element. Neither `card-processor` nor `cloud-storage`
 is its alias.
+
+## Ruling of 2026-09-24 (#926): a tier read off contents is inferred
+
+The maintainer ruled in a session that a `data-classification` row states its
+tier only where the source names the tier. Where the source names only what a
+store holds, the tier is an inference from those contents. The rows keep their
+value and their quote, and `reviewed_by` stays the maintainer's.
+
+| `data-classification` row | Before | After |
+|---|---|---|
+| `store:orders-db` | `stated` | `inferred` |
