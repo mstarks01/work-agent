@@ -255,8 +255,9 @@ def support_shares(report: Mapping[str, Any]) -> Mapping[str, float] | None:
     support: the gate that read span validity as support passed a flipped MFA
     answer, a webhook carrying a receipt store's credential and a mechanism
     spelled ``the of and a``. Every row is ``unreviewed`` until a reviewer
-    writes an assessment (ADR 0034), and no threshold on these shares has an
-    acceptance rationale yet — see :data:`PENDING`'s ``support-shares``.
+    writes an assessment (ADR 0034), and no threshold gates these shares: the
+    owner reads them on each reviewed run — see :data:`PENDING`'s
+    ``support-shares``.
 
     Read over every row the record kept, until ``review-population`` freezes
     the rows it should be read over.
@@ -511,10 +512,10 @@ PENDING: Mapping[str, Pending] = MappingProxyType(
             limit="frozen before the first assessment",
             unset=(
                 "`run.py freeze-population` records one and refuses a catalog"
-                " already under review, and none has been frozen: no report of"
-                " a treatment arm is in the tree to freeze. Choosing the settled"
-                " rows after review could drop exactly the unsupported rows the"
-                " measure has to count"
+                " already under review. The gates read reports, not a frozen"
+                " file, so a person confirms which population a review covered."
+                " Choosing the settled rows after review could drop exactly the"
+                " unsupported rows the measure has to count"
             ),
         ),
         "support-shares": Pending(
@@ -526,11 +527,13 @@ PENDING: Mapping[str, Pending] = MappingProxyType(
                 "supported, unsupported, unresolved and unreviewed shares of the"
                 " frozen population, reported together (`support_shares`)"
             ),
-            limit="",
+            limit="none: the owner reads the four shares on each reviewed run",
             unset=(
-                "no row has been assessed, and neither a 10% unsupported nor a"
-                " 20% unresolved ceiling has an acceptance rationale. A limit is"
-                " set from a reason, before the first assessment, or not at all"
+                "a review of the frozen population. Neither a 10% unsupported"
+                " nor a 20% unresolved ceiling had an acceptance rationale, and"
+                " on 2026-09-24, before the first assessment, the owner declared"
+                " no threshold. So this gate never passes by itself: the owner"
+                " reads the shares and decides whether the run is good enough"
             ),
         ),
         "case-diversity": Pending(
