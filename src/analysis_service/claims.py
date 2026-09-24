@@ -1473,10 +1473,10 @@ class UnresolvedReference(BaseModel):
 
 
 #: The reason on an :class:`UnresolvedReference` an element the model holds
-#: earns when it sits more than one hop from every place the claim's grounds
-#: name. Reach belongs in the description; ``affected_element_ids`` is what the
-#: action lands on.
-BEYOND_GROUNDS = "more than one hop from every place the claim's grounds name"
+#: earns when it sits more than two hops from every place the claim's grounds
+#: name (:data:`~analysis_service.fan_in.BOUND_HOPS`). Reach beyond that belongs
+#: in the description; ``affected_element_ids`` is what the action lands on.
+BEYOND_GROUNDS = "more than two hops from every place the claim's grounds name"
 
 
 # How much of a cited ID a mark carries. Exported for the reason
