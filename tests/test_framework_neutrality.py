@@ -254,6 +254,13 @@ DECLARED: dict[str, str] = {
         " compose an identity from an action has a verb equivalence to price; a"
         " package whose claims carry a catalog identifier has no verb and no row."
     ),
+    "evals/harness/descendants.py": (
+        "This code is STRIDE's, through `DraftThreat` and the STRIDE scorer."
+        " It replays the fan-in over a lane's proposed claims and scores them by"
+        " an identity composed from an action and a place, which only a package"
+        " whose lane agents propose an open claim set has; a package whose"
+        " claims carry a catalog identifier scores by applicability instead."
+    ),
     "evals/harness/losses.py": (
         "This code is STRIDE's, through `DraftThreat`, a category and a verb."
         " A miss lost to the verb is a cause only a package whose claims compose"
