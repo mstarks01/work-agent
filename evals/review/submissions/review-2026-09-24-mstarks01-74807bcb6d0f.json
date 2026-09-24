@@ -1,0 +1,44 @@
+{
+  "envelope": 1,
+  "submitted_by": "mstarks01",
+  "submitted_for": "mstarks01",
+  "generated": "2026-09-24",
+  "cases": {
+    "07-cicd-store-deploy": {
+      "own_list": [
+        "An attacker with registry write access substitutes a malicious deployment image, which store servers execute if they do not independently verify its integrity and authorized origin."
+      ],
+      "marks": {
+        "v6:7b7469a4b7b96280": "agree",
+        "v6:816f77f31f0de7c8": "unsure",
+        "v6:2ebaaf584e6f34b6": "unsure",
+        "v6:d44f1be375488b4e": "agree",
+        "v6:afc4fd39ff420892": "agree",
+        "v6:bb598e7101d43411": "agree",
+        "v6:f8a834d6478c16ca": "agree",
+        "v6:c062fd6f3419ddbf": "agree",
+        "v6:6f0861d1925ef03f": "agree",
+        "v6:4fc7a44cc0226b7c": "unsure",
+        "v6:bbd67adca7d7d3a3": "agree",
+        "v6:5f442ddb1be4b70d": "unsure",
+        "v6:cbb4c309fdf2a6c7": "unsure",
+        "v6:aa1341c714da4882": "unsure",
+        "v6:f2707b1404dc6c9d": "unsure",
+        "v6:3aafdcebd1ffe597": "agree",
+        "v6:de77ab4f154ca64d": "agree",
+        "v6:c21fe1f18d6d4b68": "agree",
+        "v6:e37c211b432efcba": "unsure",
+        "v6:1c235619f8a954db": "agree",
+        "v6:5fa4d44678b5f0fd": "agree",
+        "v6:1c0e8500a0b975c8": "unsure"
+      },
+      "missing": [],
+      "notes": "Assembled by Claude Code on 2026-09-24 from the maintainer's reply in a session. It carries the 21 marks of the 2026-09-22 sitting that still bind, re-keyed to each finding's current key, and marks the one finding whose key moved when its place was widened (PR #1183). The maintainer's reason for 'unsure', verbatim: the claim requires registry write access and a replaceable tag; a commit-SHA tag alone establishes neither immutability nor replaceability.",
+      "opened_digests": {
+        "source.md": "1bfb96ef3374b697ef78e76661daa3d2b227792a3b20d2d1ee1d526cde02652c",
+        "model.json": "25e0fe698e23ea38d98c8cd7e80dcef804cea2e27a8e4c09b4c5f65fc1785291",
+        "claims/stride.json": "6670a24c6470c3cad322656989c49c1a0dcaa2d356646ac0b059670679b3e42a"
+      }
+    }
+  }
+}
