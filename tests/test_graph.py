@@ -44,6 +44,7 @@ from analysis_service.claims import (
 )
 from analysis_service.compact import COMPACT_FORMAT
 from analysis_service.critic import CriticOutputError
+from analysis_service.deployment import DEFAULT_PROMPTS_DIR
 from analysis_service.frameworks import (
     PRECONDITION_RESULTS,
     PreconditionError,
@@ -2254,6 +2255,19 @@ class TestALane:
                 if placeholder != "lane"
             }
             assert read == written, lane.lane
+
+    def test_a_lane_reads_the_shared_keys_and_its_own_and_nothing_else(self):
+        """The lane capture keeps these two sets, so they must be the prompt's."""
+        declared = set(
+            re.findall(
+                r"\{([a-z_]+)\}",
+                (DEFAULT_PROMPTS_DIR / "analyze.md").read_text("utf-8"),
+            )
+        )
+
+        assert declared == (
+            set(graph.LANE_ARTIFACTS) | set(graph.LANE_SHARED_KEYS) | {"lane"}
+        )
 
     def test_no_two_lanes_share_a_key(self):
         keys = [

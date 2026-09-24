@@ -227,6 +227,11 @@ class AnalysisRun:
     #: proposal becomes a draft — so without this the lane's own answer to *what
     #: would settle this* cannot be audited after the run (#657).
     proposals: Mapping[FrameworkName, Mapping[str, Any]] = field(default_factory=dict)
+    #: What each lane read, as ``prepare`` rendered it: the job-wide keys once
+    #: and each lane's own artifacts. The proposals say what a lane answered;
+    #: this says what it was asked, so a lane that wrote nothing at a place can
+    #: be read against the leads it had (#1091).
+    lane_material: Mapping[str, Any] = field(default_factory=dict)
     #: The first pass of ``extract`` and what ``repair`` returned, on a graph
     #: that ran them. ``None`` on the analysis mode, which seeds the blessed
     #: model at ``prepare`` and runs neither.
@@ -2337,6 +2342,7 @@ def _report_of(
             name: tuple(graph_run.drafts_of(name)) for name in pipeline.frameworks
         }
         proposals = {name: graph_run.proposals_of(name) for name in pipeline.frameworks}
+        lane_material = graph_run.lane_material(pipeline.frameworks)
         result = graph_run.report(
             job=Job(
                 id=f"eval-{case.id}",
@@ -2356,7 +2362,11 @@ def _report_of(
     if isinstance(result, Rejected):
         raise EvalRunError(f"{case.id}: {_rejection(result)}")
     return AnalysisRun(
-        report=result, drafts=drafts, proposals=proposals, extraction=extraction
+        report=result,
+        drafts=drafts,
+        proposals=proposals,
+        lane_material=lane_material,
+        extraction=extraction,
     )
 
 

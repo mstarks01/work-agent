@@ -19,6 +19,7 @@ from pathlib import Path
 
 import pytest
 
+from analysis_service import graph
 from analysis_service.assertions import (
     ABSENT,
     AssertionCatalog,
@@ -70,12 +71,29 @@ def test_every_finished_case_keeps_a_report(monkeypatch, case, tmp_path):
     written = sorted(path.name for path in reports_dir(out).iterdir())
     assert written == [
         f"{case.id}.drafts.json",
+        f"{case.id}.lanes.json",
         f"{case.id}.proposals.json",
         f"{case.id}.report.json",
         "case-second.drafts.json",
+        "case-second.lanes.json",
         "case-second.proposals.json",
         "case-second.report.json",
     ], "the drafts ride beside the report, because `score` reads both"
+
+
+def test_the_lanes_file_keeps_everything_a_lane_read(monkeypatch, case, tmp_path):
+    """Every key ``analyze.md`` templates, once per job and once per lane (#1091)."""
+    run = sweep(monkeypatch, case, None)
+    out = tmp_path / "artifact.json"
+
+    write_reports(str(out), "analysis", run.runs)
+
+    held = json.loads((reports_dir(out) / f"{case.id}.lanes.json").read_text("utf-8"))
+    assert set(held["shared"]) == set(graph.LANE_SHARED_KEYS)
+    lanes = held["lanes"]["stride"]
+    assert set(lanes) == {lane.lane for lane in graph.FrameworkNodes("stride").lanes}
+    for lane, artifacts in lanes.items():
+        assert set(artifacts) == set(graph.LANE_ARTIFACTS), lane
 
 
 def test_a_persisted_report_carries_what_the_artifact_cannot(
@@ -107,6 +125,7 @@ def test_a_case_that_died_leaves_no_report(monkeypatch, case, tmp_path):
     written = sorted(path.name for path in reports_dir(out).iterdir())
     assert written == [
         "case-second.drafts.json",
+        "case-second.lanes.json",
         "case-second.proposals.json",
         "case-second.report.json",
     ]
