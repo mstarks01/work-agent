@@ -19,6 +19,10 @@ real graph run sent.
 **The prompt files are today's.** The captured material is the run's, and the
 instruction around it is read from this checkout. The command prints both
 commits, and a replay across a prompt change measures that change.
+
+**One extra user part, on request.** ``--append`` sends a file's text as a
+second part of the user turn, after the captured input. ADR 0030's measurement
+tries its instruction this way, so both of its arms read the same prompt files.
 """
 
 from __future__ import annotations
@@ -117,11 +121,14 @@ async def replay(
     call: NodeCall,
     package_loader: MarkdownLoader,
     prompt_loader: MarkdownLoader,
+    appended: str | None = None,
 ) -> BaseModel:
-    """One lane's request sent again, and its answer parsed."""
+    """One lane's request sent again, with ``appended`` as a last user part."""
     instruction, turn = await compose(
         material, framework, lane_name, package_loader, prompt_loader
     )
+    if appended is not None:
+        turn.parts = [*(turn.parts or []), types.Part(text=appended)]
     return parse(await call(instruction, turn), framework)
 
 
@@ -137,6 +144,11 @@ def arguments(parser: argparse.ArgumentParser) -> None:
         required=True,
         help="required: naming it is your consent to one paid lane call. The"
         " amount, or 'unknown' on a route that prices nothing before the call",
+    )
+    parser.add_argument(
+        "--append",
+        type=Path,
+        help="a text file sent as one more user part, after the captured input",
     )
     parser.add_argument("--out", type=Path, help="write the lane's proposals here")
 
@@ -169,6 +181,7 @@ def command_lane_replay(args: argparse.Namespace) -> int:
             call,
             MarkdownLoader(REPO_ROOT / "frameworks" / args.framework),
             MarkdownLoader(REPO_ROOT / "prompts"),
+            args.append.read_text(encoding="utf-8") if args.append else None,
         )
     )
     dumped = batch.model_dump(mode="json")
