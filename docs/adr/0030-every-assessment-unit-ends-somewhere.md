@@ -92,7 +92,8 @@ already is, and it recovers nothing.
 One sweep on the current tree without the instruction, then one pass of the
 lanes that hold a missed must-find with it, both on the strong tier, read row
 by row and by meaning. The sweep captures `<case>.lanes.json` for every case, so the
-second arm is a `lane-replay` of each captured request. The reading states:
+second arm is a `lane-replay --append` of each captured request, with the
+instruction as the appended part. The reading states:
 
 - the must-finds the instruction recovers, against the band for those rows;
 - the drafts it adds, and how many of them any reference or vote accepts;

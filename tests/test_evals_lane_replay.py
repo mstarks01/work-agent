@@ -81,6 +81,36 @@ def test_a_replay_parses_the_answer_under_the_package_schema(recorded, case):  #
     assert len(asked) == 1, "one lane, one call"
 
 
+def test_an_appended_part_follows_the_captured_turn(recorded, case):  # noqa: F811
+    out, _ = recorded
+    material = lane_replay.load_material(out, case.id)
+    _, captured = asyncio.run(
+        lane_replay.compose(
+            material, "stride", "spoofing", PACKAGE_LOADER, PROMPT_LOADER
+        )
+    )
+    sent: list = []
+
+    async def call(instruction, turn):
+        sent.append(turn)
+        return json.dumps({"claims": []})
+
+    asyncio.run(
+        lane_replay.replay(
+            material,
+            "stride",
+            "spoofing",
+            call,
+            PACKAGE_LOADER,
+            PROMPT_LOADER,
+            "Address every lead.",
+        )
+    )
+
+    assert sent[0].parts[:-1] == captured.parts
+    assert sent[0].parts[-1].text == "Address every lead."
+
+
 def test_an_answer_outside_the_schema_is_refused(recorded, case):  # noqa: F811
     out, _ = recorded
     material = lane_replay.load_material(out, case.id)
