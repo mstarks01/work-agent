@@ -1,12 +1,14 @@
 # 30. Every assessment unit ends somewhere
 
-- **Status**: proposed, priced on the first Baseline below
-- **Date**: 2026-09-09
+- **Status**: proposed. The decision waits on one measurement, named at the
+  end of this record, and ships measured or not at all.
+- **Date**: 2026-09-09; amended 2026-09-25
 - **Effort**: [#739 — a bounded coverage pass that recovers what a lane omitted](https://github.com/mstarks01/work-agent/issues/739),
   finding 4 of the audit on [#732](https://github.com/mstarks01/work-agent/issues/732)
 - **Builds on**: [ADR 0026](0026-coverage-is-per-framework.md), which counts
   what a lane cited; [ADR 0028](0028-a-draft-states-its-direction.md), which
   gives an ASVS draft a direction
+- **Measured in**: `QA-2026-09-24-03-E1` and `-E2`, `QA-2026-09-25-01-E8`
 
 ## Context
 
@@ -15,116 +17,85 @@ claim the lanes missed, move a misfiled one, or improve one; the re-ask repairs
 malformed rulings only. So one enumeration by one lane agent is the only
 discovery opportunity a job has, and a valid but short answer ends the search.
 
-The first STRIDE Baseline charges 55 of its 131 misses to `place`, a candidate
-rule led the lane to the elements and nothing was drafted, and 28 to `unled`,
-33 of the 83 must-finds. The coverage instrument counts citations against what
-the lane was offered, and its own docstring says a lane that cleared a flow and
-one that skipped it look alike. Nothing reads that count back into the run.
+A lane is offered **assessment units**, which are its own package's. For a
+package whose claims compose an identity from an action and a place, a unit is
+one **candidate** or one **boundary crossing** in one lane, never every
+element: the first Baseline offered each STRIDE lane 223 elements and the lanes
+cited about half, so a unit per element is a second pass by another name. For a
+package whose claims rule on a catalog, the neutral `units_for` hook already
+names them: the selected requirements.
+
+A lane leaves many units unanswered. On Baseline 6bff717, 153 of 324 candidates
+and 111 of 258 crossings are cited by no draft, summed over lanes, about 20
+units a case. The coverage instrument counts this, and its own docstring says a
+lane that cleared a unit and one that skipped it look alike.
 
 ## Decision
 
-**A lane answers for every assessment unit it was offered, and a unit with no
-answer is asked about once more, bounded.**
+**A lane addresses every assessment unit it is offered, in its first call, and
+files a finding that holds only if an open fact is true as a conditional
+draft.** The lane request states this in one instruction. A unit ends either in
+a claim that cites it or in the lane's judgement that the sources settle
+against a finding there; the second leaves no record.
 
-**An assessment unit is the package's own.** The neutral `units_for` hook
-already names them for a package whose claims rule on a catalog: the selected
-requirements. For a package whose claims compose an identity from an action
-and a place, a unit is one **candidate** or one **boundary crossing** in one
-lane, never every element: the first Baseline offered each STRIDE lane 223
-elements and the lanes cited about half, so a unit per element makes the
-second call a second pass. Candidates and crossings are what the lane's rules
-led it to, and both come out of what the graph already computes for the
-coverage instrument, so no table is added.
-
-**A unit ends one of three ways.** A **Claim** cites it; a **Cleared** mark
-names it with one sentence of why nothing follows, which the lane writes in
-a list beside its drafts; or a **Prerequisite** names it with the unknown that
-blocks a ruling, which for an ASVS lane is a `question` and for a STRIDE lane a
-conditional draft. A unit that ends none of these ways is **unanswered**, and
-the fan-in computes that set in code from the lane's own output.
-
-**The unanswered units get one bounded second call per lane.** The call
-carries the model, the lane's first drafts as context it must not repeat, and
-the unanswered units only. It may add drafts and marks and may change nothing
-it was given. Its size is bounded by the unanswered count, and a lane whose
-first pass answered everything makes no second call. The critic reads the
-union, as it does today.
-
-**A cleared unit is recorded, never scored as a hit.** The coverage block
-gains a `cleared` count beside `cited`. A cleared mark proves attention, not
-correctness, and the recall instruments read claims alone.
+This is a rule for the lane's first and only call. No second call follows, and
+no list of cleared units is written. The critic reads the drafts as it does
+today, and an open fact makes a draft conditional, never rejected.
 
 ## Consequences
 
-**Recall recovery has a mechanism.** The `place` and `unled` rows are the
-units this pass asks about a second time. The ceiling is those rows' must-find
-count, 33 on the first Baseline, and it is priced before any run as
-`AGENTS.md` requires.
+**Recall rises on the leads the lane passed by.** One pass of twelve captured
+lane requests with the instruction added wrote 4 of 13 must-finds the archived
+runs lost, against none archived (`-E8`). Two of the four had never appeared in
+any earlier run: case 07 ref 1 in the reference's direction, and case 12 ref 14.
 
-**Cost rises by the unanswered count.** On a lane that answers most of what it
-is offered the second call is small; on a sparse case it can approach a
-second pass. The bound is measured, not chosen: the first paid run records
-the unanswered count per lane, and the cap is set from it.
+**Output rises with it.** The same twelve lanes wrote 59 drafts with the
+instruction and 26 without. Each extra draft is work for the critic and for a
+reviewer, and nothing yet measures how many of them are real. The rule is
+adopted only where its recall gain clears the band at a draft cost the
+measurement below states.
 
-**The lane prompt grows one list.** `cleared` beside `claims`, one sentence per
-unit, and the field-count lint holds the contract to the schema.
-
-**A model can clear a unit it never read.** A cleared mark is a sentence a
-model writes, and this record trusts it exactly as far as the coverage
-docstring trusts a citation: as attention, not as an assessment. The reader
-sees the sentence.
+**The rule changes a prompt that every lane reads.** Two plausible prompt edits
+in this repository measured worse at corpus level. That is why the measurement
+below reads the whole corpus rather than the rows the instruction was tried on.
 
 ## Alternatives considered
 
-**Repeat the whole lane prompt at the same cost.** The control this record
-must beat: two full passes merged. It is the audit's own condition, and the
-first measurement runs both.
+**A bounded second call on the unanswered units.** One more call per lane,
+carrying the lane's first drafts and the units no draft cited, asking for new
+drafts only. Rejected on measurement. The ceiling is 8 must-finds, the ones
+whose place sits on an unanswered unit at the scorer's grain, not the 33 a
+count of every `place` and `unled` row suggested (`QA-2026-09-24-03-E1`).
+Against a plain repeat of the lane at the same cost, the second call won on 1
+row of 4 and tied on 3 (`-E2`). It recovers a miss that is chance, which a
+repeat also recovers. It does not change a place or a direction the lane chooses
+every time.
+
+**A `cleared` mark per unit.** One sentence per unit on why nothing follows,
+counted beside `cited` in coverage and never scored. Not adopted. A cleared mark
+proves attention and not correctness, it adds output to every lane call, and
+nothing measured shows it recovers a finding.
+
+**Repeat the whole lane prompt.** Two full passes merged. It recovers the same
+chance misses as the second call at twice the lane cost, and it is the control
+the second call failed to beat.
 
 **Let the critic add findings.** Rejected: the critic prompt's first rule is
-that it rules and does not write, and a critic that writes is a third lane
-with no candidates and no exemplars.
+that it rules and does not write, and a critic that writes is a third lane with
+no candidates and no exemplars.
 
-**A structural lint on coverage.** Rejected: it is what the coverage
-instrument already is, and it recovers nothing.
-
-## Priced on the first Baseline
-
-Offline, 2026-09-09, over `d4edd64-gpt-5.6-terra-fd1c49af`. Units unanswered
-today, across 13 cases: 121 of 323 candidates and 85 of 258 crossings were
-cited by no draft, about 16 units per case across six lanes. Elements: 555
-of 1,338, which is why an element is not a unit. What the pass can recover,
-by lane, from the `place` and `unled` rows:
-
-| lane | place | unled | must-find |
-|---|---:|---:|---:|
-| elevation-of-privilege | 6 | 13 | 13 |
-| tampering | 11 | 3 | 6 |
-| denial-of-service | 16 | 4 | 6 |
-| repudiation | 8 | 4 | 5 |
-| spoofing | 6 | 3 | 2 |
-| information-disclosure | 8 | 1 | 1 |
-
-Ceiling 33 must-finds of 129, and the elevation lane holds 13 of them. The
-ceiling is a price and not a bound, as `evals/TUNING.md` step 3 says.
-
-## Priced again on Baseline 6bff717
-
-Offline, 2026-09-24, in `QA-2026-09-24-03-E1`. The table above counts every
-`place` and `unled` row, but the second call reaches only a must-find whose
-place sits on a unit no draft cited. Of the 25 such must-finds on 6bff717, 8
-sit on an unanswered unit at the scorer's grain. 10 share only one element with
-one, and 7 have none near them. So the ceiling is 8 must-finds.
-
-`QA-2026-09-24-03-E2` then compared a prototype second call with a plain
-repeat, three calls a side on four must-finds in cases 01 and 07. The second
-call won on one row, tied on three, and cost about the same as a repeat. It
-recovered a miss that was variance. It did not change a place or a direction
-that the lane chose every time.
+**A structural lint on coverage.** Rejected: it is what the coverage instrument
+already is, and it recovers nothing.
 
 ## Measurement before acceptance
 
-Five runs of case 01 each way against the control, reading matched and
-must-find counts, the unanswered count per lane, the cleared count, the
-unlisted count and the cost. The runs wait on spend approval, and the code
-waits on the runs: a second call on every lane is a cost every job pays, and
-it ships measured or not at all.
+One sweep on the current tree without the instruction, then one pass of the
+lanes that hold a missed must-find with it, both on the strong tier, read row
+by row and by meaning. The sweep captures `<case>.lanes.json` for every case, so the
+second arm is a `lane-replay` of each captured request. The reading states:
+
+- the must-finds the instruction recovers, against the band for those rows;
+- the drafts it adds, and how many of them any reference or vote accepts;
+- the lane cost, from the charges the provider reports.
+
+If the gain does not clear the band, this record is rejected.
