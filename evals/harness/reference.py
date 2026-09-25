@@ -64,7 +64,7 @@ from analysis_service.claims import (
     derive_severity_level,
 )
 from analysis_service.frameworks.asvs.record import AsvsChapter
-from analysis_service.frameworks.stride.record import StrideCategory
+from analysis_service.frameworks.stride.record import LANES_OF_VERB, StrideCategory
 from analysis_service.markdown_loader import RESOLVE_ERRORS
 from analysis_service.sources import MAX_LABEL_CHARS, Source, SourceKind
 from analysis_service.system_model import DataFlow, SystemModel
@@ -96,6 +96,11 @@ CASE_FILES = ("source.md", "model.json", "case.json")
 
 #: Where one framework's reference records live inside a case.
 CLAIMS_DIR = "claims"
+
+#: The signed readings a person ruled answer a reference claim as well as its
+#: own. Optional, and outside a sitting's opened files, so a ruling given
+#: after a case was read leaves the case read.
+RULINGS_FILE = "rulings.json"
 
 
 class CorpusError(ValueError):
@@ -219,6 +224,56 @@ class ReferenceThreat(ReferenceClaim):
         return self.category
 
     severity: ReferenceSeverity
+
+
+class Reading(BaseModel):
+    """One verb and one place a STRIDE claim can be written at."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    verb: str
+    affected_element_ids: tuple[str, ...] = Field(min_length=1)
+
+    @field_validator("verb")
+    @classmethod
+    def _known_verb(cls, value: str) -> str:
+        return check_verb(value)
+
+
+class RuledReading(BaseModel):
+    """A second reading of one STRIDE reference claim, and who ruled it.
+
+    A reference claim holds one verb and one place. A draft that states the
+    same finding at a neighbouring place, or with a neighbouring verb, misses it
+    although a person reading both says they are one finding. This record is
+    that person's ruling: ``reference`` names the claim by its own lane, verb
+    and place as they read today, and ``also_acceptable`` is the reading the
+    scorer accepts beside it.
+
+    **The claim is named by its material, not by a key derived from it.** A
+    fingerprint is versioned, and a ruling keyed by one would strand at the next
+    version. The lane, verb and place are the claim's own fields, so a reworded
+    claim keeps its ruling and a claim whose place or verb changes fails the
+    load, because the ruling was about the claim as it was.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    lane: StrideCategory
+    reference: Reading
+    also_acceptable: Reading
+    ruling: str = Field(min_length=1, max_length=1000)
+    reviewed_by: str = Field(min_length=1, max_length=100)
+    source: str = Field(min_length=1, max_length=300)
+
+
+class CaseRulings(BaseModel):
+    """One case's :data:`RULINGS_FILE`, keyed by framework."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    case: str
+    stride: tuple[RuledReading, ...] = ()
 
 
 #: What a case expects the service to conclude about one requirement it applies.
@@ -583,6 +638,8 @@ class GoldenCase:
     sources: tuple[Source, ...]
     model: SystemModel
     references: Mapping[FrameworkName, tuple[ReferenceClaim, ...]]
+    #: STRIDE reference index -> the ruled readings it also accepts.
+    ruled_readings: Mapping[int, tuple[Reading, ...]] = MappingProxyType({})
 
     @property
     def id(self) -> str:
@@ -636,6 +693,24 @@ class GoldenCase:
                 f"{self.id}: stride references did not load as ReferenceThreat"
             )
         return narrowed
+
+    def stride_readings(
+        self, index: int
+    ) -> tuple[tuple[str | None, tuple[str, ...]], ...]:
+        """Every verb and place STRIDE reference ``index`` accepts, its own first.
+
+        **The one reader of "what may answer this reference".** The scorer's
+        in-lane pass and its cross-lane pass both ask it, so a ruled reading
+        cannot count in one pass and be missing from the other.
+        """
+        reference = self.stride_claims()[index]
+        return (
+            (reference.verb, reference.affected_element_ids),
+            *(
+                (reading.verb, reading.affected_element_ids)
+                for reading in self.ruled_readings.get(index, ())
+            ),
+        )
 
     @property
     def source_text(self) -> str:
@@ -786,17 +861,67 @@ def load_case(case_dir: Path | str) -> GoldenCase:
         )
 
     model = _load_model(case_dir)
+    references = {
+        declared.name: _load_references(case_dir, declared.name, model)
+        for declared in meta.frameworks
+    }
     return GoldenCase(
         meta=meta,
         sources=_load_sources(case_dir, meta),
         model=model,
-        references=MappingProxyType(
-            {
-                declared.name: _load_references(case_dir, declared.name, model)
-                for declared in meta.frameworks
-            }
-        ),
+        references=MappingProxyType(references),
+        ruled_readings=_load_rulings(case_dir, model, references.get("stride", ())),
     )
+
+
+def _load_rulings(
+    case_dir: Path, model: SystemModel, references: Sequence[ReferenceClaim]
+) -> Mapping[int, tuple[Reading, ...]]:
+    """The case's ruled readings by reference index, or a corpus error.
+
+    Fails closed on each way a ruling can stop meaning what it was ruled on: a
+    reference that no longer reads as it did, an element the model does not
+    carry, and a verb the lane does not admit. The last is
+    :data:`~analysis_service.frameworks.stride.record.LANES_OF_VERB`, the table
+    the service files drafts by, so a ruling cannot accept a draft the service
+    itself would refuse.
+    """
+    path = case_dir / RULINGS_FILE
+    if not path.is_file():
+        return MappingProxyType({})
+    try:
+        rulings = CaseRulings.model_validate(_read_json(path))
+    except ValidationError as exc:
+        raise CorpusError(f"{case_dir.name}: {RULINGS_FILE}: {exc}") from exc
+    if rulings.case != case_dir.name:
+        raise CorpusError(
+            f"{case_dir.name}: {RULINGS_FILE} names case {rulings.case!r}"
+        )
+    known_ids = {element.id for element in model.elements()}
+    readings: dict[int, tuple[Reading, ...]] = {}
+    for number, ruled in enumerate(rulings.stride):
+        where = f"{case_dir.name}: {RULINGS_FILE} stride ruling {number}"
+        named = [
+            index
+            for index, claim in enumerate(references)
+            if claim.lane == ruled.lane
+            and claim.verb == ruled.reference.verb
+            and set(claim.affected_element_ids)
+            == set(ruled.reference.affected_element_ids)
+        ]
+        if len(named) != 1:
+            raise CorpusError(
+                f"{where} names {len(named)} reference claims; it must name"
+                " exactly one by its lane, verb and place as they read today"
+            )
+        alternate = ruled.also_acceptable
+        dangling = sorted(set(alternate.affected_element_ids) - known_ids)
+        if dangling:
+            raise CorpusError(f"{where} cites {', '.join(dangling)}, not in the model")
+        if ruled.lane not in LANES_OF_VERB[alternate.verb]:
+            raise CorpusError(f"{where}: {alternate.verb!r} is not a {ruled.lane} verb")
+        readings[named[0]] = (*readings.get(named[0], ()), alternate)
+    return MappingProxyType(readings)
 
 
 #: The most a single corpus source may read. The largest source this repository

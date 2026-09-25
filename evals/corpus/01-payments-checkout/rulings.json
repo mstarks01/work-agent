@@ -1,0 +1,26 @@
+{
+  "case": "01-payments-checkout",
+  "stride": [
+    {
+      "lane": "repudiation",
+      "reference": {
+        "verb": "unattributable",
+        "affected_element_ids": [
+          "store:receipt-archive",
+          "entity:shopper"
+        ]
+      },
+      "also_acceptable": {
+        "verb": "unattributable",
+        "affected_element_ids": [
+          "entity:shopper",
+          "process:storefront-api",
+          "flow:entity:shopper>process:storefront-api>place-order"
+        ]
+      },
+      "ruling": "Both describe missing shopper attribution in receipts that identify only the order service; the draft appropriately makes missing identity retention conditional.",
+      "reviewed_by": "mstarks01",
+      "source": "QA-2026-09-25-01 near-miss ballot row 14: #739 second call r1"
+    }
+  ]
+}

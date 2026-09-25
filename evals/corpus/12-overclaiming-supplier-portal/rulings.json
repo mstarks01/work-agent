@@ -1,0 +1,45 @@
+{
+  "case": "12-overclaiming-supplier-portal",
+  "stride": [
+    {
+      "lane": "tampering",
+      "reference": {
+        "verb": "alter",
+        "affected_element_ids": [
+          "store:landing-bucket",
+          "flow:process:supplier-master-service>store:landing-bucket>load-extract"
+        ]
+      },
+      "also_acceptable": {
+        "verb": "plant",
+        "affected_element_ids": [
+          "flow:entity:portal-vendor>store:landing-bucket>push-nightly-extract",
+          "store:landing-bucket"
+        ]
+      },
+      "ruling": "Both describe a modified landing-bucket extract becoming authoritative supplier records; the upload path and plant wording are acceptable.",
+      "reviewed_by": "mstarks01",
+      "source": "QA-2026-09-25-01 near-miss ballot row 7: baseline 6bff717 T-01"
+    },
+    {
+      "lane": "denial-of-service",
+      "reference": {
+        "verb": "disable",
+        "affected_element_ids": [
+          "store:landing-bucket",
+          "process:supplier-master-service"
+        ]
+      },
+      "also_acceptable": {
+        "verb": "flood",
+        "affected_element_ids": [
+          "store:landing-bucket",
+          "flow:entity:portal-vendor>store:landing-bucket>push-nightly-extract"
+        ]
+      },
+      "ruling": "Flooding supplies a specific mechanism for preventing the nightly load and leaving supplier data stale; the draft explicitly describes that consequence.",
+      "reviewed_by": "mstarks01",
+      "source": "QA-2026-09-25-01 near-miss ballot row 8: baseline 6bff717 D-02"
+    }
+  ]
+}

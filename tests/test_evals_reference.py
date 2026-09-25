@@ -388,3 +388,57 @@ class TestTheFlowMapServesTheCitationsItIsAskedAbout:
         assert [case.id for case in corpus[1:]]
         for case in corpus[1:]:
             assert widened[case.id] == bare[case.id]
+
+
+#: A shipped case whose rulings file names reference 5.
+RULED_CASE = "02-iot-fleet-telemetry"
+
+
+def _ruled_case(tmp_path: Path, edit=lambda rulings: None) -> Path:
+    case_dir = _copy_case(CORPUS_DIR / RULED_CASE, tmp_path)
+    rulings = json.loads((CORPUS_DIR / RULED_CASE / "rulings.json").read_text())
+    edit(rulings)
+    (case_dir / "rulings.json").write_text(json.dumps(rulings))
+    return case_dir
+
+
+def test_a_ruled_reading_loads_beside_the_claim_it_names(tmp_path):
+    case = load_case(_ruled_case(tmp_path))
+    claim = case.stride_claims()[5]
+    readings = case.stride_readings(5)
+    assert readings[0] == (claim.verb, claim.affected_element_ids)
+    assert len(readings) == 2
+
+
+def test_a_case_without_rulings_reads_its_claims_alone(tmp_path):
+    case = load_case(_copy_case(CORPUS_DIR / RULED_CASE, tmp_path))
+    assert case.stride_readings(5) == (
+        (case.stride_claims()[5].verb, case.stride_claims()[5].affected_element_ids),
+    )
+
+
+@pytest.mark.parametrize(
+    ("edit", "message"),
+    [
+        (
+            lambda r: r["stride"][0]["reference"].update(verb="read"),
+            "names 0 reference claims",
+        ),
+        (
+            lambda r: r["stride"][0]["also_acceptable"].update(
+                affected_element_ids=["process:does-not-exist"]
+            ),
+            "not in the model",
+        ),
+        (
+            lambda r: r["stride"][0]["also_acceptable"].update(verb="flood"),
+            "is not a repudiation verb",
+        ),
+        (lambda r: r.update(case="01-payments-checkout"), "names case"),
+        (lambda r: r.update(asvs=[]), "rulings.json"),
+    ],
+    ids=["claim-moved", "dangling-element", "verb-outside-lane", "wrong-case", "asvs"],
+)
+def test_a_ruling_that_no_longer_fits_its_claim_fails_closed(tmp_path, edit, message):
+    with pytest.raises(CorpusError, match=message):
+        load_case(_ruled_case(tmp_path, edit))

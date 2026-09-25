@@ -1,0 +1,25 @@
+{
+  "case": "11-sparse-shift-scheduling",
+  "stride": [
+    {
+      "lane": "tampering",
+      "reference": {
+        "verb": "alter",
+        "affected_element_ids": [
+          "store:file-share",
+          "flow:entity:payroll-system>store:file-share>collect-payroll-export"
+        ]
+      },
+      "also_acceptable": {
+        "verb": "alter",
+        "affected_element_ids": [
+          "store:file-share",
+          "flow:process:scheduling-service>store:file-share>write-payroll-export"
+        ]
+      },
+      "ruling": "Both describe alteration of the stored payroll export before collection; the write path is acceptable.",
+      "reviewed_by": "mstarks01",
+      "source": "QA-2026-09-25-01 near-miss ballot row 6: baseline 6bff717 T-03"
+    }
+  ]
+}
