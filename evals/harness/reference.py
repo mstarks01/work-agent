@@ -240,15 +240,21 @@ class Reading(BaseModel):
         return check_verb(value)
 
 
+#: A person's answer on whether a second reading states a claim's finding.
+RulingVerdict = Literal["same", "different"]
+
+
 class RuledReading(BaseModel):
-    """A second reading of one STRIDE reference claim, and who ruled it.
+    """A second reading of one STRIDE reference claim, and who ruled on it.
 
     A reference claim holds one verb and one place. A draft that states the
     same finding at a neighbouring place, or with a neighbouring verb, misses it
     although a person reading both says they are one finding. This record is
     that person's ruling: ``reference`` names the claim by its own lane, verb
-    and place as they read today, and ``also_acceptable`` is the reading the
-    scorer accepts beside it.
+    and place as they read today, ``reading`` is the verb and place a draft
+    wrote, and ``verdict`` says whether the two are one finding. The scorer
+    accepts a ``same`` reading beside the claim's own. A ``different`` one
+    changes no score; it is kept so the question is not asked again.
 
     **The claim is named by its material, not by a key derived from it.** A
     fingerprint is versioned, and a ruling keyed by one would strand at the next
@@ -261,7 +267,8 @@ class RuledReading(BaseModel):
 
     lane: StrideCategory
     reference: Reading
-    also_acceptable: Reading
+    reading: Reading
+    verdict: RulingVerdict
     ruling: str = Field(min_length=1, max_length=1000)
     reviewed_by: str = Field(min_length=1, max_length=100)
     source: str = Field(min_length=1, max_length=300)
@@ -638,8 +645,10 @@ class GoldenCase:
     sources: tuple[Source, ...]
     model: SystemModel
     references: Mapping[FrameworkName, tuple[ReferenceClaim, ...]]
-    #: STRIDE reference index -> the ruled readings it also accepts.
+    #: STRIDE reference index -> the readings a person ruled it also accepts.
     ruled_readings: Mapping[int, tuple[Reading, ...]] = MappingProxyType({})
+    #: STRIDE reference index -> the readings a person ruled a different finding.
+    refused_readings: Mapping[int, tuple[Reading, ...]] = MappingProxyType({})
 
     @property
     def id(self) -> str:
@@ -870,14 +879,17 @@ def load_case(case_dir: Path | str) -> GoldenCase:
         sources=_load_sources(case_dir, meta),
         model=model,
         references=MappingProxyType(references),
-        ruled_readings=_load_rulings(case_dir, model, references.get("stride", ())),
+        **_load_rulings(case_dir, model, references.get("stride", ())),
     )
 
 
 def _load_rulings(
     case_dir: Path, model: SystemModel, references: Sequence[ReferenceClaim]
-) -> Mapping[int, tuple[Reading, ...]]:
-    """The case's ruled readings by reference index, or a corpus error.
+) -> dict[str, Mapping[int, tuple[Reading, ...]]]:
+    """The case's ruled readings by verdict and reference index, or an error.
+
+    Returns the two :class:`GoldenCase` fields, ``ruled_readings`` for the
+    ``same`` verdicts and ``refused_readings`` for the ``different`` ones.
 
     Fails closed on each way a ruling can stop meaning what it was ruled on: a
     reference that no longer reads as it did, an element the model does not
@@ -886,9 +898,10 @@ def _load_rulings(
     the service files drafts by, so a ruling cannot accept a draft the service
     itself would refuse.
     """
+    fields = {"same": "ruled_readings", "different": "refused_readings"}
     path = case_dir / RULINGS_FILE
     if not path.is_file():
-        return MappingProxyType({})
+        return {field: MappingProxyType({}) for field in fields.values()}
     try:
         rulings = CaseRulings.model_validate(_read_json(path))
     except ValidationError as exc:
@@ -898,7 +911,9 @@ def _load_rulings(
             f"{case_dir.name}: {RULINGS_FILE} names case {rulings.case!r}"
         )
     known_ids = {element.id for element in model.elements()}
-    readings: dict[int, tuple[Reading, ...]] = {}
+    readings: dict[str, dict[int, tuple[Reading, ...]]] = {
+        verdict: {} for verdict in fields
+    }
     for number, ruled in enumerate(rulings.stride):
         where = f"{case_dir.name}: {RULINGS_FILE} stride ruling {number}"
         named = [
@@ -914,14 +929,19 @@ def _load_rulings(
                 f"{where} names {len(named)} reference claims; it must name"
                 " exactly one by its lane, verb and place as they read today"
             )
-        alternate = ruled.also_acceptable
+        alternate = ruled.reading
         dangling = sorted(set(alternate.affected_element_ids) - known_ids)
         if dangling:
             raise CorpusError(f"{where} cites {', '.join(dangling)}, not in the model")
-        if ruled.lane not in LANES_OF_VERB[alternate.verb]:
+        # Only an accepted reading must be one the service could file: a
+        # refused one accepts nothing, and records what a lane actually wrote.
+        if ruled.verdict == "same" and ruled.lane not in LANES_OF_VERB[alternate.verb]:
             raise CorpusError(f"{where}: {alternate.verb!r} is not a {ruled.lane} verb")
-        readings[named[0]] = (*readings.get(named[0], ()), alternate)
-    return MappingProxyType(readings)
+        by_index = readings[ruled.verdict]
+        by_index[named[0]] = (*by_index.get(named[0], ()), alternate)
+    return {
+        field: MappingProxyType(readings[verdict]) for verdict, field in fields.items()
+    }
 
 
 #: The most a single corpus source may read. The largest source this repository

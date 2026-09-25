@@ -1,0 +1,26 @@
+{
+  "case": "09-cookbook-sokify-retail",
+  "stride": [
+    {
+      "lane": "elevation-of-privilege",
+      "reference": {
+        "verb": "escalate",
+        "affected_element_ids": [
+          "entity:customer",
+          "process:web-api"
+        ]
+      },
+      "reading": {
+        "verb": "escalate",
+        "affected_element_ids": [
+          "process:web-api",
+          "flow:process:mobile-app>process:web-api>api-traffic"
+        ]
+      },
+      "verdict": "different",
+      "ruling": "The reference concerns gaining catalogue-management authority; the draft concerns access to other customers' records.",
+      "reviewed_by": "mstarks01",
+      "source": "QA-2026-09-25-01-near-miss-ballot-1 row 5: baseline 6bff717 E-01"
+    }
+  ]
+}

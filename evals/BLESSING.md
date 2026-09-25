@@ -578,9 +578,22 @@ that gate rather than passing it, so no figure can rest on a draft.
 
 A STRIDE reference claim holds one verb and one place. A lane can state the
 same finding with a neighbouring verb, or at a neighbouring place, and the
-scorer then counts the claim as missed. When a person reads both and rules
-that they are one finding, record the ruling in `rulings.json` beside
-`model.json`:
+scorer then counts the claim as missed. Only a person reading both can say
+whether they are one finding.
+
+After a sweep, write the question as a ballot and record the answers:
+
+```bash
+uv run python -m evals.harness.run near-misses <artifact> --out ballot.csv
+uv run python -m evals.harness.run near-miss-rulings ballot.csv returned.csv --reviewed-by <login>
+```
+
+The ballot asks only where a ruling can move the figure: a same-lane draft
+beside a missed must-find that matched nothing of its own, that nobody voted
+down, and whose reading nobody ruled on. Fill `verdict` with `same`,
+`different` or `unsure`, and give a reason in `note` for the first two.
+`near-miss-rulings` writes each `same` and `different` answer into
+`rulings.json` beside `model.json`:
 
 ```json
 {
@@ -589,7 +602,8 @@ that they are one finding, record the ruling in `rulings.json` beside
     {
       "lane": "repudiation",
       "reference": {"verb": "unattributable", "affected_element_ids": ["..."]},
-      "also_acceptable": {"verb": "unattributable", "affected_element_ids": ["..."]},
+      "reading": {"verb": "unattributable", "affected_element_ids": ["..."]},
+      "verdict": "same",
       "ruling": "Why the two are one finding, in the reader's words.",
       "reviewed_by": "<login>",
       "source": "where the ruling was made"
@@ -599,8 +613,10 @@ that they are one finding, record the ruling in `rulings.json` beside
 ```
 
 `reference` names the claim by its own lane, verb and place, as they read
-now. `also_acceptable` is the reading the scorer accepts beside the claim's
-own. The scorer tries the claim's own reading first, and a match on the ruled
+now. `reading` is the verb and place a draft wrote. The scorer accepts a
+`same` reading beside the claim's own. A `different` reading changes no score,
+and it is kept so the next ballot does not ask the same question again. An
+`unsure` answer records nothing. The scorer tries the claim's own reading first, and a match on the ruled
 reading says so in its rationale.
 
 A ruling only adds a reading, so no draft that matched before can stop
@@ -608,8 +624,8 @@ matching. The scorer assigns every match the claims' own readings make
 first, and a ruled reading may then take only a claim still unmatched, with
 a draft still free. So a ruling on one claim cannot take a draft that
 another claim matched as written. The loader refuses a ruling that names no claim, or more than one.
-It also refuses an element the model does not carry, and a verb the lane
-does not admit. So a ruling fails loudly when its claim's place or verb
+It also refuses an element the model does not carry, and, for a `same`
+reading, a verb the lane does not admit. So a ruling fails loudly when its claim's place or verb
 changes, and a reword keeps it.
 
 The file is not one of the files a sitting opens, so a ruling does not un-read

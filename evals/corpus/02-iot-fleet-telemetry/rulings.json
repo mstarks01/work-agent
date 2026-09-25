@@ -10,7 +10,7 @@
           "store:telemetry-lake"
         ]
       },
-      "also_acceptable": {
+      "reading": {
         "verb": "unattributable",
         "affected_element_ids": [
           "entity:sensor-node",
@@ -18,9 +18,31 @@
           "flow:entity:sensor-node>process:device-gateway>publish-readings"
         ]
       },
+      "verdict": "same",
       "ruling": "Both describe disputed readings that shared fleet authentication cannot attribute to an individual node; the gateway filing is acceptable.",
       "reviewed_by": "mstarks01",
       "source": "QA-2026-09-25-01 near-miss ballot row 2: baseline 6bff717 R-01"
+    },
+    {
+      "lane": "tampering",
+      "reference": {
+        "verb": "plant",
+        "affected_element_ids": [
+          "store:firmware-bucket",
+          "entity:sensor-node"
+        ]
+      },
+      "reading": {
+        "verb": "forge",
+        "affected_element_ids": [
+          "flow:entity:sensor-node>process:device-gateway>publish-readings",
+          "process:device-gateway"
+        ]
+      },
+      "verdict": "different",
+      "ruling": "Firmware replacement and forged telemetry are different attacks on different assets.",
+      "reviewed_by": "mstarks01",
+      "source": "QA-2026-09-25-01-near-miss-ballot-1 row 1: baseline 6bff717 T-01"
     }
   ]
 }
