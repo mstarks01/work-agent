@@ -164,8 +164,8 @@ the reviewer model sees them.
 
 The **critic** is the reviewer model for one framework. It sees that framework's
 drafts together and judges what code cannot decide from structure alone. It can
-reject unsupported or misfiled drafts, identify duplicates, and calibrate the
-fields that framework owns, such as STRIDE severity.
+reject unsupported or misfiled drafts and identify duplicates. It rates no
+severity: the lane agent's rating stands as written.
 
 Code checks the review output. Every draft must receive exactly one coherent
 ruling, and a ruling cannot name a draft that does not exist. A malformed review

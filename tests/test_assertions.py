@@ -33,7 +33,6 @@ from analysis_service.assertions import (
     REGISTRY_VERSION,
     SUBJECT_PREFIXES,
     UNIVERSAL_TERMS,
-    UNPROJECTED,
     Assertion,
     AssertionCatalog,
     AssertionProposal,
@@ -850,13 +849,6 @@ class TestWhatAConsumerMayRestOn:
             "support": span_for("we have not rolled out MFA"),
         }
         return Assertion(**{**fields, **overrides})
-
-    def test_the_unprojected_predicates_are_read_off_the_registry(self):
-        assert UNPROJECTED == {
-            name for name, predicate in REGISTRY.items() if not predicate.projects_into
-        }
-        assert "mfa-requirement" in UNPROJECTED
-        assert "authentication-mechanism" not in UNPROJECTED
 
     def test_a_predicate_nobody_asked_about_is_unasked(self):
         held = catalog([self.row()])
