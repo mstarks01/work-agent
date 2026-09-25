@@ -923,6 +923,12 @@ class AssertionRecord(BaseModel):
         Dropping a row can strand another — an inference whose premise went —
         so the rows are gated again until the gate refuses nothing. The graph
         comparison runs once, over what survives, because it is not a refusal.
+
+        **A contradiction is always the one this call finds.** It is a fact
+        about the catalog and the model in front of the gate now, so one
+        carried in ``issues`` from an earlier record is dropped: it is either
+        found again here or no longer true. A patch passes its record's issues
+        through, and each patch that landed added one more copy.
         """
         found: list[CatalogIssue] = []
         removed = list(quarantined)
@@ -934,7 +940,11 @@ class AssertionRecord(BaseModel):
         return cls(
             proposed=proposed,
             catalog=admitted,
-            issues=[*issues, *found, *contradiction_issues(admitted, model)],
+            issues=[
+                *(issue for issue in issues if issue.code != "graph-contradiction"),
+                *found,
+                *contradiction_issues(admitted, model),
+            ],
             quarantined=removed,
         )
 
