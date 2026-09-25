@@ -425,13 +425,13 @@ def test_a_case_without_rulings_reads_its_claims_alone(tmp_path):
             "names 0 reference claims",
         ),
         (
-            lambda r: r["stride"][0]["also_acceptable"].update(
+            lambda r: r["stride"][0]["reading"].update(
                 affected_element_ids=["process:does-not-exist"]
             ),
             "not in the model",
         ),
         (
-            lambda r: r["stride"][0]["also_acceptable"].update(verb="flood"),
+            lambda r: r["stride"][0]["reading"].update(verb="flood"),
             "is not a repudiation verb",
         ),
         (lambda r: r.update(case="01-payments-checkout"), "names case"),

@@ -10,7 +10,7 @@
           "entity:cdn"
         ]
       },
-      "also_acceptable": {
+      "reading": {
         "verb": "alter",
         "affected_element_ids": [
           "flow:process:web-server>store:cdn-bucket>asset-publish",
@@ -18,6 +18,7 @@
           "process:web-server"
         ]
       },
+      "verdict": "same",
       "ruling": "Both describe replacing published bucket assets with malicious content delivered to readers; alter versus plant is a filing difference.",
       "reviewed_by": "mstarks01",
       "source": "QA-2026-09-25-01 filing ballot 2 row 2: baseline 6bff717 T-04"
