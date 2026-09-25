@@ -131,6 +131,27 @@
       "ruling": "Uploading into another supplier's records does not state the ability to exercise reviewer authority and self-approve.",
       "reviewed_by": "mstarks01",
       "source": "QA-2026-09-25-01-near-miss-ballot-1 row 13: flag-on run E-02"
+    },
+    {
+      "lane": "tampering",
+      "reference": {
+        "verb": "plant",
+        "affected_element_ids": [
+          "store:supplier-database",
+          "flow:process:supplier-master-service>store:supplier-database>write-supplier-records"
+        ]
+      },
+      "reading": {
+        "verb": "alter",
+        "affected_element_ids": [
+          "flow:process:supplier-master-service>store:supplier-database>write-supplier-records",
+          "store:supplier-database"
+        ]
+      },
+      "verdict": "different",
+      "ruling": "The reference concerns false records delivered through a compromised vendor's genuine extract channel and trusted by the loader. The draft concerns direct database writes that bypass the loader; the entry path and failed control differ.",
+      "reviewed_by": "mstarks01",
+      "source": "QA-2026-09-25-01-near-miss-ballot-3 row 1: mstarks01-e32ad9c5 T-02"
     }
   ]
 }
