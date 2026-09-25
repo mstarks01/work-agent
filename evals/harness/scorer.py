@@ -64,7 +64,7 @@ from analysis_service.frameworks.stride.record import DraftThreat, StrideCategor
 from analysis_service.system_model import ModelIndex
 from evals.harness.content import structural
 from evals.harness.fingerprint import key_claim
-from evals.harness.identity import ClaimPair, Matcher
+from evals.harness.identity import ClaimPair, ClaimRuling, Matcher
 from evals.harness.ledger import Ledger, Vote
 from evals.harness.reference import MUST_FIND, GoldenCase, ReferenceThreat
 
@@ -523,18 +523,7 @@ def _match_in_lane(
         for position, threat in enumerate(produced):
             if threat.category != reference.category:
                 continue
-            ruling = matcher.equivalent(
-                ClaimPair(
-                    case=case.id,
-                    category=reference.category,
-                    reference_claim=reference.claim,
-                    candidate_claim=candidate_claim(threat),
-                    reference_element_ids=tuple(reference.affected_element_ids),
-                    candidate_element_ids=tuple(threat.affected_element_ids),
-                    reference_verb=reference.verb,
-                    candidate_verb=threat.verb,
-                )
-            )
+            ruling = _rule(matcher, case, reference_index, threat)
             rulings.append(
                 PairRuling(
                     reference_index=reference_index,
@@ -549,6 +538,38 @@ def _match_in_lane(
                 matches.append(position)
         candidates[reference_index] = matches
     return candidates
+
+
+def _rule(
+    matcher: Matcher, case: GoldenCase, reference_index: int, threat: DraftThreat
+) -> ClaimRuling:
+    """The rule's answer on one pair, over every reading the reference accepts.
+
+    The reference's own reading is asked first, and its ruling is the answer
+    when no reading matches, so a miss reports the claim as it is written. A
+    match on a ruled reading says so in the rationale, because a reader of the
+    artifact would otherwise see a match the claim's own fields do not explain.
+    """
+    reference = case.stride_claims()[reference_index]
+    rulings = [
+        matcher.equivalent(
+            ClaimPair(
+                case=case.id,
+                category=reference.category,
+                reference_claim=reference.claim,
+                candidate_claim=candidate_claim(threat),
+                reference_element_ids=tuple(element_ids),
+                candidate_element_ids=tuple(threat.affected_element_ids),
+                reference_verb=verb,
+                candidate_verb=threat.verb,
+            )
+        )
+        for verb, element_ids in case.stride_readings(reference_index)
+    ]
+    if rulings[0].match or not any(ruling.match for ruling in rulings[1:]):
+        return rulings[0]
+    ruled = next(ruling for ruling in rulings[1:] if ruling.match)
+    return ClaimRuling(match=True, rationale=f"a ruled reading: {ruled.rationale}")
 
 
 def _assign(
@@ -634,18 +655,7 @@ def _find_lane_errors(
             already_used = reference_index in claimed_references
             if reference.category == threat.category or already_used:
                 continue
-            ruling = matcher.equivalent(
-                ClaimPair(
-                    case=case.id,
-                    category=reference.category,
-                    reference_claim=reference.claim,
-                    candidate_claim=candidate_claim(threat),
-                    reference_element_ids=tuple(reference.affected_element_ids),
-                    candidate_element_ids=tuple(threat.affected_element_ids),
-                    reference_verb=reference.verb,
-                    candidate_verb=threat.verb,
-                )
-            )
+            ruling = _rule(matcher, case, reference_index, threat)
             rulings.append(
                 PairRuling(
                     reference_index=reference_index,

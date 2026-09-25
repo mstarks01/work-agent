@@ -100,6 +100,7 @@ CASE_FILES = (
     "model.json",
     "case.json",
     "facts.json",
+    "rulings.json",
     "claims/*.json",
     "corrections.md",
     "REVIEW-*.md",

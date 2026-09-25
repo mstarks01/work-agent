@@ -1,0 +1,26 @@
+{
+  "case": "02-iot-fleet-telemetry",
+  "stride": [
+    {
+      "lane": "repudiation",
+      "reference": {
+        "verb": "unattributable",
+        "affected_element_ids": [
+          "entity:sensor-node",
+          "store:telemetry-lake"
+        ]
+      },
+      "also_acceptable": {
+        "verb": "unattributable",
+        "affected_element_ids": [
+          "entity:sensor-node",
+          "process:device-gateway",
+          "flow:entity:sensor-node>process:device-gateway>publish-readings"
+        ]
+      },
+      "ruling": "Both describe disputed readings that shared fleet authentication cannot attribute to an individual node; the gateway filing is acceptable.",
+      "reviewed_by": "mstarks01",
+      "source": "QA-2026-09-25-01 near-miss ballot row 2: baseline 6bff717 R-01"
+    }
+  ]
+}

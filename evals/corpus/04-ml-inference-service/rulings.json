@@ -1,0 +1,25 @@
+{
+  "case": "04-ml-inference-service",
+  "stride": [
+    {
+      "lane": "tampering",
+      "reference": {
+        "verb": "plant",
+        "affected_element_ids": [
+          "store:model-registry-bucket",
+          "flow:process:model-server>store:model-registry-bucket>load-artifact"
+        ]
+      },
+      "also_acceptable": {
+        "verb": "plant",
+        "affected_element_ids": [
+          "store:model-registry-bucket",
+          "flow:entity:ml-engineer>store:model-registry-bucket>publish-artifact"
+        ]
+      },
+      "ruling": "Both describe a planted model artifact loaded without integrity verification; the publisher path is acceptable.",
+      "reviewed_by": "mstarks01",
+      "source": "QA-2026-09-25-01 near-miss ballot row 4: baseline 6bff717 T-01"
+    }
+  ]
+}
