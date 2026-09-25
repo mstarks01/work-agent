@@ -44,7 +44,7 @@ from analysis_service.report import Report
 from analysis_service.system_model import SystemModel
 from evals.harness.bundle import reports_dir
 from evals.harness.modes import EvalRunError
-from evals.harness.reference import GoldenCase, load_corpus
+from evals.harness.reference import GoldenCase, load_corpus, tuning_cases
 
 
 def ruling_type(framework: FrameworkName) -> type[Ruling]:
@@ -184,7 +184,7 @@ def command_assembly(args: argparse.Namespace) -> int:
     """Assemble every archived block again and name any claim it moves."""
     cases = [
         case
-        for case in load_corpus(args.corpus)
+        for case in tuning_cases(load_corpus(args.corpus))
         if not args.case or case.id in args.case
     ]
     try:

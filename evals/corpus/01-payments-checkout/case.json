@@ -4,6 +4,7 @@
   "domain": "payments",
   "provenance": "internal-system (synthetic, sanitized)",
   "bootstrap": "agent-stand-in",
+  "holdout": false,
   "sources": [
     {
       "kind": "description",

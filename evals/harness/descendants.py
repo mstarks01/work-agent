@@ -44,7 +44,7 @@ from evals.harness.bundle import reports_dir, stride_threats
 from evals.harness.identity import SubsetVerbIdentity
 from evals.harness.ledger import Ledger
 from evals.harness.modes import EvalRunError
-from evals.harness.reference import GoldenCase, load_corpus
+from evals.harness.reference import GoldenCase, load_corpus, tuning_cases
 from evals.harness.scorer import score_case
 
 FRAMEWORK: FrameworkName = "stride"
@@ -173,7 +173,7 @@ def command_descendants(args: argparse.Namespace) -> int:
     )
     cases = [
         case
-        for case in load_corpus(args.corpus)
+        for case in tuning_cases(load_corpus(args.corpus))
         if not args.case or case.id in args.case
     ]
     try:

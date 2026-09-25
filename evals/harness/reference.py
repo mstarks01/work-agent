@@ -615,6 +615,10 @@ class CaseMetadata(BaseModel):
     domain: str = Field(min_length=1)
     provenance: str = Field(min_length=1)
     bootstrap: str = Field(min_length=1)
+    #: Whether the case is held out of tuning (#744). A holdout case is scored
+    #: in every sweep and reported apart, and no diagnosis command reads it,
+    #: so no fix is shaped by its losses. No default: a new case states it.
+    holdout: bool
     sources: list[CaseSource] = Field(min_length=1)
     # The aggregate, taken over the refs exactly as a report's InputRef is.
     source_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
@@ -1023,6 +1027,30 @@ def load_corpus(corpus_dir: Path | str) -> tuple[GoldenCase, ...]:
     if not cases:
         raise CorpusError(f"no cases under {corpus_dir}")
     return cases
+
+
+def diagnosable(case: GoldenCase) -> bool:
+    """Whether a diagnosis may read this case: the one reader of ``holdout``.
+
+    A holdout case confirms a fix measured elsewhere. Once an audit reads its
+    losses, a fix can be shaped by them, and the case measures that fix no
+    more independently than any other.
+    """
+    return not case.meta.holdout
+
+
+def tuning_cases(cases: Sequence[GoldenCase]) -> tuple[GoldenCase, ...]:
+    """The cases a diagnosis command reads: every case but the holdout ones."""
+    return tuple(case for case in cases if diagnosable(case))
+
+
+def refuse_holdout(case_id: str, corpus_dir: Path | str = DEFAULT_CORPUS) -> None:
+    """Refuse a diagnosis that names one case, where that case is a holdout."""
+    if not diagnosable(load_case(Path(corpus_dir) / case_id)):
+        raise CorpusError(
+            f"{case_id} is a holdout case: no diagnosis reads it, so no fix is"
+            " shaped by its losses (#744)"
+        )
 
 
 def flows_by_case(

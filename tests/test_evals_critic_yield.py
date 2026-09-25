@@ -273,6 +273,37 @@ def test_the_cli_reports_both_sides_per_case_and_pooled(case, capsys):
     assert "killed-real 0/1" in printed
 
 
+def test_a_holdout_case_is_scored_and_charged_no_losses(case):
+    # #744: the score is reported, apart; the per-miss causes are never built.
+    import dataclasses
+
+    from evals.harness import modes, run
+
+    held = dataclasses.replace(
+        case, meta=case.meta.model_copy(update={"holdout": True})
+    )
+    kept = _draft_for(_must_find(case), 1)
+    analysis = modes.AnalysisRun(
+        report=_report_with(case, [promote(kept)]), drafts={"stride": (kept,)}
+    )
+    flows = {flow.id: (flow.source, flow.destination) for flow in case.model.data_flows}
+
+    def score(subject):
+        return run._score_runs(
+            [subject],
+            {case.id: analysis},
+            _identity_matcher([kept]),
+            Ledger(),
+            {case.id: flows},
+        )
+
+    scores, _, charged = score(held)
+    assert [score.holdout for score in scores] == [True]
+    assert charged == ()
+    # The control: the same case, not held out, is charged.
+    assert len(score(case)[2]) == 1
+
+
 def _report_with(case, threats):
     """A minimal report carrying the given threats, as the modes build one."""
     from datetime import UTC, datetime

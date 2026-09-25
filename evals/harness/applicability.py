@@ -53,6 +53,7 @@ from evals.harness.reference import (
     CaseFramework,
     GoldenCase,
     ReferenceRequirement,
+    diagnosable,
 )
 
 #: The verdicts that assert a requirement applies to this system. ``rejected``
@@ -103,6 +104,8 @@ class ApplicabilityScore:
     #: ``frameworks/<name>/lanes/<lane>/exemplars.md`` — a case near STRIDE's
     #: payments exemplar is near nothing of ASVS's.
     exemplar_proximity: str
+    #: Whether the case is held out of tuning, so its figures are reported apart.
+    holdout: bool
     #: Whether the case read this framework's records as complete against the
     #: model. It decides whether :attr:`precision` is defined at all, because
     #: the complement of a sample is not a set of negatives.
@@ -174,6 +177,7 @@ class ApplicabilityScore:
             "framework": FRAMEWORK,
             "level": self.level,
             "exemplar_proximity": self.exemplar_proximity,
+            "holdout": self.holdout,
             "reference_set": self.reference_set,
             "universe": self.universe,
             "expected": len(self.expected),
@@ -294,6 +298,7 @@ def score_applicability(
         case=case.id,
         level=level,
         exemplar_proximity=declared(case).exemplar_proximity,
+        holdout=case.meta.holdout,
         reference_set=declared(case).reference_set,
         universe=len(universe),
         expected=tuple(sorted(expected)),
@@ -867,6 +872,23 @@ def pooled(scores: Sequence[ApplicabilityScore]) -> Mapping[str, Any]:
     }
 
 
+def holdout_split(scores: Sequence[ApplicabilityScore]) -> dict[str, float] | None:
+    """Applicability recall on the tuned cases beside the holdout ones (#744).
+
+    ``None`` where no holdout case was scored. The same question the STRIDE
+    scorer's split asks, over the recall this package produces.
+    """
+    held = [score for score in scores if score.holdout]
+    if not held:
+        return None
+    return {
+        "tuned_recall": round(
+            _mean(score.recall for score in scores if not score.holdout), 3
+        ),
+        "holdout_recall": round(_mean(score.recall for score in held), 3),
+    }
+
+
 def exemplar_delta(scores: Sequence[ApplicabilityScore]) -> dict[str, float]:
     """The near-vs-far applicability-recall delta: tracked, **non-gating**.
 
@@ -1116,6 +1138,7 @@ def artifact(scores: Sequence[ApplicabilityScore]) -> dict[str, Any]:
         "applicability": [score.to_json() for score in scores],
         "applicability_aggregate": pooled(scores) if scores else None,
         "applicability_exemplar_delta": exemplar_delta(scores) if scores else None,
+        "applicability_holdout_split": holdout_split(scores),
         "over_applied_for_promotion": over_applied_for_promotion(scores),
     }
 
@@ -1198,14 +1221,17 @@ def score_case(
     # cannot see: a matched requirement is matched whether the report routed
     # it to the right kind of evidence or to the wrong one (#471).
     routing = score_dispositions(case, block)
-    return {
+    rows = {
         "applicability": matrix,
         "disposition": routing,
         # Both sides of this framework's critic, from the block the run already
         # produced: no second scoring pass, because both sides are
         # requirement identifiers.
         "applicability_yield": score_yield(case, block, drafts),
-        # Where each loss the two rows above report happened, read off the
-        # same block: a scope state, a rejection cause or a verdict (#659).
-        "attribution": attribution.attribute_case(case, block, matrix, routing),
     }
+    # Where each loss the two rows above report happened, read off the same
+    # block: a scope state, a rejection cause or a verdict (#659). Never for a
+    # holdout case, whose losses no diagnosis reads.
+    if diagnosable(case):
+        rows["attribution"] = attribution.attribute_case(case, block, matrix, routing)
+    return rows
