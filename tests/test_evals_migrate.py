@@ -250,10 +250,16 @@ def test_the_repeat_archive_is_what_this_was_written_for(tmp_path):
     """A real file, if this machine has one. The archive is gitignored, so this
     skips elsewhere rather than pinning a path nobody else has."""
     archive = Path("evals/runs")
+    # The archive also holds files that are not artifacts, such as a batch's
+    # request list, so a JSON value that is not an object is not a candidate.
+    documents = (
+        (path, json.loads(path.read_text(encoding="utf-8")))
+        for path in sorted(archive.rglob("*.json"))
+    )
     older_files = [
         path
-        for path in sorted(archive.rglob("*.json"))
-        if json.loads(path.read_text(encoding="utf-8")).get("artifact_version") == 6
+        for path, data in documents
+        if isinstance(data, dict) and data.get("artifact_version") == 6
     ][:1]
     if not older_files:
         pytest.skip("no version 6 artifact on this machine")
