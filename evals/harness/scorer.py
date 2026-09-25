@@ -228,6 +228,8 @@ class CaseScore:
 
     case_id: str
     exemplar_proximity: str
+    #: Whether the case is held out of tuning, so its figures are reported apart.
+    holdout: bool
     produced_ids: tuple[str, ...]
     produced_count: int
     reference_count: int
@@ -385,6 +387,7 @@ class CaseScore:
         return {
             "case": self.case_id,
             "exemplar_proximity": self.exemplar_proximity,
+            "holdout": self.holdout,
             "counts": {
                 "produced": self.produced_count,
                 "references": self.reference_count,
@@ -498,6 +501,7 @@ def score_case(
     return CaseScore(
         case_id=case.id,
         exemplar_proximity=case.declaration("stride").exemplar_proximity,
+        holdout=case.meta.holdout,
         produced_ids=tuple(threat.id for threat in produced),
         produced_count=len(produced),
         reference_count=len(references),
@@ -826,6 +830,33 @@ def exemplar_delta(scores: Sequence[CaseScore]) -> dict[str, float]:
     }
 
 
+def holdout_split(scores: Sequence[CaseScore]) -> dict[str, float] | None:
+    """Coverage on the tuned cases beside coverage on the holdout cases (#744).
+
+    ``None`` where no holdout case was scored. A fix whose gain shows on the
+    tuned cases and not on the holdout ones was shaped by the cases it was
+    read on.
+    """
+    held = [score for score in scores if score.holdout]
+    if not held:
+        return None
+    tuned = [score for score in scores if not score.holdout]
+    return {
+        "tuned_coverage": round(
+            ratio(sum(score.reference_coverage for score in tuned), len(tuned)), 3
+        ),
+        "holdout_coverage": round(
+            ratio(sum(score.reference_coverage for score in held), len(held)), 3
+        ),
+        "tuned_must_find_coverage": round(
+            ratio(sum(score.must_find_coverage for score in tuned), len(tuned)), 3
+        ),
+        "holdout_must_find_coverage": round(
+            ratio(sum(score.must_find_coverage for score in held), len(held)), 3
+        ),
+    }
+
+
 def unlisted_for_promotion(scores: Sequence[CaseScore]) -> list[dict[str, Any]]:
     """The corpus feedback loop: the pool feeds promotion.
 
@@ -879,6 +910,14 @@ def render(scores: Sequence[CaseScore]) -> None:
             f" vs far {delta['far_coverage']:.2f}"
             f" = {delta['delta']:+.2f} (tracked, non-gating)"
         )
+        split = holdout_split(scores)
+        if split:
+            print(
+                f"holdout: coverage {split['holdout_coverage']:.2f}"
+                f" vs tuned {split['tuned_coverage']:.2f}; must-find"
+                f" {split['holdout_must_find_coverage']:.2f}"
+                f" vs tuned {split['tuned_must_find_coverage']:.2f}"
+            )
 
 
 def published(blocks: Mapping[str, Any], metric: str) -> float | None:
@@ -925,5 +964,6 @@ def artifact(scores: Sequence[CaseScore]) -> dict[str, Any]:
     return {
         "scores": [score.to_json() for score in scores],
         "exemplar_delta": exemplar_delta(scores) if scores else None,
+        "holdout_split": holdout_split(scores),
         "unlisted_for_promotion": unlisted_for_promotion(scores),
     }

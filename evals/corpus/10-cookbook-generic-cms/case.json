@@ -4,6 +4,7 @@
   "domain": "content-management",
   "provenance": "OWASP Threat Model Cookbook, \"Generic CMS example\" (Flow Diagram/generic-cms/generic-cms.py, pytm), https://github.com/OWASP/threat-model-cookbook \u2014 textual and graphical representations CC-BY 4.0. Converted to submitted-text form for this corpus.",
   "bootstrap": "agent-stand-in",
+  "holdout": false,
   "sources": [
     {
       "kind": "description",

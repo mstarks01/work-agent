@@ -181,6 +181,7 @@ CASE_FIELDS = frozenset(
         "domain",
         "provenance",
         "bootstrap",
+        "holdout",
         "sources",
         "source_sha256",
         "frameworks",

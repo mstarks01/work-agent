@@ -29,7 +29,7 @@ from evals.harness import replay
 from evals.harness.arms import ARMS, ArmRun, write_runs
 from evals.harness.artifact import load_artifact
 from evals.harness.bundle import heads_from_reports
-from evals.harness.reference import GoldenCase, load_corpus
+from evals.harness.reference import GoldenCase, load_corpus, tuning_cases
 
 #: How an artifact is named on the command line: ``<arm>=<path>``, optionally
 #: ``<arm>:<repeat>=<path>``. The arm cannot be read off the artifact — two
@@ -136,7 +136,7 @@ def command_score_arms(args: argparse.Namespace) -> int:
     """
     try:
         specs = [parse_spec(spec) for spec in args.artifact]
-        cases = load_corpus(args.corpus)
+        cases = tuning_cases(load_corpus(args.corpus))
         runs, skipped = score(specs, cases, args.corpus)
     except (ValueError, OSError) as error:
         print(f"cannot score: {error}", file=sys.stderr)

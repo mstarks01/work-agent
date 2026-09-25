@@ -384,6 +384,7 @@ INSTRUMENTS: dict[str, Instrument] = {
             "applicability",
             "applicability_aggregate",
             "applicability_exemplar_delta",
+            "applicability_holdout_split",
             "over_applied_for_promotion",
         ),
         published=(
@@ -449,7 +450,7 @@ INSTRUMENTS: dict[str, Instrument] = {
         artifact=lambda sweep: scorer.artifact(sweep.scores),
         frameworks=("stride",),
         scored=True,
-        keys=("scores", "exemplar_delta", "unlisted_for_promotion"),
+        keys=("scores", "exemplar_delta", "holdout_split", "unlisted_for_promotion"),
         published=(
             Column(
                 "reference coverage",

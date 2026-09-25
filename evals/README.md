@@ -617,6 +617,11 @@ the next sitting, and only the rate over it is a score.
   removed (good) *against* how many real threats it removed (bad). A kill count
   on its own tells you nothing about which of those two is happening.
 - **near/far exemplar delta** — see below.
+- **holdout split** — coverage on the **Holdout Case**s beside coverage on the
+  tuned ones (`holdout_split`, and `applicability_holdout_split` for ASVS).
+  Absent while no holdout case is scored. No diagnosis command reads a holdout
+  case, so a gain on the tuned cases that the holdout does not repeat was
+  shaped by the cases it was read on.
 
 The **grounds** measurements each watch a prompt rule that nothing enforces
 mechanically:
