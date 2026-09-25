@@ -30,6 +30,7 @@ import csv
 import json
 from collections.abc import Mapping, Sequence
 from pathlib import Path
+from typing import Any
 
 from analysis_service.frameworks.stride.record import DraftThreat
 from evals.harness.losses import CaseLosses, Loss
@@ -261,12 +262,12 @@ def _append(
     ballot_name: str,
 ) -> bool:
     claim = load_case(case_dir).stride_claims()[int(row["ref"])]
-    data = (
+    data: dict[str, Any] = (
         json.loads(path.read_text(encoding="utf-8"))
         if path.is_file()
         else {"case": case_dir.name, "stride": []}
     )
-    ruling = {
+    ruling: dict[str, Any] = {
         "lane": claim.lane,
         "reference": {
             "verb": claim.verb,
