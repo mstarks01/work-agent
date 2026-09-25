@@ -13,7 +13,12 @@ from pathlib import Path
 
 import pytest
 
-from analysis_service.assertions import Assertion, AssertionCatalog, Subject
+from analysis_service.assertions import (
+    Assertion,
+    AssertionCatalog,
+    AssertionRecord,
+    Subject,
+)
 from evals.harness import modes, replay
 from evals.harness.bundle import reports_dir, write_assertions
 
@@ -22,18 +27,20 @@ def result(case_id: str = "01-payments-checkout", **overrides) -> modes.Assertio
     return modes.AssertionResult(
         case_id=case_id,
         proposal={"assertions": []},
-        catalog=AssertionCatalog(
-            subjects=[Subject(id="store:queue", type="component", label="queue")],
-            entries=[
-                Assertion(
-                    subject="store:queue",
-                    predicate="storage-encryption",
-                    value="absent",
-                    basis="stated",
-                )
-            ],
+        record=AssertionRecord(
+            proposed=1,
+            catalog=AssertionCatalog(
+                subjects=[Subject(id="store:queue", type="component", label="queue")],
+                entries=[
+                    Assertion(
+                        subject="store:queue",
+                        predicate="storage-encryption",
+                        value="absent",
+                        basis="stated",
+                    )
+                ],
+            ),
         ),
-        issues=(),
         **overrides,
     )
 
