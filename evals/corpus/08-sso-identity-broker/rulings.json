@@ -1,0 +1,24 @@
+{
+  "case": "08-sso-identity-broker",
+  "stride": [
+    {
+      "lane": "denial-of-service",
+      "reference": {
+        "verb": "disable",
+        "affected_element_ids": [
+          "process:identity-broker"
+        ]
+      },
+      "also_acceptable": {
+        "verb": "flood",
+        "affected_element_ids": [
+          "process:identity-broker",
+          "flow:entity:colleague>process:identity-broker>sign-in"
+        ]
+      },
+      "ruling": "Flooding is a specific mechanism for making the shared broker unavailable; the draft explicitly connects saturation to denied sign-ins.",
+      "reviewed_by": "mstarks01",
+      "source": "QA-2026-09-25-01 filing ballot 2 row 1: baseline 6bff717 D-01"
+    }
+  ]
+}

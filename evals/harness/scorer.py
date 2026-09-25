@@ -454,9 +454,21 @@ def score_case(
     ledger once, and a test hands in one it built in memory.
     """
     rulings: list[PairRuling] = []
-    in_lane = _match_in_lane(case, produced, matcher, rulings)
+    own, ruled = _match_in_lane(case, produced, matcher, rulings)
     references = case.stride_claims()
-    assignment = _assign(in_lane, references)
+    assignment = _assign(own, references)
+    # A ruled reading only adds: it may take a reference the claims' own
+    # readings left unmatched, with a threat they left free, and never moves a
+    # match the own readings made.
+    free = set(range(len(produced))) - set(assignment.values())
+    assignment |= _assign(
+        {
+            index: [position for position in positions if position in free]
+            for index, positions in ruled.items()
+            if index not in assignment
+        },
+        references,
+    )
 
     matched = tuple(
         _matched_pair(reference_index, references[reference_index], produced[pos])
@@ -505,11 +517,14 @@ def _match_in_lane(
     produced: Sequence[DraftThreat],
     matcher: Matcher,
     rulings: list[PairRuling],
-) -> dict[int, list[int]]:
+) -> tuple[dict[int, list[int]], dict[int, list[int]]]:
     """Step 1 and 2: same-lane pairs only, one ruled verdict each.
 
-    Returns reference index -> the positions in ``produced`` the rule called
-    equivalent, which is the bipartite graph step 3 assigns over.
+    Returns two maps of reference index -> the positions in ``produced`` the
+    rule called equivalent, which are the bipartite graphs step 3 assigns over:
+    the matches the claim's own reading makes, and the ones only a ruled
+    reading makes. They are kept apart so the second can never displace the
+    first.
 
     The pair carries both verbs, because the rule's verb half is what separates
     a read from a write against one store. A reference claim with no verb makes
@@ -517,13 +532,14 @@ def _match_in_lane(
     carries a verb on all 243 claims, so that failure means a new case arrived
     without one.
     """
-    candidates: dict[int, list[int]] = {}
+    own: dict[int, list[int]] = {}
+    ruled: dict[int, list[int]] = {}
     for reference_index, reference in enumerate(case.stride_claims()):
-        matches = []
+        own[reference_index], ruled[reference_index] = [], []
         for position, threat in enumerate(produced):
             if threat.category != reference.category:
                 continue
-            ruling = _rule(matcher, case, reference_index, threat)
+            ruling, by_ruling = _rule(matcher, case, reference_index, threat)
             rulings.append(
                 PairRuling(
                     reference_index=reference_index,
@@ -535,15 +551,14 @@ def _match_in_lane(
                 )
             )
             if ruling.match:
-                matches.append(position)
-        candidates[reference_index] = matches
-    return candidates
+                (ruled if by_ruling else own)[reference_index].append(position)
+    return own, ruled
 
 
 def _rule(
     matcher: Matcher, case: GoldenCase, reference_index: int, threat: DraftThreat
-) -> ClaimRuling:
-    """The rule's answer on one pair, over every reading the reference accepts.
+) -> tuple[ClaimRuling, bool]:
+    """The rule's answer on one pair, and whether only a ruled reading matched.
 
     The reference's own reading is asked first, and its ruling is the answer
     when no reading matches, so a miss reports the claim as it is written. A
@@ -567,9 +582,11 @@ def _rule(
         for verb, element_ids in case.stride_readings(reference_index)
     ]
     if rulings[0].match or not any(ruling.match for ruling in rulings[1:]):
-        return rulings[0]
+        return rulings[0], False
     ruled = next(ruling for ruling in rulings[1:] if ruling.match)
-    return ClaimRuling(match=True, rationale=f"a ruled reading: {ruled.rationale}")
+    return ClaimRuling(
+        match=True, rationale=f"a ruled reading: {ruled.rationale}"
+    ), True
 
 
 def _assign(
@@ -655,7 +672,7 @@ def _find_lane_errors(
             already_used = reference_index in claimed_references
             if reference.category == threat.category or already_used:
                 continue
-            ruling = _rule(matcher, case, reference_index, threat)
+            ruling, _ = _rule(matcher, case, reference_index, threat)
             rulings.append(
                 PairRuling(
                     reference_index=reference_index,

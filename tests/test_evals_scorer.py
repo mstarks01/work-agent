@@ -642,3 +642,27 @@ def test_a_draft_at_a_ruled_reading_matches_and_says_so():
     assert unruled.matched == ()
     ruling = next(r for r in ruled.rulings if r.reference_index == 5 and r.match)
     assert ruling.rationale.startswith("a ruled reading")
+
+
+def test_a_ruled_reading_never_takes_a_threat_a_claims_own_reading_matched():
+    """Case 12: one threat fits ref 14 as written and ref 13 only as ruled.
+
+    Reference 13 comes first in the assignment order, so a single matching
+    pass handed the threat to it and left ref 14, which the threat matched on
+    its own terms, unmatched. Two Baselines lost ref 14 this way.
+    """
+    case = load_case(CORPUS_DIR / "12-overclaiming-supplier-portal")
+    draft = draft_threat(
+        1,
+        "elevation-of-privilege",
+        "A portal action is reachable without its role",
+        element_ids=("process:supplier-portal",),
+        verb="escalate",
+    )
+    matcher = SubsetVerbIdentity(flows_by_case([case]))
+
+    score = score_case(case, [draft], matcher, Ledger())
+
+    ruled_only = [r for r in score.rulings if r.rationale.startswith("a ruled reading")]
+    assert [r.reference_index for r in ruled_only] == [13]
+    assert [pair.reference_index for pair in score.matched] == [14]

@@ -20,6 +20,28 @@
       "ruling": "Both describe alteration of the stored payroll export before collection; the write path is acceptable.",
       "reviewed_by": "mstarks01",
       "source": "QA-2026-09-25-01 near-miss ballot row 6: baseline 6bff717 T-03"
+    },
+    {
+      "lane": "elevation-of-privilege",
+      "reference": {
+        "verb": "abuse-grant",
+        "affected_element_ids": [
+          "process:scheduling-web-app",
+          "flow:entity:colleague>process:scheduling-web-app>view-shifts"
+        ]
+      },
+      "also_acceptable": {
+        "verb": "escalate",
+        "affected_element_ids": [
+          "entity:colleague",
+          "process:scheduling-web-app",
+          "flow:entity:colleague>process:scheduling-web-app>view-shifts",
+          "flow:entity:store-manager>process:scheduling-web-app>build-rota"
+        ]
+      },
+      "ruling": "Both describe a colleague gaining manager-only rota-writing authority if role enforcement fails; escalate accurately describes the reference's attack.",
+      "reviewed_by": "mstarks01",
+      "source": "QA-2026-09-25-01 filing ballot 2 row 3: baseline 6bff717 E-01"
     }
   ]
 }
