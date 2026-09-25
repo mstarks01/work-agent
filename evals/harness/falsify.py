@@ -727,7 +727,11 @@ def run_probe(name: str, case: GoldenCase, reference: SignedReference) -> Outcom
     )
     refused = sorted({issue.code for issue in gate_issues(catalog, model, sources)})
     graded = replay_assertions(
-        case, reference, AssertionResult(case.id, {}, catalog, ())
+        case,
+        reference,
+        AssertionResult(
+            case.id, {}, AssertionRecord(proposed=len(catalog.entries), catalog=catalog)
+        ),
     )
     run = ArmRun.of(graded, reference, arm=name)
     fates = {row.reference: row.fate for row in graded.rows}

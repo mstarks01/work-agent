@@ -913,7 +913,7 @@ def replay_assertions(
         case_id=case.id,
         rows=tuple(rows),
         produced=produced,
-        rejected=len({issue.row for issue in result.issues if issue.row is not None}),
+        rejected=result.record.refused_rows(),
         issues=tuple(f"{issue.code}: {issue.message}" for issue in result.issues),
         aligned=aligned_rows(reference, result),
         required=frozenset(required_rows(reference)),

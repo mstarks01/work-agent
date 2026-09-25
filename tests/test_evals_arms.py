@@ -22,6 +22,7 @@ from analysis_service import graph
 from analysis_service.assertions import (
     Assertion,
     AssertionCatalog,
+    AssertionRecord,
     Subject,
     assertion_id,
 )
@@ -587,7 +588,9 @@ class TestTheAlignedReadingComesOffTheReplay:
         )
         entries = [moved if entry is row else entry for entry in reference.entries]
         produced = AssertionCatalog(subjects=reference.subjects, entries=list(entries))
-        result = AssertionResult(golden.id, {"assertions": []}, produced, ())
+        result = AssertionResult(
+            golden.id, {"assertions": []}, AssertionRecord(proposed=0, catalog=produced)
+        )
 
         graded = replay.replay_assertions(golden, reference, result)
         run = ArmRun.of(graded, reference, arm="A")

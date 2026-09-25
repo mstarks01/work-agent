@@ -1511,7 +1511,11 @@ class AssertionResult:
     ``proposal`` is what the node emitted, kept for the reason
     :attr:`ExtractionResult.raw` is kept: it is the only thing a re-score
     cannot recompute, because resolving has already dropped rows and located
-    spans. ``issues`` is why each dropped row dropped.
+    spans. ``record`` is what resolving and the gate built from it: the
+    catalog, why each dropped row dropped, and the rows the gate removed. It is
+    kept whole because :meth:`~AssertionRecord.refused_rows` needs all of it,
+    and a result holding only the catalog and the issues counted a refused
+    catalog as no refusal.
 
     ``stages`` is what every earlier node of the run wrote, by
     :data:`ARCHIVED_STATE`. A head that reads the sources facts-first composes
@@ -1521,10 +1525,19 @@ class AssertionResult:
 
     case_id: str
     proposal: Mapping[str, Any]
-    catalog: AssertionCatalog
-    issues: tuple[CatalogIssue, ...]
+    record: AssertionRecord
     node_runs: tuple[NodeRun, ...] = ()
     stages: Mapping[str, Any] = field(default_factory=dict)
+
+    @property
+    def catalog(self) -> AssertionCatalog:
+        """The rows the run kept."""
+        return self.record.catalog
+
+    @property
+    def issues(self) -> tuple[CatalogIssue, ...]:
+        """Why each dropped row dropped."""
+        return tuple(self.record.issues)
 
 
 @dataclass(frozen=True)
@@ -1543,9 +1556,10 @@ class AssertionScore:
     — which is the fact the graph's own attributes read as a stated control in
     ten of the corpus's 21 stated mechanism values.
 
-    Four outcomes are kept apart (#961). ``rejected`` is rows the resolver
-    dropped, counted by row; ``refused`` is the reasons, by code, and one row
-    can draw several. ``span_backed`` is kept rows whose quotes located, which
+    Four outcomes are kept apart (#961). ``rejected`` is rows the run lost,
+    by the resolver or the gate, as :meth:`~AssertionRecord.refused_rows`
+    counts them; ``refused`` is the reasons, by code, and one row can draw
+    several. ``span_backed`` is kept rows whose quotes located, which
     is not a judgement that the words support the value; ``assessed`` is the
     rows somebody judged, by assessment, and an extractor leaves every row
     ``unchecked``, so a run reads all zero there until a reviewer sits.
@@ -1667,8 +1681,7 @@ async def run_assertions(case: GoldenCase, pipeline: Pipeline) -> AssertionResul
     return AssertionResult(
         case_id=case.id,
         proposal=state[STATE_ASSERTION_PROPOSAL],
-        catalog=record.catalog,
-        issues=tuple(record.issues),
+        record=record,
         node_runs=tuple(graph_run.node_runs),
     )
 
@@ -1711,8 +1724,7 @@ async def run_heads(case: GoldenCase, pipeline: Pipeline) -> AssertionResult:
             assertion=AssertionResult(
                 case_id=case.id,
                 proposal=state.get(STATE_ASSERTION_PROPOSAL, {}),
-                catalog=AssertionCatalog(),
-                issues=(),
+                record=AssertionRecord(proposed=0, catalog=AssertionCatalog()),
                 node_runs=tuple(graph_run.node_runs),
                 stages=stages,
             ),
@@ -1721,8 +1733,7 @@ async def run_heads(case: GoldenCase, pipeline: Pipeline) -> AssertionResult:
     return AssertionResult(
         case_id=case.id,
         proposal=state.get(STATE_ASSERTION_PROPOSAL, {}),
-        catalog=record.catalog,
-        issues=tuple(record.issues),
+        record=record,
         node_runs=tuple(graph_run.node_runs),
         stages=stages,
     )
@@ -1739,7 +1750,7 @@ def score_assertions(case: GoldenCase, result: AssertionResult) -> AssertionScor
         case_id=result.case_id,
         proposed=len(result.proposal.get("assertions", ())),
         kept=len(entries),
-        rejected=len({issue.row for issue in result.issues if issue.row is not None}),
+        rejected=result.record.refused_rows(),
         refused=Counter(issue.code for issue in result.issues),
         subjects=len(catalog.subjects),
         bound_subjects=len(bound & element_ids),

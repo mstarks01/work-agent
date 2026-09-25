@@ -425,8 +425,7 @@ def charge(case: GoldenCase, reference: SignedReference) -> CaseCharge:
     result = AssertionResult(
         case_id=case.id,
         proposal={},
-        catalog=resolution.record.catalog,
-        issues=tuple(resolution.record.issues),
+        record=resolution.record,
     )
     graded = replay_assertions(case, reference, result)
 

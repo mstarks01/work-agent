@@ -22,10 +22,13 @@ import pytest
 from analysis_service import graph
 from analysis_service.assertions import (
     ABSENT,
+    MAX_SUBJECTS,
     AssertionCatalog,
     AssertionProposal,
+    AssertionRecord,
     CatalogIssue,
     CatalogProposal,
+    Quarantined,
     QuoteProposal,
     resolve_catalog,
 )
@@ -36,6 +39,7 @@ from analysis_service.system_model import SystemModel
 from analysis_service.validation import ValidationIssue, parse_and_validate
 from evals.harness import modes
 from evals.harness.bundle import (
+    heads_from_reports,
     reports_dir,
     write_assertions,
     write_extractions,
@@ -326,8 +330,9 @@ class TestTheAssertionsBesideTheArtifact:
         return AssertionResult(
             case_id=case.id,
             proposal=proposal.model_dump(mode="json"),
-            catalog=catalog,
-            issues=tuple(issues),
+            record=AssertionRecord(
+                proposed=len(proposal.assertions), catalog=catalog, issues=issues
+            ),
         )
 
     def written(self, case, tmp_path):
@@ -346,9 +351,17 @@ class TestTheAssertionsBesideTheArtifact:
             AssertionResult(
                 case_id=case.id,
                 proposal=written["proposal"],
-                catalog=AssertionCatalog.model_validate(written["catalog"]),
-                issues=tuple(
-                    CatalogIssue.model_validate(issue) for issue in written["issues"]
+                record=AssertionRecord(
+                    proposed=written["proposed"],
+                    catalog=AssertionCatalog.model_validate(written["catalog"]),
+                    issues=[
+                        CatalogIssue.model_validate(issue)
+                        for issue in written["issues"]
+                    ],
+                    quarantined=[
+                        Quarantined.model_validate(row)
+                        for row in written["quarantined"]
+                    ],
                 ),
             ),
         )
@@ -379,3 +392,48 @@ class TestTheAssertionsBesideTheArtifact:
         write_assertions(str(out), "extraction", {case.id: self.result(case)})
 
         assert not reports_dir(out).exists()
+
+
+def _refused_catalog(case) -> AssertionResult:
+    """A run the gate refused whole: more subjects than it reads, and no row
+    number on the refusal, because it is about the catalog."""
+    proposal = CatalogProposal(
+        assertions=[
+            AssertionProposal(
+                subject_type="principal",
+                subject=f"team {index}",
+                predicate="mfa-requirement",
+                value="unknown",
+                reason="silent",
+                basis="stated",
+            )
+            for index in range(MAX_SUBJECTS + 1)
+        ]
+    )
+    sources = {source.label: source.text for source in case.sources}
+    return AssertionResult(
+        case_id=case.id,
+        proposal=proposal.model_dump(mode="json"),
+        record=AssertionRecord.of(proposal, case.model, sources),
+    )
+
+
+def test_a_refused_catalog_counts_every_row_it_lost(case):
+    """The score counts what the report counts, not only the resolver's rows."""
+    result = _refused_catalog(case)
+
+    score = score_assertions(case, result)
+
+    assert score.kept == 0
+    assert score.rejected == result.record.refused_rows() == MAX_SUBJECTS + 1
+
+
+def test_a_refused_catalog_keeps_its_count_through_the_archive(case, tmp_path):
+    """A replay of the archived run counts the loss the live run counted."""
+    result = _refused_catalog(case)
+    out = tmp_path / "artifact.json"
+    write_assertions(str(out), "assertions", {case.id: result})
+
+    (read,) = heads_from_reports(out, [case]).values()
+
+    assert score_assertions(case, read).rejected == MAX_SUBJECTS + 1

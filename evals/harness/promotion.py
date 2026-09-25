@@ -333,9 +333,7 @@ def _required_fact_recall(
     reference = signed_reference(CORPUS, case)
     if reference is None:
         return None
-    graded = replay_assertions(
-        case, reference, AssertionResult(case.id, {}, record.catalog, ())
-    )
+    graded = replay_assertions(case, reference, AssertionResult(case.id, {}, record))
     return ArmRun.of(graded, reference, arm="treatment").recall
 
 

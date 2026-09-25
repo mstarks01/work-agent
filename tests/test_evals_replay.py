@@ -22,6 +22,7 @@ from analysis_service.assertions import (
     UNKNOWN,
     Assertion,
     AssertionCatalog,
+    AssertionRecord,
     CatalogIssue,
     Subject,
     assertion_id,
@@ -269,7 +270,9 @@ def graded_rows(
     """Two hand-built catalogs, graded against each other."""
     reference = replay.SignedReference(catalog=AssertionCatalog(entries=references))
     result = AssertionResult(
-        "probe", {"assertions": []}, AssertionCatalog(entries=produced), ()
+        "probe",
+        {"assertions": []},
+        AssertionRecord(proposed=0, catalog=AssertionCatalog(entries=produced)),
     )
     case = load_corpus(CORPUS)[0]
     return replay.replay_assertions(case, reference, result)
@@ -317,8 +320,12 @@ class TestOneProducedRowAnswersOneReferenceRow:
         result = AssertionResult(
             "probe",
             {"assertions": []},
-            AssertionCatalog(entries=[fact(sent, "transport-encryption", "TLS")]),
-            (),
+            AssertionRecord(
+                proposed=0,
+                catalog=AssertionCatalog(
+                    entries=[fact(sent, "transport-encryption", "TLS")]
+                ),
+            ),
         )
 
         assert len(replay.aligned_rows(reference, result)) == 1
@@ -350,7 +357,11 @@ class TestEveryReferenceRowTakesOneFate:
 
     def graded(self, golden, reference, entries, issues=()):
         produced = AssertionCatalog(subjects=reference.subjects, entries=list(entries))
-        result = AssertionResult(golden.id, {"assertions": []}, produced, tuple(issues))
+        result = AssertionResult(
+            golden.id,
+            {"assertions": []},
+            AssertionRecord(proposed=0, catalog=produced, issues=list(issues)),
+        )
         return replay.replay_assertions(golden, reference, result)
 
     def test_the_reference_against_itself_is_found_throughout(self, golden, reference):
@@ -780,7 +791,9 @@ class TestTheEndpointRidesWithTheFates:
 
     def graded(self, golden, reference, entries):
         produced = AssertionCatalog(subjects=reference.subjects, entries=list(entries))
-        result = AssertionResult(golden.id, {"assertions": []}, produced, ())
+        result = AssertionResult(
+            golden.id, {"assertions": []}, AssertionRecord(proposed=0, catalog=produced)
+        )
         return replay.replay_assertions(golden, reference, result)
 
     def test_a_perfect_run_recovers_every_required_row(self, golden, reference):
@@ -858,7 +871,11 @@ class TestSpanValidityIsReadApartFromSupport:
         produced = AssertionCatalog(
             subjects=reference.subjects, entries=list(reference.entries)
         )
-        result = AssertionResult(golden.id, {}, produced, tuple(issues))
+        result = AssertionResult(
+            golden.id,
+            {},
+            AssertionRecord(proposed=0, catalog=produced, issues=list(issues)),
+        )
         return replay.replay_assertions(golden, reference, result)
 
     def test_a_clean_run_refuses_no_span(self, golden, reference):
@@ -914,7 +931,9 @@ class TestBothReadingsArriveTogether:
 
     def graded(self, golden, reference, entries):
         produced = AssertionCatalog(subjects=reference.subjects, entries=list(entries))
-        result = AssertionResult(golden.id, {"assertions": []}, produced, ())
+        result = AssertionResult(
+            golden.id, {"assertions": []}, AssertionRecord(proposed=0, catalog=produced)
+        )
         return replay.replay_assertions(golden, reference, result)
 
     def relabelled(self, reference):
@@ -1184,7 +1203,11 @@ class TestTheBundleReadsBackWhatItWrote:
         write_assertions(
             str(out),
             "assertions",
-            {golden.id: AssertionResult(golden.id, proposal, catalog, ())},
+            {
+                golden.id: AssertionResult(
+                    golden.id, proposal, AssertionRecord(proposed=0, catalog=catalog)
+                )
+            },
         )
 
         (read,) = assertions_from_reports(out, [golden]).values()
