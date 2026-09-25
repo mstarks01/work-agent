@@ -9,16 +9,61 @@
           "process:identity-broker"
         ]
       },
-      "also_acceptable": {
+      "reading": {
         "verb": "flood",
         "affected_element_ids": [
           "process:identity-broker",
           "flow:entity:colleague>process:identity-broker>sign-in"
         ]
       },
+      "verdict": "same",
       "ruling": "Flooding is a specific mechanism for making the shared broker unavailable; the draft explicitly connects saturation to denied sign-ins.",
       "reviewed_by": "mstarks01",
       "source": "QA-2026-09-25-01 filing ballot 2 row 1: baseline 6bff717 D-01"
+    },
+    {
+      "lane": "elevation-of-privilege",
+      "reference": {
+        "verb": "abuse-grant",
+        "affected_element_ids": [
+          "flow:process:identity-broker>entity:hr-system>nightly-group-pull",
+          "entity:colleague"
+        ]
+      },
+      "reading": {
+        "verb": "use-credential",
+        "affected_element_ids": [
+          "entity:colleague",
+          "process:store-admin-console",
+          "flow:entity:colleague>process:store-admin-console>change-prices-and-void"
+        ]
+      },
+      "verdict": "different",
+      "ruling": "The draft covers continued use of an issued token but omits the nightly-pull delay that permits access and token issuance before removal; it covers only part of the reference.",
+      "reviewed_by": "mstarks01",
+      "source": "QA-2026-09-25-01-near-miss-ballot-1 row 10: flag-on run E-02"
+    },
+    {
+      "lane": "spoofing",
+      "reference": {
+        "verb": "forge",
+        "affected_element_ids": [
+          "store:key-store",
+          "process:identity-broker"
+        ]
+      },
+      "reading": {
+        "verb": "alter",
+        "affected_element_ids": [
+          "store:key-store",
+          "flow:process:identity-broker>store:key-store>read-signing-key",
+          "process:identity-broker"
+        ]
+      },
+      "verdict": "different",
+      "ruling": "Replacing the trusted signing key introduces a different attack and prerequisite from minting tokens with a compromised existing key; shared downstream consequences do not make this only a filing difference.",
+      "reviewed_by": "mstarks01",
+      "source": "QA-2026-09-25-01-near-miss-ballot-1 row 11: flag-on run T-03"
     }
   ]
 }

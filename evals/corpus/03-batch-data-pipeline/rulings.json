@@ -10,13 +10,14 @@
           "process:spark-transform-job"
         ]
       },
-      "also_acceptable": {
+      "reading": {
         "verb": "plant",
         "affected_element_ids": [
           "flow:entity:insurance-partner>store:landing-bucket>push-daily-extract",
           "store:landing-bucket"
         ]
       },
+      "verdict": "same",
       "ruling": "The draft explicitly includes altered claim rows passing schema-only checks into the warehouse; the upload path and plant wording are acceptable.",
       "reviewed_by": "mstarks01",
       "source": "QA-2026-09-25-01 near-miss ballot row 3: baseline 6bff717 T-01"

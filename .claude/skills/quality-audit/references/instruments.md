@@ -25,6 +25,7 @@ Run everything from the repository root, under `uv run`.
 | `python -m evals.harness.run pairing` | the two sides of one case's applicability disagreement |
 | `python -m evals.harness.run calibrate` | how far the identity rule agrees with the calibration labels |
 | `python -m evals.harness.run review --voter <login> <artifacts>` | what a reviewer has waiting over a finished sweep |
+| `python -m evals.harness.run near-misses <artifact> --out ballot.csv` | the missed must-finds a free same-lane draft may state with another verb or place, as a ballot a person answers; `near-miss-rulings` records the answers in `rulings.json` |
 | `python -m evals.harness.run experiments` | what a prior audit already tested, and whether the tree moved under it |
 | `python -m evals.harness.run phases` | the six phases and the graph nodes each owns; `--node` answers for one node |
 | `python evals/verify_corpus.py` | the corpus lint: what each case holds, how much of it is unsigned, and whether a verified input carries a reference answer |

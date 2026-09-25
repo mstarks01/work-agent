@@ -10,13 +10,14 @@
           "flow:entity:payroll-system>store:file-share>collect-payroll-export"
         ]
       },
-      "also_acceptable": {
+      "reading": {
         "verb": "alter",
         "affected_element_ids": [
           "store:file-share",
           "flow:process:scheduling-service>store:file-share>write-payroll-export"
         ]
       },
+      "verdict": "same",
       "ruling": "Both describe alteration of the stored payroll export before collection; the write path is acceptable.",
       "reviewed_by": "mstarks01",
       "source": "QA-2026-09-25-01 near-miss ballot row 6: baseline 6bff717 T-03"
@@ -30,7 +31,7 @@
           "flow:entity:colleague>process:scheduling-web-app>view-shifts"
         ]
       },
-      "also_acceptable": {
+      "reading": {
         "verb": "escalate",
         "affected_element_ids": [
           "entity:colleague",
@@ -39,6 +40,7 @@
           "flow:entity:store-manager>process:scheduling-web-app>build-rota"
         ]
       },
+      "verdict": "same",
       "ruling": "Both describe a colleague gaining manager-only rota-writing authority if role enforcement fails; escalate accurately describes the reference's attack.",
       "reviewed_by": "mstarks01",
       "source": "QA-2026-09-25-01 filing ballot 2 row 3: baseline 6bff717 E-01"

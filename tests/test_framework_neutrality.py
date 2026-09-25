@@ -269,6 +269,14 @@ DECLARED: dict[str, str] = {
         " reading, instead. `INSTRUMENTS` already declares the instrument"
         ' `frameworks=("stride",)`; this is the module behind it.'
     ),
+    "evals/harness/near_misses.py": (
+        "This code is STRIDE's, through `DraftThreat` and the `losses` rows it"
+        " reads. A near miss is a draft at another verb or place than its"
+        " claim, which only a package whose claims compose an identity from an"
+        " action and a place can write; a package whose claims carry a catalog"
+        " identifier matches on that identifier and has no second reading to"
+        " ask about."
+    ),
     "evals/verify_corpus.py": (
         "Six tables keyed by framework (record fields, record checks, lane"
         " accessor, ASVS-only chapter check, calibration-fixture input, verb"

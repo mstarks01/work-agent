@@ -1,0 +1,27 @@
+{
+  "case": "07-cicd-store-deploy",
+  "stride": [
+    {
+      "lane": "elevation-of-privilege",
+      "reference": {
+        "verb": "escalate",
+        "affected_element_ids": [
+          "process:build-runner",
+          "process:store-server"
+        ]
+      },
+      "reading": {
+        "verb": "abuse-grant",
+        "affected_element_ids": [
+          "process:build-runner",
+          "flow:process:build-runner>process:deploy-controller>set-current-release",
+          "process:deploy-controller"
+        ]
+      },
+      "verdict": "different",
+      "ruling": "The reference combines image-writing and release-selection authority after build-runner compromise. The draft describes cross-pipeline abuse of a shared token to select a release; it does not establish control over the selected image's contents.",
+      "reviewed_by": "mstarks01",
+      "source": "QA-2026-09-25-01-near-miss-ballot-1 row 15: #739 plain repeat r3"
+    }
+  ]
+}

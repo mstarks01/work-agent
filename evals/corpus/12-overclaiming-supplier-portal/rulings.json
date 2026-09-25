@@ -10,13 +10,14 @@
           "flow:process:supplier-master-service>store:landing-bucket>load-extract"
         ]
       },
-      "also_acceptable": {
+      "reading": {
         "verb": "plant",
         "affected_element_ids": [
           "flow:entity:portal-vendor>store:landing-bucket>push-nightly-extract",
           "store:landing-bucket"
         ]
       },
+      "verdict": "same",
       "ruling": "Both describe a modified landing-bucket extract becoming authoritative supplier records; the upload path and plant wording are acceptable.",
       "reviewed_by": "mstarks01",
       "source": "QA-2026-09-25-01 near-miss ballot row 7: baseline 6bff717 T-01"
@@ -30,13 +31,14 @@
           "process:supplier-master-service"
         ]
       },
-      "also_acceptable": {
+      "reading": {
         "verb": "flood",
         "affected_element_ids": [
           "store:landing-bucket",
           "flow:entity:portal-vendor>store:landing-bucket>push-nightly-extract"
         ]
       },
+      "verdict": "same",
       "ruling": "Flooding supplies a specific mechanism for preventing the nightly load and leaving supplier data stale; the draft explicitly describes that consequence.",
       "reviewed_by": "mstarks01",
       "source": "QA-2026-09-25-01 near-miss ballot row 8: baseline 6bff717 D-02"
@@ -50,7 +52,7 @@
           "entity:supplier"
         ]
       },
-      "also_acceptable": {
+      "reading": {
         "verb": "guess-credential",
         "affected_element_ids": [
           "entity:supplier",
@@ -58,6 +60,7 @@
           "flow:entity:supplier>process:supplier-portal>upload-documents"
         ]
       },
+      "verdict": "same",
       "ruling": "The draft includes presenting a compromised password and uploading as the supplier. However, it overclaims that the password alone is sufficient; preserve the reference's condition about unverified additional controls.",
       "reviewed_by": "mstarks01",
       "source": "QA-2026-09-25-01 filing ballot 2 row 4: baseline 6bff717 S-01"
@@ -71,7 +74,7 @@
           "process:supplier-portal"
         ]
       },
-      "also_acceptable": {
+      "reading": {
         "verb": "escalate",
         "affected_element_ids": [
           "entity:supplier",
@@ -79,9 +82,55 @@
           "process:supplier-portal"
         ]
       },
+      "verdict": "same",
       "ruling": "Both describe an authenticated supplier accessing another supplier's documents if ownership authorization fails; escalate versus abuse-grant is a filing difference.",
       "reviewed_by": "mstarks01",
       "source": "QA-2026-09-25-01 filing ballot 2 row 5: baseline 6bff717 E-01"
+    },
+    {
+      "lane": "elevation-of-privilege",
+      "reference": {
+        "verb": "escalate",
+        "affected_element_ids": [
+          "flow:entity:category-manager>process:supplier-portal>review-documents",
+          "process:supplier-portal"
+        ]
+      },
+      "reading": {
+        "verb": "escalate",
+        "affected_element_ids": [
+          "entity:supplier",
+          "flow:entity:supplier>process:supplier-portal>upload-documents",
+          "process:supplier-portal"
+        ]
+      },
+      "verdict": "different",
+      "ruling": "Cross-supplier document access does not state the ability to invoke a manager's review action and self-approve.",
+      "reviewed_by": "mstarks01",
+      "source": "QA-2026-09-25-01-near-miss-ballot-1 row 9: baseline 6bff717 E-01"
+    },
+    {
+      "lane": "elevation-of-privilege",
+      "reference": {
+        "verb": "escalate",
+        "affected_element_ids": [
+          "flow:entity:category-manager>process:supplier-portal>review-documents",
+          "process:supplier-portal"
+        ]
+      },
+      "reading": {
+        "verb": "abuse-grant",
+        "affected_element_ids": [
+          "entity:supplier",
+          "flow:entity:supplier>process:supplier-portal>upload-documents",
+          "process:supplier-portal",
+          "store:document-store"
+        ]
+      },
+      "verdict": "different",
+      "ruling": "Uploading into another supplier's records does not state the ability to exercise reviewer authority and self-approve.",
+      "reviewed_by": "mstarks01",
+      "source": "QA-2026-09-25-01-near-miss-ballot-1 row 13: flag-on run E-02"
     }
   ]
 }

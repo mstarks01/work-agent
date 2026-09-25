@@ -85,6 +85,7 @@ from evals.harness import (
     ledger,
     losses,
     modes,
+    near_misses,
     oracle,
     pairing,
     population,
@@ -1331,6 +1332,58 @@ def command_score(args: argparse.Namespace) -> int:
     return 0
 
 
+def command_near_misses(args: argparse.Namespace) -> int:
+    """Write the near-miss ballot for a finished sweep, scored as ``score`` scores it.
+
+    Offline and free: the same reports, identity rule and primary series as
+    :func:`command_score`, read through :mod:`~evals.harness.near_misses`.
+    """
+    path = Path(args.artifact)
+    loaded = load_artifact(path)
+    cases = [case for case in load_corpus(args.corpus) if case.id in loaded.cases]
+    if not cases:
+        print(f"{path}: none of its cases are in {args.corpus}", file=sys.stderr)
+        return 1
+    runs = runs_from_reports(path, cases)
+    frameworks = tuple(
+        sorted(
+            {block.framework for run in runs.values() for block in run.report.analyses}
+        )
+    )
+    by_series, _ = _scored_sweep(
+        Sweep(run=ModeRun.empty(frameworks)),
+        cases,
+        runs,
+        Path(args.ledger),
+        Path(args.roster),
+    )
+    sweep = by_series[standings.PRIMARY]
+    ballot = near_misses.rows(
+        cases,
+        sweep.scores,
+        sweep.losses,
+        {case: stride_threats(run.report) for case, run in runs.items()},
+        source=path.stem,
+    )
+    near_misses.write(ballot, Path(args.out))
+    print(f"{len(ballot)} near miss(es) written to {args.out}")
+    return 0
+
+
+def command_near_miss_rulings(args: argparse.Namespace) -> int:
+    """Record a returned near-miss ballot's ``same`` rows as signed rulings."""
+    try:
+        answered = near_misses.returned_rows(Path(args.ballot), Path(args.returned))
+        added = near_misses.record(
+            answered, Path(args.corpus), args.reviewed_by, Path(args.ballot).stem
+        )
+    except (CorpusError, ValueError) as error:
+        print(f"refused, nothing written: {error}", file=sys.stderr)
+        return 1
+    print(f"{added} ruling(s) written from {len(answered)} returned row(s)")
+    return 0
+
+
 def _warn_across_groups(ran_on: str, scored_on: str) -> None:
     """Say so when the figures and the artifact name different corpora.
 
@@ -2086,6 +2139,41 @@ def _promote_arguments(parser: argparse.ArgumentParser) -> None:
     )
 
 
+def _near_misses_arguments(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument("artifact", help="a sweep artifact with a .reports/ dir")
+    parser.add_argument("--out", required=True, help="where to write the ballot CSV")
+    parser.add_argument(
+        "--ledger",
+        default=str(ledger.DEFAULT_LEDGER_PATH),
+        help="the vote ledger the standings are read from",
+    )
+    parser.add_argument(
+        "--roster",
+        default=str(roster.DEFAULT_ROSTER_PATH),
+        help="the standing roster the scored series are split by",
+    )
+    parser.add_argument(
+        "--corpus",
+        default=str(DEFAULT_CORPUS_DIR),
+        help="corpus root, for the reference sets and flow maps",
+    )
+
+
+def _near_miss_rulings_arguments(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument("ballot", help="the ballot CSV near-misses wrote")
+    parser.add_argument("returned", help="the ballot as the reader returned it")
+    parser.add_argument(
+        "--reviewed-by",
+        required=True,
+        help="the login of the person who ruled; it signs every ruling written",
+    )
+    parser.add_argument(
+        "--corpus",
+        default=str(DEFAULT_CORPUS_DIR),
+        help="corpus root whose rulings.json files receive the rulings",
+    )
+
+
 def _score_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("artifact", help="a sweep artifact with a .reports/ dir")
     parser.add_argument(
@@ -2487,6 +2575,17 @@ COMMANDS: dict[str, Command] = {
         " omits (#1091, no credentials)",
         run=assembly.command_assembly,
         arguments=assembly.arguments,
+    ),
+    "near-misses": Command(
+        help="write a ballot of the missed must-finds a same-lane draft may state"
+        " with another verb or place (offline)",
+        run=command_near_misses,
+        arguments=_near_misses_arguments,
+    ),
+    "near-miss-rulings": Command(
+        help="record a returned near-miss ballot's 'same' rows as signed rulings",
+        run=command_near_miss_rulings,
+        arguments=_near_miss_rulings_arguments,
     ),
     "critic-replay": Command(
         help="send one archived case's critic request again and compare its"
