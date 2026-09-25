@@ -113,7 +113,6 @@ __all__ = [
     "SETTLING_REASONS",
     "SPAN_REFUSALS",
     "UNIVERSAL_TERMS",
-    "UNPROJECTED",
     "Answer",
     "Assertion",
     "AssertionCatalog",
@@ -133,6 +132,7 @@ __all__ = [
     "QualifierKind",
     "Quarantined",
     "QuoteProposal",
+    "Refusal",
     "SpanSource",
     "Standing",
     "Subject",
@@ -364,10 +364,9 @@ class Predicate:
     ``meaning`` is the definition, held here rather than in a prompt or a guide
     so that schema validation, the consumers and the evaluation coverage all
     read one sentence. ``projects_into`` names the graph field this predicate
-    is authoritative for, or ``""`` where the graph has no field — which is the
-    majority of them, and :data:`UNPROJECTED` is the set rather than a count
-    written here. A count in this sentence went stale the day the registry
-    grew, and nothing read it (#941).
+    is authoritative for, or ``""`` where the graph has no field. Whether one
+    row reaches that field is :func:`projected_attribute`'s question, because
+    the field belongs to an element type and not to every subject.
     """
 
     meaning: str
@@ -824,6 +823,17 @@ class Quarantined(BaseModel):
     codes: list[CatalogIssueCode] = Field(min_length=1)
 
 
+class Refusal(NamedTuple):
+    """One row a record lost, as :meth:`AssertionRecord.refusals` lists it."""
+
+    codes: tuple[str, ...]
+    #: The built row's identity, or ``""`` for a proposed row that never had
+    #: one or a row whose predicate the registry does not hold.
+    identity: str = ""
+    #: The proposed row's index, for a row lost before the gate built it.
+    proposed_row: int | None = None
+
+
 class AssertionRecord(BaseModel):
     """What one job's assertion pass produced, kept on the **Report**.
 
@@ -928,23 +938,43 @@ class AssertionRecord(BaseModel):
             quarantined=removed,
         )
 
-    def refused_rows(self) -> int:
-        """How many rows were refused, by whichever pass refused them.
+    def refusals(self) -> tuple[Refusal, ...]:
+        """Every row this record lost, one entry each, by whichever pass lost it.
 
-        **The one reader of "how many rows did this record lose".** The
-        resolver names the proposed row it dropped (:attr:`CatalogIssue.row`),
-        so each is counted once however many reasons it drew. The gate's
-        removals are counted off :attr:`quarantined`, the rows
-        :func:`quarantine` actually took, because a refusal of one subject
+        **The one reader of "which rows did this record lose".** The resolver
+        names the proposed row it dropped (:attr:`CatalogIssue.row`), so each
+        is one entry however many reasons it drew. The gate's removals are the
+        rows :func:`quarantine` actually took, because a refusal of one subject
         takes every row about it. A refusal of the whole catalog loses every
-        proposed row. ``support-truncated`` and ``graph-contradiction`` refuse
-        nothing and are not counted.
+        proposed row, so each proposed row is one entry. ``support-truncated``
+        and ``graph-contradiction`` refuse nothing and are not entries.
         """
         refusals = [issue for issue in self.issues if issue.code in GATE_REFUSALS]
-        if any(issue.code in CATALOG_REFUSALS for issue in refusals):
-            return self.proposed
-        rows = {issue.row for issue in refusals if issue.row is not None}
-        return len(rows) + len(self.quarantined)
+        whole = tuple(
+            sorted({issue.code for issue in refusals if issue.code in CATALOG_REFUSALS})
+        )
+        if whole:
+            return tuple(
+                Refusal(whole, proposed_row=row) for row in range(self.proposed)
+            )
+        by_row: dict[int, set[str]] = {}
+        for issue in refusals:
+            if issue.row is not None:
+                by_row.setdefault(issue.row, set()).add(issue.code)
+        return (
+            *(
+                Refusal(tuple(sorted(codes)), proposed_row=row)
+                for row, codes in sorted(by_row.items())
+            ),
+            *(
+                Refusal(tuple(sorted(removed.codes)), identity=removed.identity)
+                for removed in self.quarantined
+            ),
+        )
+
+    def refused_rows(self) -> int:
+        """How many rows this record lost: one per :meth:`refusals` entry."""
+        return len(self.refusals())
 
 
 @dataclass(frozen=True)
@@ -1392,20 +1422,6 @@ def projection_fields() -> Mapping[str, str]:
         }
     )
 
-
-#: The predicates the graph has no field for, on any element. Read off
-#: :data:`REGISTRY`, so a predicate added tomorrow is classified by its field
-#: and never listed.
-#:
-#: **Not the routing rule.** Whether a row reaches a graph field is a property
-#: of the row — :func:`projected_attribute` — and whether it is cited as itself
-#: is :func:`offered`'s. A predicate outside this set still reaches nothing on
-#: an element type without its field, and ADR 0036's first reading, which
-#: routed by predicate, left such a row with neither a projection nor an
-#: evidence entry (#926).
-UNPROJECTED: frozenset[str] = frozenset(
-    name for name, predicate in REGISTRY.items() if not predicate.projects_into
-)
 
 #: What a catalog holds about one subject under one predicate. ``unasked`` is
 #: no row at all; ``unknown`` is rows that all read :data:`UNKNOWN`;

@@ -29,7 +29,6 @@ import pytest
 
 from analysis_service.assertions import (
     REGISTRY,
-    UNPROJECTED,
     Assertion,
     AssertionCatalog,
     CatalogIssue,
@@ -115,7 +114,9 @@ class TestEveryFixtureIsReadThreeWays:
         """The two spellings of "the graph has no home for this" agree."""
         for one in FIXTURES:
             for want in one.wants:
-                assert bool(want.attribute) == (want.predicate not in UNPROJECTED)
+                assert bool(want.attribute) == bool(
+                    REGISTRY[want.predicate].projects_into
+                )
 
 
 class TestTheShapesTheSchemaCannotHold:

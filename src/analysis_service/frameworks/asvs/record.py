@@ -365,8 +365,8 @@ class RequirementProposals(ProposalBatch):
 class RequirementRulingProposal(Ruling):
     """The critic's ruling on one draft, with nothing of this package's own.
 
-    STRIDE's ruling may replace a draft's severity. ASVS has no draft field a
-    ruling could replace, so this adds nothing to the neutral shape and exists
+    A ruling replaces no draft field in any package, and this one adds no
+    judgement of its own, so it adds nothing to the neutral shape. It exists
     only so the wrapper below has an element type to narrow to.
     """
 

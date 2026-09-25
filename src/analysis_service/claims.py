@@ -1008,18 +1008,6 @@ class Claim(BaseModel):
         return cls.text_of_unit(cls.unit_of(draft))
 
     @classmethod
-    def rating_of(cls, draft: Claim) -> tuple[str, str] | None:
-        """The two ratings a draft carries, where this framework grades harm.
-
-        ``None`` for a framework that grades nothing, which is what the
-        neutral shape says; a package with a ``severity`` returns its
-        ``likelihood`` and ``impact`` so the review seam can compare two drafts
-        of one fact pattern without reading a package's field (#444).
-        """
-        del draft
-        return None
-
-    @classmethod
     def lane_diagnostics(cls, drafts: Sequence[Claim]) -> list[str]:
         """What this framework wants *logged* about one job's drafts. Nothing, here.
 

@@ -20,6 +20,7 @@ from analysis_service.assertions import (
     AssertionCatalog,
     AssertionRecord,
     CatalogIssue,
+    Quarantined,
     Subject,
     assertion_id,
 )
@@ -126,6 +127,63 @@ class TestEveryRowIsRoutedByTheJobsReaders:
             assertion_id(entry) for entry in entries
         ]
         assert {row.codes for row in rows} == {("dangling-binding",)}
+
+    def test_a_refused_catalog_loses_every_proposed_row(self) -> None:
+        """Three proposed rows merged into two, then the gate refused the
+        catalog: all three are lost, not the two it built."""
+        held = AssertionRecord(
+            proposed=3,
+            catalog=AssertionCatalog(),
+            issues=[CatalogIssue(code="too-many-subjects", message="")],
+            quarantined=[
+                Quarantined(identity=identity, codes=["too-many-subjects"])
+                for identity in ("assertion:a", "assertion:b")
+            ],
+        )
+        rows = population.population("case", held, MODEL)
+
+        assert [row.proposed_row for row in rows] == [0, 1, 2]
+        assert {row.codes for row in rows} == {("too-many-subjects",)}
+
+
+def _refused_records() -> list[AssertionRecord]:
+    ghost = "flow:entity:shopper>process:storefront-api>ghost"
+    return [
+        record(
+            issues=[
+                CatalogIssue(code="unverifiable-span", message="", row=3),
+                CatalogIssue(code="missing-scope", message="", row=3),
+            ]
+        ),
+        AssertionRecord.over(
+            AssertionCatalog(
+                subjects=[Subject(id=ghost, type="interaction", label="ghost")],
+                entries=[stated(subject=ghost), stated(subject=ghost, value="SSO")],
+            ),
+            MODEL,
+            SOURCES,
+            proposed=2,
+        ),
+        AssertionRecord(
+            proposed=3,
+            catalog=AssertionCatalog(),
+            issues=[CatalogIssue(code="too-many-subjects", message="")],
+            quarantined=[
+                Quarantined(identity="assertion:a", codes=["too-many-subjects"])
+            ],
+        ),
+    ]
+
+
+@pytest.mark.parametrize("held", _refused_records())
+def test_the_population_and_the_record_agree_on_what_was_refused(
+    held: AssertionRecord,
+) -> None:
+    """The review population and the promotion gate's refusal rate read one
+    rule, so they are held against each other rather than apart."""
+    rows = population.population("case", held, MODEL)
+
+    assert sum(row.route == "refused" for row in rows) == held.refused_rows()
 
 
 class TestAPopulationIsFrozenBeforeReview:

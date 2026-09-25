@@ -15,7 +15,7 @@ from pydantic import ValidationError
 
 from analysis_service.assertions import (
     ABSENT,
-    UNPROJECTED,
+    REGISTRY,
     Assertion,
     AssertionCatalog,
     Qualifier,
@@ -373,7 +373,7 @@ class TestEvidenceCatalog:
         catalog = evidence_catalog(model, held)
 
         assert [projection.reason for projection in applied] == ["stated"]
-        assert "authentication-mechanism" not in UNPROJECTED
+        assert REGISTRY["authentication-mechanism"].projects_into
         assert assertion_id(mechanism) not in catalog
 
     def test_a_row_the_graph_does_not_carry_is_cited_as_itself(self):
