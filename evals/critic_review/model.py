@@ -76,20 +76,14 @@ class Expectation(BaseModel):
     ``status`` is the exact verdict, and it is **optional on purpose**, for two
     different reasons.
 
-    A supported draft carrying an unknown it does not depend on ought to be
-    ``confirmed``, and today it cannot be: ``_confirmed_on_unknown_issues``
-    refuses a ``confirmed`` on any draft with an unknown ground, so
-    ``needs-info`` is the only surviving verdict available. Pinning an exact
-    status there would pin that limitation as though it were the answer.
-
-    **Whether the critic judged the unknown irrelevant is now observable.** A
-    ``confirmed`` on a draft citing an unknown is reachable only by naming every
-    such pair in ``immaterial_unknowns``, so the ruling states the judgement
-    rather than leaving a critic that weighed relevance and one that never
-    looked producing the same answer. ``judged_the_unknown`` on the replay's
-    outcome reads it. An exact ``status`` is still optional, because which
-    surviving verdict a fixture deserves is a separate question from whether
-    the critic engaged with the unknown.
+    ``status`` is optional first because code decides it from the ruling's
+    fields. A draft citing an unknown reads ``confirmed`` only where the critic
+    names every such pair in ``immaterial_unknowns``, and
+    :func:`~analysis_service.critic.complete_rulings` turns any pair it leaves
+    out into a ``needs-info``. So the ruling states whether the critic judged
+    the unknown irrelevant, and ``judged_the_unknown`` on the replay's outcome
+    reads it. Which surviving verdict a fixture deserves is a separate question
+    from whether the critic engaged with the unknown.
 
     ``rejected_because`` is optional for the second reason: which step kills a
     contradicted draft is a live question — the model showing what the draft

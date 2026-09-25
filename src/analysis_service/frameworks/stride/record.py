@@ -258,13 +258,6 @@ class DraftThreat(Claim):
         return ThreatRuling(id=ruling.id, verdict=ruling.verdict, confidence="low")
 
     @classmethod
-    def rating_of(cls, draft: Claim) -> tuple[str, str] | None:
-        """This framework grades harm, so a draft's two ratings are its own."""
-        if not isinstance(draft, DraftThreat):
-            return None
-        return draft.severity.likelihood, draft.severity.impact
-
-    @classmethod
     def lane_diagnostics(cls, drafts: Sequence[Claim]) -> list[str]:
         """Every lane whose drafts are not numbered ``01..N``, as messages.
 

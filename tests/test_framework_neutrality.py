@@ -939,7 +939,6 @@ NEUTRAL_HOOKS: dict[str, str] = {
     "unsupported": "record",
     "unit_text": "record",
     "text_of_unit": "record",
-    "rating_of": "record",
     "scope_entries": "block",
     "summarize": "block",
 }

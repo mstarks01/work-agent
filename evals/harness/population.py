@@ -38,7 +38,6 @@ from pathlib import Path
 from typing import Any, Literal
 
 from analysis_service.assertions import (
-    GATE_REFUSALS,
     UNKNOWN,
     AssertionRecord,
     CatalogProposal,
@@ -82,7 +81,7 @@ class PopulationRow:
     identity: str
     #: What refused it, for a ``refused`` row.
     codes: tuple[str, ...] = ()
-    #: The proposed row's index, for a row the resolver refused.
+    #: The proposed row's index, for a row lost before the gate built it.
     proposed_row: int | None = None
 
 
@@ -120,19 +119,15 @@ def population(
             route = "set-aside"
         rows.append(PopulationRow(case, route, identity))
 
-    # The resolver's refusals name a proposed row; the gate's removals are
-    # the rows `quarantine` took, one entry each, whatever the issue named.
-    dropped: dict[int, set[str]] = {}
-    for issue in record.issues:
-        if issue.row is not None and issue.code in GATE_REFUSALS:
-            dropped.setdefault(issue.row, set()).add(issue.code)
-    for index, codes in sorted(dropped.items()):
-        rows.append(
-            PopulationRow(case, "refused", "", tuple(sorted(codes)), proposed_row=index)
-        )
     rows.extend(
-        PopulationRow(case, "refused", removed.identity, tuple(sorted(removed.codes)))
-        for removed in record.quarantined
+        PopulationRow(
+            case,
+            "refused",
+            refusal.identity,
+            refusal.codes,
+            proposed_row=refusal.proposed_row,
+        )
+        for refusal in record.refusals()
     )
     return tuple(rows)
 
