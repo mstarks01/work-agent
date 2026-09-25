@@ -16,6 +16,7 @@ import pytest
 from pydantic import BaseModel
 
 from analysis_service.assertions import (
+    ABSENT,
     MAX_SPANS,
     Assertion,
     AssertionCatalog,
@@ -602,6 +603,35 @@ class TestCorrections:
 
         assert not result.rolled_back
         assert result.record.quarantined == [removed]
+
+    def test_a_patch_reports_a_standing_contradiction_once(self) -> None:
+        """A contradiction is found again over the patched catalog, so the
+        record's own copy is not carried beside it: each patch that landed
+        added one more."""
+        model, record = base()
+        (queue,) = model.data_stores
+        queue.encryption_at_rest = "AES-256 volume encryption"
+        (entry,) = record.catalog.entries
+        absent = entry.model_copy(
+            update={"predicate": "storage-encryption", "value": ABSENT}
+        )
+        record = AssertionRecord.over(
+            record.catalog.model_copy(update={"entries": [entry, absent]}),
+            model,
+            SOURCES,
+            proposed=2,
+        )
+        for handle in ("o1", "o2"):
+            result = apply_patch(
+                PatchBatch(operations=[place(handle, "store:queue")]),
+                model,
+                record,
+                SOURCES,
+            )
+            assert not result.rolled_back
+            model, record = result.model, result.record
+
+        assert [issue.code for issue in record.issues] == ["graph-contradiction"]
 
 
 class TestRollback:

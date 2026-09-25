@@ -15,10 +15,13 @@ hand is a lint an author stops reading.
 So the scan is ``ast`` over the names themselves, and it is narrow in one way
 and wide in three others.
 
-**Methods stay out of scope.** A framework calls them by name -- every
-``@field_validator`` and ``@model_validator`` in the tree is defined and never
-called -- and that is the false-positive class above. Nothing here can tell one
-from a genuinely dead method.
+**A decorated method stays out of scope.** A framework calls it by name --
+every ``@field_validator`` and ``@model_validator`` in the tree is defined and
+never called -- and that is the false-positive class above. A method with no
+decorator, or only ``@classmethod`` or ``@staticmethod``, is called by code, so
+a third lint holds it: its name must be used somewhere. By name, not by class,
+because an override is a definition and not a use. ``Claim.rating_of`` and its
+STRIDE override lost their one caller and passed both earlier lints.
 
 **Subpackages are in scope.** The scan reads the package recursively, because
 ``frameworks/`` is where a package's own helpers live.
@@ -339,3 +342,62 @@ def test_a_cluster_dies_together():
     }
     assert isinstance(live, set) and isinstance(dropped, set)
     assert dropped <= live, "skipping a dead body cannot add a use"
+
+
+#: The decorators that leave a method something code calls by name. Any other
+#: decorator may hand the method to a framework that calls it instead.
+_PLAIN_DECORATORS = frozenset({"classmethod", "staticmethod"})
+
+
+def _uncalled_methods(tree: ast.Module, used: set[str]) -> list[tuple[str, int]]:
+    """Each plain method in ``tree`` whose name ``used`` does not hold."""
+    return [
+        (f"{node.name}.{method.name}", method.lineno)
+        for node in ast.walk(tree)
+        if isinstance(node, ast.ClassDef)
+        for method in node.body
+        if isinstance(method, (ast.FunctionDef, ast.AsyncFunctionDef))
+        and not method.name.startswith("__")
+        and {ast.unparse(d).split("(")[0] for d in method.decorator_list}
+        <= _PLAIN_DECORATORS
+        and method.name not in used
+    ]
+
+
+def test_no_plain_method_is_unreachable():
+    """The third lint: a method code would call has a caller somewhere."""
+    used = _used_names(ignoring=frozenset())
+    dead = [
+        f"{path.relative_to(REPO_ROOT)}:{line} {name}"
+        for scope, _ in SCOPES
+        for path in source_files(scope)
+        for name, line in _uncalled_methods(parse(path), used)
+    ]
+
+    assert not dead, (
+        f"no code calls these methods: {dead}. Delete each one, or give it the"
+        " caller it was written for"
+    )
+
+
+def test_an_override_is_not_a_use():
+    """Positive control, on the shape that got through: a base method and its
+    override, and no call to either."""
+    module = ast.parse(
+        "class Base:\n"
+        "    @classmethod\n"
+        "    def rated(cls):\n"
+        "        return None\n"
+        "class Child(Base):\n"
+        "    def rated(self):\n"
+        "        return 1\n"
+        "    @property\n"
+        "    def shown(self):\n"
+        "        return 2\n"
+    )
+
+    assert [name for name, _ in _uncalled_methods(module, set())] == [
+        "Base.rated",
+        "Child.rated",
+    ]
+    assert _uncalled_methods(module, {"rated"}) == []
