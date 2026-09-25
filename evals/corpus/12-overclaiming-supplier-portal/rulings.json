@@ -40,6 +40,48 @@
       "ruling": "Flooding supplies a specific mechanism for preventing the nightly load and leaving supplier data stale; the draft explicitly describes that consequence.",
       "reviewed_by": "mstarks01",
       "source": "QA-2026-09-25-01 near-miss ballot row 8: baseline 6bff717 D-02"
+    },
+    {
+      "lane": "spoofing",
+      "reference": {
+        "verb": "use-credential",
+        "affected_element_ids": [
+          "flow:entity:supplier>process:supplier-portal>upload-documents",
+          "entity:supplier"
+        ]
+      },
+      "also_acceptable": {
+        "verb": "guess-credential",
+        "affected_element_ids": [
+          "entity:supplier",
+          "process:supplier-portal",
+          "flow:entity:supplier>process:supplier-portal>upload-documents"
+        ]
+      },
+      "ruling": "The draft includes presenting a compromised password and uploading as the supplier. However, it overclaims that the password alone is sufficient; preserve the reference's condition about unverified additional controls.",
+      "reviewed_by": "mstarks01",
+      "source": "QA-2026-09-25-01 filing ballot 2 row 4: baseline 6bff717 S-01"
+    },
+    {
+      "lane": "elevation-of-privilege",
+      "reference": {
+        "verb": "abuse-grant",
+        "affected_element_ids": [
+          "flow:entity:supplier>process:supplier-portal>upload-documents",
+          "process:supplier-portal"
+        ]
+      },
+      "also_acceptable": {
+        "verb": "escalate",
+        "affected_element_ids": [
+          "entity:supplier",
+          "flow:entity:supplier>process:supplier-portal>upload-documents",
+          "process:supplier-portal"
+        ]
+      },
+      "ruling": "Both describe an authenticated supplier accessing another supplier's documents if ownership authorization fails; escalate versus abuse-grant is a filing difference.",
+      "reviewed_by": "mstarks01",
+      "source": "QA-2026-09-25-01 filing ballot 2 row 5: baseline 6bff717 E-01"
     }
   ]
 }

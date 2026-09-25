@@ -604,7 +604,10 @@ own. The scorer tries the claim's own reading first, and a match on the ruled
 reading says so in its rationale.
 
 A ruling only adds a reading, so no draft that matched before can stop
-matching. The loader refuses a ruling that names no claim, or more than one.
+matching. The scorer assigns every match the claims' own readings make
+first, and a ruled reading may then take only a claim still unmatched, with
+a draft still free. So a ruling on one claim cannot take a draft that
+another claim matched as written. The loader refuses a ruling that names no claim, or more than one.
 It also refuses an element the model does not carry, and a verb the lane
 does not admit. So a ruling fails loudly when its claim's place or verb
 changes, and a reword keeps it.
