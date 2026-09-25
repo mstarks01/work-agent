@@ -33,6 +33,7 @@ from analysis_service.assertions import (
     AssertionRecord,
     CatalogIssue,
     CatalogProposal,
+    Quarantined,
     project,
     subject_id,
 )
@@ -180,6 +181,10 @@ def write_assertions(
     * ``catalog`` — the rows code built, which every count was taken over.
     * ``issues`` — why each dropped row dropped, structured as a repair pass
       would receive it.
+    * ``proposed`` and ``quarantined`` — how many rows were proposed, and the
+      built rows the gate removed. With ``issues`` they are what
+      :meth:`~analysis_service.assertions.AssertionRecord.refused_rows` reads,
+      so a replay counts a refused catalog as the loss it was.
     * ``projection`` — what each graph attribute the rows reach would hold, the
       reason it reads that way, and the rows behind it. It is here rather than
       recomputed by a reader because a degraded value is only explainable with
@@ -215,6 +220,10 @@ def write_assertions(
                     "catalog": result.catalog.model_dump(mode="json"),
                     "issues": [
                         issue.model_dump(mode="json") for issue in result.issues
+                    ],
+                    "proposed": result.record.proposed,
+                    "quarantined": [
+                        row.model_dump(mode="json") for row in result.record.quarantined
                     ],
                     "projection": [
                         asdict(projection) for projection in project(result.catalog)
@@ -473,8 +482,7 @@ def assertions_from_reports(
         results[case.id] = modes.AssertionResult(
             case_id=case.id,
             proposal=lifted,
-            catalog=record.catalog,
-            issues=tuple(record.issues),
+            record=record,
             stages=written.get("stages", {}),
         )
     return results
@@ -579,10 +587,19 @@ def heads_from_reports(
         results[case.id] = modes.AssertionResult(
             case_id=case.id,
             proposal=written.get("proposal", {}),
-            catalog=redrawn(AssertionCatalog.model_validate(written["catalog"])),
-            issues=tuple(
-                CatalogIssue.model_validate(issue)
-                for issue in written.get("issues", ())
+            record=AssertionRecord(
+                proposed=written.get(
+                    "proposed", len(written.get("proposal", {}).get("assertions", ()))
+                ),
+                catalog=redrawn(AssertionCatalog.model_validate(written["catalog"])),
+                issues=[
+                    CatalogIssue.model_validate(issue)
+                    for issue in written.get("issues", ())
+                ],
+                quarantined=[
+                    Quarantined.model_validate(row)
+                    for row in written.get("quarantined", ())
+                ],
             ),
             # What every earlier node wrote, which for a facts-first head is
             # the bundle and its dispositions. A charge that has to say whether

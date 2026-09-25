@@ -31,6 +31,7 @@ from analysis_service.assertions import (
     REGISTRY,
     Assertion,
     AssertionCatalog,
+    AssertionRecord,
     CatalogIssue,
     assertion_id,
 )
@@ -391,13 +392,16 @@ def _refused_result(wanted: Assertion) -> AssertionResult:
     return AssertionResult(
         case_id="synthetic",
         proposal=_proposal(wanted),
-        catalog=AssertionCatalog(),
-        issues=(
-            CatalogIssue(
-                code="unverifiable-span",
-                message="the quote is in no source",
-                row=0,
-            ),
+        record=AssertionRecord(
+            proposed=1,
+            catalog=AssertionCatalog(),
+            issues=[
+                CatalogIssue(
+                    code="unverifiable-span",
+                    message="the quote is in no source",
+                    row=0,
+                )
+            ],
         ),
     )
 
@@ -407,8 +411,7 @@ def _empty_result() -> AssertionResult:
     return AssertionResult(
         case_id="synthetic",
         proposal={"assertions": []},
-        catalog=AssertionCatalog(),
-        issues=(),
+        record=AssertionRecord(proposed=0, catalog=AssertionCatalog()),
     )
 
 
