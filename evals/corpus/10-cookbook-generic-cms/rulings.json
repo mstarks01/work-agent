@@ -1,0 +1,26 @@
+{
+  "case": "10-cookbook-generic-cms",
+  "stride": [
+    {
+      "lane": "tampering",
+      "reference": {
+        "verb": "plant",
+        "affected_element_ids": [
+          "store:cdn-bucket",
+          "entity:cdn"
+        ]
+      },
+      "also_acceptable": {
+        "verb": "alter",
+        "affected_element_ids": [
+          "flow:process:web-server>store:cdn-bucket>asset-publish",
+          "store:cdn-bucket",
+          "process:web-server"
+        ]
+      },
+      "ruling": "Both describe replacing published bucket assets with malicious content delivered to readers; alter versus plant is a filing difference.",
+      "reviewed_by": "mstarks01",
+      "source": "QA-2026-09-25-01 filing ballot 2 row 2: baseline 6bff717 T-04"
+    }
+  ]
+}
