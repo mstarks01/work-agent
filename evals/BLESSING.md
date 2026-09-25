@@ -45,7 +45,8 @@ evals/corpus/<NN>-<slug>/
   corrections.md  how the model was corrected against the source, and what that says
   facts.json      the reference facts a reader signed, per predicate (step 7); absent until drafted
   rulings.json    other readings a person ruled answer a STRIDE claim (step 8); absent until ruled
-  case.json       metadata, plus the sources array declaring the case's input
+  case.json       metadata, the sources array declaring the case's input, and
+                  `holdout`: whether the case is held out of tuning
 ```
 
 A case may declare **more than one source**, because a job may submit more than

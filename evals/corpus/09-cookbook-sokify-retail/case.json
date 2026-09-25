@@ -4,6 +4,7 @@
   "domain": "online-retail",
   "provenance": "OWASP Threat Model Cookbook, \"Sokify\" (Flow Diagram/sokify/alt1-sokify.json, Threat Dragon), https://github.com/OWASP/threat-model-cookbook — textual and graphical representations CC-BY 4.0. Converted to submitted-text form for this corpus; the source model carries no threat annotations to copy.",
   "bootstrap": "agent-stand-in",
+  "holdout": false,
   "sources": [
     {
       "kind": "description",

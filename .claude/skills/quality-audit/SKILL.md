@@ -155,6 +155,9 @@ Before any paid sweep, run one case first and read its provenance.
 - Never sign anything on the user's behalf. A signature is a human judgement.
 - Never expose a held-out answer to generation. Oracle-assisted runs are
   diagnostics and are reported apart from any score.
+- Never diagnose a **Holdout Case** (`holdout: true` in `case.json`). The
+  diagnosis commands filter it out and the replays refuse it. Read only its
+  figure in the holdout split, and only to confirm a fix measured elsewhere.
 - Never claim a report improved from an intermediate metric. The ladder in
   `references/experiment-protocol.md` says what each rung licenses.
 - A structural identity match is not proof that a finding is semantically

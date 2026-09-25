@@ -60,7 +60,7 @@ from analysis_service.system_model import (
 from evals.harness.alignment import align
 from evals.harness.arms import ArmRun
 from evals.harness.modes import AssertionResult
-from evals.harness.reference import GoldenCase, load_corpus
+from evals.harness.reference import GoldenCase, load_corpus, tuning_cases
 from evals.harness.replay import (
     SignedReference,
     classify_elements,
@@ -786,7 +786,7 @@ def _broke(probe: Probe, outcome: Outcome) -> tuple[str, ...]:
 
 def outcomes(corpus_dir: Path) -> list[Outcome]:
     """Every probe, run. A probe whose case nobody signed raises rather than passes."""
-    cases = {case.id: case for case in load_corpus(corpus_dir)}
+    cases = {case.id: case for case in tuning_cases(load_corpus(corpus_dir))}
     found = []
     for name, probe in PROBES.items():
         case = cases[probe.case_id]
@@ -1029,7 +1029,7 @@ def consume_probe(
 
 def consumed(corpus_dir: Path) -> list[Consumed]:
     """Every probe through the job, unreviewed and then reviewed."""
-    cases = {case.id: case for case in load_corpus(corpus_dir)}
+    cases = {case.id: case for case in tuning_cases(load_corpus(corpus_dir))}
     found = []
     for name, probe in PROBES.items():
         case = cases[probe.case_id]

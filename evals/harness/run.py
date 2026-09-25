@@ -163,8 +163,10 @@ from evals.harness.reference import (
     GoldenCase,
     corpus_argument,
     corpus_refusal,
+    diagnosable,
     flows_by_case,
     load_corpus,
+    tuning_cases,
 )
 from evals.harness.scorer import CaseScore
 from evals.harness.stability import (
@@ -682,9 +684,12 @@ def _score_runs(
         produced = stride_threats(runs[case.id].report)
         entry = score_case_with_yield(case, drafts, produced, matcher, votes, block)
         scored.append(entry)
+        if not diagnosable(case):
+            continue
         # The third reading off the same pass: what lost each miss, from the
         # score's own misses, the two sides the yield already compares, and the
-        # block's own record of how its first critic pass failed.
+        # block's own record of how its first critic pass failed. Never for a
+        # holdout case, whose losses no diagnosis reads.
         charged.append(
             losses.attribute_case(
                 case,
@@ -1340,7 +1345,11 @@ def command_near_misses(args: argparse.Namespace) -> int:
     """
     path = Path(args.artifact)
     loaded = load_artifact(path)
-    cases = [case for case in load_corpus(args.corpus) if case.id in loaded.cases]
+    cases = [
+        case
+        for case in tuning_cases(load_corpus(args.corpus))
+        if case.id in loaded.cases
+    ]
     if not cases:
         print(f"{path}: none of its cases are in {args.corpus}", file=sys.stderr)
         return 1
@@ -1473,7 +1482,7 @@ def command_price_verbs(args: argparse.Namespace) -> int:
     candidate so the gain is a number beside the price. Nothing is adopted; the
     table is what a decision on ``EQUIVALENT`` reads (#730).
     """
-    corpus = load_corpus(args.corpus)
+    corpus = tuning_cases(load_corpus(args.corpus))
     pairs = load_pairs(args.pairs)
     produced = None
     analysed: dict[str, Any] = {}
@@ -1537,7 +1546,7 @@ def command_pairing(args: argparse.Namespace) -> int:
     case = next(
         (
             entry
-            for entry in load_corpus(args.corpus)
+            for entry in tuning_cases(load_corpus(args.corpus))
             if entry.id == args.case and entry.id in loaded.cases
         ),
         None,
@@ -1619,7 +1628,7 @@ def command_extraction_losses(args: argparse.Namespace) -> int:
     try:
         end_to_end, analysis = load_runs([args.end_to_end, args.analysis])
         extraction_losses.refuse_unpaired(end_to_end, analysis)
-        corpus = {case.id: case for case in load_corpus(args.corpus)}
+        corpus = {case.id: case for case in tuning_cases(load_corpus(args.corpus))}
         models = {}
         for framework, case_id in sorted(end_to_end.cases & analysis.cases):
             if extraction_losses.names_elements(framework) and case_id in corpus:
@@ -1748,7 +1757,7 @@ def command_bind(args: argparse.Namespace) -> int:
     """
     corpus_dir = Path(args.corpus)
     try:
-        cases = load_corpus(corpus_dir)
+        cases = tuning_cases(load_corpus(corpus_dir))
         graphs = [
             (path.name, extractions_from_reports(path, cases))
             for path in map(Path, args.graphs)

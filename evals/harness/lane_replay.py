@@ -51,6 +51,7 @@ from evals.harness.bundle import reports_dir
 from evals.harness.modes import EvalRunError
 from evals.harness.node_call import NodeCall, node_call
 from evals.harness.provenance import REPO_ROOT
+from evals.harness.reference import CorpusError, refuse_holdout
 
 
 def lane_of(framework: FrameworkName, name: str) -> Lane:
@@ -156,8 +157,9 @@ def arguments(parser: argparse.ArgumentParser) -> None:
 def command_lane_replay(args: argparse.Namespace) -> int:
     """Send one captured lane request again, and print what the lane proposed."""
     try:
+        refuse_holdout(args.case)
         material = load_material(args.artifact, args.case)
-    except EvalRunError as error:
+    except (CorpusError, EvalRunError) as error:
         print(error, file=sys.stderr)
         return 1
     ran_at = json.loads(args.artifact.read_text(encoding="utf-8"))["repo_commit"]

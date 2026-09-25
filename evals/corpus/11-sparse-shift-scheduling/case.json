@@ -4,6 +4,7 @@
   "domain": "workforce-scheduling",
   "provenance": "Synthetic system authored for this corpus (wayfinder ticket 029). Not derived from, or sanitized from, any real system: there is nothing to leak by omission.",
   "bootstrap": "agent-stand-in",
+  "holdout": false,
   "sources": [
     {
       "kind": "description",

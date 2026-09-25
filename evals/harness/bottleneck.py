@@ -93,7 +93,7 @@ from evals.harness.alignment import Alignment, align
 from evals.harness.artifact import load_artifact
 from evals.harness.bundle import heads_from_reports
 from evals.harness.modes import AssertionResult
-from evals.harness.reference import MUST_FIND, GoldenCase, load_corpus
+from evals.harness.reference import MUST_FIND, GoldenCase, load_corpus, tuning_cases
 from evals.harness.replay import (
     ADJUDICATED_WRONG,
     AliasTarget,
@@ -1751,7 +1751,7 @@ def command_bottleneck(args: argparse.Namespace) -> int:
     if args.artifact:
         specs = [parse_spec(spec) for spec in args.artifact]
         arms = sorted({arm for arm, _, _ in specs})
-        cases = load_corpus(args.corpus)
+        cases = tuning_cases(load_corpus(args.corpus))
         charges, skipped = charge_misses(specs, cases, args.corpus)
         print("\n" + render_misses(charges, arms))
         relaxations = relax(specs, cases, args.corpus)

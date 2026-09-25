@@ -68,6 +68,7 @@ from evals.harness.lane_replay import load_material
 from evals.harness.modes import EvalRunError
 from evals.harness.node_call import NodeCall, node_call
 from evals.harness.provenance import REPO_ROOT
+from evals.harness.reference import CorpusError, refuse_holdout
 
 
 @dataclass(frozen=True)
@@ -242,8 +243,9 @@ def arguments(parser: argparse.ArgumentParser) -> None:
 def command_critic_replay(args: argparse.Namespace) -> int:
     """Send one archived critic request again and compare the verdicts."""
     try:
+        refuse_holdout(args.case)
         archived = load(args.artifact, args.case, args.framework)
-    except (EvalRunError, FileNotFoundError) as error:
+    except (CorpusError, EvalRunError, FileNotFoundError) as error:
         print(error, file=sys.stderr)
         return 1
     ran_at = json.loads(args.artifact.read_text(encoding="utf-8"))["repo_commit"]

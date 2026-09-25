@@ -71,7 +71,7 @@ from analysis_service.prompts import (
     compose_rows_prompt,
 )
 from analysis_service.sources import render_sources
-from evals.harness.reference import GoldenCase, load_corpus
+from evals.harness.reference import GoldenCase, load_corpus, tuning_cases
 from evals.harness.replay import (
     ADJUDICATED,
     ADJUDICATED_WRONG,
@@ -913,7 +913,7 @@ def command_price_arms(args: argparse.Namespace) -> int:
     functions the graph renders with. It answers the input half of #1003's cost
     gate and says plainly that it answers no more than that.
     """
-    cases = load_corpus(args.corpus)
+    cases = tuning_cases(load_corpus(args.corpus))
     references = {}
     for case in cases:
         found = signed_reference(args.corpus, case)

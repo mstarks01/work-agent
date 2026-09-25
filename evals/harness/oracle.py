@@ -95,7 +95,7 @@ from analysis_service.system_model import (
     TrustBoundary,
 )
 from evals.harness.modes import AssertionResult
-from evals.harness.reference import GoldenCase, load_corpus
+from evals.harness.reference import GoldenCase, load_corpus, tuning_cases
 from evals.harness.replay import (
     SignedReference,
     replay_assertions,
@@ -487,7 +487,7 @@ def _stage_of(
 def charges(corpus_dir: Path) -> list[CaseCharge]:
     """Every signed case, charged. A case nobody signed is skipped."""
     found = []
-    for case in load_corpus(corpus_dir):
+    for case in tuning_cases(load_corpus(corpus_dir)):
         reference = signed_reference(corpus_dir, case)
         if reference is not None:
             found.append(charge(case, reference))
