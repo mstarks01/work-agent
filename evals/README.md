@@ -150,6 +150,7 @@ evals/
     claims/<framework>.json     that framework's reference set, keyed to model.json's IDs
     corrections.md              notes on how the model was corrected, and why
     facts.json                  the reference facts, per predicate; a draft until signed (five cases)
+    rulings.json                other readings a person ruled answer a STRIDE claim (optional)
     case.json                   metadata, provenance, and the declared sources
   calibration_labels/
     build_pairs.py              the match fixtures and their labels (edit this)

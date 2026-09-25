@@ -8,7 +8,9 @@ standing lookup, the severity arithmetic — the halves that must never drift.
 
 from __future__ import annotations
 
+from dataclasses import replace
 from pathlib import Path
+from types import MappingProxyType
 
 import pytest
 
@@ -16,15 +18,22 @@ from analysis_service.claims import Ground
 from evals.harness.calibration import load_pairs
 from evals.harness.content import structural
 from evals.harness.fingerprint import components_for, version_for
+from evals.harness.identity import SubsetVerbIdentity
 from evals.harness.ledger import Ledger
-from evals.harness.reference import load_case
+from evals.harness.reference import flows_by_case, load_case
 from evals.harness.scorer import (
     candidate_claim,
     exemplar_delta,
     score_case,
     unlisted_for_promotion,
 )
-from tests.eval_factories import ScriptedMatcher, cast, produced_threat, threat_for
+from tests.eval_factories import (
+    ScriptedMatcher,
+    cast,
+    draft_threat,
+    produced_threat,
+    threat_for,
+)
 
 CORPUS_DIR = Path(__file__).resolve().parents[1] / "evals" / "corpus"
 CONTROL_CASE = CORPUS_DIR / "01-payments-checkout"
@@ -555,7 +564,12 @@ def test_recall_and_artifact_over_the_whole_labelled_set(
     assert score.must_find_coverage > 0.0
     artifact = score.to_json()
     assert artifact["counts"]["produced"] == len(produced)
-    assert len(artifact["rulings"]) == len(matcher.claim_calls)
+    # One ruling per pair asked about. A reference with a ruled reading asks
+    # the matcher once per reading, so calls are counted by pair.
+    asked = {
+        (call.reference_claim, call.candidate_claim) for call in matcher.claim_calls
+    }
+    assert len(artifact["rulings"]) == len(asked)
     assert all(ruling["rationale"] for ruling in artifact["rulings"])
 
 
@@ -603,3 +617,28 @@ def test_a_threat_citing_an_id_the_blessed_model_lacks_is_foreign(case, no_votes
     assert score.foreign == ("S-01",)
     assert [entry.threat_id for entry in score.unlisted] == ["S-02"]
     assert score.to_json()["counts"]["foreign"] == 1
+
+
+def test_a_draft_at_a_ruled_reading_matches_and_says_so():
+    """The ruled reading adds a match, and only the ruling adds it."""
+    case = load_case(CORPUS_DIR / "02-iot-fleet-telemetry")
+    reference = case.stride_claims()[5]
+    alternate = case.ruled_readings[5][0]
+    draft = draft_threat(
+        1,
+        reference.category,
+        "Readings cannot be attributed to one node",
+        element_ids=alternate.affected_element_ids,
+        verb=alternate.verb,
+    )
+    matcher = SubsetVerbIdentity(flows_by_case([case]))
+
+    ruled = score_case(case, [draft], matcher, Ledger())
+    unruled = score_case(
+        replace(case, ruled_readings=MappingProxyType({})), [draft], matcher, Ledger()
+    )
+
+    assert [pair.reference_index for pair in ruled.matched] == [5]
+    assert unruled.matched == ()
+    ruling = next(r for r in ruled.rulings if r.reference_index == 5 and r.match)
+    assert ruling.rationale.startswith("a ruled reading")

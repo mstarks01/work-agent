@@ -44,6 +44,7 @@ evals/corpus/<NN>-<slug>/
                   that framework's reference set, written against model.json's IDs
   corrections.md  how the model was corrected against the source, and what that says
   facts.json      the reference facts a reader signed, per predicate (step 7); absent until drafted
+  rulings.json    other readings a person ruled answer a STRIDE claim (step 8); absent until ruled
   case.json       metadata, plus the sources array declaring the case's input
 ```
 
@@ -572,6 +573,45 @@ control the model states or states absent must be reached by a row that
 agrees with it, and every row that states a control must land on one the
 model states, unless the pair is disputed. A file with an unsigned row skips
 that gate rather than passing it, so no figure can rest on a draft.
+
+### 8. Rule on other readings of a STRIDE claim
+
+A STRIDE reference claim holds one verb and one place. A lane can state the
+same finding with a neighbouring verb, or at a neighbouring place, and the
+scorer then counts the claim as missed. When a person reads both and rules
+that they are one finding, record the ruling in `rulings.json` beside
+`model.json`:
+
+```json
+{
+  "case": "02-iot-fleet-telemetry",
+  "stride": [
+    {
+      "lane": "repudiation",
+      "reference": {"verb": "unattributable", "affected_element_ids": ["..."]},
+      "also_acceptable": {"verb": "unattributable", "affected_element_ids": ["..."]},
+      "ruling": "Why the two are one finding, in the reader's words.",
+      "reviewed_by": "<login>",
+      "source": "where the ruling was made"
+    }
+  ]
+}
+```
+
+`reference` names the claim by its own lane, verb and place, as they read
+now. `also_acceptable` is the reading the scorer accepts beside the claim's
+own. The scorer tries the claim's own reading first, and a match on the ruled
+reading says so in its rationale.
+
+A ruling only adds a reading, so no draft that matched before can stop
+matching. The loader refuses a ruling that names no claim, or more than one.
+It also refuses an element the model does not carry, and a verb the lane
+does not admit. So a ruling fails loudly when its claim's place or verb
+changes, and a reword keeps it.
+
+The file is not one of the files a sitting opens, so a ruling does not un-read
+the case. The ruling is itself the signature: `reviewed_by` names the person
+who made it.
 
 ### A reader with no clone: one page out, one pull request back
 
