@@ -1,0 +1,27 @@
+{
+  "case": "13-dispatch-control-plane",
+  "stride": [
+    {
+      "lane": "elevation-of-privilege",
+      "reference": {
+        "verb": "ride-session",
+        "affected_element_ids": [
+          "flow:process:dispatch-console>process:dispatch-api>dispatch-requests",
+          "process:dispatch-api"
+        ]
+      },
+      "reading": {
+        "verb": "escalate",
+        "affected_element_ids": [
+          "process:dispatch-console",
+          "flow:process:dispatch-console>process:dispatch-api>dispatch-requests",
+          "process:dispatch-api"
+        ]
+      },
+      "verdict": "different",
+      "ruling": "The reference concerns cross-site requests riding an authorized engineer's browser session. The draft concerns callers gaining dispatch authority through missing server-side authentication or authorization; it does not state cross-site request inducement or use of the engineer's session.",
+      "reviewed_by": "mstarks01",
+      "source": "QA-2026-09-25-01-near-miss-ballot-3 row 2: mstarks01-e32ad9c5 E-01"
+    }
+  ]
+}
