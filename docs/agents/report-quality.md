@@ -46,6 +46,9 @@ before a new experiment: `python -m evals.harness.run experiments --signature
 | Sweep B, holdout cases by structure | 9 of 14 (case 14: 3 of 7, case 15: 6 of 7) | `evals/experiments/QA-2026-09-26-01.md`, E2 |
 | Completeness instruction, missed must-finds recovered by meaning (30 lanes, two passes) | 8 and 8, against 3 and 4 for a plain repeat | ledger `QA-2026-09-26-01-E2` |
 | Completeness instruction end to end (cases 02, 05, 10) | must-finds 13 to 15; lane proposals 44 to 84 | ledger `QA-2026-09-26-01-E5` |
+| Sweep B, tuned cases, findings that are conditional (needs-info) | 175 of 200, on 129 open facts | ledger `QA-2026-09-26-02-E1` |
+| Lane closing on cases 02, 05, 10: needs-info, confirmed, open facts | 38 to 78, 6 to 6, 28 to 44 | ledger `QA-2026-09-26-02-E1` |
+| Share of needs-info findings six ranked questions settle (cases 02, 05, 10) | 76% without the closing, 63% with it; ten settle 82% | ledger `QA-2026-09-26-02-E2` |
 
 The holdout figure measures agreement with references that nobody has read yet
 (see open work below). The corpus spread is about 3.4 must-finds per sweep, so
@@ -114,7 +117,8 @@ fan-in loss.
 ## Evidence index
 
 **Ledger rows:** `evals/experiments/QA-2026-09-26-01.jsonl` (E1 to E5) and its
-report `evals/experiments/QA-2026-09-26-01.md`; the earlier audit
+report `evals/experiments/QA-2026-09-26-01.md`; `evals/experiments/QA-2026-09-26-02.jsonl` (E1, E2,
+the report side of the lane closing) and its report; the earlier audit
 `evals/experiments/QA-2026-09-25-01.jsonl`.
 
 **Human rulings, committed:**

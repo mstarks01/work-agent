@@ -1949,7 +1949,7 @@ class PlacementReliance:
 
 
 def placement_reliance(corpus_dir: Path) -> tuple[PlacementReliance, ...]:
-    """Every tuned case's must-find findings, against the crossings they rest on."""
+    """Every tuned case's must-finds in every framework, and the crossings cited."""
     found = []
     for case in tuning_cases(load_corpus(corpus_dir)):
         crossings = case.model.boundary_crossings()
@@ -1977,7 +1977,10 @@ def placement_reliance(corpus_dir: Path) -> tuple[PlacementReliance, ...]:
 def render_reliance(found: Sequence[PlacementReliance]) -> str:
     """The reliance table, over whatever cases carry claims."""
     lines = [
-        "| case | must-finds | on an assumed crossing | on two inferred zones |",
+        (
+            "| case | must-finds, every framework | on an assumed crossing"
+            " | on two inferred zones |"
+        ),
         "| --- | ---: | ---: | ---: |",
     ]
     for one in found:
