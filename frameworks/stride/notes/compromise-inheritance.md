@@ -2,7 +2,7 @@
 
 ## When this applies
 
-An internet-facing process originates flows across a trust boundary, and what its own identity is entitled to do on the other side is unstated.
+An internet-facing process originates flows across a trust boundary, and what its own identity is entitled to do on the other side is unstated. Or a store holding a graded asset is read by named elements, and the question is what one of those readers, or a grant like theirs, exposes.
 
 ## What to look for
 
