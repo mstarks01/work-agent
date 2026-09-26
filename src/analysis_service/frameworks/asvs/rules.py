@@ -45,8 +45,9 @@ below, and the table is the whole of what is authored.
 
 from __future__ import annotations
 
-from collections.abc import Iterator
+from collections.abc import Iterator, Mapping
 from dataclasses import dataclass
+from types import MappingProxyType
 
 from analysis_service.analysis import (
     TEXT_ATTRIBUTES,
@@ -58,10 +59,11 @@ from analysis_service.analysis import (
 )
 from analysis_service.assertions import AssertionCatalog
 from analysis_service.candidates import Match, Rule, clip_fact
-from analysis_service.frameworks import PreconditionResult
+from analysis_service.frameworks import NoRule, PreconditionResult, PredicateReader
 from analysis_service.system_model import SystemModel
 
 __all__ = [
+    "PREDICATE_READERS",
     "PRESENCE_TESTS",
     "RULES",
     "STRUCTURAL_RULES",
@@ -851,3 +853,37 @@ def asvs_precondition(model: SystemModel) -> PreconditionResult:
         return "undecidable" if silent or not model.data_flows else "refuted"
 
     return "undecidable"
+
+
+#: Why no ASVS candidate rule reads an assertion predicate. The rules here find
+#: where a requirement applies, by a technology or a structure the graph shows,
+#: and a requirement is a control the lane checks rather than a weakness it is
+#: led to. So a stated fact changes how a lane rules a requirement, never which
+#: requirements it is shown, and the lane reads the settled row as evidence.
+_RULED_AS_EVIDENCE = NoRule(
+    "a candidate rule of this framework selects requirements by what the graph"
+    " shows is present; a stated fact bears on how a lane rules a requirement,"
+    " and the lane reads the settled row as evidence"
+)
+
+#: Every predicate with no graph field, each written out rather than generated,
+#: so a predicate added to the registry fails the package gate until somebody
+#: decides whether this framework needs a rule for it.
+PREDICATE_READERS: Mapping[str, PredicateReader] = MappingProxyType(
+    {
+        "administrative-authority": _RULED_AS_EVIDENCE,
+        "authorization-grant": _RULED_AS_EVIDENCE,
+        "credential-custody": _RULED_AS_EVIDENCE,
+        "credential-expiry": _RULED_AS_EVIDENCE,
+        "credential-lifetime": _RULED_AS_EVIDENCE,
+        "credential-revocation": _RULED_AS_EVIDENCE,
+        "credential-rotation": _RULED_AS_EVIDENCE,
+        "credential-sharing": _RULED_AS_EVIDENCE,
+        "destination-verification": _RULED_AS_EVIDENCE,
+        "mfa-requirement": _RULED_AS_EVIDENCE,
+        "origin-verification": _RULED_AS_EVIDENCE,
+        "represented-by": _RULED_AS_EVIDENCE,
+        "signature-verification": _RULED_AS_EVIDENCE,
+        "tenant-ownership": _RULED_AS_EVIDENCE,
+    }
+)

@@ -1,4 +1,4 @@
-"""STRIDE's twelve deterministic candidate rules.
+"""STRIDE's deterministic candidate rules.
 
 A **Candidate** is not a finding. It is a mechanically evaluated condition over
 the validated System Model — "this flow crosses a trust boundary and its
@@ -26,9 +26,10 @@ The representation is deliberately small. It is a tuple of
 lane it belongs to, the question it puts to that agent, and a plain function
 from model to matches. There is no rule DSL, no condition tree and no engine,
 because the thing a maintainer needs to do most often is read one rule and
-decide whether it is right, and a table of twelve functions is the
+decide whether it is right, and a table of plain functions is the
 representation that makes that cheapest. Adding a rule means writing a function
-and appending to :data:`RULES`.
+and appending to :data:`RULES`. A rule that reads an assertion predicate is also
+named against it in :data:`PREDICATE_READERS`.
 
 Rules fire on structure, never on prose. The attribute predicates come from
 :mod:`analysis_service.analysis`, which reads a control attribute's leading
@@ -43,7 +44,8 @@ question and an attribution question, and the two agents answer differently.
 
 from __future__ import annotations
 
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator, Mapping
+from types import MappingProxyType
 
 from analysis_service.analysis import (
     comparable_asset_tags,
@@ -63,12 +65,14 @@ from analysis_service.assertions import (
     AssertionCatalog,
     answer,
 )
-from analysis_service.candidates import Match, Rule, clip_fact
-from analysis_service.system_model import SystemModel
+from analysis_service.candidates import Fact, Match, Rule, clip_fact
+from analysis_service.frameworks import NoRule, PredicateReader
+from analysis_service.system_model import DataFlow, SystemModel
 
 __all__ = [
     "ENTERED_ZONE_KINDS",
     "LEFT_ZONE_KINDS",
+    "PREDICATE_READERS",
     "RULES",
     "SHARED_DEPENDENCY_MIN",
 ]
@@ -184,19 +188,18 @@ def _second_factor_stated_absent(
         )
 
 
-def _principal_absence(
-    catalog: AssertionCatalog, element_id: str
-) -> tuple[Assertion, ...]:
-    """Rows saying a principal this element stands for needs no second factor.
+def _principals_of(catalog: AssertionCatalog, element_id: str) -> tuple[str, ...]:
+    """The principals the sources say this element stands for.
 
     The identification is read from the catalog and never guessed here: a
     principal reaches an element only through a settled ``represented-by``,
     whose own gate rule refuses a basis this service inferred. So a wrong lead
     needs a source that states the wrong thing, rather than a rule that decided
-    two names looked alike.
+    two names looked alike. Every rule that places a fact about a principal
+    asks this, so the identification has one reader.
     """
     return tuple(
-        row
+        subject.id
         for subject in catalog.subjects
         if subject.type == "principal"
         and element_id
@@ -204,8 +207,100 @@ def _principal_absence(
             entry.value
             for entry in answer(catalog, subject.id, "represented-by").settled
         }
-        for row in answer(catalog, subject.id, "mfa-requirement").holding(ABSENT)
     )
+
+
+def _principal_absence(
+    catalog: AssertionCatalog, element_id: str
+) -> tuple[Assertion, ...]:
+    """Rows saying a principal this element stands for needs no second factor."""
+    return tuple(
+        row
+        for principal in _principals_of(catalog, element_id)
+        for row in answer(catalog, principal, "mfa-requirement").holding(ABSENT)
+    )
+
+
+def _presented_on(catalog: AssertionCatalog, flow: DataFlow) -> frozenset[str]:
+    """The credentials the sources say this flow presents.
+
+    Read from ``credential-presented`` on the flow itself, and on each
+    principal its source element stands for, because a principal presents its
+    credential on every flow it originates. The second path is the one the
+    sources usually take: they say who holds a key more often than which call
+    carries it.
+    """
+    subjects = (flow.id, *_principals_of(catalog, flow.source))
+    return frozenset(
+        entry.value
+        for subject in subjects
+        for entry in answer(catalog, subject, "credential-presented").settled
+    )
+
+
+def _credential_rows(
+    model: SystemModel,
+    catalog: AssertionCatalog,
+    weak: tuple[tuple[str, str], ...],
+) -> Iterator[tuple[DataFlow, tuple[Assertion, ...]]]:
+    """Each flow that presents a credential, with the rows that hold ``weak``.
+
+    ``weak`` pairs a credential predicate with the value that makes it a lead.
+    A flow that presents no such credential is not yielded.
+    """
+    for flow in model.data_flows:
+        rows = tuple(
+            row
+            for credential in sorted(_presented_on(catalog, flow))
+            for predicate, value in weak
+            for row in answer(catalog, credential, predicate).holding(value)
+        )
+        if rows:
+            yield flow, rows
+
+
+def _stated(rows: tuple[Assertion, ...]) -> dict[str, Fact]:
+    """What a lead from catalog rows tells the agent: each fact and its basis."""
+    return {
+        "stated": _clip(
+            "; ".join(f"{row.subject} {row.predicate} {row.value}" for row in rows)
+        ),
+        "basis": ", ".join(sorted({row.basis for row in rows})),
+    }
+
+
+def _stated_on_flow(predicate: str) -> Callable[..., Iterator[Match]]:
+    """A rule that fires where the sources say a flow lacks ``predicate``'s check.
+
+    For the verification predicates, whose subject is the interaction itself,
+    so the lead lands on the flow and both its endpoints with no
+    identification to read. Only a stated absence fires: silence about a check
+    is an ``unknown`` row, which is a question and not a lead.
+    """
+
+    def find(model: SystemModel, catalog: AssertionCatalog) -> Iterator[Match]:
+        for flow in model.data_flows:
+            rows = answer(catalog, flow.id, predicate).holding(ABSENT)
+            if rows:
+                yield (flow.id, flow.source, flow.destination), _stated(rows)
+
+    return find
+
+
+#: The credential facts that keep a credential valid after it leaks.
+_STAYS_VALID = (
+    ("credential-rotation", "not-rotated"),
+    ("credential-expiry", "does-not-expire"),
+    ("credential-revocation", ABSENT),
+)
+
+
+def _standing_credential(
+    model: SystemModel, catalog: AssertionCatalog
+) -> Iterator[Match]:
+    """A flow that presents a credential the sources say stays valid."""
+    for flow, rows in _credential_rows(model, catalog, _STAYS_VALID):
+        yield (flow.id, flow.source, flow.destination), _stated(rows)
 
 
 # --- Tampering --------------------------------------------------------------
@@ -301,6 +396,16 @@ def _unattributable_action(
                 "destination_assets": ", ".join(assets),
             },
         )
+
+
+def _shared_credential(
+    model: SystemModel, catalog: AssertionCatalog
+) -> Iterator[Match]:
+    """A flow that presents a credential the sources say more than one holds."""
+    for flow, rows in _credential_rows(
+        model, catalog, (("credential-sharing", "shared"),)
+    ):
+        yield (flow.id, flow.source, flow.destination), _stated(rows)
 
 
 # --- Information disclosure -------------------------------------------------
@@ -527,6 +632,27 @@ RULES: tuple[Rule, ...] = (
         find=_second_factor_stated_absent,
     ),
     Rule(
+        rule_id="spoofing-origin-stated-unverified",
+        lane="spoofing",
+        question=(
+            "The sources say the receiver of this flow does not check who"
+            " supplied what it takes. Who else can supply it, and as whose"
+            " does the receiver then treat what arrives?"
+        ),
+        find=_stated_on_flow("origin-verification"),
+    ),
+    Rule(
+        rule_id="spoofing-standing-credential",
+        lane="spoofing",
+        question=(
+            "The sources say a credential this flow presents stays valid: it"
+            " is not rotated, does not expire, or cannot be withdrawn. Who"
+            " could come to hold it, and for how long could they act as its"
+            " owner?"
+        ),
+        find=_standing_credential,
+    ),
+    Rule(
         rule_id="tampering-unprotected-transit-crossing",
         lane="tampering",
         question=(
@@ -549,6 +675,16 @@ RULES: tuple[Rule, ...] = (
         find=_unverified_write_to_store,
     ),
     Rule(
+        rule_id="tampering-signature-stated-unverified",
+        lane="tampering",
+        question=(
+            "The sources say the receiver of this flow does not check who"
+            " signed what it takes. Who can substitute or alter it before it"
+            " arrives, and what runs or trusts it afterwards?"
+        ),
+        find=_stated_on_flow("signature-verification"),
+    ),
+    Rule(
         rule_id="repudiation-unattributable-action",
         lane="repudiation",
         question=(
@@ -556,6 +692,16 @@ RULES: tuple[Rule, ...] = (
             " What record names the actor, and would it survive a dispute?"
         ),
         find=_unattributable_action,
+    ),
+    Rule(
+        rule_id="repudiation-shared-credential",
+        lane="repudiation",
+        question=(
+            "The sources say more than one principal holds a credential this"
+            " flow presents. Could the record name which holder acted, and"
+            " who could deny an action taken with it?"
+        ),
+        find=_shared_credential,
     ),
     Rule(
         rule_id="information-disclosure-unprotected-sensitive-transit",
@@ -566,6 +712,16 @@ RULES: tuple[Rule, ...] = (
             " exactly would they read?"
         ),
         find=_unprotected_sensitive_transit,
+    ),
+    Rule(
+        rule_id="information-disclosure-destination-stated-unverified",
+        lane="information-disclosure",
+        question=(
+            "The sources say the sender of this flow does not check that it"
+            " reaches the right place. Who could receive it instead, and what"
+            " would they read?"
+        ),
+        find=_stated_on_flow("destination-verification"),
     ),
     Rule(
         rule_id="information-disclosure-store-at-rest-unverified",
@@ -617,4 +773,49 @@ RULES: tuple[Rule, ...] = (
         ),
         find=_inbound_from_exposed_process,
     ),
+)
+
+
+#: Every assertion predicate with no graph field, and the rule here that reads
+#: it or why none does. A fact of these kinds reaches a lane as an evidence row
+#: whatever this table says; an entry decides only whether it is also a lead.
+PREDICATE_READERS: Mapping[str, PredicateReader] = MappingProxyType(
+    {
+        "mfa-requirement": "spoofing-second-factor-stated-absent",
+        "origin-verification": "spoofing-origin-stated-unverified",
+        "signature-verification": "tampering-signature-stated-unverified",
+        "destination-verification": (
+            "information-disclosure-destination-stated-unverified"
+        ),
+        "credential-sharing": "repudiation-shared-credential",
+        "credential-rotation": "spoofing-standing-credential",
+        "credential-expiry": "spoofing-standing-credential",
+        "credential-revocation": "spoofing-standing-credential",
+        "credential-lifetime": NoRule(
+            "the value is free text, and a rule reads structure, never prose;"
+            " whether a window is long is the lane's judgement"
+        ),
+        "credential-custody": NoRule(
+            "the value is free text naming where a credential is kept, and a"
+            " rule reads structure, never prose"
+        ),
+        "authorization-grant": NoRule(
+            "the resource a grant covers is often something the graph has no"
+            " element for, so a rule cannot place it; the lane reads the row"
+            " (QA-2026-09-22-02)"
+        ),
+        "administrative-authority": NoRule(
+            "it states which component a principal administers, which is a"
+            " role and not a weakness, so there is nothing for a lead to ask"
+        ),
+        "tenant-ownership": NoRule(
+            "it states which party controls a component, which is an owner"
+            " and not a weakness; a crossing into a tenant zone already leads"
+            " the elevation lane"
+        ),
+        "represented-by": NoRule(
+            "it identifies the element a principal is, and the rules read it"
+            " to place every other fact about that principal"
+        ),
+    }
 )

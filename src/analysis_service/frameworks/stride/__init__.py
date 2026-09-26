@@ -1,6 +1,6 @@
 """The STRIDE framework package: this repo's original analysis, as a package.
 
-Nine members and a text root at ``frameworks/stride/``. Everything here is
+Ten members and a text root at ``frameworks/stride/``. Everything here is
 *profile* — the tailoring this service applies — and nothing declares a catalog:
 STRIDE is a method rather than a published requirement set, so there is no
 external artifact to carry or to check a declaration against.
@@ -25,7 +25,7 @@ from analysis_service.frameworks.stride.record import (
     STRIDE_VERSION,
     DraftThreat,
 )
-from analysis_service.frameworks.stride.rules import RULES
+from analysis_service.frameworks.stride.rules import PREDICATE_READERS, RULES
 from analysis_service.system_model import SystemModel
 
 __all__ = ["CASES", "NOTES", "STRIDE", "StrideOptions"]
@@ -78,14 +78,27 @@ NOTES: dict[str, tuple[str, ...]] = {
         # control from a stated absence, which is the distinction the rule
         # fires on.
         "spoofing-second-factor-stated-absent",
+        # A receiver that does not check who supplied a thing is the note's
+        # "claim, not an assertion" failure, and a credential that stays valid
+        # is its distribution-versus-longevity paragraph.
+        "spoofing-origin-stated-unverified",
+        "spoofing-standing-credential",
     ),
     "callback-and-webhook-trust": ("spoofing-unverified-external-caller",),
     "transport-protection": (
         "tampering-unprotected-transit-crossing",
         "information-disclosure-unprotected-sensitive-transit",
     ),
-    "write-path-integrity": ("tampering-unverified-write-to-store",),
-    "attribution-and-audit": ("repudiation-unattributable-action",),
+    "write-path-integrity": (
+        "tampering-unverified-write-to-store",
+        # An unsigned artifact is dangerous where its second reader runs it,
+        # which is this note's first point.
+        "tampering-signature-stated-unverified",
+    ),
+    "attribution-and-audit": (
+        "repudiation-unattributable-action",
+        "repudiation-shared-credential",
+    ),
     "protection-at-rest": ("information-disclosure-store-at-rest-unverified",),
     "cost-of-an-unauthenticated-request": (
         "denial-of-service-internet-exposed-process",
@@ -109,6 +122,13 @@ CASES: dict[str, tuple[str, ...]] = {
         # conditional — which is the half of this case an agent gets wrong in
         # the other direction.
         "spoofing-second-factor-stated-absent",
+        # Each of these leads with a fact the sources state, not an unknown,
+        # so a finding on it is not conditional: the comparison half of this
+        # case.
+        "spoofing-origin-stated-unverified",
+        "spoofing-standing-credential",
+        "tampering-signature-stated-unverified",
+        "information-disclosure-destination-stated-unverified",
     ),
     "stated-control-outside-the-model": (
         "spoofing-unverified-boundary-auth",
@@ -126,7 +146,10 @@ CASES: dict[str, tuple[str, ...]] = {
         "elevation-of-privilege-inbound-from-exposed-process",
         "denial-of-service-shared-dependency",
     ),
-    "shared-credential-attribution": ("repudiation-unattributable-action",),
+    "shared-credential-attribution": (
+        "repudiation-unattributable-action",
+        "repudiation-shared-credential",
+    ),
 }
 
 
@@ -151,4 +174,5 @@ STRIDE = FrameworkPackage(
     knowledge=KnowledgeTables(
         notes=MappingProxyType(NOTES), cases=MappingProxyType(CASES)
     ),
+    predicate_readers=PREDICATE_READERS,
 )

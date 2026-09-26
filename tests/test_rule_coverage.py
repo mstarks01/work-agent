@@ -39,6 +39,16 @@ from analysis_service.validation import parse_and_validate
 
 CORPUS_DIR = Path(__file__).resolve().parents[1] / "evals" / "corpus"
 
+#: Why a rule that reads only the assertion catalog fires on no corpus case: a
+#: blessed case is a model and carries no catalog, so this sweep offers every
+#: rule an empty one. ``tests/test_predicate_readers.py`` fires each such rule
+#: against a catalog directly.
+_READS_ONLY_THE_CATALOG = (
+    "The rule reads only the assertion catalog, and no corpus case carries one."
+    " The remedy is a corpus that carries a blessed catalog beside its model,"
+    " which is #226's reviewed human step and not this rule's to take."
+)
+
 #: Rules the corpus does not exercise, each with the reason it is acceptable.
 #: Every entry here is the *first* reading — the rule is right and no case
 #: describes the shape — so every one is a gap in the corpus rather than in the
@@ -70,6 +80,11 @@ UNEXERCISED: dict[str, str] = {
         " blessed catalog beside its model, which is #226's reviewed human"
         " step and not this rule's to take."
     ),
+    "spoofing-origin-stated-unverified": _READS_ONLY_THE_CATALOG,
+    "spoofing-standing-credential": _READS_ONLY_THE_CATALOG,
+    "tampering-signature-stated-unverified": _READS_ONLY_THE_CATALOG,
+    "repudiation-shared-credential": _READS_ONLY_THE_CATALOG,
+    "information-disclosure-destination-stated-unverified": _READS_ONLY_THE_CATALOG,
 }
 
 
