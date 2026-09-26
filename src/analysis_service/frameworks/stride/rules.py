@@ -491,6 +491,43 @@ def _store_at_rest_unverified(
         )
 
 
+def _store_readers(model: SystemModel, catalog: AssertionCatalog) -> Iterator[Match]:
+    """A store holding a graded asset, with every element that reads it.
+
+    **The access path, beside the storage layer.** The at-rest rule asks who
+    reaches the storage beneath the application, and on its own it pointed
+    every lane at a raw copy: in QA-2026-09-26-01 all 16 drafts at four
+    references that name a read grant or a compromised reader read a storage
+    copy instead, with or without the completeness instruction. This rule names
+    the readers, so the lane can ask what one of them, or a grant like theirs,
+    exposes.
+
+    A reader is the initiator of a flow into the store whose ``operations``
+    is ``read``, ``read-write`` or ``unknown``; a flow stating ``write`` only
+    is skipped, for the reason :func:`_unverified_write_to_store` skips a read.
+    """
+    for store in model.data_stores:
+        assets = sensitive_assets(store)
+        if not assets:
+            continue
+        readers = sorted(
+            {
+                flow.source
+                for flow in inbound_flows(model, store.id)
+                if flow.operations != "write"
+            }
+        )
+        if not readers:
+            continue
+        yield (
+            (store.id, *readers),
+            {
+                "readers": _clip(", ".join(readers)),
+                "assets": ", ".join(assets),
+            },
+        )
+
+
 # --- Denial of service ------------------------------------------------------
 
 
@@ -772,6 +809,16 @@ RULES: tuple[Rule, ...] = (
             " storage layer beneath the application, and what is in it?"
         ),
         find=_store_at_rest_unverified,
+    ),
+    Rule(
+        rule_id="information-disclosure-store-readers",
+        lane="information-disclosure",
+        question=(
+            "These elements read this store through access they already hold."
+            " Who else holds a grant like theirs, and what does compromising one"
+            " of these readers expose?"
+        ),
+        find=_store_readers,
     ),
     Rule(
         rule_id="denial-of-service-internet-exposed-process",

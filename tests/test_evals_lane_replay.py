@@ -202,3 +202,15 @@ def test_a_stride_lane_reads_its_closing_last(recorded):
 
 def test_the_closing_table_answers_for_every_package():
     assert set(LANE_CLOSING_DOC) == set(PACKAGES)
+
+
+def test_fresh_leads_on_todays_run_are_the_leads_it_captured(recorded, case):  # noqa: F811
+    """One reader: rebuilt with today's code, every lane's inputs are the captured ones."""
+    out, _ = recorded
+    material = lane_replay.load_material(out, case.id)
+
+    for lane in FrameworkNodes("stride").lanes:
+        rebuilt = lane_replay.fresh_leads(
+            material, case, "stride", lane.lane, PACKAGE_LOADER
+        )
+        assert rebuilt["lanes"] == material["lanes"], lane.lane
