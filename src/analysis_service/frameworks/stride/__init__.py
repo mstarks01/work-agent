@@ -94,10 +94,16 @@ NOTES: dict[str, tuple[str, ...]] = {
         # An unsigned artifact is dangerous where its second reader runs it,
         # which is this note's first point.
         "tampering-signature-stated-unverified",
+        # Values nobody checks are this note's "stored content that becomes
+        # instruction", reached through a reader that trusts the shape alone.
+        "tampering-content-stated-unvalidated",
     ),
     "attribution-and-audit": (
         "repudiation-unattributable-action",
         "repudiation-shared-credential",
+        # A record naming the conduit rather than the actor is this note's
+        # first point.
+        "repudiation-record-names-intermediary",
     ),
     "protection-at-rest": ("information-disclosure-store-at-rest-unverified",),
     "cost-of-an-unauthenticated-request": (
@@ -129,6 +135,7 @@ CASES: dict[str, tuple[str, ...]] = {
         "spoofing-standing-credential",
         "tampering-signature-stated-unverified",
         "information-disclosure-destination-stated-unverified",
+        "tampering-content-stated-unvalidated",
     ),
     "stated-control-outside-the-model": (
         "spoofing-unverified-boundary-auth",
@@ -149,6 +156,7 @@ CASES: dict[str, tuple[str, ...]] = {
     "shared-credential-attribution": (
         "repudiation-unattributable-action",
         "repudiation-shared-credential",
+        "repudiation-record-names-intermediary",
     ),
 }
 

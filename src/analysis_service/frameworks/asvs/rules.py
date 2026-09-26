@@ -873,6 +873,7 @@ PREDICATE_READERS: Mapping[str, PredicateReader] = MappingProxyType(
     {
         "administrative-authority": _RULED_AS_EVIDENCE,
         "authorization-grant": _RULED_AS_EVIDENCE,
+        "content-validation": _RULED_AS_EVIDENCE,
         "credential-custody": _RULED_AS_EVIDENCE,
         "credential-expiry": _RULED_AS_EVIDENCE,
         "credential-lifetime": _RULED_AS_EVIDENCE,
@@ -882,6 +883,7 @@ PREDICATE_READERS: Mapping[str, PredicateReader] = MappingProxyType(
         "destination-verification": _RULED_AS_EVIDENCE,
         "mfa-requirement": _RULED_AS_EVIDENCE,
         "origin-verification": _RULED_AS_EVIDENCE,
+        "record-attribution": _RULED_AS_EVIDENCE,
         "represented-by": _RULED_AS_EVIDENCE,
         "signature-verification": _RULED_AS_EVIDENCE,
         "tenant-ownership": _RULED_AS_EVIDENCE,

@@ -408,6 +408,27 @@ def _shared_credential(
         yield (flow.id, flow.source, flow.destination), _stated(rows)
 
 
+def _record_names_intermediary(
+    model: SystemModel, catalog: AssertionCatalog
+) -> Iterator[Match]:
+    """A component whose records the sources say name no principal who acted.
+
+    ``intermediary`` means a record names only the component that passed the
+    request on, and ``absent`` that no record is kept. The lead covers the
+    component and every flow into it, because the principal the record loses
+    is at the far end of one of those flows.
+    """
+    for element in model.elements():
+        rows = tuple(
+            row
+            for value in ("intermediary", ABSENT)
+            for row in answer(catalog, element.id, "record-attribution").holding(value)
+        )
+        if rows:
+            writers = tuple(flow.id for flow in inbound_flows(model, element.id))
+            yield (element.id, *writers), _stated(rows)
+
+
 # --- Information disclosure -------------------------------------------------
 
 
@@ -685,6 +706,16 @@ RULES: tuple[Rule, ...] = (
         find=_stated_on_flow("signature-verification"),
     ),
     Rule(
+        rule_id="tampering-content-stated-unvalidated",
+        lane="tampering",
+        question=(
+            "The sources say the receiver of this flow does not check the"
+            " contents of what it takes, beyond their format. Who can put"
+            " well-formed but false values into it, and what acts on them?"
+        ),
+        find=_stated_on_flow("content-validation"),
+    ),
+    Rule(
         rule_id="repudiation-unattributable-action",
         lane="repudiation",
         question=(
@@ -702,6 +733,16 @@ RULES: tuple[Rule, ...] = (
             " who could deny an action taken with it?"
         ),
         find=_shared_credential,
+    ),
+    Rule(
+        rule_id="repudiation-record-names-intermediary",
+        lane="repudiation",
+        question=(
+            "The sources say this component's records name only the component"
+            " that passed a request on, or keep none. Which principal could"
+            " deny an action here, and what else would contradict them?"
+        ),
+        find=_record_names_intermediary,
     ),
     Rule(
         rule_id="information-disclosure-unprotected-sensitive-transit",
@@ -788,6 +829,8 @@ PREDICATE_READERS: Mapping[str, PredicateReader] = MappingProxyType(
             "information-disclosure-destination-stated-unverified"
         ),
         "credential-sharing": "repudiation-shared-credential",
+        "record-attribution": "repudiation-record-names-intermediary",
+        "content-validation": "tampering-content-stated-unvalidated",
         "credential-rotation": "spoofing-standing-credential",
         "credential-expiry": "spoofing-standing-credential",
         "credential-revocation": "spoofing-standing-credential",

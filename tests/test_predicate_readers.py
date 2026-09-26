@@ -38,7 +38,8 @@ STRIDE = PACKAGES["stride"]
 STRIDE_ROOT = PROJECT_ROOT / "frameworks" / "stride"
 
 #: For each predicate a rule may be named against: whether the row sits on the
-#: flow itself or on a credential the flow presents, and the value that leads.
+#: flow itself, on a credential the flow presents or on the component the flow
+#: enters, and the value that leads.
 #: A package naming a rule for a predicate missing here fails with a KeyError,
 #: so a new reader cannot be declared without a fixture that fires it.
 LEADS: dict[str, tuple[str, str]] = {
@@ -50,6 +51,8 @@ LEADS: dict[str, tuple[str, str]] = {
     "credential-rotation": ("credential", "not-rotated"),
     "credential-expiry": ("credential", "does-not-expire"),
     "credential-revocation": ("credential", ABSENT),
+    "content-validation": ("flow", ABSENT),
+    "record-attribution": ("component", "intermediary"),
 }
 
 CREDENTIAL = "credential:api-key"
@@ -89,12 +92,15 @@ def row(subject, predicate, value, **fields):
 
 
 def catalog_on(flow, predicate, value, *, presented=True):
-    """A catalog stating ``predicate`` about ``flow`` or the credential it presents."""
+    """A catalog stating ``predicate`` about ``flow``, or what it presents or enters."""
     where, _ = LEADS[predicate]
     subjects = [Subject(id=flow.id, type="interaction", label=flow.name)]
     entries = []
     if where == "flow":
         entries.append(row(flow.id, predicate, value))
+    elif where == "component":
+        subjects.append(Subject(id=flow.destination, type="component", label="it"))
+        entries.append(row(flow.destination, predicate, value))
     else:
         subjects.append(Subject(id=CREDENTIAL, type="credential", label="API key"))
         entries.append(row(CREDENTIAL, predicate, value))
@@ -151,9 +157,10 @@ def test_the_gate_refuses_a_table_that_does_not_answer(package, message):
 
 @pytest.mark.parametrize(("package", "predicate", "rule_id"), named_readers())
 def test_a_named_rule_fires_on_its_predicate(model, flow, package, predicate, rule_id):
-    _, value = LEADS[predicate]
+    where, value = LEADS[predicate]
     hits = fired(model, rule_id, catalog_on(flow, predicate, value), package)
-    assert [hit.element_ids[0] for hit in hits] == [flow.id]
+    lands_on = flow.destination if where == "component" else flow.id
+    assert [hit.element_ids[0] for hit in hits] == [lands_on]
 
 
 @pytest.mark.parametrize(("package", "predicate", "rule_id"), named_readers())
@@ -238,3 +245,34 @@ def test_a_verified_check_does_not_lead(model, flow):
         entries=[row(flow.id, "signature-verification", "verified")],
     )
     assert fired(model, "tampering-signature-stated-unverified", held) == []
+
+
+class TestARecordThatNamesNoPrincipal:
+    """`record-attribution`: a record naming the conduit, or no record at all."""
+
+    RULE = "repudiation-record-names-intermediary"
+
+    def test_no_record_at_all_leads(self, model, flow):
+        held = catalog_on(flow, "record-attribution", ABSENT)
+        assert [hit.element_ids[0] for hit in fired(model, self.RULE, held)] == [
+            flow.destination
+        ]
+
+    def test_a_record_naming_the_principal_does_not_lead(self, model, flow):
+        held = catalog_on(flow, "record-attribution", "principal")
+        assert fired(model, self.RULE, held) == []
+
+    def test_the_lead_covers_the_flows_that_write_into_it(self, model, flow):
+        """The principal the record loses is at the far end of one of them."""
+        (hit,) = fired(
+            model, self.RULE, catalog_on(flow, "record-attribution", "intermediary")
+        )
+        assert flow.id in hit.element_ids
+
+
+def test_a_validated_content_check_does_not_lead(model, flow):
+    held = AssertionCatalog(
+        subjects=[Subject(id=flow.id, type="interaction", label=flow.name)],
+        entries=[row(flow.id, "content-validation", "validated")],
+    )
+    assert fired(model, "tampering-content-stated-unvalidated", held) == []

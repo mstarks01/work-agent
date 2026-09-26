@@ -200,7 +200,13 @@ __all__ = [
 #: which the signed reference, the extraction contract and ASVS's
 #: classified-store rule all read as no classification (#926). The same version
 #: gives ``network-membership`` the placement rule its graph field already has.
-REGISTRY_VERSION = 7
+#:
+#: Version 8 adds ``record-attribution`` and ``content-validation`` (#1242).
+#: Case 01's source says the receipt "records which order was written and that
+#: the order service wrote it", and case 03's that "nothing validates the row
+#: contents beyond the schema". Each is a stated fact a must-find rests on, and
+#: no predicate could carry either.
+REGISTRY_VERSION = 8
 
 #: The projection's version: which graph attribute each predicate is
 #: authoritative for, and what :func:`project` does when the rows do not fit one
@@ -568,6 +574,29 @@ REGISTRY: Mapping[str, Predicate] = MappingProxyType(
             subjects=frozenset({"component", "zone"}),
             value="reference",
             refers_to=frozenset({"principal"}),
+        ),
+        # Who a record says acted. A record that names only the component that
+        # passed a request on cannot contradict the principal who asked, which
+        # is the repudiation question, and it is a stated fact rather than an
+        # absence of logging: the record exists and names somebody else.
+        "record-attribution": Predicate(
+            meaning="whom this component's records name as the one who acted:"
+            " the principal who asked, or only the component that passed the"
+            " request on",
+            subjects=frozenset({"component"}),
+            value="term",
+            terms=frozenset({"principal", "intermediary"}),
+        ),
+        # A check on what the thing says, not on who sent it or whether it
+        # parses: ``origin-verification`` asks who supplied it, and a schema
+        # check is a format check. Case 03's rows pass the schema and nothing
+        # reads their values before they reach the warehouse.
+        "content-validation": Predicate(
+            meaning="whether the receiver checks the contents of what it takes,"
+            " beyond its format or schema",
+            subjects=frozenset({"interaction"}),
+            value="term",
+            terms=frozenset({"validated"}),
         ),
         # The one predicate that says a subject *is* an element rather than
         # describing one. It is what lets a fact about a class of accounts
