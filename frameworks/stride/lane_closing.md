@@ -1,0 +1,1 @@
+Address every lead and every boundary crossing this request offers your lane. A finding that holds only if a fact the sources leave open is true is still a finding: file it as a conditional draft rather than leave it out. Leave out only what the sources settle against.

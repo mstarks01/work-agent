@@ -14,8 +14,10 @@ import json
 
 import pytest
 
+from analysis_service.frameworks import LANE_CLOSING_DOC, PACKAGES
 from analysis_service.graph import FrameworkNodes
 from analysis_service.markdown_loader import MarkdownLoader
+from analysis_service.prompts import lane_closing
 from evals.harness import lane_replay
 from evals.harness.bundle import reports_dir, write_reports
 from evals.harness.modes import EvalRunError
@@ -183,3 +185,20 @@ def test_a_thought_part_is_not_part_of_the_answer():
     )
 
     assert answer_text(response) == '{"claims": []}'
+
+
+def test_a_stride_lane_reads_its_closing_last(recorded):
+    """ADR 0030's instruction is the last part of every STRIDE lane's user turn."""
+    _, seen = recorded
+    closing = lane_closing(PACKAGE_LOADER, "stride")
+    lane_turns = [contents[-1] for _, contents in seen]
+    stride_lanes = [turn for turn in lane_turns if turn.parts[-1].text == closing]
+
+    # Two cases, six lanes each; the critic's request carries no closing.
+    assert closing
+    assert len(stride_lanes) == 2 * len(FrameworkNodes("stride").lanes)
+    assert len(stride_lanes) < len(seen)
+
+
+def test_the_closing_table_answers_for_every_package():
+    assert set(LANE_CLOSING_DOC) == set(PACKAGES)

@@ -118,6 +118,17 @@ DISCLAIMER_DOC = "disclaimer"
 OUTPUT_DOC = "output"
 SEVERITY_RUBRIC_DOC = "severity_rubric"
 
+#: The text each lane of a package reads **last**, as the final part of its
+#: user turn, or ``None`` for a package that closes nothing. A table rather
+#: than a convention, because the answer differs by package and a missing key
+#: raises. STRIDE's asks a lane to address every lead and crossing it is
+#: offered (ADR 0030); placed inside the instruction, before the exemplars, the
+#: same text lost most of its effect (QA-2026-09-26-01-E4). ASVS closes nothing:
+#: its scope table already gives every selected requirement an entry.
+LANE_CLOSING_DOC: Mapping[FrameworkName, str | None] = MappingProxyType(
+    {"stride": "lane_closing", "asvs": None}
+)
+
 
 class FrameworkPackageError(ConfigError):
     """A package this deployment carries is ill-formed or incomplete on disk.
@@ -851,6 +862,13 @@ def _disk_issues(package: FrameworkPackage, root: Path) -> list[str]:
             f"the package carries {SEVERITY_RUBRIC_DOC}.md but its record grades"
             " nothing, so nothing would read it"
         )
+
+    closing = LANE_CLOSING_DOC.get(package.name)
+    if closing:
+        path = root / f"{closing}.md"
+        expected.add(path)
+        if not _readable(root, path):
+            issues.append(f"LANE_CLOSING_DOC names {closing}.md, which is not on disk")
 
     for entry in package.knowledge.documents():
         path = root / f"{entry}.md"
