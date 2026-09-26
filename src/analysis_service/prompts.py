@@ -40,9 +40,10 @@ from types import MappingProxyType
 from typing import Literal
 
 from analysis_service.assertions import REGISTRY, Predicate, referent_type
+from analysis_service.claims import FrameworkName
 from analysis_service.compact import COMPACT_FORMAT, FULL_FORMAT
 from analysis_service.factbundle import ROLES
-from analysis_service.frameworks import OUTPUT_DOC
+from analysis_service.frameworks import LANE_CLOSING_DOC, OUTPUT_DOC
 from analysis_service.markdown_loader import MarkdownLoader
 from analysis_service.skills import lane_exemplars_doc
 
@@ -137,6 +138,14 @@ def compose_analyze_prompt(
         package_loader.load(lane_exemplars_doc(lane)),
     ]
     return "\n\n".join(part.strip() for part in parts) + "\n"
+
+
+def lane_closing(
+    package_loader: MarkdownLoader, framework: FrameworkName
+) -> str | None:
+    """The text a lane of ``framework`` reads last, or ``None`` where it has none."""
+    doc = LANE_CLOSING_DOC[framework]
+    return package_loader.load(doc).strip() if doc else None
 
 
 def compose_critic_prompt(loader: MarkdownLoader) -> str:

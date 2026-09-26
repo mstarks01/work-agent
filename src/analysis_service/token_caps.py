@@ -203,6 +203,9 @@ TOKEN_CAPS: dict[str, int] = {
     f"package/{SEVERITY_RUBRIC_DOC}": 900,
     "package/lane_skill": 3600,
     "package/lane_exemplars": 1600,
+    # One instruction a lane reads last, in its user turn rather than its
+    # instruction, so COMPOSED_ANALYZE_CAP does not count it (ADR 0030).
+    "package/lane_closing": 120,
     # Assembled rather than loaded: the critic's lane-boundary digest.
     "package/lane_digest": 2200,
     # The shared technology packs, under ``domains/``.

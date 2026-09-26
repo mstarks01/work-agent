@@ -1,14 +1,14 @@
 # 30. Every assessment unit ends somewhere
 
-- **Status**: proposed. The decision waits on one measurement, named at the
-  end of this record, and ships measured or not at all.
+- **Status**: accepted.
 - **Date**: 2026-09-09; amended 2026-09-25
 - **Effort**: [#739 — a bounded coverage pass that recovers what a lane omitted](https://github.com/mstarks01/work-agent/issues/739),
   finding 4 of the audit on [#732](https://github.com/mstarks01/work-agent/issues/732)
 - **Builds on**: [ADR 0026](0026-coverage-is-per-framework.md), which counts
   what a lane cited; [ADR 0028](0028-a-draft-states-its-direction.md), which
   gives an ASVS draft a direction
-- **Measured in**: `QA-2026-09-24-03-E1` and `-E2`, `QA-2026-09-25-01-E8`
+- **Measured in**: `QA-2026-09-24-03-E1` and `-E2`, `QA-2026-09-25-01-E8`,
+  `QA-2026-09-26-01-E2`, `-E4` and `-E5`
 
 ## Context
 
@@ -34,7 +34,10 @@ lane that cleared a unit and one that skipped it look alike.
 
 **A lane addresses every assessment unit it is offered, in its first call, and
 files a finding that holds only if an open fact is true as a conditional
-draft.** The lane request states this in one instruction. A unit ends either in
+draft.** The lane request states this in one instruction, and the lane reads it
+**last**: it is the final part of the lane's user turn, from the package's
+`LANE_CLOSING_DOC` entry. STRIDE carries one; ASVS carries none, because its
+scope table already gives every selected requirement an entry. A unit ends either in
 a claim that cites it or in the lane's judgement that the sources settle
 against a finding there; the second leaves no record.
 
@@ -87,16 +90,20 @@ no candidates and no exemplars.
 **A structural lint on coverage.** Rejected: it is what the coverage instrument
 already is, and it recovers nothing.
 
-## Measurement before acceptance
+## Measurement
 
-One sweep on the current tree without the instruction, then one pass of the
-lanes that hold a missed must-find with it, both on the strong tier, read row
-by row and by meaning. The sweep captures `<case>.lanes.json` for every case, so the
-second arm is a `lane-replay --append` of each captured request, with the
-instruction as the appended part. The reading states:
+On 30 captured lane requests that held 31 missed must-finds, the instruction
+recovered 8 and 8 by meaning over two passes, and a plain repeat of the same
+requests recovered 3 and 4 (`QA-2026-09-26-01-E2`, a blind maintainer ballot).
+It wrote about 75% more drafts.
 
-- the must-finds the instruction recovers, against the band for those rows;
-- the drafts it adds, and how many of them any reference or vote accepts;
-- the lane cost, from the charges the provider reports.
+**Where the lane reads it decides whether it works.** As the last section of
+`output.md`, before the lane's exemplars, the same words raised lane proposals
+18% and no target row reached a report (`-E4`). As the last part of the user
+turn, the full graph on cases 02, 05 and 10 nearly doubled lane proposals,
+the critic rejected none, and must-finds by structure rose from 13 to 15
+(`-E5`). A lane call costs about 20% more.
 
-If the gain does not clear the band, this record is rejected.
+**Not yet measured:** the holdout cases, and what a reader makes of a report
+about twice as long, most of it conditional. The next full sweep reads the
+holdout split.

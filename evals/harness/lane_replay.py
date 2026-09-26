@@ -46,6 +46,7 @@ from analysis_service.deployment import Deployment
 from analysis_service.frameworks import PACKAGES, package_for, schemas_for
 from analysis_service.graph import FrameworkNodes, Lane, analyze_instruction
 from analysis_service.markdown_loader import MarkdownLoader
+from analysis_service.prompts import lane_closing
 from evals.harness.artifact import repo_commit
 from evals.harness.bundle import reports_dir
 from evals.harness.modes import EvalRunError
@@ -88,7 +89,11 @@ async def compose(
     package_loader: MarkdownLoader,
     prompt_loader: MarkdownLoader,
 ) -> tuple[str, types.Content]:
-    """The instruction and the user turn one lane was sent, rebuilt."""
+    """The instruction and the user turn one lane was sent, rebuilt.
+
+    The turn ends with the package's lane closing, as the graph's callback adds
+    it, so ``--append`` comes after that.
+    """
     lane = lane_of(framework, lane_name)
     held = material["lanes"][framework][lane_name]
     state = {
@@ -107,7 +112,11 @@ async def compose(
         package_loader, prompt_loader, package_for(framework), lane
     )
     instruction = await inject_session_state(template, cast(ReadonlyContext, context))
-    return instruction, to_user_content(material["prepared"])
+    turn = to_user_content(material["prepared"])
+    closing = lane_closing(package_loader, framework)
+    if closing:
+        turn.parts = [*(turn.parts or []), types.Part(text=closing)]
+    return instruction, turn
 
 
 def parse(raw: str, framework: FrameworkName) -> BaseModel:
