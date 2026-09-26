@@ -111,7 +111,12 @@ NOTES: dict[str, tuple[str, ...]] = {
     ),
     "failure-coupling": ("denial-of-service-shared-dependency",),
     "privilege-transitions": ("elevation-of-privilege-privilege-zone-crossing",),
-    "compromise-inheritance": ("elevation-of-privilege-inbound-from-exposed-process",),
+    # The store-readers rule asks what a compromised reader of a store exposes,
+    # which is this note's pivot from the component to "the store it can read".
+    "compromise-inheritance": (
+        "elevation-of-privilege-inbound-from-exposed-process",
+        "information-disclosure-store-readers",
+    ),
 }
 
 # The same table for worked cases. A case may be selected by rules in several

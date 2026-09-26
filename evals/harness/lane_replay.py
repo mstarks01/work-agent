@@ -44,7 +44,12 @@ from pydantic import BaseModel
 from analysis_service.claims import FrameworkName
 from analysis_service.deployment import Deployment
 from analysis_service.frameworks import PACKAGES, package_for, schemas_for
-from analysis_service.graph import FrameworkNodes, Lane, analyze_instruction
+from analysis_service.graph import (
+    FrameworkNodes,
+    Lane,
+    analyze_instruction,
+    framework_lane_inputs,
+)
 from analysis_service.markdown_loader import MarkdownLoader
 from analysis_service.prompts import lane_closing
 from evals.harness.artifact import repo_commit
@@ -52,7 +57,13 @@ from evals.harness.bundle import reports_dir
 from evals.harness.modes import EvalRunError
 from evals.harness.node_call import NodeCall, node_call
 from evals.harness.provenance import REPO_ROOT
-from evals.harness.reference import CorpusError, refuse_holdout
+from evals.harness.reference import (
+    DEFAULT_CORPUS,
+    CorpusError,
+    GoldenCase,
+    load_case,
+    refuse_holdout,
+)
 
 
 def lane_of(framework: FrameworkName, name: str) -> Lane:
@@ -119,6 +130,37 @@ async def compose(
     return instruction, turn
 
 
+def fresh_leads(
+    material: dict[str, Any],
+    case: GoldenCase,
+    framework: FrameworkName,
+    lane_name: str,
+    package_loader: MarkdownLoader,
+) -> dict[str, Any]:
+    """``material`` with one lane's leads, scope, notes and cases rebuilt today.
+
+    The captured leads are the rules of the day the sweep ran. A replay that
+    measures a rule change needs the lead the graph would send now, so this
+    rebuilds the lane's four inputs from the case's blessed model through
+    :func:`~analysis_service.graph.framework_lane_inputs`, the function the
+    prepare node calls. The shared inputs stay as captured. It reads the
+    blessed model, so it is exact for an analysis-mode sweep, where the lanes
+    read that model, with the assertion layer off.
+    """
+    nodes = FrameworkNodes(framework)
+    inputs = framework_lane_inputs(
+        nodes.package,
+        nodes,
+        case.model,
+        case.declaration(framework).options,
+        None,
+        package_loader,
+    )
+    lanes = {**material["lanes"], framework: dict(material["lanes"][framework])}
+    lanes[framework][lane_name] = dict(inputs.artifacts[lane_name])
+    return {**material, "lanes": lanes}
+
+
 def parse(raw: str, framework: FrameworkName) -> BaseModel:
     """The lane's answer under its package's own proposal schema, or a refusal."""
     return schemas_for(framework).proposals.model_validate_json(raw)
@@ -160,6 +202,11 @@ def arguments(parser: argparse.ArgumentParser) -> None:
         type=Path,
         help="a text file sent as one more user part, after the captured input",
     )
+    parser.add_argument(
+        "--fresh-leads",
+        action="store_true",
+        help="rebuild the lane's leads, scope, notes and cases with today's rules",
+    )
     parser.add_argument("--out", type=Path, help="write the lane's proposals here")
 
 
@@ -168,6 +215,14 @@ def command_lane_replay(args: argparse.Namespace) -> int:
     try:
         refuse_holdout(args.case)
         material = load_material(args.artifact, args.case)
+        if args.fresh_leads:
+            material = fresh_leads(
+                material,
+                load_case(REPO_ROOT / DEFAULT_CORPUS / args.case),
+                args.framework,
+                args.lane,
+                MarkdownLoader(REPO_ROOT / "frameworks" / args.framework),
+            )
     except (CorpusError, EvalRunError) as error:
         print(error, file=sys.stderr)
         return 1

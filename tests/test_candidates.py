@@ -669,3 +669,47 @@ class TestAPrincipalReachesAnElementOnlyWhenTheSourcesSaySo:
         )
         issues = catalog_issues(self.catalog(guessed, identified=False))
         assert "inference-refused" in {issue.code for issue in issues}
+
+
+class TestTheStoreReadersRule:
+    """Pattern A (QA-2026-09-26-01-E3): a lead names who reads a graded store."""
+
+    RULE = "information-disclosure-store-readers"
+
+    def _fired(self, model):
+        from analysis_service.assertions import AssertionCatalog
+        from analysis_service.frameworks.stride.rules import RULES
+
+        rule = next(rule for rule in RULES if rule.rule_id == self.RULE)
+        return {c.element_ids[0]: c for c in rule.fire(model, AssertionCatalog())}
+
+    def test_it_names_the_reader_each_pattern_a_reference_turns_on(self):
+        from evals.harness.reference import load_case
+
+        expected = {
+            "02-iot-fleet-telemetry": ("store:telemetry-lake", "entity:fleet-operator"),
+            "05-cookbook-queue-webapp": (
+                "store:worker-config",
+                "process:background-worker-process",
+            ),
+            "12-overclaiming-supplier-portal": (
+                "store:landing-bucket",
+                "process:supplier-master-service",
+            ),
+        }
+        for case_id, (store, reader) in expected.items():
+            fired = self._fired(load_case(f"evals/corpus/{case_id}").model)
+            assert reader in fired[store].element_ids, case_id
+
+    def test_a_flow_that_only_writes_makes_no_reader(self):
+        from evals.harness.reference import load_case
+
+        model = load_case("evals/corpus/05-cookbook-queue-webapp").model
+        flows = [
+            flow.model_copy(update={"operations": "write"})
+            if flow.destination == "store:worker-config"
+            else flow
+            for flow in model.data_flows
+        ]
+        fired = self._fired(model.model_copy(update={"data_flows": flows}))
+        assert "store:worker-config" not in fired

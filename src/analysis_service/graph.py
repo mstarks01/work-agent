@@ -132,7 +132,7 @@ from analysis_service.assertions import (
     CatalogProposal,
 )
 from analysis_service.basis import unbased_controls
-from analysis_service.candidates import generate_candidates
+from analysis_service.candidates import CandidateSet, generate_candidates
 from analysis_service.claims import (
     AnalysisMarks,
     Claim,
@@ -1684,61 +1684,22 @@ def prepare_analysis(
             routes.append(nodes.skip_route)
             continue
         routes.append(nodes.run_route)
-        loader = package_loaders[name]
-        candidates = generate_candidates(model, package.lanes, package.rules, held)
-        # Selected for every lane at once, because a lane's tie-break reads what
-        # earlier lanes were sent: `select_per_lane` is the one reader of that
-        # accumulation, so the offline coverage lint measures the selection this
-        # job actually makes rather than a second spelling of it.
-        fired_by_lane = [
-            {candidate.rule_id for candidate in candidates[lane.lane].candidates}
-            for lane in nodes.lanes
-        ]
-        notes_by_lane = select_per_lane(
-            package.knowledge.notes, fired_by_lane, MAX_NOTES
+        inputs = framework_lane_inputs(
+            package,
+            nodes,
+            model,
+            options.get(name) or {},
+            held,
+            package_loaders[name],
         )
-        cases_by_lane = select_per_lane(
-            package.knowledge.cases, fired_by_lane, MAX_CASES
-        )
-        retrieved: list[str] = []
-        ruled_out: dict[str, str] = {}
-        for position, lane in enumerate(nodes.lanes):
-            candidate_set = candidates[lane.lane]
-            # The package's own rules may rule a lane's units out of this model
-            # before its agent runs; the agent is told, and the block's scope
-            # carries them as not-applicable with the rule's reason.
-            lane_ruled_out = package.record.ruled_out(
-                model, options.get(name) or {}, lane.lane
-            )
-            ruled_out.update(lane_ruled_out)
-            # Retrieval is by *fired* rule, so a lane that triggered nothing gets
-            # nothing: the material follows the leads rather than the lane.
-            notes = notes_by_lane[position]
-            cases = cases_by_lane[position]
-            # Keyed by the placeholder each fills, which is the vocabulary the
-            # prompt file uses; the lane turns that into its own four state keys.
-            lane_state = lane.state(
-                {
-                    "candidates": render_fenced(candidate_set.model_dump(mode="json")),
-                    "scope": lane_scope(
-                        lane.lane,
-                        package,
-                        model,
-                        candidate_set,
-                        options.get(name) or {},
-                        units=package.record.units_for(
-                            options.get(name) or {}, lane.lane
-                        ),
-                        ruled_out=tuple(lane_ruled_out),
-                    ),
-                    "reference_notes": compose_notes(loader, notes),
-                    "prior_cases": compose_cases(loader, cases),
-                }
-            )
-            for key, text in lane_state.items():
+        for lane in nodes.lanes:
+            for key, text in lane.state(inputs.artifacts[lane.lane]).items():
                 state.prompt(key, text)
-            retrieved += [f"notes/{doc}" for doc in notes]
-            retrieved += [f"cases/{doc}" for doc in cases]
+        candidates, ruled_out, retrieved = (
+            inputs.candidates,
+            inputs.ruled_out,
+            inputs.retrieved,
+        )
         # The record of what this framework's agents were given, written here
         # because here is where they are given it, and keyed to the framework
         # because a rule and a document both belong to the package that declared
@@ -2354,6 +2315,83 @@ class MissingFrameworkOptions(ValueError):
     option or the key to seed — and it arrived after the provider billed every
     node either way.
     """
+
+
+@dataclass(frozen=True)
+class LaneInputs:
+    """What one framework's lanes are given, and what the prepare node records."""
+
+    #: Lane name -> the four rendered artifacts, keyed by placeholder.
+    artifacts: Mapping[str, Mapping[str, str]]
+    candidates: Mapping[str, CandidateSet]
+    ruled_out: Mapping[str, str]
+    retrieved: tuple[str, ...]
+
+
+def framework_lane_inputs(
+    package: FrameworkPackage,
+    nodes: FrameworkNodes,
+    model: SystemModel,
+    options: Mapping[str, object],
+    held: AssertionCatalog | None,
+    loader: MarkdownLoader,
+) -> LaneInputs:
+    """Every lane's leads, scope, notes and prior cases, for one framework.
+
+    **The one reader of what a lane is given.** The prepare node writes these to
+    session state, and the eval harness's lane replay rebuilds a lane's leads
+    from today's rules with it, so a replay that measures a rule change measures
+    the lead the graph would send.
+    """
+    candidates = generate_candidates(model, package.lanes, package.rules, held)
+    # Selected for every lane at once, because a lane's tie-break reads what
+    # earlier lanes were sent: `select_per_lane` is the one reader of that
+    # accumulation, so the offline coverage lint measures the selection this
+    # job actually makes rather than a second spelling of it.
+    fired_by_lane = [
+        {candidate.rule_id for candidate in candidates[lane.lane].candidates}
+        for lane in nodes.lanes
+    ]
+    notes_by_lane = select_per_lane(package.knowledge.notes, fired_by_lane, MAX_NOTES)
+    cases_by_lane = select_per_lane(package.knowledge.cases, fired_by_lane, MAX_CASES)
+    artifacts: dict[str, dict[str, str]] = {}
+    retrieved: list[str] = []
+    ruled_out: dict[str, str] = {}
+    for position, lane in enumerate(nodes.lanes):
+        candidate_set = candidates[lane.lane]
+        # The package's own rules may rule a lane's units out of this model
+        # before its agent runs; the agent is told, and the block's scope
+        # carries them as not-applicable with the rule's reason.
+        lane_ruled_out = package.record.ruled_out(model, options, lane.lane)
+        ruled_out.update(lane_ruled_out)
+        # Retrieval is by *fired* rule, so a lane that triggered nothing gets
+        # nothing: the material follows the leads rather than the lane.
+        notes = notes_by_lane[position]
+        cases = cases_by_lane[position]
+        # Keyed by the placeholder each fills, which is the vocabulary the
+        # prompt file uses; the lane turns that into its own four state keys.
+        artifacts[lane.lane] = {
+            "candidates": render_fenced(candidate_set.model_dump(mode="json")),
+            "scope": lane_scope(
+                lane.lane,
+                package,
+                model,
+                candidate_set,
+                options,
+                units=package.record.units_for(options, lane.lane),
+                ruled_out=tuple(lane_ruled_out),
+            ),
+            "reference_notes": compose_notes(loader, notes),
+            "prior_cases": compose_cases(loader, cases),
+        }
+        retrieved += [f"notes/{doc}" for doc in notes]
+        retrieved += [f"cases/{doc}" for doc in cases]
+    return LaneInputs(
+        artifacts=artifacts,
+        candidates=candidates,
+        ruled_out=ruled_out,
+        retrieved=tuple(retrieved),
+    )
 
 
 def _check_options(
