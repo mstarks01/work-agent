@@ -20,7 +20,7 @@ from analysis_service.factbundle import GRAPH_REFERENTS
 from analysis_service.system_model import TrustBoundary
 from evals.harness import oracle
 from evals.harness.arms import ARMS
-from evals.harness.reference import load_corpus
+from evals.harness.reference import load_corpus, tuning_cases
 from evals.harness.replay import signed_reference
 from evals.harness.run import COMMANDS
 
@@ -120,13 +120,14 @@ class TestWhatTheOracleCannotWrite:
         the sources place nowhere reaches the graph unplaced.
         """
         references = {
-            case.id: signed_reference(CORPUS, case) for case in load_corpus(CORPUS)
+            case.id: signed_reference(CORPUS, case)
+            for case in tuning_cases(load_corpus(CORPUS))
         }
-        assert all(references.values()), "every corpus case carries a signed reference"
+        assert all(references.values()), "every tuned case carries a signed reference"
 
         placements = 0
         signed_rows = 0
-        for case in load_corpus(CORPUS):
+        for case in tuning_cases(load_corpus(CORPUS)):
             reference = references[case.id]
             assert reference is not None
             placements += sum(

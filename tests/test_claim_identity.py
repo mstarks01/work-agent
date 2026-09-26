@@ -63,6 +63,9 @@ MATCHER_WIDER_THAN_FINGERPRINT = 2
 #: between claims that are *not* distinct does not belong here; it belongs
 #: merged in the corpus.
 UNSEPARATED: dict[str, str] = {
+    "14-loyalty-oauth-platform | spoofing | process:authorization-server, process:mobile-app": (
+        "A copied refresh token and an intercepted authorization code are two credentials of one public client, both presented at the token endpoint, so both are `use-credential` on one flow. The verb does not separate them; the credential does, and so does the control: an absolute expiry answers the first and PKCE the second. `verbs.UNSEPARATED` records the same pair for the matcher."
+    ),
     "01-payments-checkout | tampering | process:order-service, process:storefront-api": (
         "Modifying an order in flight on the gRPC channel and submitting a fabricated one over it are `alter-in-transit` and `inject`. The first needs an on-path position and transport protection answers it; the second needs only reach, and authentication answers it. The verb separates them."
     ),

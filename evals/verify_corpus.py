@@ -1026,17 +1026,7 @@ def framework_issues(case_dir: Path, meta: dict, model: SystemModel) -> Iterator
 #: and delete the line. ``tests/test_corpus_lints.py`` refuses an entry naming a
 #: lane no package declares, and refuses one whose lane *does* carry a
 #: must-find — so a line here cannot outlive the hole it describes.
-UNMEASURED_LANES: Mapping[FrameworkName, Mapping[str, str]] = {
-    "asvs": {
-        "oauth-and-oidc": (
-            "the standard scopes this chapter to a delegated-authorization"
-            " protocol, and no corpus case runs one: the nearest, an identity"
-            " broker that takes another provider's assertion as a sign-in,"
-            " never says which protocol carries it. See"
-            " https://github.com/mstarks01/work-agent/issues/887"
-        )
-    },
-}
+UNMEASURED_LANES: Mapping[FrameworkName, Mapping[str, str]] = {}
 
 
 def lane_coverage_issues(must_find_lanes: Mapping[str, set[object]]) -> Iterator[str]:

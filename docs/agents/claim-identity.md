@@ -54,22 +54,22 @@ one version to another, and ADR 0037 is the decision.
 Elements alone cannot separate a read from a write against one store. The
 frontier in `tests/test_evals_identity.py` prices every rule on all three ways
 of being wrong — false splits over the 169 labelled match pairs, false merges
-over the 92 scored candidate negatives, and 2 false merges over the 317
+over the 92 scored candidate negatives, and 3 false merges over the 341
 within-lane reference pairs:
 
-| Rule | False splits (of 169) | Candidate merges (of 92) | Reference merges (of 317) |
+| Rule | False splits (of 169) | Candidate merges (of 92) | Reference merges (of 341) |
 |---|---|---|---|
 | equality | 72 | 20 | 5 |
-| endpoint subset | 12 | 69 | 36 |
-| **endpoint subset + verb** | **13** | **2** | **2** |
-| overlap | 3 | 66 | 39 |
-| endpoint overlap | 1 | 81 | 144 |
+| endpoint subset | 12 | 69 | 38 |
+| **endpoint subset + verb** | **13** | **2** | **3** |
+| overlap | 3 | 66 | 52 |
+| endpoint overlap | 1 | 81 | 165 |
 
 No element-only row is usable: the tightest loses 72 paraphrases and the loosest
-destroys 144 findings. **The verb row is the first one that is.**
+destroys 165 findings. **The verb row is the first one that is.**
 
 **Read the candidate column, not the reference one.** On reference pairs alone
-`endpoint subset` merges 36 of 317 and looks survivable. On the candidate
+`endpoint subset` merges 38 of 341 and looks survivable. On the candidate
 paraphrases a live run actually emits it merges **69 of 92** — it is barely a
 rule. The verb takes that to 2, and it costs one split to do it — 12 becomes 13,
 which is the whole price in the first column. That column did not exist
@@ -140,8 +140,8 @@ answered it: a direction is not available, and it would not pay if it were.
 **A direction is not a field.** `affected_element_ids` is a list whose order no
 rule reads, so a claim naming two processes says nothing about which way the
 attacker moves between them. Only a claim naming a **Data Flow** states a
-direction, through that flow's endpoints. 160 of the 242 corpus claims name
-exactly one flow; 5 name several and 77 name none, and neither of those yields
+direction, through that flow's endpoints. 183 of the 269 corpus claims name
+exactly one flow; 6 name several and 80 name none, and neither of those yields
 the single direction a comparison needs.
 
 **The merge that raised the question is gone, and the answer is not.** Case
@@ -401,7 +401,7 @@ The rule is the only matcher a scored sweep has. A `match` is a recall hit; a
 the vote ledger — `rejected`, `pooled`, `open`, `unvoted` or `stale`, the last
 being a vote cast on an argument this run has moved past. Nothing asks a
 model. The rule's known error costs are the record above: 13 of 169 labelled
-matches split, 2 of 92 candidate negatives merged, 2 of 317 reference pairs
+matches split, 2 of 92 candidate negatives merged, 3 of 341 reference pairs
 merged. A split surfaces as an unvoted finding in the queue rather than
 vanishing. A merge does not surface at all, which is why the candidate merge
 column is the one to watch.

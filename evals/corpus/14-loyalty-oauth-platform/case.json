@@ -1,0 +1,32 @@
+{
+  "id": "14-loyalty-oauth-platform",
+  "title": "A loyalty platform's own OAuth authorization server, serving a public mobile client and confidential partner apps",
+  "domain": "identity-and-access",
+  "provenance": "Synthetic system authored for this corpus (issue #744). Not derived from, or sanitized from, any real system: there is nothing to leak by omission.",
+  "bootstrap": "agent-stand-in",
+  "holdout": true,
+  "sources": [
+    {
+      "kind": "description",
+      "label": "System description",
+      "file": "source.md",
+      "sha256": "d414cc10c981749e783270475acdaa286ead5d32d22e334e4f6d1e23ae385a29"
+    }
+  ],
+  "source_sha256": "7c4da1f0ae818b61ce6da7ab17a98ede57233fa50eefbf26f3aa69f501f83489",
+  "frameworks": [
+    {
+      "name": "asvs",
+      "options": {
+        "level": 3
+      },
+      "exemplar_proximity": "far"
+    },
+    {
+      "name": "stride",
+      "options": {},
+      "exemplar_proximity": "far"
+    }
+  ],
+  "notes": "Holdout case 1 of 2 for #744. It fills three gaps at once: the corpus's first ASVS level 3 case, the first case where we run the OAuth authorization server ourselves, and the first where a session and a token are two different things with two different lifetimes. The central finding needs three stated facts no one sentence holds: the rewards API checks no audience, one key signs tokens for the API and for the support console, and the console sits on the same public hostname. Level 3 is what turns two stated values into gaps: a ten-minute authorization code and plain bearer tokens are both acceptable at level 2. Held out of tuning: no diagnosis reads it, so it confirms a fix measured on the other cases."
+}
