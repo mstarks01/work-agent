@@ -1,0 +1,190 @@
+[
+  {
+    "category": "spoofing",
+    "affected_element_ids": [
+      "flow:entity:company-user>process:billing-app>manage-invoices",
+      "process:billing-app"
+    ],
+    "claim": "An attacker who guesses or reuses a company admin's password signs in to the billing app as that admin, because there is no second factor.",
+    "tier": "must-find",
+    "severity": {
+      "likelihood": "medium",
+      "impact": "high"
+    },
+    "notes": "Stated outright: password only, for admins too. An admin can change the company's payout bank account.",
+    "verb": "guess-credential"
+  },
+  {
+    "category": "spoofing",
+    "affected_element_ids": [
+      "flow:process:admin-console>process:billing-app>open-session-as-customer-user",
+      "process:admin-console",
+      "process:billing-app"
+    ],
+    "claim": "An attacker who takes over one support agent's admin console account opens billing-app sessions as any user of any company.",
+    "tier": "expected",
+    "severity": {
+      "likelihood": "low",
+      "impact": "high"
+    },
+    "notes": "The console is reachable only from the support office and needs a one-time code, which keeps the likelihood low; the reach, every user of every company, keeps the impact high.",
+    "verb": "use-credential"
+  },
+  {
+    "category": "tampering",
+    "affected_element_ids": [
+      "flow:entity:company-user>process:billing-app>manage-invoices",
+      "process:billing-app",
+      "store:tenant-database"
+    ],
+    "claim": "A company user posts an invoice edit that sets the paid flag or replaces the company's payout bank account, and the billing app saves it because it saves every field it receives.",
+    "tier": "must-find",
+    "severity": {
+      "likelihood": "high",
+      "impact": "high"
+    },
+    "notes": "Stated outright. A viewer can do it too unless the app checks the role on the request, which the source says nobody wrote down. The bank account is the payment page's bank account, so payers then pay the attacker.",
+    "verb": "alter"
+  },
+  {
+    "category": "tampering",
+    "affected_element_ids": [
+      "flow:process:billing-app>store:render-queue>queue-render-job",
+      "store:render-queue",
+      "process:pdf-renderer"
+    ],
+    "claim": "An attacker who can write to the render queue plants a job naming another company's ID, and the renderer files a PDF under the company the job names.",
+    "tier": "expected",
+    "severity": {
+      "likelihood": "low",
+      "impact": "medium"
+    },
+    "notes": "Conditional: the source states nothing about who can write to the queue. The renderer's trust in the job's company ID is stated.",
+    "verb": "plant"
+  },
+  {
+    "category": "repudiation",
+    "affected_element_ids": [
+      "flow:process:admin-console>process:billing-app>open-session-as-customer-user",
+      "process:admin-console",
+      "store:tenant-database"
+    ],
+    "claim": "A support agent acting as a customer user changes that company's invoices, and the record shows only the customer user, so nothing can show the agent did it.",
+    "tier": "must-find",
+    "severity": {
+      "likelihood": "medium",
+      "impact": "medium"
+    },
+    "notes": "Stated outright: everything the agent does is recorded against the customer user. The customer cannot even dispute it, because the record names them.",
+    "verb": "unattributable"
+  },
+  {
+    "category": "information-disclosure",
+    "affected_element_ids": [
+      "flow:entity:payer>process:billing-app>open-payment-page",
+      "process:billing-app",
+      "entity:payer"
+    ],
+    "claim": "Anyone steps through invoice numbers on the payment page and reads every company's invoices, customer names and bank details, because the numbers count up across all companies and the page asks for no sign-in.",
+    "tier": "must-find",
+    "severity": {
+      "likelihood": "high",
+      "impact": "high"
+    },
+    "notes": "The case's clearest cross-tenant finding, and entirely stated: a shared counting sequence and a page with no sign-in.",
+    "verb": "elicit"
+  },
+  {
+    "category": "information-disclosure",
+    "affected_element_ids": [
+      "flow:entity:company-user>process:billing-app>manage-invoices",
+      "process:billing-app",
+      "store:tenant-database"
+    ],
+    "claim": "A signed-in user of one company opens another company's invoice by its number, if the billing app does not check that the invoice belongs to the user's company.",
+    "tier": "must-find",
+    "severity": {
+      "likelihood": "medium",
+      "impact": "high"
+    },
+    "notes": "Conditional on the check nobody wrote down. The tenant filter lives in each query by hand and the database has no row-level security, so one missed filter is enough.",
+    "verb": "elicit"
+  },
+  {
+    "category": "information-disclosure",
+    "affected_element_ids": [
+      "store:tenant-database",
+      "flow:process:billing-app>store:tenant-database>read-and-write-tenant-data"
+    ],
+    "claim": "An attacker who obtains a copy of the tenant database reads every company's invoices and payout bank details, since its protection at rest is not recorded.",
+    "tier": "expected",
+    "severity": {
+      "likelihood": "low",
+      "impact": "high"
+    },
+    "notes": "Conditional on the unrecorded at-rest protection; one copy holds every tenant.",
+    "verb": "read"
+  },
+  {
+    "category": "spoofing",
+    "affected_element_ids": [
+      "store:pdf-bucket",
+      "flow:process:billing-app>store:pdf-bucket>fetch-pdfs"
+    ],
+    "claim": "An attacker who obtains the billing app's bucket credential acts as the billing app and reads every company's invoice PDFs, because one credential serves all companies.",
+    "tier": "expected",
+    "severity": {
+      "likelihood": "low",
+      "impact": "high"
+    },
+    "notes": "Stated: one service credential for all companies. How it could be obtained is not stated.",
+    "verb": "use-credential"
+  },
+  {
+    "category": "denial-of-service",
+    "affected_element_ids": [
+      "flow:entity:company-user>process:billing-app>manage-invoices",
+      "process:pdf-renderer",
+      "store:render-queue"
+    ],
+    "claim": "A user asks for PDFs as often as they like and fills the render queue, so the one-job-at-a-time renderer stops producing PDFs for every other company.",
+    "tier": "must-find",
+    "severity": {
+      "likelihood": "medium",
+      "impact": "medium"
+    },
+    "notes": "Stated outright: no limit on requests, one job at a time, one renderer for all companies.",
+    "verb": "flood"
+  },
+  {
+    "category": "elevation-of-privilege",
+    "affected_element_ids": [
+      "flow:entity:company-user>process:billing-app>manage-invoices",
+      "process:billing-app"
+    ],
+    "claim": "A viewer sends the requests behind the buttons the pages hide from them and performs admin actions, if the billing app does not check the role on each request.",
+    "tier": "must-find",
+    "severity": {
+      "likelihood": "medium",
+      "impact": "high"
+    },
+    "notes": "Conditional on the check nobody wrote down; hiding a button is the only stated control.",
+    "verb": "escalate"
+  },
+  {
+    "category": "elevation-of-privilege",
+    "affected_element_ids": [
+      "flow:process:admin-console>process:billing-app>open-session-as-customer-user",
+      "process:admin-console",
+      "process:billing-app"
+    ],
+    "claim": "A support agent opens a session as a customer admin and uses that company's admin rights, which reach beyond anything support needs.",
+    "tier": "expected",
+    "severity": {
+      "likelihood": "low",
+      "impact": "medium"
+    },
+    "notes": "The grant is legitimate and unbounded in the source: any customer user, with no stated reason or approval. Low likelihood because agents are our own staff.",
+    "verb": "abuse-grant"
+  }
+]

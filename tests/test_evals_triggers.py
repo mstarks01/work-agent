@@ -85,12 +85,12 @@ TRIGGER_FLOORS: dict[str, dict[str, float]] = {
 #: on models but not on the elements its records name, and the second fires
 #: nowhere at all and says so in ``UNEXERCISED``. ``validation-and-business-logic``
 #: left when #430 gave it a rule that reads a crossing from an external entity,
-#: which is the element its reference records name.
+#: which is the element its reference records name. ``self-contained-tokens``
+#: left when case 14 gave its records a token-verifying process to name.
 UNTRIGGERED_LANES: dict[str, str] = dict.fromkeys(
     (
         "cryptography",
         "secure-coding-and-architecture",
-        "self-contained-tokens",
         "webrtc",
     ),
     "asvs: the chapter's rule fires on some model but never on an element one of"

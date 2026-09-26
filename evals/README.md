@@ -32,7 +32,8 @@ of 60; the exact finite-population 95% interval for that non-boundary
 population's discrepancy rate is 0.7%–10.5%. It was a joint review, not two
 independent ratings, and it says nothing about corpus correctness.
 
-**No case has a merged Case Sitting, and thirteen wait for one.** That is the
+**Cases 01 to 13 have a merged Case Sitting, and the two holdout cases wait
+for one.** That is the
 reading session over a case's source, model and reference sets together
 (`BLESSING.md` step 6), and it is what would catch the case-04 defect anywhere
 else. The act is a **Case Sitting**, recorded as one JSON file under
@@ -82,7 +83,7 @@ which questions a cheap model may answer and which it may not.
 **There is no model judge.** Claim matching is `SubsetVerbIdentity`, a rule in
 `harness/identity.py`, and it is measured on the two directions it can fail in
 (`python -m evals.harness.run calibrate`), with no provider call:
-**13 false splits of 169, 2 false merges of 92 and 2 false merges of 317.**
+**13 false splits of 169, 2 false merges of 92 and 3 false merges of 341.**
 The first two
 denominators are equivalent candidates and candidate negatives; the third is
 distinct reference pairs. Read them
@@ -92,7 +93,7 @@ denominators are different populations and none is a rate over what a live run
 emits.
 
 Equivalently by population: 13 false splits over 169 equivalent candidate pairs,
-2 false merges over 92 candidate negatives, and 2 false merges over 317
+2 false merges over 92 candidate negatives, and 3 false merges over 341
 distinct reference pairs.
 
 The 288 calibration fixtures retain their original order and reference claims.
@@ -245,7 +246,7 @@ somewhere else.
 | `harness/calibration.py` | Rule-vs-label agreement over the labelled fixtures — the scoreboard any rule change must clear. |
 | `harness/verbs.py` | The closed vocabulary of attacker actions, and what counts as one action. |
 | `harness/exemplar_verbs.py` | Which actions a package's shipped exemplars demonstrate against which its reference sets grade, and the exemplar pairs that name one place and two actions. Reads text and blessed models only, so it costs no provider call. |
-| `harness/identity.py` | Claim identity from the fields a claim carries. `SubsetVerbIdentity` has 13 false splits of 169, 2 false merges of 92 and 2 false merges of 317 with no model call. |
+| `harness/identity.py` | Claim identity from the fields a claim carries. `SubsetVerbIdentity` has 13 false splits of 169, 2 false merges of 92 and 3 false merges of 341 with no model call. |
 | `harness/fingerprint.py` | A **Claim**'s identity as a versioned value code computes. No model call. |
 | `harness/flow_ids.py` | A **Data Flow**'s identity moved to a newer version: the old-to-new mapping each case's graph implies, every dependent reference rewritten under it, and each vote carried only where the change is one-to-one. Refuses a mapping it cannot decide rather than half-renaming a case. `run.py migrate-flow-ids`. |
 | `harness/ledger.py` | The append-only record of what a **person** decided about a finding. One file per voter, named by the GitHub login. |
@@ -748,7 +749,7 @@ Three properties make the record worth keeping:
 
 ## The corpus
 
-Thirteen cases, each sized so a person can enumerate its threats exhaustively
+Fifteen cases, each sized so a person can enumerate its threats exhaustively
 (roughly 8–22 elements).
 
 The shipped prompts teach by example, and every lane's `exemplars.md` works its
@@ -780,6 +781,8 @@ too. The gap is tracked and watched, but never fails a build.
 | `11-sparse-shift-scheduling` | workforce scheduling | far | synthetic (sparse input) |
 | `12-overclaiming-supplier-portal` | supplier management | far | synthetic (over-claiming input) |
 | `13-dispatch-control-plane` | field service dispatch | far | synthetic |
+| `14-loyalty-oauth-platform` | identity & access | far | synthetic (holdout) |
+| `15-multitenant-invoicing` | multi-tenant SaaS | far | synthetic (holdout) |
 
 The Cookbook cases come from the [OWASP Threat Model
 Cookbook](https://github.com/OWASP/threat-model-cookbook) (CC-BY 4.0), converted
@@ -788,6 +791,11 @@ licence in `case.json`. Cases `11` and `12` are deliberately adversarial — one
 with input too sparse to model confidently (which should yield `needs-info`
 threats, not invented ones), one that over-claims security controls the text
 doesn't justify.
+
+Cases `14` and `15` are **Holdout Case**s (`holdout: true`). Every sweep
+scores them and reports them apart in the holdout split, and no diagnosis
+command reads them. A gain that the tuned cases show and the holdout cases do
+not was shaped by the cases it was read on.
 
 The corpus checks in `verify_corpus.py` are deterministic and need no
 credentials, so they run on every PR (via `tests/test_corpus_lints.py`) and stay

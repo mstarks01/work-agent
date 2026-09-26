@@ -146,8 +146,10 @@ def holdout_corpus(tmp_path):
     return root
 
 
-def test_the_corpus_carries_no_holdout_case_yet():
-    assert all(diagnosable(case) for case in load_corpus(CORPUS))
+def test_the_holdout_cases_are_the_ones_744_authored():
+    held = {case.id for case in load_corpus(CORPUS) if not diagnosable(case)}
+
+    assert held == {"14-loyalty-oauth-platform", "15-multitenant-invoicing"}
 
 
 def test_a_holdout_case_is_loaded_and_left_out_of_tuning(holdout_corpus):
@@ -156,7 +158,7 @@ def test_a_holdout_case_is_loaded_and_left_out_of_tuning(holdout_corpus):
 
     assert "01-payments-checkout" in {case.id for case in cases}
     assert "01-payments-checkout" not in {case.id for case in tuned}
-    assert len(tuned) == len(cases) - 1
+    assert len(tuned) == sum(diagnosable(case) for case in cases)
 
 
 def test_a_replay_of_a_holdout_case_is_refused_by_name(holdout_corpus):

@@ -81,21 +81,22 @@ MEASURED = {
 #: on two thirds of the corpus.** ``affected_element_ids`` is a list whose order
 #: no rule reads, so a claim naming two processes says nothing about which way
 #: the attacker moves between them. A claim naming a **Data Flow** says it
-#: through that flow's endpoints, and 155 of 244 corpus claims name exactly one.
+#: through that flow's endpoints, and 183 of 269 corpus claims name exactly one.
 #:
 #: The two readings of an absent direction are both dead ends, and the numbers
 #: below are why. Read it as a mismatch and the rule splits 90 of the 186
 #: labelled pairs it merges correctly today, to recover 2 of its 3 candidate
-#: merges. Read it as a wildcard and it changes nothing at all, because in every
-#: merge that survives the verb the coarser side cites no flow.
+#: merges. Read it as a wildcard and it changes nothing at all: in two of the
+#: three merges that survive the verb the coarser side cites no flow, and in the
+#: third both sides cite one flow, so their directions agree.
 DIRECTION = {
     # Over the corpus, what a claim yields without a new field.
-    "claims": 242,
-    "one_flow_cited": 160,
-    "several_flows_cited": 5,
-    "no_flow_cited": 77,
+    "claims": 269,
+    "one_flow_cited": 183,
+    "several_flows_cited": 6,
+    "no_flow_cited": 80,
     # Over the 3 reference merges the shipped rule makes.
-    "merges_with_a_direction_on_both_sides": 0,
+    "merges_with_a_direction_on_both_sides": 1,
     "merges_that_run_opposite_ways": 0,
     # Over the 261 scored pairs, an absent direction read each way.
     "as_a_mismatch_new_splits": 71,
@@ -128,12 +129,12 @@ FRONTIER = {
     "endpoint subset + verb": {
         "splits": 13,
         "candidate_merges": 2,
-        "reference_merges": 2,
+        "reference_merges": 3,
     },
-    "endpoint equality": {"splits": 49, "candidate_merges": 33, "reference_merges": 13},
-    "subset": {"splits": 33, "candidate_merges": 54, "reference_merges": 17},
-    "endpoint subset": {"splits": 12, "candidate_merges": 69, "reference_merges": 36},
-    "overlap": {"splits": 3, "candidate_merges": 66, "reference_merges": 39},
+    "endpoint equality": {"splits": 49, "candidate_merges": 33, "reference_merges": 14},
+    "subset": {"splits": 33, "candidate_merges": 54, "reference_merges": 18},
+    "endpoint subset": {"splits": 12, "candidate_merges": 69, "reference_merges": 38},
+    "overlap": {"splits": 3, "candidate_merges": 66, "reference_merges": 52},
     # 99 before the reference corrections of #925. Case 02's calibration pair
     # about disabling the Pub/Sub topic named the gateway-to-normalizer flow,
     # because the broker was not an element to name; it now names
@@ -143,7 +144,7 @@ FRONTIER = {
     "endpoint overlap": {
         "splits": 1,
         "candidate_merges": 81,
-        "reference_merges": 144,
+        "reference_merges": 165,
     },
 }
 
@@ -408,10 +409,10 @@ class TestAClaimThatNamesNoPlaceMatchesNothing:
 #: ``subset`` is what ``endpoint subset`` merges on these cases; ``subset_verb``
 #: is what survives the verb. The gap between them is what the verb buys.
 VERB_MEASURED = {
-    "cases": 13,
-    "within_lane_pairs": 317,
-    "subset": 36,
-    "subset_verb": 2,
+    "cases": 15,
+    "within_lane_pairs": 341,
+    "subset": 38,
+    "subset_verb": 3,
 }
 
 #: What :class:`~evals.harness.identity.SubsetVerbIdentity` scores against the
@@ -565,10 +566,11 @@ def test_a_direction_component_is_a_no_op_or_a_catastrophe(corpus, flows_by_case
 def test_no_surviving_merge_runs_in_two_directions(corpus, flows_by_case):
     """#652's second obstacle: on the merges that survive, one side has no way.
 
-    The three merges ``UNSEPARATED`` records each pair a claim citing a flow
-    with a coarser claim citing only its endpoints or its store. So a direction
-    read as a wildcard separates none of them, and this is the test that says
-    so. A fourth merge that *did* run two ways would land here as a failure and
+    Two of the three merges ``UNSEPARATED`` records pair a claim citing a flow
+    with a coarser claim citing only its endpoints or its store. The third,
+    case 14's two credentials of one client, cites one flow on both sides, so
+    both directions are derivable and agree. A direction separates none of
+    them, and this is the test that says so. A fourth merge that *did* run two ways would land here as a failure and
     reopen #652 with a case behind it.
 
     ``measure_merges`` finds the same pairs and reports them as prose, which a

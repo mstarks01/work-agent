@@ -52,15 +52,26 @@ from evals.review_submission import REPO_ROOT, unreviewed_cases
 #: and ``test_vocabulary_coverage.py``, no reason here says the omission is
 #: acceptable.
 #:
-#: **Empty, and this is what empty means.** The sitting of 2026-09-21 read all 13
-#: cases; acting on its marks then changed a claim file in every case, which
-#: broke every signature and put all 13 back here. The sitting of 2026-09-22
-#: cleared them: it marked the 27 findings the corpus had gained, and carried
-#: the 304 marks that still bind by fingerprint. The table is derived, never
-#: maintained — :func:`~evals.review_submission.unreviewed_cases` reads the
-#: corpus and the merged submissions — so an entry here only ever says what an
-#: unread case leaves unchecked, and a case somebody has since read is spent.
-UNREVIEWED: dict[str, str] = {}
+#: The sitting of 2026-09-21 read cases 01 to 13, and the sitting of
+#: 2026-09-22 cleared the marks acting on it had broken. The two holdout cases
+#: #744 added are the entries. The table is derived, never maintained —
+#: :func:`~evals.review_submission.unreviewed_cases` reads the corpus and the
+#: merged submissions — so an entry here only ever says what an unread case
+#: leaves unchecked, and a case somebody has since read is spent.
+UNREVIEWED: dict[str, str] = {
+    "14-loyalty-oauth-platform": (
+        "Authored by an agent for #744 as a holdout case; nobody has read its"
+        " source, model or either reference set. Until a sitting does, its"
+        " holdout figure measures agreement with an unread reference, and its"
+        " seven oauth-and-oidc must-find records are the corpus's only"
+        " measurement of that lane."
+    ),
+    "15-multitenant-invoicing": (
+        "Authored by an agent for #744 as a holdout case; nobody has read its"
+        " source, model or either reference set. Until a sitting does, its"
+        " holdout figure measures agreement with an unread reference."
+    ),
+}
 
 
 @pytest.fixture(scope="module")

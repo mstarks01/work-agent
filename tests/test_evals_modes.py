@@ -656,12 +656,14 @@ class TestAProjectionIsComparedTheWayItsFieldSays:
         assert counts["agrees_absent"] == 1
         assert counts["agrees_stated"] == counts["agrees_unstated"] == 0
 
-    def test_the_corpus_holds_six_explicit_absences(self):
+    def test_the_corpus_holds_eight_explicit_absences(self):
         """The count, pinned: a corpus edit that moves it is the alarm.
 
         The audit counted seven. The #961 step 3 signing ruled that case 04's
         "Redis has no password on it" states the absence of a password and
-        not of every mechanism, so that flow reads unknown and six remain.
+        not of every mechanism, so that flow reads unknown and six remained.
+        The two #744 cases add one each: case 14's redirect back to a partner
+        app and case 15's payment page both authenticate nobody.
         """
         absent = sum(
             1
@@ -670,7 +672,7 @@ class TestAProjectionIsComparedTheWayItsFieldSays:
             if stratum == "absent"
         )
 
-        assert absent == 6
+        assert absent == 8
 
     def test_every_projected_field_has_a_comparison(self):
         """The table is held to the registry, so a sixth field raises here."""

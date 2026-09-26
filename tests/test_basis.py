@@ -26,9 +26,9 @@ from evals.harness.reference import load_case
 
 # The figures published in the module docstring's table. Re-derived below, so
 # the prose and the code cannot drift apart.
-CORPUS_VALUES = 21
+CORPUS_VALUES = 38
 CORPUS_FLAGGED_WEAK = 0
-CORPUS_FLAGGED_STRICT = 14
+CORPUS_FLAGGED_STRICT = 16
 
 
 def _model(**flow) -> SystemModel:
@@ -273,10 +273,10 @@ def test_the_published_denominator_is_what_the_corpus_holds(corpus_values):
 
 
 def test_the_published_weak_rung_rate_is_what_the_corpus_gives(corpus_values):
-    """0 in 22 false rejections, the figure the module's table publishes.
+    """0 in 38 false rejections, the figure the module's table publishes.
 
     A flag on a blessed value is a false rejection: the corpus is the closest
-    thing to ground truth here. Read it beside the module's own caveat — 22 is
+    thing to ground truth here. Read it beside the module's own caveat — 38 is
     a small sample and no case has been read by a person (#226).
     """
     flagged = [
@@ -289,7 +289,7 @@ def test_the_published_weak_rung_rate_is_what_the_corpus_gives(corpus_values):
 
 
 def test_the_published_strict_rung_rate_is_what_the_corpus_gives(corpus_values):
-    """14 in 21, which is why the strict rung is recorded and not shipped."""
+    """16 in 38, which is why the strict rung is recorded and not shipped."""
     flagged = [
         case_id
         for case_id, tokens, source in corpus_values
@@ -302,7 +302,7 @@ def test_the_published_strict_rung_rate_is_what_the_corpus_gives(corpus_values):
 def test_the_corpus_is_read_in_full_so_its_clean_rate_means_something(
     corpus_values,
 ):
-    """0 flags over 22 values, and 22 of 22 actually searched (#925).
+    """0 flags over 38 values, and 38 of 38 actually searched (#925).
 
     The published rate is only a rate if the denominator was read. This ties
     the table's ``values`` column to the coverage of the same walk: were a case
@@ -344,7 +344,7 @@ def test_the_corpus_runs_clean_through_the_shipped_reader():
 
 
 def test_the_corpus_spends_a_fraction_of_the_scan_budget():
-    """The worst case is 440 times under the bound, which is what the constant says.
+    """The worst case is 427 times under the bound, which is what the constant says.
 
     Re-derived rather than asserted in prose: the budget is a number somebody
     will want to lower, and this says what lowering it would cost.
@@ -360,7 +360,7 @@ def test_the_corpus_spends_a_fraction_of_the_scan_budget():
         }
         worst = max(worst, sum(len(sources[label]) for _, label in scans))
 
-    assert worst == 45_448
+    assert worst == 46_732
     assert worst * 400 < MAX_SCAN_WORK
 
 

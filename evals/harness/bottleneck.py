@@ -1949,31 +1949,28 @@ class PlacementReliance:
 
 
 def placement_reliance(corpus_dir: Path) -> tuple[PlacementReliance, ...]:
-    """Every case's must-find findings, against the crossings they rest on."""
+    """Every tuned case's must-find findings, against the crossings they rest on."""
     found = []
-    for model_path in sorted(corpus_dir.glob("*/model.json")):
-        case_dir = model_path.parent
-        model = SystemModel.model_validate(json.loads(model_path.read_text()))
+    for case in tuning_cases(load_corpus(corpus_dir)):
+        crossings = case.model.boundary_crossings()
         assumed = {
-            crossing.flow_id
-            for crossing in model.boundary_crossings()
-            if crossing.assumed_endpoints
+            crossing.flow_id for crossing in crossings if crossing.assumed_endpoints
         }
         wholly = {
             crossing.flow_id
-            for crossing in model.boundary_crossings()
+            for crossing in crossings
             if len(crossing.assumed_endpoints) == 2
         }
         counts = [0, 0, 0]
-        for claims_path in sorted((case_dir / "claims").glob("*.json")):
-            for claim in json.loads(claims_path.read_text()):
-                if claim.get("tier") != MUST_FIND:
+        for claims in case.references.values():
+            for claim in claims:
+                if claim.tier != MUST_FIND:
                     continue
-                cited = set(claim.get("affected_element_ids", ()))
+                cited = set(claim.affected_element_ids)
                 counts[0] += 1
                 counts[1] += bool(cited & assumed)
                 counts[2] += bool(cited & wholly)
-        found.append(PlacementReliance(case_dir.name, *counts))
+        found.append(PlacementReliance(case.id, *counts))
     return tuple(found)
 
 

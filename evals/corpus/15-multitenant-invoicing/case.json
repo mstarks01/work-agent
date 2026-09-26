@@ -1,0 +1,32 @@
+{
+  "id": "15-multitenant-invoicing",
+  "title": "One invoicing app shared by every customer company, with the tenant filter written into each query by hand",
+  "domain": "multi-tenant-saas",
+  "provenance": "Synthetic system authored for this corpus (issue #744). Not derived from, or sanitized from, any real system: there is nothing to leak by omission.",
+  "bootstrap": "agent-stand-in",
+  "holdout": true,
+  "sources": [
+    {
+      "kind": "description",
+      "label": "System description",
+      "file": "source.md",
+      "sha256": "5f6c64fc0b7494033e74547c61f660750882de95b66dd8ca9370eef14e7c796f"
+    }
+  ],
+  "source_sha256": "165b8861d022dfcee688843da62fcfd2ef75259e9ff3a3baccd5efec3fc99b52",
+  "frameworks": [
+    {
+      "name": "asvs",
+      "options": {
+        "level": 2
+      },
+      "exemplar_proximity": "far"
+    },
+    {
+      "name": "stride",
+      "options": {},
+      "exemplar_proximity": "far"
+    }
+  ],
+  "notes": "Holdout case 2 of 2 for #744. The corpus's first case whose tenants are our own customers inside one app and one database, rather than another company across a zone. That is why the tenant boundary here is not a trust boundary at all: every tenant's data sits in one zone, and the separation lives in a filter each query adds by hand. So the case punishes an analyst that reads only crossings: the two worst findings, invoice enumeration on the payment page and a cross-tenant invoice load, cross no zone the model can show. The object-level and field-level authorization questions are the ASVS half: an invoice loaded by a counting number, an edit form saved field for field, and a role enforced by hiding buttons. Held out of tuning: no diagnosis reads it, so it confirms a fix measured on the other cases."
+}

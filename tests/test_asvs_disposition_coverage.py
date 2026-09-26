@@ -46,6 +46,8 @@ RECORDS_PER_CASE: dict[str, int] = {
     "11-sparse-shift-scheduling": 8,
     "12-overclaiming-supplier-portal": 10,
     "13-dispatch-control-plane": 6,
+    "14-loyalty-oauth-platform": 18,
+    "15-multitenant-invoicing": 10,
 }
 
 
