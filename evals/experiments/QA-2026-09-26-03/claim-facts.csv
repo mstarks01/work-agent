@@ -1,0 +1,332 @@
+case,framework,ref,tier,class,holder,note
+01,asvs,0,MF,silent,query construction,
+01,asvs,1,--,silent,input validation rules,
+01,asvs,2,MF,silent,validation enforcement side,
+01,asvs,3,MF,silent,cookie attributes,
+01,asvs,4,--,silent,response content types,
+01,asvs,5,MF,silent,password policy,
+01,asvs,6,MF,silent,credential stuffing control,
+01,asvs,7,MF,silent,session termination,
+01,asvs,8,--,silent,token entropy,
+01,asvs,9,MF,predicate,authorization-grant,single account full read/write
+01,asvs,10,--,silent,object ownership check,
+01,asvs,11,MF,silent,cipher at rest,
+01,asvs,12,MF,silent,transport on gRPC,
+01,asvs,13,MF,predicate,credential-custody,password in an environment variable
+01,asvs,14,--,field,data_classification,
+01,asvs,15,--,silent,patch windows,
+01,asvs,16,MF,predicate,record-attribution,receipt names the order service (registry v8)
+01,asvs,17,--,silent,error responses,
+01,stride,0,MF,field,authentication,session cookie
+01,stride,1,MF,silent,webhook authentication,
+01,stride,2,--,field,authentication,single application account
+01,stride,3,MF,silent,transport on gRPC,
+01,stride,4,MF,predicate,authorization-grant,full read/write
+01,stride,5,--,silent,webhook authentication,
+01,stride,6,--,predicate,authorization-grant,service account writes receipts
+01,stride,7,MF,predicate,record-attribution,receipt names the order service (registry v8)
+01,stride,8,--,silent,webhook sender identity,
+01,stride,9,--,field,authentication,shared account; audit silent
+01,stride,10,MF,silent,protection at rest,
+01,stride,11,MF,silent,transport on gRPC,
+01,stride,12,--,silent,transport on db connection,
+01,stride,13,--,predicate,credential-custody,password in an environment variable
+01,stride,14,MF,field,exposure,
+01,stride,15,--,field,exposure,
+01,stride,16,--,predicate,mfa-requirement,no MFA
+01,stride,17,--,field,authentication,none on gRPC
+01,stride,18,--,silent,object ownership check,
+02,stride,0,MF,predicate,credential-sharing,fleet-wide key
+02,stride,1,MF,silent,console authentication,
+02,stride,2,--,silent,image signature check,
+02,stride,3,MF,silent,image signature check,
+02,stride,4,--,silent,registry write access,
+02,stride,5,MF,predicate,credential-sharing,no per-device identity
+02,stride,6,MF,silent,who holds a read grant,
+02,stride,7,MF,silent,transport on MQTT,
+02,stride,8,--,field,authentication,public read
+02,stride,9,--,silent,protection at rest,
+02,stride,10,MF,field,exposure,
+02,stride,11,--,predicate,credential-sharing,any key holder can publish
+02,stride,12,--,silent,operator grant scope,
+02,stride,13,--,silent,anti-rollback check,
+02,stride,14,--,field,authentication,public read
+02,stride,15,--,silent,content validation,
+03,stride,0,MF,predicate,credential-rotation,static key never changed
+03,stride,1,MF,predicate,origin-verification,scheduler does not check the depositor
+03,stride,2,--,silent,trigger authentication,
+03,stride,3,MF,predicate,content-validation,only the schema is checked (registry v8)
+03,stride,4,--,silent,metadata db write access,
+03,stride,5,--,structure,,compromised transform writes the warehouse
+03,stride,6,--,silent,file-to-key attribution,
+03,stride,7,--,silent,lineage,
+03,stride,8,MF,predicate,authorization-grant,dataset-wide grant
+03,stride,9,MF,predicate,credential-custody,keys in the metadata database
+03,stride,10,--,silent,protection at rest,
+03,stride,11,--,silent,transport on the load,
+03,stride,12,MF,silent,size or window limits,
+03,stride,13,--,predicate,content-validation,only the schema is checked (registry v8)
+03,stride,14,--,predicate,authorization-grant,dataset-wide grant
+03,stride,15,--,silent,replay or freshness control,
+03,stride,16,--,silent,job admission limits,
+04,asvs,0,MF,silent,response content types,
+04,asvs,1,MF,silent,artifact size or type limits,
+04,asvs,2,--,silent,artifact validation,
+04,asvs,3,MF,field,authentication,API key carries no claims
+04,asvs,4,MF,predicate,credential-rotation,"""we have never expired one""; the signed row reads credential-expiry unknown"
+04,asvs,5,--,field,authentication,none; network position
+04,asvs,6,--,silent,cipher at rest,
+04,asvs,7,MF,silent,transport on the internal link,
+04,asvs,8,--,silent,service account limits,
+04,stride,0,MF,predicate,credential-rotation,"""we have never expired one"""
+04,stride,1,MF,field,authentication,none; network position
+04,stride,2,--,silent,publisher identity (hedged),
+04,stride,3,MF,silent,artifact integrity check (hedged),
+04,stride,4,MF,field,authentication,"""Redis has no password""; the signed row reads unknown"
+04,stride,5,--,silent,transport on the internal link,
+04,stride,6,--,silent,publisher identity (hedged),
+04,stride,7,--,predicate,credential-sharing,key per team
+04,stride,8,MF,silent,who holds a read grant,
+04,stride,9,MF,field,authentication,Redis has no password
+04,stride,10,--,structure,,model returns another tenant's features
+04,stride,11,--,silent,transport on the internal link,
+04,stride,12,MF,silent,rate or capacity limits,
+04,stride,13,--,field,authentication,Redis has no password
+04,stride,14,--,silent,registry write access,
+04,stride,15,--,silent,key scope,
+04,stride,16,--,silent,transport on the caller link,
+05,asvs,0,MF,silent,security response headers,
+05,asvs,1,--,silent,cookie attributes,
+05,asvs,2,MF,predicate,credential-custody,credentials in the config stores
+05,asvs,3,MF,silent,job resource bounds,
+05,asvs,4,MF,structure,,no WebRTC path
+05,asvs,5,--,silent,transport on the queue link,
+05,asvs,6,--,silent,user authentication,
+05,stride,0,MF,silent,user authentication,
+05,stride,1,MF,silent,queue authentication,
+05,stride,2,--,predicate,credential-custody,database credentials in the worker config
+05,stride,3,MF,predicate,credential-custody,queue credentials in the web config
+05,stride,4,--,silent,database authentication,
+05,stride,5,--,silent,producer attribution,
+05,stride,6,MF,predicate,credential-custody,database credentials in the worker config
+05,stride,7,MF,predicate,credential-custody,queue credentials in the web config
+05,stride,8,--,silent,protection at rest,
+05,stride,9,--,silent,transport between tiers,
+05,stride,10,MF,silent,rate or capacity limits,
+05,stride,11,--,field,exposure,
+05,stride,12,--,silent,log record permissions,
+05,stride,13,--,silent,authorization carried with a job,
+05,stride,14,--,silent,transport between tiers,
+05,stride,15,--,silent,consumer authorization,
+05,stride,16,--,silent,consumer authorization,
+05,stride,17,--,silent,replay detection,
+05,stride,18,--,predicate,credential-custody,database credentials in the worker config
+06,asvs,0,MF,silent,query construction,
+06,asvs,1,--,silent,validation side,
+06,asvs,2,--,silent,cookie attributes,
+06,asvs,3,--,silent,anti-automation,
+06,asvs,4,--,silent,authorization rules,
+06,asvs,5,MF,silent,per-account restriction,
+06,stride,0,MF,silent,lobby authentication,
+06,stride,1,MF,silent,game server authentication,
+06,stride,2,--,silent,moderation authentication,
+06,stride,3,MF,structure,,client runs on a machine the player controls
+06,stride,4,MF,silent,stats write access,
+06,stride,5,--,structure,,game server writes player records
+06,stride,6,--,silent,moderation audit record,
+06,stride,7,--,silent,actor recorded on writes,
+06,stride,8,MF,silent,protection at rest,
+06,stride,9,MF,silent,transport on client links,
+06,stride,10,--,structure,,server sends state to the client
+06,stride,11,--,silent,moderation access scope,
+06,stride,12,MF,field,exposure,
+06,stride,13,MF,field,exposure,
+06,stride,14,MF,field,operations,direct read and write
+06,stride,15,MF,silent,hand-over authentication,
+06,stride,16,--,silent,transport on corporate links,
+07,stride,0,MF,predicate,credential-sharing,shared build token
+07,stride,1,MF,silent,registry pull authentication,
+07,stride,2,--,silent,controller poll authentication,
+07,stride,3,--,silent,git push authentication,
+07,stride,4,--,silent,runner login authentication,
+07,stride,5,MF,predicate,signature-verification,downloads not verified
+07,stride,6,MF,silent,tag immutability,
+07,stride,7,--,silent,git write access,
+07,stride,8,--,silent,transport on the WAN,
+07,stride,9,--,silent,transport on the WAN,
+07,stride,10,--,predicate,authorization-grant,any developer rebuilds without review
+07,stride,11,MF,predicate,credential-sharing,every pipeline presents one token
+07,stride,12,MF,silent,token custody,
+07,stride,13,--,silent,protection at rest,
+07,stride,14,--,silent,protection at rest,
+07,stride,15,--,silent,transport on the WAN,
+07,stride,16,--,silent,rate or capacity limits,
+07,stride,17,--,silent,registry availability,
+07,stride,18,MF,structure,,runner writes the image and names the release
+07,stride,19,--,predicate,signature-verification,downloads not verified
+07,stride,20,--,silent,transport on the controller link,
+07,stride,21,--,silent,rebuild limits,
+08,asvs,0,--,silent,anti-automation,
+08,asvs,1,--,silent,federation trust documentation,
+08,asvs,2,MF,predicate,credential-revocation,"twelve-hour token, no way to pull it back; the nightly leaver pull has no predicate"
+08,asvs,3,MF,predicate,authorization-grant,store-manager group works at every store
+08,asvs,4,MF,predicate,authorization-grant,franchise provider vouches with no written limit
+08,asvs,5,--,silent,signing algorithms,
+08,asvs,6,MF,predicate,credential-sharing,one key signs every application's tokens
+08,asvs,7,--,silent,hash function,
+08,asvs,8,MF,silent,transport on sign-in,
+08,asvs,9,MF,silent,audit log contents,
+08,asvs,10,--,silent,audit log contents,
+08,asvs,11,--,silent,data classification,
+08,stride,0,MF,predicate,credential-sharing,one key signs every application's tokens
+08,stride,1,--,silent,second factor,
+08,stride,2,MF,predicate,credential-revocation,no call back and no way to pull a token back
+08,stride,3,--,silent,public key trust,
+08,stride,4,MF,field,authentication,applications decide from the groups in the token
+08,stride,5,--,silent,transport on the HR pull,
+08,stride,6,--,silent,transport to the console,
+08,stride,7,--,silent,audit log write access,
+08,stride,8,MF,field,authentication,franchise assertion taken as a sign-in
+08,stride,9,--,silent,audit log contents,
+08,stride,10,MF,predicate,credential-custody,signing key in a key store
+08,stride,11,--,silent,protection at rest,
+08,stride,12,--,silent,audit log contents,
+08,stride,13,--,silent,transport on sign-in,
+08,stride,14,--,silent,transport on the HR pull,
+08,stride,15,MF,structure,,every application signs in through the broker
+08,stride,16,--,none,directory sync cadence,"""Group membership ... comes from the HR system overnight. The broker pulls the changes once a night, and that is also how leavers stop being colleagues."""
+08,stride,17,--,predicate,credential-sharing,one key for every application
+08,stride,18,MF,predicate,authorization-grant,store-manager group works at every store
+08,stride,19,MF,predicate,credential-revocation,"token cannot be pulled back; the nightly leaver pull has no predicate"
+08,stride,20,--,predicate,authorization-grant,franchise provider vouches with no written limit
+09,asvs,0,MF,field,encryption_in_transit,plain HTTP
+09,asvs,1,MF,silent,protection of stored records,
+09,asvs,2,MF,field,protocol,the API accepts SQL statements
+09,asvs,3,MF,silent,response fields,
+09,asvs,4,MF,silent,customer authentication,
+09,asvs,5,--,silent,API read restriction,
+09,asvs,6,--,silent,accepted HTTP methods,
+09,stride,0,MF,silent,API authentication,
+09,stride,1,MF,silent,spreadsheet identity,
+09,stride,2,--,structure,,a fax carries no sender identity
+09,stride,3,MF,field,encryption_in_transit,plain HTTP
+09,stride,4,MF,field,protocol,the API accepts SQL statements
+09,stride,5,MF,field,protocol,the API accepts SQL statements
+09,stride,6,--,silent,handover write access,
+09,stride,7,--,silent,API authentication,
+09,stride,8,--,field,protocol,changes arrive as SQL from a spreadsheet
+09,stride,9,--,predicate,destination-verification,nobody checks the fax arrived
+09,stride,10,MF,field,encryption_in_transit,plain HTTP
+09,stride,11,MF,silent,protection at rest,
+09,stride,12,--,silent,protection at rest,
+09,stride,13,MF,predicate,destination-verification,nobody checks the fax arrived
+09,stride,14,--,field,exposure,
+09,stride,15,--,field,protocol,the API accepts SQL statements
+09,stride,16,--,structure,,every order passes through SIMS
+09,stride,17,--,field,protocol,the API accepts SQL statements
+09,stride,18,MF,predicate,authorization-grant,macros send SQL to the same API the app calls
+09,stride,19,--,silent,handover authentication,
+10,asvs,0,MF,silent,session representation,
+10,asvs,1,MF,field,encryption_in_transit,assets over HTTP
+10,asvs,2,MF,silent,session generation,
+10,asvs,3,MF,silent,query construction,
+10,asvs,4,--,silent,validation layer,
+10,asvs,5,--,silent,password rule,
+10,stride,0,MF,predicate,internet-exposure,"the database is reached from anywhere, no jump host; no signed row states it"
+10,stride,1,MF,silent,CDN push authentication,
+10,stride,2,--,silent,session handling,
+10,stride,3,MF,field,encryption_in_transit,assets over HTTP
+10,stride,4,MF,silent,bucket write access,
+10,stride,5,MF,field,encryption_in_transit,no TLS on the admin connection
+10,stride,6,--,silent,database write access,
+10,stride,7,--,structure,,admin edits bypass the CMS
+10,stride,8,--,silent,session handling,
+10,stride,9,MF,field,encryption_in_transit,no TLS on the admin connection
+10,stride,10,--,silent,protection at rest,
+10,stride,11,--,field,encryption_in_transit,assets over HTTP
+10,stride,12,--,field,exposure,
+10,stride,13,--,silent,bucket write access,
+10,stride,14,--,predicate,internet-exposure,the database is reached from anywhere
+10,stride,15,MF,silent,CDN push authentication,
+10,stride,16,--,silent,admin interface authentication,
+10,stride,17,MF,silent,output encoding,
+11,asvs,0,MF,silent,query construction,
+11,asvs,1,--,silent,cookie attributes,
+11,asvs,2,MF,silent,anti-automation,
+11,asvs,3,--,silent,session verification,
+11,asvs,4,--,silent,authorization rules,
+11,asvs,5,MF,silent,per-record restriction,
+11,asvs,6,MF,silent,transport,
+11,asvs,7,--,silent,data in URLs,
+11,stride,0,MF,silent,colleague authentication,
+11,stride,1,MF,silent,manager authentication,
+11,stride,2,MF,silent,collector authentication,
+11,stride,3,--,silent,service-to-service identity,
+11,stride,4,MF,silent,export integrity check,
+11,stride,5,--,silent,database write access,
+11,stride,6,--,silent,transport,
+11,stride,7,--,silent,rota change record,
+11,stride,8,--,silent,collection record,
+11,stride,9,MF,silent,protection at rest,
+11,stride,10,MF,structure,,one file holds a store's export
+11,stride,11,--,silent,transport,
+11,stride,12,--,silent,exposure and capacity,
+11,stride,13,MF,structure,,payroll depends on the weekly export
+11,stride,14,MF,silent,role enforcement,
+11,stride,15,--,silent,export period check,
+11,stride,16,--,silent,transport,
+12,asvs,0,MF,silent,query construction,
+12,asvs,1,--,silent,upload size limit,
+12,asvs,2,MF,silent,file type check,
+12,asvs,3,--,silent,anti-automation,
+12,asvs,4,--,silent,password length,
+12,asvs,5,MF,silent,initial credential handling,
+12,asvs,6,MF,silent,per-supplier restriction,
+12,asvs,7,MF,silent,transport,
+12,asvs,8,MF,silent,remediation time frames,
+12,asvs,9,--,silent,update windows,
+12,stride,0,MF,field,authentication,vendor-issued password
+12,stride,1,MF,silent,manager sign-in,
+12,stride,2,MF,silent,bucket writer authentication,
+12,stride,3,MF,predicate,content-validation,"the runbook: the file ""is picked up as-is"" (registry v8)"
+12,stride,4,MF,predicate,transport-encryption,"told encrypted end to end, runbook says plain CSV: a conflict the rows hold"
+12,stride,5,--,structure,,documents rest in a platform we do not run
+12,stride,6,--,silent,decision record,
+12,stride,7,--,silent,arrival record,
+12,stride,8,MF,silent,who holds a read grant,
+12,stride,9,--,structure,,documents rest in a platform we do not run
+12,stride,10,--,silent,transport,
+12,stride,11,--,structure,,the portal is a third-party service
+12,stride,12,MF,silent,failure detection,
+12,stride,13,MF,silent,per-tenant authorization,
+12,stride,14,MF,silent,reviewer authorization,
+12,stride,15,--,silent,approved version retention,
+12,stride,16,--,silent,replay control,
+12,stride,17,MF,silent,record cross-check,
+12,stride,18,--,silent,per-supplier limits,
+13,asvs,0,MF,silent,XML external entities,
+13,asvs,1,MF,silent,CORS origins,
+13,asvs,2,--,silent,cross-origin request check,
+13,asvs,3,MF,silent,WebSocket transport,
+13,asvs,4,--,silent,session re-check,
+13,asvs,5,--,silent,sign-in and attempt limits,
+13,stride,0,MF,predicate,credential-rotation,token never rotated
+13,stride,1,MF,silent,handshake authentication,
+13,stride,2,--,silent,partner identification,
+13,stride,3,--,silent,console sign-in,
+13,stride,4,MF,silent,document check before orders,
+13,stride,5,MF,silent,transport to the API,
+13,stride,6,--,silent,database connection check,
+13,stride,7,--,silent,archive write access,
+13,stride,8,--,predicate,record-attribution,"job orders carry only the token or session (registry v8)"
+13,stride,9,--,silent,order-to-document lineage,
+13,stride,10,MF,silent,WebSocket transport,
+13,stride,11,MF,silent,protection at rest,
+13,stride,12,--,silent,XML external entities,
+13,stride,13,--,silent,file store access,
+13,stride,14,MF,silent,connection limits,
+13,stride,15,--,silent,document size limits,
+13,stride,16,MF,silent,CORS and session checks,
+13,stride,17,--,structure,,the console is served from the corporate web host
+13,stride,18,--,silent,API write authorization,
+13,stride,19,MF,silent,CORS and session checks,
