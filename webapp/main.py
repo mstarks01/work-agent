@@ -132,6 +132,7 @@ from analysis_service import (
 from analysis_service.deployment import Deployment
 from analysis_service.frameworks import package_for
 from analysis_service.model_tiers import ModelTierConfig
+from analysis_service.open_facts import open_facts_by_framework
 from analysis_service.selection import SelectionError, resolve_selection
 from analysis_service.vendors import (
     CREDENTIAL_MODE_NOTES,
@@ -375,6 +376,9 @@ def render_report(report: Report) -> RenderedPage:
         script=client_script("report_view.js"),
         report=script_json(report.model_dump(mode="json")),
         units=script_json(unit_rows(report)),
+        open_facts=script_json(
+            open_facts_by_framework(report.analyses, report.system_model)
+        ),
     )
 
 
