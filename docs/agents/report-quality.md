@@ -118,7 +118,9 @@ fan-in loss.
 
 **Ledger rows:** `evals/experiments/QA-2026-09-26-01.jsonl` (E1 to E5) and its
 report `evals/experiments/QA-2026-09-26-01.md`; `evals/experiments/QA-2026-09-26-02.jsonl` (E1, E2,
-the report side of the lane closing) and its report; the earlier audit
+the report side of the lane closing) and its report; `evals/experiments/QA-2026-09-26-03.jsonl`
+(which stated facts no predicate holds, over all 331 reference claims) and its
+report; the earlier audit
 `evals/experiments/QA-2026-09-25-01.jsonl`.
 
 **Human rulings, committed:**
