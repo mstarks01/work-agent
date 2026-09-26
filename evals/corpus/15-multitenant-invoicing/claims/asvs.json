@@ -1,0 +1,123 @@
+[
+  {
+    "chapter": "authorization",
+    "requirement": "V8.2.2",
+    "affected_element_ids": [
+      "process:billing-app",
+      "flow:entity:payer>process:billing-app>open-payment-page"
+    ],
+    "claim": "The payment page serves any invoice by its counting number with no sign-in, so access to an invoice is not tied to anyone's permission to see it.",
+    "tier": "must-find",
+    "disposition": "gap-from-prose",
+    "notes": "Stated outright."
+  },
+  {
+    "chapter": "authorization",
+    "requirement": "V8.4.1",
+    "affected_element_ids": [
+      "process:billing-app",
+      "store:tenant-database",
+      "flow:entity:company-user>process:billing-app>manage-invoices"
+    ],
+    "claim": "Nothing states that the billing app keeps a user's reads and writes inside their own company: it loads invoices by number, adds the tenant filter by hand, and the database enforces no tenant rule.",
+    "tier": "must-find",
+    "disposition": "needs-code",
+    "notes": "Whether the check exists is a property of the app's code."
+  },
+  {
+    "chapter": "authorization",
+    "requirement": "V8.3.1",
+    "affected_element_ids": [
+      "process:billing-app",
+      "flow:entity:company-user>process:billing-app>manage-invoices"
+    ],
+    "claim": "The only stated role control is hiding buttons in the pages; nothing states that the server checks the role on each request.",
+    "tier": "must-find",
+    "disposition": "needs-code",
+    "notes": "A client-side control is stated and a server-side one is not."
+  },
+  {
+    "chapter": "authorization",
+    "requirement": "V8.2.3",
+    "affected_element_ids": [
+      "process:billing-app",
+      "flow:entity:company-user>process:billing-app>manage-invoices"
+    ],
+    "claim": "The billing app saves every field an edit posts, so no field is restricted to the users allowed to change it.",
+    "tier": "must-find",
+    "disposition": "gap-from-prose",
+    "notes": "Stated outright: the paid flag and the payout bank account included."
+  },
+  {
+    "chapter": "authorization",
+    "requirement": "V8.1.1",
+    "affected_element_ids": [
+      "process:billing-app"
+    ],
+    "claim": "Nobody wrote down who may read or change which invoices, beyond an admin and viewer role.",
+    "tier": "expected",
+    "disposition": "needs-more-prose",
+    "notes": "A fuller description could state the rules; the source names the roles and nothing they allow."
+  },
+  {
+    "chapter": "authorization",
+    "requirement": "V8.1.2",
+    "affected_element_ids": [
+      "process:billing-app"
+    ],
+    "claim": "Nobody wrote down which invoice fields each role may read or change.",
+    "tier": "expected",
+    "disposition": "needs-more-prose",
+    "notes": "The field-level half of V8.1.1."
+  },
+  {
+    "chapter": "secure-coding-and-architecture",
+    "requirement": "V15.3.3",
+    "affected_element_ids": [
+      "process:billing-app",
+      "flow:entity:company-user>process:billing-app>manage-invoices"
+    ],
+    "claim": "The edit handler accepts every field it receives rather than a list of fields each action allows.",
+    "tier": "must-find",
+    "disposition": "gap-from-prose",
+    "notes": "Stated outright; the same fact as V8.2.3 read as a coding defect."
+  },
+  {
+    "chapter": "secure-coding-and-architecture",
+    "requirement": "V15.1.3",
+    "affected_element_ids": [
+      "process:billing-app",
+      "process:pdf-renderer",
+      "store:render-queue"
+    ],
+    "claim": "Nobody wrote down that PDF rendering is resource-demanding or how its load is limited.",
+    "tier": "expected",
+    "disposition": "needs-more-prose",
+    "notes": "The source states the opposite of a limit: any user, any invoice, as often as they like."
+  },
+  {
+    "chapter": "authentication",
+    "requirement": "V6.3.3",
+    "affected_element_ids": [
+      "process:billing-app",
+      "flow:entity:company-user>process:billing-app>manage-invoices"
+    ],
+    "claim": "Users, admins included, sign in with a password alone.",
+    "tier": "must-find",
+    "disposition": "gap-from-prose",
+    "notes": "Stated outright: no second factor for admins or viewers."
+  },
+  {
+    "chapter": "security-logging-and-error-handling",
+    "requirement": "V16.2.1",
+    "affected_element_ids": [
+      "process:admin-console",
+      "store:tenant-database",
+      "flow:process:admin-console>process:billing-app>open-session-as-customer-user"
+    ],
+    "claim": "When a support agent acts as a customer user, the record names the customer user and not the agent who acted.",
+    "tier": "must-find",
+    "disposition": "gap-from-prose",
+    "notes": "Stated outright."
+  }
+]

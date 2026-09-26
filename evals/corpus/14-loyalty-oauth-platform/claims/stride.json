@@ -1,0 +1,235 @@
+[
+  {
+    "category": "spoofing",
+    "affected_element_ids": [
+      "flow:process:mobile-app>process:authorization-server>token-requests",
+      "process:mobile-app",
+      "process:authorization-server"
+    ],
+    "claim": "An attacker who copies a member's mobile refresh token from the phone keeps getting access tokens as that member indefinitely, because the token's expiry slides forward on every use.",
+    "tier": "must-find",
+    "severity": {
+      "likelihood": "medium",
+      "impact": "high"
+    },
+    "notes": "Stated outright: the refresh token never expires and slides ninety days on each use. Nothing the source states bounds the window, and nothing detects a second holder.",
+    "verb": "use-credential"
+  },
+  {
+    "category": "spoofing",
+    "affected_element_ids": [
+      "flow:process:mobile-app>process:authorization-server>token-requests",
+      "process:mobile-app"
+    ],
+    "claim": "A malicious app on the member's phone intercepts the mobile app's authorization code and redeems it as the mobile app, if the app sends no PKCE challenge.",
+    "tier": "expected",
+    "severity": {
+      "likelihood": "medium",
+      "impact": "high"
+    },
+    "notes": "Conditional on the unrecorded PKCE. A public client has no secret, so the code is the whole credential at the token endpoint.",
+    "verb": "use-credential"
+  },
+  {
+    "category": "spoofing",
+    "affected_element_ids": [
+      "flow:entity:partner-app>process:authorization-server>token-requests",
+      "entity:partner-app",
+      "process:authorization-server"
+    ],
+    "claim": "An attacker who obtains a partner app's static client secret requests tokens from the authorization server as that partner app.",
+    "tier": "expected",
+    "severity": {
+      "likelihood": "low",
+      "impact": "high"
+    },
+    "notes": "A shared secret sent in a request body is the partner's only proof of identity. Low likelihood: the source says nothing of how the secret is kept or leaked.",
+    "verb": "use-credential"
+  },
+  {
+    "category": "spoofing",
+    "affected_element_ids": [
+      "flow:entity:member>process:authorization-server>sign-in-and-consent",
+      "process:authorization-server"
+    ],
+    "claim": "An attacker guesses members' passwords on the authorization server's sign-in page and signs in as them.",
+    "tier": "expected",
+    "severity": {
+      "likelihood": "medium",
+      "impact": "medium"
+    },
+    "notes": "The sign-in is a password alone and the source states no lockout or rate limit. An expected finding, not a must-find: the silence is ordinary, not a stated gap.",
+    "verb": "guess-credential"
+  },
+  {
+    "category": "information-disclosure",
+    "affected_element_ids": [
+      "flow:entity:member>entity:partner-app>return-with-authorization-code",
+      "process:authorization-server"
+    ],
+    "claim": "An attacker who controls a URL that begins with a partner's registered redirect URI has the authorization server send members' authorization codes to it.",
+    "tier": "must-find",
+    "severity": {
+      "likelihood": "medium",
+      "impact": "medium"
+    },
+    "notes": "The case's stated OAuth defect: prefix matching on redirect URIs, so the authorization server itself sends the code to a URL the attacker owns. A confidential partner still needs its secret to redeem the code, which caps the impact.",
+    "verb": "elicit"
+  },
+  {
+    "category": "tampering",
+    "affected_element_ids": [
+      "flow:process:rewards-api>store:points-ledger>read-and-write-points",
+      "store:points-ledger",
+      "process:rewards-api"
+    ],
+    "claim": "An attacker with a foothold in the cloud account writes to the points ledger directly and changes members' balances, if the ledger does not authenticate the rewards API.",
+    "tier": "expected",
+    "severity": {
+      "likelihood": "low",
+      "impact": "high"
+    },
+    "notes": "Conditional: the source states nobody recorded how the API connects to the ledger.",
+    "verb": "alter"
+  },
+  {
+    "category": "tampering",
+    "affected_element_ids": [
+      "process:rewards-api",
+      "process:authorization-server"
+    ],
+    "claim": "An attacker who can answer the rewards API's start-up key download serves a public key of their own, and the API then accepts access tokens the attacker signs.",
+    "tier": "expected",
+    "severity": {
+      "likelihood": "low",
+      "impact": "high"
+    },
+    "notes": "The source states the key is downloaded at start-up and does not say from where or how it is checked. Low likelihood; the whole API's trust rests on that one fetch.",
+    "verb": "forge"
+  },
+  {
+    "category": "repudiation",
+    "affected_element_ids": [
+      "flow:entity:partner-app>process:rewards-api>call-rewards-api",
+      "store:points-ledger",
+      "entity:member"
+    ],
+    "claim": "A member denies approving a gift-card redemption a partner app made in their name, and the ledger cannot show that they approved it, because it records the client and not the member.",
+    "tier": "must-find",
+    "severity": {
+      "likelihood": "medium",
+      "impact": "medium"
+    },
+    "notes": "Stated outright. The consent screen proves a member connected the app once; it proves nothing about any one redemption.",
+    "verb": "unattributable"
+  },
+  {
+    "category": "information-disclosure",
+    "affected_element_ids": [
+      "flow:process:rewards-api>store:api-log-store>write-request-log",
+      "store:api-log-store"
+    ],
+    "claim": "Anyone who can read the API log store collects the bearer access tokens it records and uses them before they expire.",
+    "tier": "must-find",
+    "severity": {
+      "likelihood": "medium",
+      "impact": "high"
+    },
+    "notes": "Stated outright: every request is written with its headers. The tokens are plain bearer tokens that live an hour and carry every scope for partner apps, so a log reader holds live credentials.",
+    "verb": "read"
+  },
+  {
+    "category": "information-disclosure",
+    "affected_element_ids": [
+      "store:identity-database",
+      "flow:process:authorization-server>store:identity-database>read-and-write-accounts-and-grants"
+    ],
+    "claim": "An attacker who obtains a copy of the identity database recovers members' refresh tokens and password hashes, since its protection at rest is not recorded.",
+    "tier": "expected",
+    "severity": {
+      "likelihood": "low",
+      "impact": "high"
+    },
+    "notes": "Conditional on the unrecorded at-rest protection. It matters more here than on the other stores because the mobile refresh tokens never expire.",
+    "verb": "recover-credential"
+  },
+  {
+    "category": "denial-of-service",
+    "affected_element_ids": [
+      "process:authorization-server",
+      "flow:entity:member>process:authorization-server>sign-in-and-consent",
+      "flow:process:mobile-app>process:authorization-server>token-requests"
+    ],
+    "claim": "An attacker floods the authorization server's sign-in and token endpoints until members and partner apps can no longer get tokens.",
+    "tier": "expected",
+    "severity": {
+      "likelihood": "medium",
+      "impact": "medium"
+    },
+    "notes": "Every client depends on the one authorization server, and the source states no rate limit. The rewards API cannot serve anyone once tokens stop.",
+    "verb": "flood"
+  },
+  {
+    "category": "elevation-of-privilege",
+    "affected_element_ids": [
+      "process:support-console",
+      "entity:partner-app",
+      "process:authorization-server"
+    ],
+    "claim": "A partner app presents a member's access token to the support console, which accepts it because both services trust the same signing key and neither checks the audience, and it closes members' accounts.",
+    "tier": "must-find",
+    "severity": {
+      "likelihood": "medium",
+      "impact": "high"
+    },
+    "notes": "The case's central finding, assembled from three stated facts: no audience check, one signing key for both services, and the console on the same public hostname. Whether the console also checks a role is not stated, which is what keeps the likelihood at medium.",
+    "verb": "escalate"
+  },
+  {
+    "category": "elevation-of-privilege",
+    "affected_element_ids": [
+      "flow:entity:partner-app>process:rewards-api>call-rewards-api",
+      "entity:partner-app",
+      "process:rewards-api"
+    ],
+    "claim": "A partner app that only needs to show a member's points redeems that member's points for gift cards, because every partner app holds every scope.",
+    "tier": "must-find",
+    "severity": {
+      "likelihood": "medium",
+      "impact": "high"
+    },
+    "notes": "Stated outright: every partner gets every scope. Redemption needs nothing beyond the scope, so the grant a partner legitimately holds reaches money.",
+    "verb": "abuse-grant"
+  },
+  {
+    "category": "elevation-of-privilege",
+    "affected_element_ids": [
+      "store:identity-database",
+      "store:identity-database",
+      "flow:process:mobile-app>process:rewards-api>call-rewards-api"
+    ],
+    "claim": "A member whose account support closed keeps redeeming points with a refresh token the closure never revoked.",
+    "tier": "must-find",
+    "severity": {
+      "likelihood": "medium",
+      "impact": "medium"
+    },
+    "notes": "Stated outright: closing an account marks it closed in the directory and leaves the grant store untouched. Whether the token endpoint reads the closed flag is not stated.",
+    "verb": "abuse-grant"
+  },
+  {
+    "category": "elevation-of-privilege",
+    "affected_element_ids": [
+      "store:identity-database",
+      "entity:partner-app"
+    ],
+    "claim": "A partner app that a member disconnected keeps calling the rewards API with an access token issued before the disconnect.",
+    "tier": "expected",
+    "severity": {
+      "likelihood": "low",
+      "impact": "low"
+    },
+    "notes": "Stated, and bounded by the one-hour token life: disconnecting deletes the refresh token in the identity database and revokes nothing already issued. Expected rather than must-find because the window is short and the member already trusted the app.",
+    "verb": "abuse-grant"
+  }
+]

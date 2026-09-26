@@ -27,7 +27,7 @@ from evals.harness.exemplar_verbs import (
     verb_keyed_frameworks,
 )
 from evals.harness.fingerprint import IDENTIFIER_OF
-from evals.harness.reference import load_corpus
+from evals.harness.reference import load_corpus, tuning_cases
 
 
 @pytest.fixture(scope="module")
@@ -102,7 +102,7 @@ def test_every_case_carries_at_least_one_disagreement(corpus, swept):
     """The reach is why this is not three rows to re-bless by hand."""
     graded = {
         case.id
-        for case in corpus
+        for case in tuning_cases(corpus)
         if any(framework in case.frameworks for framework in verb_keyed_frameworks())
     }
     assert {entry.case for entry in swept} == graded

@@ -1,0 +1,222 @@
+[
+  {
+    "chapter": "oauth-and-oidc",
+    "requirement": "V10.4.1",
+    "affected_element_ids": [
+      "process:authorization-server",
+      "flow:entity:member>entity:partner-app>return-with-authorization-code"
+    ],
+    "claim": "The authorization server matches a partner's redirect URI by prefix rather than by exact comparison.",
+    "tier": "must-find",
+    "disposition": "gap-from-prose",
+    "notes": "Stated outright; the case's first OAuth defect."
+  },
+  {
+    "chapter": "oauth-and-oidc",
+    "requirement": "V10.4.3",
+    "affected_element_ids": [
+      "process:authorization-server",
+      "flow:entity:member>entity:partner-app>return-with-authorization-code"
+    ],
+    "claim": "Authorization codes stay valid for ten minutes, longer than a level 3 system allows.",
+    "tier": "must-find",
+    "disposition": "gap-from-prose",
+    "notes": "The level is what makes this a gap: ten minutes is within the level 1 and 2 bound and outside the level 3 one."
+  },
+  {
+    "chapter": "oauth-and-oidc",
+    "requirement": "V10.4.6",
+    "affected_element_ids": [
+      "process:authorization-server",
+      "flow:process:mobile-app>process:authorization-server>token-requests",
+      "process:mobile-app"
+    ],
+    "claim": "Nothing states whether the code flow requires a PKCE challenge.",
+    "tier": "must-find",
+    "disposition": "needs-config",
+    "notes": "The source says nobody wrote it down. Whether the authorization server requires it is a setting, so a fuller description would not settle it better than the configuration."
+  },
+  {
+    "chapter": "oauth-and-oidc",
+    "requirement": "V10.4.8",
+    "affected_element_ids": [
+      "process:authorization-server",
+      "flow:process:mobile-app>process:authorization-server>token-requests"
+    ],
+    "claim": "A mobile refresh token has no absolute expiry: each use slides it forward ninety days.",
+    "tier": "must-find",
+    "disposition": "gap-from-prose",
+    "notes": "Stated outright."
+  },
+  {
+    "chapter": "oauth-and-oidc",
+    "requirement": "V10.4.5",
+    "affected_element_ids": [
+      "process:authorization-server",
+      "flow:process:mobile-app>process:authorization-server>token-requests",
+      "process:mobile-app"
+    ],
+    "claim": "Nothing states how the authorization server stops a copied refresh token of the public mobile client being replayed.",
+    "tier": "expected",
+    "disposition": "needs-config",
+    "notes": "Rotation or sender constraint would be a server setting. The source states only the sliding expiry."
+  },
+  {
+    "chapter": "oauth-and-oidc",
+    "requirement": "V10.4.11",
+    "affected_element_ids": [
+      "process:authorization-server",
+      "entity:partner-app"
+    ],
+    "claim": "Every partner app is assigned every scope rather than the scopes it needs.",
+    "tier": "must-find",
+    "disposition": "gap-from-prose",
+    "notes": "Stated outright, with the reason."
+  },
+  {
+    "chapter": "oauth-and-oidc",
+    "requirement": "V10.2.3",
+    "affected_element_ids": [
+      "entity:partner-app",
+      "flow:entity:partner-app>process:authorization-server>token-requests"
+    ],
+    "claim": "Nothing states which scopes a partner app asks for in its authorization requests.",
+    "tier": "expected",
+    "disposition": "needs-code",
+    "notes": "A property of each partner's own client code, which we do not run."
+  },
+  {
+    "chapter": "oauth-and-oidc",
+    "requirement": "V10.4.16",
+    "affected_element_ids": [
+      "process:authorization-server",
+      "flow:entity:partner-app>process:authorization-server>token-requests"
+    ],
+    "claim": "Partner apps authenticate with a client secret in the request body rather than a public-key method.",
+    "tier": "expected",
+    "disposition": "gap-from-prose",
+    "notes": "A level 3 requirement; the stated secret settles it."
+  },
+  {
+    "chapter": "oauth-and-oidc",
+    "requirement": "V10.3.1",
+    "affected_element_ids": [
+      "process:rewards-api",
+      "flow:entity:partner-app>process:rewards-api>call-rewards-api",
+      "flow:process:mobile-app>process:rewards-api>call-rewards-api"
+    ],
+    "claim": "The rewards API does not check that an access token was issued for it.",
+    "tier": "must-find",
+    "disposition": "gap-from-prose",
+    "notes": "Stated outright: the API checks the signature and not the audience."
+  },
+  {
+    "chapter": "oauth-and-oidc",
+    "requirement": "V10.3.5",
+    "affected_element_ids": [
+      "process:rewards-api",
+      "flow:entity:partner-app>process:rewards-api>call-rewards-api",
+      "flow:process:mobile-app>process:rewards-api>call-rewards-api"
+    ],
+    "claim": "Access tokens are plain bearer tokens, so the rewards API cannot tell a stolen token from its holder's.",
+    "tier": "must-find",
+    "disposition": "gap-from-prose",
+    "notes": "A level 3 requirement; 'plain bearer tokens' settles it."
+  },
+  {
+    "chapter": "oauth-and-oidc",
+    "requirement": "V10.4.14",
+    "affected_element_ids": [
+      "process:authorization-server"
+    ],
+    "claim": "The authorization server issues bearer access tokens rather than sender-constrained ones.",
+    "tier": "expected",
+    "disposition": "gap-from-prose",
+    "notes": "The server-side half of V10.3.5."
+  },
+  {
+    "chapter": "self-contained-tokens",
+    "requirement": "V9.2.3",
+    "affected_element_ids": [
+      "process:rewards-api",
+      "process:support-console"
+    ],
+    "claim": "Neither the rewards API nor the support console restricts the tokens it accepts to the ones meant for it.",
+    "tier": "expected",
+    "disposition": "gap-from-prose",
+    "notes": "Stated for the rewards API; the console shares the key and the source states no check there either."
+  },
+  {
+    "chapter": "self-contained-tokens",
+    "requirement": "V9.2.4",
+    "affected_element_ids": [
+      "process:authorization-server",
+      "process:rewards-api",
+      "process:support-console"
+    ],
+    "claim": "One signing key issues tokens for both the rewards API and the support console, and nothing states that the tokens carry an audience that tells them apart.",
+    "tier": "must-find",
+    "disposition": "needs-code",
+    "notes": "The shared key is stated; whether the issued tokens name an audience is a property of the token the source does not describe."
+  },
+  {
+    "chapter": "self-contained-tokens",
+    "requirement": "V9.1.3",
+    "affected_element_ids": [
+      "process:rewards-api"
+    ],
+    "claim": "The rewards API downloads its token-verification key at start-up, and nothing states where from or how that source is trusted.",
+    "tier": "expected",
+    "disposition": "needs-config",
+    "notes": "A deployed setting."
+  },
+  {
+    "chapter": "session-management",
+    "requirement": "V7.3.1",
+    "affected_element_ids": [
+      "process:authorization-server",
+      "flow:entity:member>process:authorization-server>sign-in-and-consent"
+    ],
+    "claim": "The authorization server's sign-in session has no idle timeout.",
+    "tier": "must-find",
+    "disposition": "gap-from-prose",
+    "notes": "Stated outright: nobody decided one."
+  },
+  {
+    "chapter": "session-management",
+    "requirement": "V7.4.2",
+    "affected_element_ids": [
+      "process:support-console",
+      "store:identity-database"
+    ],
+    "claim": "Closing a member's account leaves that member's refresh tokens usable.",
+    "tier": "must-find",
+    "disposition": "gap-from-prose",
+    "notes": "Stated outright: nothing happens to the grant store on closure."
+  },
+  {
+    "chapter": "session-management",
+    "requirement": "V7.5.3",
+    "affected_element_ids": [
+      "process:rewards-api",
+      "flow:entity:partner-app>process:rewards-api>call-rewards-api",
+      "flow:process:mobile-app>process:rewards-api>call-rewards-api"
+    ],
+    "claim": "Redeeming points for a gift card asks for nothing beyond a token with the redeem scope.",
+    "tier": "must-find",
+    "disposition": "gap-from-prose",
+    "notes": "A level 3 requirement. Redemption turns points into money, and the source states the whole of what it checks."
+  },
+  {
+    "chapter": "security-logging-and-error-handling",
+    "requirement": "V16.2.5",
+    "affected_element_ids": [
+      "process:rewards-api",
+      "store:api-log-store"
+    ],
+    "claim": "The rewards API logs every request with its headers, so live bearer tokens are written to the log store.",
+    "tier": "must-find",
+    "disposition": "gap-from-prose",
+    "notes": "Stated outright."
+  }
+]
