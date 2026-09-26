@@ -85,6 +85,8 @@ UNEXERCISED: dict[str, str] = {
     "tampering-signature-stated-unverified": _READS_ONLY_THE_CATALOG,
     "repudiation-shared-credential": _READS_ONLY_THE_CATALOG,
     "information-disclosure-destination-stated-unverified": _READS_ONLY_THE_CATALOG,
+    "tampering-content-stated-unvalidated": _READS_ONLY_THE_CATALOG,
+    "repudiation-record-names-intermediary": _READS_ONLY_THE_CATALOG,
 }
 
 
