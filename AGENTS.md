@@ -119,6 +119,9 @@ refuted row is what stops the next audit paying for the same answer.
 The default audit is offline and its budget is zero. A paid run needs the
 user's explicit permission every time.
 
+**Report quality** work starts from `docs/agents/report-quality.md`: the
+current figures, the mechanisms, the open work and the evidence index.
+
 ### Price a fix before a run
 
 A sweep costs money and sees nothing under the run-to-run spread. Before any
