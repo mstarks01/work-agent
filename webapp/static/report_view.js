@@ -15,6 +15,10 @@
   // both handed to it. Same escape, same discipline — every string below is
   // still untrusted and still goes in as text.
   const UNITS = JSON.parse(document.getElementById("units").textContent);
+  // The open facts each framework's conditional findings rest on, grouped and
+  // ordered server-side. Each finding is placed under one fact; the page only
+  // renders what it is handed.
+  const OPEN_FACTS = JSON.parse(document.getElementById("open_facts").textContent);
   const $ = (id) => document.getElementById(id);
   const el = (tag, cls, text) => {
     const n = document.createElement(tag);
@@ -625,7 +629,15 @@
     // Severity order where the framework grades, and the block's own order
     // otherwise — which is the package's declared lane order, and is the only
     // ranking a framework that grades nothing has.
-    const claims = [...block.claims];
+    // A conditional finding is shown once, under the open fact that would
+    // settle the most findings on its own, rather than in the list below: a
+    // report of many conditional findings asks the same few questions many
+    // times, and grouped they read as the questions they are.
+    const facts = OPEN_FACTS[block.framework] || [];
+    const grouped = new Set(facts.flatMap(f => f.placed));
+    const byClaimId = {};
+    block.claims.forEach(c => { byClaimId[c.id] = c; });
+    const claims = block.claims.filter(c => !grouped.has(c.id));
     if (claims.every(c => c.severity)) {
       claims.sort((a,b) => SEV_ORDER.indexOf(a.severity.level) - SEV_ORDER.indexOf(b.severity.level));
     }
@@ -635,7 +647,24 @@
     } else {
       // Said rather than left blank. A framework that examined the system and
       // raised nothing is a result; an empty heading reads as a rendering fault.
-      section.append(el("div", "meta", "No claims were raised under this framework."));
+      section.append(el("div", "meta", grouped.size
+        ? "Every claim here is conditional; they are grouped below by what would settle them."
+        : "No claims were raised under this framework."));
+    }
+    if (grouped.size) {
+      section.append(el("h3", null, "Conditional \u2014 grouped by the open fact that would settle them"));
+      section.append(el("div", "meta",
+        `${grouped.size} finding(s) wait on ${facts.length} open fact(s). ` +
+        "Each finding is shown once, under the fact that settles the most findings on its own."));
+      facts.filter(f => f.placed.length).forEach(f => {
+        const box = el("details", "openfact");
+        const head = el("summary");
+        head.append(el("b", null, f.label),
+          ` \u2014 ${f.cited_by.length} finding(s) wait on this; an answer alone settles ${f.settles.length}`);
+        box.append(head);
+        f.placed.forEach(id => box.append(claimCard(marks, byClaimId[id], false)));
+        section.append(box);
+      });
     }
     // Only where there are any. Every block carries this heading otherwise, and
     // on a report with two frameworks that is two empty sections a reader has

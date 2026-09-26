@@ -99,6 +99,9 @@
      is a note about what is missing, not a finding. */
   /* one row per unit the framework answered for */
   .units { margin: 20px 0 8px; }
+  .openfact { border: 1px solid var(--line, #ddd); border-radius: 6px; margin: 8px 0; }
+  .openfact > summary { cursor: pointer; padding: 8px 12px; }
+  .openfact > .card { margin: 8px 12px; }
   .units h3 { font-size: 0.95rem; margin: 0 0 8px; }
   .unit { border: 1px solid var(--border); border-radius: 8px; background: var(--surface);
     margin-bottom: 6px; }
@@ -262,6 +265,11 @@
 <!-- The units each framework answers for, with each one's own text, joined by
      webapp/main.py because the page knows no package. Escaped the same way. -->
 <script type="application/json" id="units" nonce="__CSP_NONCE__"><!--units--></script>
+
+<!-- The open facts each framework's conditional findings rest on, grouped by
+     analysis_service.open_facts, which decides the grouping and the order.
+     Escaped the same way. -->
+<script type="application/json" id="open_facts" nonce="__CSP_NONCE__"><!--open_facts--></script>
 
 <script nonce="__CSP_NONCE__"><!--script--></script>
 </body>

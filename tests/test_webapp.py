@@ -1066,6 +1066,24 @@ def test_a_submitted_nonce_placeholder_is_not_substituted():
     assert nonce not in payload.group(1)
 
 
+def test_the_page_carries_the_open_facts_its_findings_rest_on():
+    """The grouping is computed server-side and handed over, like the units."""
+    from analysis_service.open_facts import open_facts_by_framework
+    from tests.factories import sample_report
+
+    report = sample_report()
+    rendered = render_report(report)
+    payload = re.search(
+        r'<script type="application/json" id="open_facts"[^>]*>(.*?)</script>',
+        rendered.html,
+        re.DOTALL,
+    )
+
+    assert json.loads(payload.group(1)) == json.loads(
+        json.dumps(open_facts_by_framework(report.analyses, report.system_model))
+    )
+
+
 def test_the_viewer_has_no_inline_style_attribute():
     """The CSP grants no 'unsafe-inline' for styles, so a style="" would break.
 
