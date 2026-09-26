@@ -36,6 +36,7 @@ from typing import Literal, get_args
 
 from pydantic import BaseModel
 
+from analysis_service.assertions import REGISTRY, projection_fields
 from analysis_service.candidates import Rule
 from analysis_service.claims import (
     Claim,
@@ -59,13 +60,16 @@ __all__ = [
     "FrameworkPackageError",
     "FrameworkSchemas",
     "KnowledgeTables",
+    "NoRule",
     "PreconditionError",
     "PreconditionResult",
+    "PredicateReader",
     "lane_of",
     "package_for",
     "run_precondition",
     "schemas_for",
     "selectable_without_options",
+    "unprojected_predicates",
     "validate_package",
     "widest_fan_out",
 ]
@@ -199,11 +203,37 @@ class KnowledgeTables:
 
 
 @dataclass(frozen=True)
+class NoRule:
+    """Why no candidate rule of a package reads an assertion predicate.
+
+    State the reason as a property of the framework or of the predicate, never
+    as a name, so it still answers for a package or a predicate added later.
+    """
+
+    reason: str
+
+
+#: One predicate's reader in one package: the ID of the candidate rule that
+#: reads it, or why no rule does.
+PredicateReader = str | NoRule
+
+
+def unprojected_predicates() -> frozenset[str]:
+    """Every registered predicate that copies into no System Model field.
+
+    A fact of one of these kinds reaches no graph reader. With the assertion
+    pass on, the **Evidence Catalog** offers it to every lane as a row; a
+    candidate rule is the only reader that turns it into a lead.
+    """
+    return frozenset(REGISTRY) - frozenset(projection_fields())
+
+
+@dataclass(frozen=True)
 class IdRule:
     """How one package composes a claim ID, **as data rather than code**.
 
     Three parts, one member. Keeping them together is what lets the package
-    contract stay at nine members while the ID rule carries everything the one
+    contract stay at ten members while the ID rule carries everything the one
     neutral resolver needs: without the lane field the resolver could not stamp
     the lane it is resolving, and stamping it is what makes a draft's lane, its
     ID's prefix and the node that produced it agree by construction.
@@ -259,7 +289,7 @@ class IdRule:
 class FrameworkPackage:
     """One security framework as an object the service can run.
 
-    Nine members, plus text under one root by convention.
+    Ten members, plus text under one root by convention.
 
     ``name``
         The closed :data:`~analysis_service.claims.FrameworkName`. A package
@@ -297,6 +327,14 @@ class FrameworkPackage:
         here because their retrieval key does: selection is a set intersection
         over *this package's* fired rules, so a document the service stored
         would have no service-side caller.
+    ``predicate_readers``
+        For every assertion predicate that copies into no graph field, the
+        candidate rule of this package that reads it, or a :class:`NoRule`
+        with the reason. Such a fact reaches a lane only as an evidence row, so
+        this table is what states whether anything turns it into a lead. The
+        gate refuses a table that omits a predicate or names a rule this
+        package does not declare, so a predicate added to the registry fails
+        every package until each one answers for it.
     """
 
     name: FrameworkName
@@ -308,6 +346,7 @@ class FrameworkPackage:
     options: type[BaseModel]
     precondition: Precondition
     knowledge: KnowledgeTables
+    predicate_readers: Mapping[str, PredicateReader]
 
     def rules_for(self, lane: str) -> tuple[Rule, ...]:
         """This package's rules in one lane, in declaration order."""
@@ -336,7 +375,7 @@ class FrameworkSchemas:
     """The five shapes one framework's *model calls* speak in.
 
     Beside :class:`FrameworkPackage` rather than inside it, and the split is the
-    nine-member contract's own: a package member says what this framework judges
+    ten-member contract's own: a package member says what this framework judges
     and what selects its text, which is what the deployment gate can check and
     what a maintainer edits. These five are the wire between the graph and a
     provider — the types an ``output_schema`` compiles to and the types a node's
@@ -695,6 +734,7 @@ def _declaration_issues(package: FrameworkPackage) -> list[str]:
 
     issues += _id_format_issues(package)
     issues += _knowledge_issues(package)
+    issues += _predicate_reader_issues(package)
     issues += _schema_issues(package)
     return issues
 
@@ -809,6 +849,42 @@ def _knowledge_issues(package: FrameworkPackage) -> list[str]:
             + ", ".join(unknown)
         ]
     return []
+
+
+def _predicate_reader_issues(package: FrameworkPackage) -> list[str]:
+    """Every predicate with no graph field has a reader, and every named rule exists."""
+    issues: list[str] = []
+    declared = set(package.predicate_readers)
+    expected = unprojected_predicates()
+    if missing := sorted(expected - declared):
+        issues.append(
+            "predicate_readers omits predicates with no graph field: "
+            + ", ".join(missing)
+        )
+    if extra := sorted(declared - expected):
+        issues.append(
+            "predicate_readers names predicates that are projected or not"
+            " registered: " + ", ".join(extra)
+        )
+    known = {rule.rule_id for rule in package.rules}
+    unknown = sorted(
+        reader
+        for reader in package.predicate_readers.values()
+        if isinstance(reader, str) and reader not in known
+    )
+    if unknown:
+        issues.append(
+            "predicate_readers names rules this package does not declare: "
+            + ", ".join(unknown)
+        )
+    blank = sorted(
+        predicate
+        for predicate, reader in package.predicate_readers.items()
+        if isinstance(reader, NoRule) and not reader.reason.strip()
+    )
+    if blank:
+        issues.append("predicate_readers gives no reason for: " + ", ".join(blank))
+    return issues
 
 
 def _readable(root: Path, path: Path) -> bool:
