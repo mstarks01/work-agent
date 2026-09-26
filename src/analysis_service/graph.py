@@ -207,6 +207,7 @@ from analysis_service.prompts import (
     compose_repair_prompt,
     compose_reread_prompt,
     compose_rows_prompt,
+    lane_closing,
 )
 from analysis_service.report import (
     AnalysisContext,
@@ -2611,6 +2612,7 @@ def _llm_node(
     output_key: str,
     resolve_model: ModelResolver,
     resolve_sampling: SamplingResolver,
+    closing: str | None = None,
 ) -> LlmAgent:
     """One LLM node: its model, its full instruction, its emitted schema.
 
@@ -2623,6 +2625,9 @@ def _llm_node(
     rather than looked up, because the map is now built per selection and the
     caller already holds it. The per-request timeout is not here: it rides the
     adapter ``resolve_model`` returns.
+
+    ``closing`` is text the node reads last, as one more part of its user turn
+    (:func:`append_to_user_turn`).
     """
     return LlmAgent(
         name=name,
@@ -2632,7 +2637,27 @@ def _llm_node(
         output_key=output_key,
         include_contents="none",
         generate_content_config=_generate_content_config(resolve_sampling(tier_node)),
+        before_model_callback=append_to_user_turn(closing) if closing else None,
     )
+
+
+def append_to_user_turn(text: str) -> Callable[..., None]:
+    """A callback that adds ``text`` as the last part of the request's user turn.
+
+    The position is the point: QA-2026-09-26-01-E2 measured a lane instruction
+    here and E4 measured the same words inside the instruction, where they lost
+    most of their effect. The eval harness's lane replay appends the same part,
+    so a replayed request is still the one the lane sent.
+    """
+
+    def callback(callback_context: Any, llm_request: Any) -> None:
+        turn = llm_request.contents[-1] if llm_request.contents else None
+        if turn is None or turn.role != "user":
+            llm_request.contents.append(types.Content(role="user", parts=[]))
+            turn = llm_request.contents[-1]
+        turn.parts = [*(turn.parts or []), types.Part(text=text)]
+
+    return callback
 
 
 #: The schema each extraction transport asks the model to fill. A table rather
@@ -3187,6 +3212,7 @@ def _framework_subgraph(
                 output_key=lane.drafts_key,
                 resolve_model=resolve_model,
                 resolve_sampling=resolve_sampling,
+                closing=lane_closing(package_loader, package.name),
             )
             for lane in nodes.lanes
         ),
