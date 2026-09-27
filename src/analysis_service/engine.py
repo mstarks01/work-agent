@@ -135,6 +135,11 @@ class Engine:
         self._limits = limits
         self._deadline_seconds = deadline_seconds
 
+    @property
+    def frameworks(self) -> tuple[FrameworkName, ...]:
+        """The names of the frameworks a job here is analysed under."""
+        return tuple(selection.name for selection in self._frameworks)
+
     @classmethod
     def from_config(
         cls,

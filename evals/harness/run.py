@@ -92,6 +92,7 @@ from evals.harness import (
     population,
     preflight,
     promotion,
+    question_prior,
     queue,
     replay,
     roster,
@@ -2618,6 +2619,12 @@ COMMANDS: dict[str, Command] = {
         help="record a returned near-miss ballot's 'same' rows as signed rulings",
         run=command_near_miss_rulings,
         arguments=_near_miss_rulings_arguments,
+    ),
+    "question-prior": Command(
+        help="count one framework's early-question prior from a sweep's"
+        " reports or critic replays, and write its row (no credentials)",
+        run=question_prior.command_question_prior,
+        arguments=question_prior.arguments,
     ),
     "critic-replay": Command(
         help="send one archived case's critic request again and compare its"

@@ -40,7 +40,7 @@ logged, never returned.
 | `GET` | `/v1/jobs/{id}/events` | The same progression as Server-Sent Events; resumable via `Last-Event-ID`. |
 | `GET` | `/v1/jobs/{id}/report` | The full [report](Report-Schema.md) once completed; `409` before, and `409` if the report is withheld (below). |
 | `POST` | `/v1/jobs/{id}/answers` | Answer the questions of a completed job or a job in `awaiting-answers`. Starts a **new** job that resumes from this one's model and catalog; `201` with its `job_id`. |
-| `GET` | `/v1/jobs/{id}/questions` | What the job asks you, as `{"job_id", "link_questions", "fact_questions", "fallback"}`: a finished report's questions, or a waiting job's (link questions only). Derived from the report when you ask, under the report's own rules: `409` before completion and `409` when the report is withheld. |
+| `GET` | `/v1/jobs/{id}/questions` | What the job asks you, as `{"job_id", "link_questions", "fact_questions", "early_questions", "fallback"}`: a finished report's questions, or a waiting job's link and early questions. Derived from the report when you ask, under the report's own rules: `409` before completion and `409` when the report is withheld. |
 | `GET` | `/healthz` | Unauthenticated liveness probe. |
 
 Errors are RFC 9457 `application/problem+json`.
@@ -157,6 +157,15 @@ answers; either starts the analysis as a new job. A job submitted without
 `questions`, such as an autonomous run, never stops. A deployment that builds
 no assertion catalog refuses `"questions": true`.
 
+A waiting job also lists `early_questions`: the open facts of its model, most
+likely needed first, before any finding exists. Each entry is
+`{key, kind, label, reasons, choices}`. `kind` and `choices` are as they are
+for a report's open facts below. `reasons` gives the questions of the rules
+that fire on the element, which say why the fact matters. An attribute is
+asked only where the model holds `unknown`, and a zone only where the service
+inferred it. Answer them as `facts` on the route below. The analysis then
+reads your answers, so the findings rest on them.
+
 **Limit:** a waiting job is held in the service's memory. A restart of the
 service loses it, with its extraction; submit it again.
 
@@ -202,7 +211,7 @@ Answer with `facts` beside or instead of `links`:
 
 ```json
 {"facts": [{"key": ["flow:entity:customer>process:web-app>login",
-                    "encryption_in_transit", "", ""], "value": "TLS 1.3"}]}
+                    "encryption_in_transit", "", "", ""], "value": "TLS 1.3"}]}
 ```
 
 An attribute answer is written onto the model the new job analyses, and the

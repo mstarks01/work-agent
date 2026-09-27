@@ -37,8 +37,8 @@ run returned.
 `{"links": []}` is legal only here, and means "continue without answers".
 
 **The questions a paused job asks are the link questions** from the catalog
-it holds. The early attribute and zone questions #1225 proposes are further
-question types, not part of this decision.
+it holds, and the early fact questions of
+[ADR 0048](0048-a-paused-job-ranks-its-open-facts-before-any-finding.md).
 
 ## Consequences
 

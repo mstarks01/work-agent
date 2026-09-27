@@ -51,6 +51,7 @@ from analysis_service.auth import (
 from analysis_service.budgets import BudgetPolicy
 from analysis_service.claims import FrameworkAnalysis, FrameworkName
 from analysis_service.deployment import Deployment
+from analysis_service.early_questions import early_questions
 from analysis_service.errors import ConfigError
 from analysis_service.frameworks import PACKAGES
 from analysis_service.graph import ENTRY_EXTRACT
@@ -938,22 +939,31 @@ def create_app(
     ) -> JSONResponse:
         """What a job asks the submitter, derived at read time.
 
-        A job waiting on answers asks about the checkpoint it holds. A finished
-        job asks about its report, served under the report's own rule, so a
-        report that is withheld withholds its questions too.
+        A job waiting on answers asks about the checkpoint it holds, and its
+        open facts are ranked before any finding exists. A finished job asks
+        about its report, served under the report's own rule, so a report that
+        is withheld withholds its questions too.
         """
         answerable = await _answerable(request, job_id, subject)
         if isinstance(answerable, JSONResponse):
             return answerable
-        _, model, assertions, analyses = answerable
+        record, model, assertions, analyses = answerable
         catalog = None if assertions is None else assertions.catalog
         questions = link_questions(catalog, model)
         facts = fact_questions(analyses, model, catalog)
+        early = (
+            early_questions(
+                model, [selection.name for selection in record.frameworks], catalog
+            )
+            if record.status == "awaiting-answers"
+            else ()
+        )
         return JSONResponse(
             {
                 "job_id": job_id,
                 "link_questions": [question.to_json() for question in questions],
                 "fact_questions": [fact.to_json() for fact in facts],
+                "early_questions": [question.to_json() for question in early],
                 "fallback": question_fallback(analyses).to_json(),
             }
         )

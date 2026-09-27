@@ -280,7 +280,7 @@ def test_the_form_script_asks_answers_and_follows_to_the_report():
 await ids.analyze.listeners.submit({ preventDefault() {} }); await settle();
 streams[0].listeners.questions({ data: JSON.stringify({ run: "r1", questions: [
   { principal: "shopper accounts", rows: 2,
-    options: [{ id: "entity:shopper", name: "Shopper" }] }] }) });
+    options: [{ id: "entity:shopper", name: "Shopper" }] }], facts: [] }) });
 const select = ids.questions.querySelectorAll("select")[0];
 select.value = "entity:shopper";
 await ids.continue.listeners.click(); await settle();
@@ -293,7 +293,8 @@ streams[1].listeners.done({ data: JSON.stringify({ url: "/report/r2" }) });
     assert seen["calls"][1] == {
         "url": "/answer/r1",
         "body": {
-            "links": [{"principal": "shopper accounts", "element": "entity:shopper"}]
+            "links": [{"principal": "shopper accounts", "element": "entity:shopper"}],
+            "facts": [],
         },
     }
     assert seen["streams"] == ["/events/r1", "/events/r2"]
@@ -305,11 +306,45 @@ def test_an_unanswered_question_is_left_out_of_the_answers():
     steps = """
 await ids.analyze.listeners.submit({ preventDefault() {} }); await settle();
 streams[0].listeners.questions({ data: JSON.stringify({ run: "r1", questions: [
-  { principal: "ml engineers", rows: 1, options: [] }] }) });
+  { principal: "ml engineers", rows: 1, options: [] }], facts: [] }) });
 await ids.continue.listeners.click(); await settle();
 """
     seen = _run_form_script(steps)
-    assert seen["calls"][1]["body"] == {"links": []}
+    assert seen["calls"][1]["body"] == {"links": [], "facts": []}
+
+
+def test_the_form_script_sends_an_early_answer_with_the_links():
+    key = [valid_model().data_flows[0].id, "encryption_in_transit", "", "", ""]
+    kind = [valid_model().data_stores[0].id, "", "", "", "audit-evidence"]
+    facts = [
+        {
+            "key": key,
+            "kind": "attribute",
+            "label": "login: encryption in transit",
+            "reasons": ["This flow crosses a trust boundary."],
+            "choices": [],
+        },
+        {
+            "key": kind,
+            "kind": "question",
+            "label": "What record shows who acted?",
+            "reasons": [],
+            "choices": [],
+        },
+    ]
+    steps = f"""
+await ids.analyze.listeners.submit({{ preventDefault() {{}} }}); await settle();
+streams[0].listeners.questions({{ data: JSON.stringify({{ run: "r1", questions: [],
+  facts: {json.dumps(facts)} }}) }});
+const [first] = ids.questions.querySelectorAll("input");
+first.value = "  TLS 1.3 ";
+await ids.continue.listeners.click(); await settle();
+"""
+    seen = _run_form_script(steps)
+    assert seen["calls"][1]["body"] == {
+        "links": [],
+        "facts": [{"key": key, "value": "TLS 1.3"}],
+    }
 
 
 def test_the_form_script_follows_a_run_the_report_page_started():

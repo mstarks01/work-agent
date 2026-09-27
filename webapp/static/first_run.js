@@ -85,8 +85,10 @@
   // unanswered; "none" says the principal is no element. Every label and
   // option is untrusted and lands as text.
   let pausedRun = null;
+  let factInputs = [];
   const showQuestions = (data) => {
     pausedRun = data.run;
+    factInputs = [];
     questions.replaceChildren();
     for (const q of data.questions) {
       const row = document.createElement("p");
@@ -113,17 +115,59 @@
       row.append(label);
       questions.append(row);
     }
+    // The open facts, ranked before any finding exists. The first few in
+    // full, the rest one click away; each says which rules make it matter.
+    const SHOWN = 10;
+    const more = document.createElement("details");
+    const summary = document.createElement("summary");
+    summary.textContent = `More questions (${data.facts.length - SHOWN})`;
+    more.append(summary);
+    data.facts.forEach((q, index) => {
+      const row = document.createElement("p");
+      let input;
+      if (q.choices.length) {
+        input = document.createElement("select");
+        const skip = document.createElement("option");
+        skip.value = "";
+        skip.textContent = "(leave unanswered)";
+        input.append(skip);
+        for (const option of q.choices) {
+          const choice = document.createElement("option");
+          choice.value = option.id;
+          choice.textContent = option.name ? `${option.name} (${option.id})` : option.id;
+          input.append(choice);
+        }
+      } else {
+        input = document.createElement("input");
+        input.type = "text";
+        input.maxLength = 1000;
+        input.placeholder = "(leave unanswered)";
+      }
+      input.dataset.key = JSON.stringify(q.key);
+      factInputs.push(input);
+      const label = document.createElement("b");
+      label.textContent = q.label;
+      const why = document.createElement("div");
+      why.className = "meta";
+      why.textContent = q.reasons.join(" ");
+      row.append(label, " ", input, why);
+      (index < SHOWN ? questions : more).append(row);
+    });
+    if (data.facts.length > SHOWN) questions.append(more);
     asked.hidden = false;
   };
 
   document.getElementById("continue").addEventListener("click", async () => {
     const links = [...questions.querySelectorAll("select")]
-      .filter((select) => select.value)
+      .filter((select) => select.dataset.principal && select.value)
       .map((select) => ({ principal: select.dataset.principal, element: select.value }));
+    const facts = factInputs
+      .filter((input) => input.value.trim())
+      .map((input) => ({ key: JSON.parse(input.dataset.key), value: input.value.trim() }));
     const resumed = await fetch("/answer/" + pausedRun, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ links }),
+      body: JSON.stringify({ links, facts }),
     });
     if (!resumed.ok) {
       fail((await resumed.json()).message);
