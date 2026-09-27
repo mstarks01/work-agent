@@ -246,6 +246,11 @@ def _bare_attribute(value: str) -> str:
 AttributeName = Annotated[str, BeforeValidator(_bare_attribute)]
 
 
+#: An open fact's identity: element, attribute, assertion row and subject.
+#: Read off :attr:`UnknownRef.key`, which is the one reader of it.
+UnknownKey = tuple[str, str, str, str]
+
+
 class UnknownRef(BaseModel):
     """What a ``needs-info`` verdict says has to be answered.
 
@@ -318,16 +323,18 @@ class UnknownRef(BaseModel):
         return bool(self.element_id or self.attribute)
 
     @property
-    def key(self) -> tuple[str, str, str]:
-        """The three reference fields as one comparable value.
+    def key(self) -> UnknownKey:
+        """The four reference fields as one comparable value.
 
         **The one reader of "are these two references the same".** The pair
         was the whole of it while a reference could only name an element, and
         a set of pairs read every assertion reference as the empty pair — so
         two dismissals of two different open rows compared equal and one
-        dismissal answered both.
+        dismissal answered both. The subject is part of it for the same
+        reason: without it every free-text question read as one, and a report
+        grouped every one of them under the first.
         """
-        return self.element_id, self.attribute, self.assertion
+        return self.element_id, self.attribute, self.assertion, self.subject
 
 
 def name_unknown(ref: UnknownRef) -> str:
@@ -601,7 +608,7 @@ class VerdictFields(BaseModel):
     immaterial_unknowns: list[UnknownRef] = Field(default_factory=list)
     rejected_because: RejectionStep | None = None
 
-    def dismissed_refs(self) -> frozenset[tuple[str, str, str]]:
+    def dismissed_refs(self) -> frozenset[UnknownKey]:
         """``immaterial_unknowns`` as the keys it names, by :attr:`UnknownRef.key`.
 
         Named for a reference rather than for a pair: an open assertion row is
@@ -902,7 +909,7 @@ class Claim(BaseModel):
         construction either way and nothing has to re-derive one from prose
         (#439).
         """
-        seen: dict[tuple[str, str, str], UnknownRef] = {}
+        seen: dict[UnknownKey, UnknownRef] = {}
         for ground in self.grounds:
             if ground.kind not in CONDITIONAL_GROUNDS:
                 continue
