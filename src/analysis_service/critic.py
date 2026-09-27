@@ -52,6 +52,7 @@ from analysis_service.claims import (
     RuledClaim,
     Ruling,
     SeverityLevel,
+    UnknownKey,
     UnknownRef,
     UnreconciledRuling,
     UnverifiedGround,
@@ -110,29 +111,62 @@ def snap_rulings(
     answered. Unresolvable there is not fatal on the first look: it routes to
     the bounded ``recritic``. Snapping it means a re-ask is spent on a critic
     that pointed somewhere real rather than on one that mis-typed a slug.
+
+    Each fact is then named once, by :func:`_one_per_fact`, so the seam and
+    assembly agree about which entries a verdict carries.
     """
     return [
         ruling.model_copy(
             update={
                 "verdict": ruling.verdict.model_copy(
                     update={
-                        "related_unknowns": [
-                            # Only the model-reference spelling has an ID to
-                            # snap. A subject names no element, so there is
-                            # nothing to snap it to.
-                            ref.model_copy(
-                                update={"element_id": snap(ref.element_id, element_ids)}
-                            )
-                            if ref.names_an_element
-                            else ref
-                            for ref in ruling.verdict.related_unknowns
-                        ]
+                        "related_unknowns": _one_per_fact(
+                            [
+                                # Only the model-reference spelling has an ID
+                                # to snap. A subject names no element, so
+                                # there is nothing to snap it to.
+                                ref.model_copy(
+                                    update={
+                                        "element_id": snap(ref.element_id, element_ids)
+                                    }
+                                )
+                                if ref.names_an_element
+                                else ref
+                                for ref in ruling.verdict.related_unknowns
+                            ]
+                        )
                     }
                 )
             }
         )
         for ruling in rulings
     ]
+
+
+def _place(ref: UnknownRef) -> tuple[str, str, str]:
+    """Where an entry points: its element, and its attribute or question."""
+    return (ref.element_id, ref.attribute, ref.question)
+
+
+def _one_per_fact(refs: Sequence[UnknownRef]) -> list[UnknownRef]:
+    """A verdict's entries, with each fact named once.
+
+    An entry with the key of one before it adds nothing. An entry that mixes
+    spellings is dropped where a sound entry names the same element and
+    attribute or question, because that twin already asks the fact. A mixed
+    entry with no twin stays, and the review seam sends it back.
+    """
+    sound = {
+        _place(ref) for ref in refs if len(ref.spellings) == 1 and any(_place(ref))
+    }
+    kept: list[UnknownRef] = []
+    seen: set[UnknownKey] = set()
+    for ref in refs:
+        twinned = len(ref.spellings) > 1 and _place(ref) in sound
+        if not twinned and ref.key not in seen:
+            seen.add(ref.key)
+            kept.append(ref)
+    return kept
 
 
 class ReviewProblems(NamedTuple):
@@ -260,6 +294,19 @@ def _unresolved_unknown_ref_issues(
             # hold — the seam that does hold it is the one that built the
             # ground, and a reference it could not resolve never reached a
             # draft. Both are the whole reason the spellings exist.
+            if len(ref.spellings) > 1:
+                issues.append(
+                    UnreconciledRuling.of(
+                        claim_id=ruling.id,
+                        kind="unresolved-unknown",
+                        message=f"claim {ruling.id!r} names one open fact in"
+                        f" {len(ref.spellings)} ways at once"
+                        f" ({', '.join(ref.spellings)}); an entry uses one:"
+                        " an element and attribute, an assertion, a question"
+                        " kind with its element, or a subject",
+                    )
+                )
+                continue
             if ref.question:
                 # A kind of question about an element: the kind is the
                 # table's, and the element is the model's, so both are checked
