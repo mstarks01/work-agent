@@ -39,6 +39,7 @@ from analysis_service.graph import (
     ENTRY_HEAD_ONLY,
     ENTRY_RESUME,
     STATE_ASSERTION_CATALOG,
+    STATE_FACT_ANSWERS,
     STATE_FRAMEWORK_OPTIONS,
     STATE_LINK_ANSWERS,
     STATE_VALID_MODEL,
@@ -57,6 +58,7 @@ from analysis_service.jobs import (
     PipelineOutcome,
     PipelineRejected,
 )
+from analysis_service.questions import answered_model
 from analysis_service.report import (
     InputRef,
     Job,
@@ -150,6 +152,7 @@ class AdkPipelineRunner:
                     for selection in job.frameworks
                 },
                 STATE_LINK_ANSWERS: [link.model_dump() for link in job.links],
+                STATE_FACT_ANSWERS: [fact.model_dump() for fact in job.facts],
                 **_resumed_state(job),
             },
             on_node=on_node,
@@ -229,10 +232,13 @@ def _resumed_state(job: JobRecord) -> dict[str, Any]:
     if job.resumption is None:
         return {}
     held = job.resumption.checkpoint
-    return {
-        STATE_VALID_MODEL: held.system_model.model_dump(mode="json"),
-        STATE_ASSERTION_CATALOG: held.assertions.model_dump(mode="json"),
-    }
+    # An attribute answer settles the attribute, so the resumed run analyses
+    # the model with it written in.
+    model = answered_model(held.system_model, job.facts)
+    seeded: dict[str, Any] = {STATE_VALID_MODEL: model.model_dump(mode="json")}
+    if held.assertions is not None:
+        seeded[STATE_ASSERTION_CATALOG] = held.assertions.model_dump(mode="json")
+    return seeded
 
 
 def _paused(job: JobRecord, graph_run: GraphRun) -> PipelineOutcome:

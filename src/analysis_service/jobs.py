@@ -40,6 +40,7 @@ from analysis_service.budgets import BudgetPolicy, measured_tokens, spent_tokens
 from analysis_service.certification import CertifyResult
 from analysis_service.claims import FrameworkAnalysis
 from analysis_service.links import MAX_LINK_ANSWERS, LinkAnswer
+from analysis_service.questions import MAX_FACT_ANSWERS, FactAnswer
 from analysis_service.report import (
     FrameworkSelection,
     InputRef,
@@ -126,7 +127,9 @@ class Checkpoint(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
     system_model: SystemModel
-    assertions: AssertionRecord
+    #: ``None`` where the run built no assertion catalog: its answers can then
+    #: be about attributes and subjects, and never about a link or a row.
+    assertions: AssertionRecord | None
 
 
 class Resumption(BaseModel):
@@ -171,6 +174,10 @@ class JobRecord(BaseModel):
     # quotes; these are what ``prepare`` writes the rows from. See
     # :mod:`analysis_service.links`.
     links: list[LinkAnswer] = Field(default_factory=list, max_length=MAX_LINK_ANSWERS)
+    # The submitter's answers to a report's open facts, carried by a resumed
+    # job and also composed into its answers Source. See
+    # :mod:`analysis_service.questions`.
+    facts: list[FactAnswer] = Field(default_factory=list, max_length=MAX_FACT_ANSWERS)
     # Set on a job resumed from a finished one: its run starts at ``prepare``
     # from these, and runs no extraction and no assertion pass.
     resumption: Resumption | None = None
@@ -216,6 +223,7 @@ class JobRecord(BaseModel):
         frameworks: Sequence[FrameworkSelection],
         system_name: str | None = None,
         links: Sequence[LinkAnswer] = (),
+        facts: Sequence[FactAnswer] = (),
         resumption: Resumption | None = None,
         ask_questions: bool = False,
         reserved_tokens: int = 0,
@@ -229,6 +237,7 @@ class JobRecord(BaseModel):
             frameworks=list(frameworks),
             system_name=system_name,
             links=list(links),
+            facts=list(facts),
             resumption=resumption,
             ask_questions=ask_questions,
             created_at=now,
