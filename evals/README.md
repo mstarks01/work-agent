@@ -351,6 +351,19 @@ quality-audit skill's third condition, it reads signed material, and so its
 figures locate a loss and never score a route. It refuses a case with an
 unsigned row before anything is spent.
 
+`answered` is `analysis` mode with a submitter's answers, which it reads from
+`evals/answers/<case>.json`. The file names who signed it (`signed_by`) and
+lists answers in the shape `POST /v1/jobs/{id}/answers` takes. The answers
+reach the graph as they reach a resumed production job: attribute answers are
+written onto the model, and every answer is a line of the answers Source. The
+file sits outside the corpus, so it moves no corpus digest, and the artifact's
+commit says which answers ran. It refuses a case with no signed file, or with
+an answer its model cannot take, before anything is spent.
+
+```sh
+python -m evals.harness.run run --mode answered --case 06-cookbook-online-game
+```
+
 Scoring itself is offline: matching is the identity rule, and the standing of
 each unmatched finding comes from the vote ledger. So a finished sweep can be
 scored again, against the ledger as it stands now, with no provider call:
