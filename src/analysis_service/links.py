@@ -57,6 +57,7 @@ __all__ = [
     "apply_links",
     "fold",
     "link_questions",
+    "merged_links",
     "with_link_answers",
 ]
 
@@ -135,6 +136,32 @@ def _composed(links: Sequence[LinkAnswer]) -> tuple[str, tuple[tuple[int, int], 
     return "\n".join(lines), tuple(spans)
 
 
+def _refuse_repeats(links: Sequence[LinkAnswer]) -> None:
+    """Refuse two answers about one principal in one submission.
+
+    Refused rather than resolved by order: the service cannot know which of the
+    two the submitter meant.
+    """
+    principals = [fold(link.principal) for link in links]
+    repeated = sorted({key for key in principals if principals.count(key) > 1})
+    if repeated:
+        raise ValueError(f"links answers one principal twice: {', '.join(repeated)}")
+
+
+def merged_links(
+    earlier: Sequence[LinkAnswer], later: Sequence[LinkAnswer]
+) -> list[LinkAnswer]:
+    """A resumed job's answers: the parent's, with the new ones over them.
+
+    A later answer about a principal replaces an earlier one, because the
+    submitter gave it knowing the report the earlier answer produced.
+    """
+    _refuse_repeats(later)
+    merged = {fold(link.principal): link for link in earlier}
+    merged.update({fold(link.principal): link for link in later})
+    return list(merged.values())
+
+
 def with_link_answers(
     sources: Sequence[Source], links: Sequence[LinkAnswer]
 ) -> list[Source]:
@@ -152,12 +179,7 @@ def with_link_answers(
         )
     if not links:
         return list(sources)
-    principals = [fold(link.principal) for link in links]
-    repeated = sorted({key for key in principals if principals.count(key) > 1})
-    if repeated:
-        # Refused rather than resolved by order: the service cannot know which
-        # of two answers about one principal the submitter meant.
-        raise ValueError(f"links answers one principal twice: {', '.join(repeated)}")
+    _refuse_repeats(links)
     text, _ = _composed(links)
     return [*sources, Source(kind="answers", label=ANSWERS_LABEL, text=text)]
 

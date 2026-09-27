@@ -28,14 +28,17 @@ from __future__ import annotations
 
 import logging
 from datetime import UTC, datetime
+from typing import Any
 
 from google.adk.sessions import BaseSessionService
 
 from analysis_service.certification import CertificationGate, CertifyResult
 from analysis_service.execution import GraphExecutor
 from analysis_service.graph import (
+    STATE_ASSERTION_CATALOG,
     STATE_FRAMEWORK_OPTIONS,
     STATE_LINK_ANSWERS,
+    STATE_VALID_MODEL,
     GraphProducedNothing,
     Pipeline,
     Rejected,
@@ -140,6 +143,7 @@ class AdkPipelineRunner:
                     for selection in job.frameworks
                 },
                 STATE_LINK_ANSWERS: [link.model_dump() for link in job.links],
+                **_resumed_state(job),
             },
             on_node=on_node,
         )
@@ -193,3 +197,18 @@ class AdkPipelineRunner:
                 list(result.unexercised),
             )
         return result
+
+
+def _resumed_state(job: JobRecord) -> dict[str, Any]:
+    """What a resumed job's run starts from: its parent's model and catalog.
+
+    Seeded at the keys the validity gate and ``prepare`` write in a full run,
+    so the resumed graph's ``prepare`` reads them exactly as it reads its own.
+    Empty for a job that starts from its sources.
+    """
+    if job.resumption is None:
+        return {}
+    return {
+        STATE_VALID_MODEL: job.resumption.system_model.model_dump(mode="json"),
+        STATE_ASSERTION_CATALOG: job.resumption.assertions.model_dump(mode="json"),
+    }

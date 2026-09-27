@@ -555,13 +555,22 @@ def tier_node_by_graph_node(
 
 # --- Routes -----------------------------------------------------------------
 
-Entry = Literal["extract", "prepare", "extract-only", "assert-only", "head-only"]
+Entry = Literal[
+    "extract", "prepare", "extract-only", "assert-only", "head-only", "resume"
+]
 
 ENTRY_EXTRACT: Entry = "extract"
 ENTRY_PREPARE: Entry = "prepare"
 """The analysis eval mode's entry: start at ``prepare`` over a blessed model
 seeded in state, so a recall miss cannot be blamed on an element ``extract``
 never produced."""
+
+ENTRY_RESUME: Entry = "resume"
+"""A job resumed from a finished one (#1252): start at ``prepare`` over the
+parent's **Valid System Model** and assertion catalog, both seeded in state,
+with the submitter's answers. No reading node and no assertion pass runs, so
+an answer applies to the catalog that asked the question, and ``prepare``
+gates that catalog with the answers written in."""
 
 ENTRY_EXTRACT_ONLY: Entry = "extract-only"
 """The extraction eval mode: run ``extract`` and stop, leaving its emission at
@@ -1832,7 +1841,9 @@ def _resolve_assertions(state: SessionState, model: SystemModel) -> AssertionRec
             model,
             sources,
             proposed=record.proposed,
-            issues=[*record.issues, *unplaced],
+            # A resumed job's catalog already carries its parent's issues, so
+            # an answer that placed nothing then is not reported twice.
+            issues=list(dict.fromkeys([*record.issues, *unplaced])),
             quarantined=record.quarantined,
         )
     state.put(STATE_ASSERTION_CATALOG, record.model_dump(mode="json"))
@@ -3346,8 +3357,14 @@ def build_pipeline(
         ENTRY_EXTRACT_ONLY,
         ENTRY_ASSERT_ONLY,
         ENTRY_HEAD_ONLY,
+        ENTRY_RESUME,
     ):
         raise ValueError(f"unknown graph entry point: {entry!r}")
+    if entry == ENTRY_RESUME and (assertions or source_review):
+        raise ValueError(
+            "a resumed job reads the catalog its parent job built, so it runs no"
+            " assertion pass and no source review"
+        )
     if extraction_format not in EXTRACTION_FORMATS:
         raise ValueError(f"unknown extraction format: {extraction_format!r}")
     if extraction_strategy not in EXTRACTION_STRATEGIES:
@@ -3453,8 +3470,14 @@ def build_pipeline(
             framework: package_loaders[framework].load(DISCLAIMER_DOC).strip()
             for framework in frameworks
         }
+        # A resumed job carries no assertion pass, and its ``prepare`` still
+        # reads a catalog: the one its parent built, seeded in state.
         tail: Any = prepare_node(
-            keys, frameworks, domain_loader, package_loaders, assertions
+            keys,
+            frameworks,
+            domain_loader,
+            package_loaders,
+            assertions or entry == ENTRY_RESUME,
         )
         assemble = _node(
             _assemble_node_func(keys, frameworks, disclaimers), ASSEMBLE_NODE
