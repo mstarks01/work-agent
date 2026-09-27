@@ -12,6 +12,7 @@ import json
 import re
 import shutil
 import subprocess
+from types import MappingProxyType
 
 import pytest
 from fastapi.testclient import TestClient
@@ -45,19 +46,25 @@ HELD = Checkpoint(
 class PausingRunner(StubPipelineRunner):
     """Pauses a job that asks; completes every other, with a catalog on its report."""
 
-    def __init__(self) -> None:
+    def __init__(self, catalog: bool = True) -> None:
         super().__init__()
+        self.catalog = catalog
         self.resumed_links: list = []
+        self.resumed_facts: list = []
 
     async def run(self, job, on_node):
         if job.pauses():
             return PipelineAwaiting(checkpoint=HELD)
         if job.resumption is not None:
             self.resumed_links.append(list(job.links))
+            self.resumed_facts.append(list(job.facts))
         outcome = await super().run(job, on_node)
         assert isinstance(outcome, PipelineCompleted)
         report = outcome.report.model_copy(
-            update={"assertions": HELD.assertions, "system_model": HELD.system_model}
+            update={
+                "assertions": HELD.assertions if self.catalog else None,
+                "system_model": HELD.system_model,
+            }
         )
         return PipelineCompleted(report=report)
 
@@ -308,3 +315,176 @@ await ids.continue.listeners.click(); await settle();
 def test_the_form_script_follows_a_run_the_report_page_started():
     seen = _run_form_script("await settle();", search="?follow=r9")
     assert seen["streams"] == ["/events/r9"]
+
+
+#: One answer to the valid model's first flow's transport protection.
+FACT = MappingProxyType(
+    {
+        "key": (valid_model().data_flows[0].id, "encryption_in_transit", "", ""),
+        "value": "TLS 1.3",
+    }
+)
+
+
+class TestFactAnswers:
+    """The report's open facts, answered on an install with or without a catalog."""
+
+    def test_a_fact_answer_reruns_a_report_that_built_no_catalog(self, tiers):
+        runner = PausingRunner(catalog=False)
+        client = client_for(tiers, runner, asks=False)
+        finished = start(client, questions=False)
+        client.get(f"/events/{finished}")
+        response = client.post(
+            f"/answer/{finished}",
+            json={"links": [], "facts": [dict(FACT)]},
+            headers=SAME_ORIGIN,
+        )
+        assert response.status_code == 200, response.text
+        assert "event: done" in client.get(f"/events/{response.json()['run']}").text
+        assert [fact.value for fact in runner.resumed_facts[0]] == ["TLS 1.3"]
+
+    def test_a_link_answer_is_refused_where_the_report_built_no_catalog(self, tiers):
+        client = client_for(tiers, PausingRunner(catalog=False), asks=False)
+        finished = start(client, questions=False)
+        client.get(f"/events/{finished}")
+        response = client.post(
+            f"/answer/{finished}", json={"links": [LINK]}, headers=SAME_ORIGIN
+        )
+        assert response.status_code == 400
+        assert "no catalog" in response.json()["message"]
+
+    def test_a_fact_the_report_does_not_hold_is_refused(self, tiers, runner):
+        client = client_for(tiers, runner)
+        finished = start(client, questions=False)
+        client.get(f"/events/{finished}")
+        wrong = {"key": [FACT["key"][0], "exposure", "", ""], "value": "internal"}
+        response = client.post(
+            f"/answer/{finished}",
+            json={"links": [], "facts": [wrong]},
+            headers=SAME_ORIGIN,
+        )
+        assert response.status_code == 400
+
+    def test_the_report_page_carries_its_fact_questions(self, tiers, runner):
+        client = client_for(tiers, runner)
+        finished = start(client, questions=False)
+        done = event(client.get(f"/events/{finished}").text, "done")
+        page = client.get(done["url"]).text
+        assert re.search(r'id="fact_questions"[^>]*>\[', page)
+
+
+# The report page's answer block, run for real: the viewer's helper block
+# (which parses the page's payloads and defines ``el`` and ``$``), then the
+# answer block cut from the shipped script by its first and last lines. The
+# served script carries no comments, so neither marker is one.
+_VIEWER_ANSWER_HARNESS = r"""
+const calls = [];
+class Node {
+  constructor(tag) { this.tag = tag; this.children = []; this.dataset = {};
+    this.value = ""; this.listeners = {}; this._text = ""; }
+  append(...kids) { for (const k of kids) this.children.push(k); }
+  set textContent(t) { this._text = t; }
+  get textContent() { return this._text; }
+  addEventListener(name, fn) { this.listeners[name] = fn; }
+  all(tag) { const out = [];
+    const walk = (n) => { for (const c of n.children) if (typeof c === "object") {
+      if (c.tag === tag) out.push(c); walk(c); } };
+    walk(this); return out; }
+}
+const payloads = PAYLOADS;
+const box = new Node("div");
+globalThis.document = {
+  getElementById: (id) => id === "links" ? box
+    : Object.assign(new Node("script"), { _text: JSON.stringify(payloads[id] ?? {}) }),
+  createElement: (tag) => new Node(tag),
+  createDocumentFragment: () => new Node("#fragment"),
+  createTextNode: (t) => Object.assign(new Node("#text"), { _text: t }),
+};
+globalThis.location = { href: "", pathname: "/report/r1" };
+globalThis.fetch = async (url, init) => {
+  calls.push({ url, body: JSON.parse(init.body) });
+  return { ok: true, json: async () => ({ run: "r2" }) };
+};
+"""
+
+ANSWER_BLOCK_START = "  if (LINK_QUESTIONS.length || FACT_QUESTIONS.length) {"
+ANSWER_BLOCK_END = "    box.append(actions, note);\n  }\n"
+
+
+def _run_answer_block(payloads: dict, steps: str) -> dict:
+    from tests.test_webapp import FIRST_VIEWER_CONSTANT, viewer_javascript
+
+    node = shutil.which("node")
+    if node is None:
+        pytest.skip("no node on PATH to run the report page's script")
+    javascript = viewer_javascript()
+    helpers = javascript.split(FIRST_VIEWER_CONSTANT)[0]
+    start = javascript.index(ANSWER_BLOCK_START)
+    end = javascript.index(ANSWER_BLOCK_END, start) + len(ANSWER_BLOCK_END)
+    program = (
+        _VIEWER_ANSWER_HARNESS.replace("PAYLOADS", json.dumps(payloads))
+        + helpers
+        + javascript[start:end]
+        + "\n(async () => {\n"
+        + steps
+        + "\nconsole.log(JSON.stringify({calls, href: location.href}));\n})();"
+    )
+    done = subprocess.run(
+        [node, "-e", program], capture_output=True, text=True, timeout=30, check=False
+    )
+    assert done.returncode == 0, done.stderr
+    return json.loads(done.stdout.strip().splitlines()[-1])
+
+
+def test_the_report_page_sends_both_kinds_of_answer_and_follows_the_run():
+    model = valid_model().model_dump(mode="json")
+    payloads = {
+        "report": {"system_model": model},
+        "link_questions": [
+            {
+                "principal": "customer accounts",
+                "rows": 1,
+                "options": ["entity:customer"],
+            }
+        ],
+        "fact_questions": [
+            {
+                "key": list(FACT["key"]),
+                "kind": "attribute",
+                "label": "login",
+                "cited_by": 2,
+                "settled_so_far": 2,
+                "choices": [],
+            },
+            {
+                "key": ["", "", "", "whether queries are bound"],
+                "kind": "subject",
+                "label": "whether queries are bound",
+                "cited_by": 1,
+                "settled_so_far": 2,
+                "choices": [],
+            },
+        ],
+    }
+    steps = """
+const [link] = box.all("select");
+link.value = "entity:customer";
+const [first, second] = box.all("input");
+first.value = "  TLS 1.3 ";
+const button = box.all("button")[0];
+await button.listeners.click();
+"""
+    seen = _run_answer_block(payloads, steps)
+
+    assert seen["calls"] == [
+        {
+            "url": "/answer/r1",
+            "body": {
+                "links": [
+                    {"principal": "customer accounts", "element": "entity:customer"}
+                ],
+                "facts": [{"key": list(FACT["key"]), "value": "TLS 1.3"}],
+            },
+        }
+    ]
+    assert seen["href"] == "/?follow=r2"

@@ -326,7 +326,16 @@ an assertion catalog (`ANALYSIS_ASSERTIONS=true`), the app can ask you:
   analysis again with these answers**. The app shows the new run's progress
   and then its report.
 
-A run that waits for your answers is kept in the app's memory, like every other
+- **The report's open facts.** Most findings are conditional: they rest on
+  facts your description never states, such as how a flow is protected. Under
+  **What would settle the conditional findings?** the report lists every such
+  fact, the most useful first, with how many findings are settled once you
+  answer down to it. Answer as far as you like, by choosing a value or typing
+  one line, and run the analysis again. This works on every install, with or
+  without an assertion catalog.
+
+An answer settles its fact, even where your description said otherwise. A run
+that waits for your answers is kept in the app's memory, like every other
 run. A restart of the app loses it.
 
 ## Next steps
