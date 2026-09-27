@@ -242,7 +242,11 @@ def _resumed_state(job: JobRecord) -> dict[str, Any]:
 
 
 def _paused(job: JobRecord, graph_run: GraphRun) -> PipelineOutcome:
-    """A job that stopped after its assertion pass, as the outcome it waits in."""
+    """A job that stopped after its head, as the outcome it waits in.
+
+    Its checkpoint holds the catalog where the head built one, and none where
+    the deployment runs no pass that makes one.
+    """
     try:
         held = paused_at(graph_run.final_state)
     except GraphProducedNothing as exc:

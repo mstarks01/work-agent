@@ -311,18 +311,22 @@ uses `unknown`; code turns a claim resting on such an attribute into
 
 ### Answer the questions the analysis asks
 
-Some sources state facts about a group of people or accounts, such as "no MFA
-for shopper accounts", but never say which part of the model that group is.
-The analysis cannot use those facts until it knows. Where your install builds
-an assertion catalog (`ANALYSIS_ASSERTIONS=true`), the app can ask you:
+The app can ask you questions before the analysis, and after the report.
 
 - **Before the analysis.** Tick **Ask me questions before the analysis runs**.
-  The run stops after it has read your description and shows one question per
-  group. Choose the element each group is, or **None of these**, and click
-  **Continue**. Questions you leave unanswered stay open. The analysis then
-  starts from what was already read, so nothing is read again.
-- **After the report.** The report page lists the same kind of questions under
-  **Which element is each of these?**. Choose answers and click **Run the
+  The run stops after it has read your description. It lists the open facts of
+  the model, the most likely needed first, each with the reason a rule gives:
+  a value the description leaves unknown, a zone the app had to guess, or a
+  fixed question about one element. Answer by choosing a value or typing one
+  line. Where your install builds an assertion catalog
+  (`ANALYSIS_ASSERTIONS=true`), it also asks which element each group of
+  people or accounts is, such as "shopper accounts", so that facts about the
+  group reach the model. Questions you leave unanswered stay open. Click
+  **Continue**. The analysis then starts from what was already read, so
+  nothing is read again, and it reads your answers.
+- **After the report.** Where your install builds an assertion catalog, the
+  report page lists the group questions under **Which element is each of
+  these?**. Choose answers and click **Run the
   analysis again with these answers**. The app shows the new run's progress
   and then its report.
 

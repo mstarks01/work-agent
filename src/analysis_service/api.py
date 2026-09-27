@@ -807,13 +807,11 @@ def create_app(
         selection = _resolve_selection(
             request.app.state.frameworks, submission.frameworks
         )
-        if (submission.links or submission.questions) and not (
-            request.app.state.carries_catalog
-        ):
+        if submission.links and not request.app.state.carries_catalog:
             raise HTTPException(
                 status_code=400,
-                detail="this deployment builds no assertion catalog, so it asks no"
-                " question and nothing would read a link answer",
+                detail="this deployment builds no assertion catalog, so nothing"
+                " would read a link answer",
             )
         # Only onto a job that has sources of its own: answers alone would
         # carry the body past the ladder's empty-sources rung.

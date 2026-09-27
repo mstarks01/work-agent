@@ -189,6 +189,7 @@ PHASES: Mapping[Phase, PhaseEntry] = MappingProxyType(
                     "reading",
                     "apply",
                     "catalog",
+                    "pause",
                     "read",
                     "validate",
                     "repair",

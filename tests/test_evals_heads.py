@@ -162,6 +162,16 @@ LANES = {
 class TestTheHeadOnlyGraph:
     """What it carries, and what it deliberately does not."""
 
+    def test_the_heads_mode_refuses_a_deployment_that_builds_no_catalog(self):
+        with pytest.raises(modes.EvalRunError, match="no pass that makes one"):
+            modes.build_eval_pipeline(
+                graph.ENTRY_HEAD_ONLY,
+                deployment=Deployment.from_env(env=dict(VERTEX_ENV)),
+                resolve_model=lambda tier_node: ScriptedLlm(
+                    model=EVAL_MODEL, reply="{}", seen=[]
+                ),
+            )
+
     @pytest.mark.parametrize("strategy", (GRAPH_FIRST, FACTS_FIRST))
     def test_it_carries_no_lane_and_no_critic(self, corpus_case, strategy) -> None:
         """The endpoint reads the catalog, so the judgement tier is not billed."""

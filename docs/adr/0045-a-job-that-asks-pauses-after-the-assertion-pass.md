@@ -24,7 +24,9 @@ and the assertion pass, then the catalog. An autonomous caller that does not
 set it runs the full graph and never waits.
 
 **The run ends in `awaiting-answers`**, holding a `Checkpoint`: the **Valid
-System Model** and the gated assertion record. The wait sits between two runs,
+System Model** and the gated assertion record. A deployment that builds no
+catalog runs no assertion pass, so its head ends at the `pause` node after the
+validity gate, and its checkpoint holds no catalog (ADR 0048). The wait sits between two runs,
 never inside one, because every run is bounded by the job deadline and the
 wait is not.
 

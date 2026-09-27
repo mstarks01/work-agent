@@ -150,12 +150,13 @@ many stated facts an answer would place, and `options` are the element IDs an
 answer may name. The most rows come first.
 
 **Ask before the analysis runs.** Submit with `"questions": true` beside the
-sources. The job stops after extraction and the assertion pass, ends in
-`awaiting-answers`, and waits. Its questions come from what it has read so far.
-Answer them with the route below, or send `{"links": []}` to continue without
-answers; either starts the analysis as a new job. A job submitted without
-`questions`, such as an autonomous run, never stops. A deployment that builds
-no assertion catalog refuses `"questions": true`.
+sources. The job stops after extraction, and after the assertion pass where
+the deployment runs one. It ends in `awaiting-answers` and waits. Its
+questions come from what it has read so far. Answer them with the route below,
+or send `{"links": []}` to continue without answers; either starts the
+analysis as a new job. A job submitted without `questions`, such as an
+autonomous run, never stops. A deployment that builds no assertion catalog
+asks no link question, and asks its early questions.
 
 A waiting job also lists `early_questions`: the open facts of its model, most
 likely needed first, before any finding exists. Each entry is
