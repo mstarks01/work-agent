@@ -22,6 +22,9 @@
   // The principals no element stands for yet, ranked server-side by how many
   // stated facts an answer would place. The page only renders what it is handed.
   const LINK_QUESTIONS = JSON.parse(document.getElementById("link_questions").textContent);
+  // The open facts the conditional findings rest on, ranked server-side so
+  // that answering from the top settles the most. The page only renders them.
+  const FACT_QUESTIONS = JSON.parse(document.getElementById("fact_questions").textContent);
   const $ = (id) => document.getElementById(id);
   const el = (tag, cls, text) => {
     const n = document.createElement(tag);
@@ -683,50 +686,88 @@
   // against `job.frameworks`.
   R.analyses.forEach(renderBlock);
 
-  // Link questions: one per principal the report cannot place. An answer names
-  // one element by its ID, or "none", and goes to /answer/{run}, which starts
-  // a run from this report's model and catalog; code writes the link, so no
-  // model reads it.
-  if (LINK_QUESTIONS.length) {
+  // What the report asks: which element each principal is (link questions),
+  // and the open facts its conditional findings rest on (fact questions).
+  // Answers go to /answer/{run}, which starts a run from this report's model
+  // and catalog; code writes every answer, so no model reads one. Every label
+  // is untrusted and lands as text.
+  if (LINK_QUESTIONS.length || FACT_QUESTIONS.length) {
     const names = {};
     [...R.system_model.external_entities, ...R.system_model.processes,
      ...R.system_model.data_stores].forEach(e => { names[e.id] = e.name; });
     const box = $("links");
-    box.append(el("h2", null, "Which element is each of these?"));
-    box.append(el("div", "meta",
-      "The sources state facts about these principals but never say which element " +
-      "of the model each one is, so no rule can place the facts. Choose below, " +
-      "then run the analysis again from what was already read."));
-    // One select per question. "" leaves it unanswered; "none" says the
-    // principal is no element. Every label is untrusted and lands as text.
-    const selects = LINK_QUESTIONS.map(q => {
-      const row = el("p");
-      const select = el("select");
-      select.dataset.principal = q.principal;
-      select.append(Object.assign(el("option", null, "(leave unanswered)"), { value: "" }));
-      q.options.forEach(id => {
-        const label = names[id] ? `${names[id]} (${id})` : id;
-        select.append(Object.assign(el("option", null, label), { value: id }));
+    const option = (label, value) => Object.assign(el("option", null, label), { value });
+    const linkSelects = [];
+    const factInputs = [];
+
+    if (LINK_QUESTIONS.length) {
+      box.append(el("h2", null, "Which element is each of these?"));
+      box.append(el("div", "meta",
+        "The sources state facts about these principals but never say which element " +
+        "of the model each one is, so no rule can place the facts."));
+      LINK_QUESTIONS.forEach(q => {
+        const row = el("p");
+        const select = el("select");
+        select.dataset.principal = q.principal;
+        select.append(option("(leave unanswered)", ""));
+        q.options.forEach(id => select.append(option(names[id] ? `${names[id]} (${id})` : id, id)));
+        select.append(option("None of these", "none"));
+        row.append(el("b", null, q.principal),
+          ` \u2014 an answer places ${q.rows} stated fact(s) `, select);
+        box.append(row);
+        linkSelects.push(select);
       });
-      select.append(Object.assign(el("option", null, "None of these"), { value: "none" }));
-      row.append(el("b", null, q.principal),
-        ` \u2014 an answer places ${q.rows} stated fact(s) `, select);
-      box.append(row);
-      return select;
-    });
+    }
+
+    if (FACT_QUESTIONS.length) {
+      box.append(el("h2", null, "What would settle the conditional findings?"));
+      box.append(el("div", "meta",
+        "Each question is a fact the conditional findings wait on, the most useful " +
+        "first. Beside each is how many findings are settled once it and every " +
+        "question above it is answered. Answer as far down as you like."));
+      // The first few in full; the rest one click away rather than a wall.
+      const SHOWN = 10;
+      const more = el("details", "openfact");
+      more.append(el("summary", null, `More questions (${FACT_QUESTIONS.length - SHOWN})`));
+      FACT_QUESTIONS.forEach((q, index) => {
+        const row = el("p");
+        let input;
+        if (q.choices.length) {
+          input = el("select");
+          input.append(option("(leave unanswered)", ""));
+          q.choices.forEach(choice => input.append(option(names[choice] ? `${names[choice]} (${choice})` : choice, choice)));
+        } else {
+          input = el("input");
+          input.type = "text";
+          input.maxLength = 1000;
+          input.placeholder = "(leave unanswered)";
+        }
+        input.dataset.key = JSON.stringify(q.key);
+        row.append(el("b", null, q.label),
+          ` \u2014 ${q.cited_by} finding(s) wait on it; answering down to here settles ${q.settled_so_far} `,
+          input);
+        (index < SHOWN ? box : more).append(row);
+        factInputs.push(input);
+      });
+      if (FACT_QUESTIONS.length > SHOWN) box.append(more);
+    }
+
     const again = el("button", null, "Run the analysis again with these answers");
     const note = el("div", "meta");
     again.addEventListener("click", async () => {
-      const links = selects
+      const links = linkSelects
         .filter(s => s.value)
         .map(s => ({ principal: s.dataset.principal, element: s.value }));
+      const facts = factInputs
+        .filter(i => i.value.trim())
+        .map(i => ({ key: JSON.parse(i.dataset.key), value: i.value.trim() }));
       again.disabled = true;
       // The run id is this page's own path: /report/{run}.
       const run = location.pathname.split("/").pop();
       const resumed = await fetch("/answer/" + encodeURIComponent(run), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ links }),
+        body: JSON.stringify({ links, facts }),
       });
       const body = await resumed.json();
       if (!resumed.ok) {

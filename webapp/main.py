@@ -139,10 +139,17 @@ from analysis_service.links import (
     MAX_LINK_ANSWERS,
     LinkAnswer,
     link_questions,
+    merged_facts,
     merged_links,
 )
 from analysis_service.model_tiers import ModelTierConfig
 from analysis_service.open_facts import open_facts_by_framework
+from analysis_service.questions import (
+    MAX_FACT_ANSWERS,
+    FactAnswer,
+    check_fact_answers,
+    fact_questions,
+)
 from analysis_service.selection import SelectionError, resolve_selection
 from analysis_service.vendors import (
     CREDENTIAL_MODE_NOTES,
@@ -210,6 +217,7 @@ class Run:
     engine: Engine | None = None
     sources: list[Source] = field(default_factory=list)
     links: list[LinkAnswer] = field(default_factory=list)
+    facts: list[FactAnswer] = field(default_factory=list)
     checkpoint: Checkpoint | None = None
 
 
@@ -404,6 +412,16 @@ def render_report(report: Report) -> RenderedPage:
         open_facts=script_json(
             open_facts_by_framework(report.analyses, report.system_model)
         ),
+        fact_questions=script_json(
+            [
+                question.to_json()
+                for question in fact_questions(
+                    report.analyses,
+                    report.system_model,
+                    report.assertions.catalog if report.assertions else None,
+                )
+            ]
+        ),
         link_questions=script_json(
             [
                 question.to_json()
@@ -554,18 +572,34 @@ def create_app(
             if not isinstance(raw, list) or len(raw) > MAX_LINK_ANSWERS:
                 raise ValueError
             links = [LinkAnswer.model_validate(link) for link in raw]
-            merged = merged_links(parent.links, links)
-        except (ValidationError, ValueError, KeyError, TypeError) as exc:
-            detail = (
-                str(exc)
-                if "twice" in str(exc)
-                else (
-                    "Expected a JSON body with a 'links' list, each naming a principal"
-                    " and an element ID or 'none'."
-                )
+            raw_facts = body.get("facts", [])
+            if not isinstance(raw_facts, list) or len(raw_facts) > MAX_FACT_ANSWERS:
+                raise TypeError
+            facts = [FactAnswer.model_validate(fact) for fact in raw_facts]
+        except (ValidationError, ValueError, KeyError, TypeError):
+            return JSONResponse(
+                {
+                    "message": "Expected a JSON body with a 'links' list and a"
+                    " 'facts' list of answers this report asked for."
+                },
+                status_code=400,
             )
-            return JSONResponse({"message": detail}, status_code=400)
-        if not links and parent.report is not None:
+        held = parent.checkpoint
+        try:
+            if links and held.assertions is None:
+                raise ValueError("this report built no catalog, so it asks no link")
+            check_fact_answers(
+                facts,
+                held.system_model,
+                None if held.assertions is None else held.assertions.catalog,
+            )
+            merged = merged_links(parent.links, links)
+            answered = merged_facts(parent.facts, facts)
+        except ValueError as exc:
+            # The answer rules' own refusals name the submitter's choices, so
+            # they are safe to show.
+            return JSONResponse({"message": str(exc)}, status_code=400)
+        if not (links or facts) and parent.report is not None:
             return JSONResponse(
                 {
                     "message": "No answers were sent, and a finished run has nothing"
@@ -579,13 +613,16 @@ def create_app(
                 {"message": "An analysis is already running. Wait for it to finish."},
                 status_code=409,
             )
-        run.engine, run.sources, run.links = parent.engine, parent.sources, merged
+        run.engine, run.sources = parent.engine, parent.sources
+        run.links, run.facts = merged, answered
         start = partial(
             parent.engine.resume,
             parent.sources,
             parent.checkpoint,
             links,
+            facts=facts,
             earlier_links=parent.links,
+            earlier_facts=parent.facts,
             system_name="Your system",
         )
         run.task = asyncio.create_task(_drive(analyses, run, start))
@@ -746,11 +783,12 @@ async def _drive(
     else:
         if isinstance(outcome, PipelineCompleted):
             run.report = outcome.report
-            if outcome.report.assertions is not None:
-                run.checkpoint = Checkpoint(
-                    system_model=outcome.report.system_model,
-                    assertions=outcome.report.assertions,
-                )
+            # Every finished report can be answered: its open facts need no
+            # catalog, and its link questions need the one it carries.
+            run.checkpoint = Checkpoint(
+                system_model=outcome.report.system_model,
+                assertions=outcome.report.assertions,
+            )
             await _emit(run, "done", {"url": f"/report/{run.id}"})
         elif isinstance(outcome, PipelineAwaiting):
             run.checkpoint = outcome.checkpoint
