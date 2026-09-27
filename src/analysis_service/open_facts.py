@@ -26,7 +26,7 @@ from collections import defaultdict
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 
-from analysis_service.claims import FrameworkAnalysis, UnknownRef
+from analysis_service.claims import FrameworkAnalysis, UnknownKey, UnknownRef
 from analysis_service.system_model import SystemModel
 
 NEEDS_INFO = "needs-info"
@@ -37,7 +37,7 @@ class OpenFact:
     """One open fact, and the conditional findings that wait on it."""
 
     #: :attr:`UnknownRef.key`, as a list so it serialises as JSON.
-    key: tuple[str, str, str]
+    key: UnknownKey
     #: What a reader sees: an element's name and the attribute, or the subject.
     label: str
     #: Every needs-info finding that cites this fact.
@@ -79,8 +79,8 @@ def _label(ref: UnknownRef, names: Mapping[str, str]) -> str:
 def open_facts(block: FrameworkAnalysis, model: SystemModel) -> tuple[OpenFact, ...]:
     """Every open fact this block's needs-info findings rest on, best first."""
     names = _names(model)
-    needs: dict[str, set[tuple[str, str, str]]] = {}
-    labels: dict[tuple[str, str, str], str] = {}
+    needs: dict[str, set[UnknownKey]] = {}
+    labels: dict[UnknownKey, str] = {}
     for claim in block.claims:
         if claim.verdict.status != NEEDS_INFO:
             continue
@@ -88,7 +88,7 @@ def open_facts(block: FrameworkAnalysis, model: SystemModel) -> tuple[OpenFact, 
         needs[claim.id] = {ref.key for ref in refs}
         for ref in refs:
             labels.setdefault(ref.key, _label(ref, names))
-    cited: dict[tuple[str, str, str], list[str]] = defaultdict(list)
+    cited: dict[UnknownKey, list[str]] = defaultdict(list)
     for claim_id, keys in needs.items():
         for key in keys:
             cited[key].append(claim_id)
@@ -100,7 +100,7 @@ def open_facts(block: FrameworkAnalysis, model: SystemModel) -> tuple[OpenFact, 
         cited, key=lambda key: (-len(settles[key]), -len(cited[key]), labels[key])
     )
     rank = {key: position for position, key in enumerate(order)}
-    placed: dict[tuple[str, str, str], list[str]] = defaultdict(list)
+    placed: dict[UnknownKey, list[str]] = defaultdict(list)
     for claim_id, keys in needs.items():
         if keys:
             placed[min(keys, key=rank.__getitem__)].append(claim_id)

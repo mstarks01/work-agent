@@ -34,7 +34,7 @@ from typing import Any, Protocol
 from google.adk.utils.content_utils import to_user_content
 from google.genai import types
 
-from analysis_service.claims import AnalysisMarks, Ruling
+from analysis_service.claims import AnalysisMarks, Ruling, UnknownKey
 from analysis_service.critic import complete_rulings, critic_view, review_issues
 from analysis_service.frameworks import FrameworkPackage, schemas_for
 from analysis_service.graph import merge_summary, render_fenced, rulings_of
@@ -191,7 +191,7 @@ class FixtureOutcome:
     #: and an assertion row, of which exactly one spelling is filled. Empty
     #: where it dismissed none, which on a draft citing one is a critic that
     #: left the question alone — the fact #894 asks for, in a field.
-    dismissed_unknowns: tuple[tuple[str, str, str], ...] = ()
+    dismissed_unknowns: tuple[UnknownKey, ...] = ()
 
     @property
     def judged_the_unknown(self) -> bool:

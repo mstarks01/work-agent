@@ -76,7 +76,7 @@ def test_a_flow_reads_as_its_two_endpoints(report):
     flows = {flow.id: flow for flow in report.system_model.data_flows}
     for block in report.analyses:
         for fact in open_facts(block, report.system_model):
-            element_id, attribute, _ = fact.key
+            element_id, attribute, _, _ = fact.key
             if element_id in flows:
                 flow = flows[element_id]
                 assert fact.label.startswith(
@@ -91,3 +91,34 @@ def test_the_page_payload_is_json_per_framework(report):
     for facts in payload.values():
         for fact in facts:
             assert set(fact) == {"key", "label", "cited_by", "settles", "placed"}
+
+
+def test_two_free_text_questions_are_two_facts():
+    """A subject is part of an open fact's identity (#1225).
+
+    Without it every free-text question keyed as ``("", "", "")``, so a report
+    grouped all of them under whichever it met first.
+    """
+    from analysis_service.claims import UnknownRef
+
+    first = UnknownRef(subject="whether queries are parameterized")
+    second = UnknownRef(subject="whether an authorization policy is documented")
+    assert first.key != second.key
+
+
+@pytest.mark.parametrize("path", REPORTS, ids=lambda path: path.name[:2])
+def test_every_free_text_subject_is_its_own_fact(path):
+    report = Report.model_validate_json(path.read_text(encoding="utf-8"))
+    for block in report.analyses:
+        subjects = {
+            ref.subject
+            for claim in _needs_info(block)
+            for ref in claim.verdict.related_unknowns
+            if ref.subject and not ref.names_an_element and not ref.assertion
+        }
+        grouped = {
+            fact.key[3]
+            for fact in open_facts(block, report.system_model)
+            if fact.key[3]
+        }
+        assert grouped == subjects
