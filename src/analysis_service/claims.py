@@ -250,6 +250,8 @@ AttributeName = Annotated[str, BeforeValidator(_bare_attribute)]
 #: An open fact's identity: element, attribute, assertion row, subject and
 #: question kind. Read off :attr:`UnknownRef.key`, which is the one reader of it.
 UnknownKey = tuple[str, str, str, str, str]
+#: The four ways :class:`UnknownRef` names an open fact.
+Spelling = Literal["question", "attribute", "assertion", "subject"]
 
 
 class UnknownRef(BaseModel):
@@ -345,6 +347,28 @@ class UnknownRef(BaseModel):
         holds no field for, so it is its own spelling rather than this one.
         """
         return bool(self.element_id or self.attribute) and not self.question
+
+    @property
+    def spellings(self) -> tuple[Spelling, ...]:
+        """Which of the four spellings this reference uses. A sound one uses one.
+
+        **The one reader of "how is this fact named".** The review seam sends
+        back an entry that uses more than one,
+        :func:`~analysis_service.critic.snap_rulings` drops one
+        whose sound twin sits beside it, and the fallback count reads the
+        question and subject spellings here. A model whose provider treats the
+        schema as a hint writes an attribute reference and then repeats it with
+        a ``subject`` and schema punctuation in ``assertion``
+        (``QA-2026-09-26-03-E10``).
+        """
+        used: dict[Spelling, bool] = {
+            "question": bool(self.question),
+            "attribute": bool(self.attribute)
+            or (bool(self.element_id) and not self.question),
+            "assertion": bool(self.assertion.strip()),
+            "subject": bool(self.subject.strip()),
+        }
+        return tuple(name for name, on in used.items() if on)
 
     @property
     def key(self) -> UnknownKey:

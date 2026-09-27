@@ -45,6 +45,7 @@ from analysis_service.compact import COMPACT_FORMAT, FULL_FORMAT
 from analysis_service.factbundle import ROLES
 from analysis_service.frameworks import LANE_CLOSING_DOC, OUTPUT_DOC
 from analysis_service.markdown_loader import MarkdownLoader
+from analysis_service.question_kinds import QUESTION_KINDS
 from analysis_service.skills import lane_exemplars_doc
 
 # The four fixed H2 sections of an agent prompt, in order. The lints enforce
@@ -158,8 +159,24 @@ def compose_critic_prompt(loader: MarkdownLoader) -> str:
     What this framework's verdicts *assert* is not here: that is the package's
     own ``critic.md``, composed into the node's skills by
     :func:`~analysis_service.skills.compose_critic_skills`.
+
+    The question kinds follow the body, rendered from their table for the
+    reason :func:`compose_assert_prompt` gives.
     """
-    return loader.load(CRITIC_PROMPT_NAME).strip() + "\n"
+    parts = [loader.load(CRITIC_PROMPT_NAME), render_question_kinds()]
+    return "\n\n".join(part.strip() for part in parts) + "\n"
+
+
+def render_question_kinds() -> str:
+    """The question kinds as the list the critic reads, one kind to a line.
+
+    The provider schema lists them too, but a provider may treat a schema as a
+    hint and never show the model its descriptions (``QA-2026-09-26-03-E10``),
+    so the instruction carries the list whatever the route does with it.
+    """
+    rows = ["## The question kinds", ""]
+    rows += [f"- `{name}`: {kind.covers}" for name, kind in QUESTION_KINDS.items()]
+    return "\n".join(rows)
 
 
 def compose_recritic_prompt(loader: MarkdownLoader) -> str:

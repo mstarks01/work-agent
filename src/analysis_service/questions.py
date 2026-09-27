@@ -333,8 +333,8 @@ def question_fallback(analyses: Sequence[FrameworkAnalysis]) -> Fallback:
         for ref in claim.verdict.related_unknowns
     ]
     return Fallback(
-        typed=sum(1 for ref in refs if ref.question),
-        free_text=sum(1 for ref in refs if ref.subject and not ref.question),
+        typed=sum(1 for ref in refs if ref.spellings == ("question",)),
+        free_text=sum(1 for ref in refs if ref.spellings == ("subject",)),
     )
 
 
