@@ -35,10 +35,14 @@ from google.adk.sessions import BaseSessionService
 from analysis_service.certification import CertificationGate, CertifyResult
 from analysis_service.execution import GraphExecutor, GraphRun
 from analysis_service.graph import (
+    ENTRY_EXTRACT,
+    ENTRY_HEAD_ONLY,
+    ENTRY_RESUME,
     STATE_ASSERTION_CATALOG,
     STATE_FRAMEWORK_OPTIONS,
     STATE_LINK_ANSWERS,
     STATE_VALID_MODEL,
+    Entry,
     GraphProducedNothing,
     Pipeline,
     Rejected,
@@ -202,6 +206,17 @@ class AdkPipelineRunner:
                 list(result.unexercised),
             )
         return result
+
+
+def entry_of(job: JobRecord) -> Entry:
+    """Where a job's run starts: its sources, a paused head, or a checkpoint.
+
+    The one reader of it: the HTTP route and the in-process engine both pick a
+    runner by it.
+    """
+    if job.resumption is not None:
+        return ENTRY_RESUME
+    return ENTRY_HEAD_ONLY if job.pauses() else ENTRY_EXTRACT
 
 
 def _resumed_state(job: JobRecord) -> dict[str, Any]:

@@ -20,6 +20,7 @@ from analysis_service.engine import (
     EngineDeadlineError,
     EngineInputError,
 )
+from analysis_service.graph import ENTRY_EXTRACT
 from analysis_service.jobs import (
     JobRecord,
     PipelineCompleted,
@@ -286,7 +287,7 @@ def test_from_config_builds_an_adk_runner():
         },
     )
 
-    assert isinstance(engine._runner, AdkPipelineRunner)
+    assert isinstance(engine._runner_for(ENTRY_EXTRACT), AdkPipelineRunner)
 
 
 def test_engine_drives_the_real_graph_to_a_report():
