@@ -57,12 +57,14 @@ def ask(report):
 
 
 class TestTheRanking:
-    def test_answering_every_question_settles_every_conditional_finding(self, report):
+    def test_answering_every_question_settles_every_waiting_finding(self, report):
+        """A finding waits on the open facts its grounds cite, and its verdict's."""
         waiting = sum(
             1
             for block in report.analyses
-            for claim in block.claims
-            if claim.verdict.status == "needs-info" and claim.verdict.related_unknowns
+            for claim in block.all_claims()
+            if claim.unknown_grounds()
+            or (claim.verdict.status == "needs-info" and claim.verdict.related_unknowns)
         )
         questions = ask(report)
         assert questions[-1].settled_so_far == waiting if questions else waiting == 0
@@ -83,6 +85,40 @@ class TestTheRanking:
 
 def flow_id():
     return valid_model().data_flows[0].id
+
+
+class TestTheCriticCannotReorderTheEvidence:
+    """The evidence section reads grounds only (``QA-2026-09-26-03-E7``)."""
+
+    def rewritten(self, report):
+        """The same drafts under a critic that confirmed every one of them."""
+        blocks = []
+        for block in report.analyses:
+            claims = [
+                claim.model_copy(
+                    update={
+                        "verdict": claim.verdict.model_copy(
+                            update={"status": "confirmed", "related_unknowns": []}
+                        )
+                    }
+                )
+                for claim in block.claims
+            ]
+            blocks.append(block.model_copy(update={"claims": claims}))
+        return report.model_copy(update={"analyses": blocks})
+
+    def evidence(self, report):
+        return [q.key for q in ask(report) if q.basis == "evidence"]
+
+    def test_the_evidence_section_is_the_same_whatever_the_verdicts(self, report):
+        assert self.evidence(self.rewritten(report)) == self.evidence(report)
+
+    def test_the_evidence_section_comes_first(self, report):
+        bases = [q.basis for q in ask(report)]
+        assert bases == sorted(bases, key=lambda basis: basis != "evidence")
+
+    def test_a_free_text_fact_is_only_ever_the_critic_s(self, report):
+        assert all(q.basis == "critic" for q in ask(report) if q.kind == "subject")
 
 
 class TestTheAnswerForms:
