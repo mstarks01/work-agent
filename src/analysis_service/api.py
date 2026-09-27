@@ -42,7 +42,7 @@ from starlette._utils import get_route_path
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from analysis_service import budgets
-from analysis_service.assertions import AssertionCatalog, AssertionRecord
+from analysis_service.assertions import AssertionRecord
 from analysis_service.auth import (
     AuthenticationError,
     TokenVerifier,
@@ -53,10 +53,11 @@ from analysis_service.claims import FrameworkName
 from analysis_service.deployment import Deployment
 from analysis_service.errors import ConfigError
 from analysis_service.frameworks import PACKAGES
-from analysis_service.graph import ENTRY_EXTRACT, ENTRY_RESUME
+from analysis_service.graph import ENTRY_EXTRACT, ENTRY_HEAD_ONLY, ENTRY_RESUME, Entry
 from analysis_service.jobs import (
     TERMINAL_STATUSES,
     Admission,
+    Checkpoint,
     JobRecord,
     JobStatus,
     JobStore,
@@ -312,6 +313,10 @@ class JobSubmission(BaseModel):
     #: principal is. Composed into one more Source and written as stated
     #: ``represented-by`` rows; see :mod:`analysis_service.links`.
     links: list[LinkAnswer] = Field(default_factory=list, max_length=MAX_LINK_ANSWERS)
+    #: Stop after the assertion pass, publish the questions, and wait for a
+    #: person to answer them. Off by default, so an autonomous caller's job
+    #: never waits (#1252).
+    questions: bool = False
 
     @field_validator("system_name")
     @classmethod
@@ -320,11 +325,15 @@ class JobSubmission(BaseModel):
 
 
 class AnswersSubmission(BaseModel):
-    """Answers to a finished report's questions, sent against that report's job."""
+    """Answers to a job's questions, sent against that job.
+
+    Empty is legal only for a job waiting on answers, where it means "continue
+    without answers"; against a finished report it answers nothing.
+    """
 
     model_config = ConfigDict(extra="forbid")
 
-    links: list[LinkAnswer] = Field(min_length=1, max_length=MAX_LINK_ANSWERS)
+    links: list[LinkAnswer] = Field(default_factory=list, max_length=MAX_LINK_ANSWERS)
 
 
 class NodeCompletion(BaseModel):
@@ -384,10 +393,7 @@ async def _admit_and_start(
     # The runner is looked up before the reservation. A graph is built on
     # first use per selection, and a build that raised after the reservation
     # would leave a slot held that no task ever releases.
-    runner = request.app.state.runner_for(
-        record.selection(),
-        ENTRY_RESUME if record.resumption is not None else ENTRY_EXTRACT,
-    )
+    runner = request.app.state.runner_for(record.selection(), _entry_of(record))
     budget = request.app.state.budget
     admission = await store.reserve(record, ceiling=ceiling, budget=budget)
     if admission.outcome in _REFUSALS:
@@ -433,6 +439,40 @@ async def _admit_and_start(
         status_code=201,
         headers={"Location": f"/v1/jobs/{record.id}"},
     )
+
+
+async def _answerable(
+    request: Request, job_id: str, subject: str
+) -> tuple[JobRecord, SystemModel, AssertionRecord | None] | JSONResponse:
+    """The model and catalog this caller may ask or answer about, or the refusal.
+
+    **The one reader of "what does this job ask about".** A job waiting on
+    answers holds its checkpoint; a finished job reads its report through the
+    rule that serves it. Any other job asks nothing yet.
+    """
+    record = await _owned_job(request, job_id, subject)
+    if record.status == "awaiting-answers":
+        if record.checkpoint is None:
+            logger.error("waiting job %s holds no checkpoint", record.id)
+            raise HTTPException(status_code=500, detail="an internal error occurred")
+        held = record.checkpoint
+        return record, held.system_model, held.assertions
+    served = await _servable_report(request, job_id, subject)
+    if isinstance(served, JSONResponse):
+        return served
+    assertions = served.get("assertions")
+    return (
+        record,
+        SystemModel.model_validate(served["system_model"]),
+        None if assertions is None else AssertionRecord.model_validate(assertions),
+    )
+
+
+def _entry_of(record: JobRecord) -> Entry:
+    """Where a job's run starts: its sources, a paused head, or a checkpoint."""
+    if record.resumption is not None:
+        return ENTRY_RESUME
+    return ENTRY_HEAD_ONLY if record.pauses() else ENTRY_EXTRACT
 
 
 async def _servable_report(
@@ -762,11 +802,13 @@ def create_app(
         selection = _resolve_selection(
             request.app.state.frameworks, submission.frameworks
         )
-        if submission.links and not request.app.state.carries_catalog:
+        if (submission.links or submission.questions) and not (
+            request.app.state.carries_catalog
+        ):
             raise HTTPException(
                 status_code=400,
-                detail="this deployment builds no assertion catalog, so nothing"
-                " would read a link answer",
+                detail="this deployment builds no assertion catalog, so it asks no"
+                " question and nothing would read a link answer",
             )
         # Only onto a job that has sources of its own: answers alone would
         # carry the body past the ladder's empty-sources rung.
@@ -796,6 +838,7 @@ def create_app(
             frameworks=selection,
             system_name=submission.system_name,
             links=submission.links,
+            ask_questions=submission.questions,
             reserved_tokens=budgets.estimate(sources, selection),
         )
         return await _admit_and_start(request, record, background_tasks, subject)
@@ -822,16 +865,22 @@ def create_app(
                 detail="this deployment builds no assertion catalog, so nothing"
                 " would read a link answer",
             )
-        served = await _servable_report(request, job_id, subject)
-        if isinstance(served, JSONResponse):
-            return served
-        if served.get("assertions") is None:
+        answerable = await _answerable(request, job_id, subject)
+        if isinstance(answerable, JSONResponse):
+            return answerable
+        parent, model, assertions = answerable
+        if assertions is None:
             raise HTTPException(
                 status_code=409,
                 detail="this report carries no assertion catalog, so it asked"
                 " no link question",
             )
-        parent = await _owned_job(request, job_id, subject)
+        if not answers.links and parent.status != "awaiting-answers":
+            raise HTTPException(
+                status_code=400,
+                detail="no answers were sent; only a job waiting on answers can"
+                " continue without them",
+            )
         try:
             links = merged_links(parent.links, answers.links)
             sources = with_link_answers(
@@ -853,8 +902,7 @@ def create_app(
             links=links,
             resumption=Resumption(
                 parent_id=parent.id,
-                system_model=SystemModel.model_validate(served["system_model"]),
-                assertions=AssertionRecord.model_validate(served["assertions"]),
+                checkpoint=Checkpoint(system_model=model, assertions=assertions),
             ),
             reserved_tokens=budgets.estimate(sources, parent.frameworks),
         )
@@ -882,18 +930,18 @@ def create_app(
     async def get_questions(
         job_id: str, request: Request, subject: str = Depends(require_subject)
     ) -> JSONResponse:
-        """What the finished report asks the submitter, derived at read time.
+        """What a job asks the submitter, derived at read time.
 
-        Served under the report's own rule, because the questions are read off
-        the report: a report that is withheld withholds its questions too.
+        A job waiting on answers asks about the checkpoint it holds. A finished
+        job asks about its report, served under the report's own rule, so a
+        report that is withheld withholds its questions too.
         """
-        served = await _servable_report(request, job_id, subject)
-        if isinstance(served, JSONResponse):
-            return served
-        held = served.get("assertions")
+        answerable = await _answerable(request, job_id, subject)
+        if isinstance(answerable, JSONResponse):
+            return answerable
+        _, model, assertions = answerable
         questions = link_questions(
-            None if held is None else AssertionCatalog.model_validate(held["catalog"]),
-            SystemModel.model_validate(served["system_model"]),
+            None if assertions is None else assertions.catalog, model
         )
         return JSONResponse(
             {

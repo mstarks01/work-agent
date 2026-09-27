@@ -33,7 +33,7 @@ from typing import Any
 from google.adk.sessions import BaseSessionService
 
 from analysis_service.certification import CertificationGate, CertifyResult
-from analysis_service.execution import GraphExecutor
+from analysis_service.execution import GraphExecutor, GraphRun
 from analysis_service.graph import (
     STATE_ASSERTION_CATALOG,
     STATE_FRAMEWORK_OPTIONS,
@@ -42,10 +42,13 @@ from analysis_service.graph import (
     GraphProducedNothing,
     Pipeline,
     Rejected,
+    paused_at,
 )
 from analysis_service.jobs import (
+    Checkpoint,
     JobRecord,
     NodeCallback,
+    PipelineAwaiting,
     PipelineCompleted,
     PipelineOutcome,
     PipelineRejected,
@@ -147,6 +150,8 @@ class AdkPipelineRunner:
             },
             on_node=on_node,
         )
+        if job.pauses():
+            return _paused(job, graph_run)
         try:
             result = graph_run.report(
                 job=Job(
@@ -208,7 +213,23 @@ def _resumed_state(job: JobRecord) -> dict[str, Any]:
     """
     if job.resumption is None:
         return {}
+    held = job.resumption.checkpoint
     return {
-        STATE_VALID_MODEL: job.resumption.system_model.model_dump(mode="json"),
-        STATE_ASSERTION_CATALOG: job.resumption.assertions.model_dump(mode="json"),
+        STATE_VALID_MODEL: held.system_model.model_dump(mode="json"),
+        STATE_ASSERTION_CATALOG: held.assertions.model_dump(mode="json"),
     }
+
+
+def _paused(job: JobRecord, graph_run: GraphRun) -> PipelineOutcome:
+    """A job that stopped after its assertion pass, as the outcome it waits in."""
+    try:
+        held = paused_at(graph_run.final_state)
+    except GraphProducedNothing as exc:
+        raise PipelineError(f"job {job.id}: {exc}") from exc
+    if isinstance(held, Rejected):
+        return PipelineRejected(issues=held.issues, nodes=graph_run.node_runs)
+    model, assertions = held
+    return PipelineAwaiting(
+        checkpoint=Checkpoint(system_model=model, assertions=assertions),
+        nodes=graph_run.node_runs,
+    )
