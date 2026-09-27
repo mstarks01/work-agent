@@ -168,7 +168,8 @@ report's findings cite, most useful first:
 
 ```json
 {"key": ["flow:entity:customer>process:web-app>login", "encryption_in_transit", "", ""],
- "kind": "attribute", "label": "Customer → Web App: encryption in transit",
+ "kind": "attribute", "basis": "evidence",
+ "label": "Customer → Web App: encryption in transit",
  "cited_by": 4, "settled_so_far": 3, "choices": []}
 ```
 
@@ -177,7 +178,12 @@ report's findings cite, most useful first:
   about a principal, a credential or a component that the sources left open),
   or `subject` (a question with no place in the model, such as whether queries
   are parameterized).
-- `settled_so_far` is how many conditional findings are settled once you have
+- `basis` is `evidence` where a finding's own evidence rests on the fact, and
+  `critic` where only the reviewer's verdict names it. The `evidence` questions
+  come first, and their order does not change when the analysis runs again on
+  the same drafts. The `critic` questions follow, and they can change, because
+  the reviewer's verdicts vary between runs.
+- `settled_so_far` is how many findings are settled once you have
   answered this question and every question above it. Answer from the top, as
   far as you like; the list is not capped.
 - `choices` lists the values the fact takes. Empty means free text, one line,
