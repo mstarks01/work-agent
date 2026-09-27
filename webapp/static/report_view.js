@@ -729,7 +729,17 @@
       const SHOWN = 10;
       const more = el("details", "openfact");
       more.append(el("summary", null, `More questions (${FACT_QUESTIONS.length - SHOWN})`));
+      // The facts only the critic named come after the ones the findings' own
+      // evidence rests on, and they can change when the analysis runs again,
+      // so they are headed apart.
+      let criticHeaded = false;
       FACT_QUESTIONS.forEach((q, index) => {
+        const into = index < SHOWN ? box : more;
+        if (q.basis === "critic" && !criticHeaded) {
+          criticHeaded = true;
+          into.append(el("h3", null,
+            "Raised by the reviewer \u2014 these can change when the analysis runs again"));
+        }
         const row = el("p");
         let input;
         if (q.choices.length) {
@@ -746,7 +756,7 @@
         row.append(el("b", null, q.label),
           ` \u2014 ${q.cited_by} finding(s) wait on it; answering down to here settles ${q.settled_so_far} `,
           input);
-        (index < SHOWN ? box : more).append(row);
+        into.append(row);
         factInputs.push(input);
       });
       if (FACT_QUESTIONS.length > SHOWN) box.append(more);

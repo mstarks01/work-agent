@@ -3,7 +3,9 @@
 A ``needs-info`` verdict names the facts an answer would settle. This module
 turns them into questions, ranks them, and writes the answers back (#1225).
 
-**Every open fact is asked, in the order that settles the most.** With the
+**Every open fact is asked, in the order that settles the most.** The facts a
+finding's own grounds cite come first, in an order the critic cannot change;
+the facts only the critic named follow (``QA-2026-09-26-03-E7``). With the
 STRIDE lane closing a conditional finding waits on several facts, and six
 questions settled about a quarter of them where asking every one settled all
 (``QA-2026-09-26-03-E6``). So no cap is chosen here. The next question is the
@@ -66,6 +68,9 @@ __all__ = [
 MAX_FACT_ANSWERS = 200
 
 FactKind = Literal["attribute", "assertion", "subject"]
+Basis = Literal["evidence", "critic"]
+#: One finding: its framework and its claim ID.
+Finding = tuple[str, str]
 
 
 class FactAnswer(BaseModel):
@@ -99,6 +104,10 @@ class FactQuestion:
 
     key: UnknownKey
     kind: FactKind
+    #: ``evidence`` where a finding's own grounds cite the fact, which does not
+    #: change when the critic is sampled again; ``critic`` where only the
+    #: critic's verdict names it, which does.
+    basis: Basis
     #: What a reader sees: an element's name and the attribute, or the subject.
     label: str
     #: How many still-open findings cite it when it is asked.
@@ -113,6 +122,7 @@ class FactQuestion:
         return {
             "key": list(self.key),
             "kind": self.kind,
+            "basis": self.basis,
             "label": self.label,
             "cited_by": self.cited_by,
             "settled_so_far": self.settled_so_far,
@@ -182,51 +192,94 @@ def _open_row(catalog: AssertionCatalog, identity: str) -> Assertion | None:
     )
 
 
+def _greedy(open_facts: Mapping[Finding, set[UnknownKey]]) -> list[UnknownKey]:
+    """The facts in the order that settles the most findings, asked one by one.
+
+    The next fact is the one the most still-open findings cite; a tie goes to
+    the lower key, so one input always gives one order.
+    """
+    left = {finding: set(keys) for finding, keys in open_facts.items() if keys}
+    order: list[UnknownKey] = []
+    while left:
+        cites = Counter(key for keys in left.values() for key in keys)
+        key = min(cites.items(), key=lambda item: (-item[1], item[0]))[0]
+        order.append(key)
+        left = {finding: keys - {key} for finding, keys in left.items() if keys - {key}}
+    return order
+
+
 def fact_questions(
     analyses: Sequence[FrameworkAnalysis],
     model: SystemModel,
     catalog: AssertionCatalog | None,
 ) -> tuple[FactQuestion, ...]:
-    """Every open fact a report's needs-info findings cite, the most settling first.
+    """Every open fact a report's findings rest on, the most settling first.
 
-    Greedy over the findings that are still open: the next question is the fact
-    the most of them cite, which is the order in which answering from the top
-    settles the most. The findings of every framework count together, because
-    one answer settles a fact for every framework that cites it.
+    **Two sections, and the first does not depend on the critic.** The
+    evidence section ranks the open facts each finding's own grounds cite, for
+    every finding the lanes wrote, rejected ones included. A critic that is
+    sampled again rules differently about a third of the time, and a list read
+    from its verdicts shared 7 of 18 questions with the list from a second
+    sample; a list read from the grounds is the same for both, and settled 82%
+    as many findings as each sample's own list (``QA-2026-09-26-03-E7``). The
+    critic section follows, with the facts only the critic named: its
+    free-text subjects, mostly, which change from one sample to the next.
+
+    Each question counts the findings of every framework together, because one
+    answer settles a fact for every framework that cites it. ``cited_by`` and
+    ``settled_so_far`` count findings waiting on the fact, by their grounds or,
+    for a conditional finding, by its verdict too.
     """
-    needs: dict[tuple[str, str], set[UnknownKey]] = {}
+    evidence: dict[Finding, set[UnknownKey]] = {}
+    named: dict[Finding, set[UnknownKey]] = {}
     refs: dict[UnknownKey, UnknownRef] = {}
     for block in analyses:
-        for claim in block.claims:
-            if claim.verdict.status != "needs-info":
-                continue
-            keys = set()
-            for ref in claim.verdict.related_unknowns:
-                keys.add(ref.key)
+        for claim in block.all_claims():
+            finding = (block.framework, claim.id)
+            grounds = claim.unknown_grounds()
+            evidence[finding] = {ref.key for ref in grounds}
+            cited = list(grounds)
+            if claim.verdict.status == "needs-info":
+                named[finding] = {ref.key for ref in claim.verdict.related_unknowns}
+                cited += claim.verdict.related_unknowns
+            for ref in cited:
                 refs.setdefault(ref.key, ref)
-            needs[block.framework, claim.id] = keys
-    open_findings = {finding: set(keys) for finding, keys in needs.items() if keys}
+    first = _greedy(evidence)
+    asked_first = set(first)
+    later = _greedy({f: keys - asked_first for f, keys in named.items()})
+    waiting = {
+        finding: evidence.get(finding, set()) | named.get(finding, set())
+        for finding in evidence.keys() | named.keys()
+    }
+    waiting = {finding: keys for finding, keys in waiting.items() if keys}
     names = element_names(model)
     asked: list[FactQuestion] = []
-    settled = 0
-    while open_findings:
-        cites = Counter(key for keys in open_findings.values() for key in keys)
-        key, count = min(cites.items(), key=lambda item: (-item[1], item[0]))
-        for finding in list(open_findings):
-            open_findings[finding].discard(key)
-            if not open_findings[finding]:
-                del open_findings[finding]
-                settled += 1
-        asked.append(
-            FactQuestion(
-                key=key,
-                kind=_kind_of(key),
-                label=label_of(refs[key], names),
-                cited_by=count,
-                settled_so_far=settled,
-                choices=_choices(key, model, catalog),
+    answered: set[UnknownKey] = set()
+    sections: tuple[tuple[Basis, list[UnknownKey]], ...] = (
+        ("evidence", first),
+        ("critic", later),
+    )
+    for basis, keys in sections:
+        for key in keys:
+            cited_by = sum(
+                1
+                for facts in waiting.values()
+                if key in facts and not facts <= answered
             )
-        )
+            answered.add(key)
+            asked.append(
+                FactQuestion(
+                    key=key,
+                    kind=_kind_of(key),
+                    basis=basis,
+                    label=label_of(refs[key], names),
+                    cited_by=cited_by,
+                    settled_so_far=sum(
+                        1 for facts in waiting.values() if facts <= answered
+                    ),
+                    choices=_choices(key, model, catalog),
+                )
+            )
     return tuple(asked)
 
 

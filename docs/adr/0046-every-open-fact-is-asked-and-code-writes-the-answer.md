@@ -6,7 +6,7 @@
   its first question type
 - **Relates to**: [ADR 0043](0043-a-link-answer-is-closed-and-code-writes-it.md)
   and [ADR 0044](0044-a-resumed-job-starts-at-prepare.md)
-- **Evidence**: `QA-2026-09-26-03-E6` in `evals/experiments/`
+- **Evidence**: `QA-2026-09-26-03-E6` and `-E7` in `evals/experiments/`
 
 ## Context
 
@@ -25,6 +25,14 @@ question states how many findings are settled once it and every question
 before it is answered. The submitter answers from the top as far as they
 choose. The findings of every framework count together, because one answer
 settles a fact for every framework that cites it.
+
+**The facts a finding's own evidence rests on come first, and the critic
+cannot reorder them.** That section ranks the open facts in every finding's
+grounds, rejected findings included, and reads no verdict. The facts only the
+critic named follow, marked `critic`. Two critic samples of the same drafts
+gave verdict-ranked lists that shared 7 of 18 questions; the grounds-ranked
+list is one list for both and settled 82% as many findings as each sample's
+own list (`QA-2026-09-26-03-E7`).
 
 **A question is keyed by its open fact**, `UnknownRef.key`, and an answer sends
 the key back. The resumed job analyses the checkpoint the question was asked
