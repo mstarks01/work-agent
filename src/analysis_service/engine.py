@@ -129,8 +129,8 @@ class Engine:
         # runner (a test stand-in) runs that runner for every entry.
         self._runner_for = runner_for or (lambda entry: runner)
         # Whether a job here builds an assertion catalog, which is the only
-        # reader of a question or an answer. False unless the deployment says
-        # so, so an engine that cannot know refuses both.
+        # reader of a link answer. False unless the deployment says so, so an
+        # engine that cannot know refuses one.
         self._carries_catalog = carries_catalog
         self._limits = limits
         self._deadline_seconds = deadline_seconds
@@ -236,10 +236,6 @@ class Engine:
             else:
                 issues = outcome.issues
         """
-        if ask_questions and not self._carries_catalog:
-            raise EngineInputError(
-                "this deployment builds no assertion catalog, so it asks no question"
-            )
         job = self._build_job(
             sources,
             system_name=system_name,

@@ -54,7 +54,10 @@ class PausingRunner(StubPipelineRunner):
 
     async def run(self, job, on_node):
         if job.pauses():
-            return PipelineAwaiting(checkpoint=HELD)
+            held = (
+                HELD if self.catalog else HELD.model_copy(update={"assertions": None})
+            )
+            return PipelineAwaiting(checkpoint=held)
         if job.resumption is not None:
             self.resumed_links.append(list(job.links))
             self.resumed_facts.append(list(job.facts))
@@ -74,18 +77,18 @@ def runner():
     return PausingRunner()
 
 
-def client_for(tiers, runner, asks=True):
+def client_for(tiers, runner, catalog=True):
     def engine_for(selection):
         return Engine(
             runner,
             limits=WEBAPP_LIMITS,
             deadline_seconds=TEST_DEADLINE,
             frameworks=selection,
-            carries_catalog=asks,
+            carries_catalog=catalog,
         )
 
     startup = Startup(
-        engine_for=engine_for, frameworks=CARRIED, tiers=tiers, error=None, asks=asks
+        engine_for=engine_for, frameworks=CARRIED, tiers=tiers, error=None
     )
     return TestClient(create_app(startup), base_url=LOOPBACK)
 
@@ -117,18 +120,25 @@ LINK = {"principal": "customer accounts", "element": "entity:customer"}
 
 
 class TestTheToggle:
-    def test_the_form_offers_it_where_the_install_can_ask(self, tiers, runner):
+    def test_the_form_offers_it_on_every_install(self, tiers, runner):
         assert 'id="ask"' in client_for(tiers, runner).get("/").text
-        assert 'id="ask"' not in client_for(tiers, runner, asks=False).get("/").text
+        assert 'id="ask"' in client_for(tiers, runner, catalog=False).get("/").text
 
-    def test_it_is_refused_where_the_install_cannot_ask(self, tiers, runner):
-        client = client_for(tiers, runner, asks=False)
-        response = client.post(
-            "/analyze",
-            json=posted("A web app talks to a database.") | {"questions": True},
+    def test_an_install_with_no_catalog_pauses_and_asks_early_questions(self, tiers):
+        client = client_for(tiers, PausingRunner(catalog=False), catalog=False)
+        paused = start(client, questions=True)
+        asked = event(client.get(f"/events/{paused}").text, "questions")
+        assert asked["questions"] == []
+        assert asked["facts"]
+        answered = client.post(
+            f"/answer/{paused}",
+            json={
+                "links": [],
+                "facts": [{"key": asked["facts"][0]["key"], "value": "yes"}],
+            },
             headers=SAME_ORIGIN,
         )
-        assert response.status_code == 400
+        assert answered.status_code == 200, answered.text
 
 
 class TestTheWholeFlow:
@@ -366,7 +376,7 @@ class TestFactAnswers:
 
     def test_a_fact_answer_reruns_a_report_that_built_no_catalog(self, tiers):
         runner = PausingRunner(catalog=False)
-        client = client_for(tiers, runner, asks=False)
+        client = client_for(tiers, runner, catalog=False)
         finished = start(client, questions=False)
         client.get(f"/events/{finished}")
         response = client.post(
@@ -379,7 +389,7 @@ class TestFactAnswers:
         assert [fact.value for fact in runner.resumed_facts[0]] == ["TLS 1.3"]
 
     def test_a_link_answer_is_refused_where_the_report_built_no_catalog(self, tiers):
-        client = client_for(tiers, PausingRunner(catalog=False), asks=False)
+        client = client_for(tiers, PausingRunner(catalog=False), catalog=False)
         finished = start(client, questions=False)
         client.get(f"/events/{finished}")
         response = client.post(

@@ -61,9 +61,12 @@ measurement for that.
 A case gets 60 to 126 early questions. The pages show the first ten and put
 the rest one click away.
 
-Only a deployment that builds an assertion catalog can pause, as ADR 0045
-decided. An early fact question needs no catalog, so a pause for a deployment
-without one is the next change to decide.
+**Every deployment can pause.** An early fact question needs no catalog, so a
+deployment that builds none runs the head without an assertion pass, stops at
+the `pause` node after the validity gate, and asks its early questions and no
+link question. A link answer still needs a catalog, and it is refused where
+there is none. The eval's heads mode scores a catalog, so it refuses such a
+deployment before it runs.
 
 The STRIDE row counts E11's two terra replays of Baseline 6bff717. The ASVS
 row counts no run, so an ASVS job asks nothing early until a row is counted

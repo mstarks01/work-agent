@@ -283,6 +283,9 @@ APPLY_NODE = "apply"
 #: The head-only entry's terminal node: resolve the catalog this head produced
 #: and stop, so #1003's endpoint is scored without paying for the lanes.
 CATALOG_NODE = "catalog"
+#: The head-only entry's terminal node on a graph that builds no catalog: the
+#: validity gate has put the model in state, so a paused job stops here.
+PAUSE_NODE = "pause"
 READ_MODEL_NODE = "read"
 VALIDATE_NODE = "validate"
 REPAIR_NODE = "repair"
@@ -592,9 +595,13 @@ ENTRY_ASSERT_ONLY: Entry = "assert-only"
 PREPARING_ENTRIES: frozenset[Entry] = frozenset({ENTRY_EXTRACT, ENTRY_PREPARE})
 
 ENTRY_HEAD_ONLY: Entry = "head-only"
-"""#1003's arm entry: run one arm's head — the reading node, the validity gate,
-the bounded repair, and whichever of the two passes this graph carries — then
-resolve the catalog and stop.
+"""Run the head — the reading node, the validity gate, the bounded repair, and
+whichever of the two passes this graph carries — then stop: after resolving
+the catalog where a pass built one, and at :data:`PAUSE_NODE` where none did.
+
+Two readers stop here. #1003's arms score the catalog, and a job that asks
+questions pauses with the valid model and whatever catalog it has
+(ADR 0045, ADR 0048).
 
 **The primary endpoint is scored on the catalog, and no lane writes one.** An
 end-to-end run would pay every lane agent and every critic on the judgement
@@ -3051,6 +3058,13 @@ def park_catalog(ctx, keys: GraphKeys, valid_model: dict) -> dict[str, Any]:
     }
 
 
+def _pause(valid_model: dict) -> dict[str, Any]:
+    """Stop a head that built no catalog. The gate has parked the model already."""
+    return {
+        "elements": sum(1 for _ in SystemModel.model_validate(valid_model).elements())
+    }
+
+
 def _catalog_node_func(keys: GraphKeys) -> Callable[..., Any]:
     """The terminal catalog node, with this graph's key families bound to it."""
 
@@ -3421,11 +3435,6 @@ def build_pipeline(
         raise ValueError(
             f"entry {entry!r} ends in no catalog, so nothing would read a source review"
         )
-    if entry == ENTRY_HEAD_ONLY and not catalogs:
-        raise ValueError(
-            "the head-only entry is scored on the catalog its head produces,"
-            " and this graph builds no node that produces one"
-        )
     if source_review and not catalogs:
         raise ValueError(
             "a source review reads the catalog beside the model, and this graph"
@@ -3515,8 +3524,10 @@ def build_pipeline(
             )
             for framework in frameworks
         ]
-    else:
+    elif catalogs:
         tail = _node(_catalog_node_func(keys), CATALOG_NODE)
+    else:
+        tail = _node(_pause, PAUSE_NODE)
     # Where the valid model goes next: straight to ``prepare``, or through the
     # assertion pass first. One name for both, so the three edges that carry
     # a valid model are written once whichever graph this is.
@@ -3831,8 +3842,10 @@ GraphResult = Analysis | Rejected
 
 def paused_at(
     final_state: Mapping[str, Any],
-) -> tuple[SystemModel, AssertionRecord] | Rejected:
-    """What a head-only drive left: the valid model and its gated catalog.
+) -> tuple[SystemModel, AssertionRecord | None] | Rejected:
+    """What a head-only drive left: the valid model, and its gated catalog.
+
+    The catalog is ``None`` where the graph built no pass that makes one.
 
     The reader of a run that stops after its assertion pass, as
     :func:`result_of` is the reader of one that analyses. A rejection is
@@ -3844,11 +3857,13 @@ def paused_at(
         return Rejected(issues=rejection_issues(rejection))
     model = final_state.get(STATE_VALID_MODEL)
     record = final_state.get(STATE_ASSERTION_CATALOG)
-    if model is None or record is None:
+    if model is None:
         raise GraphProducedNothing(
-            "a head-only drive left neither a rejection nor a model and catalog"
+            "a head-only drive left neither a rejection nor a model"
         )
-    return SystemModel.model_validate(model), AssertionRecord.model_validate(record)
+    return SystemModel.model_validate(model), (
+        None if record is None else AssertionRecord.model_validate(record)
+    )
 
 
 def result_of(final_state: Mapping[str, Any]) -> GraphResult:
