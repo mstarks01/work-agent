@@ -35,6 +35,7 @@ from uuid import uuid4
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
+from analysis_service.assertions import AssertionRecord
 from analysis_service.budgets import BudgetPolicy, measured_tokens, spent_tokens
 from analysis_service.certification import CertifyResult
 from analysis_service.claims import FrameworkAnalysis
@@ -106,6 +107,22 @@ class JobEvent(BaseModel):
         return self
 
 
+class Resumption(BaseModel):
+    """What a job resumed from a finished one starts from (#1252).
+
+    The parent's **Valid System Model** and assertion record, copied onto the
+    new job at submission rather than read from the parent at run time: the
+    job then carries everything its run needs, and a store that no longer
+    holds the parent cannot change what the job was admitted to run.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    parent_id: str
+    system_model: SystemModel
+    assertions: AssertionRecord
+
+
 class JobRecord(BaseModel):
     """Everything the service knows about one job.
 
@@ -133,6 +150,9 @@ class JobRecord(BaseModel):
     # quotes; these are what ``prepare`` writes the rows from. See
     # :mod:`analysis_service.links`.
     links: list[LinkAnswer] = Field(default_factory=list, max_length=MAX_LINK_ANSWERS)
+    # Set on a job resumed from a finished one: its run starts at ``prepare``
+    # from these, and runs no extraction and no assertion pass.
+    resumption: Resumption | None = None
     status: JobStatus = "queued"
     created_at: datetime
     updated_at: datetime
@@ -169,6 +189,7 @@ class JobRecord(BaseModel):
         frameworks: Sequence[FrameworkSelection],
         system_name: str | None = None,
         links: Sequence[LinkAnswer] = (),
+        resumption: Resumption | None = None,
         reserved_tokens: int = 0,
     ) -> Self:
         """A fresh queued job with its initial status event recorded."""
@@ -180,6 +201,7 @@ class JobRecord(BaseModel):
             frameworks=list(frameworks),
             system_name=system_name,
             links=list(links),
+            resumption=resumption,
             created_at=now,
             updated_at=now,
             reserved_tokens=reserved_tokens,

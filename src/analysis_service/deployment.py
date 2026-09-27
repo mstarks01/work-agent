@@ -289,7 +289,7 @@ class Deployment:
     # The runner cache. ``init=False`` so a ``replace`` starts a fresh one: a
     # deployment with a different sampling builds different adapters, and a
     # copied cache would hand it a graph built for another sampling.
-    _runners: dict[tuple[FrameworkName, ...], AdkPipelineRunner] = field(
+    _runners: dict[tuple[tuple[FrameworkName, ...], Entry], AdkPipelineRunner] = field(
         default_factory=dict, init=False, repr=False, compare=False
     )
 
@@ -493,7 +493,9 @@ class Deployment:
             require_certified=self.require_certified,
         )
 
-    def runner(self, frameworks: Sequence[FrameworkName]) -> AdkPipelineRunner:
+    def runner(
+        self, frameworks: Sequence[FrameworkName], entry: Entry = ENTRY_EXTRACT
+    ) -> AdkPipelineRunner:
         """The production runner for one framework selection: its graph and the gate.
 
         Memoized **per selection**, because the graph is expensive to compose —
@@ -502,13 +504,18 @@ class Deployment:
         selection. Two jobs naming the same frameworks in the same order share
         one runner; naming them in a different order does not, since order is
         the report's block order and a different order is a different graph.
+
+        ``entry`` is the other half of the key: a job resumed from a finished
+        one starts at ``prepare`` and runs a different graph over the same
+        selection (#1252).
         """
         selection = self.selection(frameworks)
-        if selection not in self._runners:
-            self._runners[selection] = AdkPipelineRunner(
-                self.pipeline(selection), certification=self.gate
+        key = (selection, entry)
+        if key not in self._runners:
+            self._runners[key] = AdkPipelineRunner(
+                self.pipeline(selection, entry=entry), certification=self.gate
             )
-        return self._runners[selection]
+        return self._runners[key]
 
 
 def _flag(env: Mapping[str, str], var: str) -> bool:
