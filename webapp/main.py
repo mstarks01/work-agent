@@ -279,10 +279,6 @@ class Startup:
     frameworks: tuple[FrameworkName, ...]
     tiers: ModelTierConfig | None
     error: ConfigError | None
-    #: Whether a run here builds an assertion catalog, and so can ask link
-    #: questions. False unless the deployment says so, so the form offers no
-    #: question toggle on an install that could not honour it.
-    asks: bool = False
 
     @property
     def ok(self) -> bool:
@@ -325,7 +321,6 @@ def build_startup(env: Mapping[str, str] | None = None) -> Startup:
         frameworks=deployment.frameworks,
         tiers=deployment.tiers,
         error=None,
-        asks=deployment.carries_catalog,
     )
 
 
@@ -461,7 +456,7 @@ def create_app(
                 script=client_script("first_run.js"),
                 tiers=_tier_lines(state.tiers),
                 frameworks=_framework_fields(state.frameworks),
-                questions=_QUESTIONS_FIELD if state.asks else "",
+                questions=_QUESTIONS_FIELD,
             )
         )
 
@@ -496,15 +491,6 @@ def create_app(
                 {
                     "message": "Expected a JSON body with a 'sources' list and a"
                     " 'frameworks' list naming frameworks this install carries."
-                },
-                status_code=400,
-            )
-
-        if ask_questions and not state.asks:
-            return JSONResponse(
-                {
-                    "message": "This install builds no assertion catalog, so it asks"
-                    " no question."
                 },
                 status_code=400,
             )
@@ -1078,7 +1064,8 @@ _FORM_PAGE = (
 """
 )
 
-#: The question toggle, shown only on an install that builds a catalog.
+#: The question toggle. Every install can pause: one with no catalog asks its
+#: early questions and no link question.
 _QUESTIONS_FIELD = """<p><label><input type="checkbox" id="ask" name="ask">
     Ask me questions before the analysis runs, and wait for my answers</label></p>"""
 

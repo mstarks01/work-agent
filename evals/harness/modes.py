@@ -1377,6 +1377,13 @@ def build_eval_pipeline(
     overrides the deployment's for a sweep varying the per-tier params.
     """
     deployment = deployment or Deployment.from_env()
+    if entry == ENTRY_HEAD_ONLY and not deployment.carries_catalog:
+        # The service pauses on such a head; the heads mode scores a catalog,
+        # so it refuses before the first node is paid for.
+        raise EvalRunError(
+            "the heads mode scores the catalog its head produces, and this"
+            " deployment builds no pass that makes one"
+        )
     if sampling is not None:
         deployment = replace(deployment, sampling=sampling)
     return deployment.pipeline(frameworks, entry=entry, resolve_model=resolve_model)

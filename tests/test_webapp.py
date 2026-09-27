@@ -176,11 +176,13 @@ def test_no_form_control_can_influence_which_model_runs(client, tiers):
 
 
 def test_the_only_controls_are_the_picker_and_the_description(client):
-    """One textarea, one checkbox per carried framework, one select per option."""
+    """One textarea, a checkbox per carried framework and the question toggle,
+    and one select per option."""
     page = client.get("/").text
 
     assert page.count("<textarea") == 1
-    assert page.count('type="checkbox"') == len(CARRIED)
+    assert page.count('type="checkbox"') == len(CARRIED) + 1
+    assert 'id="ask"' in page
     # ASVS declares a level and STRIDE declares nothing, so exactly one select.
     assert page.count("<select") == 1
     assert 'data-option="level"' in page

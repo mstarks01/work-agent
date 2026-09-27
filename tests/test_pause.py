@@ -87,6 +87,28 @@ class TestThePausedRun:
         assert graph.PREPARE_NODE not in visited
         assert outcome.nodes
 
+    def test_a_head_with_no_catalog_pass_stops_after_the_gate(self):
+        """A deployment that builds no catalog still pauses, for early questions."""
+        pipeline, _ = scripted_pipeline(
+            {"extract": valid_model().model_dump_json()},
+            entry=graph.ENTRY_HEAD_ONLY,
+        )
+        record = asking_job()
+        record.transition("running")
+        visited: list[str] = []
+
+        async def on_node(node: str) -> None:
+            visited.append(node)
+
+        outcome = asyncio.run(AdkPipelineRunner(pipeline).run(record, on_node))
+
+        assert isinstance(outcome, PipelineAwaiting)
+        assert outcome.checkpoint.system_model == valid_model()
+        assert outcome.checkpoint.assertions is None
+        assert graph.PAUSE_NODE in visited
+        assert graph.ASSERT_NODE not in visited
+        assert graph.CATALOG_NODE not in visited
+
 
 class TestTheWait:
     def test_a_paused_run_ends_in_awaiting_answers_with_its_checkpoint(self):
@@ -147,12 +169,23 @@ class TestTheRoutes:
         client.post("/v1/jobs", json=submission(), headers=auth())
         assert entries == [graph.ENTRY_EXTRACT]
 
-    def test_questions_are_refused_where_no_catalog_is_built(self):
+    def test_questions_pause_a_job_where_no_catalog_is_built(self):
+        from tests.test_api import make_client
+
+        client, _ = make_client()
+        entries = recorded_entries(client)
+        response = client.post(
+            "/v1/jobs", json=submission(questions=True), headers=auth()
+        )
+        assert response.status_code == 201
+        assert entries == [graph.ENTRY_HEAD_ONLY]
+
+    def test_a_link_answer_is_still_refused_where_no_catalog_is_built(self):
         from tests.test_api import make_client
 
         client, _ = make_client()
         response = client.post(
-            "/v1/jobs", json=submission(questions=True), headers=auth()
+            "/v1/jobs", json=submission(links=[LINK.model_dump()]), headers=auth()
         )
         assert response.status_code == 400
 
