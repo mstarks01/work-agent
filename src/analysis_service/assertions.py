@@ -778,6 +778,11 @@ CatalogIssueCode = Literal[
     # passages between them than a row carries, and the row kept the first
     # :data:`MAX_SPANS`; this names how many it did not keep.
     "support-truncated",
+    # Not a refused row. A submitter's link answer named a principal this
+    # catalog does not hold, or a component this model does not hold, so it
+    # placed nothing; see :mod:`analysis_service.links`.
+    "unmatched-link",
+    "unknown-link-element",
 ]
 
 
@@ -794,6 +799,8 @@ CatalogIssueCode = Literal[
 GATE_REFUSALS: frozenset[str] = frozenset(get_args(CatalogIssueCode)) - {
     "graph-contradiction",
     "support-truncated",
+    "unmatched-link",
+    "unknown-link-element",
 }
 
 #: The refusals of a whole catalog rather than of a row in it: a catalog keyed

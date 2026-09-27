@@ -45,7 +45,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 # Closed and load-bearing: each kind names the register rendered around its
 # text. Adding one means editing prompts/extract.md in the same change.
-SourceKind = Literal["description", "transcript"]
+SourceKind = Literal["description", "transcript", "answers"]
 
 # What a caller gets when they use the convenience constructors rather than
 # naming a source themselves. The wire never defaults a label — an unnamed
@@ -118,6 +118,7 @@ def _carries_formatting(value: str) -> bool:
 _REGISTERS: dict[str, str] = {
     "description": "a written description of the system",
     "transcript": "a transcribed conversation about the system",
+    "answers": "the submitter's answers to questions this service asked",
 }
 
 # Separates the label from the text inside a block. Positional, not parsed: the

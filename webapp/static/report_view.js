@@ -19,6 +19,9 @@
   // ordered server-side. Each finding is placed under one fact; the page only
   // renders what it is handed.
   const OPEN_FACTS = JSON.parse(document.getElementById("open_facts").textContent);
+  // The principals no element stands for yet, ranked server-side by how many
+  // stated facts an answer would place. The page only renders what it is handed.
+  const LINK_QUESTIONS = JSON.parse(document.getElementById("link_questions").textContent);
   const $ = (id) => document.getElementById(id);
   const el = (tag, cls, text) => {
     const n = document.createElement(tag);
@@ -679,6 +682,36 @@
   // In the job's own selection order, which the envelope has already checked
   // against `job.frameworks`.
   R.analyses.forEach(renderBlock);
+
+  // Link questions: one per principal the report cannot place. An answer names
+  // one element by its ID, or "none", and rides in the next submission's
+  // `links`; code writes it as the link, so no model reads it.
+  if (LINK_QUESTIONS.length) {
+    const names = {};
+    [...R.system_model.external_entities, ...R.system_model.processes,
+     ...R.system_model.data_stores].forEach(e => { names[e.id] = e.name; });
+    const box = $("links");
+    box.append(el("h2", null, "Which element is each of these?"));
+    box.append(el("div", "meta",
+      "The sources state facts about these principals but never say which element " +
+      "of the model each one is, so no rule can place the facts. Answer in the " +
+      "next submission's `links` field with an element ID, or \"none\"."));
+    LINK_QUESTIONS.forEach(q => {
+      const item = el("details", "openfact");
+      const head = el("summary");
+      head.append(el("b", null, q.principal),
+        ` \u2014 an answer places ${q.rows} stated fact(s)`);
+      item.append(head);
+      const list = el("ul");
+      q.options.forEach(id => {
+        const li = el("li");
+        li.append(code(id), ` ${names[id] || ""}`);
+        list.append(li);
+      });
+      item.append(list);
+      box.append(item);
+    });
+  }
 
   // system model table. Each entry returns the cell's children rather than a
   // string of markup — `technology`, `protocol`, `authentication` and

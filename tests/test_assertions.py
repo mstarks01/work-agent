@@ -681,6 +681,8 @@ class TestWhatTheGateRefuses:
         assert set(get_args(CatalogIssueCode)) - GATE_REFUSALS == {
             "graph-contradiction",
             "support-truncated",
+            "unmatched-link",
+            "unknown-link-element",
         }
 
     @pytest.mark.parametrize(

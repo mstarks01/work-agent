@@ -1084,6 +1084,25 @@ def test_the_page_carries_the_open_facts_its_findings_rest_on():
     )
 
 
+def test_the_page_carries_the_link_questions_its_catalog_raises():
+    """The questions are computed server-side and handed over, like the units."""
+    from analysis_service.links import link_questions
+    from tests.factories import sample_report
+
+    report = sample_report()
+    rendered = render_report(report)
+    payload = re.search(
+        r'<script type="application/json" id="link_questions"[^>]*>(.*?)</script>',
+        rendered.html,
+        re.DOTALL,
+    )
+
+    catalog = report.assertions.catalog if report.assertions else None
+    assert json.loads(payload.group(1)) == [
+        question.to_json() for question in link_questions(catalog, report.system_model)
+    ]
+
+
 def test_the_viewer_has_no_inline_style_attribute():
     """The CSP grants no 'unsafe-inline' for styles, so a style="" would break.
 

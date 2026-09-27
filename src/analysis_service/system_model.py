@@ -83,6 +83,10 @@ _ID_SLUG = r"[a-z0-9]+(?:-[a-z0-9]+)*"
 #: A non-flow element ID: ``<prefix>:<slug>``, and exactly one colon.
 _PLAIN_ID = rf"{_ID_PREFIX}:{_ID_SLUG}"
 
+#: The same shape, compiled for a reader outside this module that has to check
+#: an ID it did not build, such as a submitter's link answer.
+PLAIN_ID_RE = re.compile(_PLAIN_ID)
+
 #: The character that separates a **Data Flow** ID's three parts.
 #:
 #: Picked against the ID alphabet rather than for how it reads. A part is a
