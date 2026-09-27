@@ -45,6 +45,7 @@ from pydantic.json_schema import SkipJsonSchema
 
 from analysis_service.actions import ActionVerb
 from analysis_service.grounding import MovedKind, meaning_moved
+from analysis_service.question_kinds import QUESTION_KINDS
 from analysis_service.system_model import (
     SystemModel,
     all_attribute_names,
@@ -246,9 +247,9 @@ def _bare_attribute(value: str) -> str:
 AttributeName = Annotated[str, BeforeValidator(_bare_attribute)]
 
 
-#: An open fact's identity: element, attribute, assertion row and subject.
-#: Read off :attr:`UnknownRef.key`, which is the one reader of it.
-UnknownKey = tuple[str, str, str, str]
+#: An open fact's identity: element, attribute, assertion row, subject and
+#: question kind. Read off :attr:`UnknownRef.key`, which is the one reader of it.
+UnknownKey = tuple[str, str, str, str, str]
 
 
 class UnknownRef(BaseModel):
@@ -316,11 +317,34 @@ class UnknownRef(BaseModel):
     #: a reference longer than that names no row here, and the review seam
     #: reports it as one the draft does not carry, which is true.
     assertion: str = Field(default="", max_length=300)
+    #: The fourth spelling: a kind of question from
+    #: :data:`~analysis_service.question_kinds.QUESTION_KINDS`, asked about the
+    #: element in ``element_id``. The critic picks it where a fact has no place
+    #: in the model and a kind fits, so the question is the same whichever
+    #: sample of the critic asks it; ``subject`` is the fallback where none
+    #: fits (``QA-2026-09-26-03-E8``). The provider schema lists the kinds, so a
+    #: constrained critic cannot invent one.
+    question: str = Field(
+        default="",
+        max_length=100,
+        json_schema_extra={
+            "enum": ["", *QUESTION_KINDS],
+            "description": "A kind of question about the element in element_id,"
+            " where the fact has no place in the model: "
+            + "; ".join(
+                f"{name} ({kind.covers})" for name, kind in QUESTION_KINDS.items()
+            ),
+        },
+    )
 
     @property
     def names_an_element(self) -> bool:
-        """Is this the model-reference spelling? Asked in three places."""
-        return bool(self.element_id or self.attribute)
+        """Is this the model-reference spelling? Asked in three places.
+
+        A question kind names an element too, but asks a question the model
+        holds no field for, so it is its own spelling rather than this one.
+        """
+        return bool(self.element_id or self.attribute) and not self.question
 
     @property
     def key(self) -> UnknownKey:
@@ -334,7 +358,13 @@ class UnknownRef(BaseModel):
         reason: without it every free-text question read as one, and a report
         grouped every one of them under the first.
         """
-        return self.element_id, self.attribute, self.assertion, self.subject
+        return (
+            self.element_id,
+            self.attribute,
+            self.assertion,
+            self.subject,
+            self.question,
+        )
 
 
 def name_unknown(ref: UnknownRef) -> str:

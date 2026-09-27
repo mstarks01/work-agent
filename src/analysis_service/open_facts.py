@@ -27,6 +27,7 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 
 from analysis_service.claims import FrameworkAnalysis, UnknownKey, UnknownRef
+from analysis_service.question_kinds import QUESTION_KINDS
 from analysis_service.system_model import SystemModel
 
 NEEDS_INFO = "needs-info"
@@ -72,9 +73,13 @@ def element_names(model: SystemModel) -> Mapping[str, str]:
 
 
 def label_of(ref: UnknownRef, names: Mapping[str, str]) -> str:
-    """What a reader sees for one open fact: an element and attribute, or the subject."""
+    """What a reader sees for one open fact: an element and attribute, or the question."""
     if ref.assertion:
         return ref.assertion
+    if ref.question:
+        where = names.get(ref.element_id, ref.element_id)
+        kind = QUESTION_KINDS.get(ref.question)
+        return kind.template.format(element=where) if kind else ref.question
     if ref.names_an_element:
         where = names.get(ref.element_id, ref.element_id)
         return f"{where}: {ref.attribute.replace('_', ' ')}"

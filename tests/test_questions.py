@@ -130,7 +130,7 @@ class TestTheAnswerForms:
 
     def test_a_closed_attribute_offers_its_values_but_unknown(self):
         process = valid_model().processes[0].id
-        assert self.question_for((process, "exposure", "", "")) == (
+        assert self.question_for((process, "exposure", "", "", "")) == (
             "internet-facing",
             "internal",
         )
@@ -138,41 +138,43 @@ class TestTheAnswerForms:
     def test_a_zone_is_answered_by_a_boundary(self):
         store = valid_model().data_stores[0].id
         boundaries = tuple(b.id for b in valid_model().trust_boundaries)
-        assert self.question_for((store, "trust_zone", "", "")) == boundaries
+        assert self.question_for((store, "trust_zone", "", "", "")) == boundaries
 
     def test_a_mechanism_is_answered_in_words(self):
-        assert self.question_for((flow_id(), "encryption_in_transit", "", "")) == ()
+        assert self.question_for((flow_id(), "encryption_in_transit", "", "", "")) == ()
 
 
 class TestTheChecks:
     def test_an_attribute_the_element_lacks_is_refused(self):
-        wrong = FactAnswer(key=(flow_id(), "exposure", "", ""), value="internal")
+        wrong = FactAnswer(key=(flow_id(), "exposure", "", "", ""), value="internal")
         with pytest.raises(ValueError, match="no attribute"):
             check_fact_answers([wrong], valid_model(), None)
 
     def test_a_value_outside_the_choices_is_refused(self):
         process = valid_model().processes[0].id
-        wrong = FactAnswer(key=(process, "exposure", "", ""), value="everywhere")
+        wrong = FactAnswer(key=(process, "exposure", "", "", ""), value="everywhere")
         with pytest.raises(ValueError, match="not one of"):
             check_fact_answers([wrong], valid_model(), None)
 
     def test_an_open_row_the_catalog_lacks_is_refused(self):
-        wrong = FactAnswer(key=("", "", "missing-row", ""), value="required")
+        wrong = FactAnswer(key=("", "", "missing-row", "", ""), value="required")
         with pytest.raises(ValueError, match="no open assertion row"):
             check_fact_answers([wrong], valid_model(), AssertionCatalog())
 
     def test_a_subject_answer_is_free_text(self):
-        fine = FactAnswer(key=("", "", "", "whether queries are bound"), value="yes")
+        fine = FactAnswer(
+            key=("", "", "", "whether queries are bound", ""), value="yes"
+        )
         check_fact_answers([fine], valid_model(), None)
 
     def test_an_answer_is_one_line(self):
         with pytest.raises(ValueError):
-            FactAnswer(key=("", "", "", "q"), value="two\nlines")
+            FactAnswer(key=("", "", "", "q", ""), value="two\nlines")
 
 
 def test_an_attribute_answer_is_written_onto_the_model_and_noted():
     answer = FactAnswer(
-        key=(flow_id(), "encryption_in_transit", "", ""), value="TLS 1.3"
+        key=(flow_id(), "encryption_in_transit", "", "", ""), value="TLS 1.3"
     )
     model = answered_model(valid_model(), [answer])
     flow = model.data_flows[0]
@@ -193,7 +195,7 @@ def test_an_assertion_answer_replaces_its_open_row_and_passes_the_gate():
         subjects=[Subject(id=subject, type="principal", label="customer accounts")],
         entries=[open_row],
     )
-    answer = FactAnswer(key=("", "", assertion_id(open_row), ""), value="absent")
+    answer = FactAnswer(key=("", "", assertion_id(open_row), "", ""), value="absent")
     written, issues = apply_answers(catalog, valid_model(), [], [answer])
     sources = with_link_answers([DESCRIPTION], [], [answer])
     record = AssertionRecord.over(
@@ -214,7 +216,7 @@ class TestTheResumedRunWithoutACatalog:
 
     def test_an_attribute_answer_reaches_the_report(self):
         answer = FactAnswer(
-            key=(flow_id(), "encryption_in_transit", "", ""), value="TLS 1.3"
+            key=(flow_id(), "encryption_in_transit", "", "", ""), value="TLS 1.3"
         )
         record = JobRecord.create(
             owner_subject="idp|user-1",
@@ -263,7 +265,7 @@ class TestTheRoutes:
         client, store = make_client()
         job = self.completed(store)
         answer = {
-            "key": [flow_id(), "encryption_in_transit", "", ""],
+            "key": [flow_id(), "encryption_in_transit", "", "", ""],
             "value": "TLS 1.3",
         }
         response = client.post(
@@ -279,7 +281,7 @@ class TestTheRoutes:
 
         client, store = make_client()
         job = self.completed(store)
-        wrong = {"key": [flow_id(), "exposure", "", ""], "value": "internal"}
+        wrong = {"key": [flow_id(), "exposure", "", "", ""], "value": "internal"}
         response = client.post(
             f"/v1/jobs/{job}/answers", json={"facts": [wrong]}, headers=auth()
         )
