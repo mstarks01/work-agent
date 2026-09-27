@@ -53,9 +53,17 @@ from analysis_service.validation import ValidationIssue
 
 logger = logging.getLogger(__name__)
 
-JobStatus = Literal["queued", "running", "completed", "failed", "rejected"]
+JobStatus = Literal[
+    "queued", "running", "completed", "failed", "rejected", "awaiting-answers"
+]
 
-TERMINAL_STATUSES: frozenset[JobStatus] = frozenset({"completed", "failed", "rejected"})
+# ``awaiting-answers`` ends the job's run: the job stopped after its assertion
+# pass to ask a person, and holds its model and catalog. It is terminal for the
+# lifecycle and for admission, so a job waiting on a person takes no in-flight
+# slot and its tokens settle. Answering it starts a resumed job (#1252).
+TERMINAL_STATUSES: frozenset[JobStatus] = frozenset(
+    {"completed", "failed", "rejected", "awaiting-answers"}
+)
 
 _LEGAL_TRANSITIONS: dict[JobStatus, frozenset[JobStatus]] = {
     "queued": frozenset({"running"}),
@@ -63,6 +71,7 @@ _LEGAL_TRANSITIONS: dict[JobStatus, frozenset[JobStatus]] = {
     "completed": frozenset(),
     "failed": frozenset(),
     "rejected": frozenset(),
+    "awaiting-answers": frozenset(),
 }
 
 # Stored on a failed job in place of any internal detail.
@@ -107,20 +116,32 @@ class JobEvent(BaseModel):
         return self
 
 
-class Resumption(BaseModel):
-    """What a job resumed from a finished one starts from (#1252).
+class Checkpoint(BaseModel):
+    """A run's **Valid System Model** and gated assertion record: what ``prepare`` reads.
 
-    The parent's **Valid System Model** and assertion record, copied onto the
-    new job at submission rather than read from the parent at run time: the
-    job then carries everything its run needs, and a store that no longer
-    holds the parent cannot change what the job was admitted to run.
+    Held by a job that paused after its assertion pass, and copied onto a job
+    resumed from it or from a finished report.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    system_model: SystemModel
+    assertions: AssertionRecord
+
+
+class Resumption(BaseModel):
+    """What a job resumed from an earlier one starts from (#1252).
+
+    The parent's checkpoint, copied onto the new job at submission rather than
+    read from the parent at run time: the job then carries everything its run
+    needs, and a store that no longer holds the parent cannot change what the
+    job was admitted to run.
     """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
     parent_id: str
-    system_model: SystemModel
-    assertions: AssertionRecord
+    checkpoint: Checkpoint
 
 
 class JobRecord(BaseModel):
@@ -153,6 +174,12 @@ class JobRecord(BaseModel):
     # Set on a job resumed from a finished one: its run starts at ``prepare``
     # from these, and runs no extraction and no assertion pass.
     resumption: Resumption | None = None
+    # Whether this job stops after its assertion pass to ask a person, and
+    # waits for the answers. Off unless a submission asks for it, so an
+    # autonomous run never waits.
+    ask_questions: bool = False
+    # What a paused job holds while it waits: the answers resume from it.
+    checkpoint: Checkpoint | None = None
     status: JobStatus = "queued"
     created_at: datetime
     updated_at: datetime
@@ -190,6 +217,7 @@ class JobRecord(BaseModel):
         system_name: str | None = None,
         links: Sequence[LinkAnswer] = (),
         resumption: Resumption | None = None,
+        ask_questions: bool = False,
         reserved_tokens: int = 0,
     ) -> Self:
         """A fresh queued job with its initial status event recorded."""
@@ -202,12 +230,20 @@ class JobRecord(BaseModel):
             system_name=system_name,
             links=list(links),
             resumption=resumption,
+            ask_questions=ask_questions,
             created_at=now,
             updated_at=now,
             reserved_tokens=reserved_tokens,
         )
         record._append_event(kind="status", status="queued")
         return record
+
+    def pauses(self) -> bool:
+        """Whether this job's run stops after the assertion pass to ask a person.
+
+        A resumed job never pauses: it is the run that answers came back to.
+        """
+        return self.ask_questions and self.resumption is None
 
     def selection(self) -> tuple[str, ...]:
         """This job's frameworks by name, in selection order.
@@ -585,7 +621,21 @@ class PipelineRejected:
     nodes: list[NodeRun] = field(default_factory=list)
 
 
-PipelineOutcome = PipelineCompleted | PipelineRejected
+@dataclass(frozen=True)
+class PipelineAwaiting:
+    """The run stopped after its assertion pass to ask a person.
+
+    ``checkpoint`` is what the answers resume from. ``nodes`` is what the run
+    spent, for the reason :class:`PipelineRejected` carries it: no report exists
+    to carry the measurement, and a pause that settled to zero would hand a
+    caller the extraction and the assertion pass free.
+    """
+
+    checkpoint: Checkpoint
+    nodes: list[NodeRun] = field(default_factory=list)
+
+
+PipelineOutcome = PipelineCompleted | PipelineRejected | PipelineAwaiting
 
 # Called after each pipeline node completes, with the node's name.
 NodeCallback = Callable[[str], Awaitable[None]]
@@ -750,6 +800,11 @@ async def execute_job(
         record.report = outcome.report
         record.certification = outcome.certification
         record.transition("completed")
+    elif isinstance(outcome, PipelineAwaiting):
+        # The node runs first, for the settling reason below.
+        record.checkpoint = outcome.checkpoint
+        record.unreported_nodes = outcome.nodes
+        record.transition("awaiting-answers")
     else:
         # The node runs first, for the reason the report goes first above:
         # settling reads them, and a transition that ran before they were

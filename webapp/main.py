@@ -126,6 +126,7 @@ from analysis_service import (
     FrameworkName,
     FrameworkSelection,
     PipelineCompleted,
+    PipelineRejected,
     Report,
     Source,
 )
@@ -639,6 +640,13 @@ async def _drive(
         if isinstance(outcome, PipelineCompleted):
             run.report = outcome.report
             await _emit(run, "done", {"url": f"/report/{run.id}"})
+        elif not isinstance(outcome, PipelineRejected):
+            # This app's engine never asks questions, so a run that paused is
+            # this service's defect: named in the log, generic to the browser.
+            logger.error("run %s ended as %s", run.id, type(outcome).__name__)
+            await _emit(
+                run, "failed", {"message": "The analysis failed. Check the server log."}
+            )
         else:
             await _emit(
                 run,

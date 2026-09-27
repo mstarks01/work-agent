@@ -61,7 +61,7 @@ from analysis_service.graph import (
     FrameworkNodes,
 )
 from analysis_service.identity import execution_fingerprint
-from analysis_service.jobs import PipelineRejected
+from analysis_service.jobs import PipelineCompleted, PipelineRejected
 from analysis_service.model_tiers import TierName
 from analysis_service.report import (
     NodeRun,
@@ -748,8 +748,13 @@ async def run_smoke(deployment: Deployment | None = None) -> SmokeResult:
         )
         return SmokeResult(tiers=tiers, checks=checks)
 
-    # `PipelineOutcome` is exactly the two branches, and the other one returned
-    # above, so this is the completed case by elimination rather than by check.
+    # A smoke job never asks questions, so it never pauses; an outcome that
+    # did is this service's defect, and it is named rather than read as a report.
+    if not isinstance(outcome, PipelineCompleted):
+        raise TypeError(
+            f"a smoke job ended as {type(outcome).__name__}, which only a job"
+            " that asks questions can reach"
+        )
     report = outcome.report
     return SmokeResult(
         tiers=tiers,

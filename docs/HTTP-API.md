@@ -39,8 +39,8 @@ logged, never returned.
 | `GET` | `/v1/jobs/{id}` | Poll: status, per-node progress, timestamps. Never the report. |
 | `GET` | `/v1/jobs/{id}/events` | The same progression as Server-Sent Events; resumable via `Last-Event-ID`. |
 | `GET` | `/v1/jobs/{id}/report` | The full [report](Report-Schema.md) once completed; `409` before, and `409` if the report is withheld (below). |
-| `POST` | `/v1/jobs/{id}/answers` | Answer a completed report's questions. Starts a **new** job that resumes from this one's model and catalog; `201` with its `job_id`. |
-| `GET` | `/v1/jobs/{id}/questions` | What the finished report asks you, as `{"job_id", "link_questions"}`. Derived from the report when you ask, under the report's own rules: `409` before completion and `409` when the report is withheld. |
+| `POST` | `/v1/jobs/{id}/answers` | Answer the questions of a completed job or a job in `awaiting-answers`. Starts a **new** job that resumes from this one's model and catalog; `201` with its `job_id`. |
+| `GET` | `/v1/jobs/{id}/questions` | What the job asks you, as `{"job_id", "link_questions"}`: a finished report's questions, or a waiting job's. Derived from the report when you ask, under the report's own rules: `409` before completion and `409` when the report is withheld. |
 | `GET` | `/healthz` | Unauthenticated liveness probe. |
 
 Errors are RFC 9457 `application/problem+json`.
@@ -73,12 +73,13 @@ flowchart LR
     running -- report produced --> completed([completed])
     running -- validity gate refused the input --> rejected([rejected])
     running -- internal error --> failed([failed])
+    running -- questions asked --> awaiting([awaiting-answers])
 
     classDef live fill:#f1f5f9,stroke:#64748b,stroke-width:1.5px,color:#0f172a
     classDef good fill:#dcfce7,stroke:#16a34a,stroke-width:1.5px,color:#052e16
     classDef bad fill:#fee2e2,stroke:#dc2626,stroke-width:1.5px,color:#450a0a
     class queued,running live
-    class completed good
+    class completed,awaiting good
     class rejected,failed bad
 ```
 
@@ -86,6 +87,11 @@ flowchart LR
 - `rejected` — the input failed the validity gate; the poll response carries the
   `validation_issues` (see [Report-Schema](Report-Schema.md)).
 - `failed` — an internal error; only a generic message is exposed.
+- `awaiting-answers` — only for a job submitted with `"questions": true`. The
+  run stopped after its assertion pass and waits for you, for as long as it
+  takes. `GET /v1/jobs/{id}/questions` lists what it asks, and
+  `POST /v1/jobs/{id}/answers` continues it as a new job (see below). A waiting
+  job takes none of your in-flight slots.
 
 This mirrors the engine's three outcomes; the HTTP layer adds the queue,
 ownership, and delivery around them.
@@ -143,7 +149,18 @@ the same list. Each entry is `{key, principal, rows, options}`: `rows` is how
 many stated facts an answer would place, and `options` are the element IDs an
 answer may name. The most rows come first.
 
-**Answer against the finished job.** This is the usual way:
+**Ask before the analysis runs.** Submit with `"questions": true` beside the
+sources. The job stops after extraction and the assertion pass, ends in
+`awaiting-answers`, and waits. Its questions come from what it has read so far.
+Answer them with the route below, or send `{"links": []}` to continue without
+answers; either starts the analysis as a new job. A job submitted without
+`questions`, such as an autonomous run, never stops. A deployment that builds
+no assertion catalog refuses `"questions": true`.
+
+**Limit:** a waiting job is held in the service's memory. A restart of the
+service loses it, with its extraction; submit it again.
+
+**Answer against the finished job.** This is the usual way after a report:
 
 ```http
 POST /v1/jobs/{id}/answers
@@ -165,7 +182,8 @@ same principal. The finished job's report is unchanged.
 | --- | --- |
 | `400` | This deployment builds no assertion catalog, or two answers name the same principal. |
 | `404` | The job is not yours, or does not exist. |
-| `409` | The job is not completed, its report is withheld, or its report carries no catalog. |
+| `400` | `links` is empty and the job is not waiting on answers. Empty means "continue without answers". |
+| `409` | The job is neither completed nor waiting on answers, its report is withheld, or its report carries no catalog. |
 | `422` | `links` is missing or empty, or an entry is malformed. |
 
 **Or answer in a new submission** of the same system, beside the sources. That

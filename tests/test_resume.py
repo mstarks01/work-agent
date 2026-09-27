@@ -23,6 +23,7 @@ from analysis_service.assertions import (
     answer,
 )
 from analysis_service.jobs import (
+    Checkpoint,
     InMemoryJobStore,
     JobRecord,
     PipelineCompleted,
@@ -60,6 +61,19 @@ def parent_catalog() -> AssertionCatalog:
     )
 
 
+def recorded_entries(client) -> list[str]:
+    """Which graph entry each job this client starts is run on, in order."""
+    entries: list[str] = []
+    runner = client.app.state.runner_for
+
+    def recording(selection, entry=graph.ENTRY_EXTRACT):
+        entries.append(entry)
+        return runner(selection, entry)
+
+    client.app.state.runner_for = recording
+    return entries
+
+
 class TestTheResumedRun:
     """The real graph, from ``prepare``, with scripted models."""
 
@@ -72,8 +86,10 @@ class TestTheResumedRun:
             links=links,
             resumption=Resumption(
                 parent_id="job-parent",
-                system_model=valid_model(),
-                assertions=AssertionRecord(proposed=1, catalog=parent_catalog()),
+                checkpoint=Checkpoint(
+                    system_model=valid_model(),
+                    assertions=AssertionRecord(proposed=1, catalog=parent_catalog()),
+                ),
             ),
         )
         record.transition("running")
@@ -152,20 +168,13 @@ class TestTheAnswersRoute:
         child = self.child(store, self.post(client, parent, LINK.model_dump()))
 
         assert child.resumption.parent_id == parent
-        assert child.resumption.assertions.catalog == parent_catalog()
+        assert child.resumption.checkpoint.assertions.catalog == parent_catalog()
         assert child.links == [LINK]
         assert [source.kind for source in child.sources] == ["description", "answers"]
 
     def test_the_resumed_job_is_run_from_prepare(self):
         client, store = catalog_client()
-        entries = []
-        runner = client.app.state.runner_for
-
-        def recording(selection, entry=graph.ENTRY_EXTRACT):
-            entries.append(entry)
-            return runner(selection, entry)
-
-        client.app.state.runner_for = recording
+        entries = recorded_entries(client)
         self.post(client, self.completed(store), LINK.model_dump())
         assert entries == [graph.ENTRY_RESUME]
 
@@ -210,10 +219,13 @@ class TestTheAnswersRoute:
         response = self.post(client, parent, LINK.model_dump(), twice.model_dump())
         assert response.status_code == 400
 
-    def test_no_answers_is_malformed(self):
+    def test_no_answers_against_a_finished_report_is_refused(self):
+        """Empty means "continue without answers", which only a waiting job can."""
         client, store = catalog_client()
         parent = self.completed(store)
-        assert self.post(client, parent).status_code == 422
+        response = self.post(client, parent)
+        assert response.status_code == 400
+        assert "continue without" in response.json()["detail"]
 
 
 def test_a_resumption_is_absent_on_an_ordinary_job():
