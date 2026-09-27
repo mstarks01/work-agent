@@ -62,6 +62,7 @@ from analysis_service.jobs import (
     build_store,
     execute_job,
 )
+from analysis_service.links import MAX_LINK_ANSWERS, LinkAnswer, with_link_answers
 from analysis_service.parsing import ascii_int
 from analysis_service.report import FrameworkSelection
 from analysis_service.selection import SelectionError, resolve_selection
@@ -297,6 +298,10 @@ class JobSubmission(BaseModel):
     #: is what this field exists to avoid. The body as a whole stays bounded by
     #: ``BodyLimitMiddleware``.
     system_name: str | None = None
+    #: Answers to an earlier report's link questions: which component each
+    #: principal is. Composed into one more Source and written as stated
+    #: ``represented-by`` rows; see :mod:`analysis_service.links`.
+    links: list[LinkAnswer] = Field(default_factory=list, max_length=MAX_LINK_ANSWERS)
 
     @field_validator("system_name")
     @classmethod
@@ -525,6 +530,7 @@ def create_app(
     max_active_jobs: int | None = None,
     budget: BudgetPolicy | None = None,
     frameworks: Sequence[FrameworkName] | None = None,
+    carries_catalog: bool | None = None,
 ) -> FastAPI:
     """Build the service app; production defaults, injectable seams for tests.
 
@@ -542,6 +548,12 @@ def create_app(
     has asked for yet costs nothing. An injected runner serves every selection,
     because a stand-in that answers one is answering the seam rather than the
     graph.
+
+    ``carries_catalog`` says whether a job here builds an assertion catalog,
+    which is the only reader of a link answer. It is the deployment's wherever
+    there is one. Without a deployment it defaults to ``False``, so an app
+    that cannot know refuses link answers rather than accepting what nothing
+    reads.
 
     ``limits`` bounds what one job may carry, ``job_deadline_seconds`` bounds
     how long one may run, ``max_active_jobs`` bounds how many one caller may
@@ -562,6 +574,11 @@ def create_app(
         app.state.certification = deployment.gate
     frameworks = _setting(frameworks, deployment, "frameworks", lambda d: d.frameworks)
     app.state.frameworks = tuple(frameworks)
+    app.state.carries_catalog = (
+        carries_catalog
+        if carries_catalog is not None
+        else deployment is not None and deployment.carries_catalog
+    )
     app.state.limits = limits = _setting(
         limits, deployment, "limits", lambda d: d.resilience.source_limits()
     )
@@ -634,7 +651,23 @@ def create_app(
         selection = _resolve_selection(
             request.app.state.frameworks, submission.frameworks
         )
-        breach = request.app.state.limits.breach(submission.sources)
+        if submission.links and not request.app.state.carries_catalog:
+            raise HTTPException(
+                status_code=400,
+                detail="this deployment builds no assertion catalog, so nothing"
+                " would read a link answer",
+            )
+        # Only onto a job that has sources of its own: answers alone would
+        # carry the body past the ladder's empty-sources rung.
+        try:
+            sources = (
+                with_link_answers(submission.sources, submission.links)
+                if submission.sources
+                else list(submission.sources)
+            )
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        breach = request.app.state.limits.breach(sources)
         if breach is not None:
             raise HTTPException(
                 status_code=_STATUS_BY_RUNG[breach.rung], detail=breach.message
@@ -648,10 +681,11 @@ def create_app(
         # about the rung; both answers refuse it, and neither runs a model.
         record = JobRecord.create(
             owner_subject=subject,
-            sources=submission.sources,
+            sources=sources,
             frameworks=selection,
             system_name=submission.system_name,
-            reserved_tokens=budgets.estimate(submission.sources, selection),
+            links=submission.links,
+            reserved_tokens=budgets.estimate(sources, selection),
         )
         # The runner is looked up before the reservation. A graph is built on
         # first use per selection, and a build that raised after the reservation

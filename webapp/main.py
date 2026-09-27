@@ -131,6 +131,7 @@ from analysis_service import (
 )
 from analysis_service.deployment import Deployment
 from analysis_service.frameworks import package_for
+from analysis_service.links import link_questions
 from analysis_service.model_tiers import ModelTierConfig
 from analysis_service.open_facts import open_facts_by_framework
 from analysis_service.selection import SelectionError, resolve_selection
@@ -378,6 +379,15 @@ def render_report(report: Report) -> RenderedPage:
         units=script_json(unit_rows(report)),
         open_facts=script_json(
             open_facts_by_framework(report.analyses, report.system_model)
+        ),
+        link_questions=script_json(
+            [
+                question.to_json()
+                for question in link_questions(
+                    report.assertions.catalog if report.assertions else None,
+                    report.system_model,
+                )
+            ]
         ),
     )
 

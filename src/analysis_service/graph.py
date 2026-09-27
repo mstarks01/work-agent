@@ -193,6 +193,7 @@ from analysis_service.knowledge import (
     compose_notes,
     select_per_lane,
 )
+from analysis_service.links import LinkAnswer, apply_links
 from analysis_service.markdown_loader import MarkdownLoader, estimate_tokens
 from analysis_service.model_tiers import ReviewIndependence, TierName
 from analysis_service.patch import PatchBatch, apply_patch
@@ -811,6 +812,10 @@ STATE_REJECTION = "rejection"
 # produces a different answer under different ones, which is why they reach the
 # lane agents and the block rather than only the report's ``job`` field.
 STATE_FRAMEWORK_OPTIONS = "framework_options"
+# The submitter's answers to an earlier report's link questions, as the job
+# record holds them. Job data like the options, seeded per run by the driver;
+# ``prepare`` writes each as a stated ``represented-by`` row before the gate.
+STATE_LINK_ANSWERS = "link_answers"
 
 #: The job-wide state keys ``analyze.md`` templates, which every lane of every
 #: framework reads as one value. With :data:`LANE_ARTIFACTS` and ``{lane}`` they
@@ -906,6 +911,7 @@ SHARED_STRUCTURED_KEYS: frozenset[str] = frozenset(
         STATE_ANALYSIS,
         STATE_REJECTION,
         STATE_FRAMEWORK_OPTIONS,
+        STATE_LINK_ANSWERS,
         STATE_REPAIR_BASELINE,
         STATE_MODEL_REPAIR,
     }
@@ -1813,6 +1819,21 @@ def _resolve_assertions(state: SessionState, model: SystemModel) -> AssertionRec
             )
         record = AssertionRecord.of(
             CatalogProposal.model_validate(proposed), model, sources
+        )
+    links = [
+        LinkAnswer.model_validate(link) for link in state.get(STATE_LINK_ANSWERS) or []
+    ]
+    if links:
+        # The submitter's answers settle the principal's link, so they are
+        # written over whatever the node proposed and gated with the rest.
+        linked, unplaced = apply_links(record.catalog, model, links)
+        record = AssertionRecord.over(
+            linked,
+            model,
+            sources,
+            proposed=record.proposed,
+            issues=[*record.issues, *unplaced],
+            quarantined=record.quarantined,
         )
     state.put(STATE_ASSERTION_CATALOG, record.model_dump(mode="json"))
     return record

@@ -50,6 +50,7 @@ from analysis_service.jobs import (
     PipelineOutcome,
     PipelineRunner,
 )
+from analysis_service.links import with_link_answers
 from analysis_service.report import FrameworkSelection
 from analysis_service.selection import SelectionError, resolve_selection
 from analysis_service.sources import Source, SourceLimits, clean_system_name
@@ -274,6 +275,12 @@ class Engine:
                 "analyze takes a sequence of Source, not a string; "
                 "pass [Source.description(text)] or [Source.transcript(text)]"
             )
+        # The same refusal the HTTP route makes: an answers source is composed
+        # by the service, and this entry point takes no link answers.
+        try:
+            with_link_answers(sources, ())
+        except ValueError as exc:
+            raise EngineInputError(str(exc)) from exc
         breach = self._limits.breach(sources)
         if breach is not None:
             raise EngineInputError(breach.message)

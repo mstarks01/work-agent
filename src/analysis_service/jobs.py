@@ -38,6 +38,7 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 from analysis_service.budgets import BudgetPolicy, measured_tokens, spent_tokens
 from analysis_service.certification import CertifyResult
 from analysis_service.claims import FrameworkAnalysis
+from analysis_service.links import MAX_LINK_ANSWERS, LinkAnswer
 from analysis_service.report import (
     FrameworkSelection,
     InputRef,
@@ -127,6 +128,11 @@ class JobRecord(BaseModel):
     # things on two installs.
     frameworks: list[FrameworkSelection] = Field(min_length=1)
     system_name: str | None = None
+    # The submitter's answers to an earlier report's link questions. They are
+    # also composed into one of ``sources``, which is what an answer's row
+    # quotes; these are what ``prepare`` writes the rows from. See
+    # :mod:`analysis_service.links`.
+    links: list[LinkAnswer] = Field(default_factory=list, max_length=MAX_LINK_ANSWERS)
     status: JobStatus = "queued"
     created_at: datetime
     updated_at: datetime
@@ -162,6 +168,7 @@ class JobRecord(BaseModel):
         sources: Sequence[Source],
         frameworks: Sequence[FrameworkSelection],
         system_name: str | None = None,
+        links: Sequence[LinkAnswer] = (),
         reserved_tokens: int = 0,
     ) -> Self:
         """A fresh queued job with its initial status event recorded."""
@@ -172,6 +179,7 @@ class JobRecord(BaseModel):
             sources=list(sources),
             frameworks=list(frameworks),
             system_name=system_name,
+            links=list(links),
             created_at=now,
             updated_at=now,
             reserved_tokens=reserved_tokens,

@@ -35,6 +35,7 @@ from analysis_service.certification import CertificationGate, CertifyResult
 from analysis_service.execution import GraphExecutor
 from analysis_service.graph import (
     STATE_FRAMEWORK_OPTIONS,
+    STATE_LINK_ANSWERS,
     GraphProducedNothing,
     Pipeline,
     Rejected,
@@ -137,7 +138,8 @@ class AdkPipelineRunner:
                 STATE_FRAMEWORK_OPTIONS: {
                     selection.name: dict(selection.options)
                     for selection in job.frameworks
-                }
+                },
+                STATE_LINK_ANSWERS: [link.model_dump() for link in job.links],
             },
             on_node=on_node,
         )
