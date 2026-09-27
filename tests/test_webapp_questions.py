@@ -20,7 +20,7 @@ from fastapi.testclient import TestClient
 from analysis_service import Engine, StubPipelineRunner
 from analysis_service.assertions import AssertionRecord
 from analysis_service.jobs import Checkpoint, PipelineAwaiting, PipelineCompleted
-from tests import test_webapp
+from tests import test_open_facts, test_questions, test_webapp
 from tests.factories import valid_model
 from tests.test_resume import parent_catalog
 from tests.test_webapp import (
@@ -455,6 +455,7 @@ def test_the_report_page_sends_both_kinds_of_answer_and_follows_the_run():
                 "cited_by": 2,
                 "settled_so_far": 2,
                 "choices": [],
+                "findings": ["stride/I-01", "stride/T-01"],
             },
             {
                 "key": ["", "", "", "whether queries are bound", ""],
@@ -463,6 +464,7 @@ def test_the_report_page_sends_both_kinds_of_answer_and_follows_the_run():
                 "cited_by": 1,
                 "settled_so_far": 2,
                 "choices": [],
+                "findings": ["stride/T-01"],
             },
         ],
     }
@@ -488,3 +490,70 @@ await button.listeners.click();
         }
     ]
     assert seen["href"] == "/?follow=r2"
+
+
+def tallies(questions: list[dict], answer: list[dict]) -> list[str]:
+    """The running line after answering the questions in ``answer``."""
+    payloads = {
+        "report": {"system_model": valid_model().model_dump(mode="json")},
+        "link_questions": [],
+        "fact_questions": questions,
+    }
+    steps = f"""
+const inputs = [...box.all("input"), ...box.all("select")];
+const byKey = new Map(inputs.map(i => [i.dataset.key, i]));
+for (const q of {json.dumps(answer)}) {{
+  const input = byKey.get(JSON.stringify(q.key));
+  input.value = q.choices.length ? q.choices[0] : "an answer";
+  (input.listeners.input || input.listeners.change)();
+}}
+calls.push(...box.all("div").map(d => d.textContent).filter(t => t.startsWith("Your")));
+"""
+    return _run_answer_block(payloads, steps)["calls"]
+
+
+report = test_open_facts.report
+
+
+class TestTheRunningCount:
+    """The page's count and the ranking's ``settled_so_far`` are two readers of
+    one rule, so each is held against the other on real reports."""
+
+    def test_it_matches_the_ranking_at_every_depth(self, report):
+        questions = [q.to_json() for q in test_questions.ask(report)]
+        if not questions:
+            pytest.skip("this report waits on no fact")
+        total = len({f for q in questions for f in q["findings"]})
+        for depth in sorted({0, 1, len(questions) // 2, len(questions)}):
+            settled = questions[depth - 1]["settled_so_far"] if depth else 0
+            line = f"Your answers settle {settled} of the {total} findings"
+            assert tallies(questions, questions[:depth]) == [
+                f"{line} that wait on a fact."
+            ]
+
+    def test_it_counts_answers_given_out_of_order(self):
+        questions = [
+            {
+                "key": ["", "", "", "a", ""],
+                "kind": "subject",
+                "basis": "critic",
+                "label": "a",
+                "cited_by": 1,
+                "settled_so_far": 1,
+                "choices": [],
+                "findings": ["stride/S-01"],
+            },
+            {
+                "key": ["", "", "", "b", ""],
+                "kind": "subject",
+                "basis": "critic",
+                "label": "b",
+                "cited_by": 1,
+                "settled_so_far": 2,
+                "choices": [],
+                "findings": ["stride/S-02"],
+            },
+        ]
+        assert tallies(questions, questions[1:]) == [
+            "Your answers settle 1 of the 2 findings that wait on a fact."
+        ]

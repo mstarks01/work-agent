@@ -167,10 +167,11 @@ such as how a flow is protected. `fact_questions` lists every such fact the
 report's findings cite, most useful first:
 
 ```json
-{"key": ["flow:entity:customer>process:web-app>login", "encryption_in_transit", "", ""],
+{"key": ["flow:entity:customer>process:web-app>login", "encryption_in_transit", "", "", ""],
  "kind": "attribute", "basis": "evidence",
  "label": "Customer → Web App: encryption in transit",
- "cited_by": 4, "settled_so_far": 3, "choices": []}
+ "cited_by": 4, "settled_so_far": 3, "choices": [],
+ "findings": ["stride/I-01", "stride/I-02", "stride/T-03", "stride/T-04"]}
 ```
 
 - `key` names the fact. Send it back unchanged with your answer.
@@ -193,6 +194,9 @@ report's findings cite, most useful first:
   far as you like; the list is not capped.
 - `choices` lists the values the fact takes. Empty means free text, one line,
   at most 1,000 characters.
+- `findings` names every finding that waits on the fact, as
+  `framework/claim`. A finding is settled once every question that names it
+  has an answer, in any order, so you can count what a set of answers settles.
 
 Answer with `facts` beside or instead of `links`:
 
