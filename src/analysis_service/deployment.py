@@ -468,6 +468,16 @@ class Deployment:
             ),
         )
 
+    @property
+    def carries_catalog(self) -> bool:
+        """Whether a production job here builds an assertion catalog.
+
+        Either the assertion pass runs, or a facts-first reading carries its
+        own rows. A link answer writes into that catalog, so a deployment with
+        none has no reader for one and refuses it at submission.
+        """
+        return self.assertions or self.extraction_strategy in FACTS_STRATEGIES
+
     @cached_property
     def gate(self) -> CertificationGate:
         """This deployment's certification gate, built once.

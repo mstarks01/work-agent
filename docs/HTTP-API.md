@@ -121,12 +121,46 @@ billed.
 The report answers exactly this set, one block per framework, in this order.
 
 Each source is `{kind, label, text}`. `kind` is `description` or `transcript`
-and selects the guidance extraction reads the text under. `label` is yours: it
+and selects the guidance extraction reads the text under. A third kind,
+`answers`, is composed by the service from `links` (below); a submission that
+sends one itself is refused. `label` is yours: it
 must be unique within the job, at most 200 characters and single-line, and it
 is the key every `source_excerpt` in the report cites, so pick something you
 will recognise. Order is presentation only — **sources carry equal weight**, and
 an earlier one does not override a later one. A single-source job is a
 one-element list.
+
+### Answering link questions
+
+A report can ask which element of the model a **principal** is: "shopper
+accounts", "the calling teams", "ML engineers". The sources state facts about
+these principals, such as "no MFA for shopper accounts", but never say which
+element each one is, so no rule can place those facts. The report page lists
+the questions, with the element IDs an answer may name.
+
+Answer in the next submission of the same system, beside the sources:
+
+```json
+"links": [
+  {"principal": "shopper accounts", "element": "entity:shopper"},
+  {"principal": "anything that can reach the service", "element": "none"}
+]
+```
+
+- `principal` is the name the report asked about. Case, a plural and a
+  possessive do not matter.
+- `element` is the ID of an external entity, a process or a data store, or
+  `none` when the principal is no element of the model.
+- The service writes each answer into one more source, labelled `Answers to
+  link questions`, and records the link as a fact the submitter stated. Your
+  answer settles the link, even where the sources say something else.
+- An answer that names no principal the new run found, or an element the new
+  model does not hold, places nothing. It is kept on the job with the reason.
+- At most 50 answers per submission. The answers source counts toward the byte
+  budget like any other.
+
+A deployment that builds no assertion catalog has nothing that reads an
+answer, so it refuses a submission that carries `links`.
 
 The service takes **text only**. Decode `.vtt`, `.docx` or a meeting-tool export
 to text before submitting; there is no multipart upload and no file parsing.
@@ -152,6 +186,10 @@ when a deployment changes vendor. Shape is checked before size:
 | `422` | A source is malformed: unknown `kind`, missing or over-long `label`, empty `text`, an unknown field. |
 | `422` | A `label` carries a control, bidi or zero-width character. A label is a citation key rendered as chrome beside the text it names, so a character that renders as something other than what it is can misrepresent the report. Rejected rather than stripped: a label is bounded but never rewritten, so repairing one would cite something you did not submit. Line breaks are refused for the same reason. |
 | `400` | `sources` is present but empty. |
+| `400` | A source has `kind` `answers`. The service composes that source from `links`. |
+| `400` | `links` is not empty and this deployment builds no assertion catalog. |
+| `400` | Two `links` entries answer the same principal. Refused rather than resolved by order, because the service cannot know which answer you meant. |
+| `422` | A `links` entry names an `element` that is not an entity, process or store ID, or `none`; or there are more than 50 entries. |
 | `422` | `frameworks` is missing or empty. There is no default, so an omitted selection is a malformed submission rather than an implied one. |
 | `422` | `frameworks` names a framework this deployment does not carry, or names one twice. The message names it; order carries nothing, so a repeat is a mistake rather than a preference. |
 | `422` | Two sources share a `label`. Refused at any size — a label is a citation key, so a repeated one leaves every excerpt naming it ambiguous. The message names the repeated labels. |
