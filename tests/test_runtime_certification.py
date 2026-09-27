@@ -108,6 +108,19 @@ class TestAnnotateByDefault:
 
 
 class TestRequireCertifiedWithholds:
+    def test_a_withheld_report_withholds_its_questions(self):
+        """The questions are a view of the report, so they follow its gate."""
+        result = CertifyResult(
+            certified=False,
+            uncertified=({"node": "critic", "fingerprint": FP_A},),
+        )
+        client = make_client(result, gate(require_certified=True))
+        job_id = submit(client)
+        response = client.get(f"/v1/jobs/{job_id}/questions", headers=auth())
+
+        assert response.status_code == 409
+        assert "link_questions" not in response.text
+
     def test_an_uncertified_report_is_withheld_when_the_knob_is_on(self):
         result = CertifyResult(
             certified=False,

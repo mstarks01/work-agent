@@ -39,6 +39,7 @@ logged, never returned.
 | `GET` | `/v1/jobs/{id}` | Poll: status, per-node progress, timestamps. Never the report. |
 | `GET` | `/v1/jobs/{id}/events` | The same progression as Server-Sent Events; resumable via `Last-Event-ID`. |
 | `GET` | `/v1/jobs/{id}/report` | The full [report](Report-Schema.md) once completed; `409` before, and `409` if the report is withheld (below). |
+| `GET` | `/v1/jobs/{id}/questions` | What the finished report asks you, as `{"job_id", "link_questions"}`. Derived from the report when you ask, under the report's own rules: `409` before completion and `409` when the report is withheld. |
 | `GET` | `/healthz` | Unauthenticated liveness probe. |
 
 Errors are RFC 9457 `application/problem+json`.
@@ -135,8 +136,11 @@ one-element list.
 A report can ask which element of the model a **principal** is: "shopper
 accounts", "the calling teams", "ML engineers". The sources state facts about
 these principals, such as "no MFA for shopper accounts", but never say which
-element each one is, so no rule can place those facts. The report page lists
-the questions, with the element IDs an answer may name.
+element each one is, so no rule can place those facts.
+`GET /v1/jobs/{id}/questions` lists the questions, and the report page shows
+the same list. Each entry is `{key, principal, rows, options}`: `rows` is how
+many stated facts an answer would place, and `options` are the element IDs an
+answer may name. The most rows come first.
 
 Answer in the next submission of the same system, beside the sources:
 
