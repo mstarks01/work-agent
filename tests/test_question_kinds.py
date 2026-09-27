@@ -35,9 +35,9 @@ class TestTheTable:
         assert re.fullmatch(r"[a-z]+(-[a-z]+)*", name)
         assert QUESTION_KINDS[name].template.count("{element}") == 1
 
-    def test_nobody_has_reviewed_the_wording_and_the_table_says_so(self):
+    def test_the_maintainer_reviewed_every_row_and_the_table_says_so(self):
         """Provenance in a field the code reads, never in a sentence."""
-        assert {kind.reviewed_by for kind in QUESTION_KINDS.values()} == {None}
+        assert {kind.reviewed_by for kind in QUESTION_KINDS.values()} == {"mstarks01"}
 
     def test_the_provider_schema_lists_every_kind(self):
         schema = UnknownRef.model_json_schema()["properties"]["question"]
