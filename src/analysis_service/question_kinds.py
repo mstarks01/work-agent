@@ -81,8 +81,7 @@ QUESTION_KINDS: Mapping[str, QuestionKind] = MappingProxyType(
             reviewed_by=None,
         ),
         "code-execution": QuestionKind(
-            template="Can content that {element} takes run code with its"
-            " authority?",
+            template="Can content that {element} takes run code with its authority?",
             covers="loaders, build steps or parsers that execute supplied content",
             reviewed_by=None,
         ),
@@ -93,8 +92,7 @@ QUESTION_KINDS: Mapping[str, QuestionKind] = MappingProxyType(
             reviewed_by=None,
         ),
         "content-validation": QuestionKind(
-            template="Does {element} check the values it takes, beyond their"
-            " format?",
+            template="Does {element} check the values it takes, beyond their format?",
             covers="input validation, output encoding, query construction",
             reviewed_by=None,
         ),
@@ -121,8 +119,7 @@ QUESTION_KINDS: Mapping[str, QuestionKind] = MappingProxyType(
             reviewed_by=None,
         ),
         "data-exposure": QuestionKind(
-            template="Which data does {element} return or record, and who can"
-            " see it?",
+            template="Which data does {element} return or record, and who can see it?",
             covers="response fields, data in URLs or logs, classification",
             reviewed_by=None,
         ),
