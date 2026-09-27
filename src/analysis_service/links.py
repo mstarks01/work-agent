@@ -45,6 +45,7 @@ from analysis_service.assertions import (
     answer,
     settled,
 )
+from analysis_service.questions import FactAnswer, fact_rows
 from analysis_service.sources import Source, plain_name, text_digest
 from analysis_service.system_model import PLAIN_ID_RE, SystemModel
 
@@ -54,9 +55,10 @@ __all__ = [
     "NONE_OF_THESE",
     "LinkAnswer",
     "LinkQuestion",
-    "apply_links",
+    "apply_answers",
     "fold",
     "link_questions",
+    "merged_facts",
     "merged_links",
     "resumed_sources",
     "with_link_answers",
@@ -126,15 +128,28 @@ def _line(link: LinkAnswer) -> str:
     return f'"{link.principal}" is {target}.'
 
 
-def _composed(links: Sequence[LinkAnswer]) -> tuple[str, tuple[tuple[int, int], ...]]:
+def _fact_line(fact: FactAnswer) -> str:
+    element_id, attribute, assertion, subject = fact.key
+    if fact.kind == "attribute":
+        return f'The {attribute} of {element_id} is "{fact.value}".'
+    if fact.kind == "assertion":
+        return f'The open question {assertion} is answered "{fact.value}".'
+    return f'Asked "{subject}", the answer is "{fact.value}".'
+
+
+Spans = tuple[tuple[int, int], ...]
+
+
+def _composed(
+    links: Sequence[LinkAnswer], facts: Sequence[FactAnswer] = ()
+) -> tuple[str, Spans, Spans]:
     """The answers Source's text, and where each answer's line sits in it."""
-    spans, lines, at = [], [], 0
-    for link in links:
-        line = _line(link)
+    lines = [*map(_line, links), *map(_fact_line, facts)]
+    spans, at = [], 0
+    for line in lines:
         spans.append((at, at + len(line)))
-        lines.append(line)
         at += len(line) + 1
-    return "\n".join(lines), tuple(spans)
+    return "\n".join(lines), tuple(spans[: len(links)]), tuple(spans[len(links) :])
 
 
 def _refuse_repeats(links: Sequence[LinkAnswer]) -> None:
@@ -147,6 +162,23 @@ def _refuse_repeats(links: Sequence[LinkAnswer]) -> None:
     repeated = sorted({key for key in principals if principals.count(key) > 1})
     if repeated:
         raise ValueError(f"links answers one principal twice: {', '.join(repeated)}")
+
+
+def _refuse_repeated_facts(facts: Sequence[FactAnswer]) -> None:
+    """Refuse two answers to one open fact in one submission, as for links."""
+    keys = [fact.key for fact in facts]
+    if len(set(keys)) != len(keys):
+        raise ValueError("facts answers one open fact twice")
+
+
+def merged_facts(
+    earlier: Sequence[FactAnswer], later: Sequence[FactAnswer]
+) -> list[FactAnswer]:
+    """A resumed job's fact answers: the parent's, with the new ones over them."""
+    _refuse_repeated_facts(later)
+    merged = {fact.key: fact for fact in earlier}
+    merged.update({fact.key: fact for fact in later})
+    return list(merged.values())
 
 
 def merged_links(
@@ -164,7 +196,9 @@ def merged_links(
 
 
 def with_link_answers(
-    sources: Sequence[Source], links: Sequence[LinkAnswer]
+    sources: Sequence[Source],
+    links: Sequence[LinkAnswer],
+    facts: Sequence[FactAnswer] = (),
 ) -> list[Source]:
     """A job's sources, with its link answers composed into one more.
 
@@ -178,10 +212,11 @@ def with_link_answers(
             "an answers source is composed by this service from 'links';"
             " submit the answers there"
         )
-    if not links:
+    if not links and not facts:
         return list(sources)
     _refuse_repeats(links)
-    text, _ = _composed(links)
+    _refuse_repeated_facts(facts)
+    text, _, _ = _composed(links, facts)
     return [*sources, Source(kind="answers", label=ANSWERS_LABEL, text=text)]
 
 
@@ -189,7 +224,9 @@ def resumed_sources(
     parent_sources: Sequence[Source],
     parent_links: Sequence[LinkAnswer],
     links: Sequence[LinkAnswer],
-) -> tuple[list[Source], list[LinkAnswer]]:
+    parent_facts: Sequence[FactAnswer] = (),
+    facts: Sequence[FactAnswer] = (),
+) -> tuple[list[Source], list[LinkAnswer], list[FactAnswer]]:
     """A resumed job's sources and answers, from its parent's and the new ones.
 
     **The one reader of "what does a resumed job carry".** The HTTP route and
@@ -199,8 +236,9 @@ def resumed_sources(
     set.
     """
     merged = merged_links(parent_links, links)
+    answered = merged_facts(parent_facts, facts)
     kept = [source for source in parent_sources if source.kind != "answers"]
-    return with_link_answers(kept, merged), merged
+    return with_link_answers(kept, merged, answered), merged, answered
 
 
 @dataclass(frozen=True)
@@ -267,12 +305,44 @@ def link_questions(
     )
 
 
-def apply_links(
+def apply_answers(
     catalog: AssertionCatalog,
     model: SystemModel,
     links: Sequence[LinkAnswer],
+    facts: Sequence[FactAnswer] = (),
 ) -> tuple[AssertionCatalog, list[CatalogIssue]]:
-    """The catalog with each answer written as a stated ``represented-by`` row.
+    """The catalog with every answer written in: links, then answered open rows.
+
+    A fact answer about an attribute is written onto the model instead, by
+    :func:`~analysis_service.questions.answered_model`, and one about a subject
+    has no row; both still quote their lines of the answers Source.
+    """
+    text, link_spans, fact_spans = _composed(links, facts)
+    digest = text_digest(text)
+    linked, issues = _link_rows(catalog, model, links, text, digest, link_spans)
+    spans = [
+        SupportSpan(
+            source_label=ANSWERS_LABEL,
+            digest=digest,
+            start=start,
+            end=end,
+            quote=text[start:end],
+        )
+        for start, end in fact_spans
+    ]
+    answered, unmatched = fact_rows(linked, facts, spans)
+    return answered, [*issues, *unmatched]
+
+
+def _link_rows(
+    catalog: AssertionCatalog,
+    model: SystemModel,
+    links: Sequence[LinkAnswer],
+    text: str,
+    digest: str,
+    spans: Spans,
+) -> tuple[AssertionCatalog, list[CatalogIssue]]:
+    """The catalog with each link answer written as a stated ``represented-by`` row.
 
     An answer reaches every principal subject whose name folds to its own, and
     replaces any ``represented-by`` row already on it. An answer that reaches no
@@ -281,8 +351,6 @@ def apply_links(
     """
     if not links:
         return catalog, []
-    text, spans = _composed(links)
-    digest = text_digest(text)
     held = set(_components(model))
     subjects = list(catalog.subjects)
     known = {subject.id for subject in subjects}

@@ -792,7 +792,10 @@ def question_rows(checkpoint: Checkpoint) -> list[dict[str, object]]:
                 for option in question.options
             ],
         }
-        for question in link_questions(checkpoint.assertions.catalog, model)
+        for question in link_questions(
+            None if checkpoint.assertions is None else checkpoint.assertions.catalog,
+            model,
+        )
     ]
 
 

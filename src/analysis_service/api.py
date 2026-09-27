@@ -49,7 +49,7 @@ from analysis_service.auth import (
     build_verifier,
 )
 from analysis_service.budgets import BudgetPolicy
-from analysis_service.claims import FrameworkName
+from analysis_service.claims import FrameworkAnalysis, FrameworkName
 from analysis_service.deployment import Deployment
 from analysis_service.errors import ConfigError
 from analysis_service.frameworks import PACKAGES
@@ -75,7 +75,13 @@ from analysis_service.links import (
 )
 from analysis_service.parsing import ascii_int
 from analysis_service.pipeline import entry_of
-from analysis_service.report import FrameworkSelection
+from analysis_service.questions import (
+    MAX_FACT_ANSWERS,
+    FactAnswer,
+    check_fact_answers,
+    fact_questions,
+)
+from analysis_service.report import FrameworkSelection, Report
 from analysis_service.selection import SelectionError, resolve_selection
 from analysis_service.sources import Source, SourceLimits, clean_system_name
 from analysis_service.system_model import SystemModel
@@ -328,13 +334,16 @@ class JobSubmission(BaseModel):
 class AnswersSubmission(BaseModel):
     """Answers to a job's questions, sent against that job.
 
-    Empty is legal only for a job waiting on answers, where it means "continue
-    without answers"; against a finished report it answers nothing.
+    ``links`` answers which element a principal is, and ``facts`` answers the
+    open facts a report's conditional findings rest on. Both empty is legal
+    only for a job waiting on answers, where it means "continue without
+    answers"; against a finished report it answers nothing.
     """
 
     model_config = ConfigDict(extra="forbid")
 
     links: list[LinkAnswer] = Field(default_factory=list, max_length=MAX_LINK_ANSWERS)
+    facts: list[FactAnswer] = Field(default_factory=list, max_length=MAX_FACT_ANSWERS)
 
 
 class NodeCompletion(BaseModel):
@@ -444,12 +453,15 @@ async def _admit_and_start(
 
 async def _answerable(
     request: Request, job_id: str, subject: str
-) -> tuple[JobRecord, SystemModel, AssertionRecord | None] | JSONResponse:
-    """The model and catalog this caller may ask or answer about, or the refusal.
+) -> (
+    tuple[JobRecord, SystemModel, AssertionRecord | None, list[FrameworkAnalysis]]
+    | JSONResponse
+):
+    """The model, catalog and findings this caller may ask or answer about.
 
     **The one reader of "what does this job ask about".** A job waiting on
-    answers holds its checkpoint; a finished job reads its report through the
-    rule that serves it. Any other job asks nothing yet.
+    answers holds its checkpoint and has no findings yet; a finished job reads
+    its report through the rule that serves it. Any other job asks nothing yet.
     """
     record = await _owned_job(request, job_id, subject)
     if record.status == "awaiting-answers":
@@ -457,16 +469,13 @@ async def _answerable(
             logger.error("waiting job %s holds no checkpoint", record.id)
             raise HTTPException(status_code=500, detail="an internal error occurred")
         held = record.checkpoint
-        return record, held.system_model, held.assertions
+        return record, held.system_model, held.assertions, []
     served = await _servable_report(request, job_id, subject)
     if isinstance(served, JSONResponse):
         return served
-    assertions = served.get("assertions")
-    return (
-        record,
-        SystemModel.model_validate(served["system_model"]),
-        None if assertions is None else AssertionRecord.model_validate(assertions),
-    )
+    report = Report.model_validate(served)
+    assertions = report.assertions
+    return record, report.system_model, assertions, list(report.analyses)
 
 
 async def _servable_report(
@@ -853,7 +862,7 @@ def create_app(
         is admitted as a new job, against the ceiling and the token budget,
         because its lanes and critics spend model calls.
         """
-        if not request.app.state.carries_catalog:
+        if answers.links and not request.app.state.carries_catalog:
             raise HTTPException(
                 status_code=400,
                 detail="this deployment builds no assertion catalog, so nothing"
@@ -862,22 +871,25 @@ def create_app(
         answerable = await _answerable(request, job_id, subject)
         if isinstance(answerable, JSONResponse):
             return answerable
-        parent, model, assertions = answerable
-        if assertions is None:
+        parent, model, assertions, _ = answerable
+        if answers.links and assertions is None:
             raise HTTPException(
                 status_code=409,
                 detail="this report carries no assertion catalog, so it asked"
                 " no link question",
             )
-        if not answers.links and parent.status != "awaiting-answers":
+        if not (answers.links or answers.facts) and parent.status != "awaiting-answers":
             raise HTTPException(
                 status_code=400,
                 detail="no answers were sent; only a job waiting on answers can"
                 " continue without them",
             )
         try:
-            sources, links = resumed_sources(
-                parent.sources, parent.links, answers.links
+            check_fact_answers(
+                answers.facts, model, None if assertions is None else assertions.catalog
+            )
+            sources, links, facts = resumed_sources(
+                parent.sources, parent.links, answers.links, parent.facts, answers.facts
             )
         except ValueError as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
@@ -892,6 +904,7 @@ def create_app(
             frameworks=parent.frameworks,
             system_name=parent.system_name,
             links=links,
+            facts=facts,
             resumption=Resumption(
                 parent_id=parent.id,
                 checkpoint=Checkpoint(system_model=model, assertions=assertions),
@@ -931,14 +944,15 @@ def create_app(
         answerable = await _answerable(request, job_id, subject)
         if isinstance(answerable, JSONResponse):
             return answerable
-        _, model, assertions = answerable
-        questions = link_questions(
-            None if assertions is None else assertions.catalog, model
-        )
+        _, model, assertions, analyses = answerable
+        catalog = None if assertions is None else assertions.catalog
+        questions = link_questions(catalog, model)
+        facts = fact_questions(analyses, model, catalog)
         return JSONResponse(
             {
                 "job_id": job_id,
                 "link_questions": [question.to_json() for question in questions],
+                "fact_questions": [fact.to_json() for fact in facts],
             }
         )
 

@@ -683,6 +683,7 @@ class TestWhatTheGateRefuses:
             "support-truncated",
             "unmatched-link",
             "unknown-link-element",
+            "unmatched-answer",
         }
 
     @pytest.mark.parametrize(
