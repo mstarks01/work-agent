@@ -684,8 +684,9 @@
   R.analyses.forEach(renderBlock);
 
   // Link questions: one per principal the report cannot place. An answer names
-  // one element by its ID, or "none", and rides in the next submission's
-  // `links`; code writes it as the link, so no model reads it.
+  // one element by its ID, or "none", and goes to /answer/{run}, which starts
+  // a run from this report's model and catalog; code writes the link, so no
+  // model reads it.
   if (LINK_QUESTIONS.length) {
     const names = {};
     [...R.system_model.external_entities, ...R.system_model.processes,
@@ -694,23 +695,51 @@
     box.append(el("h2", null, "Which element is each of these?"));
     box.append(el("div", "meta",
       "The sources state facts about these principals but never say which element " +
-      "of the model each one is, so no rule can place the facts. Answer in the " +
-      "next submission's `links` field with an element ID, or \"none\"."));
-    LINK_QUESTIONS.forEach(q => {
-      const item = el("details", "openfact");
-      const head = el("summary");
-      head.append(el("b", null, q.principal),
-        ` \u2014 an answer places ${q.rows} stated fact(s)`);
-      item.append(head);
-      const list = el("ul");
+      "of the model each one is, so no rule can place the facts. Choose below, " +
+      "then run the analysis again from what was already read."));
+    // One select per question. "" leaves it unanswered; "none" says the
+    // principal is no element. Every label is untrusted and lands as text.
+    const selects = LINK_QUESTIONS.map(q => {
+      const row = el("p");
+      const select = el("select");
+      select.dataset.principal = q.principal;
+      select.append(Object.assign(el("option", null, "(leave unanswered)"), { value: "" }));
       q.options.forEach(id => {
-        const li = el("li");
-        li.append(code(id), ` ${names[id] || ""}`);
-        list.append(li);
+        const label = names[id] ? `${names[id]} (${id})` : id;
+        select.append(Object.assign(el("option", null, label), { value: id }));
       });
-      item.append(list);
-      box.append(item);
+      select.append(Object.assign(el("option", null, "None of these"), { value: "none" }));
+      row.append(el("b", null, q.principal),
+        ` \u2014 an answer places ${q.rows} stated fact(s) `, select);
+      box.append(row);
+      return select;
     });
+    const again = el("button", null, "Run the analysis again with these answers");
+    const note = el("div", "meta");
+    again.addEventListener("click", async () => {
+      const links = selects
+        .filter(s => s.value)
+        .map(s => ({ principal: s.dataset.principal, element: s.value }));
+      again.disabled = true;
+      // The run id is this page's own path: /report/{run}.
+      const run = location.pathname.split("/").pop();
+      const resumed = await fetch("/answer/" + encodeURIComponent(run), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ links }),
+      });
+      const body = await resumed.json();
+      if (!resumed.ok) {
+        note.textContent = body.message;
+        again.disabled = false;
+        return;
+      }
+      // The form page follows a run's progress; this page shows one report.
+      location.href = "/?follow=" + encodeURIComponent(body.run);
+    });
+    const actions = el("p");
+    actions.append(again);
+    box.append(actions, note);
   }
 
   // system model table. Each entry returns the cell's children rather than a

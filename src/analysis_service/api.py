@@ -53,7 +53,7 @@ from analysis_service.claims import FrameworkName
 from analysis_service.deployment import Deployment
 from analysis_service.errors import ConfigError
 from analysis_service.frameworks import PACKAGES
-from analysis_service.graph import ENTRY_EXTRACT, ENTRY_HEAD_ONLY, ENTRY_RESUME, Entry
+from analysis_service.graph import ENTRY_EXTRACT
 from analysis_service.jobs import (
     TERMINAL_STATUSES,
     Admission,
@@ -70,10 +70,11 @@ from analysis_service.links import (
     MAX_LINK_ANSWERS,
     LinkAnswer,
     link_questions,
-    merged_links,
+    resumed_sources,
     with_link_answers,
 )
 from analysis_service.parsing import ascii_int
+from analysis_service.pipeline import entry_of
 from analysis_service.report import FrameworkSelection
 from analysis_service.selection import SelectionError, resolve_selection
 from analysis_service.sources import Source, SourceLimits, clean_system_name
@@ -393,7 +394,7 @@ async def _admit_and_start(
     # The runner is looked up before the reservation. A graph is built on
     # first use per selection, and a build that raised after the reservation
     # would leave a slot held that no task ever releases.
-    runner = request.app.state.runner_for(record.selection(), _entry_of(record))
+    runner = request.app.state.runner_for(record.selection(), entry_of(record))
     budget = request.app.state.budget
     admission = await store.reserve(record, ceiling=ceiling, budget=budget)
     if admission.outcome in _REFUSALS:
@@ -466,13 +467,6 @@ async def _answerable(
         SystemModel.model_validate(served["system_model"]),
         None if assertions is None else AssertionRecord.model_validate(assertions),
     )
-
-
-def _entry_of(record: JobRecord) -> Entry:
-    """Where a job's run starts: its sources, a paused head, or a checkpoint."""
-    if record.resumption is not None:
-        return ENTRY_RESUME
-    return ENTRY_HEAD_ONLY if record.pauses() else ENTRY_EXTRACT
 
 
 async def _servable_report(
@@ -882,10 +876,8 @@ def create_app(
                 " continue without them",
             )
         try:
-            links = merged_links(parent.links, answers.links)
-            sources = with_link_answers(
-                [source for source in parent.sources if source.kind != "answers"],
-                links,
+            sources, links = resumed_sources(
+                parent.sources, parent.links, answers.links
             )
         except ValueError as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
