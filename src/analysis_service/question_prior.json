@@ -1,0 +1,54 @@
+{
+  "asvs": {
+    "runs": [],
+    "revision": null,
+    "cases": 0,
+    "rates": {}
+  },
+  "stride": {
+    "runs": [
+      "evals/baselines/6bff717-gpt-5.6-terra-24dda4db/mstarks01-e32ad9c5.json",
+      "evals/runs/20260927T-critic-question-kinds/a",
+      "evals/runs/20260927T-critic-question-kinds/b"
+    ],
+    "revision": "8e7b8c035b38e3d4221de14f0851c77d2836ecba",
+    "cases": 13,
+    "rates": {
+      "DataFlow": {
+        "audit-evidence": 0.0225,
+        "authentication": 0.8371,
+        "authorization-scope": 0.0393,
+        "data-exposure": 0.0112,
+        "encryption_in_transit": 0.5,
+        "protocol": 0.0449,
+        "reachability": 0.0843,
+        "security-configuration": 0.0056
+      },
+      "DataStore": {
+        "audit-evidence": 0.1618,
+        "authorization-scope": 0.3824,
+        "capacity-limits": 0.2059,
+        "encryption_at_rest": 0.8382,
+        "physical-access": 0.0147,
+        "reachability": 0.3235,
+        "stored-copy-access": 0.7647,
+        "stored-copy-integrity": 0.1471
+      },
+      "ExternalEntity": {
+        "trust_zone": 0.1207
+      },
+      "Process": {
+        "audit-evidence": 0.3333,
+        "authorization-scope": 0.3636,
+        "capacity-limits": 0.5152,
+        "code-execution": 0.0152,
+        "content-validation": 0.0606,
+        "data-exposure": 0.0152,
+        "provenance": 0.0606,
+        "reachability": 0.0758,
+        "trust_zone": 0.1364,
+        "update-process": 0.0152
+      }
+    }
+  }
+}

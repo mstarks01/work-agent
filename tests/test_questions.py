@@ -124,9 +124,9 @@ class TestTheCriticCannotReorderTheEvidence:
 class TestTheAnswerForms:
     def question_for(self, key):
         """A one-finding report is overkill here; the forms read the key alone."""
-        from analysis_service.questions import _choices
+        from analysis_service.questions import answer_choices
 
-        return _choices(key, valid_model(), None)
+        return answer_choices(key, valid_model(), None)
 
     def test_a_closed_attribute_offers_its_values_but_unknown(self):
         process = valid_model().processes[0].id

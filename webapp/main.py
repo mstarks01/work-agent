@@ -133,6 +133,7 @@ from analysis_service import (
     Source,
 )
 from analysis_service.deployment import Deployment
+from analysis_service.early_questions import early_questions
 from analysis_service.frameworks import package_for
 from analysis_service.jobs import Checkpoint, PipelineAwaiting, PipelineOutcome
 from analysis_service.links import (
@@ -795,7 +796,14 @@ async def _drive(
             await _emit(
                 run,
                 "questions",
-                {"run": run.id, "questions": question_rows(outcome.checkpoint)},
+                {
+                    "run": run.id,
+                    "questions": question_rows(outcome.checkpoint),
+                    "facts": early_rows(
+                        outcome.checkpoint,
+                        () if run.engine is None else run.engine.frameworks,
+                    ),
+                },
             )
         else:
             await _emit(
@@ -833,6 +841,31 @@ def question_rows(checkpoint: Checkpoint) -> list[dict[str, object]]:
         for question in link_questions(
             None if checkpoint.assertions is None else checkpoint.assertions.catalog,
             model,
+        )
+    ]
+
+
+def early_rows(
+    checkpoint: Checkpoint, frameworks: Sequence[FrameworkName]
+) -> list[dict[str, object]]:
+    """A paused run's open facts, ranked before any finding, with choice names.
+
+    Every string is untrusted and lands on the page as text.
+    """
+    model = checkpoint.system_model
+    names = {element.id: element.name for element in model.elements()}
+    return [
+        {
+            **question.to_json(),
+            "choices": [
+                {"id": choice, "name": names.get(choice, "")}
+                for choice in question.choices
+            ],
+        }
+        for question in early_questions(
+            model,
+            frameworks,
+            None if checkpoint.assertions is None else checkpoint.assertions.catalog,
         )
     ]
 

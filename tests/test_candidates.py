@@ -479,9 +479,11 @@ class TestCandidatesAreNotFindings:
 
         The importers of this module are the seam that renders the prompt
         (``graph``), the fan-in that regenerates the same candidates for the
-        coverage account (``fan_in``), and the accounting itself
-        (``coverage``). Neither the critic nor the report can see one, so no
-        code path exists that turns a fired rule into a threat.
+        coverage account (``fan_in``), the accounting itself (``coverage``),
+        and the ranking of the questions a paused job asks
+        (``early_questions``), which orders questions and writes no finding.
+        Neither the critic nor the report can see one, so no code path exists
+        that turns a fired rule into a threat.
         """
         from pathlib import Path
 
@@ -491,7 +493,12 @@ class TestCandidatesAreNotFindings:
             for path in package.glob("*.py")
             if "from analysis_service.candidates import" in path.read_text()
         }
-        assert importers == {"coverage.py", "fan_in.py", "graph.py"}
+        assert importers == {
+            "coverage.py",
+            "early_questions.py",
+            "fan_in.py",
+            "graph.py",
+        }
 
 
 class TestTheRuleThatReadsTheCatalog:
