@@ -56,6 +56,7 @@ from analysis_service.jobs import (
 )
 from analysis_service.links import LinkAnswer, resumed_sources, with_link_answers
 from analysis_service.pipeline import entry_of
+from analysis_service.questions import FactAnswer, check_fact_answers
 from analysis_service.report import FrameworkSelection
 from analysis_service.selection import SelectionError, resolve_selection
 from analysis_service.sources import Source, SourceLimits, clean_system_name
@@ -246,9 +247,11 @@ class Engine:
         self,
         sources: Sequence[Source],
         checkpoint: Checkpoint,
-        links: Sequence[LinkAnswer],
+        links: Sequence[LinkAnswer] = (),
         *,
+        facts: Sequence[FactAnswer] = (),
         earlier_links: Sequence[LinkAnswer] = (),
+        earlier_facts: Sequence[FactAnswer] = (),
         system_name: str | None = None,
         caller: str = DEFAULT_CALLER,
         on_node: NodeCallback | None = None,
@@ -256,18 +259,26 @@ class Engine:
         """Continue an earlier run from its checkpoint, with the submitter's answers.
 
         ``checkpoint`` is what a paused run held, or what a finished report's
-        model and catalog are. ``sources`` and ``earlier_links`` are what that
-        run was given; ``links`` are the new answers, which go over the earlier
-        ones. The run starts at ``prepare``, so no extraction and no assertion
-        pass runs again (#1252).
+        model and catalog are. ``sources``, ``earlier_links`` and
+        ``earlier_facts`` are what that run was given; ``links`` and ``facts``
+        are the new answers, which go over the earlier ones. The run starts at
+        ``prepare``, so no extraction and no assertion pass runs again (#1252).
+        A link answer needs the checkpoint's catalog; a fact answer about an
+        attribute or a subject needs none.
         """
-        if not self._carries_catalog:
+        if links and (not self._carries_catalog or checkpoint.assertions is None):
             raise EngineInputError(
-                "this deployment builds no assertion catalog, so nothing would"
-                " read a link answer"
+                "this run built no assertion catalog, so nothing would read a"
+                " link answer"
             )
+        catalog = (
+            None if checkpoint.assertions is None else checkpoint.assertions.catalog
+        )
         try:
-            carried, merged = resumed_sources(sources, earlier_links, links)
+            check_fact_answers(facts, checkpoint.system_model, catalog)
+            carried, merged, answered = resumed_sources(
+                sources, earlier_links, links, earlier_facts, facts
+            )
         except ValueError as exc:
             raise EngineInputError(str(exc)) from exc
         breach = self._limits.breach(carried)
@@ -279,6 +290,7 @@ class Engine:
             frameworks=self._frameworks,
             system_name=_engine_system_name(system_name),
             links=merged,
+            facts=answered,
             resumption=Resumption(parent_id="in-process", checkpoint=checkpoint),
         )
         return await self._run(job, on_node)

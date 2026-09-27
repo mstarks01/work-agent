@@ -57,8 +57,12 @@ class OpenFact:
         }
 
 
-def _names(model: SystemModel) -> Mapping[str, str]:
-    """Each element's display name; a flow reads as its two endpoints."""
+def element_names(model: SystemModel) -> Mapping[str, str]:
+    """Each element's display name; a flow reads as its two endpoints.
+
+    Read by :mod:`analysis_service.questions` too, so a question and its open
+    fact name an element alike.
+    """
     names = {element.id: element.name for element in model.elements()}
     for flow in model.data_flows:
         source = names.get(flow.source, flow.source)
@@ -67,7 +71,8 @@ def _names(model: SystemModel) -> Mapping[str, str]:
     return names
 
 
-def _label(ref: UnknownRef, names: Mapping[str, str]) -> str:
+def label_of(ref: UnknownRef, names: Mapping[str, str]) -> str:
+    """What a reader sees for one open fact: an element and attribute, or the subject."""
     if ref.assertion:
         return ref.assertion
     if ref.names_an_element:
@@ -78,7 +83,7 @@ def _label(ref: UnknownRef, names: Mapping[str, str]) -> str:
 
 def open_facts(block: FrameworkAnalysis, model: SystemModel) -> tuple[OpenFact, ...]:
     """Every open fact this block's needs-info findings rest on, best first."""
-    names = _names(model)
+    names = element_names(model)
     needs: dict[str, set[UnknownKey]] = {}
     labels: dict[UnknownKey, str] = {}
     for claim in block.claims:
@@ -87,7 +92,7 @@ def open_facts(block: FrameworkAnalysis, model: SystemModel) -> tuple[OpenFact, 
         refs = claim.verdict.related_unknowns
         needs[claim.id] = {ref.key for ref in refs}
         for ref in refs:
-            labels.setdefault(ref.key, _label(ref, names))
+            labels.setdefault(ref.key, label_of(ref, names))
     cited: dict[UnknownKey, list[str]] = defaultdict(list)
     for claim_id, keys in needs.items():
         for key in keys:

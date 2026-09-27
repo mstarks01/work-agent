@@ -193,7 +193,7 @@ from analysis_service.knowledge import (
     compose_notes,
     select_per_lane,
 )
-from analysis_service.links import LinkAnswer, apply_links
+from analysis_service.links import LinkAnswer, apply_answers
 from analysis_service.markdown_loader import MarkdownLoader, estimate_tokens
 from analysis_service.model_tiers import ReviewIndependence, TierName
 from analysis_service.patch import PatchBatch, apply_patch
@@ -210,6 +210,7 @@ from analysis_service.prompts import (
     compose_rows_prompt,
     lane_closing,
 )
+from analysis_service.questions import FactAnswer
 from analysis_service.report import (
     AnalysisContext,
     ExecutionEnvelope,
@@ -565,6 +566,12 @@ ENTRY_PREPARE: Entry = "prepare"
 seeded in state, so a recall miss cannot be blamed on an element ``extract``
 never produced."""
 
+#: How ``prepare`` reads the assertion catalog: not at all, always (a pass ran
+#: ahead of it and must have left one), or only where one was seeded (a resumed
+#: job, whose parent may have built none).
+SEEDED: Literal["seeded"] = "seeded"
+CatalogRead = bool | Literal["seeded"]
+
 ENTRY_RESUME: Entry = "resume"
 """A job resumed from a finished one (#1252): start at ``prepare`` over the
 parent's **Valid System Model** and assertion catalog, both seeded in state,
@@ -825,6 +832,10 @@ STATE_FRAMEWORK_OPTIONS = "framework_options"
 # record holds them. Job data like the options, seeded per run by the driver;
 # ``prepare`` writes each as a stated ``represented-by`` row before the gate.
 STATE_LINK_ANSWERS = "link_answers"
+# The submitter's answers to a report's open facts, seeded the same way. An
+# attribute answer is already written onto the seeded model; ``prepare``
+# writes the assertion answers over the open rows they answer.
+STATE_FACT_ANSWERS = "fact_answers"
 
 #: The job-wide state keys ``analyze.md`` templates, which every lane of every
 #: framework reads as one value. With :data:`LANE_ARTIFACTS` and ``{lane}`` they
@@ -921,6 +932,7 @@ SHARED_STRUCTURED_KEYS: frozenset[str] = frozenset(
         STATE_REJECTION,
         STATE_FRAMEWORK_OPTIONS,
         STATE_LINK_ANSWERS,
+        STATE_FACT_ANSWERS,
         STATE_REPAIR_BASELINE,
         STATE_MODEL_REPAIR,
     }
@@ -1577,7 +1589,7 @@ def prepare_analysis(
     frameworks: Sequence[FrameworkName],
     domain_loader: MarkdownLoader,
     package_loaders: Mapping[FrameworkName, MarkdownLoader],
-    assertions: bool = False,
+    assertions: CatalogRead = False,
 ) -> Event:
     """Run each framework's precondition, then derive what its lane agents read.
 
@@ -1646,7 +1658,12 @@ def prepare_analysis(
     """
     model = SystemModel.model_validate(valid_model)
     state = keys.state(ctx)
-    record = _resolve_assertions(state, model) if assertions else None
+    record = (
+        _resolve_assertions(state, model)
+        if assertions is True
+        or (assertions == SEEDED and state.get(STATE_ASSERTION_CATALOG) is not None)
+        else None
+    )
     held = None if record is None else record.catalog
     if held is not None:
         # ADR 0034's migration, applied where the catalog answers. The model
@@ -1832,10 +1849,13 @@ def _resolve_assertions(state: SessionState, model: SystemModel) -> AssertionRec
     links = [
         LinkAnswer.model_validate(link) for link in state.get(STATE_LINK_ANSWERS) or []
     ]
-    if links:
-        # The submitter's answers settle the principal's link, so they are
-        # written over whatever the node proposed and gated with the rest.
-        linked, unplaced = apply_links(record.catalog, model, links)
+    facts = [
+        FactAnswer.model_validate(fact) for fact in state.get(STATE_FACT_ANSWERS) or []
+    ]
+    if links or facts:
+        # The submitter's answers settle what they answer, so they are written
+        # over whatever the node proposed and gated with the rest.
+        linked, unplaced = apply_answers(record.catalog, model, links, facts)
         record = AssertionRecord.over(
             linked,
             model,
@@ -1861,7 +1881,7 @@ def prepare_node(
     frameworks: Sequence[FrameworkName],
     domain_loader: MarkdownLoader,
     package_loaders: Mapping[FrameworkName, MarkdownLoader],
-    assertions: bool = False,
+    assertions: CatalogRead = False,
 ) -> FunctionNode:
     """The ``prepare`` node, with this deployment's Markdown roots bound to it.
 
@@ -3470,14 +3490,15 @@ def build_pipeline(
             framework: package_loaders[framework].load(DISCLAIMER_DOC).strip()
             for framework in frameworks
         }
-        # A resumed job carries no assertion pass, and its ``prepare`` still
-        # reads a catalog: the one its parent built, seeded in state.
+        # A resumed job carries no assertion pass, and its ``prepare`` reads
+        # the catalog its parent built where one was seeded, and none where the
+        # parent built none.
         tail: Any = prepare_node(
             keys,
             frameworks,
             domain_loader,
             package_loaders,
-            assertions or entry == ENTRY_RESUME,
+            SEEDED if entry == ENTRY_RESUME else assertions,
         )
         assemble = _node(
             _assemble_node_func(keys, frameworks, disclaimers), ASSEMBLE_NODE

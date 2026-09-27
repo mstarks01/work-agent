@@ -783,6 +783,8 @@ CatalogIssueCode = Literal[
     # placed nothing; see :mod:`analysis_service.links`.
     "unmatched-link",
     "unknown-link-element",
+    # A submitter's answer to an open row this catalog does not hold.
+    "unmatched-answer",
 ]
 
 
@@ -801,6 +803,7 @@ GATE_REFUSALS: frozenset[str] = frozenset(get_args(CatalogIssueCode)) - {
     "support-truncated",
     "unmatched-link",
     "unknown-link-element",
+    "unmatched-answer",
 }
 
 #: The refusals of a whole catalog rather than of a row in it: a catalog keyed

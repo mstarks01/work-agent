@@ -40,7 +40,7 @@ logged, never returned.
 | `GET` | `/v1/jobs/{id}/events` | The same progression as Server-Sent Events; resumable via `Last-Event-ID`. |
 | `GET` | `/v1/jobs/{id}/report` | The full [report](Report-Schema.md) once completed; `409` before, and `409` if the report is withheld (below). |
 | `POST` | `/v1/jobs/{id}/answers` | Answer the questions of a completed job or a job in `awaiting-answers`. Starts a **new** job that resumes from this one's model and catalog; `201` with its `job_id`. |
-| `GET` | `/v1/jobs/{id}/questions` | What the job asks you, as `{"job_id", "link_questions"}`: a finished report's questions, or a waiting job's. Derived from the report when you ask, under the report's own rules: `409` before completion and `409` when the report is withheld. |
+| `GET` | `/v1/jobs/{id}/questions` | What the job asks you, as `{"job_id", "link_questions", "fact_questions"}`: a finished report's questions, or a waiting job's (link questions only). Derived from the report when you ask, under the report's own rules: `409` before completion and `409` when the report is withheld. |
 | `GET` | `/healthz` | Unauthenticated liveness probe. |
 
 Errors are RFC 9457 `application/problem+json`.
@@ -160,6 +160,43 @@ no assertion catalog refuses `"questions": true`.
 **Limit:** a waiting job is held in the service's memory. A restart of the
 service loses it, with its extraction; submit it again.
 
+### Answering the report's open facts
+
+Most findings are conditional: they rest on facts the sources never state,
+such as how a flow is protected. `fact_questions` lists every such fact the
+report's findings cite, most useful first:
+
+```json
+{"key": ["flow:entity:customer>process:web-app>login", "encryption_in_transit", "", ""],
+ "kind": "attribute", "label": "Customer → Web App: encryption in transit",
+ "cited_by": 4, "settled_so_far": 3, "choices": []}
+```
+
+- `key` names the fact. Send it back unchanged with your answer.
+- `kind` is `attribute` (a value the model left unknown), `assertion` (a fact
+  about a principal, a credential or a component that the sources left open),
+  or `subject` (a question with no place in the model, such as whether queries
+  are parameterized).
+- `settled_so_far` is how many conditional findings are settled once you have
+  answered this question and every question above it. Answer from the top, as
+  far as you like; the list is not capped.
+- `choices` lists the values the fact takes. Empty means free text, one line,
+  at most 1,000 characters.
+
+Answer with `facts` beside or instead of `links`:
+
+```json
+{"facts": [{"key": ["flow:entity:customer>process:web-app>login",
+                    "encryption_in_transit", "", ""], "value": "TLS 1.3"}]}
+```
+
+An attribute answer is written onto the model the new job analyses, and the
+element's notes say you gave it. An assertion answer replaces the open fact
+with a stated one. A subject answer reaches the analysis as your words in the
+answers source. Your answer settles the fact, even where the sources said
+otherwise. Fact answers need no assertion catalog, so every deployment takes
+them.
+
 **Answer against the finished job.** This is the usual way after a report:
 
 ```http
@@ -180,9 +217,9 @@ same principal. The finished job's report is unchanged.
 
 | Status | Cause |
 | --- | --- |
-| `400` | This deployment builds no assertion catalog, or two answers name the same principal. |
+| `400` | `links` is sent and this deployment builds no assertion catalog; two answers name the same principal or the same fact; or a fact answer names a fact the report does not hold, or a value the fact cannot take. |
 | `404` | The job is not yours, or does not exist. |
-| `400` | `links` is empty and the job is not waiting on answers. Empty means "continue without answers". |
+| `400` | `links` and `facts` are both empty and the job is not waiting on answers. Empty means "continue without answers". |
 | `409` | The job is neither completed nor waiting on answers, its report is withheld, or its report carries no catalog. |
 | `422` | `links` is missing or empty, or an entry is malformed. |
 

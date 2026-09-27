@@ -32,7 +32,7 @@ from analysis_service.links import (
     ANSWERS_LABEL,
     NONE_OF_THESE,
     LinkAnswer,
-    apply_links,
+    apply_answers,
     fold,
     link_questions,
     with_link_answers,
@@ -165,14 +165,14 @@ class TestTheQuestions:
 
     def test_an_answered_principal_is_not_asked_again(self, model):
         link = LinkAnswer(principal="customer accounts", element=NONE_OF_THESE)
-        linked, _ = apply_links(catalog(), model, [link])
+        linked, _ = apply_answers(catalog(), model, [link])
         assert link_questions(linked, model) == ()
 
 
 class TestTheRowAnAnswerWrites:
     def test_the_row_is_stated_and_passes_the_gate(self, model):
         link = LinkAnswer(principal="Customer accounts", element="entity:customer")
-        linked, issues = apply_links(catalog(), model, [link])
+        linked, issues = apply_answers(catalog(), model, [link])
         record = AssertionRecord.over(linked, model, answered([link]), proposed=1)
 
         assert issues == []
@@ -183,7 +183,7 @@ class TestTheRowAnAnswerWrites:
 
     def test_none_of_these_settles_the_link_as_absent(self, model):
         link = LinkAnswer(principal="customer accounts", element=NONE_OF_THESE)
-        linked, _ = apply_links(catalog(), model, [link])
+        linked, _ = apply_answers(catalog(), model, [link])
         record = AssertionRecord.over(linked, model, answered([link]), proposed=1)
 
         assert record.issues == []
@@ -204,7 +204,7 @@ class TestTheRowAnAnswerWrites:
                 support=[],
             ),
         )
-        linked, _ = apply_links(held, model, [link])
+        linked, _ = apply_answers(held, model, [link])
         values = [
             entry.value
             for entry in linked.entries
@@ -214,19 +214,19 @@ class TestTheRowAnAnswerWrites:
 
     def test_an_answer_no_principal_matches_says_so(self, model):
         link = LinkAnswer(principal="the payroll team", element="entity:customer")
-        linked, issues = apply_links(catalog(), model, [link])
+        linked, issues = apply_answers(catalog(), model, [link])
         assert [issue.code for issue in issues] == ["unmatched-link"]
         assert linked == catalog()
 
     def test_an_element_the_model_lacks_says_so(self, model):
         link = LinkAnswer(principal="customer accounts", element="process:nowhere")
-        _, issues = apply_links(catalog(), model, [link])
+        _, issues = apply_answers(catalog(), model, [link])
         assert [issue.code for issue in issues] == ["unknown-link-element"]
 
     def test_without_the_answers_source_the_row_is_refused(self, model):
         """The quote is checked like any other, so a missing Source fails closed."""
         link = LinkAnswer(principal="customer accounts", element="entity:customer")
-        linked, _ = apply_links(catalog(), model, [link])
+        linked, _ = apply_answers(catalog(), model, [link])
         record = AssertionRecord.over(
             linked, model, {DESCRIPTION.label: DESCRIPTION.text}, proposed=1
         )
@@ -250,7 +250,7 @@ class TestTheRuleTheLinkFeeds:
             ]
 
         link = LinkAnswer(principal="customer accounts", element="entity:customer")
-        linked, _ = apply_links(catalog(), model, [link])
+        linked, _ = apply_answers(catalog(), model, [link])
         assert fired(catalog()) == []
         assert fired(linked)
 
