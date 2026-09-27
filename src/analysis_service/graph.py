@@ -3808,6 +3808,28 @@ class GraphProducedNothing(RuntimeError):
 GraphResult = Analysis | Rejected
 
 
+def paused_at(
+    final_state: Mapping[str, Any],
+) -> tuple[SystemModel, AssertionRecord] | Rejected:
+    """What a head-only drive left: the valid model and its gated catalog.
+
+    The reader of a run that stops after its assertion pass, as
+    :func:`result_of` is the reader of one that analyses. A rejection is
+    returned as :func:`result_of` returns it, because the validity gate ran
+    first and refused.
+    """
+    rejection = final_state.get(STATE_REJECTION)
+    if rejection is not None:
+        return Rejected(issues=rejection_issues(rejection))
+    model = final_state.get(STATE_VALID_MODEL)
+    record = final_state.get(STATE_ASSERTION_CATALOG)
+    if model is None or record is None:
+        raise GraphProducedNothing(
+            "a head-only drive left neither a rejection nor a model and catalog"
+        )
+    return SystemModel.model_validate(model), AssertionRecord.model_validate(record)
+
+
 def result_of(final_state: Mapping[str, Any]) -> GraphResult:
     """What a finished drive left behind, as one of the graph's two outcomes.
 
