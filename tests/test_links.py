@@ -344,3 +344,55 @@ class TestTheEntryPoints:
                 system_name=None,
                 caller="me",
             )
+
+
+class TestTheQuestionsRoute:
+    """The API serves what the page shows, under the report's own rule."""
+
+    def completed(self, store, subject, assertions):
+        from analysis_service.jobs import JobRecord
+        from tests.factories import sample_report, sample_selection
+        from tests.test_api import admit
+
+        record = JobRecord.create(
+            owner_subject=subject,
+            sources=[DESCRIPTION],
+            frameworks=sample_selection(),
+        )
+        record.transition("running")
+        record.report = sample_report().model_copy(update={"assertions": assertions})
+        record.transition("completed")
+        asyncio.run(admit(store, record))
+        return record.id
+
+    def test_a_completed_report_serves_its_link_questions(self):
+        client, store = make_client()
+        job = self.completed(
+            store, "alice", AssertionRecord(proposed=1, catalog=catalog())
+        )
+        response = client.get(f"/v1/jobs/{job}/questions", headers=auth())
+        assert response.status_code == 200
+        (question,) = response.json()["link_questions"]
+        assert question["principal"] == "customer accounts"
+
+    def test_a_report_with_no_catalog_asks_nothing(self):
+        client, store = make_client()
+        job = self.completed(store, "alice", None)
+        response = client.get(f"/v1/jobs/{job}/questions", headers=auth())
+        assert response.json()["link_questions"] == []
+
+    def test_another_caller_s_job_is_not_found(self):
+        client, store = make_client()
+        job = self.completed(
+            store, "alice", AssertionRecord(proposed=1, catalog=catalog())
+        )
+        response = client.get(f"/v1/jobs/{job}/questions", headers=auth("bob-token"))
+        assert response.status_code == 404
+
+    def test_a_running_job_has_no_questions_yet(self):
+        from tests.test_api import seed
+
+        client, store = make_client()
+        record = seed(store, "alice", "running")
+        response = client.get(f"/v1/jobs/{record.id}/questions", headers=auth())
+        assert response.status_code == 409
