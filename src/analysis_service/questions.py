@@ -124,6 +124,10 @@ class FactQuestion:
     settled_so_far: int
     #: The answers it takes, or empty where the answer is free text.
     choices: tuple[str, ...]
+    #: Every finding that waits on it, as ``framework/claim``. A finding is
+    #: settled once every question that names it has an answer, whichever
+    #: questions those are.
+    findings: tuple[str, ...]
 
     def to_json(self) -> dict[str, object]:
         return {
@@ -134,6 +138,7 @@ class FactQuestion:
             "cited_by": self.cited_by,
             "settled_so_far": self.settled_so_far,
             "choices": list(self.choices),
+            "findings": list(self.findings),
         }
 
 
@@ -285,6 +290,13 @@ def fact_questions(
                         1 for facts in waiting.values() if facts <= answered
                     ),
                     choices=_choices(key, model, catalog),
+                    findings=tuple(
+                        sorted(
+                            f"{framework}/{claim}"
+                            for (framework, claim), facts in waiting.items()
+                            if key in facts
+                        )
+                    ),
                 )
             )
     return tuple(asked)
