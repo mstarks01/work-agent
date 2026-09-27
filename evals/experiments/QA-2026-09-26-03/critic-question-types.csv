@@ -1,0 +1,80 @@
+case,claim,type,question
+01,D-01,capacity,"What request-rate, concurrency, request-size, timeout, queueing, and load-shedding limits bound checkout and its downstream order, database, and receipt-processing work?"
+01,R-01,audit,Is there independently retained audit evidence that reliably binds an order-service request to its originating caller or shopper identity?
+01,T-04,copy-integrity,"Do database media, snapshots, backups, and restores have cryptographic integrity and provenance validation that prevents altered artifacts from being restored?"
+02,D-01,capacity,"Whether device-gateway, registry, and Pub/Sub capacity controls and per-device quotas prevent one credential holder from exhausting telemetry-ingestion capacity"
+02,D-02,capacity,"Whether firmware-bucket request limits, quota isolation, caching, and available capacity prevent anonymous request floods from denying legitimate node downloads"
+02,S-01,physical,Whether physical access to a deployed sensor node permits extraction of the fleet-wide pre-shared key
+02,T-01,physical,Whether physical access to a deployed sensor node permits extraction of the fleet-wide pre-shared key
+02,D-03,capacity,"Whether telemetry-ingestion quotas, Pub/Sub backpressure, BigQuery throughput limits, and budget controls prevent one node or credential holder from exhausting lake and dashboard capacity"
+03,I-08,authz,Whether data analysts are authorized to access member-identifying claim columns for their defined analysis duties.
+03,R-01,audit,"Whether immutable audit evidence records the authenticated principal, job-run identifier, source, timestamp, and write outcome for warehouse loads."
+03,D-01,capacity,"Whether per-partner upload, object-count, object-size, storage, scheduler-fan-out, and transform-concurrency limits are enforced for the landing pipeline."
+03,D-02,capacity,"Whether per-principal warehouse query budgets, concurrency limits, timeouts, workload isolation, and abuse throttling are enforced."
+03,E-01,authz,Whether the Spark transform authorizes only the scheduler workload identity to submit transform requests that can use warehouse write authority.
+03,T-02,copy-integrity,"Whether landing-bucket media, snapshots, restored objects, and ingestion inputs receive integrity or provenance verification that would detect offline modification."
+03,T-03,copy-integrity,"Whether Airflow metadata backups, restores, and connection configuration are integrity-verified before the scheduler uses them."
+03,T-04,authz,Whether warehouse write authorization restricts normalized-record writes to the Spark transform workload identity.
+04,D-01,capacity,"Whether rate limits, concurrency ceilings, request-size or complexity limits, GPU-time budgets, queue bounds, and load shedding bound admitted inference work."
+04,E-02,code-execution,Whether the artifact format or model-server loader can execute supplied model logic or custom operators with the model-server process identity.
+04,R-01,audit,"Whether artifact publication records retain the verified individual principal, artifact identity, timestamp, outcome, and integrity-protected history."
+04,S-03,reachability,Whether an attacker can reach the artifact publishing interface.
+05,D-01,capacity,"Whether queue admission, request and job-rate limits, message-size limits, retention, provider quotas, and producer backpressure bound job accumulation."
+05,E-01,reachability,Whether an internet attacker can compromise process:web-application through its public-facing interaction.
+05,R-01,audit,Whether the worker's database credential can amend or delete audit-log records and whether those records are protected by append-only or independent retained evidence.
+05,T-01,authz,Whether queue producer and consumer access controls authorize an attacker to write or overwrite job messages.
+05,T-02,authz,Whether an unauthenticated or weakly authenticated database client can obtain authority to alter application records.
+06,D-02,capacity,"Does the game-server tier bound pre-session and active gameplay connection, CPU, socket, and per-match resource consumption sufficiently to resist flooding?"
+06,E-01,authz,Does the game server authorize every gameplay action and reported state against the verified player's assigned match and permitted account scope?
+06,D-01,capacity,"Does the lobby enforce sufficient connection and matchmaking-request admission controls, rate limits, and capacity bounds to prevent abusive clients from exhausting it?"
+06,D-03,capacity,Can an attacker drive costly gameplay activity faster than the game server's admission and rate controls can constrain it?
+06,D-03,capacity,"Does the player database isolate caller workloads with capacity, connection, query, lock, storage, and budget limits sufficient to prevent one caller from starving the others?"
+06,R-01,audit,"Is there durable, tamper-evident evidence linking verified player identities, gameplay actions, and resulting match outcomes for the dispute period?"
+06,T-01,validation,"Does the game server independently enforce authoritative game-state, sequencing, and gameplay-action validity before recording outcomes?"
+06,R-02,audit,"Does the moderation system retain a durable, protected account-change record linking each change to a verified staff member and recording the relevant change details?"
+07,E-01,provenance,Does the build runner verify trusted signatures or provenance for dependency packages before accepting them?
+07,E-01,code-execution,Can resolved dependency content execute during the build or be incorporated into the released container image with the build runner's authority?
+07,R-01,audit,Does protected audit evidence record and retain the verified originating pipeline and initiating actor for each deploy-controller release change?
+07,T-01,provenance,Does the build runner verify trusted signatures or provenance for dependency packages before accepting them?
+07,T-02,authz,Do Git repository and protected-branch authorization rules prevent untrusted or over-broad callers from pushing or merging code that can trigger a build?
+07,T-03,authz,"Does the image registry authorize only the intended build identity to push, replace, or tag release images?"
+07,T-04,authz,"Does the shared build token authorize its holder to set any available image SHA as the current release, without provenance or release-policy enforcement?"
+07,D-01,capacity,"Are manual rebuild requests subject to per-identity rate and concurrency limits, bounded queues, and build-resource budgets?"
+07,D-02,capacity,"Are repository storage, object-count, branch-count, and per-developer push-rate quotas enforced on the Git server?"
+07,D-03,capacity,"Does the deploy controller enforce per-store polling-rate limits and bounded connection, worker, timeout, and load-shedding controls?"
+08,D-01,capacity,"What rate limiting, concurrency limits, queue bounds, overload shedding, timeouts, and dependency-isolation controls protect the identity broker from repeated sign-in requests?"
+08,I-04,copy-access,"Can an attacker obtain a disk, backup, snapshot, replica, or other storage-layer copy of the directory?"
+08,I-05,copy-access,"Can an attacker obtain a disk, backup, snapshot, replica, or other storage-layer copy of the key store?"
+08,R-02,audit,Does the store admin console create and retain immutable action-level audit records binding the verified actor to each price change or transaction void?
+08,R-01,audit,"Does the audit trail cover franchise assertions and retain immutable evidence binding the upstream issuer, asserted subject, validation result, timestamp, and outcome?"
+08,T-01,reachability,Can an attacker obtain reachability to the directory write interface?
+09,D-01,capacity,"What rate limiting, concurrency limits, queue bounds, capacity protections, and overload-shedding controls protect the Web API order path and its downstream dependencies?"
+09,E-01,authz,Does the Web API authorize and constrain SQL submitted by the catalogue spreadsheet so it cannot exercise customer-record access or other non-catalogue authority?
+09,R-01,audit,"Does the system retain protected order audit evidence binding a verified customer identity to the order action, target, time, and outcome?"
+09,T-02,authz,Does the Web API authorize and constrain SQL-command operations from the catalogue spreadsheet so callers cannot execute unauthorized commands?
+09,I-02,destination,"Can the fax destination number stored against an order be incorrect, stale, reassigned, or altered so that a confirmation reaches an unintended recipient?"
+09,R-02,audit,"Does the system retain protected catalogue-change history binding a specific marketing user to the changed values, time, and outcome?"
+10,D-01,capacity,"Whether public page requests have effective rate, concurrency, request-size, and work-cost limits before they can exhaust web-server or database capacity."
+10,D-02,capacity,"Whether direct MySQL clients are constrained by connection, query-cost, statement-timeout, idle-session, and storage-consumption limits."
+10,R-01,audit,"Whether direct database changes are recorded in independent immutable audit evidence containing verified actor identity, action, target, time, and outcome."
+10,S-02,reachability,Whether an attacker can reach the CDN bucket publishing interface.
+10,T-04,copy-integrity,"Whether MySQL volumes, backups, snapshots, and exported copies are protected against unauthorized modification."
+10,T-04,copy-integrity,Whether database restores verify the authenticity and integrity of restored data before accepting it.
+11,D-01,capacity,"Whether the web app and scheduling service enforce request-rate, concurrency, queue, and resource-capacity controls sufficient to resist flooding."
+11,E-01,authz,Whether the web app and scheduling service independently enforce verified caller role and permitted store scope for rota-management operations.
+11,R-01,audit,"Whether rota changes are retained in protected, immutable audit evidence that records the verified originating manager, action, values, time, and outcome."
+11,R-02,audit,"Whether signed or otherwise trustworthy retained collection evidence identifies the payroll system, export, time, and outcome."
+12,E-01,authz,Whether the landing bucket authorizes only the intended vendor producer to place extracts that the master service can import.
+12,T-01,authz,Whether the landing-bucket ingest path authorizes only the intended vendor writer.
+12,T-01,provenance,Whether the supplier master service verifies extract origin and integrity before loading records.
+12,D-01,capacity,"Whether the portal and document store enforce per-supplier upload size, parsing-cost, concurrency, request-rate, and retained-storage limits."
+12,D-02,capacity,"Whether the landing bucket enforces writer-specific object-size, object-count, request-rate, and retained-capacity limits."
+12,R-01,audit,"Whether the vendor retains durable audit evidence binding each approval or rejection to a verified individual, target, outcome, and time."
+12,R-02,audit,Whether signed delivery evidence or a durable receipt binds each extract and delivery time to the portal vendor.
+13,D-01,capacity,"Whether the dispatch API enforces WebSocket per-client and aggregate connection limits, timeouts, bounded resource allocation, and capacity isolation sufficient to prevent held connections from exhausting service capacity."
+13,E-01,authz,Whether the dispatch API independently enforces deny-by-default server-side role and per-object authorization for each crew-movement and depot-work request.
+13,E-02,authz,Whether the schedule importer constrains partner-supplied work orders to an explicitly authorized partner scope before using its API grant.
+13,E-02,authz,Whether the dispatch API independently authorizes the operations requested by imported work orders rather than trusting the importer's standing credential.
+13,T-03,reachability,Whether any attacker-accessible foothold can directly reach the dispatch database interface.
+13,D-02,capacity,"Whether the schedule importer enforces XML response-size, parser-depth, entity-expansion, processing-time, archive-retention, and storage-quota limits sufficient to resist hostile feed documents."
+13,R-01,audit,Whether protected token or session issuance and retention records map each recorded job-order session or token to an individual duty engineer for the full dispute period.
