@@ -122,15 +122,15 @@ def snap_rulings(
                     update={
                         "related_unknowns": _one_per_fact(
                             [
-                                # Only the model-reference spelling has an ID
-                                # to snap. A subject names no element, so
-                                # there is nothing to snap it to.
+                                # An attribute reference and a question kind
+                                # name an element, so each has an ID to snap.
+                                # A subject or an assertion names none.
                                 ref.model_copy(
                                     update={
                                         "element_id": snap(ref.element_id, element_ids)
                                     }
                                 )
-                                if ref.names_an_element
+                                if ref.element_id
                                 else ref
                                 for ref in ruling.verdict.related_unknowns
                             ]
