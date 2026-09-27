@@ -60,6 +60,12 @@ class TestTheSeam:
         ref = UnknownRef(element_id="store:nowhere", question="audit-evidence")
         assert self.issues(ref)
 
+    def test_a_kind_about_a_mistyped_element_is_snapped_and_passes(self):
+        ref = UnknownRef(element_id="store:Orders-DB", question="audit-evidence")
+        (ruling,) = snap_rulings(rulings_of(ref), {STORE})
+        assert ruling.verdict.related_unknowns[0].element_id == STORE
+        assert self.issues(ref) == []
+
     def test_a_kind_the_table_lacks_is_sent_back(self):
         ref = UnknownRef.model_construct(
             element_id=STORE, attribute="", subject="", assertion="", question="vibes"
