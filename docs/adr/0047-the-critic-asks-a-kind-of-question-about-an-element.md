@@ -1,6 +1,6 @@
 # 47. The critic asks a kind of question about an element
 
-- **Status**: accepted; the table's wording is not yet reviewed
+- **Status**: accepted
 - **Date**: 2026-09-27
 - **Effort**: [#1225](https://github.com/mstarks01/work-agent/issues/1225)
 - **Relates to**: [ADR 0046](0046-every-open-fact-is-asked-and-code-writes-the-answer.md),
@@ -37,8 +37,9 @@ counts how many of these facts were typed and how many fell back
 score` prints it. A low, steady share says the table is enough; the fallback
 texts name the kinds it lacks.
 
-**Nobody has reviewed the wording.** An agent drafted every row, and
-`reviewed_by` stays `None` on each until the maintainer reads it.
+**The maintainer reviewed the wording.** An agent drafted every row, and the
+maintainer accepted each one, which `reviewed_by` records. A new row carries
+`None` until the maintainer reads it.
 
 ## Consequences
 
