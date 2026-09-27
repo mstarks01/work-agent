@@ -40,7 +40,7 @@ logged, never returned.
 | `GET` | `/v1/jobs/{id}/events` | The same progression as Server-Sent Events; resumable via `Last-Event-ID`. |
 | `GET` | `/v1/jobs/{id}/report` | The full [report](Report-Schema.md) once completed; `409` before, and `409` if the report is withheld (below). |
 | `POST` | `/v1/jobs/{id}/answers` | Answer the questions of a completed job or a job in `awaiting-answers`. Starts a **new** job that resumes from this one's model and catalog; `201` with its `job_id`. |
-| `GET` | `/v1/jobs/{id}/questions` | What the job asks you, as `{"job_id", "link_questions", "fact_questions"}`: a finished report's questions, or a waiting job's (link questions only). Derived from the report when you ask, under the report's own rules: `409` before completion and `409` when the report is withheld. |
+| `GET` | `/v1/jobs/{id}/questions` | What the job asks you, as `{"job_id", "link_questions", "fact_questions", "fallback"}`: a finished report's questions, or a waiting job's (link questions only). Derived from the report when you ask, under the report's own rules: `409` before completion and `409` when the report is withheld. |
 | `GET` | `/healthz` | Unauthenticated liveness probe. |
 
 Errors are RFC 9457 `application/problem+json`.
@@ -176,13 +176,18 @@ report's findings cite, most useful first:
 - `key` names the fact. Send it back unchanged with your answer.
 - `kind` is `attribute` (a value the model left unknown), `assertion` (a fact
   about a principal, a credential or a component that the sources left open),
-  or `subject` (a question with no place in the model, such as whether queries
-  are parameterized).
+  `question` (one of a fixed list of questions about one element, such as
+  "What limits bound the requests the Web App accepts?"), or `subject` (a
+  question the reviewer wrote in its own words because no listed question
+  fitted).
 - `basis` is `evidence` where a finding's own evidence rests on the fact, and
   `critic` where only the reviewer's verdict names it. The `evidence` questions
   come first, and their order does not change when the analysis runs again on
   the same drafts. The `critic` questions follow, and they can change, because
   the reviewer's verdicts vary between runs.
+- `fallback` counts the reviewer's questions that used the fixed list
+  (`typed`) and those it had to write in its own words (`free_text`), and the
+  share that fell back (`rate`).
 - `settled_so_far` is how many findings are settled once you have
   answered this question and every question above it. Answer from the top, as
   far as you like; the list is not capped.

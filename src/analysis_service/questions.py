@@ -20,9 +20,11 @@ submitter answers from the top as far as they choose.
   the submitter answered it.
 * An **assertion** row the sources left open. The answer replaces the row with
   a stated one, quoting its line of the answers Source.
-* A **subject** with no place in the model, such as whether queries are
-  parameterized. Nothing structured can hold the answer, so it reaches the
-  lanes only as its line of the answers Source.
+* A **question** of one of the kinds in
+  :data:`~analysis_service.question_kinds.QUESTION_KINDS`, about one element,
+  or a free-text **subject** where no kind fits. Nothing structured can hold
+  either answer, so it reaches the lanes only as its line of the answers
+  Source.
 
 An answer to a question this service asked settles the fact, even against the
 sources (the maintainer's decision of 2026-09-25 on #1225).
@@ -50,6 +52,7 @@ from analysis_service.assertions import (
 )
 from analysis_service.claims import FrameworkAnalysis, UnknownKey, UnknownRef
 from analysis_service.open_facts import element_names, label_of
+from analysis_service.question_kinds import QUESTION_KINDS
 from analysis_service.sources import plain_name
 from analysis_service.system_model import SystemModel
 
@@ -57,17 +60,19 @@ __all__ = [
     "MAX_FACT_ANSWERS",
     "FactAnswer",
     "FactQuestion",
+    "Fallback",
     "answered_model",
     "check_fact_answers",
     "fact_questions",
     "fact_rows",
+    "question_fallback",
 ]
 
 #: How many fact answers one submission carries. The largest report measured
 #: raised 85 open facts, so this bounds the body above any real use.
 MAX_FACT_ANSWERS = 200
 
-FactKind = Literal["attribute", "assertion", "subject"]
+FactKind = Literal["attribute", "assertion", "question", "subject"]
 Basis = Literal["evidence", "critic"]
 #: One finding: its framework and its claim ID.
 Finding = tuple[str, str]
@@ -92,7 +97,9 @@ class FactAnswer(BaseModel):
 
 
 def _kind_of(key: UnknownKey) -> FactKind:
-    element_id, attribute, assertion, _ = key
+    element_id, attribute, assertion, _, question = key
+    if question:
+        return "question"
     if assertion:
         return "assertion"
     return "attribute" if element_id or attribute else "subject"
@@ -159,7 +166,7 @@ _ATTRIBUTE_CHOICES: Mapping[str, Callable[[SystemModel, str], tuple[str, ...]]] 
 
 
 def _choices(key: UnknownKey, model: SystemModel, catalog: AssertionCatalog | None):
-    element_id, attribute, assertion, _ = key
+    element_id, attribute, assertion, _, _ = key
     kind = _kind_of(key)
     if kind == "attribute":
         special = _ATTRIBUTE_CHOICES.get(attribute)
@@ -283,6 +290,42 @@ def fact_questions(
     return tuple(asked)
 
 
+@dataclass(frozen=True)
+class Fallback:
+    """How the critic named the open facts that have no place in the model.
+
+    ``typed`` names a kind from the question table and an element; ``free_text``
+    fell back to a ``subject``. The share that fell back is what says whether
+    the table is enough (``QA-2026-09-26-03-E8``): a low, steady share means it
+    is, and the fallback texts name the kinds it lacks.
+    """
+
+    typed: int
+    free_text: int
+
+    @property
+    def rate(self) -> float | None:
+        total = self.typed + self.free_text
+        return None if total == 0 else round(self.free_text / total, 3)
+
+    def to_json(self) -> dict[str, object]:
+        return {"typed": self.typed, "free_text": self.free_text, "rate": self.rate}
+
+
+def question_fallback(analyses: Sequence[FrameworkAnalysis]) -> Fallback:
+    """Count a report's typed and free-text open facts across its verdicts."""
+    refs = [
+        ref
+        for block in analyses
+        for claim in block.all_claims()
+        for ref in claim.verdict.related_unknowns
+    ]
+    return Fallback(
+        typed=sum(1 for ref in refs if ref.question),
+        free_text=sum(1 for ref in refs if ref.subject and not ref.question),
+    )
+
+
 def check_fact_answers(
     answers: Sequence[FactAnswer],
     model: SystemModel,
@@ -294,9 +337,12 @@ def check_fact_answers(
     the questions were asked about, so a wrong answer costs nothing.
     """
     for answer in answers:
-        element_id, attribute, assertion, subject = answer.key
+        element_id, attribute, assertion, subject, question = answer.key
         kind = answer.kind
-        if kind == "attribute":
+        if kind == "question":
+            if question not in QUESTION_KINDS or model.get(element_id) is None:
+                raise ValueError(f"no question {question!r} about {element_id!r}")
+        elif kind == "attribute":
             element = model.get(element_id)
             if element is None or attribute not in type(element).model_fields:
                 raise ValueError(f"no attribute {attribute!r} on {element_id!r}")
@@ -330,7 +376,7 @@ def answered_model(model: SystemModel, answers: Sequence[FactAnswer]) -> SystemM
     for answer in answers:
         if answer.kind != "attribute":
             continue
-        element_id, attribute, _, _ = answer.key
+        element_id, attribute, _, _, _ = answer.key
         element = by_id.get(element_id)
         if element is None:
             continue

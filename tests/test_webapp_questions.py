@@ -320,7 +320,7 @@ def test_the_form_script_follows_a_run_the_report_page_started():
 #: One answer to the valid model's first flow's transport protection.
 FACT = MappingProxyType(
     {
-        "key": (valid_model().data_flows[0].id, "encryption_in_transit", "", ""),
+        "key": (valid_model().data_flows[0].id, "encryption_in_transit", "", "", ""),
         "value": "TLS 1.3",
     }
 )
@@ -357,7 +357,7 @@ class TestFactAnswers:
         client = client_for(tiers, runner)
         finished = start(client, questions=False)
         client.get(f"/events/{finished}")
-        wrong = {"key": [FACT["key"][0], "exposure", "", ""], "value": "internal"}
+        wrong = {"key": [FACT["key"][0], "exposure", "", "", ""], "value": "internal"}
         response = client.post(
             f"/answer/{finished}",
             json={"links": [], "facts": [wrong]},
@@ -457,7 +457,7 @@ def test_the_report_page_sends_both_kinds_of_answer_and_follows_the_run():
                 "choices": [],
             },
             {
-                "key": ["", "", "", "whether queries are bound"],
+                "key": ["", "", "", "whether queries are bound", ""],
                 "kind": "subject",
                 "label": "whether queries are bound",
                 "cited_by": 1,

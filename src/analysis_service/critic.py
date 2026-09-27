@@ -60,6 +60,7 @@ from analysis_service.claims import (
 )
 from analysis_service.evidence import ground_gloss
 from analysis_service.frameworks import FrameworkSchemas, lane_of
+from analysis_service.question_kinds import QUESTION_KINDS
 from analysis_service.references import snap
 from analysis_service.system_model import (
     ModelIndex,
@@ -259,6 +260,23 @@ def _unresolved_unknown_ref_issues(
             # hold — the seam that does hold it is the one that built the
             # ground, and a reference it could not resolve never reached a
             # draft. Both are the whole reason the spellings exist.
+            if ref.question:
+                # A kind of question about an element: the kind is the
+                # table's, and the element is the model's, so both are checked
+                # and nothing else is.
+                if ref.question not in QUESTION_KINDS or ref.element_id not in by_id:
+                    issues.append(
+                        UnreconciledRuling.of(
+                            claim_id=ruling.id,
+                            kind="unresolved-unknown",
+                            message=f"claim {ruling.id!r} asks question"
+                            f" {ref.question!r} about {ref.element_id!r}; a"
+                            " question names a kind from the list and an"
+                            " element of this model, or the fact goes in"
+                            " `subject`",
+                        )
+                    )
+                continue
             if not ref.names_an_element:
                 if not (ref.subject.strip() or ref.assertion.strip()):
                     issues.append(

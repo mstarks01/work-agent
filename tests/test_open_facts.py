@@ -76,7 +76,7 @@ def test_a_flow_reads_as_its_two_endpoints(report):
     flows = {flow.id: flow for flow in report.system_model.data_flows}
     for block in report.analyses:
         for fact in open_facts(block, report.system_model):
-            element_id, attribute, _, _ = fact.key
+            element_id, attribute, _, _, _ = fact.key
             if element_id in flows:
                 flow = flows[element_id]
                 assert fact.label.startswith(
