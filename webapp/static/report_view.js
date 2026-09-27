@@ -724,7 +724,8 @@
       box.append(el("div", "meta",
         "Each question is a fact the conditional findings wait on, the most useful " +
         "first. Beside each is how many findings are settled once it and every " +
-        "question above it is answered. Answer as far down as you like."));
+        "question above it is answered. Answer as far down as you like; the line " +
+        "under the questions counts what your answers settle."));
       // The first few in full; the rest one click away rather than a wall.
       const SHOWN = 10;
       const more = el("details", "openfact");
@@ -733,6 +734,21 @@
       // evidence rests on, and they can change when the analysis runs again,
       // so they are headed apart.
       let criticHeaded = false;
+      // A finding is settled once every question that names it has an answer,
+      // in any order, so the count follows the answers given, not the rank.
+      const waitsOn = new Map();
+      FACT_QUESTIONS.forEach((q, index) => q.findings.forEach(finding => {
+        if (!waitsOn.has(finding)) waitsOn.set(finding, []);
+        waitsOn.get(finding).push(index);
+      }));
+      const tally = el("div", "meta");
+      function recount() {
+        const settled = [...waitsOn.values()]
+          .filter(asked => asked.every(index => factInputs[index].value.trim()))
+          .length;
+        tally.textContent =
+          `Your answers settle ${settled} of the ${waitsOn.size} findings that wait on a fact.`;
+      }
       FACT_QUESTIONS.forEach((q, index) => {
         const into = index < SHOWN ? box : more;
         if (q.basis === "critic" && !criticHeaded) {
@@ -753,6 +769,7 @@
           input.placeholder = "(leave unanswered)";
         }
         input.dataset.key = JSON.stringify(q.key);
+        input.addEventListener(q.choices.length ? "change" : "input", recount);
         row.append(el("b", null, q.label),
           ` \u2014 ${q.cited_by} finding(s) wait on it; answering down to here settles ${q.settled_so_far} `,
           input);
@@ -760,6 +777,8 @@
         factInputs.push(input);
       });
       if (FACT_QUESTIONS.length > SHOWN) box.append(more);
+      box.append(tally);
+      recount();
     }
 
     const again = el("button", null, "Run the analysis again with these answers");
