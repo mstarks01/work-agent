@@ -61,8 +61,10 @@ __all__ = [
     "FactAnswer",
     "FactQuestion",
     "Fallback",
+    "answer_choices",
     "answered_model",
     "check_fact_answers",
+    "fact_kind",
     "fact_questions",
     "fact_rows",
     "question_fallback",
@@ -93,10 +95,11 @@ class FactAnswer(BaseModel):
 
     @property
     def kind(self) -> FactKind:
-        return _kind_of(self.key)
+        return fact_kind(self.key)
 
 
-def _kind_of(key: UnknownKey) -> FactKind:
+def fact_kind(key: UnknownKey) -> FactKind:
+    """Which of the four kinds of fact this key names."""
     element_id, attribute, assertion, _, question = key
     if question:
         return "question"
@@ -170,9 +173,12 @@ _ATTRIBUTE_CHOICES: Mapping[str, Callable[[SystemModel, str], tuple[str, ...]]] 
 )
 
 
-def _choices(key: UnknownKey, model: SystemModel, catalog: AssertionCatalog | None):
+def answer_choices(
+    key: UnknownKey, model: SystemModel, catalog: AssertionCatalog | None
+) -> tuple[str, ...]:
+    """The values an answer to this fact may take, or empty for free text."""
     element_id, attribute, assertion, _, _ = key
-    kind = _kind_of(key)
+    kind = fact_kind(key)
     if kind == "attribute":
         special = _ATTRIBUTE_CHOICES.get(attribute)
         return (
@@ -282,14 +288,14 @@ def fact_questions(
             asked.append(
                 FactQuestion(
                     key=key,
-                    kind=_kind_of(key),
+                    kind=fact_kind(key),
                     basis=basis,
                     label=label_of(refs[key], names),
                     cited_by=cited_by,
                     settled_so_far=sum(
                         1 for facts in waiting.values() if facts <= answered
                     ),
-                    choices=_choices(key, model, catalog),
+                    choices=answer_choices(key, model, catalog),
                     findings=tuple(
                         sorted(
                             f"{framework}/{claim}"
@@ -363,7 +369,7 @@ def check_fact_answers(
                 raise ValueError(f"no open assertion row {assertion!r}")
         elif not subject:
             raise ValueError("an answer names an element, an assertion or a subject")
-        choices = _choices(answer.key, model, catalog)
+        choices = answer_choices(answer.key, model, catalog)
         if choices and answer.value not in choices:
             raise ValueError(
                 f"{answer.value!r} is not one of {', '.join(choices)} for"
