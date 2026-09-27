@@ -22,6 +22,7 @@ from analysis_service.jobs import (
     InMemoryJobStore,
     JobRecord,
     PipelineAwaiting,
+    Resumption,
     execute_job,
 )
 from analysis_service.pipeline import AdkPipelineRunner
@@ -38,14 +39,18 @@ from tests.test_links import catalog_client
 from tests.test_resume import LINK, PRINCIPAL, parent_catalog, recorded_entries
 
 
-def asking_job(**overrides) -> JobRecord:
-    fields = {
-        "owner_subject": "alice",
-        "sources": [Source.description(DESCRIPTION_TEXT)],
-        "frameworks": sample_selection(),
-        "ask_questions": True,
-    } | overrides
-    return JobRecord.create(**fields)
+def asking_job(
+    owner_subject: str = "alice",
+    ask_questions: bool = True,
+    resumption: Resumption | None = None,
+) -> JobRecord:
+    return JobRecord.create(
+        owner_subject=owner_subject,
+        sources=[Source.description(DESCRIPTION_TEXT)],
+        frameworks=sample_selection(),
+        ask_questions=ask_questions,
+        resumption=resumption,
+    )
 
 
 def held() -> Checkpoint:
@@ -111,8 +116,6 @@ class TestTheWait:
             record.transition("running")
 
     def test_a_resumed_job_never_pauses(self):
-        from analysis_service.jobs import Resumption
-
         resumed = asking_job(resumption=Resumption(parent_id="p", checkpoint=held()))
         assert asking_job().pauses()
         assert not resumed.pauses()
