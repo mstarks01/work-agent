@@ -42,6 +42,7 @@ from starlette._utils import get_route_path
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from analysis_service import budgets
+from analysis_service.assertions import AssertionCatalog
 from analysis_service.auth import (
     AuthenticationError,
     TokenVerifier,
@@ -62,11 +63,17 @@ from analysis_service.jobs import (
     build_store,
     execute_job,
 )
-from analysis_service.links import MAX_LINK_ANSWERS, LinkAnswer, with_link_answers
+from analysis_service.links import (
+    MAX_LINK_ANSWERS,
+    LinkAnswer,
+    link_questions,
+    with_link_answers,
+)
 from analysis_service.parsing import ascii_int
 from analysis_service.report import FrameworkSelection
 from analysis_service.selection import SelectionError, resolve_selection
 from analysis_service.sources import Source, SourceLimits, clean_system_name
+from analysis_service.system_model import SystemModel
 from analysis_service.validation import ValidationIssue
 
 logger = logging.getLogger(__name__)
@@ -347,6 +354,33 @@ def _resolve_selection(
         return resolve_selection(carried, requested)
     except SelectionError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from None
+
+
+async def _servable_report(
+    request: Request, job_id: str, subject: str
+) -> dict[str, Any] | JSONResponse:
+    """The report payload this caller may read, or the response that refuses it.
+
+    **The one reader of "may this report be served".** The report route and
+    every route derived from the report ask it, so a report the gate withholds
+    cannot reach a caller through a view of it.
+    """
+    record = await _owned_job(request, job_id, subject)
+    if record.status != "completed":
+        raise HTTPException(
+            status_code=409,
+            detail=f"job status is {record.status!r};"
+            " the report exists only once the job is completed",
+        )
+    withheld = _withheld_report(request, record)
+    if withheld is not None:
+        return withheld
+    store: JobStore = request.app.state.store
+    payload = await store.report_json(job_id, subject)
+    if payload is None:
+        logger.error("completed job %s has no report attached", record.id)
+        raise HTTPException(status_code=500, detail="an internal error occurred")
+    return payload
 
 
 def _withheld_report(request: Request, record: JobRecord) -> JSONResponse | None:
@@ -752,22 +786,32 @@ def create_app(
     async def get_report(
         job_id: str, request: Request, subject: str = Depends(require_subject)
     ) -> JSONResponse:
-        record = await _owned_job(request, job_id, subject)
-        if record.status != "completed":
-            raise HTTPException(
-                status_code=409,
-                detail=f"job status is {record.status!r};"
-                " the report exists only once the job is completed",
-            )
-        withheld = _withheld_report(request, record)
-        if withheld is not None:
-            return withheld
-        store: JobStore = request.app.state.store
-        payload = await store.report_json(job_id, subject)
-        if payload is None:
-            logger.error("completed job %s has no report attached", record.id)
-            raise HTTPException(status_code=500, detail="an internal error occurred")
-        return JSONResponse(payload)
+        served = await _servable_report(request, job_id, subject)
+        return served if isinstance(served, JSONResponse) else JSONResponse(served)
+
+    @app.get("/v1/jobs/{job_id}/questions")
+    async def get_questions(
+        job_id: str, request: Request, subject: str = Depends(require_subject)
+    ) -> JSONResponse:
+        """What the finished report asks the submitter, derived at read time.
+
+        Served under the report's own rule, because the questions are read off
+        the report: a report that is withheld withholds its questions too.
+        """
+        served = await _servable_report(request, job_id, subject)
+        if isinstance(served, JSONResponse):
+            return served
+        held = served.get("assertions")
+        questions = link_questions(
+            None if held is None else AssertionCatalog.model_validate(held["catalog"]),
+            SystemModel.model_validate(served["system_model"]),
+        )
+        return JSONResponse(
+            {
+                "job_id": job_id,
+                "link_questions": [question.to_json() for question in questions],
+            }
+        )
 
     @app.get("/v1/jobs/{job_id}/events")
     async def stream_events(
