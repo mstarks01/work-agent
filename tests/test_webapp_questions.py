@@ -1,0 +1,310 @@
+"""The first-run app asks link questions and resumes a run with the answers (#1252).
+
+Offline, with a runner that pauses a job that asks and completes every other.
+The flow under test is the whole one a person walks: tick the toggle, get the
+questions on the form page, answer them, and reach a report; or answer the
+questions a finished report asks and run it again.
+"""
+
+from __future__ import annotations
+
+import json
+import re
+import shutil
+import subprocess
+
+import pytest
+from fastapi.testclient import TestClient
+
+from analysis_service import Engine, StubPipelineRunner
+from analysis_service.assertions import AssertionRecord
+from analysis_service.jobs import Checkpoint, PipelineAwaiting, PipelineCompleted
+from tests import test_webapp
+from tests.factories import valid_model
+from tests.test_resume import parent_catalog
+from tests.test_webapp import (
+    CARRIED,
+    LOOPBACK,
+    PROJECT_ROOT,
+    SAME_ORIGIN,
+    TEST_DEADLINE,
+    WEBAPP_LIMITS,
+    posted,
+)
+from webapp.main import Startup, create_app
+
+#: The shipped tier config, as the webapp tests build it: one fixture, used here.
+tiers = test_webapp.tiers
+
+HELD = Checkpoint(
+    system_model=valid_model(),
+    assertions=AssertionRecord(proposed=1, catalog=parent_catalog()),
+)
+
+
+class PausingRunner(StubPipelineRunner):
+    """Pauses a job that asks; completes every other, with a catalog on its report."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.resumed_links: list = []
+
+    async def run(self, job, on_node):
+        if job.pauses():
+            return PipelineAwaiting(checkpoint=HELD)
+        if job.resumption is not None:
+            self.resumed_links.append(list(job.links))
+        outcome = await super().run(job, on_node)
+        assert isinstance(outcome, PipelineCompleted)
+        report = outcome.report.model_copy(
+            update={"assertions": HELD.assertions, "system_model": HELD.system_model}
+        )
+        return PipelineCompleted(report=report)
+
+
+@pytest.fixture
+def runner():
+    return PausingRunner()
+
+
+def client_for(tiers, runner, asks=True):
+    def engine_for(selection):
+        return Engine(
+            runner,
+            limits=WEBAPP_LIMITS,
+            deadline_seconds=TEST_DEADLINE,
+            frameworks=selection,
+            carries_catalog=asks,
+        )
+
+    startup = Startup(
+        engine_for=engine_for, frameworks=CARRIED, tiers=tiers, error=None, asks=asks
+    )
+    return TestClient(create_app(startup), base_url=LOOPBACK)
+
+
+def start(client, questions: bool) -> str:
+    started = client.post(
+        "/analyze",
+        json=posted("A web app talks to a database.") | {"questions": questions},
+        headers=SAME_ORIGIN,
+    )
+    assert started.status_code == 200, started.text
+    return started.json()["run"]
+
+
+def event(stream: str, name: str) -> dict:
+    match = re.search(rf"event: {name}\ndata: (.*)\n", stream)
+    assert match, stream
+    return json.loads(match.group(1))
+
+
+def answer(client, run_id: str, *links) -> dict:
+    response = client.post(
+        f"/answer/{run_id}", json={"links": list(links)}, headers=SAME_ORIGIN
+    )
+    return response
+
+
+LINK = {"principal": "customer accounts", "element": "entity:customer"}
+
+
+class TestTheToggle:
+    def test_the_form_offers_it_where_the_install_can_ask(self, tiers, runner):
+        assert 'id="ask"' in client_for(tiers, runner).get("/").text
+        assert 'id="ask"' not in client_for(tiers, runner, asks=False).get("/").text
+
+    def test_it_is_refused_where_the_install_cannot_ask(self, tiers, runner):
+        client = client_for(tiers, runner, asks=False)
+        response = client.post(
+            "/analyze",
+            json=posted("A web app talks to a database.") | {"questions": True},
+            headers=SAME_ORIGIN,
+        )
+        assert response.status_code == 400
+
+
+class TestTheWholeFlow:
+    def test_a_paused_run_asks_and_its_answers_reach_a_report(self, tiers, runner):
+        client = client_for(tiers, runner)
+        paused = start(client, questions=True)
+        asked = event(client.get(f"/events/{paused}").text, "questions")
+
+        (question,) = asked["questions"]
+        assert question["principal"] == "customer accounts"
+        assert {"id": "entity:customer", "name": "Customer"} in question["options"]
+
+        resumed = answer(client, paused, LINK)
+        assert resumed.status_code == 200, resumed.text
+        done = event(client.get(f"/events/{resumed.json()['run']}").text, "done")
+        assert client.get(done["url"]).status_code == 200
+        assert [link.element for link in runner.resumed_links[0]] == ["entity:customer"]
+
+    def test_no_answers_continues_a_paused_run(self, tiers, runner):
+        client = client_for(tiers, runner)
+        paused = start(client, questions=True)
+        client.get(f"/events/{paused}")
+        resumed = answer(client, paused)
+        assert resumed.status_code == 200
+        assert "event: done" in client.get(f"/events/{resumed.json()['run']}").text
+
+    def test_without_the_toggle_the_run_never_pauses(self, tiers, runner):
+        client = client_for(tiers, runner)
+        run = start(client, questions=False)
+        assert "event: done" in client.get(f"/events/{run}").text
+
+    def test_a_finished_report_s_questions_run_it_again(self, tiers, runner):
+        client = client_for(tiers, runner)
+        finished = start(client, questions=False)
+        client.get(f"/events/{finished}")
+        resumed = answer(client, finished, LINK)
+        assert resumed.status_code == 200
+        assert "event: done" in client.get(f"/events/{resumed.json()['run']}").text
+
+
+class TestTheAnswerEndpoint:
+    def test_it_requires_the_app_s_own_page(self, tiers, runner):
+        client = client_for(tiers, runner)
+        paused = start(client, questions=True)
+        client.get(f"/events/{paused}")
+        response = client.post(f"/answer/{paused}", json={"links": [LINK]})
+        assert response.status_code == 403
+
+    def test_an_unknown_run_is_not_found(self, tiers, runner):
+        assert answer(client_for(tiers, runner), "nope", LINK).status_code == 404
+
+    def test_no_answers_to_a_finished_run_is_refused(self, tiers, runner):
+        client = client_for(tiers, runner)
+        finished = start(client, questions=False)
+        client.get(f"/events/{finished}")
+        assert answer(client, finished).status_code == 400
+
+    def test_two_answers_about_one_principal_are_refused(self, tiers, runner):
+        client = client_for(tiers, runner)
+        paused = start(client, questions=True)
+        client.get(f"/events/{paused}")
+        twice = {"principal": "Customer Accounts", "element": "none"}
+        response = answer(client, paused, LINK, twice)
+        assert response.status_code == 400
+        assert "twice" in response.json()["message"]
+
+    def test_a_malformed_answer_is_refused(self, tiers, runner):
+        client = client_for(tiers, runner)
+        paused = start(client, questions=True)
+        client.get(f"/events/{paused}")
+        bad = {"principal": "customer accounts", "element": "flow:x>y>z"}
+        assert answer(client, paused, bad).status_code == 400
+
+
+def test_the_report_page_may_reach_its_own_origin_and_nothing_else(tiers, runner):
+    """It posts answers to ``/answer/{run}``, so it needs ``connect-src 'self'``."""
+    client = client_for(tiers, runner)
+    finished = start(client, questions=False)
+    done = event(client.get(f"/events/{finished}").text, "done")
+    policy = client.get(done["url"]).headers["content-security-policy"]
+    assert "connect-src 'self'" in policy
+    assert "frame-ancestors 'none'" in policy
+
+
+# A stand-in DOM, fetch, EventSource and location: enough to run the real
+# form-page script through the question flow under ``node``. No browser is
+# needed, so the flow a person walks is checked on every run of the suite.
+_FORM_HARNESS = r"""
+const calls = [], streams = [];
+class Node {
+  constructor(tag) { this.tag = tag; this.children = []; this.dataset = {};
+    this.hidden = false; this.value = ""; this.textContent = ""; this.listeners = {}; }
+  append(...kids) { for (const k of kids) this.children.push(k); }
+  replaceChildren(...kids) { this.children = [...kids]; }
+  addEventListener(name, fn) { this.listeners[name] = fn; }
+  querySelectorAll(sel) {
+    const out = [];
+    const walk = (n) => { for (const c of n.children || []) {
+      if (typeof c === "object") { if (c.tag === sel) out.push(c); walk(c); } } };
+    walk(this); return out;
+  }
+  closest() { return new Node("div"); }
+  querySelector() { return new Node("div"); }
+}
+const ids = {};
+for (const id of ["analyze","description","ticks","problem","go","load","ask",
+                  "asked","questions","continue"]) ids[id] = new Node(id);
+ids.ask.checked = true;
+globalThis.document = {
+  getElementById: (id) => ids[id] || null,
+  createElement: (tag) => new Node(tag),
+  querySelectorAll: () => [],
+};
+globalThis.location = { href: "", search: SEARCH };
+globalThis.fetch = async (url, init) => {
+  calls.push({ url, body: init && init.body ? JSON.parse(init.body) : null });
+  const next = url === "/analyze" ? "r1" : "r2";
+  return { ok: true, json: async () => ({ run: next }) };
+};
+globalThis.EventSource = class { constructor(url) { this.url = url;
+  this.listeners = {}; streams.push(this); }
+  addEventListener(name, fn) { this.listeners[name] = fn; } close() {} };
+const settle = () => new Promise((r) => setTimeout(r, 0));
+"""
+
+
+def _run_form_script(steps: str, search: str = "") -> dict:
+    node = shutil.which("node")
+    if node is None:
+        pytest.skip("no node on PATH to run the form page's script")
+    script = (PROJECT_ROOT / "webapp" / "static" / "first_run.js").read_text()
+    program = (
+        _FORM_HARNESS.replace("SEARCH", json.dumps(search))
+        + script
+        + "\n(async () => {\n"
+        + steps
+        + "\nconsole.log(JSON.stringify({calls, streams: streams.map(s => s.url),"
+        " href: location.href, asked: !ids.asked.hidden}));\n})();"
+    )
+    done = subprocess.run(
+        [node, "-e", program], capture_output=True, text=True, timeout=30, check=False
+    )
+    assert done.returncode == 0, done.stderr
+    return json.loads(done.stdout.strip().splitlines()[-1])
+
+
+def test_the_form_script_asks_answers_and_follows_to_the_report():
+    steps = """
+await ids.analyze.listeners.submit({ preventDefault() {} }); await settle();
+streams[0].listeners.questions({ data: JSON.stringify({ run: "r1", questions: [
+  { principal: "shopper accounts", rows: 2,
+    options: [{ id: "entity:shopper", name: "Shopper" }] }] }) });
+const select = ids.questions.querySelectorAll("select")[0];
+select.value = "entity:shopper";
+await ids.continue.listeners.click(); await settle();
+streams[1].listeners.done({ data: JSON.stringify({ url: "/report/r2" }) });
+"""
+    seen = _run_form_script(steps)
+
+    assert seen["calls"][0]["url"] == "/analyze"
+    assert seen["calls"][0]["body"]["questions"] is True
+    assert seen["calls"][1] == {
+        "url": "/answer/r1",
+        "body": {
+            "links": [{"principal": "shopper accounts", "element": "entity:shopper"}]
+        },
+    }
+    assert seen["streams"] == ["/events/r1", "/events/r2"]
+    assert seen["href"] == "/report/r2"
+    assert seen["asked"] is False
+
+
+def test_an_unanswered_question_is_left_out_of_the_answers():
+    steps = """
+await ids.analyze.listeners.submit({ preventDefault() {} }); await settle();
+streams[0].listeners.questions({ data: JSON.stringify({ run: "r1", questions: [
+  { principal: "ml engineers", rows: 1, options: [] }] }) });
+await ids.continue.listeners.click(); await settle();
+"""
+    seen = _run_form_script(steps)
+    assert seen["calls"][1]["body"] == {"links": []}
+
+
+def test_the_form_script_follows_a_run_the_report_page_started():
+    seen = _run_form_script("await settle();", search="?follow=r9")
+    assert seen["streams"] == ["/events/r9"]

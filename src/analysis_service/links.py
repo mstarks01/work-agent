@@ -58,6 +58,7 @@ __all__ = [
     "fold",
     "link_questions",
     "merged_links",
+    "resumed_sources",
     "with_link_answers",
 ]
 
@@ -182,6 +183,24 @@ def with_link_answers(
     _refuse_repeats(links)
     text, _ = _composed(links)
     return [*sources, Source(kind="answers", label=ANSWERS_LABEL, text=text)]
+
+
+def resumed_sources(
+    parent_sources: Sequence[Source],
+    parent_links: Sequence[LinkAnswer],
+    links: Sequence[LinkAnswer],
+) -> tuple[list[Source], list[LinkAnswer]]:
+    """A resumed job's sources and answers, from its parent's and the new ones.
+
+    **The one reader of "what does a resumed job carry".** The HTTP route and
+    the in-process engine both resume, and each would otherwise drop the
+    parent's answers Source and compose a new one its own way. The new answers
+    go over the parent's, and the answers Source is composed from the merged
+    set.
+    """
+    merged = merged_links(parent_links, links)
+    kept = [source for source in parent_sources if source.kind != "answers"]
+    return with_link_answers(kept, merged), merged
 
 
 @dataclass(frozen=True)

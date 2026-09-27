@@ -38,19 +38,24 @@ from __future__ import annotations
 import asyncio
 import logging
 import time
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
+from functools import partial
 from typing import Self
 
 from analysis_service.claims import FrameworkName
 from analysis_service.deployment import Deployment
 from analysis_service.frameworks import PACKAGES
+from analysis_service.graph import Entry
 from analysis_service.jobs import (
+    Checkpoint,
     JobRecord,
     NodeCallback,
     PipelineOutcome,
     PipelineRunner,
+    Resumption,
 )
-from analysis_service.links import with_link_answers
+from analysis_service.links import LinkAnswer, resumed_sources, with_link_answers
+from analysis_service.pipeline import entry_of
 from analysis_service.report import FrameworkSelection
 from analysis_service.selection import SelectionError, resolve_selection
 from analysis_service.sources import Source, SourceLimits, clean_system_name
@@ -102,6 +107,8 @@ class Engine:
         limits: SourceLimits,
         deadline_seconds: float,
         frameworks: Sequence[FrameworkSelection],
+        runner_for: Callable[[Entry], PipelineRunner] | None = None,
+        carries_catalog: bool = False,
     ) -> None:
         # The same rule the HTTP route and the web app apply, read through the
         # one reader all three share. The constructor holds no deployment, so
@@ -115,7 +122,15 @@ class Engine:
             self._frameworks = resolve_selection(list(PACKAGES), frameworks)
         except SelectionError as exc:
             raise EngineInputError(str(exc)) from exc
-        self._runner = runner
+        # The graph a job runs depends on where it starts: its sources, a
+        # pause after the assertion pass, or a checkpoint it resumes from. An
+        # engine built on a deployment asks it for each; one built on a single
+        # runner (a test stand-in) runs that runner for every entry.
+        self._runner_for = runner_for or (lambda entry: runner)
+        # Whether a job here builds an assertion catalog, which is the only
+        # reader of a question or an answer. False unless the deployment says
+        # so, so an engine that cannot know refuses both.
+        self._carries_catalog = carries_catalog
         self._limits = limits
         self._deadline_seconds = deadline_seconds
 
@@ -158,11 +173,14 @@ class Engine:
             else FrameworkSelection(name=entry)
             for entry in frameworks
         ]
+        names = [selection.name for selection in selections]
         return cls(
-            deployment.runner([selection.name for selection in selections]),
+            deployment.runner(names),
             limits=deployment.resilience.source_limits(),
             deadline_seconds=deployment.job_deadline_seconds(),
             frameworks=selections,
+            runner_for=partial(deployment.runner, names),
+            carries_catalog=deployment.carries_catalog,
         )
 
     async def analyze(
@@ -172,6 +190,7 @@ class Engine:
         system_name: str | None = None,
         caller: str = DEFAULT_CALLER,
         on_node: NodeCallback | None = None,
+        ask_questions: bool = False,
     ) -> PipelineOutcome:
         """Drive one submission to a terminal state.
 
@@ -211,11 +230,68 @@ class Engine:
             else:
                 issues = outcome.issues
         """
-        job = self._build_job(sources, system_name=system_name, caller=caller)
+        if ask_questions and not self._carries_catalog:
+            raise EngineInputError(
+                "this deployment builds no assertion catalog, so it asks no question"
+            )
+        job = self._build_job(
+            sources,
+            system_name=system_name,
+            caller=caller,
+            ask_questions=ask_questions,
+        )
+        return await self._run(job, on_node)
+
+    async def resume(
+        self,
+        sources: Sequence[Source],
+        checkpoint: Checkpoint,
+        links: Sequence[LinkAnswer],
+        *,
+        earlier_links: Sequence[LinkAnswer] = (),
+        system_name: str | None = None,
+        caller: str = DEFAULT_CALLER,
+        on_node: NodeCallback | None = None,
+    ) -> PipelineOutcome:
+        """Continue an earlier run from its checkpoint, with the submitter's answers.
+
+        ``checkpoint`` is what a paused run held, or what a finished report's
+        model and catalog are. ``sources`` and ``earlier_links`` are what that
+        run was given; ``links`` are the new answers, which go over the earlier
+        ones. The run starts at ``prepare``, so no extraction and no assertion
+        pass runs again (#1252).
+        """
+        if not self._carries_catalog:
+            raise EngineInputError(
+                "this deployment builds no assertion catalog, so nothing would"
+                " read a link answer"
+            )
+        try:
+            carried, merged = resumed_sources(sources, earlier_links, links)
+        except ValueError as exc:
+            raise EngineInputError(str(exc)) from exc
+        breach = self._limits.breach(carried)
+        if breach is not None:
+            raise EngineInputError(breach.message)
+        job = JobRecord.create(
+            owner_subject=caller,
+            sources=carried,
+            frameworks=self._frameworks,
+            system_name=_engine_system_name(system_name),
+            links=merged,
+            resumption=Resumption(parent_id="in-process", checkpoint=checkpoint),
+        )
+        return await self._run(job, on_node)
+
+    async def _run(
+        self, job: JobRecord, on_node: NodeCallback | None
+    ) -> PipelineOutcome:
+        """One job on the runner its entry selects, bounded by the job deadline."""
+        runner = self._runner_for(entry_of(job))
         started = time.monotonic()
         try:
             async with asyncio.timeout(self._deadline_seconds) as bound:
-                return await self._runner.run(job, on_node or _ignore_node)
+                return await runner.run(job, on_node or _ignore_node)
         except TimeoutError as exc:
             # Only *this* bound expiring is a deadline. A TimeoutError raised
             # inside the graph is somebody else's timeout and keeps its own
@@ -257,7 +333,12 @@ class Engine:
         )
 
     def _build_job(
-        self, sources: Sequence[Source], *, system_name: str | None, caller: str
+        self,
+        sources: Sequence[Source],
+        *,
+        system_name: str | None,
+        caller: str,
+        ask_questions: bool = False,
     ) -> JobRecord:
         """Shape a submission into a job, or refuse it before any model runs.
 
@@ -289,6 +370,7 @@ class Engine:
             sources=sources,
             frameworks=self._frameworks,
             system_name=_engine_system_name(system_name),
+            ask_questions=ask_questions,
         )
 
 

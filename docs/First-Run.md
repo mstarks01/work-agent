@@ -309,6 +309,26 @@ that are actually known. When the input does not state an attribute, extraction
 uses `unknown`; code turns a claim resting on such an attribute into
 `needs-info` rather than treating the control as missing.
 
+### Answer the questions the analysis asks
+
+Some sources state facts about a group of people or accounts, such as "no MFA
+for shopper accounts", but never say which part of the model that group is.
+The analysis cannot use those facts until it knows. Where your install builds
+an assertion catalog (`ANALYSIS_ASSERTIONS=true`), the app can ask you:
+
+- **Before the analysis.** Tick **Ask me questions before the analysis runs**.
+  The run stops after it has read your description and shows one question per
+  group. Choose the element each group is, or **None of these**, and click
+  **Continue**. Questions you leave unanswered stay open. The analysis then
+  starts from what was already read, so nothing is read again.
+- **After the report.** The report page lists the same kind of questions under
+  **Which element is each of these?**. Choose answers and click **Run the
+  analysis again with these answers**. The app shows the new run's progress
+  and then its report.
+
+A run that waits for your answers is kept in the app's memory, like every other
+run. A restart of the app loses it.
+
 ## Next steps
 
 - Use the [Integration guide](Integration-Guide.md) to embed the in-process

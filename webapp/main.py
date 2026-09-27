@@ -17,6 +17,7 @@ Two pages, three data endpoints:
 ``GET  /report/{run}``  ``report_view.html`` with this run's JSON injected
 ``GET  /example``       ``examples/orders.md``, for **Load example**
 ``POST /analyze``       start a run on a selection, return its id
+``POST /answer/{run}``  answer a run's link questions, start the resumed run
 ``GET  /events/{run}``  server-sent per-node progress
 ======================  ========================================================
 
@@ -58,7 +59,8 @@ The security posture is deliberate throughout:
   land as text nodes. Server-side, the two f-string pages escape through
   :func:`~webapp.page.escape`, which is quote-safe, so where a value lands is
   not part of whether the escape is adequate.
-* CSRF: ``POST /analyze`` requires ``Sec-Fetch-Site: same-origin``. The header
+* CSRF: ``POST /analyze`` and ``POST /answer/{run}`` require
+  ``Sec-Fetch-Site: same-origin``. The header
   is browser-set and unspoofable from script, and it is checked before anything
   else, so a cross-origin caller cannot even start a run. The check is
   :func:`~webapp.page.is_same_origin`, which the two eval-side apps share
@@ -77,10 +79,11 @@ The security posture is deliberate throughout:
   colours through ``element.style.*``, which is a CSSOM write CSP does not
   govern. No page loads an external resource or carries an ``on*=`` handler, so
   ``'none'`` costs nothing. Each policy grants what its own page does and
-  nothing else: the report page reaches the network not at all, the form page
-  reaches only its own origin, through ``connect-src 'self'`` for ``/example``,
-  ``/analyze`` and ``/events``, and the diagnostic page runs no script, so it is
-  granted no ``script-src`` at all. Each page declares what it does as a
+  nothing else: the report page reaches only its own origin, to post answers to
+  ``/answer/{run}``, the form page reaches only its own origin, through
+  ``connect-src 'self'`` for ``/example``, ``/analyze``, ``/answer/{run}`` and
+  ``/events``, and the diagnostic page runs no script, so it is granted no
+  ``script-src`` at all. Each page declares what it does as a
   :class:`~webapp.page.Grants`, and the policy follows from the declaration
   rather than from a string this file keeps. A page and its policy are built
   together as a :class:`~webapp.page.RenderedPage` and served through
@@ -101,7 +104,7 @@ import json
 import logging
 import os
 import secrets
-from collections.abc import AsyncIterator, Callable, Mapping, Sequence
+from collections.abc import AsyncIterator, Awaitable, Callable, Mapping, Sequence
 from dataclasses import dataclass, field
 from functools import partial
 from pathlib import Path
@@ -126,13 +129,18 @@ from analysis_service import (
     FrameworkName,
     FrameworkSelection,
     PipelineCompleted,
-    PipelineRejected,
     Report,
     Source,
 )
 from analysis_service.deployment import Deployment
 from analysis_service.frameworks import package_for
-from analysis_service.links import link_questions
+from analysis_service.jobs import Checkpoint, PipelineAwaiting, PipelineOutcome
+from analysis_service.links import (
+    MAX_LINK_ANSWERS,
+    LinkAnswer,
+    link_questions,
+    merged_links,
+)
 from analysis_service.model_tiers import ModelTierConfig
 from analysis_service.open_facts import open_facts_by_framework
 from analysis_service.selection import SelectionError, resolve_selection
@@ -169,8 +177,9 @@ PORT = 8000
 # oldest-first evicted. A restart loses history, which is correct here.
 MAX_RUNS = 20
 
-#: The report page loads nothing external and reaches the network not at all.
-_REPORT_GRANTS = Grants(script=True, style=True)
+#: The report page loads nothing external. It reaches its own origin for one
+#: thing: posting answers to its link questions to ``/answer/{run}``.
+_REPORT_GRANTS = Grants(script=True, style=True, connect=True)
 
 #: The form page calls ``/example``, ``/analyze`` and ``/events/{run}``, so it
 #: needs its own origin and the report page does not. ``form-action`` stays
@@ -187,12 +196,21 @@ _DIAGNOSTIC_GRANTS = Grants(style=True)
 
 @dataclass
 class Run:
-    """One in-flight or finished analysis."""
+    """One in-flight or finished analysis.
+
+    ``engine``, ``sources`` and ``links`` are what the run was given, and
+    ``checkpoint`` is the model and catalog it reached: a paused run's, or a
+    finished report's. Together they are what an answer resumes from.
+    """
 
     id: str
     events: asyncio.Queue[tuple[str, str]] = field(default_factory=asyncio.Queue)
     report: Report | None = None
     task: asyncio.Task | None = None
+    engine: Engine | None = None
+    sources: list[Source] = field(default_factory=list)
+    links: list[LinkAnswer] = field(default_factory=list)
+    checkpoint: Checkpoint | None = None
 
 
 class Analyses:
@@ -252,6 +270,10 @@ class Startup:
     frameworks: tuple[FrameworkName, ...]
     tiers: ModelTierConfig | None
     error: ConfigError | None
+    #: Whether a run here builds an assertion catalog, and so can ask link
+    #: questions. False unless the deployment says so, so the form offers no
+    #: question toggle on an install that could not honour it.
+    asks: bool = False
 
     @property
     def ok(self) -> bool:
@@ -294,6 +316,7 @@ def build_startup(env: Mapping[str, str] | None = None) -> Startup:
         frameworks=deployment.frameworks,
         tiers=deployment.tiers,
         error=None,
+        asks=deployment.carries_catalog,
     )
 
 
@@ -419,6 +442,7 @@ def create_app(
                 script=client_script("first_run.js"),
                 tiers=_tier_lines(state.tiers),
                 frameworks=_framework_fields(state.frameworks),
+                questions=_QUESTIONS_FIELD if state.asks else "",
             )
         )
 
@@ -442,6 +466,7 @@ def create_app(
             body = await request.json()
             sources = [Source.model_validate(source) for source in body["sources"]]
             selection = _selection(state.frameworks, body["frameworks"])
+            ask_questions = body.get("questions") is True
         except SelectionError as exc:
             # Names the framework and the field it wanted, or the name the
             # install does not carry, and nothing about this deployment. Safe
@@ -452,6 +477,15 @@ def create_app(
                 {
                     "message": "Expected a JSON body with a 'sources' list and a"
                     " 'frameworks' list naming frameworks this install carries."
+                },
+                status_code=400,
+            )
+
+        if ask_questions and not state.asks:
+            return JSONResponse(
+                {
+                    "message": "This install builds no assertion catalog, so it asks"
+                    " no question."
                 },
                 status_code=400,
             )
@@ -482,8 +516,79 @@ def create_app(
                 {"message": "An analysis is already running. Wait for it to finish."},
                 status_code=409,
             )
+        run.engine, run.sources = engine, sources
+        start = partial(
+            engine.analyze,
+            sources,
+            system_name="Your system",
+            ask_questions=ask_questions,
+        )
         # Held on the run so the task is not garbage-collected mid-flight.
-        run.task = asyncio.create_task(_drive(engine, analyses, run, sources))
+        run.task = asyncio.create_task(_drive(analyses, run, start))
+        return JSONResponse({"run": run.id})
+
+    @app.post("/answer/{run_id}")
+    async def answer(run_id: str, request: Request) -> Response:
+        """Answer a run's link questions, and start the run that resumes from it.
+
+        The run answered is a paused one or a finished one. The new run starts
+        at ``prepare`` from what that run reached, so nothing is extracted
+        again. An empty answer list continues a paused run without answers; a
+        finished run has nothing to continue.
+        """
+        if not is_same_origin(request):
+            logger.warning("refused a POST /answer that was not same-origin")
+            return JSONResponse(
+                {"message": "This request did not come from the app's own page."},
+                status_code=403,
+            )
+        parent = analyses.get(run_id)
+        if parent is None or parent.checkpoint is None or parent.engine is None:
+            return JSONResponse(
+                {"message": "That run asks no question, or no longer exists."},
+                status_code=404,
+            )
+        try:
+            body = await request.json()
+            raw = body["links"]
+            if not isinstance(raw, list) or len(raw) > MAX_LINK_ANSWERS:
+                raise ValueError
+            links = [LinkAnswer.model_validate(link) for link in raw]
+            merged = merged_links(parent.links, links)
+        except (ValidationError, ValueError, KeyError, TypeError) as exc:
+            detail = (
+                str(exc)
+                if "twice" in str(exc)
+                else (
+                    "Expected a JSON body with a 'links' list, each naming a principal"
+                    " and an element ID or 'none'."
+                )
+            )
+            return JSONResponse({"message": detail}, status_code=400)
+        if not links and parent.report is not None:
+            return JSONResponse(
+                {
+                    "message": "No answers were sent, and a finished run has nothing"
+                    " to continue."
+                },
+                status_code=400,
+            )
+        run = analyses.claim()
+        if run is None:
+            return JSONResponse(
+                {"message": "An analysis is already running. Wait for it to finish."},
+                status_code=409,
+            )
+        run.engine, run.sources, run.links = parent.engine, parent.sources, merged
+        start = partial(
+            parent.engine.resume,
+            parent.sources,
+            parent.checkpoint,
+            links,
+            earlier_links=parent.links,
+            system_name="Your system",
+        )
+        run.task = asyncio.create_task(_drive(analyses, run, start))
         return JSONResponse({"run": run.id})
 
     @app.get("/events/{run_id}")
@@ -605,18 +710,20 @@ def _option_control(name: FrameworkName, field: str, annotation: object) -> str:
 
 
 async def _drive(
-    engine: Engine, analyses: Analyses, run: Run, sources: list[Source]
+    analyses: Analyses,
+    run: Run,
+    start: Callable[..., Awaitable[PipelineOutcome]],
 ) -> None:
     """Run one analysis to a terminal state, narrating it onto the run's queue.
 
-    Only a completed run reaches the viewer, because the viewer renders
-    reports. A rejection, a bad submission and an internal failure all land
+    ``start`` is the engine call, a fresh analysis or a resumption, still
+    waiting for its ``on_node``. Only a completed run reaches the viewer,
+    because the viewer renders reports. A paused run sends its questions to the
+    form page. A rejection, a bad submission and an internal failure all land
     back on the form page, where the submitted text is still in the textarea.
     """
     try:
-        outcome = await engine.analyze(
-            sources, system_name="Your system", on_node=_ticker(run)
-        )
+        outcome = await start(on_node=_ticker(run))
     except EngineInputError as exc:
         # Raised before any model ran — no sources, too many, or more bytes
         # than this deployment allows. The message is about the caller's input
@@ -639,13 +746,18 @@ async def _drive(
     else:
         if isinstance(outcome, PipelineCompleted):
             run.report = outcome.report
+            if outcome.report.assertions is not None:
+                run.checkpoint = Checkpoint(
+                    system_model=outcome.report.system_model,
+                    assertions=outcome.report.assertions,
+                )
             await _emit(run, "done", {"url": f"/report/{run.id}"})
-        elif not isinstance(outcome, PipelineRejected):
-            # This app's engine never asks questions, so a run that paused is
-            # this service's defect: named in the log, generic to the browser.
-            logger.error("run %s ended as %s", run.id, type(outcome).__name__)
+        elif isinstance(outcome, PipelineAwaiting):
+            run.checkpoint = outcome.checkpoint
             await _emit(
-                run, "failed", {"message": "The analysis failed. Check the server log."}
+                run,
+                "questions",
+                {"run": run.id, "questions": question_rows(outcome.checkpoint)},
             )
         else:
             await _emit(
@@ -661,6 +773,27 @@ async def _drive(
     finally:
         analyses.release()
         await run.events.put(("", ""))  # sentinel: closes the SSE stream
+
+
+def question_rows(checkpoint: Checkpoint) -> list[dict[str, object]]:
+    """A checkpoint's link questions, with each option's element name beside it.
+
+    The form page has no report to look names up in, so they travel with the
+    questions. Every string is untrusted and lands on the page as text.
+    """
+    model = checkpoint.system_model
+    names = {element.id: element.name for element in model.elements()}
+    return [
+        {
+            "principal": question.principal,
+            "rows": question.rows,
+            "options": [
+                {"id": option, "name": names.get(option, "")}
+                for option in question.options
+            ],
+        }
+        for question in link_questions(checkpoint.assertions.catalog, model)
+    ]
 
 
 def _ticker(run: Run):
@@ -850,6 +983,7 @@ _FORM_PAGE = (
   </fieldset>
   <p><textarea id="description" name="description"
      placeholder="Describe your system..."></textarea></p>
+  <!--questions-->
   <p>
     <button type="submit" id="go">Analyze</button>
     <button type="button" id="load">Load example</button>
@@ -857,10 +991,22 @@ _FORM_PAGE = (
 </form>
 <div id="problem" class="problem" hidden></div>
 <ul id="ticks" hidden></ul>
+<div id="asked" hidden>
+  <h2>Before the analysis: which element is each of these?</h2>
+  <p class="sub">The description states facts about these principals but never
+  says which element each one is. Answer what you can; the analysis then starts
+  from what was already read.</p>
+  <div id="questions"></div>
+  <p><button type="button" id="continue">Continue</button></p>
+</div>
 <script nonce="__CSP_NONCE__"><!--script--></script>
 </body></html>
 """
 )
+
+#: The question toggle, shown only on an install that builds a catalog.
+_QUESTIONS_FIELD = """<p><label><input type="checkbox" id="ask" name="ask">
+    Ask me questions before the analysis runs, and wait for my answers</label></p>"""
 
 _DIAGNOSTIC_PAGE = (
     """<!doctype html>
