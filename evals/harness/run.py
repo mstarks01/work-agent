@@ -57,7 +57,11 @@ from analysis_service.frameworks import PACKAGES
 from analysis_service.graph import Pipeline
 from analysis_service.identity import build_identity
 from analysis_service.model_tiers import ModelTierConfig, TierSelection
-from analysis_service.questions import question_fallback
+from analysis_service.questions import (
+    FactAnswer,
+    check_fact_answers,
+    question_fallback,
+)
 from analysis_service.report import (
     NodeLatency,
     NodeRun,
@@ -273,11 +277,14 @@ async def _run_mode(
     ask: Callable[[str], str] | None = None,
     in_flight: int = 1,
     signed: Mapping[str, CatalogProposal] | None = None,
+    answers: Mapping[str, tuple[FactAnswer, ...]] | None = None,
 ) -> ModeRun:
     """Run one mode over the selected cases, collecting Tier 1 failures.
 
     ``signed`` is each case's signed proposal, which only the ``direct-facts``
     mode reads; :func:`signed_proposals` builds it before anything is spent.
+    ``answers`` is each case's signed answers, which only the ``answered`` mode
+    reads; :func:`signed_answers` builds it before anything is spent.
 
     The execution identities come back too, taken from the node runs rather
     than from the report: the extraction mode produces no report, and sourcing
@@ -450,6 +457,8 @@ async def _run_mode(
                 run = await modes.run_direct_facts(
                     case, pipeline, (signed or {})[case.id]
                 )
+            elif mode == "answered":
+                run = await modes.run_answered(case, pipeline, (answers or {})[case.id])
             elif mode == "analysis":
                 run = await modes.run_analysis(case, pipeline)
             else:
@@ -994,6 +1003,44 @@ def signed_proposals(
     }
 
 
+#: Where each case's signed answers sit: outside the corpus, so a new answers
+#: file moves no corpus digest. The artifact's commit pins which answers ran.
+ANSWERS_DIR = REPO_ROOT / "evals" / "answers"
+
+
+def signed_answers(
+    cases: Sequence[GoldenCase], answers_dir: Path = ANSWERS_DIR
+) -> dict[str, tuple[FactAnswer, ...]]:
+    """Each case's signed answers, or a refusal naming the cases without them.
+
+    The ``answered`` mode puts these answers in front of the lanes as the
+    submitter's own, so a file nobody signed would be an agent's reading
+    presented as a person's. Each answer is checked against the case's model by
+    the rule the answers route applies.
+    """
+    loaded: dict[str, tuple[FactAnswer, ...]] = {}
+    unsigned: list[str] = []
+    for case in cases:
+        path = answers_dir / f"{case.id}.json"
+        raw = json.loads(path.read_text(encoding="utf-8")) if path.is_file() else {}
+        if not raw.get("signed_by"):
+            unsigned.append(case.id)
+            continue
+        answers = tuple(FactAnswer.model_validate(entry) for entry in raw["answers"])
+        try:
+            check_fact_answers(answers, case.model, None)
+        except ValueError as error:
+            raise modes.EvalRunError(f"{case.id}: {error}") from error
+        loaded[case.id] = answers
+    if unsigned:
+        raise modes.EvalRunError(
+            f"no signed answers for {', '.join(unsigned)}; the answered mode"
+            f" reads only a case whose {answers_dir.name}/<case>.json names who"
+            " signed it"
+        )
+    return loaded
+
+
 def command_run(args: argparse.Namespace) -> int:
     cases = _select(load_corpus(args.corpus), args.case)
     # Before anything is spent, like every check here.
@@ -1003,6 +1050,7 @@ def command_run(args: argparse.Namespace) -> int:
             if args.mode == "direct-facts"
             else None
         )
+        answers = signed_answers(cases) if args.mode == "answered" else None
     except modes.EvalRunError as refusal:
         print(refusal, file=sys.stderr)
         return 1
@@ -1046,6 +1094,7 @@ def command_run(args: argparse.Namespace) -> int:
             ask,
             in_flight=in_flight,
             signed=signed,
+            answers=answers,
         )
     )
     failures = mode_run.failures

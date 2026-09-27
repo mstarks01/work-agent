@@ -105,6 +105,8 @@ from analysis_service.graph import (
     result_of,
     tier_node_by_graph_node,
 )
+from analysis_service.links import with_link_answers
+from analysis_service.questions import FactAnswer, answered_model
 from analysis_service.report import (
     FrameworkSelection,
     InputRef,
@@ -2402,6 +2404,32 @@ async def run_direct_facts(
         SIGNED_PROPOSAL.reset(token)
 
 
+async def run_answered(
+    case: GoldenCase, pipeline: Pipeline, answers: Sequence[FactAnswer]
+) -> AnalysisRun:
+    """The ``answered`` mode: ``analysis`` mode with a submitter's signed answers.
+
+    The answers reach the graph as they reach a resumed production job, through
+    the two functions that job calls: the attribute answers written onto the
+    model, and every answer as a line of the answers Source.
+    """
+    # One case for the graph and the report, so the report names the answers
+    # Source it ran with and a quote from it verifies against its text.
+    answered = replace(
+        case, sources=tuple(with_link_answers(case.sources, [], answers))
+    )
+    model = answered_model(case.model, answers)
+    graph_run = await run_graph(
+        pipeline,
+        answered.sources,
+        {
+            STATE_VALID_MODEL: model.model_dump(mode="json"),
+            STATE_FRAMEWORK_OPTIONS: case_framework_options(case),
+        },
+    )
+    return _run_from_graph(answered, graph_run, pipeline)
+
+
 async def run_end_to_end(case: GoldenCase, pipeline: Pipeline) -> AnalysisRun:
     """Mode 3: text in, report out — the integration smoke test."""
     graph_run = await run_graph(
@@ -2518,6 +2546,9 @@ MODE_ENTRIES: dict[str, Entry] = {
     # a route of its own, so an arm measured here ran the nodes an arm measured
     # end to end would have run.
     "heads": ENTRY_HEAD_ONLY,
+    # The analysis mode with a case's signed answers, written in as a resumed
+    # job writes them (#1225). Built by :func:`run_answered`.
+    "answered": ENTRY_PREPARE,
 }
 
 #: The modes whose graph runs ``extract``, and so the ones whose sweep keeps
@@ -2533,7 +2564,9 @@ EXTRACTING_MODES: frozenset[str] = frozenset(
 #: validity gate and returns an :class:`ExtractionResult`, so a sweep of it has
 #: no report to persist and says so rather than writing an empty file
 #: ([#180](https://github.com/mstarks01/work-agent/issues/180)).
-REPORTING_MODES: frozenset[str] = frozenset({"analysis", "direct-facts", "end-to-end"})
+REPORTING_MODES: frozenset[str] = frozenset(
+    {"analysis", "answered", "direct-facts", "end-to-end"}
+)
 
 
 def render_extraction(scores: Sequence[ExtractionScore]) -> None:
