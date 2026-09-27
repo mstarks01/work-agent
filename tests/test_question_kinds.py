@@ -14,9 +14,10 @@ import re
 import pytest
 
 from analysis_service.claims import ProposedVerdict, UnknownRef
-from analysis_service.critic import review_issues
+from analysis_service.critic import review_issues, snap_rulings
 from analysis_service.links import with_link_answers
 from analysis_service.open_facts import element_names, label_of
+from analysis_service.prompts import compose_critic_prompt
 from analysis_service.question_kinds import QUESTION_KINDS
 from analysis_service.questions import (
     FactAnswer,
@@ -24,7 +25,8 @@ from analysis_service.questions import (
     question_fallback,
 )
 from analysis_service.sources import Source
-from tests.factories import sample_draft, sample_ruling, valid_model
+from tests import test_critic_review_replay
+from tests.factories import sample_draft, sample_report, sample_ruling, valid_model
 
 STORE = "store:orders-db"
 
@@ -44,18 +46,9 @@ class TestTheTable:
         assert schema["enum"] == ["", *QUESTION_KINDS]
 
 
-def rulings(ref: UnknownRef):
-    return [
-        sample_ruling(
-            "S-01",
-            verdict=ProposedVerdict(reason="rests on it", related_unknowns=[ref]),
-        )
-    ]
-
-
 class TestTheSeam:
     def issues(self, ref):
-        problems = review_issues([sample_draft("S-01")], rulings(ref), valid_model())
+        problems = review_issues([sample_draft("S-01")], rulings_of(ref), valid_model())
         return [m for m in problems.messages if "question" in m]
 
     def test_a_kind_about_an_element_of_the_model_passes(self):
@@ -111,9 +104,72 @@ class TestTheAnswer:
 
 
 def test_the_fallback_counts_typed_and_free_text_facts():
-    from tests.factories import sample_report
-
     report = sample_report()
     counted = question_fallback(report.analyses)
     assert counted.typed == 0
     assert counted.rate is None or 0 <= counted.rate <= 1
+
+
+#: What a critic wrote on a route that treated the schema as a hint: a sound
+#: attribute reference, then the same fact again with the attribute's name in
+#: ``subject`` and schema punctuation in ``assertion`` (``QA-2026-09-26-03-E10``).
+SOUND = UnknownRef(element_id=STORE, attribute="encryption_at_rest")
+ECHO = UnknownRef(
+    element_id=STORE,
+    attribute="encryption_at_rest",
+    subject="encryption_at_rest",
+    assertion="}],",
+)
+
+
+class TestOneSpellingPerFact:
+    @pytest.mark.parametrize(
+        ("ref", "spellings"),
+        [
+            (SOUND, ("attribute",)),
+            (UnknownRef(element_id=STORE, question="audit-evidence"), ("question",)),
+            (UnknownRef(assertion="row"), ("assertion",)),
+            (UnknownRef(subject="whether queries are bound"), ("subject",)),
+            (ECHO, ("attribute", "assertion", "subject")),
+        ],
+    )
+    def test_each_spelling_is_named(self, ref, spellings):
+        assert ref.spellings == spellings
+
+    def test_a_mixed_entry_with_a_sound_twin_is_dropped(self):
+        (ruling,) = snap_rulings(rulings_of(SOUND, ECHO, SOUND), {STORE})
+        assert ruling.verdict.related_unknowns == [SOUND]
+
+    def test_a_mixed_entry_with_no_twin_stays_and_is_sent_back(self):
+        (ruling,) = snap_rulings(rulings_of(ECHO), {STORE})
+        assert ruling.verdict.related_unknowns == [ECHO]
+        problems = review_issues(
+            [sample_draft("S-01")], rulings_of(ECHO), valid_model()
+        )
+        assert any("3 ways at once" in m for m in problems.messages)
+
+    def test_a_mixed_entry_is_neither_typed_nor_free_text(self):
+        report = sample_report()
+        (block,) = report.analyses[:1]
+        claim = block.claims[0]
+        verdict = claim.verdict.model_copy(update={"related_unknowns": [ECHO]})
+        block = block.model_copy(
+            update={"claims": [claim.model_copy(update={"verdict": verdict})]}
+        )
+        counted = question_fallback([block])
+        assert (counted.typed, counted.free_text) == (0, 0)
+
+
+def rulings_of(*refs: UnknownRef):
+    return [
+        sample_ruling(
+            "S-01",
+            verdict=ProposedVerdict(reason="rests on it", related_unknowns=list(refs)),
+        )
+    ]
+
+
+def test_the_critic_prompt_lists_every_kind_with_what_it_covers():
+    prompt = compose_critic_prompt(test_critic_review_replay.PROMPT_LOADER)
+    for name, kind in QUESTION_KINDS.items():
+        assert f"- `{name}`: {kind.covers}" in prompt

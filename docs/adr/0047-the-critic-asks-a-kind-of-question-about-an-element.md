@@ -31,6 +31,19 @@ review seam sends back a kind the table lacks, or an element the model lacks.
 The critic prompt asks for a kind where one fits, and for a `subject` only
 where none does.
 
+**The prompt lists the kinds too.** The service adds the list to the critic's
+instruction from the table. A provider can treat a schema as a hint and not
+show its descriptions to the model, so the schema alone does not make sure
+that the model sees the kinds.
+
+**An entry uses one spelling.** `UnknownRef.spellings` names the spellings an
+entry uses. The review seam sends back an entry with more than one. Where a
+sound entry for the same element and attribute, or the same element and
+question, is in the same verdict, `snap_rulings` drops the mixed entry
+before the check, so both the check and the report skip it. A model that
+treats the schema as a hint wrote each fact twice in this way
+(`QA-2026-09-26-03-E10`).
+
 **The fallback is kept and counted.** A `subject` is still legal, and a report
 counts how many of these facts were typed and how many fell back
 (`question_fallback`). The questions route returns the count, and `run.py
