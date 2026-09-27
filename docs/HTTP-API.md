@@ -39,6 +39,7 @@ logged, never returned.
 | `GET` | `/v1/jobs/{id}` | Poll: status, per-node progress, timestamps. Never the report. |
 | `GET` | `/v1/jobs/{id}/events` | The same progression as Server-Sent Events; resumable via `Last-Event-ID`. |
 | `GET` | `/v1/jobs/{id}/report` | The full [report](Report-Schema.md) once completed; `409` before, and `409` if the report is withheld (below). |
+| `POST` | `/v1/jobs/{id}/answers` | Answer a completed report's questions. Starts a **new** job that resumes from this one's model and catalog; `201` with its `job_id`. |
 | `GET` | `/v1/jobs/{id}/questions` | What the finished report asks you, as `{"job_id", "link_questions"}`. Derived from the report when you ask, under the report's own rules: `409` before completion and `409` when the report is withheld. |
 | `GET` | `/healthz` | Unauthenticated liveness probe. |
 
@@ -142,7 +143,34 @@ the same list. Each entry is `{key, principal, rows, options}`: `rows` is how
 many stated facts an answer would place, and `options` are the element IDs an
 answer may name. The most rows come first.
 
-Answer in the next submission of the same system, beside the sources:
+**Answer against the finished job.** This is the usual way:
+
+```http
+POST /v1/jobs/{id}/answers
+Content-Type: application/json
+
+{"links": [{"principal": "shopper accounts", "element": "entity:shopper"}]}
+```
+
+The service starts a new job and returns its `job_id`, as a submission does.
+That job resumes from the finished job's own System Model and catalog, so no
+extraction and no assertion pass runs again. Your answers apply to the exact
+catalog that asked the question, and only the analysis and review steps
+spend model calls. It is a new job: it counts toward your jobs in flight and
+your token budget, and it is refused the same ways a submission is (`429`). An
+answer about a principal replaces the finished job's earlier answer about the
+same principal. The finished job's report is unchanged.
+
+| Status | Cause |
+| --- | --- |
+| `400` | This deployment builds no assertion catalog, or two answers name the same principal. |
+| `404` | The job is not yours, or does not exist. |
+| `409` | The job is not completed, its report is withheld, or its report carries no catalog. |
+| `422` | `links` is missing or empty, or an entry is malformed. |
+
+**Or answer in a new submission** of the same system, beside the sources. That
+job extracts everything again, and a principal the new run spells differently
+places nothing:
 
 ```json
 "links": [

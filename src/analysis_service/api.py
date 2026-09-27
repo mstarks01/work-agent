@@ -42,7 +42,7 @@ from starlette._utils import get_route_path
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from analysis_service import budgets
-from analysis_service.assertions import AssertionCatalog
+from analysis_service.assertions import AssertionCatalog, AssertionRecord
 from analysis_service.auth import (
     AuthenticationError,
     TokenVerifier,
@@ -53,6 +53,7 @@ from analysis_service.claims import FrameworkName
 from analysis_service.deployment import Deployment
 from analysis_service.errors import ConfigError
 from analysis_service.frameworks import PACKAGES
+from analysis_service.graph import ENTRY_EXTRACT, ENTRY_RESUME
 from analysis_service.jobs import (
     TERMINAL_STATUSES,
     Admission,
@@ -60,6 +61,7 @@ from analysis_service.jobs import (
     JobStatus,
     JobStore,
     PipelineRunner,
+    Resumption,
     build_store,
     execute_job,
 )
@@ -67,6 +69,7 @@ from analysis_service.links import (
     MAX_LINK_ANSWERS,
     LinkAnswer,
     link_questions,
+    merged_links,
     with_link_answers,
 )
 from analysis_service.parsing import ascii_int
@@ -316,6 +319,14 @@ class JobSubmission(BaseModel):
         return clean_system_name(value)
 
 
+class AnswersSubmission(BaseModel):
+    """Answers to a finished report's questions, sent against that report's job."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    links: list[LinkAnswer] = Field(min_length=1, max_length=MAX_LINK_ANSWERS)
+
+
 class NodeCompletion(BaseModel):
     """One finished pipeline node, as shown in the poll response."""
 
@@ -354,6 +365,74 @@ def _resolve_selection(
         return resolve_selection(carried, requested)
     except SelectionError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from None
+
+
+async def _admit_and_start(
+    request: Request,
+    record: JobRecord,
+    background_tasks: BackgroundTasks,
+    subject: str,
+) -> JSONResponse:
+    """Admit one new job against the ceiling and the budget, and start it.
+
+    **The one admission.** A submission and a resumed job are both new jobs:
+    each takes an in-flight slot and a share of the token budget, and each is
+    refused the same way when it cannot have one.
+    """
+    store: JobStore = request.app.state.store
+    ceiling: int = request.app.state.max_active_jobs
+    # The runner is looked up before the reservation. A graph is built on
+    # first use per selection, and a build that raised after the reservation
+    # would leave a slot held that no task ever releases.
+    runner = request.app.state.runner_for(
+        record.selection(),
+        ENTRY_RESUME if record.resumption is not None else ENTRY_EXTRACT,
+    )
+    budget = request.app.state.budget
+    admission = await store.reserve(record, ceiling=ceiling, budget=budget)
+    if admission.outcome in _REFUSALS:
+        # Every refusal is logged, because it is the only place these bounds
+        # are observable from outside the caller they refused: a caller
+        # sitting on one is either a client that needs a larger share or the
+        # consumption they exist to stop, and neither is visible from a 429
+        # nobody recorded. The log carries the deployment-wide figure the
+        # response withholds.
+        logger.warning(
+            "subject %s refused (%s): %d in flight of %d, %d tokens of %d"
+            " in this subject's window, %d of %d across the deployment",
+            subject,
+            admission.outcome,
+            admission.active,
+            ceiling,
+            admission.subject_tokens,
+            budget.max_tokens_per_window,
+            admission.global_tokens,
+            budget.global_max_tokens_per_window,
+        )
+        raise HTTPException(
+            status_code=429, detail=_REFUSALS[admission.outcome](admission, ceiling)
+        )
+    if admission.outcome != "admitted":
+        # A duplicate id, or an outcome the table above does not answer, is
+        # this service's defect and not something the caller can act on or
+        # provoke: the API mints the id, and the store's outcomes are held
+        # to the table by test. It gets the same opaque 500 every unhandled
+        # error gets, and the outcome goes to the log. Fails closed: only
+        # an admission starts a job.
+        logger.error("job %s was not admitted: %s", record.id, admission.outcome)
+        raise HTTPException(status_code=500, detail="an internal error occurred")
+    background_tasks.add_task(
+        execute_job,
+        store,
+        runner,
+        record.id,
+        deadline_seconds=request.app.state.job_deadline_seconds,
+    )
+    return JSONResponse(
+        {"job_id": record.id, "status": record.status},
+        status_code=201,
+        headers={"Location": f"/v1/jobs/{record.id}"},
+    )
 
 
 async def _servable_report(
@@ -600,7 +679,7 @@ def create_app(
     app = FastAPI(title="Security Analysis Service")
     app.state.store = store if store is not None else build_store()
     if runner is not None:
-        app.state.runner_for = lambda selection: runner
+        app.state.runner_for = lambda selection, entry=ENTRY_EXTRACT: runner
         app.state.certification = None
     else:
         deployment = deployment if deployment is not None else Deployment.from_env()
@@ -677,8 +756,6 @@ def create_app(
         background_tasks: BackgroundTasks,
         subject: str = Depends(require_subject),
     ) -> JSONResponse:
-        store: JobStore = request.app.state.store
-        ceiling: int = request.app.state.max_active_jobs
         # Shape before budget: a framework this service does not carry is the
         # wrong request at any size, and answering it with a byte count would
         # quote a cap the caller never came near.
@@ -721,55 +798,67 @@ def create_app(
             links=submission.links,
             reserved_tokens=budgets.estimate(sources, selection),
         )
-        # The runner is looked up before the reservation. A graph is built on
-        # first use per selection, and a build that raised after the reservation
-        # would leave a slot held that no task ever releases.
-        runner = request.app.state.runner_for(record.selection())
-        budget = request.app.state.budget
-        admission = await store.reserve(record, ceiling=ceiling, budget=budget)
-        if admission.outcome in _REFUSALS:
-            # Every refusal is logged, because it is the only place these bounds
-            # are observable from outside the caller they refused: a caller
-            # sitting on one is either a client that needs a larger share or the
-            # consumption they exist to stop, and neither is visible from a 429
-            # nobody recorded. The log carries the deployment-wide figure the
-            # response withholds.
-            logger.warning(
-                "subject %s refused (%s): %d in flight of %d, %d tokens of %d"
-                " in this subject's window, %d of %d across the deployment",
-                subject,
-                admission.outcome,
-                admission.active,
-                ceiling,
-                admission.subject_tokens,
-                budget.max_tokens_per_window,
-                admission.global_tokens,
-                budget.global_max_tokens_per_window,
-            )
+        return await _admit_and_start(request, record, background_tasks, subject)
+
+    @app.post("/v1/jobs/{job_id}/answers", status_code=201)
+    async def answer_job(
+        job_id: str,
+        answers: AnswersSubmission,
+        request: Request,
+        background_tasks: BackgroundTasks,
+        subject: str = Depends(require_subject),
+    ) -> JSONResponse:
+        """Answer a finished report's questions, and resume its job from ``prepare``.
+
+        The new job runs on the parent's own model and catalog with the answers
+        written in, so an answer applies to the catalog that asked the
+        question, and no extraction or assertion pass runs again (#1252). It
+        is admitted as a new job, against the ceiling and the token budget,
+        because its lanes and critics spend model calls.
+        """
+        if not request.app.state.carries_catalog:
             raise HTTPException(
-                status_code=429, detail=_REFUSALS[admission.outcome](admission, ceiling)
+                status_code=400,
+                detail="this deployment builds no assertion catalog, so nothing"
+                " would read a link answer",
             )
-        if admission.outcome != "admitted":
-            # A duplicate id, or an outcome the table above does not answer, is
-            # this service's defect and not something the caller can act on or
-            # provoke: the API mints the id, and the store's outcomes are held
-            # to the table by test. It gets the same opaque 500 every unhandled
-            # error gets, and the outcome goes to the log. Fails closed: only
-            # an admission starts a job.
-            logger.error("job %s was not admitted: %s", record.id, admission.outcome)
-            raise HTTPException(status_code=500, detail="an internal error occurred")
-        background_tasks.add_task(
-            execute_job,
-            store,
-            runner,
-            record.id,
-            deadline_seconds=request.app.state.job_deadline_seconds,
+        served = await _servable_report(request, job_id, subject)
+        if isinstance(served, JSONResponse):
+            return served
+        if served.get("assertions") is None:
+            raise HTTPException(
+                status_code=409,
+                detail="this report carries no assertion catalog, so it asked"
+                " no link question",
+            )
+        parent = await _owned_job(request, job_id, subject)
+        try:
+            links = merged_links(parent.links, answers.links)
+            sources = with_link_answers(
+                [source for source in parent.sources if source.kind != "answers"],
+                links,
+            )
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        breach = request.app.state.limits.breach(sources)
+        if breach is not None:
+            raise HTTPException(
+                status_code=_STATUS_BY_RUNG[breach.rung], detail=breach.message
+            )
+        record = JobRecord.create(
+            owner_subject=subject,
+            sources=sources,
+            frameworks=parent.frameworks,
+            system_name=parent.system_name,
+            links=links,
+            resumption=Resumption(
+                parent_id=parent.id,
+                system_model=SystemModel.model_validate(served["system_model"]),
+                assertions=AssertionRecord.model_validate(served["assertions"]),
+            ),
+            reserved_tokens=budgets.estimate(sources, parent.frameworks),
         )
-        return JSONResponse(
-            {"job_id": record.id, "status": record.status},
-            status_code=201,
-            headers={"Location": f"/v1/jobs/{record.id}"},
-        )
+        return await _admit_and_start(request, record, background_tasks, subject)
 
     @app.get(
         "/v1/jobs/{job_id}",
