@@ -57,6 +57,7 @@ from analysis_service.frameworks import PACKAGES
 from analysis_service.graph import Pipeline
 from analysis_service.identity import build_identity
 from analysis_service.model_tiers import ModelTierConfig, TierSelection
+from analysis_service.questions import question_fallback
 from analysis_service.report import (
     NodeLatency,
     NodeRun,
@@ -1272,6 +1273,27 @@ def command_promote(args: argparse.Namespace) -> int:
     return 0
 
 
+def _print_question_fallback(runs: Mapping[str, Any]) -> None:
+    """How often the critic fell back to free text for a question with no place.
+
+    Printed only, so the scored artifact keeps its version: it is read off the
+    reports, which carry every verdict already.
+    """
+    counts = [
+        question_fallback(run.report.analyses)
+        for run in runs.values()
+        if getattr(run, "report", None) is not None
+    ]
+    typed = sum(count.typed for count in counts)
+    free = sum(count.free_text for count in counts)
+    total = typed + free
+    rate = f"{free / total:.0%}" if total else "n/a"
+    print(
+        f"\nQuestion kinds: {typed} typed, {free} free text; fallback {rate}"
+        " (instrument, non-gating)"
+    )
+
+
 def command_score(args: argparse.Namespace) -> int:
     """Re-score a finished sweep against the ledger as it stands now.
 
@@ -1321,6 +1343,7 @@ def command_score(args: argparse.Namespace) -> int:
     sweep = by_series[standings.PRIMARY]
     render_all(sweep, scored=True)
     _print_series(by_series)
+    _print_question_fallback(runs)
 
     raw = dict(loaded.raw)
     raw |= _scored_keys(sweep)

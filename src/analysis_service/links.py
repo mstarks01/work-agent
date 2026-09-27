@@ -45,6 +45,7 @@ from analysis_service.assertions import (
     answer,
     settled,
 )
+from analysis_service.question_kinds import QUESTION_KINDS
 from analysis_service.questions import FactAnswer, fact_rows
 from analysis_service.sources import Source, plain_name, text_digest
 from analysis_service.system_model import PLAIN_ID_RE, SystemModel
@@ -129,7 +130,11 @@ def _line(link: LinkAnswer) -> str:
 
 
 def _fact_line(fact: FactAnswer) -> str:
-    element_id, attribute, assertion, subject = fact.key
+    element_id, attribute, assertion, subject, question = fact.key
+    if fact.kind == "question":
+        kind = QUESTION_KINDS[question]
+        asked = kind.template.format(element=element_id)
+        return f'Asked "{asked}", the answer is "{fact.value}".'
     if fact.kind == "attribute":
         return f'The {attribute} of {element_id} is "{fact.value}".'
     if fact.kind == "assertion":

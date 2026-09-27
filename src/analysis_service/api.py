@@ -80,6 +80,7 @@ from analysis_service.questions import (
     FactAnswer,
     check_fact_answers,
     fact_questions,
+    question_fallback,
 )
 from analysis_service.report import FrameworkSelection, Report
 from analysis_service.selection import SelectionError, resolve_selection
@@ -953,6 +954,7 @@ def create_app(
                 "job_id": job_id,
                 "link_questions": [question.to_json() for question in questions],
                 "fact_questions": [fact.to_json() for fact in facts],
+                "fallback": question_fallback(analyses).to_json(),
             }
         )
 
