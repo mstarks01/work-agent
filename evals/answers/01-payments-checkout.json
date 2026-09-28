@@ -2,7 +2,50 @@
   "case": "01-payments-checkout",
   "drafted_by": "agent",
   "signed_by": null,
-  "purpose": "withheld-sentence test (#1225): each withheld phrase states one control, the model fields that record it are set back, and each answer gives the same fact back in the blessed model's own value",
+  "purpose": "withheld-sentence test (#1225): each withheld phrase states one control, the model fields that record or paraphrase it are set back, and each answer gives the same fact back in the blessed model's own value",
+  "targets": [
+    {
+      "withheld": 1,
+      "tier": "must-find",
+      "verb": "replay",
+      "affected_element_ids": [
+        "flow:entity:shopper>process:storefront-api>place-order",
+        "entity:shopper"
+      ],
+      "why": "the session cookie a shopper is issued is what an attacker replays"
+    },
+    {
+      "withheld": 2,
+      "tier": "expected",
+      "verb": "inject",
+      "affected_element_ids": [
+        "flow:process:storefront-api>process:order-service>submit-order",
+        "process:order-service",
+        "process:storefront-api"
+      ],
+      "why": "the order service authenticates no caller, so any workload that reaches it submits orders"
+    },
+    {
+      "withheld": 3,
+      "tier": "must-find",
+      "verb": "alter",
+      "affected_element_ids": [
+        "store:orders-db",
+        "flow:process:order-service>store:orders-db>read-write-orders"
+      ],
+      "why": "one account holds full read/write on the orders"
+    },
+    {
+      "withheld": 3,
+      "tier": "expected",
+      "verb": "recover-credential",
+      "affected_element_ids": [
+        "process:order-service",
+        "flow:process:order-service>store:orders-db>read-write-orders"
+      ],
+      "why": "the database password sits in the worker's environment"
+    }
+  ],
   "withheld": {
     "source": [
       {
@@ -48,20 +91,48 @@
         "element_id": "flow:process:order-service>store:orders-db>read-write-orders",
         "field": "source_excerpt",
         "value": "Orders, shopper addresses and card-last-four live in a PostgreSQL database (orders-db) that the order service reads and writes."
+      },
+      {
+        "element_id": "flow:entity:shopper>process:storefront-api>place-order",
+        "field": "description",
+        "value": "Shopper submits an order."
+      },
+      {
+        "element_id": "process:storefront-api",
+        "field": "description",
+        "value": "Node service on Cloud Run; the only internet-exposed component. Receives the processor's settlement webhook."
       }
     ]
   },
   "answers": [
     {
-      "key": ["flow:entity:shopper>process:storefront-api>place-order", "authentication", "", "", ""],
+      "key": [
+        "flow:entity:shopper>process:storefront-api>place-order",
+        "authentication",
+        "",
+        "",
+        ""
+      ],
       "value": "session cookie issued after email and password login; no MFA"
     },
     {
-      "key": ["flow:process:storefront-api>process:order-service>submit-order", "authentication", "", "", ""],
+      "key": [
+        "flow:process:storefront-api>process:order-service>submit-order",
+        "authentication",
+        "",
+        "",
+        ""
+      ],
       "value": "none; accepted by network position"
     },
     {
-      "key": ["flow:process:order-service>store:orders-db>read-write-orders", "authentication", "", "", ""],
+      "key": [
+        "flow:process:order-service>store:orders-db>read-write-orders",
+        "authentication",
+        "",
+        "",
+        ""
+      ],
       "value": "single application account with full read/write; password from an environment variable"
     }
   ]

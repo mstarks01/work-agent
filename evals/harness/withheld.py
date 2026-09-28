@@ -19,6 +19,12 @@ occur exactly once across the sources, and afterwards no withheld phrase may
 remain in a source or in a model field, and every element's excerpt must still
 occur in a source. Each check fails closed, because a fact left behind in an
 excerpt reaches the lanes and makes the floor a ceiling.
+
+**A paraphrase is the reviewer's to find.** The phrase check finds a withheld
+phrase and never a restatement of it: case 01's draft passed with "an
+authenticated session" still in a flow's description. So the file lists
+every field it sets back, a person reads the withheld model before signing,
+and ``targets`` names the reference claims each withheld fact supports.
 """
 
 from __future__ import annotations
