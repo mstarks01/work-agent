@@ -93,6 +93,20 @@ class TestWhatIsAsked:
         )
         assert keys(rates, model) == [(STORE, ZONE_ATTRIBUTE, "", "", "")]
 
+    def test_a_qualified_unknown_is_asked(self):
+        """The reading the evidence catalog uses, not an exact match (#1289, Q4)."""
+        model = valid_model()
+        model.get(STORE).encryption_at_rest = "unknown; the sources are silent"
+        asked = keys({"DataStore": {"encryption_at_rest": 1.0}}, model)
+        assert asked == [(STORE, "encryption_at_rest", "", "", "")]
+
+    def test_an_unknown_zone_is_asked_without_an_assumption(self):
+        model = valid_model()
+        model.get(STORE).trust_zone = "unknown"
+        assert keys({"DataStore": {ZONE_ATTRIBUTE: 1.0}}, model) == [
+            (STORE, ZONE_ATTRIBUTE, "", "", "")
+        ]
+
     def test_a_framework_whose_row_counted_no_run_asks_nothing(self):
         assert early_questions(valid_model(), ["asvs"], None) == ()
 

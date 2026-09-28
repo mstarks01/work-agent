@@ -54,9 +54,14 @@ from analysis_service.jobs import (
     PipelineRunner,
     Resumption,
 )
-from analysis_service.links import LinkAnswer, resumed_sources, with_link_answers
+from analysis_service.links import (
+    LinkAnswer,
+    check_answers,
+    resumed_sources,
+    with_link_answers,
+)
 from analysis_service.pipeline import entry_of
-from analysis_service.questions import FactAnswer, check_fact_answers
+from analysis_service.questions import FactAnswer
 from analysis_service.report import FrameworkSelection
 from analysis_service.selection import SelectionError, resolve_selection
 from analysis_service.sources import Source, SourceLimits, clean_system_name
@@ -276,7 +281,7 @@ class Engine:
             None if checkpoint.assertions is None else checkpoint.assertions.catalog
         )
         try:
-            check_fact_answers(facts, checkpoint.system_model, catalog)
+            check_answers(links, facts, checkpoint.system_model, catalog)
             carried, merged, answered = resumed_sources(
                 sources, earlier_links, links, earlier_facts, facts
             )

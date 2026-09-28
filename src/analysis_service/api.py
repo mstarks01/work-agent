@@ -69,6 +69,7 @@ from analysis_service.jobs import (
 from analysis_service.links import (
     MAX_LINK_ANSWERS,
     LinkAnswer,
+    check_answers,
     link_questions,
     resumed_sources,
     with_link_answers,
@@ -78,7 +79,6 @@ from analysis_service.pipeline import entry_of
 from analysis_service.questions import (
     MAX_FACT_ANSWERS,
     FactAnswer,
-    check_fact_answers,
     fact_questions,
     question_fallback,
 )
@@ -917,8 +917,11 @@ def create_app(
                 " continue without them",
             )
         try:
-            check_fact_answers(
-                answers.facts, model, None if assertions is None else assertions.catalog
+            check_answers(
+                answers.links,
+                answers.facts,
+                model,
+                None if assertions is None else assertions.catalog,
             )
             sources, links, facts = resumed_sources(
                 parent.sources, parent.links, answers.links, parent.facts, answers.facts

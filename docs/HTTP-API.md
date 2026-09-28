@@ -180,7 +180,7 @@ report's findings cite, most useful first:
 {"key": ["flow:entity:customer>process:web-app>login", "encryption_in_transit", "", "", ""],
  "kind": "attribute", "basis": "evidence",
  "label": "Customer → Web App: encryption in transit",
- "cited_by": 4, "settled_so_far": 3, "choices": [],
+ "cited_by": 4, "covered_so_far": 3, "choices": [],
  "findings": ["stride/I-01", "stride/I-02", "stride/T-03", "stride/T-04"]}
 ```
 
@@ -199,9 +199,12 @@ report's findings cite, most useful first:
 - `fallback` counts the reviewer's questions that used the fixed list
   (`typed`) and those it had to write in its own words (`free_text`), and the
   share that fell back (`rate`).
-- `settled_so_far` is how many findings are settled once you have
-  answered this question and every question above it. Answer from the top, as
-  far as you like; the list is not capped.
+- `covered_so_far` is how many findings have an answer to every fact they
+  wait on, once you have answered this question and every question above it.
+  It counts answers, not verdicts: an answer such as "I don't know" still
+  counts, and only the resumed run rules on each finding again. The count
+  includes drafts the reviewer rejected. Answer from the top, as far as you
+  like; the list is not capped.
 - `choices` lists the values the fact takes. Empty means free text on one
   line: at most 1,000 characters, and at most 200 for an attribute other than
   `data_description`. An answer
@@ -209,8 +212,8 @@ report's findings cite, most useful first:
   where there is none. It may not be blank or open with another negation, such
   as "no" or "not".
 - `findings` names every finding that waits on the fact, as
-  `framework/claim`. A finding is settled once every question that names it
-  has an answer, in any order, so you can count what a set of answers settles.
+  `framework/claim`. A finding is covered once every question that names it
+  has an answer, in any order, so you can count what a set of answers covers.
 
 Answer with `facts` beside or instead of `links`:
 
@@ -220,7 +223,9 @@ Answer with `facts` beside or instead of `links`:
 ```
 
 An attribute answer is written onto the model the new job analyses, and the
-element's notes say you gave it. An assertion answer replaces the open fact
+element's notes say you gave it. The answer removes each catalog fact about
+that attribute, and a `superseded-by-answer` issue names each removed fact. An
+inferred trust zone that you answer is no longer marked as inferred. An assertion answer replaces the open fact
 with a stated one. A subject answer reaches the analysis as your words in the
 answers source. Your answer settles the fact, even where the sources said
 otherwise. Fact answers need no assertion catalog, so every deployment takes

@@ -271,6 +271,8 @@ Open <http://127.0.0.1:8000>.
 The app is a local demonstration, not a production service. The implementation
 hard-codes `127.0.0.1:8000`, performs no user authentication, allows one active
 run, and keeps at most 20 recent runs in process memory. A restart loses them.
+When the app must remove a run, it removes the oldest run that does not wait
+for your answers.
 
 If configuration or credentials are missing, the app shows a diagnostic page
 instead of the analysis form.
@@ -333,14 +335,16 @@ The app can ask you questions before the analysis, and after the report.
 - **The report's open facts.** Most findings are conditional: they rest on
   facts your description never states, such as how a flow is protected. Under
   **What would settle the conditional findings?** the report lists every such
-  fact, the most useful first, with how many findings are settled once you
-  answer down to it. Answer as far as you like, by choosing a value or typing
+  fact, the most useful first, with how many findings have every fact answered
+  once you answer down to it. The resumed run decides whether each answer
+  settles its finding. Answer as far as you like, by choosing a value or typing
   one line, and run the analysis again. This works on every install, with or
   without an assertion catalog.
 
 An answer settles its fact, even where your description said otherwise. A run
 that waits for your answers is kept in the app's memory, like every other
-run. A restart of the app loses it.
+run, but the app removes it only after every run that does not wait. A restart
+of the app loses it.
 
 ## Next steps
 
