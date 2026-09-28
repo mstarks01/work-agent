@@ -234,6 +234,7 @@ class Node {
   append(...kids) { for (const k of kids) this.children.push(k); }
   replaceChildren(...kids) { this.children = [...kids]; }
   addEventListener(name, fn) { this.listeners[name] = fn; }
+  setAttribute(name, value) { this[name] = value; }
   querySelectorAll(sel) {
     const out = [];
     const walk = (n) => { for (const c of n.children || []) {
@@ -432,6 +433,7 @@ class Node {
   set textContent(t) { this._text = t; }
   get textContent() { return this._text; }
   addEventListener(name, fn) { this.listeners[name] = fn; }
+  setAttribute(name, value) { this[name] = value; }
   all(tag) { const out = [];
     const walk = (n) => { for (const c of n.children) if (typeof c === "object") {
       if (c.tag === tag) out.push(c); walk(c); } };
@@ -668,3 +670,102 @@ def test_the_registry_removes_a_run_that_waits_for_answers_last():
 
     assert analyses.get(paused.id) is paused
     assert analyses.get(run.id) is run
+
+
+CONTROL = {
+    "key": list(FACT["key"]),
+    "kind": "attribute",
+    "label": "login: encryption in transit",
+    "cited_by": 1,
+    "covered_so_far": 1,
+    "choices": [],
+    "form": "control",
+    "suggestions": ["HTTPS", "TLS 1.3"],
+    "findings": ["stride/I-01"],
+}
+
+
+def control_answer(steps: str) -> list:
+    """The facts the report page sends after ``steps`` fill the control."""
+    payloads = {
+        "report": {"system_model": valid_model().model_dump(mode="json")},
+        "link_questions": [],
+        "fact_questions": [CONTROL],
+    }
+    click = "\nawait box.all('button')[0].listeners.click();\n"
+    seen = _run_answer_block(payloads, steps + click)
+    return seen["calls"][0]["body"]["facts"]
+
+
+@pytest.mark.parametrize(("state", "sent"), [("none", "none"), ("unknown", "unknown")])
+def test_a_control_says_there_is_none_or_that_nobody_knows(state, sent):
+    facts = control_answer(
+        f"""
+const [state] = box.all("select");
+state.value = "{state}";
+state.listeners.change();
+"""
+    )
+    assert facts == [{"key": CONTROL["key"], "value": sent}]
+
+
+def test_a_control_names_its_mechanism_in_text():
+    facts = control_answer(
+        """
+const [state] = box.all("select");
+state.value = "mechanism";
+state.listeners.change();
+const [input] = box.all("input");
+input.value = "mutual TLS, certificates rotated yearly";
+"""
+    )
+    assert facts == [
+        {"key": CONTROL["key"], "value": "mutual TLS, certificates rotated yearly"}
+    ]
+
+
+def test_a_control_offers_its_suggestions_beside_the_text():
+    payloads = {
+        "report": {"system_model": valid_model().model_dump(mode="json")},
+        "link_questions": [],
+        "fact_questions": [CONTROL],
+    }
+    steps = """
+const [list] = box.all("datalist");
+const [input] = box.all("input");
+calls.push({ list: list.id, points: input.list,
+  values: list.children.map(o => o.value) });
+"""
+    (seen,) = _run_answer_block(payloads, steps)["calls"]
+    assert seen["points"] == seen["list"]
+    assert seen["values"] == CONTROL["suggestions"]
+
+
+def test_the_form_script_sends_a_control_s_state():
+    """At the pause too, "There is none" sends ``none``."""
+    key = [valid_model().data_flows[0].id, "encryption_in_transit", "", "", ""]
+    facts = [
+        {
+            "key": key,
+            "kind": "attribute",
+            "label": "login: encryption in transit",
+            "reasons": [],
+            "choices": [],
+            "form": "control",
+            "suggestions": ["HTTPS"],
+        }
+    ]
+    steps = f"""
+await ids.analyze.listeners.submit({{ preventDefault() {{}} }}); await settle();
+streams[0].listeners.questions({{ data: JSON.stringify({{ run: "r1", questions: [],
+  facts: {json.dumps(facts)} }}) }});
+const [state] = ids.questions.querySelectorAll("select");
+state.value = "none";
+state.listeners.change();
+await ids.continue.listeners.click(); await settle();
+"""
+    seen = _run_form_script(steps)
+    assert seen["calls"][1]["body"] == {
+        "links": [],
+        "facts": [{"key": key, "value": "none"}],
+    }

@@ -13,6 +13,7 @@ import asyncio
 import pytest
 
 from analysis_service import graph
+from analysis_service.analysis import CONTROL_ATTRIBUTES, control_state
 from analysis_service.assertions import (
     UNKNOWN,
     Assertion,
@@ -39,8 +40,12 @@ from analysis_service.links import (
 from analysis_service.pipeline import AdkPipelineRunner
 from analysis_service.questions import (
     ANSWERS_LABEL,
+    CONTROL_SUGGESTIONS,
     FactAnswer,
     _greedy,
+    answer_choices,
+    answer_form,
+    answer_suggestions,
     answered_model,
     check_fact_answers,
     fact_kind,
@@ -797,3 +802,50 @@ def test_a_rejected_draft_ranks_the_questions_but_is_not_counted(report):
         if claim.verdict.status == "rejected"
     }
     assert not counted & rejected
+
+
+class TestTheControlForm:
+    """A free-text control is asked as none, unknown, or a named mechanism."""
+
+    def test_the_suggestions_answer_every_free_text_control(self):
+        """Derived from the element classes, so a new control needs a row."""
+        free_text = {
+            attribute
+            for element in valid_model().elements()
+            for attribute in CONTROL_ATTRIBUTES
+            if attribute in type(element).model_fields
+            and not answer_choices(
+                (element.id, attribute, "", "", ""), valid_model(), None
+            )
+        }
+        assert set(CONTROL_SUGGESTIONS) == free_text
+
+    @pytest.mark.parametrize(
+        ("attribute", "value"),
+        [(a, v) for a, values in CONTROL_SUGGESTIONS.items() for v in values],
+    )
+    def test_every_suggestion_is_an_answer_the_gate_reads_as_stated(
+        self, attribute, value
+    ):
+        model = open_model()
+        model.data_flows[0].encryption_in_transit = UNKNOWN
+        store = model.data_stores[0]
+        store.encryption_at_rest = UNKNOWN
+        element = store.id if attribute == "encryption_at_rest" else flow_id()
+        answer = FactAnswer(key=(element, attribute, "", "", ""), value=value)
+
+        check_fact_answers([answer], model, None)
+        assert control_state(value) == "stated"
+
+    @pytest.mark.parametrize(
+        ("key", "form"),
+        [
+            ((flow_id(), "authentication", "", "", ""), "control"),
+            (("process:web-app", "exposure", "", "", ""), "choice"),
+            (("process:web-app", "", "", "", "capacity-limits"), "text"),
+            (("", "", "", "who rotates the keys?", ""), "text"),
+        ],
+    )
+    def test_each_fact_takes_its_form(self, key, form):
+        assert answer_form(key, valid_model(), None) == form
+        assert bool(answer_suggestions(key)) == (form == "control")

@@ -50,8 +50,11 @@ from analysis_service.frameworks import PACKAGES
 from analysis_service.open_facts import element_names, label_of
 from analysis_service.question_kinds import QUESTION_KINDS
 from analysis_service.questions import (
+    AnswerForm,
     FactKind,
     answer_choices,
+    answer_form,
+    answer_suggestions,
     fact_kind,
     open_attribute,
     prepared_model,
@@ -136,6 +139,10 @@ class EarlyQuestion:
     reasons: tuple[str, ...]
     #: The answers it takes, or empty where the answer is free text.
     choices: tuple[str, ...]
+    #: How a page takes the answer; see :data:`~analysis_service.questions.AnswerForm`.
+    form: AnswerForm
+    #: Common mechanisms a ``control`` answer may start from.
+    suggestions: tuple[str, ...]
 
     def to_json(self) -> dict[str, object]:
         return {
@@ -144,6 +151,8 @@ class EarlyQuestion:
             "label": self.label,
             "reasons": list(self.reasons),
             "choices": list(self.choices),
+            "form": self.form,
+            "suggestions": list(self.suggestions),
         }
 
 
@@ -199,6 +208,8 @@ def early_questions(
             ),
             reasons=tuple(reasons.get(key[0], ())),
             choices=answer_choices(key, model, catalog),
+            form=answer_form(key, model, catalog),
+            suggestions=answer_suggestions(key),
         )
         for key in sorted(score, key=lambda key: (-score[key], key))
     )
