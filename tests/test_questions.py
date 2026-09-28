@@ -18,6 +18,7 @@ from analysis_service.assertions import (
     Assertion,
     AssertionCatalog,
     AssertionRecord,
+    Quarantined,
     Subject,
     assertion_id,
 )
@@ -27,9 +28,10 @@ from analysis_service.jobs import (
     PipelineCompleted,
     Resumption,
 )
-from analysis_service.links import apply_answers, with_link_answers
+from analysis_service.links import apply_answers, resumed_sources, with_link_answers
 from analysis_service.pipeline import AdkPipelineRunner
 from analysis_service.questions import (
+    ANSWERS_LABEL,
     FactAnswer,
     answered_model,
     check_fact_answers,
@@ -161,6 +163,37 @@ class TestTheChecks:
         with pytest.raises(ValueError, match="no open assertion row"):
             check_fact_answers([wrong], valid_model(), AssertionCatalog())
 
+    @pytest.mark.parametrize("field", ["id", "name", "notes", "source_excerpt"])
+    def test_a_field_that_says_what_an_element_is_is_refused(self, field):
+        process = valid_model().processes[0].id
+        wrong = FactAnswer(key=(process, field, "", "", ""), value="process:other")
+        with pytest.raises(ValueError, match="no attribute"):
+            check_fact_answers([wrong], valid_model(), None)
+
+    @pytest.mark.parametrize("field", ["source", "destination"])
+    def test_a_flow_endpoint_is_refused(self, field):
+        wrong = FactAnswer(key=(flow_id(), field, "", "", ""), value="entity:other")
+        with pytest.raises(ValueError, match="no attribute"):
+            check_fact_answers([wrong], valid_model(), None)
+
+    def test_a_row_the_sources_settled_is_refused(self):
+        settled = Assertion(
+            subject=PRINCIPAL,
+            predicate="mfa-requirement",
+            value="required",
+            basis="inferred",
+            explanation="the description names two factors",
+        )
+        wrong = FactAnswer(key=("", "", assertion_id(settled), "", ""), value="absent")
+        with pytest.raises(ValueError, match="no open assertion row"):
+            check_fact_answers([wrong], valid_model(), open_catalog(settled))
+
+    def test_a_row_an_earlier_answer_settled_can_be_answered_again(self):
+        first = FactAnswer(key=("", "", assertion_id(OPEN_ROW), "", ""), value="absent")
+        written, _ = apply_answers(open_catalog(), valid_model(), [], [first])
+        again = first.model_copy(update={"value": "required"})
+        check_fact_answers([again], valid_model(), written)
+
     def test_a_subject_answer_is_free_text(self):
         fine = FactAnswer(
             key=("", "", "", "whether queries are bound", ""), value="yes"
@@ -180,6 +213,16 @@ def test_an_attribute_answer_is_written_onto_the_model_and_noted():
     flow = model.data_flows[0]
     assert flow.encryption_in_transit == "TLS 1.3"
     assert "TLS 1.3" in flow.notes
+
+
+def test_an_attribute_answer_is_noted_once_however_many_rounds_carry_it():
+    answer = FactAnswer(
+        key=(flow_id(), "encryption_in_transit", "", "", ""), value="TLS 1.3"
+    )
+    once = answered_model(valid_model(), [answer])
+    twice = answered_model(once, [answer])
+
+    assert twice.data_flows[0].notes == once.data_flows[0].notes
 
 
 def test_an_assertion_answer_replaces_its_open_row_and_passes_the_gate():
@@ -295,3 +338,110 @@ class TestTheRoutes:
         body = client.get(f"/v1/jobs/{job}/questions", headers=auth()).json()
         assert "fact_questions" in body
         assert isinstance(body["fact_questions"], list)
+
+
+PRINCIPAL = "principal:customer-accounts"
+OPEN_ROW = Assertion(
+    subject=PRINCIPAL,
+    predicate="mfa-requirement",
+    value=UNKNOWN,
+    basis="stated",
+    reason="silent",
+)
+
+
+def open_catalog(*entries: Assertion) -> AssertionCatalog:
+    return AssertionCatalog(
+        subjects=[Subject(id=PRINCIPAL, type="principal", label="customer accounts")],
+        entries=list(entries or [OPEN_ROW]),
+    )
+
+
+def resume(checkpoint, facts=(), earlier=()):
+    """One resumed job on the real graph from ``prepare``, and its report."""
+    sources, links, answered = resumed_sources([DESCRIPTION], [], [], earlier, facts)
+    job = JobRecord.create(
+        owner_subject="idp|user-1",
+        sources=sources,
+        frameworks=sample_selection(),
+        links=links,
+        facts=answered,
+        resumption=Resumption(parent_id="job-parent", checkpoint=checkpoint),
+    )
+    job.transition("running")
+    pipeline, _ = scripted_pipeline({}, entry=graph.ENTRY_RESUME)
+
+    async def on_node(node: str) -> None:
+        del node
+
+    outcome = asyncio.run(AdkPipelineRunner(pipeline).run(job, on_node))
+    assert isinstance(outcome, PipelineCompleted)
+    return outcome.report
+
+
+class TestASecondRound:
+    """A report of a resumed job, answered again.
+
+    Its checkpoint holds the first round's answered rows, and their quotes read
+    the answers Source that round composed. The second round writes that
+    Source again from the merged answers.
+    """
+
+    FIRST = FactAnswer(key=("", "", assertion_id(OPEN_ROW), "", ""), value="required")
+    LATER = FactAnswer(key=("", "", "", "who rotates the keys?", ""), value="ops")
+
+    def first_round(self):
+        return resume(
+            Checkpoint(
+                system_model=valid_model(),
+                assertions=AssertionRecord(proposed=1, catalog=open_catalog()),
+            ),
+            [self.FIRST],
+        )
+
+    def second_round(self, facts=()):
+        report = self.first_round()
+        checkpoint = Checkpoint(
+            system_model=report.system_model, assertions=report.assertions
+        )
+        return resume(checkpoint, facts, earlier=[self.FIRST])
+
+    def test_a_later_answer_keeps_the_earlier_answer_s_row(self):
+        record = self.second_round([self.LATER]).assertions
+
+        (row,) = record.catalog.entries
+        assert (row.value, row.basis) == ("required", "stated")
+        assert record.quarantined == []
+        assert record.issues == []
+
+    def test_the_earlier_row_quotes_this_round_s_answers_source(self):
+        report = self.second_round([self.LATER])
+        (source,) = [s for s in report.input.sources if s.label == ANSWERS_LABEL]
+        (row,) = report.assertions.catalog.entries
+
+        assert row.support[0].digest == source.sha256
+
+    def test_no_new_answer_reports_no_unmatched_answer(self):
+        record = self.second_round().assertions
+
+        assert [issue.code for issue in record.issues] == []
+
+    def test_a_later_answer_to_the_same_row_replaces_the_earlier_one(self):
+        record = self.second_round(
+            [self.FIRST.model_copy(update={"value": "absent"})]
+        ).assertions
+
+        (row,) = record.catalog.entries
+        assert row.value == "absent"
+
+
+def test_a_resumed_job_keeps_the_rows_its_parent_s_gate_removed():
+    removed = Quarantined(identity="assertion:gone", codes=["unsupported-assertion"])
+    parent = AssertionRecord(proposed=2, catalog=open_catalog(), quarantined=[removed])
+
+    record = resume(
+        Checkpoint(system_model=valid_model(), assertions=parent)
+    ).assertions
+
+    assert record.quarantined == [removed]
+    assert record.refused_rows() == parent.refused_rows() == 1

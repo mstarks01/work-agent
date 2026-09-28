@@ -1834,14 +1834,7 @@ def _resolve_assertions(state: SessionState, model: SystemModel) -> AssertionRec
     sources = state.get(STATE_SOURCE_TEXTS) or {}
     held = state.get(STATE_ASSERTION_CATALOG)
     if held is not None:
-        patched = AssertionRecord.model_validate(held)
-        record = AssertionRecord.over(
-            patched.catalog,
-            model,
-            sources,
-            proposed=patched.proposed,
-            issues=patched.issues,
-        )
+        record = AssertionRecord.model_validate(held)
     else:
         proposed = state.get(STATE_ASSERTION_PROPOSAL)
         if proposed is None:
@@ -1859,9 +1852,12 @@ def _resolve_assertions(state: SessionState, model: SystemModel) -> AssertionRec
     facts = [
         FactAnswer.model_validate(fact) for fact in state.get(STATE_FACT_ANSWERS) or []
     ]
-    if links or facts:
+    if held is not None or links or facts:
         # The submitter's answers settle what they answer, so they are written
-        # over whatever the node proposed and gated with the rest.
+        # over whatever the node proposed and gated with the rest. A held
+        # record is gated only after that: a resumed job's catalog holds its
+        # parent's answered rows, and their quotes read the answers Source the
+        # parent composed until this round writes them again.
         linked, unplaced = apply_answers(record.catalog, model, links, facts)
         record = AssertionRecord.over(
             linked,

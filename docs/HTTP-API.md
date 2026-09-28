@@ -246,7 +246,7 @@ same principal. The finished job's report is unchanged.
 | `404` | The job is not yours, or does not exist. |
 | `400` | `links` and `facts` are both empty and the job is not waiting on answers. Empty means "continue without answers". |
 | `409` | The job is neither completed nor waiting on answers, its report is withheld, or its report carries no catalog. |
-| `422` | `links` is missing or empty, or an entry is malformed. |
+| `422` | An entry of `links` or `facts` is malformed, or a list holds more than its limit: 50 links, 200 facts. |
 
 **Or answer in a new submission** of the same system, beside the sources. That
 job extracts everything again, and a principal the new run spells differently
