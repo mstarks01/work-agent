@@ -154,8 +154,12 @@ def test_every_early_question_takes_an_answer_the_answer_rules_accept():
     """The early list and the answers route are two readers of one model."""
     model = valid_model()
     for question in early_questions(model, ["stride"], None):
-        value = question.choices[0] if question.choices else "stated by the submitter"
-        check_fact_answers([FactAnswer(key=question.key, value=value)], model, None)
+        if question.facets:
+            answer = FactAnswer(key=question.key, facets={question.facets[0].id: "yes"})
+        else:
+            value = question.choices[0] if question.choices else "stated by them"
+            answer = FactAnswer(key=question.key, value=value)
+        check_fact_answers([answer], model, None)
 
 
 def test_the_shipped_prior_puts_an_unknown_attribute_near_the_top():
@@ -227,10 +231,16 @@ class TestTheGroups:
 
 class TestTheYesNoKinds:
     def test_a_yes_no_kind_opens_with_a_verb_that_asks_whether(self):
-        """The field follows the reviewed wording, so the two cannot drift."""
+        """The field follows the reviewed wording, so the two cannot drift.
+
+        A kind that asks whether several things hold is answered in facets.
+        """
         for name, kind in QUESTION_KINDS.items():
             asks_whether = kind.template.split()[0] in {"Are", "Can", "Does"}
-            assert (kind.answer == "yes-no") == asks_whether, name
+            if kind.answer == "yes-no":
+                assert asks_whether, name
+            if asks_whether:
+                assert kind.answer in {"yes-no", "facets"}, name
 
     def test_a_yes_no_kind_takes_yes_no_or_unknown(self):
         key = UnknownRef(element_id=STORE, question="stored-copy-integrity").key
@@ -242,6 +252,6 @@ class TestTheYesNoKinds:
                 [FactAnswer(key=key, value="sometimes")], valid_model(), None
             )
 
-    def test_a_text_kind_stays_free_text(self):
+    def test_a_faceted_kind_has_no_choices_of_its_own(self):
         key = UnknownRef(element_id=STORE, question="audit-evidence").key
         assert answer_choices(key, valid_model(), None) == ()

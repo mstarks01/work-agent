@@ -28,6 +28,11 @@
   // The answer that says the submitter does not know. The service writes
   // nothing for it, so the fact stays open.
   const DONT_KNOW = "unknown";
+  // The answers a facet takes, as the service lists them in FACET_ANSWERS.
+  const FACET_CHOICES = [
+    ["yes", "yes"], ["no", "no"], ["not applicable", "not applicable"],
+    ["I don't know", DONT_KNOW],
+  ];
   // How many of the reviewer's open facts used the fixed list of questions,
   // and how many it wrote in its own words, counted server-side.
   const FALLBACK = JSON.parse(document.getElementById("question_fallback").textContent);
@@ -704,7 +709,9 @@
     const box = $("links");
     const option = (label, value) => Object.assign(el("option", null, label), { value });
     const linkSelects = [];
-    const factInputs = [];
+    // One reader per fact question: `read` is its answer as the service takes
+    // it, or null; `known` is whether that answer says more than "I don't know".
+    const factAnswers = [];
 
     if (LINK_QUESTIONS.length) {
       box.append(el("h2", null, "Which element is each of these?"));
@@ -756,10 +763,7 @@
       }));
       const tally = el("div", "meta");
       function recount() {
-        const known = index => {
-          const value = factInputs[index].value.trim();
-          return value && value !== DONT_KNOW;
-        };
+        const known = index => factAnswers[index].known();
         const covered = [...waitsOn.values()].filter(asked => asked.every(known)).length;
         tally.textContent =
           `Your answers cover every fact for ${covered} of the ${waitsOn.size} findings ` +
@@ -773,6 +777,33 @@
             "Raised by the reviewer \u2014 these can change when the analysis runs again"));
         }
         const row = el("p");
+        if (q.form === "facets") {
+          // One list per facet; a facet left blank is not sent.
+          const list = el("ul");
+          const selects = q.facets.map(facet => {
+            const select = el("select");
+            select.append(option("(leave unanswered)", ""));
+            FACET_CHOICES.forEach(([label, value]) => select.append(option(label, value)));
+            select.dataset.key = JSON.stringify(q.key);
+            select.dataset.facet = facet.id;
+            select.addEventListener("change", recount);
+            const item = el("li", null, `${facet.question} `);
+            item.append(select);
+            list.append(item);
+            return select;
+          });
+          const given = () => Object.fromEntries(
+            selects.filter(s => s.value).map(s => [s.dataset.facet, s.value]));
+          factAnswers.push({
+            read: () => Object.keys(given()).length ? { key: q.key, facets: given() } : null,
+            known: () => Object.values(given()).some(value => value !== DONT_KNOW),
+          });
+          row.append(el("b", null, q.label),
+            ` \u2014 ${q.cited_by} finding(s) wait on it; answering down to here covers ${q.covered_so_far}`,
+            list);
+          into.append(row);
+          return;
+        }
         let input;
         // "unknown" is the answer that says you do not know: the fact stays
         // open, and it covers no finding. `beside` is what follows the label.
@@ -826,7 +857,10 @@
           ` \u2014 ${q.cited_by} finding(s) wait on it; answering down to here covers ${q.covered_so_far} `,
           ...beside);
         into.append(row);
-        factInputs.push(input);
+        factAnswers.push({
+          read: () => input.value.trim() ? { key: q.key, value: input.value.trim() } : null,
+          known: () => Boolean(input.value.trim()) && input.value.trim() !== DONT_KNOW,
+        });
       });
       if (FACT_QUESTIONS.length > SHOWN) box.append(more);
       box.append(tally);
@@ -839,9 +873,7 @@
       const links = linkSelects
         .filter(s => s.value)
         .map(s => ({ principal: s.dataset.principal, element: s.value }));
-      const facts = factInputs
-        .filter(i => i.value.trim())
-        .map(i => ({ key: JSON.parse(i.dataset.key), value: i.value.trim() }));
+      const facts = factAnswers.map(answer => answer.read()).filter(Boolean);
       again.disabled = true;
       // The run id is this page's own path: /report/{run}.
       const run = location.pathname.split("/").pop();

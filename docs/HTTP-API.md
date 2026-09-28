@@ -160,9 +160,9 @@ asks no link question, and asks its early questions.
 
 A waiting job also lists `early_questions`: the open facts of its model, most
 likely needed first, before any finding exists. Each entry is
-`{key, kind, label, reasons, choices, form, suggestions, group, group_heading,
-element}`. `kind`, `choices`, `form` and `suggestions` are as they are for a
-report's open facts below. `group` is the question kind or the attribute, and
+`{key, kind, label, reasons, choices, form, suggestions, facets, group,
+group_heading, element}`. `kind`, `choices`, `form`, `suggestions` and
+`facets` are as they are for a report's open facts below. `group` is the question kind or the attribute, and
 `group_heading` is its question with no element named, so a page can ask each
 once and list the elements under it by their `element` name. The list keeps
 its order within and across groups.
@@ -217,7 +217,11 @@ findings, so that each has every fact it waits on answered:
   a control with no closed set, such as `authentication`: send `none` where
   there is none, `unknown` where nobody knows, or name the mechanism.
   `suggestions` then lists common mechanisms to start from, and your text may
-  say more, such as how a key is rotated. `text` means free text.
+  say more, such as how a key is rotated. `facets` means a question kind with
+  several parts, listed in `facets` as `{id, question}`: answer each part you
+  can with `yes`, `no`, `not applicable` or `unknown`, and send them as a
+  `facets` map in place of `value`. The service writes the answer's line from
+  them. `text` means free text.
 - `choices` lists the values the fact takes. A question kind that asks
   whether something holds, such as "Can content it takes run code with its
   authority?", takes `yes` or `no`. Empty means free text on one
@@ -238,8 +242,14 @@ Answer with `facts` beside or instead of `links`:
 
 ```json
 {"facts": [{"key": ["flow:entity:customer>process:web-app>login",
-                    "encryption_in_transit", "", "", ""], "value": "TLS 1.3"}]}
+                    "encryption_in_transit", "", "", ""], "value": "TLS 1.3"},
+           {"key": ["process:web-app", "", "", "", "capacity-limits"],
+            "facets": {"rate": "yes", "quota": "not applicable"}}]}
 ```
+
+A question kind with facets takes only a `facets` map, or the value `unknown`.
+A facet you leave out is not answered. An answer whose facets are all
+`unknown` says that you do not know, and covers no finding.
 
 An attribute answer is accepted only where the model leaves the attribute open,
 or where an earlier round of answers answered it. The model is read with the

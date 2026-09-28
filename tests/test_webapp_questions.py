@@ -20,6 +20,8 @@ from fastapi.testclient import TestClient
 from analysis_service import Engine, StubPipelineRunner
 from analysis_service.assertions import AssertionRecord
 from analysis_service.jobs import Checkpoint, PipelineAwaiting, PipelineCompleted
+from analysis_service.question_kinds import QUESTION_KINDS
+from analysis_service.questions import FACET_ANSWERS, FactAnswer
 from tests import test_open_facts, test_questions, test_webapp
 from tests.factories import valid_model
 from tests.test_resume import parent_catalog
@@ -843,3 +845,114 @@ await ids.continue.listeners.click(); await settle();
     ]
     (sent,) = [c for c in seen if c.get("url") == "/answer/r1"]
     assert sent["body"]["facts"] == [{"key": facts[0]["key"], "value": "no"}]
+
+
+def facet_fact(element, kind="capacity-limits"):
+    facets = QUESTION_KINDS[kind].facets
+    return {
+        "key": [element.id, "", "", "", kind],
+        "kind": "question",
+        "label": kind,
+        "reasons": [],
+        "choices": [],
+        "form": "facets",
+        "suggestions": [],
+        "facets": [{"id": f.id, "question": f.question} for f in facets],
+        "group": kind,
+        "group_heading": f"{kind}?",
+        "element": element.name,
+    }
+
+
+def test_the_pause_asks_facets_as_a_table_with_a_same_for_all_row():
+    """A column per facet, a row per element, and a row that sets a column."""
+    store, flow = valid_model().data_stores[0], valid_model().data_flows[0]
+    facts = [facet_fact(store), facet_fact(flow)]
+    steps = f"""
+await ids.analyze.listeners.submit({{ preventDefault() {{}} }}); await settle();
+streams[0].listeners.questions({{ data: JSON.stringify({{ run: "r1", questions: [],
+  facts: {json.dumps(facts)} }}) }});
+const [table] = ids.questions.querySelectorAll("table");
+const [head, all, ...rows] = table.children;
+calls.push({{ columns: head.children.map(c => c.textContent), rows: rows.length }});
+const every = all.children[1].children[0];
+every.value = "yes";
+every.listeners.change();
+const quota = rows[1].children[4].children[0];
+quota.value = "not applicable";
+await ids.continue.listeners.click(); await settle();
+"""
+    seen = _run_form_script(steps)["calls"]
+    (layout,) = [c for c in seen if "columns" in c]
+    (sent,) = [c for c in seen if c.get("url") == "/answer/r1"]
+
+    facets = QUESTION_KINDS["capacity-limits"].facets
+    assert layout == {
+        "columns": ["Part of your system", *(f.question for f in facets)],
+        "rows": 2,
+    }
+    assert sent["body"]["facts"] == [
+        {"key": facts[0]["key"], "facets": {"rate": "yes"}},
+        {"key": facts[1]["key"], "facets": {"rate": "yes", "quota": "not applicable"}},
+    ]
+    for fact in sent["body"]["facts"]:
+        FactAnswer.model_validate(fact)
+
+
+@pytest.mark.parametrize("value", ["yes", "no", "not applicable", "unknown"])
+def test_every_facet_answer_the_page_offers_is_one_the_service_takes(value):
+    """The page's FACET_CHOICES and the service's FACET_ANSWERS are two readers."""
+    store = valid_model().data_stores[0]
+    facts = [facet_fact(store)]
+    steps = f"""
+await ids.analyze.listeners.submit({{ preventDefault() {{}} }}); await settle();
+streams[0].listeners.questions({{ data: JSON.stringify({{ run: "r1", questions: [],
+  facts: {json.dumps(facts)} }}) }});
+const [table] = ids.questions.querySelectorAll("table");
+const select = table.children[2].children[1].children[0];
+calls.push({{ offered: select.children.map(o => o.value) }});
+select.value = {json.dumps(value)};
+await ids.continue.listeners.click(); await settle();
+"""
+    seen = _run_form_script(steps)["calls"]
+    (offered,) = [c["offered"] for c in seen if "offered" in c]
+    (sent,) = [c for c in seen if c.get("url") == "/answer/r1"]
+
+    assert offered == ["", *FACET_ANSWERS, "unknown"]
+    FactAnswer.model_validate(sent["body"]["facts"][0])
+
+
+def test_the_report_page_sends_facets_and_counts_only_a_known_one():
+    store = valid_model().data_stores[0]
+    question = {
+        **facet_fact(store, "audit-evidence"),
+        "basis": "evidence",
+        "cited_by": 1,
+        "covered_so_far": 1,
+        "findings": ["stride/R-01"],
+    }
+    payloads = {
+        "report": {"system_model": valid_model().model_dump(mode="json")},
+        "link_questions": [],
+        "fact_questions": [question],
+    }
+    steps = """
+const [first, second] = box.all("select");
+first.value = "unknown";
+first.listeners.change();
+calls.push({ after_unknown: box.all("div").map(d => d.textContent).filter(t => t.startsWith("Your"))[0] });
+second.value = "no";
+second.listeners.change();
+calls.push({ after_no: box.all("div").map(d => d.textContent).filter(t => t.startsWith("Your"))[0] });
+await box.all("button")[0].listeners.click();
+"""
+    seen = _run_answer_block(payloads, steps)["calls"]
+
+    assert seen[0]["after_unknown"].startswith("Your answers cover every fact for 0")
+    assert seen[1]["after_no"].startswith("Your answers cover every fact for 1")
+    assert seen[2]["body"]["facts"] == [
+        {
+            "key": question["key"],
+            "facets": {"records-actor": "unknown", "record-protected": "no"},
+        }
+    ]

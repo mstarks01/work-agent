@@ -49,9 +49,16 @@ from collections import Counter
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from types import MappingProxyType
-from typing import Literal, get_args, get_origin
+from typing import Any, Literal, get_args, get_origin
 
-from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    ValidationError,
+    field_validator,
+    model_validator,
+)
 
 from analysis_service.analysis import control_state
 from analysis_service.assertions import (
@@ -68,7 +75,7 @@ from analysis_service.assertions import (
 )
 from analysis_service.claims import FrameworkAnalysis, UnknownKey, UnknownRef
 from analysis_service.open_facts import element_names, label_of
-from analysis_service.question_kinds import QUESTION_KINDS
+from analysis_service.question_kinds import QUESTION_KINDS, Facet
 from analysis_service.sources import plain_name
 from analysis_service.system_model import (
     ZONE_ATTRIBUTE,
@@ -80,6 +87,7 @@ from analysis_service.validation import validate
 __all__ = [
     "ANSWERS_LABEL",
     "CONTROL_SUGGESTIONS",
+    "FACET_ANSWERS",
     "MAX_FACT_ANSWERS",
     "YES_NO",
     "AnswerForm",
@@ -87,10 +95,12 @@ __all__ = [
     "FactQuestion",
     "Fallback",
     "answer_choices",
+    "answer_facets",
     "answer_form",
     "answer_suggestions",
     "answered_model",
     "check_fact_answers",
+    "facets_json",
     "fact_kind",
     "fact_questions",
     "fact_rows",
@@ -124,6 +134,43 @@ class FactAnswer(BaseModel):
 
     key: UnknownKey
     value: str = Field(min_length=1, max_length=1000)
+    #: A ``facets`` kind's answer: each facet's ID and one of
+    #: :data:`FACET_ANSWERS` or ``unknown``. The service writes ``value`` from
+    #: it, so a submission sends one or the other.
+    facets: dict[str, str] | None = None
+
+    @model_validator(mode="before")
+    @classmethod
+    def _facet_value(cls, data: Any) -> Any:
+        """Write ``value`` from ``facets``, one facet a clause, in the kind's order."""
+        if not isinstance(data, dict) or data.get("facets") is None:
+            return data
+        facets, key = data["facets"], data.get("key")
+        question = key[4] if isinstance(key, list | tuple) and len(key) == 5 else ""
+        kind = QUESTION_KINDS.get(question)
+        if kind is None or kind.answer != "facets":
+            raise ValueError("facets answer only a question kind that has facets")
+        if not isinstance(facets, dict) or not facets:
+            raise ValueError("a facet answer names at least one facet")
+        ids = {facet.id for facet in kind.facets}
+        for facet, answer in facets.items():
+            if facet not in ids:
+                raise ValueError(f"no facet {facet!r} of {question!r}")
+            if answer not in (*FACET_ANSWERS, UNKNOWN):
+                raise ValueError(
+                    f"{answer!r} is not one of {', '.join(FACET_ANSWERS)} or"
+                    f" {UNKNOWN} for {facet!r}"
+                )
+        given = [facet for facet in kind.facets if facet.id in facets]
+        known = any(facets[facet.id] != UNKNOWN for facet in given)
+        value = (
+            "; ".join(f"{facet.question} {facets[facet.id]}" for facet in given)
+            if known
+            else UNKNOWN
+        )
+        if data.get("value") not in (None, value):
+            raise ValueError("the service writes a facet answer's value")
+        return {**data, "value": value}
 
     @field_validator("value")
     @classmethod
@@ -204,6 +251,8 @@ class FactQuestion:
     form: AnswerForm
     #: Common mechanisms a ``control`` answer may start from.
     suggestions: tuple[str, ...]
+    #: The parts a ``facets`` answer is given in.
+    facets: tuple[Facet, ...]
     #: Every finding that waits on it, as ``framework/claim``. A finding is
     #: covered once every question that names it has an answer, whichever
     #: questions those are.
@@ -220,6 +269,7 @@ class FactQuestion:
             "choices": list(self.choices),
             "form": self.form,
             "suggestions": list(self.suggestions),
+            "facets": facets_json(self.facets),
             "findings": list(self.findings),
         }
 
@@ -289,6 +339,9 @@ def answer_choices(
 #: The answers a ``yes-no`` question kind takes.
 YES_NO: tuple[str, ...] = ("yes", "no")
 
+#: The answers a facet takes, beside ``unknown``.
+FACET_ANSWERS: tuple[str, ...] = ("yes", "no", "not applicable")
+
 #: Starting points for a control answered in free text: common mechanisms, so
 #: a submitter can pick one and add what matters, such as how a key is rotated.
 #: Keyed by every control attribute with no closed set, which
@@ -327,22 +380,35 @@ CONTROL_SUGGESTIONS: Mapping[str, tuple[str, ...]] = MappingProxyType(
 #: How a page takes an answer: one of ``choices``; a control, where the
 #: submitter says there is none, does not know, or names the mechanism in
 #: text; or free text.
-AnswerForm = Literal["choice", "control", "text"]
+AnswerForm = Literal["choice", "control", "facets", "text"]
 
 
 def answer_form(
     key: UnknownKey, model: SystemModel, catalog: AssertionCatalog | None
 ) -> AnswerForm:
     """How a page takes an answer to this fact."""
+    if answer_facets(key):
+        return "facets"
     if answer_choices(key, model, catalog):
         return "choice"
     control = fact_kind(key) == "attribute" and key[1] in CONTROL_SUGGESTIONS
     return "control" if control else "text"
 
 
+def answer_facets(key: UnknownKey) -> tuple[Facet, ...]:
+    """The facets a question kind is answered in, or empty."""
+    kind = QUESTION_KINDS.get(key[4]) if fact_kind(key) == "question" else None
+    return () if kind is None else kind.facets
+
+
 def answer_suggestions(key: UnknownKey) -> tuple[str, ...]:
     """Common mechanisms for a control answered in free text, or empty."""
     return CONTROL_SUGGESTIONS.get(key[1], ()) if fact_kind(key) == "attribute" else ()
+
+
+def facets_json(facets: Sequence[Facet]) -> list[dict[str, str]]:
+    """The facets as a page reads them."""
+    return [{"id": facet.id, "question": facet.question} for facet in facets]
 
 
 def _answered_row(catalog: AssertionCatalog, identity: str) -> Assertion | None:
@@ -485,6 +551,7 @@ def fact_questions(
                     choices=answer_choices(key, model, catalog),
                     form=answer_form(key, model, catalog),
                     suggestions=answer_suggestions(key),
+                    facets=answer_facets(key),
                     findings=tuple(
                         sorted(
                             f"{framework}/{claim}"
@@ -577,6 +644,8 @@ def check_fact_answers(
         if kind == "question":
             if question not in QUESTION_KINDS or model.get(element_id) is None:
                 raise ValueError(f"no question {question!r} about {element_id!r}")
+            if answer_facets(answer.key) and answer.facets is None and answer.known:
+                raise ValueError(f"{question!r} is answered in its facets")
         elif kind == "attribute":
             element = model.get(element_id)
             answerable = () if element is None else attribute_names(element)
