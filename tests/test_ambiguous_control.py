@@ -60,3 +60,30 @@ def test_the_gate_and_control_state_share_one_reader_of_the_leading_word():
     assert leading_word("  Not stated", AMBIGUOUS_CONTROL_LEADS) == "not"
     assert leading_word("nobody said", AMBIGUOUS_CONTROL_LEADS) is None
     assert leading_word("N/A", AMBIGUOUS_CONTROL_LEADS) == "n/a"
+
+
+@pytest.mark.parametrize(
+    "value",
+    [
+        "I don't know",
+        "I don’t know",
+        "don't know yet",
+        "TBD",
+        "unsure, maybe OAuth",
+        "probably TLS",
+        "idk",
+    ],
+)
+def test_a_control_opening_with_a_doubt_is_refused(value):
+    """``control_state`` reads each of these as a stated control (#1289)."""
+    model = valid_model()
+    model.data_flows[0].authentication = value
+    assert control_state(value) == "stated"
+    assert "ambiguous-control" in codes(model)
+
+
+@pytest.mark.parametrize("value", ["IAM database auth", "idempotency key", "TLS 1.3"])
+def test_a_mechanism_that_shares_letters_with_a_doubt_passes(value):
+    model = valid_model()
+    model.data_flows[0].authentication = value
+    assert "ambiguous-control" not in codes(model)

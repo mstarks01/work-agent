@@ -151,7 +151,7 @@ table is the table (first assignment vs last); which version keys a ledger row
 (two copies of one line); when an element ID is checked (the rule and the
 deriver disagreed about the empty-slug case).
 
-Three corollaries, the first two from the same audits:
+Five corollaries, the first two from the same audits:
 
 - **A self-sized fence is safe only while its neighbours are fenced too.** Ask
   what sits beside the value, not only what wraps it.
@@ -180,6 +180,17 @@ Three corollaries, the first two from the same audits:
   first.** `run.py replay` over `evals/emissions/` costs nothing, and the diff
   is the only thing that says whether a rule change moved a figure. A fixture
   that sets an ID without its name hides this whole class, and three did.
+- **A check before admission runs the writer it guards, and discards the
+  result.** `check_answers` writes the link answers with `apply_answers`, and
+  the attribute check builds the answered model and asks the validity gate. A
+  check that restates the writer's rules admits what the writer then refuses
+  (#1289, Q5).
+- **Two writers of one fact need a stated precedence and a test that asks
+  every reader.** An answer and the catalog's projection both wrote an
+  attribute, and the projection ran second (#1289, Q1).
+  `tests/test_answer_invariants.py` drives the resume graph once for each
+  `PROJECTION_EFFECT` reason and asks the model, the catalog and a later
+  reader's view for the same fact.
 
 ### Name the shapes before you read the value
 

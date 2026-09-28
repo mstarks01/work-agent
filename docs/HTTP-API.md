@@ -212,7 +212,8 @@ findings, so that each has every fact it waits on answered:
   `data_description`. An answer
   about a control, such as `authentication`, names the mechanism, or is `none`
   where there is none. It may not be blank or open with another negation, such
-  as "no" or "not".
+  as "no" or "not". It may not open with a doubt either, such as "TBD" or
+  "I don't know": send `unknown` for that.
 - The value `unknown` says that you do not know. Every fact takes it, whatever
   its `choices`. The service writes nothing for it, so the fact stays open, and
   the analysis reads your answer as a line of the answers source.

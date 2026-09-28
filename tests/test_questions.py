@@ -772,6 +772,16 @@ class TestAnUnknownAnswer:
         assert written.entries == [OPEN_ROW]
         assert issues == []
 
+    @pytest.mark.parametrize("typed", ["I don't know", "I don\u2019t know", "TBD"])
+    def test_a_typed_doubt_about_a_control_is_refused(self, typed):
+        """The page's choice sends ``unknown``; typed words read as a control."""
+        answer = FactAnswer(key=self.DONT_KNOW.key, value=typed)
+        model = valid_model()
+        model.data_flows[1].authentication = UNKNOWN
+        key = (model.data_flows[1].id, "authentication", "", "", "")
+        with pytest.raises(ValueError, match="opens with"):
+            check_fact_answers([answer.model_copy(update={"key": key})], model, None)
+
     def test_it_is_refused_over_an_earlier_answer(self):
         earlier = self.DONT_KNOW.model_copy(update={"value": "TLS 1.3"})
         with pytest.raises(ValueError, match="earlier answer settled"):
