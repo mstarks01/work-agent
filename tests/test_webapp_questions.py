@@ -792,3 +792,54 @@ calls.push({ analysing: !ids.status.hidden, text: ids["status-text"].textContent
     assert paused == {"paused": True}
     assert analysing["analysing"]
     assert "threat analysis with your answers" in analysing["text"]
+
+
+def test_the_form_script_asks_each_group_once_with_a_row_per_element():
+    """Two elements under one kind make one group with two rows (#1289)."""
+    store, flow = valid_model().data_stores[0], valid_model().data_flows[0]
+
+    def fact(element, name, choices):
+        return {
+            "key": [element.id, "", "", "", name],
+            "kind": "question",
+            "label": name,
+            "reasons": ["why"],
+            "choices": [{"id": c, "name": ""} for c in choices],
+            "form": "choice" if choices else "text",
+            "suggestions": [],
+            "group": name,
+            "group_heading": f"{name} heading?",
+            "element": element.name,
+        }
+
+    facts = [
+        fact(store, "stored-copy-integrity", ["yes", "no"]),
+        fact(flow, "audit-evidence", []),
+        fact(flow, "stored-copy-integrity", ["yes", "no"]),
+    ]
+    steps = f"""
+await ids.analyze.listeners.submit({{ preventDefault() {{}} }}); await settle();
+streams[0].listeners.questions({{ data: JSON.stringify({{ run: "r1", questions: [],
+  facts: {json.dumps(facts)} }}) }});
+const groups = ids.questions.querySelectorAll("details");
+calls.push({{ groups: groups.map(g => ({{
+  title: g.children[0].textContent,
+  rows: g.children.slice(1).map(r => r.children[0].textContent),
+  open: g.open }})) }});
+const [first] = ids.questions.querySelectorAll("select");
+first.value = "no";
+await ids.continue.listeners.click(); await settle();
+"""
+    seen = _run_form_script(steps)["calls"]
+    (layout,) = [c for c in seen if "groups" in c]
+
+    assert layout["groups"] == [
+        {
+            "title": "stored-copy-integrity heading? (2)",
+            "rows": [store.name, flow.name],
+            "open": True,
+        },
+        {"title": "audit-evidence heading? (1)", "rows": [flow.name], "open": True},
+    ]
+    (sent,) = [c for c in seen if c.get("url") == "/answer/r1"]
+    assert sent["body"]["facts"] == [{"key": facts[0]["key"], "value": "no"}]

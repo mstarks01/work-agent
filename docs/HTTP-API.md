@@ -160,8 +160,12 @@ asks no link question, and asks its early questions.
 
 A waiting job also lists `early_questions`: the open facts of its model, most
 likely needed first, before any finding exists. Each entry is
-`{key, kind, label, reasons, choices, form, suggestions}`. `kind`, `choices`,
-`form` and `suggestions` are as they are for a report's open facts below.
+`{key, kind, label, reasons, choices, form, suggestions, group, group_heading,
+element}`. `kind`, `choices`, `form` and `suggestions` are as they are for a
+report's open facts below. `group` is the question kind or the attribute, and
+`group_heading` is its question with no element named, so a page can ask each
+once and list the elements under it by their `element` name. The list keeps
+its order within and across groups.
 `reasons` gives the questions of the rules that fire on the element, which say
 why the fact matters. An attribute is asked only where the model, with the
 assertion catalog applied, leaves it open: `unknown`, possibly with a
@@ -214,7 +218,9 @@ findings, so that each has every fact it waits on answered:
   there is none, `unknown` where nobody knows, or name the mechanism.
   `suggestions` then lists common mechanisms to start from, and your text may
   say more, such as how a key is rotated. `text` means free text.
-- `choices` lists the values the fact takes. Empty means free text on one
+- `choices` lists the values the fact takes. A question kind that asks
+  whether something holds, such as "Can content it takes run code with its
+  authority?", takes `yes` or `no`. Empty means free text on one
   line: at most 1,000 characters, and at most 200 for an attribute other than
   `data_description`. An answer
   about a control, such as `authentication`, names the mechanism, or is `none`

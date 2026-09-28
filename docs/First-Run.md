@@ -316,16 +316,19 @@ uses `unknown`; code turns a claim resting on such an attribute into
 The app can ask you questions before the analysis, and after the report.
 
 - **Before the analysis.** Tick **Ask me questions before the analysis runs**.
-  The run stops after it has read your description. It lists the open facts of
-  the model, the most likely needed first, each with the reason a rule gives:
-  a value the description leaves unknown, a zone the app had to guess, or a
-  fixed question about one element. Answer by choosing a value or typing one
-  line. Where your install builds an assertion catalog
-  (`ANALYSIS_ASSERTIONS=true`), it also asks which element each group of
-  people or accounts is, such as "shopper accounts", so that facts about the
-  group reach the model. Questions you leave unanswered stay open. Click
-  **Continue**. The analysis then starts from what was already read, so
-  nothing is read again, and it reads your answers.
+  The app reads your description, builds the system model and checks it. Then
+  it stops, before the threat analysis starts, and says so. It asks each open
+  fact once, with a row for each part of your system it applies to: a value
+  the description leaves unknown, a zone the app had to guess, or a fixed
+  question such as "Who can reach its interface, and from where?". A question
+  that asks whether something holds takes yes, no or "I don't know". The most
+  likely needed questions come first and are open; the rest are one click
+  away. Hover over a part's name to see why a rule asks about it. Where your
+  install builds an assertion catalog (`ANALYSIS_ASSERTIONS=true`), it also
+  asks which element each group of people or accounts is, such as "shopper
+  accounts", so that facts about the group reach the model. Rows you leave
+  blank stay open. Click **Start the analysis**. The analysis then starts from
+  what was already read, so nothing is read again, and it reads your answers.
 - **After the report.** Where your install builds an assertion catalog, the
   report page lists the group questions under **Which element is each of
   these?**. Choose answers and click **Run the

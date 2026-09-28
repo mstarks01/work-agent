@@ -47,7 +47,7 @@ from analysis_service.assertions import AssertionCatalog
 from analysis_service.candidates import generate_candidates
 from analysis_service.claims import FrameworkName, UnknownKey, UnknownRef
 from analysis_service.frameworks import PACKAGES
-from analysis_service.open_facts import element_names, label_of
+from analysis_service.open_facts import element_names, group_of, label_of
 from analysis_service.question_kinds import QUESTION_KINDS
 from analysis_service.questions import (
     AnswerForm,
@@ -143,6 +143,11 @@ class EarlyQuestion:
     form: AnswerForm
     #: Common mechanisms a ``control`` answer may start from.
     suggestions: tuple[str, ...]
+    #: The group a page shows it in, the group's heading, and the element's
+    #: name as its row in that group (:func:`~analysis_service.open_facts.group_of`).
+    group: str
+    group_heading: str
+    element: str
 
     def to_json(self) -> dict[str, object]:
         return {
@@ -153,6 +158,9 @@ class EarlyQuestion:
             "choices": list(self.choices),
             "form": self.form,
             "suggestions": list(self.suggestions),
+            "group": self.group,
+            "group_heading": self.group_heading,
+            "element": self.element,
         }
 
 
@@ -199,17 +207,22 @@ def early_questions(
                 if key is not None:
                     score[key] = score.get(key, 0.0) + rate * (1 + named[element.id])
     names = element_names(model)
-    return tuple(
-        EarlyQuestion(
-            key=key,
-            kind=fact_kind(key),
-            label=label_of(
-                UnknownRef(element_id=key[0], attribute=key[1], question=key[4]), names
-            ),
-            reasons=tuple(reasons.get(key[0], ())),
-            choices=answer_choices(key, model, catalog),
-            form=answer_form(key, model, catalog),
-            suggestions=answer_suggestions(key),
+    asked = []
+    for key in sorted(score, key=lambda key: (-score[key], key)):
+        ref = UnknownRef(element_id=key[0], attribute=key[1], question=key[4])
+        group, heading = group_of(ref)
+        asked.append(
+            EarlyQuestion(
+                key=key,
+                kind=fact_kind(key),
+                label=label_of(ref, names),
+                reasons=tuple(reasons.get(key[0], ())),
+                choices=answer_choices(key, model, catalog),
+                form=answer_form(key, model, catalog),
+                suggestions=answer_suggestions(key),
+                group=group,
+                group_heading=heading,
+                element=names.get(key[0], key[0]),
+            )
         )
-        for key in sorted(score, key=lambda key: (-score[key], key))
-    )
+    return tuple(asked)
