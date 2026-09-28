@@ -79,11 +79,15 @@ from analysis_service.validation import validate
 
 __all__ = [
     "ANSWERS_LABEL",
+    "CONTROL_SUGGESTIONS",
     "MAX_FACT_ANSWERS",
+    "AnswerForm",
     "FactAnswer",
     "FactQuestion",
     "Fallback",
     "answer_choices",
+    "answer_form",
+    "answer_suggestions",
     "answered_model",
     "check_fact_answers",
     "fact_kind",
@@ -195,6 +199,10 @@ class FactQuestion:
     covered_so_far: int
     #: The answers it takes, or empty where the answer is free text.
     choices: tuple[str, ...]
+    #: How a page takes the answer; see :data:`AnswerForm`.
+    form: AnswerForm
+    #: Common mechanisms a ``control`` answer may start from.
+    suggestions: tuple[str, ...]
     #: Every finding that waits on it, as ``framework/claim``. A finding is
     #: covered once every question that names it has an answer, whichever
     #: questions those are.
@@ -209,6 +217,8 @@ class FactQuestion:
             "cited_by": self.cited_by,
             "covered_so_far": self.covered_so_far,
             "choices": list(self.choices),
+            "form": self.form,
+            "suggestions": list(self.suggestions),
             "findings": list(self.findings),
         }
 
@@ -270,6 +280,62 @@ def answer_choices(
                 if subject.type in predicate.refers_to
             )
     return ()
+
+
+#: Starting points for a control answered in free text: common mechanisms, so
+#: a submitter can pick one and add what matters, such as how a key is rotated.
+#: Keyed by every control attribute with no closed set, which
+#: ``tests/test_questions.py`` derives from the element classes. The words come
+#: from the corpus's signed models where they name one, and a suggestion is
+#: never an answer until the submitter sends it.
+CONTROL_SUGGESTIONS: Mapping[str, tuple[str, ...]] = MappingProxyType(
+    {
+        "authentication": (
+            "session cookie after a password login",
+            "password and a second factor",
+            "company SSO",
+            "OAuth 2.0 bearer token",
+            "API key in a header",
+            "service account",
+            "mutual TLS",
+            "pre-shared key",
+        ),
+        "encryption_in_transit": (
+            "HTTPS",
+            "TLS 1.3",
+            "TLS 1.2",
+            "mutual TLS",
+            "SSH transport",
+            "VPN tunnel",
+        ),
+        "encryption_at_rest": (
+            "provider-managed key",
+            "customer-managed key (CMEK)",
+            "full-disk encryption",
+            "database transparent data encryption",
+        ),
+    }
+)
+
+#: How a page takes an answer: one of ``choices``; a control, where the
+#: submitter says there is none, does not know, or names the mechanism in
+#: text; or free text.
+AnswerForm = Literal["choice", "control", "text"]
+
+
+def answer_form(
+    key: UnknownKey, model: SystemModel, catalog: AssertionCatalog | None
+) -> AnswerForm:
+    """How a page takes an answer to this fact."""
+    if answer_choices(key, model, catalog):
+        return "choice"
+    control = fact_kind(key) == "attribute" and key[1] in CONTROL_SUGGESTIONS
+    return "control" if control else "text"
+
+
+def answer_suggestions(key: UnknownKey) -> tuple[str, ...]:
+    """Common mechanisms for a control answered in free text, or empty."""
+    return CONTROL_SUGGESTIONS.get(key[1], ()) if fact_kind(key) == "attribute" else ()
 
 
 def _answered_row(catalog: AssertionCatalog, identity: str) -> Assertion | None:
@@ -410,6 +476,8 @@ def fact_questions(
                         1 for facts in waiting.values() if facts <= answered
                     ),
                     choices=answer_choices(key, model, catalog),
+                    form=answer_form(key, model, catalog),
+                    suggestions=answer_suggestions(key),
                     findings=tuple(
                         sorted(
                             f"{framework}/{claim}"

@@ -775,13 +775,35 @@
         const row = el("p");
         let input;
         // "unknown" is the answer that says you do not know: the fact stays
-        // open, and it covers no finding.
-        let dontKnow = null;
+        // open, and it covers no finding. `beside` is what follows the label.
+        let beside;
         if (q.choices.length) {
           input = el("select");
           input.append(option("(leave unanswered)", ""));
           q.choices.forEach(choice => input.append(option(names[choice] ? `${names[choice]} (${choice})` : choice, choice)));
           input.append(option("I don't know", DONT_KNOW));
+          beside = [input];
+        } else if (q.form === "control") {
+          // A control: say there is none, say you do not know, or name the
+          // mechanism. The suggestions are a start; the text is the answer.
+          input = el("input");
+          input.type = "text";
+          input.maxLength = 1000;
+          input.placeholder = "the mechanism, and what matters about it";
+          const list = el("datalist");
+          list.id = `suggest-${index}`;
+          q.suggestions.forEach(s => list.append(option(s, s)));
+          input.setAttribute("list", list.id);
+          const state = el("select");
+          state.append(option("(leave unanswered)", ""), option("There is none", "none"),
+            option("I don't know", DONT_KNOW), option("A mechanism:", "mechanism"));
+          state.addEventListener("change", () => {
+            const fixed = state.value === "none" || state.value === DONT_KNOW;
+            input.value = fixed ? state.value : "";
+            input.disabled = fixed;
+            recount();
+          });
+          beside = [state, " ", input, list];
         } else {
           input = el("input");
           input.type = "text";
@@ -794,15 +816,15 @@
             input.disabled = box.checked;
             recount();
           });
-          dontKnow = el("label");
+          const dontKnow = el("label");
           dontKnow.append(box, " I don't know");
+          beside = [input, " ", dontKnow];
         }
         input.dataset.key = JSON.stringify(q.key);
         input.addEventListener(q.choices.length ? "change" : "input", recount);
         row.append(el("b", null, q.label),
           ` \u2014 ${q.cited_by} finding(s) wait on it; answering down to here covers ${q.covered_so_far} `,
-          input);
-        if (dontKnow) row.append(" ", dontKnow);
+          ...beside);
         into.append(row);
         factInputs.push(input);
       });

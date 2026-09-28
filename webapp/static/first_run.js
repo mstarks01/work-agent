@@ -125,40 +125,50 @@
     const summary = document.createElement("summary");
     summary.textContent = `More questions (${data.facts.length - SHOWN})`;
     more.append(summary);
+    const optionOf = (label, value) => {
+      const choice = document.createElement("option");
+      choice.value = value;
+      choice.textContent = label;
+      return choice;
+    };
     data.facts.forEach((q, index) => {
       const row = document.createElement("p");
       let input;
+      // `beside` is what follows the label.
+      let beside;
       if (q.choices.length) {
         input = document.createElement("select");
-        const skip = document.createElement("option");
-        skip.value = "";
-        skip.textContent = "(leave unanswered)";
-        input.append(skip);
+        input.append(optionOf("(leave unanswered)", ""));
         for (const option of q.choices) {
-          const choice = document.createElement("option");
-          choice.value = option.id;
-          choice.textContent = option.name ? `${option.name} (${option.id})` : option.id;
-          input.append(choice);
+          input.append(optionOf(option.name ? `${option.name} (${option.id})` : option.id, option.id));
         }
-        const dontKnow = document.createElement("option");
-        dontKnow.value = DONT_KNOW;
-        dontKnow.textContent = "I don't know";
-        input.append(dontKnow);
+        input.append(optionOf("I don't know", DONT_KNOW));
+        beside = [input];
+      } else if (q.form === "control") {
+        // A control: say there is none, say you do not know, or name the
+        // mechanism. The suggestions are a start; the text is the answer.
+        input = document.createElement("input");
+        input.type = "text";
+        input.maxLength = 1000;
+        input.placeholder = "the mechanism, and what matters about it";
+        const list = document.createElement("datalist");
+        list.id = `early-suggest-${index}`;
+        for (const suggestion of q.suggestions) list.append(optionOf(suggestion, suggestion));
+        input.setAttribute("list", list.id);
+        const state = document.createElement("select");
+        state.append(optionOf("(leave unanswered)", ""), optionOf("There is none", "none"),
+          optionOf("I don't know", DONT_KNOW), optionOf("A mechanism:", "mechanism"));
+        state.addEventListener("change", () => {
+          const fixed = state.value === "none" || state.value === DONT_KNOW;
+          input.value = fixed ? state.value : "";
+          input.disabled = fixed;
+        });
+        beside = [state, " ", input, list];
       } else {
         input = document.createElement("input");
         input.type = "text";
         input.maxLength = 1000;
         input.placeholder = "(leave unanswered)";
-      }
-      input.dataset.key = JSON.stringify(q.key);
-      factInputs.push(input);
-      const label = document.createElement("b");
-      label.textContent = q.label;
-      const why = document.createElement("div");
-      why.className = "meta";
-      why.textContent = q.reasons.join(" ");
-      row.append(label, " ", input);
-      if (!q.choices.length) {
         const box = document.createElement("input");
         box.type = "checkbox";
         box.addEventListener("change", () => {
@@ -167,9 +177,16 @@
         });
         const dontKnow = document.createElement("label");
         dontKnow.append(box, " I don't know");
-        row.append(" ", dontKnow);
+        beside = [input, " ", dontKnow];
       }
-      row.append(why);
+      input.dataset.key = JSON.stringify(q.key);
+      factInputs.push(input);
+      const label = document.createElement("b");
+      label.textContent = q.label;
+      const why = document.createElement("div");
+      why.className = "meta";
+      why.textContent = q.reasons.join(" ");
+      row.append(label, " ", ...beside, why);
       (index < SHOWN ? questions : more).append(row);
     });
     if (data.facts.length > SHOWN) questions.append(more);

@@ -337,7 +337,10 @@ The app can ask you questions before the analysis, and after the report.
   **What would settle the conditional findings?** the report lists every such
   fact, the most useful first, with how many findings have every fact answered
   once you answer down to it. Choose "I don't know" where nobody knows: the
-  fact stays open. The resumed run decides whether each answer
+  fact stays open. For a control such as authentication or encryption, first
+  choose "There is none", "I don't know" or "A mechanism". For a mechanism, the
+  text box suggests common ones as you type, and you can add what matters,
+  such as how often a key is rotated. The resumed run decides whether each answer
   settles its finding. Answer as far as you like, by choosing a value or typing
   one line, and run the analysis again. This works on every install, with or
   without an assertion catalog.

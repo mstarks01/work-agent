@@ -160,11 +160,12 @@ asks no link question, and asks its early questions.
 
 A waiting job also lists `early_questions`: the open facts of its model, most
 likely needed first, before any finding exists. Each entry is
-`{key, kind, label, reasons, choices}`. `kind` and `choices` are as they are
-for a report's open facts below. `reasons` gives the questions of the rules
-that fire on the element, which say why the fact matters. An attribute is
-asked only where the model holds `unknown`, and a zone only where the service
-inferred it. Answer them as `facts` on the route below. The analysis then
+`{key, kind, label, reasons, choices, form, suggestions}`. `kind`, `choices`,
+`form` and `suggestions` are as they are for a report's open facts below.
+`reasons` gives the questions of the rules that fire on the element, which say
+why the fact matters. An attribute is asked only where the model, with the
+assertion catalog applied, leaves it open: `unknown`, possibly with a
+qualification after it, or a zone the service inferred. Answer them as `facts` on the route below. The analysis then
 reads your answers, so the findings rest on them.
 
 **Limit:** a waiting job is held in the service's memory. A restart of the
@@ -182,6 +183,7 @@ findings, so that each has every fact it waits on answered:
  "kind": "attribute", "basis": "evidence",
  "label": "Customer → Web App: encryption in transit",
  "cited_by": 4, "covered_so_far": 3, "choices": [],
+ "form": "control", "suggestions": ["HTTPS", "TLS 1.3", "TLS 1.2"],
  "findings": ["stride/I-01", "stride/I-02", "stride/T-03", "stride/T-04"]}
 ```
 
@@ -207,6 +209,11 @@ findings, so that each has every fact it waits on answered:
   again. A draft the reviewer rejected still ranks the questions, but no count
   includes it. Answer from the top, as far as you like; the list is not
   capped.
+- `form` says how to answer. `choice` means one of `choices`. `control` means
+  a control with no closed set, such as `authentication`: send `none` where
+  there is none, `unknown` where nobody knows, or name the mechanism.
+  `suggestions` then lists common mechanisms to start from, and your text may
+  say more, such as how a key is rotated. `text` means free text.
 - `choices` lists the values the fact takes. Empty means free text on one
   line: at most 1,000 characters, and at most 200 for an attribute other than
   `data_description`. An answer
