@@ -53,7 +53,9 @@ def signed_file(tmp_path, case_id, answers, signed_by="mstarks01"):
 class TestTheSignedAnswers:
     def test_signed_answers_load(self, tmp_path, case):  # noqa: F811
         signed_file(tmp_path, case.id, [AT_REST])
-        assert run.signed_answers([case], tmp_path) == {case.id: (AT_REST,)}
+        loaded = run.signed_answers([case], tmp_path)
+        assert loaded[case.id].answers == (AT_REST,)
+        assert loaded[case.id].signed_by == "mstarks01"
 
     def test_an_unsigned_file_is_refused(self, tmp_path, case):  # noqa: F811
         signed_file(tmp_path, case.id, [AT_REST], signed_by=None)

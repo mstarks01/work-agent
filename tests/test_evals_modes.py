@@ -1065,6 +1065,7 @@ def test_every_mode_maps_to_a_graph_entry():
         "end-to-end": ENTRY_EXTRACT,
         "heads": ENTRY_HEAD_ONLY,
         "answered": ENTRY_PREPARE,
+        "withheld": ENTRY_PREPARE,
     }
 
 

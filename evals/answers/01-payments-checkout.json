@@ -1,0 +1,68 @@
+{
+  "case": "01-payments-checkout",
+  "drafted_by": "agent",
+  "signed_by": null,
+  "purpose": "withheld-sentence test (#1225): each withheld phrase states one control, the model fields that record it are set back, and each answer gives the same fact back in the blessed model's own value",
+  "withheld": {
+    "source": [
+      {
+        "text": "Shoppers sign in with email and password and get a session cookie; we have not rolled out MFA for shopper accounts yet.",
+        "replacement": ""
+      },
+      {
+        "text": "There is no auth on that gRPC call — the order service accepts anything that can reach it, which is meant to be only the storefront API.",
+        "replacement": ""
+      },
+      {
+        "text": "and writes with a single application account that has full read/write. The password comes from an environment variable on the worker.",
+        "replacement": "and writes."
+      }
+    ],
+    "model": [
+      {
+        "element_id": "flow:entity:shopper>process:storefront-api>place-order",
+        "field": "authentication",
+        "value": "unknown"
+      },
+      {
+        "element_id": "flow:entity:shopper>process:storefront-api>place-order",
+        "field": "source_excerpt",
+        "value": "Shoppers browse the storefront and place orders through the storefront API, a Node service running on Cloud Run."
+      },
+      {
+        "element_id": "flow:process:storefront-api>process:order-service>submit-order",
+        "field": "authentication",
+        "value": "unknown"
+      },
+      {
+        "element_id": "flow:process:storefront-api>process:order-service>submit-order",
+        "field": "source_excerpt",
+        "value": "When a shopper submits an order the storefront API calls the order service over gRPC."
+      },
+      {
+        "element_id": "flow:process:order-service>store:orders-db>read-write-orders",
+        "field": "authentication",
+        "value": "unknown"
+      },
+      {
+        "element_id": "flow:process:order-service>store:orders-db>read-write-orders",
+        "field": "source_excerpt",
+        "value": "Orders, shopper addresses and card-last-four live in a PostgreSQL database (orders-db) that the order service reads and writes."
+      }
+    ]
+  },
+  "answers": [
+    {
+      "key": ["flow:entity:shopper>process:storefront-api>place-order", "authentication", "", "", ""],
+      "value": "session cookie issued after email and password login; no MFA"
+    },
+    {
+      "key": ["flow:process:storefront-api>process:order-service>submit-order", "authentication", "", "", ""],
+      "value": "none; accepted by network position"
+    },
+    {
+      "key": ["flow:process:order-service>store:orders-db>read-write-orders", "authentication", "", "", ""],
+      "value": "single application account with full read/write; password from an environment variable"
+    }
+  ]
+}
