@@ -842,7 +842,8 @@ class TestTheControlForm:
         [
             ((flow_id(), "authentication", "", "", ""), "control"),
             (("process:web-app", "exposure", "", "", ""), "choice"),
-            (("process:web-app", "", "", "", "capacity-limits"), "text"),
+            (("process:web-app", "", "", "", "capacity-limits"), "facets"),
+            (("process:web-app", "", "", "", "code-execution"), "choice"),
             (("", "", "", "who rotates the keys?", ""), "text"),
         ],
     )

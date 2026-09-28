@@ -48,13 +48,15 @@ from analysis_service.candidates import generate_candidates
 from analysis_service.claims import FrameworkName, UnknownKey, UnknownRef
 from analysis_service.frameworks import PACKAGES
 from analysis_service.open_facts import element_names, group_of, label_of
-from analysis_service.question_kinds import QUESTION_KINDS
+from analysis_service.question_kinds import QUESTION_KINDS, Facet
 from analysis_service.questions import (
     AnswerForm,
     FactKind,
     answer_choices,
+    answer_facets,
     answer_form,
     answer_suggestions,
+    facets_json,
     fact_kind,
     open_attribute,
     prepared_model,
@@ -143,6 +145,8 @@ class EarlyQuestion:
     form: AnswerForm
     #: Common mechanisms a ``control`` answer may start from.
     suggestions: tuple[str, ...]
+    #: The parts a ``facets`` answer is given in.
+    facets: tuple[Facet, ...]
     #: The group a page shows it in, the group's heading, and the element's
     #: name as its row in that group (:func:`~analysis_service.open_facts.group_of`).
     group: str
@@ -158,6 +162,7 @@ class EarlyQuestion:
             "choices": list(self.choices),
             "form": self.form,
             "suggestions": list(self.suggestions),
+            "facets": facets_json(self.facets),
             "group": self.group,
             "group_heading": self.group_heading,
             "element": self.element,
@@ -220,6 +225,7 @@ def early_questions(
                 choices=answer_choices(key, model, catalog),
                 form=answer_form(key, model, catalog),
                 suggestions=answer_suggestions(key),
+                facets=answer_facets(key),
                 group=group,
                 group_heading=heading,
                 element=names.get(key[0], key[0]),

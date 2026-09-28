@@ -25,6 +25,7 @@ from analysis_service.questions import (
     question_fallback,
 )
 from analysis_service.sources import Source
+from analysis_service.system_model import UNKNOWN
 from tests import test_critic_review_replay
 from tests.factories import sample_draft, sample_report, sample_ruling, valid_model
 
@@ -90,20 +91,26 @@ def test_the_label_is_the_kind_s_question_about_the_element_s_name():
 class TestTheAnswer:
     KEY = (STORE, "", "", "", "audit-evidence")
 
-    def test_it_is_free_text_about_an_element_that_exists(self):
-        check_fact_answers(
-            [FactAnswer(key=self.KEY, value="Postgres audit log")], valid_model(), None
-        )
+    def test_it_is_answered_in_its_facets(self):
+        answer = FactAnswer(key=self.KEY, facets={"records-actor": "yes"})
+        check_fact_answers([answer], valid_model(), None)
+        assert answer.value == "Does it record who performed each action? yes"
+
+    def test_free_text_is_refused_where_the_kind_has_facets(self):
+        answer = FactAnswer(key=self.KEY, value="Postgres audit log")
+        with pytest.raises(ValueError, match="answered in its facets"):
+            check_fact_answers([answer], valid_model(), None)
 
     def test_it_is_refused_about_an_element_that_does_not(self):
         wrong = FactAnswer(
-            key=("store:nowhere", "", "", "", "audit-evidence"), value="x"
+            key=("store:nowhere", "", "", "", "audit-evidence"),
+            facets={"records-actor": "yes"},
         )
         with pytest.raises(ValueError, match="no question"):
             check_fact_answers([wrong], valid_model(), None)
 
     def test_its_line_asks_the_kind_s_question(self):
-        answer = FactAnswer(key=self.KEY, value="Postgres audit log")
+        answer = FactAnswer(key=self.KEY, facets={"records-actor": "yes"})
         (_, answers) = with_link_answers([Source.description("an app")], [], [answer])
         asked = QUESTION_KINDS["audit-evidence"].template.format(element=STORE)
         assert f'Asked "{asked}"' in answers.text
@@ -179,3 +186,59 @@ def test_the_critic_prompt_lists_every_kind_with_what_it_covers():
     prompt = compose_critic_prompt(test_critic_review_replay.PROMPT_LOADER)
     for name, kind in QUESTION_KINDS.items():
         assert f"- `{name}`: {kind.covers}" in prompt
+
+
+class TestTheFacets:
+    """A compound kind is answered in short parts (#1289)."""
+
+    def test_a_kind_has_facets_exactly_where_it_is_answered_in_them(self):
+        for name, kind in QUESTION_KINDS.items():
+            assert bool(kind.facets) == (kind.answer == "facets"), name
+
+    def test_facet_ids_are_distinct_within_a_kind(self):
+        for kind in QUESTION_KINDS.values():
+            ids = [facet.id for facet in kind.facets]
+            assert len(ids) == len(set(ids))
+
+    def test_every_facet_is_a_question(self):
+        for kind in QUESTION_KINDS.values():
+            for facet in kind.facets:
+                assert facet.question.endswith("?")
+
+    def test_the_value_lists_the_facets_in_the_kind_s_order(self):
+        key = (STORE, "", "", "", "capacity-limits")
+        answer = FactAnswer(key=key, facets={"quota": "no", "rate": "yes"})
+        assert answer.value == (
+            "Does it limit the rate of requests? yes;"
+            " Does it set a quota per user or tenant? no"
+        )
+
+    def test_only_unknown_facets_are_an_unknown_answer(self):
+        key = (STORE, "", "", "", "capacity-limits")
+        answer = FactAnswer(key=key, facets={"rate": UNKNOWN})
+        assert not answer.known
+        assert answer.value == UNKNOWN
+
+    @pytest.mark.parametrize(
+        ("facets", "error"),
+        [
+            ({"nope": "yes"}, "no facet"),
+            ({"rate": "sometimes"}, "is not one of"),
+            ({}, "at least one facet"),
+        ],
+    )
+    def test_a_bad_facet_answer_is_refused(self, facets, error):
+        with pytest.raises(ValueError, match=error):
+            FactAnswer(key=(STORE, "", "", "", "capacity-limits"), facets=facets)
+
+    def test_facets_are_refused_for_a_kind_without_them(self):
+        with pytest.raises(ValueError, match="only a question kind that has facets"):
+            FactAnswer(key=(STORE, "", "", "", "code-execution"), facets={"x": "yes"})
+
+    def test_a_value_beside_facets_must_be_the_written_one(self):
+        key = (STORE, "", "", "", "capacity-limits")
+        with pytest.raises(ValueError, match="writes a facet answer"):
+            FactAnswer(key=key, facets={"rate": "yes"}, value="something else")
+        written = FactAnswer(key=key, facets={"rate": "yes"})
+        again = FactAnswer.model_validate(written.model_dump())
+        assert again == written

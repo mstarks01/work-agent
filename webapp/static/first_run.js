@@ -105,13 +105,19 @@
   // unanswered; "none" says the principal is no element. Every label and
   // option is untrusted and lands as text.
   let pausedRun = null;
-  let factInputs = [];
+  // One reader per question: its answer as the service takes it, or null.
+  let answers = [];
   // The answer that says the submitter does not know. The service writes
   // nothing for it, so the fact stays open.
   const DONT_KNOW = "unknown";
+  // The answers a facet takes, as the service lists them in FACET_ANSWERS.
+  const FACET_CHOICES = [
+    ["yes", "yes"], ["no", "no"], ["not applicable", "not applicable"],
+    ["I don't know", DONT_KNOW],
+  ];
   const showQuestions = (data) => {
     pausedRun = data.run;
-    factInputs = [];
+    answers = [];
     questions.replaceChildren();
     const heading = (title, text) => {
       const lead = document.createElement("p");
@@ -180,7 +186,76 @@
       choice.textContent = label;
       return choice;
     };
+    // A question with facets is a table: a column per facet, a row per
+    // element, and a first row that sets the whole column.
+    const facetTable = (group, q) => {
+      const table = document.createElement("table");
+      const head = document.createElement("tr");
+      const corner = document.createElement("th");
+      corner.textContent = "Part of your system";
+      head.append(corner);
+      const columns = q.facets.map((facet) => {
+        const cell = document.createElement("th");
+        cell.textContent = facet.question;
+        head.append(cell);
+        return [];
+      });
+      const all = document.createElement("tr");
+      const allLabel = document.createElement("td");
+      allLabel.textContent = "Same for all";
+      all.append(allLabel);
+      q.facets.forEach((facet, column) => {
+        const cell = document.createElement("td");
+        const every = facetSelect("(set every row)");
+        every.addEventListener("change", () => {
+          for (const select of columns[column]) select.value = every.value;
+        });
+        cell.append(every);
+        all.append(cell);
+      });
+      table.append(head, all);
+      group.box.append(table);
+      return { table, columns };
+    };
+    const facetSelect = (blank) => {
+      const select = document.createElement("select");
+      select.append(optionOf(blank, ""));
+      for (const [label, value] of FACET_CHOICES) select.append(optionOf(label, value));
+      return select;
+    };
     data.facts.forEach((q, index) => {
+      const group = groups.get(q.group);
+      group.count += 1;
+      const label = document.createElement("b");
+      label.textContent = q.element;
+      // Why the fact matters: the questions of the rules that fire on it.
+      label.title = q.reasons.join(" ");
+      if (q.form === "facets") {
+        group.grid = group.grid || facetTable(group, q);
+        const row = document.createElement("tr");
+        const name = document.createElement("td");
+        name.append(label);
+        row.append(name);
+        const selects = q.facets.map((facet, column) => {
+          const select = facetSelect("(leave unanswered)");
+          select.dataset.key = JSON.stringify(q.key);
+          select.dataset.facet = facet.id;
+          group.grid.columns[column].push(select);
+          const cell = document.createElement("td");
+          cell.append(select);
+          row.append(cell);
+          return select;
+        });
+        group.grid.table.append(row);
+        answers.push(() => {
+          const given = {};
+          for (const select of selects) {
+            if (select.value) given[select.dataset.facet] = select.value;
+          }
+          return Object.keys(given).length ? { key: q.key, facets: given } : null;
+        });
+        return;
+      }
       const row = document.createElement("p");
       let input;
       // `beside` is what follows the label.
@@ -229,14 +304,11 @@
         beside = [input, " ", dontKnow];
       }
       input.dataset.key = JSON.stringify(q.key);
-      factInputs.push(input);
-      const label = document.createElement("b");
-      label.textContent = q.element;
-      // Why the fact matters: the questions of the rules that fire on it.
-      label.title = q.reasons.join(" ");
+      answers.push(() => {
+        const value = input.value.trim();
+        return value ? { key: q.key, value } : null;
+      });
       row.append(label, " ", ...beside);
-      const group = groups.get(q.group);
-      group.count += 1;
       group.box.append(row);
     });
     for (const group of groups.values()) {
@@ -250,9 +322,7 @@
     const links = [...questions.querySelectorAll("select")]
       .filter((select) => select.dataset.principal && select.value)
       .map((select) => ({ principal: select.dataset.principal, element: select.value }));
-    const facts = factInputs
-      .filter((input) => input.value.trim())
-      .map((input) => ({ key: JSON.parse(input.dataset.key), value: input.value.trim() }));
+    const facts = answers.map((read) => read()).filter(Boolean);
     const resumed = await fetch("/answer/" + pausedRun, {
       method: "POST",
       headers: { "Content-Type": "application/json" },

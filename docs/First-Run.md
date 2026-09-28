@@ -321,7 +321,11 @@ The app can ask you questions before the analysis, and after the report.
   fact once, with a row for each part of your system it applies to: a value
   the description leaves unknown, a zone the app had to guess, or a fixed
   question such as "Who can reach its interface, and from where?". A question
-  that asks whether something holds takes yes, no or "I don't know". The most
+  that asks whether something holds takes yes, no or "I don't know". A
+  question with several parts, such as "What limits bound the requests…?", is
+  a table: one column for each part, one row for each part of your system, and
+  a first row that sets a whole column at once. Each cell takes yes, no, not
+  applicable or "I don't know". The most
   likely needed questions come first and are open; the rest are one click
   away. Hover over a part's name to see why a rule asks about it. Where your
   install builds an assertion catalog (`ANALYSIS_ASSERTIONS=true`), it also
