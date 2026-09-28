@@ -96,6 +96,7 @@ from analysis_service.validation import validate
 
 __all__ = [
     "ABSENT",
+    "ANSWER_ISSUES",
     "CATALOG_REFUSALS",
     "GATE_REFUSALS",
     "MAX_ASSERTIONS",
@@ -788,7 +789,14 @@ CatalogIssueCode = Literal[
 ]
 
 
-#: Every code that refuses a row, which is every code but two.
+#: The issues a submitter's answer draws when it places nothing. None is a
+#: refusal, and each is a fact about the answers one round applies, so a round
+#: drops the ones its checkpoint carries and finds its own again.
+ANSWER_ISSUES: frozenset[str] = frozenset(
+    {"unmatched-link", "unknown-link-element", "unmatched-answer"}
+)
+
+#: Every code that refuses a row: every code but two and the answer issues.
 #:
 #: :data:`CatalogIssueCode` holds what a report's ``assertions.issues`` can say.
 #: ``graph-contradiction`` is not a refusal: the row stands, stays settled and
@@ -798,13 +806,11 @@ CatalogIssueCode = Literal[
 #: left to a reader to remember, because ``tests/test_assertions.py`` holds the
 #: gate's fixture table to exactly these, and a new code that is a refusal must
 #: fail there rather than quietly join the exception.
-GATE_REFUSALS: frozenset[str] = frozenset(get_args(CatalogIssueCode)) - {
-    "graph-contradiction",
-    "support-truncated",
-    "unmatched-link",
-    "unknown-link-element",
-    "unmatched-answer",
-}
+GATE_REFUSALS: frozenset[str] = (
+    frozenset(get_args(CatalogIssueCode))
+    - {"graph-contradiction", "support-truncated"}
+    - ANSWER_ISSUES
+)
 
 #: The refusals of a whole catalog rather than of a row in it: a catalog keyed
 #: by another registry, or one over a count bound. Nothing in such a catalog

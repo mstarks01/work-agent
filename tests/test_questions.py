@@ -28,7 +28,12 @@ from analysis_service.jobs import (
     PipelineCompleted,
     Resumption,
 )
-from analysis_service.links import apply_answers, resumed_sources, with_link_answers
+from analysis_service.links import (
+    LinkAnswer,
+    apply_answers,
+    resumed_sources,
+    with_link_answers,
+)
 from analysis_service.pipeline import AdkPipelineRunner
 from analysis_service.questions import (
     ANSWERS_LABEL,
@@ -193,6 +198,19 @@ class TestTheChecks:
         written, _ = apply_answers(open_catalog(), valid_model(), [], [first])
         again = first.model_copy(update={"value": "required"})
         check_fact_answers([again], valid_model(), written)
+
+    @pytest.mark.parametrize(
+        ("value", "rule"),
+        [
+            ("no authentication at all", "opens with 'no'"),
+            ("   ", "is empty"),
+            ("x" * 201, "at most 200"),
+        ],
+    )
+    def test_a_value_the_validity_gate_refuses_is_refused(self, value, rule):
+        wrong = FactAnswer(key=(flow_id(), "authentication", "", "", ""), value=value)
+        with pytest.raises(ValueError, match=rule):
+            check_fact_answers([wrong], valid_model(), None)
 
     def test_a_subject_answer_is_free_text(self):
         fine = FactAnswer(
@@ -445,3 +463,46 @@ def test_a_resumed_job_keeps_the_rows_its_parent_s_gate_removed():
 
     assert record.quarantined == [removed]
     assert record.refused_rows() == parent.refused_rows() == 1
+
+
+def test_a_corrected_link_answer_leaves_no_issue_from_the_earlier_round():
+    wrong = LinkAnswer(principal="customer accounts", element="process:ghost")
+    right = LinkAnswer(principal="customer accounts", element="entity:customer")
+    first = resume_links(
+        Checkpoint(
+            system_model=valid_model(),
+            assertions=AssertionRecord(proposed=1, catalog=open_catalog()),
+        ),
+        [wrong],
+    )
+    assert [issue.code for issue in first.assertions.issues] == ["unknown-link-element"]
+
+    second = resume_links(
+        Checkpoint(system_model=first.system_model, assertions=first.assertions),
+        [right],
+        earlier=[wrong],
+    )
+
+    assert second.assertions.issues == []
+
+
+def resume_links(checkpoint, links, earlier=()):
+    """One resumed job with link answers, on the real graph from ``prepare``."""
+    sources, merged, facts = resumed_sources([DESCRIPTION], earlier, links)
+    job = JobRecord.create(
+        owner_subject="idp|user-1",
+        sources=sources,
+        frameworks=sample_selection(),
+        links=merged,
+        facts=facts,
+        resumption=Resumption(parent_id="job-parent", checkpoint=checkpoint),
+    )
+    job.transition("running")
+    pipeline, _ = scripted_pipeline({}, entry=graph.ENTRY_RESUME)
+
+    async def on_node(node: str) -> None:
+        del node
+
+    outcome = asyncio.run(AdkPipelineRunner(pipeline).run(job, on_node))
+    assert isinstance(outcome, PipelineCompleted)
+    return outcome.report

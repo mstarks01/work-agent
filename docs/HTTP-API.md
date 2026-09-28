@@ -202,8 +202,12 @@ report's findings cite, most useful first:
 - `settled_so_far` is how many findings are settled once you have
   answered this question and every question above it. Answer from the top, as
   far as you like; the list is not capped.
-- `choices` lists the values the fact takes. Empty means free text, one line,
-  at most 1,000 characters.
+- `choices` lists the values the fact takes. Empty means free text on one
+  line: at most 1,000 characters, and at most 200 for an attribute other than
+  `data_description`. An answer
+  about a control, such as `authentication`, names the mechanism, or is `none`
+  where there is none. It may not be blank or open with another negation, such
+  as "no" or "not".
 - `findings` names every finding that waits on the fact, as
   `framework/claim`. A finding is settled once every question that names it
   has an answer, in any order, so you can count what a set of answers settles.

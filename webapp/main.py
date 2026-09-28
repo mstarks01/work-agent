@@ -17,7 +17,7 @@ Two pages, three data endpoints:
 ``GET  /report/{run}``  ``report_view.html`` with this run's JSON injected
 ``GET  /example``       ``examples/orders.md``, for **Load example**
 ``POST /analyze``       start a run on a selection, return its id
-``POST /answer/{run}``  answer a run's link questions, start the resumed run
+``POST /answer/{run}``  answer a run's questions, start the resumed run
 ``GET  /events/{run}``  server-sent per-node progress
 ======================  ========================================================
 
@@ -187,7 +187,7 @@ PORT = 8000
 MAX_RUNS = 20
 
 #: The report page loads nothing external. It reaches its own origin for one
-#: thing: posting answers to its link questions to ``/answer/{run}``.
+#: thing: posting answers to its questions to ``/answer/{run}``.
 _REPORT_GRANTS = Grants(script=True, style=True, connect=True)
 
 #: The form page calls ``/example``, ``/analyze`` and ``/events/{run}``, so it
@@ -536,7 +536,7 @@ def create_app(
 
     @app.post("/answer/{run_id}")
     async def answer(run_id: str, request: Request) -> Response:
-        """Answer a run's link questions, and start the run that resumes from it.
+        """Answer a run's questions, and start the run that resumes from it.
 
         The run answered is a paused one or a finished one. The new run starts
         at ``prepare`` from what that run reached, so nothing is extracted

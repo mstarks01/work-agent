@@ -127,6 +127,7 @@ from google.genai import types
 from pydantic import BaseModel, ValidationError
 
 from analysis_service.assertions import (
+    ANSWER_ISSUES,
     AssertionCatalog,
     AssertionRecord,
     CatalogProposal,
@@ -1864,9 +1865,12 @@ def _resolve_assertions(state: SessionState, model: SystemModel) -> AssertionRec
             model,
             sources,
             proposed=record.proposed,
-            # A resumed job's catalog already carries its parent's issues, so
-            # an answer that placed nothing then is not reported twice.
-            issues=list(dict.fromkeys([*record.issues, *unplaced])),
+            # A resumed job's catalog carries its parent's issues. This round
+            # applies every answer again, so what placed nothing is its own.
+            issues=[
+                *(issue for issue in record.issues if issue.code not in ANSWER_ISSUES),
+                *unplaced,
+            ],
             quarantined=record.quarantined,
         )
     state.put(STATE_ASSERTION_CATALOG, record.model_dump(mode="json"))
