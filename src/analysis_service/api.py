@@ -38,7 +38,6 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse, StreamingResponse
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import BaseModel, ConfigDict, Field, field_validator
-from starlette._utils import get_route_path
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from analysis_service import budgets
@@ -83,7 +82,7 @@ from analysis_service.questions import (
     fact_questions,
     question_fallback,
 )
-from analysis_service.report import FrameworkSelection, Report
+from analysis_service.report import FrameworkSelection
 from analysis_service.selection import SelectionError, resolve_selection
 from analysis_service.sources import Source, SourceLimits, clean_system_name
 from analysis_service.system_model import SystemModel
@@ -127,7 +126,13 @@ _SUBMIT_PATH = "/v1/jobs"
 
 
 class BodyLimitMiddleware:
-    """Refuse an over-sized submission body, declared or not.
+    """Refuse an over-sized request body, declared or not, on every POST route.
+
+    Every POST route is capped, not a named one. FastAPI reads and parses a
+    body before it resolves the route's dependencies, and authentication is a
+    dependency, so an uncapped route buffers whatever an anonymous caller sends
+    before it answers 401. A cap keyed to one path left the answers route open
+    in exactly that way.
 
     Pure ASGI rather than a ``@app.middleware("http")`` function because the
     bound has to sit on the **receive channel**: the header-only version of this
@@ -146,7 +151,7 @@ class BodyLimitMiddleware:
     app pulls it, because a guard that raises out of ``receive`` does not get to
     write the response: FastAPI wraps any exception escaping its body parse in a
     400 ``There was an error parsing the body``, so the refusal would arrive as
-    the wrong status with the cap unmentioned. Draining costs nothing this route
+    the wrong status with the cap unmentioned. Draining costs nothing a POST route
     was not already paying — the JSON body is buffered whole to be parsed — and
     the buffer is bounded by the cap it enforces.
 
@@ -155,22 +160,12 @@ class BodyLimitMiddleware:
     :class:`~analysis_service.sources.SourceLimits` remains the contract.
     """
 
-    def __init__(self, app, *, max_bytes: int, path: str = _SUBMIT_PATH) -> None:
+    def __init__(self, app, *, max_bytes: int) -> None:
         self._app = app
         self._max_bytes = max_bytes
-        self._path = path
 
     async def __call__(self, scope, receive, send) -> None:
-        # Match the path the router matches: get_route_path strips any ASGI
-        # root_path first, while raw scope["path"] keeps it. Comparing the raw
-        # path meant that under a path-prefixing proxy (uvicorn --root-path) the
-        # router still routed POST /prefix/v1/jobs here while this guard saw a
-        # mismatch and waved the unbounded body through.
-        if (
-            scope["type"] != "http"
-            or scope["method"] != "POST"
-            or get_route_path(scope) != self._path
-        ):
+        if scope["type"] != "http" or scope["method"] != "POST":
             await self._app(scope, receive, send)
             return
 
@@ -464,41 +459,53 @@ async def _answerable(
     **The one reader of "what does this job ask about".** A job waiting on
     answers holds its checkpoint and has no findings yet; a finished job reads
     its report through the rule that serves it. Any other job asks nothing yet.
+
+    Each heavy field is read by name, once. The envelope carries neither, so a
+    status read never pays for them, and the report is copied as an object
+    rather than serialized and validated again.
     """
+    store: JobStore = request.app.state.store
     record = await _owned_job(request, job_id, subject)
     if record.status == "awaiting-answers":
-        if record.checkpoint is None:
+        held = await store.checkpoint(job_id, subject)
+        if held is None:
             logger.error("waiting job %s holds no checkpoint", record.id)
             raise HTTPException(status_code=500, detail="an internal error occurred")
-        held = record.checkpoint
         return record, held.system_model, held.assertions, []
-    served = await _servable_report(request, job_id, subject)
-    if isinstance(served, JSONResponse):
-        return served
-    report = Report.model_validate(served)
-    assertions = report.assertions
-    return record, report.system_model, assertions, list(report.analyses)
+    refused = _unservable(request, record)
+    if refused is not None:
+        return refused
+    report = await store.report(job_id, subject)
+    if report is None:
+        logger.error("completed job %s has no report attached", record.id)
+        raise HTTPException(status_code=500, detail="an internal error occurred")
+    return record, report.system_model, report.assertions, list(report.analyses)
 
 
-async def _servable_report(
-    request: Request, job_id: str, subject: str
-) -> dict[str, Any] | JSONResponse:
-    """The report payload this caller may read, or the response that refuses it.
+def _unservable(request: Request, record: JobRecord) -> JSONResponse | None:
+    """Why this job's report may not be served, or ``None`` if it may.
 
     **The one reader of "may this report be served".** The report route and
     every route derived from the report ask it, so a report the gate withholds
     cannot reach a caller through a view of it.
     """
-    record = await _owned_job(request, job_id, subject)
     if record.status != "completed":
         raise HTTPException(
             status_code=409,
             detail=f"job status is {record.status!r};"
             " the report exists only once the job is completed",
         )
-    withheld = _withheld_report(request, record)
-    if withheld is not None:
-        return withheld
+    return _withheld_report(request, record)
+
+
+async def _servable_report(
+    request: Request, job_id: str, subject: str
+) -> dict[str, Any] | JSONResponse:
+    """The report payload this caller may read, or the response that refuses it."""
+    record = await _owned_job(request, job_id, subject)
+    refused = _unservable(request, record)
+    if refused is not None:
+        return refused
     store: JobStore = request.app.state.store
     payload = await store.report_json(job_id, subject)
     if payload is None:
@@ -596,6 +603,31 @@ async def _owned_job(request: Request, job_id: str, subject: str) -> JobRecord:
     if record is None:
         raise HTTPException(status_code=404, detail="job not found")
     return record
+
+
+def _questions_payload(
+    record: JobRecord,
+    model: SystemModel,
+    assertions: AssertionRecord | None,
+    analyses: list[FrameworkAnalysis],
+) -> dict[str, Any]:
+    """Every question a job asks, as the questions route serves them."""
+    catalog = None if assertions is None else assertions.catalog
+    early = (
+        early_questions(
+            model, [selection.name for selection in record.frameworks], catalog
+        )
+        if record.status == "awaiting-answers"
+        else ()
+    )
+    return {
+        "link_questions": [q.to_json() for q in link_questions(catalog, model)],
+        "fact_questions": [
+            fact.to_json() for fact in fact_questions(analyses, model, catalog)
+        ],
+        "early_questions": [question.to_json() for question in early],
+        "fallback": question_fallback(analyses).to_json(),
+    }
 
 
 def _status_view(record: JobRecord) -> JobStatusView:
@@ -945,26 +977,10 @@ def create_app(
         answerable = await _answerable(request, job_id, subject)
         if isinstance(answerable, JSONResponse):
             return answerable
-        record, model, assertions, analyses = answerable
-        catalog = None if assertions is None else assertions.catalog
-        questions = link_questions(catalog, model)
-        facts = fact_questions(analyses, model, catalog)
-        early = (
-            early_questions(
-                model, [selection.name for selection in record.frameworks], catalog
-            )
-            if record.status == "awaiting-answers"
-            else ()
-        )
-        return JSONResponse(
-            {
-                "job_id": job_id,
-                "link_questions": [question.to_json() for question in questions],
-                "fact_questions": [fact.to_json() for fact in facts],
-                "early_questions": [question.to_json() for question in early],
-                "fallback": question_fallback(analyses).to_json(),
-            }
-        )
+        # The derivation grows with the report, and a read carries no
+        # admission bound, so it runs off the event loop.
+        payload = await anyio.to_thread.run_sync(_questions_payload, *answerable)
+        return JSONResponse({"job_id": job_id} | payload)
 
     @app.get("/v1/jobs/{job_id}/events")
     async def stream_events(

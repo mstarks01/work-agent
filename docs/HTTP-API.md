@@ -312,8 +312,10 @@ when a deployment changes vendor. Shape is checked before size:
 | `413` | More sources than the deployment allows. The message names the count and the limit. |
 | `413` | The sources total more bytes than allowed. There is no per-source cap, so the message names **no** culprit — it carries a per-label byte breakdown instead, because the overspend belongs to the sum. |
 
-An absurdly large body is refused before it is parsed at all, by a coarse guard
-derived from the byte budget.
+An absurdly large body is refused with `413` before it is parsed at all, by a
+coarse guard derived from the byte budget. The guard covers every `POST` route,
+the answers route included, and it runs before authentication, so an
+over-sized body is refused whether or not it carries a token.
 
 ### How many jobs you may run at once
 
