@@ -1,5 +1,7 @@
 """OIDC JWT verifier and provider registry: verification, config, selection."""
 
+import base64
+import json
 from datetime import UTC, datetime, timedelta
 from types import SimpleNamespace
 
@@ -137,6 +139,40 @@ class TestOidcJwtVerifier:
             assert str(exc) == "invalid or expired credentials"
         else:
             pytest.fail("expected AuthenticationError")
+
+
+class TestARejectedTokenLogsOneRecord:
+    """pyjwt writes the unverified header's ``crit`` names into its error
+    message, and the rejection is logged before any key is fetched. A newline
+    there forged records from an unauthenticated request (run 11, finding 4)."""
+
+    @staticmethod
+    def _token_with_crit(value: str) -> str:
+        header = {"alg": "RS256", "kid": "k1", "crit": [value]}
+        parts = [
+            json.dumps(header).encode(),
+            b'{"sub":"x"}',
+            b"sig",
+        ]
+        return ".".join(
+            base64.urlsafe_b64encode(part).rstrip(b"=").decode() for part in parts
+        )
+
+    @pytest.mark.parametrize("terminator", ["\n", "\r", "\x85", "\u2028"])
+    def test_a_line_terminator_in_crit_stays_inside_one_record(
+        self, caplog, terminator
+    ):
+        forged = f"b64{terminator}INFO analysis_service.auth: accepted admin"
+        with (
+            caplog.at_level("INFO", logger="analysis_service.auth"),
+            pytest.raises(AuthenticationError),
+        ):
+            verifier().verify(self._token_with_crit(forged))
+
+        (record,) = caplog.records
+        message = record.getMessage()
+        assert not any(char in message for char in "\n\r\x85\u2028")
+        assert "accepted admin" in message
 
 
 class TestOidcSettings:

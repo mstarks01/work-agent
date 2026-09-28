@@ -923,19 +923,17 @@ class TestFrameworksListIsBounded:
         assert response.status_code == 422
 
 
-class TestBodyCapUnderRootPath:
-    """The raw-body cap must hold when the app is mounted under a root_path.
+class TestBodyCapOnEveryPost:
+    """The raw-body cap holds on every POST route, under any root_path.
 
-    The guard compared the raw ASGI path against ``/v1/jobs`` while the router
-    matched the root_path-stripped path, so under a path-prefixing proxy the
-    router routed the submission while the guard waved the unbounded body
-    through. It now compares the routed path, like the router.
+    FastAPI parses a body before it resolves the route's dependencies, and
+    authentication is one, so an uncapped POST route buffers what an anonymous
+    caller sends before it answers 401. A cap keyed to ``/v1/jobs`` left the
+    answers route open in exactly that way (run 11, finding 1).
     """
 
     @staticmethod
-    def _status_for(root_path: str, path: str, body: bytes) -> int:
-        from analysis_service.api import BodyLimitMiddleware
-
+    def _status_for(method: str, root_path: str, path: str, body: bytes) -> int:
         async def inner(scope, receive, send):
             while True:
                 message = await receive()
@@ -947,7 +945,7 @@ class TestBodyCapUnderRootPath:
         middleware = BodyLimitMiddleware(inner, max_bytes=16)
         scope = {
             "type": "http",
-            "method": "POST",
+            "method": method,
             "path": path,
             "root_path": root_path,
             "headers": [],
@@ -964,14 +962,38 @@ class TestBodyCapUnderRootPath:
         start = next(m for m in sent if m["type"] == "http.response.start")
         return start["status"]
 
-    def test_body_cap_applies_under_a_root_path_prefix(self):
-        assert self._status_for("/api", "/api/v1/jobs", b"x" * 64) == 413
+    @pytest.mark.parametrize(
+        ("root_path", "path"),
+        [
+            ("", "/v1/jobs"),
+            ("/api", "/api/v1/jobs"),
+            ("", "/v1/jobs/abc/answers"),
+            ("/api", "/api/v1/jobs/abc/answers"),
+            ("", "/v1/anything"),
+        ],
+    )
+    def test_every_post_body_is_capped(self, root_path, path):
+        assert self._status_for("POST", root_path, path, b"x" * 64) == 413
 
-    def test_body_cap_still_applies_without_a_prefix(self):
-        assert self._status_for("", "/v1/jobs", b"x" * 64) == 413
+    def test_a_get_is_not_capped(self):
+        assert self._status_for("GET", "", "/v1/jobs/abc", b"x" * 64) == 201
 
-    def test_a_non_submission_path_is_not_capped(self):
-        assert self._status_for("", "/v1/other", b"x" * 64) == 201
+    def test_every_post_route_refuses_an_over_cap_body_before_authentication(self):
+        """Driven through the real app, so a POST route added tomorrow is
+        covered by the same test rather than by a path someone remembers."""
+        client, _ = make_client()
+        over_cap = b"x" * (TEST_LIMITS.max_total_bytes * _BODY_SLACK * 2)
+        paths = [
+            route.path.replace("{job_id}", "abc")
+            for route in client.app.routes
+            if "POST" in getattr(route, "methods", ())
+        ]
+        assert "/v1/jobs/abc/answers" in paths
+        for path in paths:
+            response = client.post(
+                path, content=over_cap, headers={"content-type": "application/json"}
+            )
+            assert response.status_code == 413, path
 
 
 class TestConsumptionBudgets:

@@ -374,7 +374,10 @@ class OidcJwtVerifier:
         # differently from another is what the generic message exists to
         # prevent -- and wrote a traceback per request to the operator's log.
         except (jwt.PyJWTError, TypeError, ValueError) as exc:
-            logger.info("rejected bearer token: %s", exc)
+            # repr of the message, never the message: pyjwt writes fields of the
+            # unverified header into it (``crit`` verbatim), so a newline there
+            # would forge a log record from an unauthenticated request.
+            logger.info("rejected bearer token: %r", str(exc))
             raise AuthenticationError("invalid or expired credentials") from exc
         return _clean_subject(claims["sub"])
 

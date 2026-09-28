@@ -414,6 +414,10 @@ class JobStore(Protocol):
 
     async def report_json(self, job_id: str, subject: str) -> dict[str, Any] | None: ...
 
+    async def report(self, job_id: str, subject: str) -> Report | None: ...
+
+    async def checkpoint(self, job_id: str, subject: str) -> Checkpoint | None: ...
+
     async def events_after(
         self, job_id: str, seen: int
     ) -> tuple[JobStatus, list[JobEvent]] | None: ...
@@ -513,14 +517,16 @@ class InMemoryJobStore:
         return None if record is None else record.model_copy(deep=True)
 
     async def owned(self, job_id: str, subject: str) -> JobRecord | None:
-        """The record ``subject`` owns, without its report, or ``None``.
+        """The record ``subject`` owns, as an envelope, or ``None``.
 
         What the status and event routes need: they read the envelope and never
-        the analysis, and the report is nearly all of a completed record's
-        weight. Copying it for them is work no caller asked for, and a read
-        carries none of the bounds admission does — no ceiling, no rate, no
-        budget — so a caller who polls a completed job pays the whole report per
-        request and the process pays it on the event loop.
+        the analysis. The report, the checkpoint and the resumption are nearly
+        all of a record's weight, and none of them is read by the envelope.
+        Copying them is work no caller asked for, and a read carries none of
+        the bounds admission does — no ceiling, no rate, no budget — so a caller
+        who polls a job pays each of them per request and the process pays it
+        on the event loop. A route that needs one of them asks for it by name:
+        :meth:`report_json`, :meth:`report`, :meth:`checkpoint`.
 
         Ownership is checked before anything is copied, so a foreign job costs
         what a missing one costs. Answering the same ``None`` for both is what
@@ -530,7 +536,10 @@ class InMemoryJobStore:
         record = self._records.get(job_id)
         if record is None or record.owner_subject != subject:
             return None
-        return record.model_copy(update={"report": None}).model_copy(deep=True)
+        envelope = record.model_copy(
+            update={"report": None, "checkpoint": None, "resumption": None}
+        )
+        return envelope.model_copy(deep=True)
 
     async def report_json(self, job_id: str, subject: str) -> dict[str, Any] | None:
         """The owned job's report, already JSON, or ``None`` if it has none.
@@ -548,6 +557,34 @@ class InMemoryJobStore:
         if record.report is None:
             return None
         return record.report.model_dump(mode="json")
+
+    async def report(self, job_id: str, subject: str) -> Report | None:
+        """The owned job's report, as a copy the caller may keep, or ``None``.
+
+        One pass over the stored report. Serializing it with :meth:`report_json`
+        and validating the result again is two passes to reach the same object.
+        Ownership is re-checked, as :meth:`report_json` does.
+        """
+        record = self._records.get(job_id)
+        if record is None or record.owner_subject != subject:
+            return None
+        if record.report is None:
+            return None
+        return record.report.model_copy(deep=True)
+
+    async def checkpoint(self, job_id: str, subject: str) -> Checkpoint | None:
+        """The owned job's checkpoint, as a copy the caller may keep, or ``None``.
+
+        The only route that reads a checkpoint asks for it here, so a status
+        read never copies it. Ownership is re-checked, as :meth:`report_json`
+        does.
+        """
+        record = self._records.get(job_id)
+        if record is None or record.owner_subject != subject:
+            return None
+        if record.checkpoint is None:
+            return None
+        return record.checkpoint.model_copy(deep=True)
 
     async def events_after(
         self, job_id: str, seen: int

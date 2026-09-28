@@ -9,6 +9,7 @@ from analysis_service.jobs import (
     DEADLINE_FAILURE_MESSAGE,
     GENERIC_FAILURE_MESSAGE,
     Admission,
+    Checkpoint,
     InMemoryJobStore,
     InvalidTransitionError,
     JobRecord,
@@ -17,6 +18,7 @@ from analysis_service.jobs import (
     NodeCallback,
     PipelineOutcome,
     PipelineRejected,
+    Resumption,
     StubPipelineRunner,
     build_store,
     execute_job,
@@ -33,6 +35,7 @@ from tests.factories import (
     admit,
     sample_report,
     sample_selection,
+    valid_model,
 )
 
 
@@ -195,6 +198,57 @@ class TestInMemoryJobStore:
         assert trimmed.status == "completed"
         assert trimmed.report is None
         assert whole.report is not None, "get still answers with the whole record"
+
+    def test_owned_leaves_the_checkpoint_and_the_resumption_behind(self):
+        """A waiting job's checkpoint and a resumed job's parent checkpoint are
+        each a whole model and catalog, and the envelope reads neither (run 11,
+        finding 2). The one route that needs a checkpoint asks for it by name."""
+
+        async def scenario():
+            store = InMemoryJobStore()
+            held = Checkpoint(system_model=valid_model(), assertions=None)
+            record = make_record()
+            record.resumption = Resumption(parent_id="parent", checkpoint=held)
+            await admit(store, record)
+            record.transition("running")
+            record.checkpoint = held
+            record.transition("awaiting-answers")
+            await store.save(record)
+            return (
+                await store.owned(record.id, "alice"),
+                await store.checkpoint(record.id, "alice"),
+                await store.checkpoint(record.id, "mallory"),
+            )
+
+        envelope, asked, foreign = asyncio.run(scenario())
+        assert envelope is not None
+        assert envelope.status == "awaiting-answers"
+        assert envelope.checkpoint is None
+        assert envelope.resumption is None
+        assert asked is not None and asked.system_model == valid_model()
+        assert foreign is None
+
+    def test_report_is_one_copy_and_rechecks_ownership(self):
+        async def scenario():
+            store = InMemoryJobStore()
+            record = make_record()
+            await admit(store, record)
+            record.transition("running")
+            record.report = sample_report()
+            record.transition("completed")
+            await store.save(record)
+            mine = await store.report(record.id, "alice")
+            mine.system_model.external_entities.clear()
+            return (
+                mine,
+                await store.report(record.id, "alice"),
+                await store.report(record.id, "mallory"),
+            )
+
+        mutated, again, foreign = asyncio.run(scenario())
+        assert again == sample_report(), "the caller's copy aliases nothing stored"
+        assert mutated != again
+        assert foreign is None
 
     def test_report_json_serializes_without_a_second_copy(self):
         async def scenario():
