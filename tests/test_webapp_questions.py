@@ -416,6 +416,7 @@ class TestFactAnswers:
         done = event(client.get(f"/events/{finished}").text, "done")
         page = client.get(done["url"]).text
         assert re.search(r'id="fact_questions"[^>]*>\[', page)
+        assert re.search(r'id="question_fallback"[^>]*>\{"typed"', page)
 
 
 # The report page's answer block, run for real: the viewer's helper block
@@ -602,3 +603,29 @@ class TestTheRunningCount:
         assert tallies(questions, questions[1:]) == [
             "Your answers settle 1 of the 2 findings that wait on a fact."
         ]
+
+
+def test_the_report_page_says_how_many_facts_fell_back_to_free_text():
+    question = {
+        "key": ["", "", "", "a", ""],
+        "kind": "subject",
+        "basis": "critic",
+        "label": "a",
+        "cited_by": 1,
+        "settled_so_far": 1,
+        "choices": [],
+        "findings": ["stride/S-01"],
+    }
+    payloads = {
+        "report": {"system_model": valid_model().model_dump(mode="json")},
+        "link_questions": [],
+        "fact_questions": [question],
+        "question_fallback": {"typed": 12, "free_text": 1, "rate": 0.0769},
+    }
+    steps = """
+calls.push(...box.all("div").map(d => d.textContent).filter(t => t.includes("fixed list")));
+"""
+    line = "The reviewer asked 12 open fact(s) from the fixed list of questions"
+    assert _run_answer_block(payloads, steps)["calls"] == [
+        f"{line} and 1 in its own words."
+    ]

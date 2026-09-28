@@ -150,6 +150,7 @@ from analysis_service.questions import (
     FactAnswer,
     check_fact_answers,
     fact_questions,
+    question_fallback,
 )
 from analysis_service.selection import SelectionError, resolve_selection
 from analysis_service.vendors import (
@@ -418,6 +419,7 @@ def render_report(report: Report) -> RenderedPage:
                 )
             ]
         ),
+        question_fallback=script_json(question_fallback(report.analyses).to_json()),
         link_questions=script_json(
             [
                 question.to_json()

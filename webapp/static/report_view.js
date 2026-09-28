@@ -25,6 +25,9 @@
   // The open facts the conditional findings rest on, ranked server-side so
   // that answering from the top settles the most. The page only renders them.
   const FACT_QUESTIONS = JSON.parse(document.getElementById("fact_questions").textContent);
+  // How many of the reviewer's open facts used the fixed list of questions,
+  // and how many it wrote in its own words, counted server-side.
+  const FALLBACK = JSON.parse(document.getElementById("question_fallback").textContent);
   const $ = (id) => document.getElementById(id);
   const el = (tag, cls, text) => {
     const n = document.createElement(tag);
@@ -726,6 +729,11 @@
         "first. Beside each is how many findings are settled once it and every " +
         "question above it is answered. Answer as far down as you like; the line " +
         "under the questions counts what your answers settle."));
+      if (FALLBACK.typed + FALLBACK.free_text) {
+        box.append(el("div", "meta",
+          `The reviewer asked ${FALLBACK.typed} open fact(s) from the fixed list of ` +
+          `questions and ${FALLBACK.free_text} in its own words.`));
+      }
       // The first few in full; the rest one click away rather than a wall.
       const SHOWN = 10;
       const more = el("details", "openfact");
