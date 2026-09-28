@@ -18,8 +18,10 @@ pattern="co-authored-by:.*(${names})|(generated|written|created|authored) (with|
 if [ "${1:-}" = "--text" ]; then
     found=$(grep -inE "$pattern" || true)
 else
-    found=$(git log --format='commit %h%nauthor %an <%ae>%ncommitter %cn <%ce>%n%B' "$@" \
-        | grep -iE "^commit |$pattern" | grep -iE -B1 "$pattern" || true)
+    # Read first and fail on a range git cannot read: inside a pipe, a failed
+    # git log would leave nothing to search, and the check would pass.
+    log=$(git log --format='commit %h%nauthor %an <%ae>%ncommitter %cn <%ce>%n%B' "$@")
+    found=$(printf '%s\n' "$log" | grep -iE "^commit |$pattern" | grep -iE -B1 "$pattern" || true)
 fi
 
 if [ -n "$found" ]; then
