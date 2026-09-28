@@ -499,7 +499,7 @@ def test_the_report_page_sends_both_kinds_of_answer_and_follows_the_run():
                 "kind": "attribute",
                 "label": "login",
                 "cited_by": 2,
-                "settled_so_far": 2,
+                "covered_so_far": 2,
                 "choices": [],
                 "findings": ["stride/I-01", "stride/T-01"],
             },
@@ -508,7 +508,7 @@ def test_the_report_page_sends_both_kinds_of_answer_and_follows_the_run():
                 "kind": "subject",
                 "label": "whether queries are bound",
                 "cited_by": 1,
-                "settled_so_far": 2,
+                "covered_so_far": 2,
                 "choices": [],
                 "findings": ["stride/T-01"],
             },
@@ -561,8 +561,11 @@ calls.push(...box.all("div").map(d => d.textContent).filter(t => t.startsWith("Y
 report = test_open_facts.report
 
 
+DECIDED = "The analysis decides again whether they are settled."
+
+
 class TestTheRunningCount:
-    """The page's count and the ranking's ``settled_so_far`` are two readers of
+    """The page's count and the ranking's ``covered_so_far`` are two readers of
     one rule, so each is held against the other on real reports."""
 
     def test_it_matches_the_ranking_at_every_depth(self, report):
@@ -571,10 +574,10 @@ class TestTheRunningCount:
             pytest.skip("this report waits on no fact")
         total = len({f for q in questions for f in q["findings"]})
         for depth in sorted({0, 1, len(questions) // 2, len(questions)}):
-            settled = questions[depth - 1]["settled_so_far"] if depth else 0
-            line = f"Your answers settle {settled} of the {total} findings"
+            covered = questions[depth - 1]["covered_so_far"] if depth else 0
+            line = f"Your answers cover every fact for {covered} of the {total}"
             assert tallies(questions, questions[:depth]) == [
-                f"{line} that wait on a fact."
+                f"{line} findings that wait on one. {DECIDED}"
             ]
 
     def test_it_counts_answers_given_out_of_order(self):
@@ -585,7 +588,7 @@ class TestTheRunningCount:
                 "basis": "critic",
                 "label": "a",
                 "cited_by": 1,
-                "settled_so_far": 1,
+                "covered_so_far": 1,
                 "choices": [],
                 "findings": ["stride/S-01"],
             },
@@ -595,14 +598,13 @@ class TestTheRunningCount:
                 "basis": "critic",
                 "label": "b",
                 "cited_by": 1,
-                "settled_so_far": 2,
+                "covered_so_far": 2,
                 "choices": [],
                 "findings": ["stride/S-02"],
             },
         ]
-        assert tallies(questions, questions[1:]) == [
-            "Your answers settle 1 of the 2 findings that wait on a fact."
-        ]
+        line = "Your answers cover every fact for 1 of the 2 findings that wait on one."
+        assert tallies(questions, questions[1:]) == [f"{line} {DECIDED}"]
 
 
 def test_the_report_page_says_how_many_facts_fell_back_to_free_text():
@@ -612,7 +614,7 @@ def test_the_report_page_says_how_many_facts_fell_back_to_free_text():
         "basis": "critic",
         "label": "a",
         "cited_by": 1,
-        "settled_so_far": 1,
+        "covered_so_far": 1,
         "choices": [],
         "findings": ["stride/S-01"],
     }
@@ -629,3 +631,22 @@ calls.push(...box.all("div").map(d => d.textContent).filter(t => t.includes("fix
     assert _run_answer_block(payloads, steps)["calls"] == [
         f"{line} and 1 in its own words."
     ]
+
+
+def test_the_registry_removes_a_run_that_waits_for_answers_last():
+    """A paused run outlives later finished runs (#1289, Q7)."""
+    from analysis_service.jobs import Checkpoint
+    from tests.factories import sample_report, valid_model
+    from webapp.main import Analyses
+
+    analyses = Analyses(max_runs=2)
+    paused = analyses.claim()
+    paused.checkpoint = Checkpoint(system_model=valid_model(), assertions=None)
+    analyses.release()
+    for _ in range(3):
+        run = analyses.claim()
+        run.report = sample_report()
+        analyses.release()
+
+    assert analyses.get(paused.id) is paused
+    assert analyses.get(run.id) is run

@@ -3,15 +3,18 @@
 A ``needs-info`` verdict names the facts an answer would settle. This module
 turns them into questions, ranks them, and writes the answers back (#1225).
 
-**Every open fact is asked, in the order that settles the most.** The facts a
+**Every open fact is asked, the most cited first.** The facts a
 finding's own grounds cite come first, in an order the critic cannot change;
 the facts only the critic named follow (``QA-2026-09-26-03-E7``). With the
 STRIDE lane closing a conditional finding waits on several facts, and six
 questions settled about a quarter of them where asking every one settled all
 (``QA-2026-09-26-03-E6``). So no cap is chosen here. The next question is the
-one the most still-open findings cite, and each question states how many
-findings are settled once it and every question before it is answered. A
-submitter answers from the top as far as they choose.
+one the most still-open findings cite, and each question states for how many
+findings every fact is answered once it and every question before it is. That
+count is coverage, not a verdict: an answer can be ``I don't know``, and a
+finding with every fact answered is ruled again only by the resumed run. The
+order is greedy, so it does not find the fewest questions that cover the most
+findings. A submitter answers from the top as far as they choose.
 
 **Three kinds of fact, and an answer to each is written by code.**
 
@@ -49,6 +52,7 @@ from analysis_service.assertions import (
     CatalogIssue,
     SupportSpan,
     assertion_id,
+    projected_attribute,
 )
 from analysis_service.claims import FrameworkAnalysis, UnknownKey, UnknownRef
 from analysis_service.open_facts import element_names, label_of
@@ -132,13 +136,13 @@ class FactQuestion:
     label: str
     #: How many still-open findings cite it when it is asked.
     cited_by: int
-    #: How many findings are settled once it and every question before it is
-    #: answered.
-    settled_so_far: int
+    #: For how many findings every fact is answered once it and every question
+    #: before it is answered. Coverage, not a verdict.
+    covered_so_far: int
     #: The answers it takes, or empty where the answer is free text.
     choices: tuple[str, ...]
     #: Every finding that waits on it, as ``framework/claim``. A finding is
-    #: settled once every question that names it has an answer, whichever
+    #: covered once every question that names it has an answer, whichever
     #: questions those are.
     findings: tuple[str, ...]
 
@@ -149,7 +153,7 @@ class FactQuestion:
             "basis": self.basis,
             "label": self.label,
             "cited_by": self.cited_by,
-            "settled_so_far": self.settled_so_far,
+            "covered_so_far": self.covered_so_far,
             "choices": list(self.choices),
             "findings": list(self.findings),
         }
@@ -236,10 +240,12 @@ def _answered_row(catalog: AssertionCatalog, identity: str) -> Assertion | None:
 
 
 def _greedy(open_facts: Mapping[Finding, set[UnknownKey]]) -> list[UnknownKey]:
-    """The facts in the order that settles the most findings, asked one by one.
+    """The facts in order, the one the most still-open findings cite first.
 
-    The next fact is the one the most still-open findings cite; a tie goes to
-    the lower key, so one input always gives one order.
+    A tie goes to the lower key, so one input always gives one order. Greedy by
+    citation, so it does not maximise the findings a fixed number of questions
+    covers: ten findings that wait on three facts together outrank nine that
+    each wait on one.
     """
     left = {finding: set(keys) for finding, keys in open_facts.items() if keys}
     order: list[UnknownKey] = []
@@ -256,7 +262,7 @@ def fact_questions(
     model: SystemModel,
     catalog: AssertionCatalog | None,
 ) -> tuple[FactQuestion, ...]:
-    """Every open fact a report's findings rest on, the most settling first.
+    """Every open fact a report's findings rest on, the most cited first.
 
     **Two sections, and the first does not depend on the critic.** The
     evidence section ranks the open facts each finding's own grounds cite, for
@@ -270,8 +276,8 @@ def fact_questions(
 
     Each question counts the findings of every framework together, because one
     answer settles a fact for every framework that cites it. ``cited_by`` and
-    ``settled_so_far`` count findings waiting on the fact, by their grounds or,
-    for a conditional finding, by its verdict too.
+    ``covered_so_far`` count findings waiting on the fact, by their grounds or,
+    for a conditional finding, by its verdict too. Rejected drafts are counted.
     """
     evidence: dict[Finding, set[UnknownKey]] = {}
     named: dict[Finding, set[UnknownKey]] = {}
@@ -317,7 +323,7 @@ def fact_questions(
                     basis=basis,
                     label=label_of(refs[key], names),
                     cited_by=cited_by,
-                    settled_so_far=sum(
+                    covered_so_far=sum(
                         1 for facts in waiting.values() if facts <= answered
                     ),
                     choices=answer_choices(key, model, catalog),
@@ -377,10 +383,21 @@ def check_fact_answers(
     """Refuse an answer that names no open fact here, or a value the fact cannot hold.
 
     Checked before a resumed run is admitted, against the model and catalog
-    the questions were asked about, so a wrong answer costs nothing.
+    the questions were asked about, so a wrong answer costs nothing. A key
+    names one fact in one of the four spellings, as
+    :attr:`~analysis_service.claims.UnknownRef.spellings` reads them.
     """
     for answer in answers:
         element_id, attribute, assertion, subject, question = answer.key
+        ref = UnknownRef.model_construct(
+            element_id=element_id,
+            attribute=attribute,
+            assertion=assertion,
+            subject=subject,
+            question=question,
+        )
+        if len(ref.spellings) != 1:
+            raise ValueError(f"an answer's key names one fact, not {answer.key!r}")
         kind = answer.kind
         if kind == "question":
             if question not in QUESTION_KINDS or model.get(element_id) is None:
@@ -390,11 +407,10 @@ def check_fact_answers(
             answerable = () if element is None else attribute_names(element)
             if attribute not in answerable or attribute in _ENDPOINTS:
                 raise ValueError(f"no attribute {attribute!r} on {element_id!r}")
-        elif kind == "assertion":
-            if catalog is None or _answered_row(catalog, assertion) is None:
-                raise ValueError(f"no open assertion row {assertion!r}")
-        elif not subject:
-            raise ValueError("an answer names an element, an assertion or a subject")
+        elif kind == "assertion" and (
+            catalog is None or _answered_row(catalog, assertion) is None
+        ):
+            raise ValueError(f"no open assertion row {assertion!r}")
         choices = answer_choices(answer.key, model, catalog)
         if choices and answer.value not in choices:
             raise ValueError(
@@ -429,7 +445,11 @@ def _check_attribute_values(answers: Sequence[FactAnswer], model: SystemModel) -
 
 
 def answered_model(model: SystemModel, answers: Sequence[FactAnswer]) -> SystemModel:
-    """The model with every attribute answer written in, and noted on its element."""
+    """The model with every attribute answer written in, and noted on its element.
+
+    The answer settles the attribute, so an :class:`~analysis_service.system_model.Assumption`
+    that named it as inferred is removed. The note keeps who settled it.
+    """
     data = model.model_dump(mode="json")
     by_id = {
         element["id"]: element
@@ -455,6 +475,12 @@ def answered_model(model: SystemModel, answers: Sequence[FactAnswer]) -> SystemM
         notes = element.get("notes", "")
         if note not in notes:
             element["notes"] = f"{notes} {note}".strip()[:2000]
+    answered = {answer.key[:2] for answer in answers if answer.kind == "attribute"}
+    data["assumptions"] = [
+        assumption
+        for assumption in data.get("assumptions", [])
+        if (assumption["element_id"], assumption["attribute"]) not in answered
+    ]
     return SystemModel.model_validate(data)
 
 
@@ -470,9 +496,32 @@ def fact_rows(
     predicate and scope, so it answers exactly what was asked. An earlier
     round's answer is written again over the row it wrote, so its quote reads
     this round's answers Source.
+
+    **An attribute answer removes every row that reaches its attribute**, scoped
+    rows too. The answer settles the attribute, and a row left beside it would
+    project over the answer or reach the lanes as the opposite fact. Each
+    removed row is named by a ``superseded-by-answer`` issue, which later
+    rounds keep.
     """
     replaced: dict[str, Assertion] = {}
     issues: list[CatalogIssue] = []
+    answered = {answer.key[:2] for answer in answers if answer.kind == "attribute"}
+    superseded = {
+        assertion_id(entry)
+        for entry in catalog.entries
+        if (entry.subject, projected_attribute(entry.predicate, entry.subject))
+        in answered
+    }
+    issues.extend(
+        CatalogIssue(
+            code="superseded-by-answer",
+            message="the submitter's answer to this row's attribute replaced it",
+            subject=entry.subject,
+            assertion=assertion_id(entry),
+        )
+        for entry in catalog.entries
+        if assertion_id(entry) in superseded
+    )
     for answer, span in zip(answers, spans, strict=True):
         if answer.kind != "assertion":
             continue
@@ -494,5 +543,9 @@ def fact_rows(
                 "support": [span],
             }
         )
-    entries = [replaced.get(assertion_id(entry), entry) for entry in catalog.entries]
+    entries = [
+        replaced.get(assertion_id(entry), entry)
+        for entry in catalog.entries
+        if assertion_id(entry) not in superseded
+    ]
     return catalog.model_copy(update={"entries": entries}), issues

@@ -20,6 +20,7 @@ from analysis_service.assertions import (
     AssertionRecord,
     Quarantined,
     Subject,
+    SupportSpan,
     assertion_id,
 )
 from analysis_service.jobs import (
@@ -31,6 +32,7 @@ from analysis_service.jobs import (
 from analysis_service.links import (
     LinkAnswer,
     apply_answers,
+    check_answers,
     resumed_sources,
     with_link_answers,
 )
@@ -42,7 +44,8 @@ from analysis_service.questions import (
     check_fact_answers,
     fact_questions,
 )
-from analysis_service.sources import Source
+from analysis_service.sources import Source, text_digest
+from analysis_service.system_model import ZONE_ATTRIBUTE, Assumption
 from tests import test_open_facts
 from tests.factories import (
     DESCRIPTION_TEXT,
@@ -74,10 +77,10 @@ class TestTheRanking:
             or (claim.verdict.status == "needs-info" and claim.verdict.related_unknowns)
         )
         questions = ask(report)
-        assert questions[-1].settled_so_far == waiting if questions else waiting == 0
+        assert questions[-1].covered_so_far == waiting if questions else waiting == 0
 
     def test_each_question_settles_at_least_as_many_as_the_last(self, report):
-        settled = [question.settled_so_far for question in ask(report)]
+        settled = [question.covered_so_far for question in ask(report)]
         assert settled == sorted(settled)
 
     def test_the_first_question_is_the_most_cited_fact(self, report):
@@ -375,9 +378,9 @@ def open_catalog(*entries: Assertion) -> AssertionCatalog:
     )
 
 
-def resume(checkpoint, facts=(), earlier=()):
+def resume(checkpoint, facts=(), earlier=(), given=(DESCRIPTION,)):
     """One resumed job on the real graph from ``prepare``, and its report."""
-    sources, links, answered = resumed_sources([DESCRIPTION], [], [], earlier, facts)
+    sources, links, answered = resumed_sources(list(given), [], [], earlier, facts)
     job = JobRecord.create(
         owner_subject="idp|user-1",
         sources=sources,
@@ -506,3 +509,157 @@ def resume_links(checkpoint, links, earlier=()):
     outcome = asyncio.run(AdkPipelineRunner(pipeline).run(job, on_node))
     assert isinstance(outcome, PipelineCompleted)
     return outcome.report
+
+
+PROOF = Source(
+    kind="description",
+    label="Transport facts",
+    text="Transport encryption is absent on this flow.",
+)
+
+
+class TestAnAttributeAnswerOverACatalogRow:
+    """The answer settles the attribute, even where a catalog row says otherwise.
+
+    The row projects into the same attribute, so it would write over the
+    answer before the lanes read the model (#1289, Q1).
+    """
+
+    TLS = FactAnswer(
+        key=(flow_id(), "encryption_in_transit", "", "", ""), value="TLS 1.3"
+    )
+
+    def checkpoint(self):
+        row = Assertion(
+            subject=flow_id(),
+            predicate="transport-encryption",
+            value="absent",
+            basis="stated",
+            support=[
+                SupportSpan(
+                    source_label=PROOF.label,
+                    digest=text_digest(PROOF.text),
+                    start=0,
+                    end=len(PROOF.text),
+                    quote=PROOF.text,
+                )
+            ],
+        )
+        catalog = AssertionCatalog(
+            subjects=[Subject(id=flow_id(), type="interaction", label="flow")],
+            entries=[row],
+        )
+        return Checkpoint(
+            system_model=valid_model(),
+            assertions=AssertionRecord(proposed=1, catalog=catalog),
+        )
+
+    def encryption(self, report):
+        return report.system_model.data_flows[0].encryption_in_transit
+
+    def test_without_an_answer_the_row_projects(self):
+        assert self.encryption(
+            resume(self.checkpoint(), given=[DESCRIPTION, PROOF])
+        ) == ("none")
+
+    def test_the_answer_reaches_the_model_and_removes_the_row(self):
+        report = resume(self.checkpoint(), [self.TLS], given=[DESCRIPTION, PROOF])
+
+        assert self.encryption(report) == "TLS 1.3"
+        assert report.assertions.catalog.entries == []
+        assert [i.code for i in report.assertions.issues] == ["superseded-by-answer"]
+        assert report.assertions.refused_rows() == 0
+
+    def test_a_later_round_keeps_the_answer_and_the_issue(self):
+        first = resume(self.checkpoint(), [self.TLS], given=[DESCRIPTION, PROOF])
+        second = resume(
+            Checkpoint(system_model=first.system_model, assertions=first.assertions),
+            earlier=[self.TLS],
+            given=[DESCRIPTION, PROOF],
+        )
+
+        assert self.encryption(second) == "TLS 1.3"
+        assert [i.code for i in second.assertions.issues] == ["superseded-by-answer"]
+
+    def test_a_revised_answer_replaces_the_first(self):
+        first = resume(self.checkpoint(), [self.TLS], given=[DESCRIPTION, PROOF])
+        second = resume(
+            Checkpoint(system_model=first.system_model, assertions=first.assertions),
+            [self.TLS.model_copy(update={"value": "none"})],
+            earlier=[self.TLS],
+            given=[DESCRIPTION, PROOF],
+        )
+
+        assert self.encryption(second) == "none"
+
+
+class TestAnAnsweredZone:
+    """An answered zone is no longer an inference (#1289, Q3)."""
+
+    PROCESS = "process:web-app"
+
+    def model(self):
+        model = valid_model()
+        model.assumptions.append(
+            Assumption(
+                assumption="the web app sits in the internal network",
+                element_id=self.PROCESS,
+                attribute=ZONE_ATTRIBUTE,
+                basis="the sources are silent",
+            )
+        )
+        return model
+
+    @pytest.mark.parametrize("confirm", [True, False])
+    def test_confirming_or_changing_it_removes_the_assumption(self, confirm):
+        model = self.model()
+        zones = [boundary.id for boundary in model.trust_boundaries]
+        held = model.get(self.PROCESS).trust_zone
+        value = held if confirm else next(zone for zone in zones if zone != held)
+        answer = FactAnswer(key=(self.PROCESS, ZONE_ATTRIBUTE, "", "", ""), value=value)
+
+        answered = answered_model(model, [answer])
+
+        assert self.PROCESS not in answered.assumed_zone_elements()
+        assert answered.get(self.PROCESS).trust_zone == value
+
+
+class TestTheAdmissionCheck:
+    """A submission that would place nothing is refused before admission (Q5)."""
+
+    @pytest.mark.parametrize(
+        "key",
+        [
+            (flow_id(), "authentication", "", "", "capacity-limits"),
+            (flow_id(), "authentication", "", "who rotates keys?", ""),
+            ("", "", "", "", ""),
+        ],
+    )
+    def test_a_key_that_names_two_facts_or_none_is_refused(self, key):
+        with pytest.raises(ValueError, match="names one fact"):
+            check_fact_answers([FactAnswer(key=key, value="x")], valid_model(), None)
+
+    @pytest.mark.parametrize(
+        "link",
+        [
+            LinkAnswer(principal="customer accounts", element="process:ghost"),
+            LinkAnswer(principal="nobody at all", element="entity:customer"),
+        ],
+    )
+    def test_a_link_that_would_place_nothing_is_refused(self, link):
+        with pytest.raises(ValueError):
+            check_answers([link], [], valid_model(), open_catalog())
+
+    def test_a_link_that_places_is_admitted(self):
+        link = LinkAnswer(principal="customer accounts", element="entity:customer")
+        check_answers([link], [], valid_model(), open_catalog())
+
+
+def test_the_same_answers_twice_give_the_same_catalog():
+    """A repeated submission changes nothing (#1289, Q2)."""
+    rounds = TestASecondRound()
+    first = rounds.first_round().assertions
+    again = rounds.second_round([rounds.FIRST]).assertions
+
+    assert again.catalog.entries == first.catalog.entries
+    assert again.issues == first.issues == []

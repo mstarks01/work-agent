@@ -786,6 +786,10 @@ CatalogIssueCode = Literal[
     "unknown-link-element",
     # A submitter's answer to an open row this catalog does not hold.
     "unmatched-answer",
+    # Not a refused row. A submitter's answer to a graph attribute replaced
+    # this row, which reached the same attribute; see
+    # :func:`~analysis_service.questions.fact_rows`.
+    "superseded-by-answer",
 ]
 
 
@@ -796,19 +800,21 @@ ANSWER_ISSUES: frozenset[str] = frozenset(
     {"unmatched-link", "unknown-link-element", "unmatched-answer"}
 )
 
-#: Every code that refuses a row: every code but two and the answer issues.
+#: Every code that refuses a row: every code but three and the answer issues.
 #:
 #: :data:`CatalogIssueCode` holds what a report's ``assertions.issues`` can say.
 #: ``graph-contradiction`` is not a refusal: the row stands, stays settled and
 #: stays citable, and the finding is about the graph attribute beside it.
 #: ``support-truncated`` is not one either: the row stands on the spans it kept,
-#: and the finding is about the ones it did not. Spelled as a set rather than
-#: left to a reader to remember, because ``tests/test_assertions.py`` holds the
-#: gate's fixture table to exactly these, and a new code that is a refusal must
-#: fail there rather than quietly join the exception.
+#: and the finding is about the ones it did not. ``superseded-by-answer`` is
+#: not one: the submitter's answer settles the fact the row stated, so the row
+#: leaves the catalog, and the issue keeps which row it was. Spelled as a set
+#: rather than left to a reader to remember, because ``tests/test_assertions.py``
+#: holds the gate's fixture table to exactly these, and a new code that is a
+#: refusal must fail there rather than quietly join the exception.
 GATE_REFUSALS: frozenset[str] = (
     frozenset(get_args(CatalogIssueCode))
-    - {"graph-contradiction", "support-truncated"}
+    - {"graph-contradiction", "support-truncated", "superseded-by-answer"}
     - ANSWER_ISSUES
 )
 

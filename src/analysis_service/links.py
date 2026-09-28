@@ -46,7 +46,12 @@ from analysis_service.assertions import (
     settled,
 )
 from analysis_service.question_kinds import QUESTION_KINDS
-from analysis_service.questions import ANSWERS_LABEL, FactAnswer, fact_rows
+from analysis_service.questions import (
+    ANSWERS_LABEL,
+    FactAnswer,
+    check_fact_answers,
+    fact_rows,
+)
 from analysis_service.sources import Source, plain_name, text_digest
 from analysis_service.system_model import PLAIN_ID_RE, SystemModel
 
@@ -57,6 +62,7 @@ __all__ = [
     "LinkAnswer",
     "LinkQuestion",
     "apply_answers",
+    "check_answers",
     "fold",
     "link_questions",
     "merged_facts",
@@ -333,6 +339,26 @@ def apply_answers(
     ]
     answered, unmatched = fact_rows(linked, facts, spans)
     return answered, [*issues, *unmatched]
+
+
+def check_answers(
+    links: Sequence[LinkAnswer],
+    facts: Sequence[FactAnswer],
+    model: SystemModel,
+    catalog: AssertionCatalog | None,
+) -> None:
+    """Refuse an answer that would place nothing, before a resumed run is admitted.
+
+    **The one admission check of a submission's answers.** The HTTP route, the
+    first-run app and the in-process engine all call it. A link answer is
+    written by :func:`apply_answers` here, and each issue it would raise is a
+    refusal, so a wrong link costs nothing.
+    """
+    check_fact_answers(facts, model, catalog)
+    if links and catalog is not None:
+        _, issues = apply_answers(catalog, model, links)
+        if issues:
+            raise ValueError(issues[0].message)
 
 
 def _link_rows(

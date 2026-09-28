@@ -139,6 +139,7 @@ from analysis_service.jobs import Checkpoint, PipelineAwaiting, PipelineOutcome
 from analysis_service.links import (
     MAX_LINK_ANSWERS,
     LinkAnswer,
+    check_answers,
     link_questions,
     merged_facts,
     merged_links,
@@ -148,7 +149,6 @@ from analysis_service.open_facts import open_facts_by_framework
 from analysis_service.questions import (
     MAX_FACT_ANSWERS,
     FactAnswer,
-    check_fact_answers,
     fact_questions,
     question_fallback,
 )
@@ -183,7 +183,8 @@ PORT = 8000
 
 # The registry is a demo surface, not a job store — /v1 already is one. It holds
 # untrusted prose and its report, in memory, per process, never persisted, and
-# oldest-first evicted. A restart loses history, which is correct here.
+# oldest-first evicted, a run that waits for answers last. A restart loses
+# history, which is correct here.
 MAX_RUNS = 20
 
 #: The report page loads nothing external. It reaches its own origin for one
@@ -222,6 +223,11 @@ class Run:
     facts: list[FactAnswer] = field(default_factory=list)
     checkpoint: Checkpoint | None = None
 
+    @property
+    def paused(self) -> bool:
+        """True while the run waits for answers before its analysis."""
+        return self.checkpoint is not None and self.report is None
+
 
 class Analyses:
     """The bounded run registry, plus the one-run-at-a-time gate.
@@ -245,7 +251,14 @@ class Analyses:
         run = Run(id=secrets.token_urlsafe(16))
         self._runs[run.id] = run
         while len(self._runs) > self._max_runs:
-            self._runs.pop(next(iter(self._runs)))
+            # A paused run waits for its submitter's answers, so it goes after
+            # every finished one, and the run just claimed is never removed.
+            self._runs.pop(
+                min(
+                    self._runs,
+                    key=lambda key: (key == run.id, self._runs[key].paused),
+                )
+            )
         return run
 
     def release(self) -> None:
@@ -577,7 +590,8 @@ def create_app(
         try:
             if links and held.assertions is None:
                 raise ValueError("this report built no catalog, so it asks no link")
-            check_fact_answers(
+            check_answers(
+                links,
                 facts,
                 held.system_model,
                 None if held.assertions is None else held.assertions.catalog,

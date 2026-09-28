@@ -684,6 +684,7 @@ class TestWhatTheGateRefuses:
             "unmatched-link",
             "unknown-link-element",
             "unmatched-answer",
+            "superseded-by-answer",
         }
 
     @pytest.mark.parametrize(
