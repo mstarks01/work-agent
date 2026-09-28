@@ -1041,6 +1041,12 @@ _STYLE = """
   .pick b { font-family: ui-monospace, monospace; font-weight: 600; }
   .opts { margin-left: .75rem; font-size: .85rem; opacity: .8; }
   .opts[hidden] { display: none; }
+  .spinner { display: inline-block; width: .9em; height: .9em; border-radius: 50%;
+             border: 2px solid currentColor; border-right-color: transparent;
+             vertical-align: -.1em; animation: spin .8s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  @media (prefers-reduced-motion: reduce) { .spinner { animation: none; } }
+  .hint { font-size: .85rem; opacity: .7; }
 """
 
 _FORM_PAGE = (
@@ -1067,14 +1073,18 @@ _FORM_PAGE = (
   </p>
 </form>
 <div id="problem" class="problem" hidden></div>
+<p id="status" hidden><span class="spinner" aria-hidden="true"></span>
+  <span id="status-text" role="status"></span></p>
 <ul id="ticks" hidden></ul>
 <div id="asked" hidden>
-  <h2>Before the analysis: which element is each of these?</h2>
-  <p class="sub">The description states facts about these principals but never
-  says which element each one is. Answer what you can; the analysis then starts
-  from what was already read.</p>
+  <h2>Your system model is ready. The threat analysis has not started.</h2>
+  <p class="sub">The service read your description, built a model of your system
+  and checked it. It stopped before the threat analysis so that you can add
+  facts your description does not state. Answer what you can, leave the rest
+  blank, and choose <b>Start the analysis</b>. The analysis reads your
+  answers.</p>
   <div id="questions"></div>
-  <p><button type="button" id="continue">Continue</button></p>
+  <p><button type="button" id="continue">Start the analysis</button></p>
 </div>
 <script nonce="__CSP_NONCE__"><!--script--></script>
 </body></html>

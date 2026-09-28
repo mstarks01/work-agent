@@ -246,7 +246,8 @@ class Node {
 }
 const ids = {};
 for (const id of ["analyze","description","ticks","problem","go","load","ask",
-                  "asked","questions","continue"]) ids[id] = new Node(id);
+                  "asked","questions","continue","status","status-text"])
+  ids[id] = new Node(id);
 ids.ask.checked = true;
 globalThis.document = {
   getElementById: (id) => ids[id] || null,
@@ -769,3 +770,25 @@ await ids.continue.listeners.click(); await settle();
         "links": [],
         "facts": [{"key": key, "value": "none"}],
     }
+
+
+def test_the_form_script_shows_what_the_service_is_doing():
+    """A spinner and a sentence from Analyze until the pause, and again after."""
+    steps = """
+await ids.analyze.listeners.submit({ preventDefault() {} }); await settle();
+calls.push({ building: !ids.status.hidden, text: ids["status-text"].textContent });
+streams[0].listeners.questions({ data: JSON.stringify({ run: "r1", questions: [],
+  facts: [] }) });
+calls.push({ paused: ids.status.hidden });
+await ids.continue.listeners.click(); await settle();
+calls.push({ analysing: !ids.status.hidden, text: ids["status-text"].textContent });
+"""
+    seen = _run_form_script(steps)["calls"]
+    building, paused, analysing = (c for c in seen if "url" not in c)
+
+    assert building["building"]
+    assert "building the system model" in building["text"]
+    assert "stops for your answers" in building["text"]
+    assert paused == {"paused": True}
+    assert analysing["analysing"]
+    assert "threat analysis with your answers" in analysing["text"]
