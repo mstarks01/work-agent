@@ -29,12 +29,15 @@ from __future__ import annotations
 import ast
 import re
 from pathlib import Path
+from typing import get_args
 
 import pytest
 
+from analysis_service.assertions import QUALIFIED_SPELLING, UNKNOWN
 from analysis_service.claims import ATTRIBUTE_GROUNDS
 from analysis_service.factbundle import LANDED
 from analysis_service.sources import FORMATTING_CATEGORIES
+from analysis_service.system_model import Element, all_attribute_names
 from evals.harness.reference import CASE_FILES, MUST_FIND
 from evals.harness.roster import STANDINGS
 from tests.source_tree import REPO_ROOT, parse, source_files
@@ -557,3 +560,105 @@ def test_the_respelling_scan_finds_one_when_there_is_one(tmp_path):
     found = _respelled(ast.parse(probe.read_text(encoding="utf-8")), LANDED)
 
     assert found == [2]
+
+
+# --- One reader of "is this attribute unknown" -------------------------------
+#
+# The questions audit (#1289, Q4) found the early questions asking about an
+# attribute only where it held exactly ``unknown``, while the evidence catalog
+# read it through ``control_state``. A qualified value such as
+# ``unknown; the sources are silent`` was open to the analysis and never asked.
+# Each reader's own test agreed with it.
+
+
+def _qualifiable_attributes() -> frozenset[str]:
+    """The attributes that can hold a qualified ``unknown``.
+
+    A free-text field in some element type, less the fields the projection
+    spells bare (:data:`~analysis_service.assertions.QUALIFIED_SPELLING`),
+    where the gate refuses anything after the sentinel. A closed field holds
+    the bare sentinel or nothing, so an exact comparison reads it correctly.
+    """
+    return frozenset(
+        name
+        for element_type in get_args(Element)
+        for name, field in element_type.model_fields.items()
+        if name in all_attribute_names()
+        and field.annotation is str
+        and QUALIFIED_SPELLING.get(name) != "bare"
+    )
+
+
+def _unknown_comparisons(path: Path, attributes: frozenset[str]) -> list[int]:
+    """Lines comparing one of ``attributes`` to the ``unknown`` sentinel exactly."""
+
+    def sentinel(node: ast.expr) -> bool:
+        return (isinstance(node, ast.Name) and node.id == "UNKNOWN") or (
+            isinstance(node, ast.Constant) and node.value == UNKNOWN
+        )
+
+    def attribute(node: ast.expr) -> bool:
+        if isinstance(node, ast.Attribute):
+            return node.attr in attributes
+        if isinstance(node, ast.Subscript) and isinstance(node.slice, ast.Constant):
+            return node.slice.value in attributes
+        return (
+            isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Name)
+            and node.func.id == "getattr"
+        )
+
+    return [
+        node.lineno
+        for node in ast.walk(parse(path))
+        if isinstance(node, ast.Compare)
+        and any(isinstance(op, ast.Eq | ast.NotEq) for op in node.ops)
+        and any(sentinel(side) for side in (node.left, *node.comparators))
+        and any(attribute(side) for side in (node.left, *node.comparators))
+    ]
+
+
+def test_no_site_reads_an_open_attribute_by_exact_match():
+    """``control_state`` is the one reader, and ``open_attribute`` asks it.
+
+    An exact match misses a qualified ``unknown``, which the projection writes
+    into every free-text field it qualifies.
+    """
+    attributes = _qualifiable_attributes()
+    offenders = {
+        f"{path.relative_to(REPO_ROOT)}:{line}"
+        for path in source_files("src", "evals", "webapp")
+        for line in _unknown_comparisons(path, attributes)
+    }
+
+    assert not offenders, (
+        f"these compare an attribute to 'unknown' exactly: {sorted(offenders)}."
+        " Ask analysis.control_state, or questions.open_attribute."
+    )
+
+
+def test_the_qualifiable_set_is_the_free_text_fields():
+    """Pins the derivation: a bare or closed field is out, a prose one is in."""
+    attributes = _qualifiable_attributes()
+
+    assert {"authentication", "encryption_in_transit"} <= attributes
+    assert not {"trust_zone", "exposure", "kind"} & attributes
+
+
+def test_the_unknown_comparison_scan_finds_one_when_there_is_one(tmp_path):
+    """Positive control, spelled as the defect was, and what is not one."""
+    probe = tmp_path / "probe.py"
+    probe.write_text(
+        "UNKNOWN = 'unknown'\n"
+        "def asked(element, field):\n"
+        "    return getattr(element, field, None) == UNKNOWN\n"
+        "def flow(f):\n"
+        "    return f.encryption_in_transit != 'unknown'\n"
+        "def zone(e):\n"
+        "    return e.trust_zone == UNKNOWN\n"
+        "def row(entry):\n"
+        "    return entry.value == UNKNOWN\n",
+        encoding="utf-8",
+    )
+
+    assert _unknown_comparisons(probe, _qualifiable_attributes()) == [3, 5]

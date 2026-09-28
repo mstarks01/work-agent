@@ -286,9 +286,42 @@ AMBIGUOUS_CONTROL_LEADS: frozenset[str] = frozenset(
     {"no", "not", "without", "never", "neither", "nor", "n/a", "na", "nil"}
 )
 
+#: Leading words that say the writer does not know. ``control_state`` reads
+#: "I don't know" or "TBD" as a stated control, so a submitter who typed one
+#: into an answer turned off every rule that asks about a missing control
+#: (#1289). The sentinel for that fact is ``unknown``. An apostrophe comes in
+#: two spellings, and a phone or a word processor types the curly one. No
+#: archived model or report held a control that opens with one of these.
+UNCERTAIN_CONTROL_LEADS: frozenset[str] = frozenset(
+    {
+        "unsure",
+        "uncertain",
+        "unclear",
+        "unconfirmed",
+        "unverified",
+        "maybe",
+        "possibly",
+        "probably",
+        "presumably",
+        "tbd",
+        "tba",
+        "tbc",
+        "idk",
+        "dunno",
+        *(
+            f"{lead}{apostrophe}t know"
+            for lead in ("i don", "don", "we don")
+            for apostrophe in ("'", "\u2019")
+        ),
+        "i do not know",
+        "do not know",
+        "we do not know",
+    }
+)
+
 
 def _ambiguous_control_issues(element: Element) -> list[ValidationIssue]:
-    """Every control whose leading word is a negation other than ``none``.
+    """Every control whose leading word is a negation other than ``none``, or a doubt.
 
     The extraction contract gives a control three shapes: ``unknown`` for a
     control the input never mentions, ``none`` for one it says is not there,
@@ -307,7 +340,10 @@ def _ambiguous_control_issues(element: Element) -> list[ValidationIssue]:
         # sentinels, so "where a word ends" has one answer: ``no-mfa`` and
         # ``no/unknown`` open with ``no`` here exactly as ``none;`` opens with
         # ``none`` there.
-        lead = leading_word(str(getattr(element, attribute)), AMBIGUOUS_CONTROL_LEADS)
+        lead = leading_word(
+            str(getattr(element, attribute)),
+            AMBIGUOUS_CONTROL_LEADS | UNCERTAIN_CONTROL_LEADS,
+        )
         if lead is not None:
             issues.append(
                 ValidationIssue(

@@ -160,6 +160,9 @@ Before any paid sweep, run one case first and read its provenance.
   figure in the holdout split, and only to confirm a fix measured elsewhere.
 - Never claim a report improved from an intermediate metric. The ladder in
   `references/experiment-protocol.md` says what each rung licenses.
+- Measure a shipped rule by calling the shipped function. A script that
+  copies the rule measures the copy: E13 ranked early questions with its own
+  loop, and E16 measured `early_questions` itself.
 - A structural identity match is not proof that a finding is semantically
   right, and an unlisted output is not automatically wrong.
 - A change to one framework package owes an explicit answer for every other
