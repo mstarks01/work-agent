@@ -45,9 +45,11 @@ jobs:
         env:
           BEFORE: ${{ github.event.before }}
           AFTER: ${{ github.event.after }}
+        # A new branch, or a forced push whose old tip this clone does not
+        # hold, has no range to read, so the whole history of the tip is read.
         run: |
-          if [ "$BEFORE" = "0000000000000000000000000000000000000000" ]; then
-            .githooks/check-attribution -1 "$AFTER"
-          else
+          if git cat-file -e "$BEFORE^{commit}" 2>/dev/null; then
             .githooks/check-attribution "$BEFORE..$AFTER"
+          else
+            .githooks/check-attribution "$AFTER"
           fi
