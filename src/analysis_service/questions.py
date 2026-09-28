@@ -54,9 +54,10 @@ from analysis_service.claims import FrameworkAnalysis, UnknownKey, UnknownRef
 from analysis_service.open_facts import element_names, label_of
 from analysis_service.question_kinds import QUESTION_KINDS
 from analysis_service.sources import plain_name
-from analysis_service.system_model import SystemModel
+from analysis_service.system_model import SystemModel, attribute_names
 
 __all__ = [
+    "ANSWERS_LABEL",
     "MAX_FACT_ANSWERS",
     "FactAnswer",
     "FactQuestion",
@@ -73,6 +74,14 @@ __all__ = [
 #: How many fact answers one submission carries. The largest report measured
 #: raised 85 open facts, so this bounds the body above any real use.
 MAX_FACT_ANSWERS = 200
+
+#: The label of the Source the answers become. A caller's own source may not
+#: use it: the job refuses two sources that share a label.
+ANSWERS_LABEL = "Answers to link questions"
+
+#: The fields a flow's ID is built from. An answer cannot move one, because the
+#: flow would then carry an ID its endpoints no longer derive.
+_ENDPOINTS = frozenset({"source", "destination"})
 
 FactKind = Literal["attribute", "assertion", "question", "subject"]
 Basis = Literal["evidence", "critic"]
@@ -187,7 +196,7 @@ def answer_choices(
             else _closed(model, element_id, attribute)
         )
     if kind == "assertion" and catalog is not None:
-        row = _open_row(catalog, assertion)
+        row = _answered_row(catalog, assertion)
         if row is None:
             return ()
         predicate = REGISTRY.get(row.predicate)
@@ -204,10 +213,25 @@ def answer_choices(
     return ()
 
 
-def _open_row(catalog: AssertionCatalog, identity: str) -> Assertion | None:
-    return next(
-        (entry for entry in catalog.entries if assertion_id(entry) == identity), None
-    )
+def _answered_row(catalog: AssertionCatalog, identity: str) -> Assertion | None:
+    """The row an answer to the open row ``identity`` writes over, if any.
+
+    **The one reader of "which row does this answer settle".** That is the open
+    row itself, or the stated row an earlier answer wrote in its place. The
+    second is the row a resumed job's checkpoint holds, and a later round
+    writes it again, so that its quote reads the answers Source this round
+    composed. A row the sources settled is neither, so no answer names it.
+    """
+    for entry in catalog.entries:
+        if entry.value == UNKNOWN:
+            reopened = entry
+        elif any(span.source_label == ANSWERS_LABEL for span in entry.support):
+            reopened = entry.model_copy(update={"value": UNKNOWN})
+        else:
+            continue
+        if assertion_id(reopened) == identity:
+            return entry
+    return None
 
 
 def _greedy(open_facts: Mapping[Finding, set[UnknownKey]]) -> list[UnknownKey]:
@@ -362,10 +386,11 @@ def check_fact_answers(
                 raise ValueError(f"no question {question!r} about {element_id!r}")
         elif kind == "attribute":
             element = model.get(element_id)
-            if element is None or attribute not in type(element).model_fields:
+            answerable = () if element is None else attribute_names(element)
+            if attribute not in answerable or attribute in _ENDPOINTS:
                 raise ValueError(f"no attribute {attribute!r} on {element_id!r}")
         elif kind == "assertion":
-            if catalog is None or _open_row(catalog, assertion) is None:
+            if catalog is None or _answered_row(catalog, assertion) is None:
                 raise ValueError(f"no open assertion row {assertion!r}")
         elif not subject:
             raise ValueError("an answer names an element, an assertion or a subject")
@@ -400,7 +425,10 @@ def answered_model(model: SystemModel, answers: Sequence[FactAnswer]) -> SystemM
             continue
         element[attribute] = answer.value
         note = f'The submitter answered {attribute}: "{answer.value}".'
-        element["notes"] = f"{element.get('notes', '')} {note}".strip()[:2000]
+        # A resumed job's checkpoint already holds an earlier round's answers.
+        notes = element.get("notes", "")
+        if note not in notes:
+            element["notes"] = f"{notes} {note}".strip()[:2000]
     return SystemModel.model_validate(data)
 
 
@@ -413,14 +441,16 @@ def fact_rows(
 
     ``spans`` are where each answer's line sits in the answers Source, in the
     order of ``answers``. The stated row keeps the open row's subject,
-    predicate and scope, so it answers exactly what was asked.
+    predicate and scope, so it answers exactly what was asked. An earlier
+    round's answer is written again over the row it wrote, so its quote reads
+    this round's answers Source.
     """
     replaced: dict[str, Assertion] = {}
     issues: list[CatalogIssue] = []
     for answer, span in zip(answers, spans, strict=True):
         if answer.kind != "assertion":
             continue
-        row = _open_row(catalog, answer.key[2])
+        row = _answered_row(catalog, answer.key[2])
         if row is None:
             issues.append(
                 CatalogIssue(

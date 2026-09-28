@@ -46,7 +46,7 @@ from analysis_service.assertions import (
     settled,
 )
 from analysis_service.question_kinds import QUESTION_KINDS
-from analysis_service.questions import FactAnswer, fact_rows
+from analysis_service.questions import ANSWERS_LABEL, FactAnswer, fact_rows
 from analysis_service.sources import Source, plain_name, text_digest
 from analysis_service.system_model import PLAIN_ID_RE, SystemModel
 
@@ -73,10 +73,6 @@ NONE_OF_THESE = "none"
 #: How many answers one submission carries. The archive asks at most five link
 #: questions a report, so this bounds the body far above any real use.
 MAX_LINK_ANSWERS = 50
-
-#: The label of the Source the answers become. A caller's own source may not
-#: use it: the job refuses two sources that share a label.
-ANSWERS_LABEL = "Answers to link questions"
 
 _WORD = re.compile(r"[a-z0-9]+")
 
