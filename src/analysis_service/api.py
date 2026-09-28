@@ -922,6 +922,7 @@ def create_app(
                 answers.facts,
                 model,
                 None if assertions is None else assertions.catalog,
+                parent.facts,
             )
             sources, links, facts = resumed_sources(
                 parent.sources, parent.links, answers.links, parent.facts, answers.facts

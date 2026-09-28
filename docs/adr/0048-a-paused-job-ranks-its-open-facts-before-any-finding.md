@@ -8,6 +8,9 @@
   whose pause this adds to; [ADR 0047](0047-the-critic-asks-a-kind-of-question-about-an-element.md),
   whose kinds it asks early
 - **Evidence**: `QA-2026-09-26-03-E5` and `-E13` in `evals/experiments/`
+- **Amended by**: [ADR 0049](0049-an-answer-binds-to-an-open-fact-and-the-order-completes-findings.md),
+  which keeps the prior as the eligibility rule and shares the open-fact rule
+  with the answer check
 
 ## Context
 

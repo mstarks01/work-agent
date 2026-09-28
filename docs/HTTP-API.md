@@ -174,7 +174,8 @@ service loses it, with its extraction; submit it again.
 
 Most findings are conditional: they rest on facts the sources never state,
 such as how a flow is protected. `fact_questions` lists every such fact the
-report's findings cite, most useful first:
+report's findings cite. The first question is the one that completes the most
+findings, so that each has every fact it waits on answered:
 
 ```json
 {"key": ["flow:entity:customer>process:web-app>login", "encryption_in_transit", "", "", ""],
@@ -185,7 +186,8 @@ report's findings cite, most useful first:
 ```
 
 - `key` names the fact. Send it back unchanged with your answer.
-- `kind` is `attribute` (a value the model left unknown), `assertion` (a fact
+- `kind` is `attribute` (a value the model left unknown, or a trust zone the
+  service inferred), `assertion` (a fact
   about a principal, a credential or a component that the sources left open),
   `question` (one of a fixed list of questions about one element, such as
   "What limits bound the requests the Web App accepts?"), or `subject` (a
@@ -201,16 +203,19 @@ report's findings cite, most useful first:
   share that fell back (`rate`).
 - `covered_so_far` is how many findings have an answer to every fact they
   wait on, once you have answered this question and every question above it.
-  It counts answers, not verdicts: an answer such as "I don't know" still
-  counts, and only the resumed run rules on each finding again. The count
-  includes drafts the reviewer rejected. Answer from the top, as far as you
-  like; the list is not capped.
+  It counts answers, not verdicts: only the resumed run rules on each finding
+  again. A draft the reviewer rejected still ranks the questions, but no count
+  includes it. Answer from the top, as far as you like; the list is not
+  capped.
 - `choices` lists the values the fact takes. Empty means free text on one
   line: at most 1,000 characters, and at most 200 for an attribute other than
   `data_description`. An answer
   about a control, such as `authentication`, names the mechanism, or is `none`
   where there is none. It may not be blank or open with another negation, such
   as "no" or "not".
+- The value `unknown` says that you do not know. Every fact takes it, whatever
+  its `choices`. The service writes nothing for it, so the fact stays open, and
+  the analysis reads your answer as a line of the answers source.
 - `findings` names every finding that waits on the fact, as
   `framework/claim`. A finding is covered once every question that names it
   has an answer, in any order, so you can count what a set of answers covers.
@@ -222,11 +227,16 @@ Answer with `facts` beside or instead of `links`:
                     "encryption_in_transit", "", "", ""], "value": "TLS 1.3"}]}
 ```
 
+An attribute answer is accepted only where the model leaves the attribute open,
+or where an earlier round of answers answered it. An answer to an attribute that
+the sources state is refused with `400`. An `unknown` answer to a fact that an
+earlier round settled is refused too: send a value to change it.
+
 An attribute answer is written onto the model the new job analyses, and the
 element's notes say you gave it. The answer removes each catalog fact about
 that attribute, and a `superseded-by-answer` issue names each removed fact. An
-inferred trust zone that you answer is no longer marked as inferred. An assertion answer replaces the open fact
-with a stated one. A subject answer reaches the analysis as your words in the
+inferred trust zone that you answer is no longer marked as inferred. An
+assertion answer replaces the open fact with a stated one. A subject answer reaches the analysis as your words in the
 answers source. Your answer settles the fact, even where the sources said
 otherwise. Fact answers need no assertion catalog, so every deployment takes
 them.

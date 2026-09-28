@@ -7,6 +7,9 @@
 - **Relates to**: [ADR 0043](0043-a-link-answer-is-closed-and-code-writes-it.md)
   and [ADR 0044](0044-a-resumed-job-starts-at-prepare.md)
 - **Evidence**: `QA-2026-09-26-03-E6` and `-E7` in `evals/experiments/`
+- **Amended by**: [ADR 0049](0049-an-answer-binds-to-an-open-fact-and-the-order-completes-findings.md),
+  which orders questions by the findings each completes, leaves rejected drafts
+  out of the count, and refuses an answer to a stated attribute
 
 ## Context
 
