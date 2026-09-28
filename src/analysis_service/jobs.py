@@ -27,7 +27,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import os
-from collections.abc import Awaitable, Callable, Iterable, Mapping, Sequence
+from collections.abc import Awaitable, Callable, Mapping, Sequence
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from typing import Any, Literal, Protocol, Self
@@ -66,11 +66,8 @@ TERMINAL_STATUSES: frozenset[JobStatus] = frozenset(
     {"completed", "failed", "rejected", "awaiting-answers"}
 )
 
-# ``queued -> failed`` is the edge a durable store takes when it opens and finds
-# a job that a stopped process admitted and never started: no task will ever
-# run it (see :meth:`JobRecord.interrupt`).
 _LEGAL_TRANSITIONS: dict[JobStatus, frozenset[JobStatus]] = {
-    "queued": frozenset({"running", "failed"}),
+    "queued": frozenset({"running"}),
     "running": TERMINAL_STATUSES,
     "completed": frozenset(),
     "failed": frozenset(),
@@ -80,10 +77,6 @@ _LEGAL_TRANSITIONS: dict[JobStatus, frozenset[JobStatus]] = {
 
 # Stored on a failed job in place of any internal detail.
 GENERIC_FAILURE_MESSAGE = "internal error while running the analysis pipeline"
-# Stored on a job the service stopped under, found when a durable store opens.
-INTERRUPTED_FAILURE_MESSAGE = (
-    "the service stopped before this job finished; submit it again"
-)
 
 # Stored on a job the deadline killed. Deliberately *not* the generic message:
 # a deadline is an operational fact about this deployment's bounds, not a
@@ -303,17 +296,6 @@ class JobRecord(BaseModel):
                 self.measured_tokens = measured
         self._append_event(kind="status", status=new_status)
 
-    def interrupt(self) -> None:
-        """End, as failed, a job whose process stopped before its run ended.
-
-        Only a durable store meets one: the job was queued or running in a
-        process that no longer exists, so no task will ever move it, and left
-        alone it would count against its caller's ceiling for good. It keeps
-        its reservation, because nothing measured what the run spent.
-        """
-        self.transition("failed")
-        self.error = INTERRUPTED_FAILURE_MESSAGE
-
     def spent_tokens(self) -> int | None:
         """What this job's node runs measured, or ``None`` if nothing measured them.
 
@@ -439,87 +421,6 @@ class JobStore(Protocol):
     async def save(self, record: JobRecord) -> None: ...
 
 
-class Held(Protocol):
-    """What admission reads of a job the store already holds, and never writes."""
-
-    @property
-    def owner_subject(self) -> str: ...
-
-    @property
-    def status(self) -> JobStatus: ...
-
-    @property
-    def created_at(self) -> datetime: ...
-
-    @property
-    def reserved_tokens(self) -> int: ...
-
-    @property
-    def measured_tokens(self) -> int | None: ...
-
-
-def admit(
-    record: JobRecord, held: Iterable[Held], ceiling: int, budget: BudgetPolicy
-) -> Admission:
-    """Every admission bound, checked against the jobs a store already holds.
-
-    **The one reader of the admission rules.** Each store calls it inside its
-    own atomic step, which is what keeps the count and the insert one
-    operation (#505); a store that re-derived a bound would admit on its own
-    arithmetic. ``held`` is every job the store holds, or at least every job of
-    the record's subject and every job inside the budget window.
-
-    **The bounds run cheapest-first, and the order is the answer a caller
-    gets.** A submission over several of them hears about the concurrency
-    ceiling before the rate, and the rate before either budget, because that
-    is the order in which they clear: a job of theirs finishing, then the
-    window rolling, then the window rolling further.
-    """
-    held_records = list(held)
-    subject = record.owner_subject
-    since = budget.window_start()
-    mine = [one for one in held_records if one.owner_subject == subject]
-    active = sum(1 for held in mine if held.status not in TERMINAL_STATUSES)
-    if active >= ceiling:
-        return Admission(outcome="at_ceiling", active=active)
-
-    started = sum(1 for held in mine if held.created_at >= since)
-    if started >= budget.max_jobs_per_window:
-        return Admission(outcome="over_rate", active=active)
-
-    subject_tokens = spent_tokens(
-        (held.reserved_tokens, held.measured_tokens)
-        for held in mine
-        if held.created_at >= since
-    )
-    if subject_tokens + record.reserved_tokens > budget.max_tokens_per_window:
-        return Admission(
-            outcome="over_subject_budget",
-            active=active,
-            subject_tokens=subject_tokens,
-        )
-
-    global_tokens = spent_tokens(
-        (held.reserved_tokens, held.measured_tokens)
-        for held in held_records
-        if held.created_at >= since
-    )
-    if global_tokens + record.reserved_tokens > budget.global_max_tokens_per_window:
-        return Admission(
-            outcome="over_global_budget",
-            active=active,
-            subject_tokens=subject_tokens,
-            global_tokens=global_tokens,
-        )
-
-    return Admission(
-        outcome="admitted",
-        active=active,
-        subject_tokens=subject_tokens,
-        global_tokens=global_tokens,
-    )
-
-
 class InMemoryJobStore:
     """Dict-backed store; hands out copies so callers must ``save`` mutations."""
 
@@ -548,14 +449,64 @@ class InMemoryJobStore:
 
         A duplicate id is settled before every bound, so a record the store
         already holds is never also counted against the budgets it is already
-        inside. The bounds themselves are :func:`admit`'s.
+        inside.
+
+        **The bounds run cheapest-first, and the order is the answer a caller
+        gets.** A submission over several of them hears about the concurrency
+        ceiling before the rate, and the rate before either budget, because that
+        is the order in which they clear: a job of theirs finishing, then the
+        window rolling, then the window rolling further. Telling a caller about
+        the bound that clears soonest is the one that helps them.
         """
         if record.id in self._records:
             return Admission(outcome="duplicate", active=0)
-        admission = admit(record, self._records.values(), ceiling, budget)
-        if admission.outcome == "admitted":
-            self._records[record.id] = record.model_copy(deep=True)
-        return admission
+
+        subject = record.owner_subject
+        since = budget.window_start()
+        mine = [
+            held for held in self._records.values() if held.owner_subject == subject
+        ]
+
+        active = sum(1 for held in mine if held.status not in TERMINAL_STATUSES)
+        if active >= ceiling:
+            return Admission(outcome="at_ceiling", active=active)
+
+        started = sum(1 for held in mine if held.created_at >= since)
+        if started >= budget.max_jobs_per_window:
+            return Admission(outcome="over_rate", active=active)
+
+        subject_tokens = spent_tokens(
+            (held.reserved_tokens, held.measured_tokens)
+            for held in mine
+            if held.created_at >= since
+        )
+        if subject_tokens + record.reserved_tokens > budget.max_tokens_per_window:
+            return Admission(
+                outcome="over_subject_budget",
+                active=active,
+                subject_tokens=subject_tokens,
+            )
+
+        global_tokens = spent_tokens(
+            (held.reserved_tokens, held.measured_tokens)
+            for held in self._records.values()
+            if held.created_at >= since
+        )
+        if global_tokens + record.reserved_tokens > budget.global_max_tokens_per_window:
+            return Admission(
+                outcome="over_global_budget",
+                active=active,
+                subject_tokens=subject_tokens,
+                global_tokens=global_tokens,
+            )
+
+        self._records[record.id] = record.model_copy(deep=True)
+        return Admission(
+            outcome="admitted",
+            active=active,
+            subject_tokens=subject_tokens,
+            global_tokens=global_tokens,
+        )
 
     async def get(self, job_id: str) -> JobRecord | None:
         record = self._records.get(job_id)
@@ -626,17 +577,8 @@ class JobStoreConfigError(ValueError):
 
 JobStoreFactory = Callable[[Mapping[str, str]], JobStore]
 
-
-def _sqlite_store(env: Mapping[str, str]) -> JobStore:
-    """The durable store, imported on use because its module imports this one."""
-    from analysis_service.sqlite_store import sqlite_store
-
-    return sqlite_store(env)
-
-
 _FACTORIES: dict[str, JobStoreFactory] = {
     "memory": lambda env: InMemoryJobStore(),
-    "sqlite": _sqlite_store,
 }
 
 
