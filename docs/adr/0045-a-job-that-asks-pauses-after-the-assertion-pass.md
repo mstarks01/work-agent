@@ -44,9 +44,9 @@ it holds, and the early fact questions of
 
 ## Consequences
 
-The job store is still in memory, and the choice of a persistent store is
-still deferred. A restart loses every waiting job and its extraction. The
-pause ships behind the toggle with that limit stated in the API document.
+A waiting job survives a restart in the `sqlite` job store
+([ADR 0049](0049-a-sqlite-job-store-keeps-jobs-across-a-restart.md)). The
+`memory` store still loses every waiting job and its extraction on a restart.
 
 A resumed job carries the parent's ID, so a paused job and its continuation
 are linked, but the paused job's own status does not change when it is

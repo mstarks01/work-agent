@@ -8,6 +8,7 @@ from analysis_service.execution import GraphFailed
 from analysis_service.jobs import (
     DEADLINE_FAILURE_MESSAGE,
     GENERIC_FAILURE_MESSAGE,
+    INTERRUPTED_FAILURE_MESSAGE,
     Admission,
     InMemoryJobStore,
     InvalidTransitionError,
@@ -27,6 +28,7 @@ from analysis_service.report import (
     TokenUsage,
 )
 from analysis_service.sources import Source
+from analysis_service.sqlite_store import SqliteJobStore
 from analysis_service.validation import ValidationIssue
 from tests.factories import (
     SEEDING_BUDGET,
@@ -100,11 +102,22 @@ class TestLifecycle:
         record.transition(terminal)
         assert record.status == terminal
 
+    @pytest.mark.parametrize("status", ["queued", "running"])
+    def test_an_interrupted_job_fails_and_keeps_its_reservation(self, status):
+        record = make_record()
+        record.reserved_tokens = 5000
+        if status == "running":
+            record.transition("running")
+        record.interrupt()
+        assert record.status == "failed"
+        assert record.error == INTERRUPTED_FAILURE_MESSAGE
+        assert record.measured_tokens is None
+        assert record.reserved_tokens == 5000
+
     @pytest.mark.parametrize(
         ("start", "target"),
         [
             ("queued", "completed"),
-            ("queued", "failed"),
             ("queued", "rejected"),
             ("running", "queued"),
             ("completed", "running"),
@@ -136,10 +149,33 @@ class TestLifecycle:
         assert record.updated_at >= before
 
 
-class TestInMemoryJobStore:
+@pytest.fixture(params=["memory", "sqlite"])
+def new_store(request, tmp_path):
+    """A maker of fresh stores of one kind; each sqlite store gets its own file."""
+    opened: list[SqliteJobStore] = []
+
+    def make():
+        if request.param == "memory":
+            return InMemoryJobStore()
+        store = SqliteJobStore(tmp_path / f"jobs-{len(opened)}.db")
+        opened.append(store)
+        return store
+
+    yield make
+    for store in opened:
+        store.close()
+
+
+class TestJobStore:
+    """Every store answers these the same way; the fixture runs each on both."""
+
+    @pytest.fixture(autouse=True)
+    def _stores(self, new_store):
+        self.store = new_store
+
     def test_create_get_roundtrip(self):
         async def scenario():
-            store = InMemoryJobStore()
+            store = self.store()
             record = make_record()
             await admit(store, record)
             return await store.get(record.id)
@@ -149,12 +185,12 @@ class TestInMemoryJobStore:
         assert fetched.status == "queued"
 
     def test_get_unknown_returns_none(self):
-        store = InMemoryJobStore()
+        store = self.store()
         assert asyncio.run(store.get("job-missing")) is None
 
     def test_reserve_get_roundtrip_keeps_the_record_queued(self):
         async def scenario():
-            store = InMemoryJobStore()
+            store = self.store()
             record = make_record()
             await admit(store, record)
             return await store.get(record.id)
@@ -168,7 +204,7 @@ class TestInMemoryJobStore:
         cannot be probed for existence."""
 
         async def scenario():
-            store = InMemoryJobStore()
+            store = self.store()
             record = make_record()
             await admit(store, record)
             return await store.owned(record.id, "mallory")
@@ -181,7 +217,7 @@ class TestInMemoryJobStore:
         a read carries none of the bounds admission does."""
 
         async def scenario():
-            store = InMemoryJobStore()
+            store = self.store()
             record = make_record()
             await admit(store, record)
             record.transition("running")
@@ -198,7 +234,7 @@ class TestInMemoryJobStore:
 
     def test_report_json_serializes_without_a_second_copy(self):
         async def scenario():
-            store = InMemoryJobStore()
+            store = self.store()
             record = make_record()
             await admit(store, record)
             record.transition("running")
@@ -216,7 +252,7 @@ class TestInMemoryJobStore:
 
     def test_report_json_answers_none_when_no_report_is_attached(self):
         async def scenario():
-            store = InMemoryJobStore()
+            store = self.store()
             record = make_record()
             await admit(store, record)
             return await store.report_json(record.id, "alice")
@@ -225,11 +261,11 @@ class TestInMemoryJobStore:
 
     def test_save_requires_existing_record(self):
         with pytest.raises(ValueError, match="does not exist"):
-            asyncio.run(InMemoryJobStore().save(make_record()))
+            asyncio.run(self.store().save(make_record()))
 
     def test_mutations_invisible_until_saved(self):
         async def scenario():
-            store = InMemoryJobStore()
+            store = self.store()
             record = make_record()
             await admit(store, record)
             record.transition("running")
@@ -253,11 +289,15 @@ class TestReserve:
     so what these tests read is the count the reservation itself observed.
     """
 
+    @pytest.fixture(autouse=True)
+    def _stores(self, new_store):
+        self.store = new_store
+
     def counts(self, statuses: list[JobStatus], subject: str = "alice") -> int:
         """How many jobs a fresh reservation for ``subject`` sees in flight."""
 
         async def scenario():
-            store = InMemoryJobStore()
+            store = self.store()
             for status in statuses:
                 record = make_record()
                 await admit(store, record)
@@ -291,7 +331,7 @@ class TestReserve:
 
     def test_only_the_named_subject_is_counted(self):
         async def scenario():
-            store = InMemoryJobStore()
+            store = self.store()
             seen = {}
             for owner in ("alice", "alice", "bob", "alice", "bob"):
                 record = JobRecord.create(
@@ -317,7 +357,7 @@ class TestReserve:
 
     def test_a_reservation_at_the_ceiling_admits_nothing(self):
         async def scenario():
-            store = InMemoryJobStore()
+            store = self.store()
             await admit(store, make_record())
             refused = make_record()
             outcome = await store.reserve(refused, ceiling=1, budget=SEEDING_BUDGET)
@@ -331,7 +371,7 @@ class TestReserve:
 
     def test_a_reservation_below_the_ceiling_is_admitted(self):
         async def scenario():
-            store = InMemoryJobStore()
+            store = self.store()
             await admit(store, make_record())
             record = make_record()
             return await store.reserve(
@@ -344,7 +384,7 @@ class TestReserve:
 
     def test_a_ceiling_another_subject_fills_does_not_refuse_this_one(self):
         async def scenario():
-            store = InMemoryJobStore()
+            store = self.store()
             for _ in range(3):
                 await admit(store, make_record())
             bob = JobRecord.create(
@@ -361,7 +401,7 @@ class TestReserve:
         # error; it is distinct from at_ceiling so the API can answer 500
         # rather than 429 for it.
         async def scenario():
-            store = InMemoryJobStore()
+            store = self.store()
             record = make_record()
             await admit(store, record)
             return await admit(store, record)
@@ -373,7 +413,7 @@ class TestReserve:
         # Counting it against the ceiling as well would report at_ceiling for
         # what is really a collision, and send a defect out as a 429.
         async def scenario():
-            store = InMemoryJobStore()
+            store = self.store()
             record = make_record()
             await admit(store, record)
             return await store.reserve(record, ceiling=1, budget=SEEDING_BUDGET)
@@ -385,7 +425,7 @@ class TestReserve:
         # the same moment and they contend for one slot. Two calls -- a count
         # then a create -- would let all of them read 0 before any wrote.
         async def scenario():
-            store = InMemoryJobStore()
+            store = self.store()
             start = asyncio.Event()
 
             async def contend():
@@ -405,7 +445,7 @@ class TestReserve:
         # The count and the records cannot disagree: an admitted reservation is
         # a written record, and a refused one is nothing at all.
         async def scenario():
-            store = InMemoryJobStore()
+            store = self.store()
 
             async def contend():
                 record = make_record()
