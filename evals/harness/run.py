@@ -58,8 +58,6 @@ from analysis_service.graph import Pipeline
 from analysis_service.identity import build_identity
 from analysis_service.model_tiers import ModelTierConfig, TierSelection
 from analysis_service.questions import (
-    FactAnswer,
-    check_fact_answers,
     question_fallback,
 )
 from analysis_service.report import (
@@ -186,6 +184,7 @@ from evals.harness.stability import (
     load_runs,
 )
 from evals.harness.structural import report_issues
+from evals.harness.withheld import AnswerFile, load_answer_file, withheld_case
 from evals.reference_facts import load_facts, signed_proposal
 
 EVALS_ROOT = Path(__file__).resolve().parents[1]
@@ -277,14 +276,15 @@ async def _run_mode(
     ask: Callable[[str], str] | None = None,
     in_flight: int = 1,
     signed: Mapping[str, CatalogProposal] | None = None,
-    answers: Mapping[str, tuple[FactAnswer, ...]] | None = None,
+    answers: Mapping[str, AnswerFile] | None = None,
 ) -> ModeRun:
     """Run one mode over the selected cases, collecting Tier 1 failures.
 
     ``signed`` is each case's signed proposal, which only the ``direct-facts``
     mode reads; :func:`signed_proposals` builds it before anything is spent.
-    ``answers`` is each case's signed answers, which only the ``answered`` mode
-    reads; :func:`signed_answers` builds it before anything is spent.
+    ``answers`` is each case's signed answers file, which the ``answered`` and
+    ``withheld`` modes read; :func:`signed_answers` builds it before anything
+    is spent.
 
     The execution identities come back too, taken from the node runs rather
     than from the report: the extraction mode produces no report, and sourcing
@@ -458,7 +458,14 @@ async def _run_mode(
                     case, pipeline, (signed or {})[case.id]
                 )
             elif mode == "answered":
-                run = await modes.run_answered(case, pipeline, (answers or {})[case.id])
+                answer_file = (answers or {})[case.id]
+                run = await modes.run_answered(
+                    withheld_case(case, answer_file), pipeline, answer_file.answers
+                )
+            elif mode == "withheld":
+                run = await modes.run_analysis(
+                    withheld_case(case, (answers or {})[case.id]), pipeline
+                )
             elif mode == "analysis":
                 run = await modes.run_analysis(case, pipeline)
             else:
@@ -1010,33 +1017,30 @@ ANSWERS_DIR = REPO_ROOT / "evals" / "answers"
 
 def signed_answers(
     cases: Sequence[GoldenCase], answers_dir: Path = ANSWERS_DIR
-) -> dict[str, tuple[FactAnswer, ...]]:
-    """Each case's signed answers, or a refusal naming the cases without them.
+) -> dict[str, AnswerFile]:
+    """Each case's signed answers file, or a refusal naming the cases without one.
 
     The ``answered`` mode puts these answers in front of the lanes as the
-    submitter's own, so a file nobody signed would be an agent's reading
-    presented as a person's. Each answer is checked against the case's model by
-    the rule the answers route applies.
+    submitter's own, and the ``withheld`` mode takes facts out of the case on
+    the file's word, so a file nobody signed would be an agent's reading
+    presented as a person's. Each file is applied once here, so a phrase that
+    does not match or an answer the model cannot take stops the sweep before
+    anything is spent.
     """
-    loaded: dict[str, tuple[FactAnswer, ...]] = {}
+    loaded: dict[str, AnswerFile] = {}
     unsigned: list[str] = []
     for case in cases:
-        path = answers_dir / f"{case.id}.json"
-        raw = json.loads(path.read_text(encoding="utf-8")) if path.is_file() else {}
-        if not raw.get("signed_by"):
+        answer_file = load_answer_file(answers_dir / f"{case.id}.json")
+        if answer_file is None:
             unsigned.append(case.id)
             continue
-        answers = tuple(FactAnswer.model_validate(entry) for entry in raw["answers"])
-        try:
-            check_fact_answers(answers, case.model, None)
-        except ValueError as error:
-            raise modes.EvalRunError(f"{case.id}: {error}") from error
-        loaded[case.id] = answers
+        withheld_case(case, answer_file)
+        loaded[case.id] = answer_file
     if unsigned:
         raise modes.EvalRunError(
-            f"no signed answers for {', '.join(unsigned)}; the answered mode"
-            f" reads only a case whose {answers_dir.name}/<case>.json names who"
-            " signed it"
+            f"no signed answers for {', '.join(unsigned)}; the answered and"
+            f" withheld modes read only a case whose {answers_dir.name}/<case>.json"
+            " names who signed it"
         )
     return loaded
 
@@ -1050,7 +1054,9 @@ def command_run(args: argparse.Namespace) -> int:
             if args.mode == "direct-facts"
             else None
         )
-        answers = signed_answers(cases) if args.mode == "answered" else None
+        answers = (
+            signed_answers(cases) if args.mode in ("answered", "withheld") else None
+        )
     except modes.EvalRunError as refusal:
         print(refusal, file=sys.stderr)
         return 1

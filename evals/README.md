@@ -221,6 +221,7 @@ somewhere else.
 | `harness/assembly.py` | Assembly run again on the archive. Every draft in `<case>.drafts.json` was ruled before assembly, so one the report carries in neither array is a **report omission**, found without any ruling. The drafts the report does account for are assembled again from the rulings its ruled claims carry, and a claim filed differently is named. A ruling today's review check refuses is reported, not raised. `run.py assembly`. |
 | `harness/critic_replay.py` | One archived case's critic call, rebuilt and sent again: the instruction from `critic_instruction` templated by ADK over the captured `system_model` and `boundary_crossings` and the draft view `critic_view` renders from the archived drafts and marks, and the user turn from `merge_summary`. A test holds the rebuilt request against the one a real graph run sent, byte for byte. Compares each draft's verdict with the archived one, and with `--out` writes the completed rulings, so each verdict's reason and open facts can be read. `run.py critic-replay`, one paid call. |
 | `harness/question_prior.py` | Counts the early-question prior: how often a framework's findings cite each attribute or question kind, per element of one type, over a sweep's tuned cases. It reads the reports' verdicts, or with `--replay` the rulings of critic replays of that sweep. It writes that framework's row of `src/analysis_service/question_prior.json` with the runs it read, and keeps the other rows. `run.py question-prior`, no credentials. |
+| `harness/withheld.py` | A case's answers file, `evals/answers/<case>.json`: who signed it, its answers, and for the withheld-sentence test the phrases taken out of the sources and the model fields set back. One reader parses, checks and applies it for the `answered` and `withheld` modes, and each check fails closed: a phrase must occur once, and afterwards no withheld phrase may remain in a source or a model field, and every excerpt must still occur in a source. |
 | `harness/descendants.py` | The stages after a lane, run again on the archive: the fan-in re-run over a sweep's `<case>.proposals.json` with any injected proposal added to its lane, each kept draft carrying its archived critic ruling by title, and every draft no critic ruled on bounded both ways (`lower` rejected, `upper` accepted). Answers whether a finding would have survived had a lane proposed it, for no provider call. Assembly is not re-run. `run.py descendants`. |
 | `harness/near_misses.py` | The near-miss ballot. `run.py near-misses` reads a scored sweep's `losses` rows and writes one row per missed must-find that a free same-lane draft may state with another verb or place, leaving out a draft that matched its own reference, one a person voted down, and any reading already ruled. `run.py near-miss-rulings` checks a returned ballot against the issued one and writes each `same` and `different` answer into the case's `rulings.json`, signed with the reader's login; a ruling that does not load undoes the whole write. Offline. |
 | `harness/lane_replay.py` | One lane's request, rebuilt from the sweep's `<case>.lanes.json` and sent again: the instruction through the graph's own `analyze_instruction` and ADK's templating, the user turn through ADK's `to_user_content` over `prepare`'s captured output, closed by the package's lane closing as the graph closes it. A test holds the rebuilt request against the one a real graph run sent, byte for byte. `--append` sends a file's text as one more user part after the captured input. `run.py lane-replay`, one paid call. |
@@ -360,8 +361,17 @@ file sits outside the corpus, so it moves no corpus digest, and the artifact's
 commit says which answers ran. It refuses a case with no signed file, or with
 an answer its model cannot take, before anything is spent.
 
+The file may also describe a **withheld-sentence test**. No corpus case has an
+owner who knows more than its source, so the test takes stated controls out of
+a case and gives them back as answers. Its `withheld` block names each phrase
+to take out of the sources and each model field to set back, and its answers
+restate the same facts. Three runs of one case then compare the full case
+(`analysis`), the case without the facts (`withheld`), and the case without
+the facts plus the answers (`answered`).
+
 ```sh
-python -m evals.harness.run run --mode answered --case 06-cookbook-online-game
+python -m evals.harness.run run --mode withheld --case 01-payments-checkout
+python -m evals.harness.run run --mode answered --case 01-payments-checkout
 ```
 
 Scoring itself is offline: matching is the identity rule, and the standing of
