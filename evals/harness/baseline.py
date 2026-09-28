@@ -83,6 +83,7 @@ from evals.harness.artifact import (
     _ungraded,
     load_artifact,
 )
+from evals.harness.history import current_commit
 from evals.harness.prices import UnitPrices, price_calls
 
 EVALS_ROOT = Path(__file__).resolve().parents[1]
@@ -937,17 +938,17 @@ def verify(
     if strays:
         problems.append(f"{directory.name}: files no sweep owns: {strays}")
 
-    if _git(root, "cat-file", "-e", f"{identity.repo_commit}^{{commit}}") is not None:
-        if (
-            _git(root, "merge-base", "--is-ancestor", identity.repo_commit, base_ref)
-            is None
-        ):
+    # The identity keeps the ID it was sealed with; a history rewrite renames
+    # the commit, and the git checks read it at the ID it has now.
+    commit = current_commit(identity.repo_commit)
+    if _git(root, "cat-file", "-e", f"{commit}^{{commit}}") is not None:
+        if _git(root, "merge-base", "--is-ancestor", commit, base_ref) is None:
             problems.append(
                 f"{identity.repo_commit[:12]}: not an ancestor of {base_ref};"
                 " a fork-only commit is refused because the identity names a"
                 " commit a reader can open (#323)"
             )
-        recomputed_digest = corpus_digest_at(identity.repo_commit, root)
+        recomputed_digest = corpus_digest_at(commit, root)
         if (
             recomputed_digest is not None
             and recomputed_digest != identity.corpus_digest
@@ -957,7 +958,7 @@ def verify(
                 f" {identity.repo_commit[:12]} recomputes to"
                 f" {recomputed_digest[:12]}…, not the artifacts'"
             )
-        expected_cases = _case_ids_at(identity.repo_commit, root)
+        expected_cases = _case_ids_at(commit, root)
         for filename, artifact in sorted(artifacts.items()):
             if expected_cases is not None and set(artifact.cases) != expected_cases:
                 problems.append(

@@ -63,6 +63,7 @@ from typing import Any, Literal
 
 from analysis_service.claims import FrameworkName
 from analysis_service.frameworks import PACKAGES
+from evals.harness.history import current_commit
 from evals.harness.provenance import REPO_ROOT
 
 #: Where the ledger lives: one JSONL file per audit, named by its audit ID.
@@ -586,6 +587,9 @@ def staleness(experiment: Experiment, changed: Iterable[str]) -> Staleness:
 def changed_since(revision: str, root: Path | None = None) -> tuple[str, ...] | None:
     """Every tracked path that differs between ``revision`` and the tree now.
 
+    A revision a history rewrite renamed is read at its new ID, so a row keeps
+    the ID it was recorded with and still answers.
+
     ``None`` where ``git`` cannot answer, which :func:`staleness`'s caller
     turns into ``undecidable``. Reads the working tree as well as the commit,
     so an audit run against uncommitted edits is not told its history is
@@ -594,7 +598,7 @@ def changed_since(revision: str, root: Path | None = None) -> tuple[str, ...] | 
     cwd = str(root if root is not None else REPO_ROOT)
     try:
         done = subprocess.run(
-            ["git", "diff", "--name-only", revision],
+            ["git", "diff", "--name-only", current_commit(revision)],
             cwd=cwd,
             capture_output=True,
             text=True,

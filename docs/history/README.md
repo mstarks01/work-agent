@@ -1,6 +1,6 @@
 # History
 
-One record, for one rewrite. A file here answers a question a stale commit ID
+One record per rewrite. A file here answers a question a stale commit ID
 raises, and nothing here is a changelog.
 
 ## The attribution strip of 17 September 2026
@@ -45,3 +45,31 @@ branches those citations point at moved with the rewrite.
 GitHub keeps a copy of every merged pull request's commits under `refs/pull/`,
 and nobody can delete those. The branches of merged pull requests also survive.
 Both still carry the old IDs and the attribution lines.
+
+## The attribution strip of 28 September 2026
+
+A second rewrite removed the AI attribution lines that commits since 17
+September carried, on `main` and on the other eight branches, and rewrote the
+36 commits on `docs/wayfinder-live-map` that named an agent as their author.
+Each branch's tip tree is the same, byte for byte, and each branch has the same
+number of commits. Four `reviewed/*` tags moved with their commits.
+
+The rewrite changed the ID of 740 commits. `git filter-repo` also removes the
+GitHub signature from every commit it writes, so the rewritten commits show no
+"Verified" badge; their messages and files did not otherwise change.
+
+`attribution-strip-2026-09-28.tsv` maps each old ID to the new one, in the
+same shape as the first map.
+
+### Where an old ID still appears
+
+This time the records that name an old ID keep it, because several are signed
+or append-only: Baseline `6bff717`'s identity and directory name, the
+experiment ledger's `revision` fields, and the configuration labels in the
+vote ledger and in the corpus claims. `evals.harness.history.current_commit`
+resolves an old ID through every map here, and the Baseline check and the
+ledger reader call it before they ask git about a commit.
+
+A configuration label such as `6bff717-gpt-5.6-terra-24dda4db` starts with the
+commit's first seven characters. Find the old ID in the map by that prefix.
+
