@@ -249,7 +249,9 @@ Answer with `facts` beside or instead of `links`:
 
 A question kind with facets takes only a `facets` map, or the value `unknown`.
 A facet you leave out is not answered. An answer whose facets are all
-`unknown` says that you do not know, and covers no finding.
+`unknown` says that you do not know. A finding counts as covered only when
+every facet of the kind has `yes`, `no` or `not applicable`, because the
+reviewer names the kind a finding waits on, not a facet.
 
 An attribute answer is accepted only where the model leaves the attribute open,
 or where an earlier round of answers answered it. The model is read with the

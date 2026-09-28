@@ -922,7 +922,8 @@ await ids.continue.listeners.click(); await settle();
     FactAnswer.model_validate(sent["body"]["facts"][0])
 
 
-def test_the_report_page_sends_facets_and_counts_only_a_known_one():
+def test_the_report_page_counts_a_kind_only_when_every_facet_is_known():
+    """The critic names the kind, so one known facet does not cover it."""
     store = valid_model().data_stores[0]
     question = {
         **facet_fact(store, "audit-evidence"),
@@ -937,22 +938,27 @@ def test_the_report_page_sends_facets_and_counts_only_a_known_one():
         "fact_questions": [question],
     }
     steps = """
+const tally = () => box.all("div").map(d => d.textContent).filter(t => t.startsWith("Your"))[0];
 const [first, second] = box.all("select");
-first.value = "unknown";
-first.listeners.change();
-calls.push({ after_unknown: box.all("div").map(d => d.textContent).filter(t => t.startsWith("Your"))[0] });
 second.value = "no";
 second.listeners.change();
-calls.push({ after_no: box.all("div").map(d => d.textContent).filter(t => t.startsWith("Your"))[0] });
+calls.push({ one_known: tally() });
+first.value = "unknown";
+first.listeners.change();
+calls.push({ one_unknown: tally() });
+first.value = "yes";
+first.listeners.change();
+calls.push({ both_known: tally() });
 await box.all("button")[0].listeners.click();
 """
     seen = _run_answer_block(payloads, steps)["calls"]
 
-    assert seen[0]["after_unknown"].startswith("Your answers cover every fact for 0")
-    assert seen[1]["after_no"].startswith("Your answers cover every fact for 1")
-    assert seen[2]["body"]["facts"] == [
+    assert seen[0]["one_known"].startswith("Your answers cover every fact for 0")
+    assert seen[1]["one_unknown"].startswith("Your answers cover every fact for 0")
+    assert seen[2]["both_known"].startswith("Your answers cover every fact for 1")
+    assert seen[3]["body"]["facts"] == [
         {
             "key": question["key"],
-            "facets": {"records-actor": "unknown", "record-protected": "no"},
+            "facets": {"records-actor": "yes", "record-protected": "no"},
         }
     ]

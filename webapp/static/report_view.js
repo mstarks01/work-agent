@@ -796,7 +796,9 @@
             selects.filter(s => s.value).map(s => [s.dataset.facet, s.value]));
           factAnswers.push({
             read: () => Object.keys(given()).length ? { key: q.key, facets: given() } : null,
-            known: () => Object.values(given()).some(value => value !== DONT_KNOW),
+            // The critic names the kind, not a facet, so a finding waiting on
+            // it is covered only once every facet says more than "I don't know".
+            known: () => selects.every(s => s.value && s.value !== DONT_KNOW),
           });
           row.append(el("b", null, q.label),
             ` \u2014 ${q.cited_by} finding(s) wait on it; answering down to here covers ${q.covered_so_far}`,
