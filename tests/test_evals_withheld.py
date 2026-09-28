@@ -69,3 +69,24 @@ def test_a_phrase_that_is_not_in_the_sources_is_refused(case, tmp_path):  # noqa
 
     with pytest.raises(modes.EvalRunError, match="occurs 0 times"):
         withheld_case(case, signed_copy(tmp_path, misspell))
+
+
+def test_each_target_is_a_reference_claim_of_the_case(case):  # noqa: F811
+    """A target names a claim by its verb and elements, never by its index."""
+    raw = json.loads(DRAFT.read_text(encoding="utf-8"))
+    references = {
+        (claim.verb, tuple(claim.affected_element_ids), claim.tier)
+        for claim in case.references["stride"]
+    }
+    withheld = len(raw["withheld"]["source"])
+    for target in raw["targets"]:
+        key = (target["verb"], tuple(target["affected_element_ids"]), target["tier"])
+        assert key in references, target
+        assert 1 <= target["withheld"] <= withheld
+
+
+def test_no_description_still_restates_a_withheld_control(case, tmp_path):  # noqa: F811
+    withheld = withheld_case(case, signed_copy(tmp_path))
+    for element in withheld.model.elements():
+        assert "authenticated session" not in element.description
+        assert "Terminates shopper sessions" not in element.description
