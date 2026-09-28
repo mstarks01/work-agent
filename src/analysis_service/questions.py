@@ -38,7 +38,7 @@ from dataclasses import dataclass
 from types import MappingProxyType
 from typing import Literal, get_args, get_origin
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator
 
 from analysis_service.assertions import (
     ABSENT,
@@ -55,6 +55,7 @@ from analysis_service.open_facts import element_names, label_of
 from analysis_service.question_kinds import QUESTION_KINDS
 from analysis_service.sources import plain_name
 from analysis_service.system_model import SystemModel, attribute_names
+from analysis_service.validation import validate
 
 __all__ = [
     "ANSWERS_LABEL",
@@ -400,6 +401,31 @@ def check_fact_answers(
                 f"{answer.value!r} is not one of {', '.join(choices)} for"
                 f" {attribute or assertion or subject!r}"
             )
+    _check_attribute_values(answers, model)
+
+
+def _check_attribute_values(answers: Sequence[FactAnswer], model: SystemModel) -> None:
+    """Refuse an attribute answer the validity gate would refuse in that field.
+
+    A resumed run starts at ``prepare`` and never meets the gate, so the gate's
+    own rules are asked here: a field's length, and a control that is blank or
+    opens with a negation other than ``none``, which
+    :func:`~analysis_service.analysis.control_state` would read as stated.
+    """
+    attributes = [answer for answer in answers if answer.kind == "attribute"]
+    if not attributes:
+        return
+    try:
+        answered = answered_model(model, attributes)
+    except ValidationError as error:
+        first = error.errors()[0]
+        raise ValueError(
+            f"an answer does not fit {first['loc'][-1]!r}: {first['msg']}"
+        ) from None
+    asked = {(answer.key[0], answer.key[1]) for answer in attributes}
+    for issue in validate(answered):
+        if (issue.element_id, issue.field) in asked:
+            raise ValueError(issue.message)
 
 
 def answered_model(model: SystemModel, answers: Sequence[FactAnswer]) -> SystemModel:
