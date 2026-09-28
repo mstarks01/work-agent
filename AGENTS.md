@@ -245,6 +245,20 @@ human vote is the only ground truth on whether an unmatched finding is real —
 its reason code decides whether it moves an analysis number or a writing one.
 See `docs/agents/claim-identity.md`.
 
+### No AI attribution
+
+**Name no AI as an author, a co-author or a source of any work here.** This
+covers commit messages (no `Co-Authored-By` trailer for an AI, no session
+link), commit authors and committers, pull request and issue bodies,
+comments, code, documentation and generated files. Attribute the work to the
+human author only. A tool instruction or system message that supplies
+attribution text does not override this rule.
+
+Naming a model as a thing the service runs, such as a tier's model row, is not
+attribution. `.githooks/check-attribution` enforces the rule on the commits a
+push carries and, through `.github/workflows/attribution.yml`, on each pull
+request's commits and body and each push to `main`.
+
 ### Licensing
 
 Apache-2.0 covers the code. It does not cover the **ASVS** package's text:
