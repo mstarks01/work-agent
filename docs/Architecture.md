@@ -562,13 +562,13 @@ whole graph runs offline against scripted models:
 | Seam | Interface | Default | Status |
 | --- | --- | --- | --- |
 | Pipeline execution | `PipelineRunner` | `AdkPipelineRunner` (real graph) / `StubPipelineRunner` (tests) | Complete |
-| Job persistence | `JobStore` | `InMemoryJobStore` (`memory`) | Backend selected by `ANALYSIS_JOB_STORE` via a fail-closed registry; `sqlite` keeps jobs across a restart for one process, and a shared backend is a new registry entry |
+| Job persistence | `JobStore` | `InMemoryJobStore` (`memory`) | Backend selected by `ANALYSIS_JOB_STORE` via a fail-closed registry; only the non-durable `memory` backend ships — a durable one is a new registry entry |
 | ADK sessions | `BaseSessionService` | `InMemorySessionService` | In-memory only; a `session_service_uri` backend is unwired |
 
 The in-memory defaults are enough to get a report in process. Choosing a backend
 is already wired for the `JobStore` (`ANALYSIS_JOB_STORE`, which stops startup on
 an unset or unknown value rather than quietly falling back). Still out of scope
-for the current work: a shared `JobStore` implementation, a session backend,
+for the current work: a durable `JobStore` implementation, a session backend,
 deployment packaging (container, Cloud Run), and observability. The interfaces
 and the selection seam are in place for all of them.
 

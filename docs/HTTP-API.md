@@ -167,10 +167,8 @@ asked only where the model holds `unknown`, and a zone only where the service
 inferred it. Answer them as `facts` on the route below. The analysis then
 reads your answers, so the findings rest on them.
 
-**A waiting job survives a restart only in a durable store.** With the
-`sqlite` store, a paused job, its model and its catalog stay on disk, and you
-answer it after a restart as before. With the `memory` store, a restart loses
-it and its extraction. See [Job storage](#job-storage).
+**Limit:** a waiting job is held in the service's memory. A restart of the
+service loses it, with its extraction; submit it again.
 
 ### Answering the report's open facts
 
@@ -499,39 +497,23 @@ non-durable storage. The value is never read from the request.
 
 | Variable | Purpose |
 | --- | --- |
-| `ANALYSIS_JOB_STORE` | Job-store backend to use: `memory` or `sqlite`. |
-| `ANALYSIS_JOB_STORE_PATH` | The SQLite file the `sqlite` store uses. Required for `sqlite`; its directory must exist. |
+| `ANALYSIS_JOB_STORE` | Job-store backend to use. Today: `memory`. |
 
 The `memory` backend is a per-instance, in-process dict: fast and dependency-free,
 but jobs are lost on restart and are not shared across instances, so it suits
-development only.
-
-The `sqlite` backend keeps every job in one SQLite file, so jobs, paused jobs
-and reports survive a restart. It is for one process on one host:
-
-- It locks the file, and a second process that opens the same path stops at
-  startup.
-- When it opens, a job it holds as `queued` or `running` belonged to a process
-  that stopped. That job ends as `failed` with the message "the service stopped
-  before this job finished; submit it again", and it keeps its token
-  reservation. A paused, completed, failed or rejected job stays as it was.
-- The file holds submitted sources, answers and reports, and it is created
-  readable and writable by its owner only. Put it on storage your own policy
-  protects; the service does not encrypt it and does not delete old jobs.
-
-A deployment with more than one instance needs a shared backend (see below).
-See [ADR 0049](adr/0049-a-sqlite-job-store-keeps-jobs-across-a-restart.md).
+single-instance or development deployments only. Durable, multi-instance
+deployments need a shared backend (see below).
 
 ### Adding a new backend
 
-A shared backend (Redis, Postgres, …) is a new entry in the
+A durable or shared backend (Redis, Postgres, …) is a new entry in the
 `_FACTORIES` registry in [`src/analysis_service/jobs.py`](../src/analysis_service/jobs.py).
 Implement the `JobStore` protocol and read any connection settings from its own
 prefixed env vars; the API layer is unchanged. The protocol is six methods:
 
 | Method | What a backend owes it |
 | --- | --- |
-| `reserve` | **Counts and inserts in one atomic operation.** Every bound admission enforces — the concurrency ceiling, the per-subject rate, the per-subject token budget and the deployment's global token budget — is enforced here and nowhere else. A backend that checks and then inserts has put the race back: two submissions that each read the count before either inserts both pass a ceiling of one. Call `admit` from `jobs.py` inside that operation, as both shipped stores do, so every backend applies the same bounds. |
+| `reserve` | **Counts and inserts in one atomic operation.** Every bound admission enforces — the concurrency ceiling, the per-subject rate, the per-subject token budget and the deployment's global token budget — is enforced here and nowhere else. A backend that checks and then inserts has put the race back: two submissions that each read the count before either inserts both pass a ceiling of one. |
 | `get` | The whole record, for the driver that runs the job. |
 | `owned` | The record a subject owns, without its report. Ownership is checked before anything is copied, so a foreign job costs what a missing one costs. |
 | `report_json` | The owned job's report, already serialised. |

@@ -270,7 +270,7 @@ class TestThePrepareSeam:
         assert answer(record.catalog, PRINCIPAL, "represented-by").settled
 
 
-def catalog_client(store=None):
+def catalog_client():
     """The route's test client on an app that builds an assertion catalog."""
     from fastapi.testclient import TestClient
 
@@ -278,7 +278,7 @@ def catalog_client(store=None):
     from analysis_service.jobs import InMemoryJobStore
     from tests import test_api
 
-    store = InMemoryJobStore() if store is None else store
+    store = InMemoryJobStore()
     app = create_app(
         store=store,
         runner=test_api.StubPipelineRunner(),
