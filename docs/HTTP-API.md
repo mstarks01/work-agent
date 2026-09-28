@@ -229,7 +229,9 @@ Answer with `facts` beside or instead of `links`:
 ```
 
 An attribute answer is accepted only where the model leaves the attribute open,
-or where an earlier round of answers answered it. An answer to an attribute that
+or where an earlier round of answers answered it. The model is read with the
+assertion catalog applied, as the analysis reads it, so a fact the catalog
+states takes no answer even while the job waits at its pause. An answer to an attribute that
 the sources state is refused with `400`. An `unknown` answer to a fact that an
 earlier round settled is refused too: send a value to change it.
 
