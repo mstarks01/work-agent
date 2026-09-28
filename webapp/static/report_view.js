@@ -25,6 +25,9 @@
   // The open facts the conditional findings rest on, ranked server-side so
   // with the most-cited fact first. The page only renders them.
   const FACT_QUESTIONS = JSON.parse(document.getElementById("fact_questions").textContent);
+  // The answer that says the submitter does not know. The service writes
+  // nothing for it, so the fact stays open.
+  const DONT_KNOW = "unknown";
   // How many of the reviewer's open facts used the fixed list of questions,
   // and how many it wrote in its own words, counted server-side.
   const FALLBACK = JSON.parse(document.getElementById("question_fallback").textContent);
@@ -729,8 +732,8 @@
         "first. Beside each is how many findings have every fact answered once it " +
         "and every question above it is answered. Answer as far down as you like; " +
         "the line under the questions counts the findings your answers cover. The " +
-        "analysis decides again whether each answer settles its finding, and an " +
-        "answer such as \"I don't know\" settles nothing."));
+        "analysis decides again whether each answer settles its finding. Choose " +
+        "\"I don't know\" where nobody knows: the fact stays open."));
       if (FALLBACK.typed + FALLBACK.free_text) {
         box.append(el("div", "meta",
           `The reviewer asked ${FALLBACK.typed} open fact(s) from the fixed list of ` +
@@ -753,9 +756,11 @@
       }));
       const tally = el("div", "meta");
       function recount() {
-        const covered = [...waitsOn.values()]
-          .filter(asked => asked.every(index => factInputs[index].value.trim()))
-          .length;
+        const known = index => {
+          const value = factInputs[index].value.trim();
+          return value && value !== DONT_KNOW;
+        };
+        const covered = [...waitsOn.values()].filter(asked => asked.every(known)).length;
         tally.textContent =
           `Your answers cover every fact for ${covered} of the ${waitsOn.size} findings ` +
           "that wait on one. The analysis decides again whether they are settled.";
@@ -769,21 +774,35 @@
         }
         const row = el("p");
         let input;
+        // "unknown" is the answer that says you do not know: the fact stays
+        // open, and it covers no finding.
+        let dontKnow = null;
         if (q.choices.length) {
           input = el("select");
           input.append(option("(leave unanswered)", ""));
           q.choices.forEach(choice => input.append(option(names[choice] ? `${names[choice]} (${choice})` : choice, choice)));
+          input.append(option("I don't know", DONT_KNOW));
         } else {
           input = el("input");
           input.type = "text";
           input.maxLength = 1000;
           input.placeholder = "(leave unanswered)";
+          const box = el("input");
+          box.type = "checkbox";
+          box.addEventListener("change", () => {
+            input.value = box.checked ? DONT_KNOW : "";
+            input.disabled = box.checked;
+            recount();
+          });
+          dontKnow = el("label");
+          dontKnow.append(box, " I don't know");
         }
         input.dataset.key = JSON.stringify(q.key);
         input.addEventListener(q.choices.length ? "change" : "input", recount);
         row.append(el("b", null, q.label),
           ` \u2014 ${q.cited_by} finding(s) wait on it; answering down to here covers ${q.covered_so_far} `,
           input);
+        if (dontKnow) row.append(" ", dontKnow);
         into.append(row);
         factInputs.push(input);
       });

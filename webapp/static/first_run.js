@@ -86,6 +86,9 @@
   // option is untrusted and lands as text.
   let pausedRun = null;
   let factInputs = [];
+  // The answer that says the submitter does not know. The service writes
+  // nothing for it, so the fact stays open.
+  const DONT_KNOW = "unknown";
   const showQuestions = (data) => {
     pausedRun = data.run;
     factInputs = [];
@@ -137,6 +140,10 @@
           choice.textContent = option.name ? `${option.name} (${option.id})` : option.id;
           input.append(choice);
         }
+        const dontKnow = document.createElement("option");
+        dontKnow.value = DONT_KNOW;
+        dontKnow.textContent = "I don't know";
+        input.append(dontKnow);
       } else {
         input = document.createElement("input");
         input.type = "text";
@@ -150,7 +157,19 @@
       const why = document.createElement("div");
       why.className = "meta";
       why.textContent = q.reasons.join(" ");
-      row.append(label, " ", input, why);
+      row.append(label, " ", input);
+      if (!q.choices.length) {
+        const box = document.createElement("input");
+        box.type = "checkbox";
+        box.addEventListener("change", () => {
+          input.value = box.checked ? DONT_KNOW : "";
+          input.disabled = box.checked;
+        });
+        const dontKnow = document.createElement("label");
+        dontKnow.append(box, " I don't know");
+        row.append(" ", dontKnow);
+      }
+      row.append(why);
       (index < SHOWN ? questions : more).append(row);
     });
     if (data.facts.length > SHOWN) questions.append(more);

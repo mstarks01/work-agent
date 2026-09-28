@@ -281,7 +281,7 @@ class Engine:
             None if checkpoint.assertions is None else checkpoint.assertions.catalog
         )
         try:
-            check_answers(links, facts, checkpoint.system_model, catalog)
+            check_answers(links, facts, checkpoint.system_model, catalog, earlier_facts)
             carried, merged, answered = resumed_sources(
                 sources, earlier_links, links, earlier_facts, facts
             )

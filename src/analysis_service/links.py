@@ -346,15 +346,17 @@ def check_answers(
     facts: Sequence[FactAnswer],
     model: SystemModel,
     catalog: AssertionCatalog | None,
+    earlier: Sequence[FactAnswer] = (),
 ) -> None:
     """Refuse an answer that would place nothing, before a resumed run is admitted.
 
     **The one admission check of a submission's answers.** The HTTP route, the
     first-run app and the in-process engine all call it. A link answer is
     written by :func:`apply_answers` here, and each issue it would raise is a
-    refusal, so a wrong link costs nothing.
+    refusal, so a wrong link costs nothing. ``earlier`` is the fact answers of
+    the earlier rounds.
     """
-    check_fact_answers(facts, model, catalog)
+    check_fact_answers(facts, model, catalog, earlier)
     if links and catalog is not None:
         _, issues = apply_answers(catalog, model, links)
         if issues:

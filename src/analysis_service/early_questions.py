@@ -15,12 +15,14 @@ the report's own order settled, at six and at ten questions a case. The count
 cannot see the main reason to ask early: the lanes then write their findings
 with the answer in hand.
 
-**Only what is open is asked.** An attribute is asked where
-:func:`~analysis_service.analysis.control_state` reads it as unverified, which
-is the reading the evidence catalog uses, so a qualified ``unknown`` is asked
-too. A zone is asked where it is unverified or the service inferred it. A
-question kind has no field, so each kind the prior names for the element's type
-is asked.
+**Only what is open is asked.** An attribute or a zone is asked where
+:func:`~analysis_service.questions.open_attribute` says it is open, the rule
+the answer check reads too. A question kind has no field, so each kind the
+prior names for the element's type is asked.
+
+**The prior decides which fields are asked, as well as their order.** Asking
+every open attribute and zone the prior does not name added about 18% to the
+list and covered one more finding in 337 (``QA-2026-09-26-03-E17``).
 
 **The prior is a table with its provenance.** ``question_prior.json`` holds one
 row per framework in :data:`~analysis_service.frameworks.PACKAGES`, and each
@@ -41,15 +43,19 @@ from dataclasses import dataclass
 from pathlib import Path
 from types import MappingProxyType
 
-from analysis_service.analysis import control_state
 from analysis_service.assertions import AssertionCatalog
 from analysis_service.candidates import generate_candidates
 from analysis_service.claims import FrameworkName, UnknownKey, UnknownRef
 from analysis_service.frameworks import PACKAGES
 from analysis_service.open_facts import element_names, label_of
 from analysis_service.question_kinds import QUESTION_KINDS
-from analysis_service.questions import FactKind, answer_choices, fact_kind
-from analysis_service.system_model import ZONE_ATTRIBUTE, Element, SystemModel
+from analysis_service.questions import (
+    FactKind,
+    answer_choices,
+    fact_kind,
+    open_attribute,
+)
+from analysis_service.system_model import Element, SystemModel
 
 __all__ = [
     "QUESTION_PRIOR",
@@ -144,10 +150,7 @@ def _open_key(model: SystemModel, element: Element, field: str) -> UnknownKey | 
     """The fact this field asks about this element, or ``None`` where it is not open."""
     if field in QUESTION_KINDS:
         return UnknownRef(element_id=element.id, question=field).key
-    value = getattr(element, field, None)
-    unverified = isinstance(value, str) and control_state(value) == "unverified"
-    assumed = field == ZONE_ATTRIBUTE and element.id in model.assumed_zone_elements()
-    if unverified or assumed:
+    if open_attribute(model, element.id, field):
         return UnknownRef(element_id=element.id, attribute=field).key
     return None
 

@@ -3,18 +3,28 @@
 A ``needs-info`` verdict names the facts an answer would settle. This module
 turns them into questions, ranks them, and writes the answers back (#1225).
 
-**Every open fact is asked, the most cited first.** The facts a
-finding's own grounds cite come first, in an order the critic cannot change;
-the facts only the critic named follow (``QA-2026-09-26-03-E7``). With the
-STRIDE lane closing a conditional finding waits on several facts, and six
-questions settled about a quarter of them where asking every one settled all
-(``QA-2026-09-26-03-E6``). So no cap is chosen here. The next question is the
-one the most still-open findings cite, and each question states for how many
-findings every fact is answered once it and every question before it is. That
-count is coverage, not a verdict: an answer can be ``I don't know``, and a
-finding with every fact answered is ruled again only by the resumed run. The
-order is greedy, so it does not find the fewest questions that cover the most
-findings. A submitter answers from the top as far as they choose.
+**Every open fact is asked, in the order that completes the most findings.**
+The facts a finding's own grounds cite come first, in an order the critic
+cannot change; the facts only the critic named follow
+(``QA-2026-09-26-03-E7``). With the STRIDE lane closing a conditional finding
+waits on several facts, and six questions settled about a quarter of them
+where asking every one settled all (``QA-2026-09-26-03-E6``). So no cap is
+chosen here. The next question is the one that completes the most findings, so
+that each has every fact it waits on answered (``QA-2026-09-26-03-E17``). Each
+question states how many findings are covered once it and every question
+before it is answered. That count is coverage, not a verdict: only the resumed
+run rules on a finding again. A rejected draft still ranks the questions, and
+is left out of every count. A submitter answers from the top as far as they
+choose.
+
+**Only an open fact is asked, and only an open fact takes an answer.** An
+attribute is open where :func:`open_attribute` says so. An answer to an
+attribute the model states is refused, unless an earlier round answered it,
+so a submission cannot overwrite what the sources said.
+
+**An answer of** ``unknown`` **says the submitter does not know.** It writes
+nothing structured, the fact stays open, and it covers no finding. It reaches
+the lanes as its line of the answers Source.
 
 **Three kinds of fact, and an answer to each is written by code.**
 
@@ -43,6 +53,7 @@ from typing import Literal, get_args, get_origin
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator
 
+from analysis_service.analysis import control_state
 from analysis_service.assertions import (
     ABSENT,
     REGISTRY,
@@ -58,7 +69,11 @@ from analysis_service.claims import FrameworkAnalysis, UnknownKey, UnknownRef
 from analysis_service.open_facts import element_names, label_of
 from analysis_service.question_kinds import QUESTION_KINDS
 from analysis_service.sources import plain_name
-from analysis_service.system_model import SystemModel, attribute_names
+from analysis_service.system_model import (
+    ZONE_ATTRIBUTE,
+    SystemModel,
+    attribute_names,
+)
 from analysis_service.validation import validate
 
 __all__ = [
@@ -73,6 +88,7 @@ __all__ = [
     "fact_kind",
     "fact_questions",
     "fact_rows",
+    "open_attribute",
     "question_fallback",
 ]
 
@@ -110,6 +126,28 @@ class FactAnswer(BaseModel):
     @property
     def kind(self) -> FactKind:
         return fact_kind(self.key)
+
+    @property
+    def known(self) -> bool:
+        """False where the submitter answered that they do not know."""
+        return self.value != UNKNOWN
+
+
+def open_attribute(model: SystemModel, element_id: str, attribute: str) -> bool:
+    """True where this attribute is a fact the model leaves open.
+
+    **The one reader of "may this attribute be asked, and answered".** Open is
+    unverified by :func:`~analysis_service.analysis.control_state`, the
+    reading the evidence catalog uses, or a zone the service inferred. The
+    early list, the report list and the answer check all ask it.
+    """
+    element = model.get(element_id)
+    value = getattr(element, attribute, None)
+    unverified = isinstance(value, str) and control_state(value) == "unverified"
+    assumed = (
+        attribute == ZONE_ATTRIBUTE and element_id in model.assumed_zone_elements()
+    )
+    return element is not None and (unverified or assumed)
 
 
 def fact_kind(key: UnknownKey) -> FactKind:
@@ -240,20 +278,32 @@ def _answered_row(catalog: AssertionCatalog, identity: str) -> Assertion | None:
 
 
 def _greedy(open_facts: Mapping[Finding, set[UnknownKey]]) -> list[UnknownKey]:
-    """The facts in order, the one the most still-open findings cite first.
+    """The facts in the order that completes the most findings, asked one by one.
 
-    A tie goes to the lower key, so one input always gives one order. Greedy by
-    citation, so it does not maximise the findings a fixed number of questions
-    covers: ten findings that wait on three facts together outrank nine that
-    each wait on one.
+    Where one question completes findings, the next is the one that completes
+    the most. Where none does, the next are the facts of the finding with the
+    fewest left, the most cited first. A tie goes to more citations, then to
+    the lower key, so one input always gives one order. Measured against
+    asking the most cited fact first, it covers more findings at every
+    depth (``QA-2026-09-26-03-E17``).
     """
     left = {finding: set(keys) for finding, keys in open_facts.items() if keys}
     order: list[UnknownKey] = []
     while left:
         cites = Counter(key for keys in left.values() for key in keys)
-        key = min(cites.items(), key=lambda item: (-item[1], item[0]))[0]
-        order.append(key)
-        left = {finding: keys - {key} for finding, keys in left.items() if keys - {key}}
+        completes = Counter(
+            next(iter(keys)) for keys in left.values() if len(keys) == 1
+        )
+        if completes:
+            chosen = [
+                min(completes, key=lambda key: (-completes[key], -cites[key], key))
+            ]
+        else:
+            nearest = min(left.values(), key=lambda keys: (len(keys), sorted(keys)))
+            chosen = sorted(nearest, key=lambda key: (-cites[key], key))
+        order.extend(chosen)
+        asked = set(chosen)
+        left = {finding: keys - asked for finding, keys in left.items() if keys - asked}
     return order
 
 
@@ -262,7 +312,7 @@ def fact_questions(
     model: SystemModel,
     catalog: AssertionCatalog | None,
 ) -> tuple[FactQuestion, ...]:
-    """Every open fact a report's findings rest on, the most cited first.
+    """Every open fact a report's findings rest on, the most completing first.
 
     **Two sections, and the first does not depend on the critic.** The
     evidence section ranks the open facts each finding's own grounds cite, for
@@ -277,20 +327,30 @@ def fact_questions(
     Each question counts the findings of every framework together, because one
     answer settles a fact for every framework that cites it. ``cited_by`` and
     ``covered_so_far`` count findings waiting on the fact, by their grounds or,
-    for a conditional finding, by its verdict too. Rejected drafts are counted.
+    for a conditional finding, by its verdict too. A rejected draft ranks the
+    questions and is not counted, because no answer brings it into the report.
+
+    An attribute the model states is not asked, even where the critic names
+    it, because :func:`check_fact_answers` refuses an answer to it.
     """
     evidence: dict[Finding, set[UnknownKey]] = {}
     named: dict[Finding, set[UnknownKey]] = {}
     refs: dict[UnknownKey, UnknownRef] = {}
+    rejected: set[Finding] = set()
     for block in analyses:
         for claim in block.all_claims():
             finding = (block.framework, claim.id)
-            grounds = claim.unknown_grounds()
+            if claim.verdict.status == "rejected":
+                rejected.add(finding)
+            grounds = [ref for ref in claim.unknown_grounds() if _open(ref, model)]
             evidence[finding] = {ref.key for ref in grounds}
             cited = list(grounds)
             if claim.verdict.status == "needs-info":
-                named[finding] = {ref.key for ref in claim.verdict.related_unknowns}
-                cited += claim.verdict.related_unknowns
+                verdict = [
+                    ref for ref in claim.verdict.related_unknowns if _open(ref, model)
+                ]
+                named[finding] = {ref.key for ref in verdict}
+                cited += verdict
             for ref in cited:
                 refs.setdefault(ref.key, ref)
     first = _greedy(evidence)
@@ -300,7 +360,11 @@ def fact_questions(
         finding: evidence.get(finding, set()) | named.get(finding, set())
         for finding in evidence.keys() | named.keys()
     }
-    waiting = {finding: keys for finding, keys in waiting.items() if keys}
+    waiting = {
+        finding: keys
+        for finding, keys in waiting.items()
+        if keys and finding not in rejected
+    }
     names = element_names(model)
     asked: list[FactQuestion] = []
     answered: set[UnknownKey] = set()
@@ -337,6 +401,14 @@ def fact_questions(
                 )
             )
     return tuple(asked)
+
+
+def _open(ref: UnknownRef, model: SystemModel) -> bool:
+    """False for an attribute the model states; every other fact is open."""
+    element_id, attribute, *_ = ref.key
+    return fact_kind(ref.key) != "attribute" or open_attribute(
+        model, element_id, attribute
+    )
 
 
 @dataclass(frozen=True)
@@ -379,6 +451,7 @@ def check_fact_answers(
     answers: Sequence[FactAnswer],
     model: SystemModel,
     catalog: AssertionCatalog | None,
+    earlier: Sequence[FactAnswer] = (),
 ) -> None:
     """Refuse an answer that names no open fact here, or a value the fact cannot hold.
 
@@ -386,7 +459,14 @@ def check_fact_answers(
     the questions were asked about, so a wrong answer costs nothing. A key
     names one fact in one of the four spellings, as
     :attr:`~analysis_service.claims.UnknownRef.spellings` reads them.
+
+    ``earlier`` is what the earlier rounds answered. An attribute one of them
+    answered is stated now, and may be answered again with another value. An
+    ``unknown`` answer to a fact an earlier round settled is refused, because
+    it would reopen the fact.
     """
+    answered_before = {answer.key for answer in earlier}
+    settled_before = {answer.key for answer in earlier if answer.known}
     for answer in answers:
         element_id, attribute, assertion, subject, question = answer.key
         ref = UnknownRef.model_construct(
@@ -407,10 +487,22 @@ def check_fact_answers(
             answerable = () if element is None else attribute_names(element)
             if attribute not in answerable or attribute in _ENDPOINTS:
                 raise ValueError(f"no attribute {attribute!r} on {element_id!r}")
+            if answer.key not in answered_before and not open_attribute(
+                model, element_id, attribute
+            ):
+                raise ValueError(
+                    f"{attribute!r} on {element_id!r} is stated, so it takes no answer"
+                )
         elif kind == "assertion" and (
             catalog is None or _answered_row(catalog, assertion) is None
         ):
             raise ValueError(f"no open assertion row {assertion!r}")
+        if not answer.known:
+            if answer.key in settled_before:
+                raise ValueError(
+                    "an earlier answer settled this fact; send a value to change it"
+                )
+            continue
         choices = answer_choices(answer.key, model, catalog)
         if choices and answer.value not in choices:
             raise ValueError(
@@ -428,7 +520,9 @@ def _check_attribute_values(answers: Sequence[FactAnswer], model: SystemModel) -
     opens with a negation other than ``none``, which
     :func:`~analysis_service.analysis.control_state` would read as stated.
     """
-    attributes = [answer for answer in answers if answer.kind == "attribute"]
+    attributes = [
+        answer for answer in answers if answer.kind == "attribute" and answer.known
+    ]
     if not attributes:
         return
     try:
@@ -447,8 +541,10 @@ def _check_attribute_values(answers: Sequence[FactAnswer], model: SystemModel) -
 def answered_model(model: SystemModel, answers: Sequence[FactAnswer]) -> SystemModel:
     """The model with every attribute answer written in, and noted on its element.
 
-    The answer settles the attribute, so an :class:`~analysis_service.system_model.Assumption`
-    that named it as inferred is removed. The note keeps who settled it.
+    The answer settles the attribute, so an
+    :class:`~analysis_service.system_model.Assumption` that named it as inferred
+    is removed. The note keeps who settled it. An ``unknown`` answer writes only
+    the note, so the attribute stays open.
     """
     data = model.model_dump(mode="json")
     by_id = {
@@ -469,13 +565,20 @@ def answered_model(model: SystemModel, answers: Sequence[FactAnswer]) -> SystemM
         element = by_id.get(element_id)
         if element is None:
             continue
-        element[attribute] = answer.value
-        note = f'The submitter answered {attribute}: "{answer.value}".'
+        if answer.known:
+            element[attribute] = answer.value
+            note = f'The submitter answered {attribute}: "{answer.value}".'
+        else:
+            note = f"The submitter does not know {attribute}."
         # A resumed job's checkpoint already holds an earlier round's answers.
         notes = element.get("notes", "")
         if note not in notes:
             element["notes"] = f"{notes} {note}".strip()[:2000]
-    answered = {answer.key[:2] for answer in answers if answer.kind == "attribute"}
+    answered = {
+        answer.key[:2]
+        for answer in answers
+        if answer.kind == "attribute" and answer.known
+    }
     data["assumptions"] = [
         assumption
         for assumption in data.get("assumptions", [])
@@ -505,7 +608,11 @@ def fact_rows(
     """
     replaced: dict[str, Assertion] = {}
     issues: list[CatalogIssue] = []
-    answered = {answer.key[:2] for answer in answers if answer.kind == "attribute"}
+    answered = {
+        answer.key[:2]
+        for answer in answers
+        if answer.kind == "attribute" and answer.known
+    }
     superseded = {
         assertion_id(entry)
         for entry in catalog.entries
@@ -523,7 +630,7 @@ def fact_rows(
         if assertion_id(entry) in superseded
     )
     for answer, span in zip(answers, spans, strict=True):
-        if answer.kind != "assertion":
+        if answer.kind != "assertion" or not answer.known:
             continue
         row = _answered_row(catalog, answer.key[2])
         if row is None:

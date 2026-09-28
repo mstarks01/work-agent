@@ -40,9 +40,12 @@ from analysis_service.pipeline import AdkPipelineRunner
 from analysis_service.questions import (
     ANSWERS_LABEL,
     FactAnswer,
+    _greedy,
     answered_model,
     check_fact_answers,
+    fact_kind,
     fact_questions,
+    open_attribute,
 )
 from analysis_service.sources import Source, text_digest
 from analysis_service.system_model import ZONE_ATTRIBUTE, Assumption
@@ -67,14 +70,34 @@ def ask(report):
 
 
 class TestTheRanking:
-    def test_answering_every_question_settles_every_waiting_finding(self, report):
-        """A finding waits on the open facts its grounds cite, and its verdict's."""
+    def test_answering_every_question_covers_every_waiting_finding(self, report):
+        """A finding waits on the open facts its grounds cite, and its verdict's.
+
+        A rejected draft is not counted, and an attribute the model states is
+        not an open fact.
+        """
+        model = report.system_model
+
+        def open_refs(refs):
+            return [
+                ref
+                for ref in refs
+                if fact_kind(ref.key) != "attribute"
+                or open_attribute(model, ref.element_id, ref.attribute)
+            ]
+
         waiting = sum(
             1
             for block in report.analyses
             for claim in block.all_claims()
-            if claim.unknown_grounds()
-            or (claim.verdict.status == "needs-info" and claim.verdict.related_unknowns)
+            if claim.verdict.status != "rejected"
+            and (
+                open_refs(claim.unknown_grounds())
+                or (
+                    claim.verdict.status == "needs-info"
+                    and open_refs(claim.verdict.related_unknowns)
+                )
+            )
         )
         questions = ask(report)
         assert questions[-1].covered_so_far == waiting if questions else waiting == 0
@@ -83,10 +106,21 @@ class TestTheRanking:
         settled = [question.covered_so_far for question in ask(report)]
         assert settled == sorted(settled)
 
-    def test_the_first_question_is_the_most_cited_fact(self, report):
-        questions = ask(report)
-        if questions:
-            assert questions[0].cited_by == max(q.cited_by for q in questions)
+    def test_the_first_question_completes_the_most_findings(self):
+        """Ten findings need A, B and C together, nine need D alone (#1289).
+
+        Asking the most cited fact first asks A and completes none.
+        """
+        key = lambda name: ("", "", "", name, "")
+        waiting = {
+            ("stride", f"T-{i}"): {key("A"), key("B"), key("C")} for i in range(10)
+        }
+        waiting.update({("stride", f"S-{i}"): {key("D")} for i in range(9)})
+
+        order = _greedy(waiting)
+
+        assert order[0] == key("D")
+        assert order[1:] == [key("A"), key("B"), key("C")]
 
     def test_every_fact_is_asked_once(self, report):
         keys = [question.key for question in ask(report)]
@@ -95,6 +129,15 @@ class TestTheRanking:
 
 def flow_id():
     return valid_model().data_flows[0].id
+
+
+def open_model():
+    """The shared model with the facts these tests answer left open."""
+    model = valid_model()
+    model.data_flows[0].authentication = "unknown"
+    model.data_flows[0].encryption_in_transit = "unknown"
+    model.processes[0].exposure = "unknown"
+    return model
 
 
 class TestTheCriticCannotReorderTheEvidence:
@@ -164,7 +207,7 @@ class TestTheChecks:
         process = valid_model().processes[0].id
         wrong = FactAnswer(key=(process, "exposure", "", "", ""), value="everywhere")
         with pytest.raises(ValueError, match="not one of"):
-            check_fact_answers([wrong], valid_model(), None)
+            check_fact_answers([wrong], open_model(), None)
 
     def test_an_open_row_the_catalog_lacks_is_refused(self):
         wrong = FactAnswer(key=("", "", "missing-row", "", ""), value="required")
@@ -213,7 +256,7 @@ class TestTheChecks:
     def test_a_value_the_validity_gate_refuses_is_refused(self, value, rule):
         wrong = FactAnswer(key=(flow_id(), "authentication", "", "", ""), value=value)
         with pytest.raises(ValueError, match=rule):
-            check_fact_answers([wrong], valid_model(), None)
+            check_fact_answers([wrong], open_model(), None)
 
     def test_a_subject_answer_is_free_text(self):
         fine = FactAnswer(
@@ -329,7 +372,13 @@ class TestTheRoutes:
         client, store = make_client()
         job = self.completed(store)
         answer = {
-            "key": [flow_id(), "encryption_in_transit", "", "", ""],
+            "key": [
+                valid_model().data_flows[1].id,
+                "encryption_in_transit",
+                "",
+                "",
+                "",
+            ],
             "value": "TLS 1.3",
         }
         response = client.post(
@@ -663,3 +712,78 @@ def test_the_same_answers_twice_give_the_same_catalog():
 
     assert again.catalog.entries == first.catalog.entries
     assert again.issues == first.issues == []
+
+
+class TestAnAnswerBindsToAnOpenFact:
+    """A submission answers what is open, or what an earlier round answered (D2)."""
+
+    STATED = FactAnswer(
+        key=(flow_id(), "encryption_in_transit", "", "", ""), value="plaintext"
+    )
+
+    def test_an_attribute_the_model_states_is_refused(self):
+        with pytest.raises(ValueError, match="is stated"):
+            check_fact_answers([self.STATED], valid_model(), None)
+
+    def test_an_attribute_an_earlier_round_answered_may_be_answered_again(self):
+        earlier = self.STATED.model_copy(update={"value": "TLS 1.3"})
+        check_fact_answers([self.STATED], valid_model(), None, [earlier])
+
+    def test_an_inferred_zone_is_open(self):
+        model = TestAnAnsweredZone().model()
+        zone = model.get(TestAnAnsweredZone.PROCESS).trust_zone
+        answer = FactAnswer(
+            key=(TestAnAnsweredZone.PROCESS, ZONE_ATTRIBUTE, "", "", ""), value=zone
+        )
+        check_fact_answers([answer], model, None)
+
+    def test_the_report_does_not_ask_what_it_refuses(self, report):
+        """Every attribute question the report lists takes an answer."""
+        model = report.system_model
+        for question in ask(report):
+            if question.kind == "attribute":
+                assert open_attribute(model, question.key[0], question.key[1])
+
+
+class TestAnUnknownAnswer:
+    """``unknown`` says the submitter does not know, and the fact stays open (D3)."""
+
+    DONT_KNOW = FactAnswer(
+        key=(valid_model().data_flows[1].id, "encryption_in_transit", "", "", ""),
+        value=UNKNOWN,
+    )
+
+    def test_it_is_admitted_for_a_closed_attribute_too(self):
+        process = valid_model().processes[0].id
+        answer = FactAnswer(key=(process, "exposure", "", "", ""), value=UNKNOWN)
+        check_fact_answers([answer], open_model(), None)
+
+    def test_it_writes_only_a_note(self):
+        model = answered_model(valid_model(), [self.DONT_KNOW])
+        flow = model.data_flows[1]
+
+        assert flow.encryption_in_transit == UNKNOWN
+        assert "does not know encryption_in_transit" in flow.notes
+
+    def test_it_leaves_an_open_row_open(self):
+        answer = FactAnswer(key=("", "", assertion_id(OPEN_ROW), "", ""), value=UNKNOWN)
+        written, issues = apply_answers(open_catalog(), valid_model(), [], [answer])
+
+        assert written.entries == [OPEN_ROW]
+        assert issues == []
+
+    def test_it_is_refused_over_an_earlier_answer(self):
+        earlier = self.DONT_KNOW.model_copy(update={"value": "TLS 1.3"})
+        with pytest.raises(ValueError, match="earlier answer settled"):
+            check_fact_answers([self.DONT_KNOW], valid_model(), None, [earlier])
+
+
+def test_a_rejected_draft_ranks_the_questions_but_is_not_counted(report):
+    counted = {f for question in ask(report) for f in question.findings}
+    rejected = {
+        f"{block.framework}/{claim.id}"
+        for block in report.analyses
+        for claim in block.all_claims()
+        if claim.verdict.status == "rejected"
+    }
+    assert not counted & rejected

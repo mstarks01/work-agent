@@ -595,6 +595,7 @@ def create_app(
                 facts,
                 held.system_model,
                 None if held.assertions is None else held.assertions.catalog,
+                parent.facts,
             )
             merged = merged_links(parent.links, links)
             answered = merged_facts(parent.facts, facts)

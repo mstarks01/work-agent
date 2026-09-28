@@ -365,7 +365,7 @@ def test_the_form_script_follows_a_run_the_report_page_started():
 #: One answer to the valid model's first flow's transport protection.
 FACT = MappingProxyType(
     {
-        "key": (valid_model().data_flows[0].id, "encryption_in_transit", "", "", ""),
+        "key": (valid_model().data_flows[1].id, "encryption_in_transit", "", "", ""),
         "value": "TLS 1.3",
     }
 )
@@ -538,8 +538,14 @@ await button.listeners.click();
     assert seen["href"] == "/?follow=r2"
 
 
-def tallies(questions: list[dict], answer: list[dict]) -> list[str]:
-    """The running line after answering the questions in ``answer``."""
+def tallies(
+    questions: list[dict], answer: list[dict], value: str | None = None
+) -> list[str]:
+    """The running line after answering the questions in ``answer``.
+
+    Each answer is ``value`` where one is given, and otherwise the first choice
+    or a line of text.
+    """
     payloads = {
         "report": {"system_model": valid_model().model_dump(mode="json")},
         "link_questions": [],
@@ -550,7 +556,7 @@ const inputs = [...box.all("input"), ...box.all("select")];
 const byKey = new Map(inputs.map(i => [i.dataset.key, i]));
 for (const q of {json.dumps(answer)}) {{
   const input = byKey.get(JSON.stringify(q.key));
-  input.value = q.choices.length ? q.choices[0] : "an answer";
+  input.value = {json.dumps(value)} ?? (q.choices.length ? q.choices[0] : "an answer");
   (input.listeners.input || input.listeners.change)();
 }}
 calls.push(...box.all("div").map(d => d.textContent).filter(t => t.startsWith("Your")));
@@ -562,6 +568,18 @@ report = test_open_facts.report
 
 
 DECIDED = "The analysis decides again whether they are settled."
+
+
+def test_an_answer_of_unknown_covers_no_finding(report):
+    """I don't know leaves the fact open, so the count does not move (#1289)."""
+    questions = [q.to_json() for q in test_questions.ask(report)]
+    if not questions:
+        pytest.skip("this report waits on no fact")
+    total = len({f for q in questions for f in q["findings"]})
+    line = f"Your answers cover every fact for 0 of the {total} findings"
+    assert tallies(questions, questions, value="unknown") == [
+        f"{line} that wait on one. {DECIDED}"
+    ]
 
 
 class TestTheRunningCount:
