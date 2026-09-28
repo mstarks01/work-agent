@@ -29,11 +29,14 @@ from analysis_service.assertions import (
     projected_attribute,
     support_span,
 )
+from analysis_service.early_questions import early_questions
 from analysis_service.evidence import prepared_view
 from analysis_service.jobs import Checkpoint
-from analysis_service.questions import FactAnswer
+from analysis_service.links import check_answers
+from analysis_service.questions import FactAnswer, open_attribute
 from analysis_service.sources import Source
 from tests.factories import DESCRIPTION_TEXT, valid_model
+from tests.test_early_questions import prior_of
 from tests.test_questions import resume
 
 FLOW = valid_model().data_flows[0].id
@@ -236,3 +239,93 @@ def test_i_do_not_know_changes_nothing_the_catalog_says(reason):
     assert effective(report, attribute) == effective(silent, attribute)
     assert reaching(report, attribute) == reaching(silent, attribute)
     assert "superseded-by-answer" not in {i.code for i in report.assertions.issues}
+
+
+# --- The pause reads the model the lanes will read ---------------------------
+#
+# A paused checkpoint holds the model before prepare projects the catalog. Read
+# there, a fact the catalog states still looked open: the early list offered it,
+# the check admitted an answer, and the answer then superseded what the sources
+# stated. The lists and the check now read ``prepared_model``.
+
+PRIOR = prior_of({"DataFlow": {attribute: 1.0 for attribute in ANSWERS}})
+
+
+def early_keys(checkpoint):
+    catalog = checkpoint.assertions.catalog
+    return {
+        question.key
+        for question in early_questions(
+            checkpoint.system_model, ["stride"], catalog, PRIOR
+        )
+    }
+
+
+@pytest.mark.parametrize("reason", sorted(SHAPES))
+def test_every_early_question_is_admitted(reason):
+    """The early list and the answer check read one model, for every shape."""
+    _, rows = SHAPES[reason]
+    held = checkpoint(rows)
+    catalog = held.assertions.catalog
+    for question in early_questions(held.system_model, ["stride"], catalog, PRIOR):
+        attribute = question.key[1]
+        value = (
+            question.choices[0]
+            if question.choices
+            else ANSWERS.get(attribute, ("stated by the submitter",))[0]
+        )
+        answer = FactAnswer(key=question.key, value=value)
+        check_answers([], [answer], held.system_model, catalog)
+
+
+def lanes_read_open(held, attribute):
+    """Whether the model the lanes will read leaves the attribute open.
+
+    Read through ``prepared_view``, the reader ``prepare`` calls, and not
+    through ``prepared_model``, so the expectation does not follow the code it
+    checks.
+    """
+    prepared, _, _ = prepared_view(held.system_model, held.assertions.catalog)
+    return open_attribute(prepared, FLOW, attribute)
+
+
+@pytest.mark.parametrize("stated_by_extraction", [False, True])
+@pytest.mark.parametrize("reason", sorted(SHAPES))
+def test_the_pause_asks_exactly_what_the_lanes_read_open(reason, stated_by_extraction):
+    """Asked and admitted where the lanes read the fact open; else neither.
+
+    ADR 0041 holds an unchecked value back from an open attribute, so a
+    ``stated`` row can leave the fact open to the lanes too.
+    """
+    attribute, rows = SHAPES[reason]
+    held = checkpoint(rows)
+    if stated_by_extraction:
+        setattr(held.system_model.data_flows[0], attribute, "TLS 1.2")
+    key = (FLOW, attribute, "", "", "")
+    given = [answer(attribute, ANSWERS[attribute][0])]
+    catalog = held.assertions.catalog
+
+    if lanes_read_open(held, attribute):
+        assert key in early_keys(held)
+        check_answers([], given, held.system_model, catalog)
+    else:
+        assert key not in early_keys(held)
+        with pytest.raises(ValueError, match="is stated"):
+            check_answers([], given, held.system_model, catalog)
+
+
+def test_the_pause_table_holds_both_outcomes():
+    """A control: some shape settles the fact at the pause, and some opens it
+    over a value extraction stated, so neither branch above is vacuous."""
+    settles = set()
+    opens = set()
+    for reason, (attribute, rows) in SHAPES.items():
+        held = checkpoint(rows)
+        if not lanes_read_open(held, attribute):
+            settles.add(reason)
+        setattr(held.system_model.data_flows[0], attribute, "TLS 1.2")
+        if lanes_read_open(held, attribute):
+            opens.add(reason)
+
+    assert "absent" in settles
+    assert {"hedged", "scoped", "several-values"} <= opens

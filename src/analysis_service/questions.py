@@ -62,6 +62,7 @@ from analysis_service.assertions import (
     AssertionCatalog,
     CatalogIssue,
     SupportSpan,
+    apply_projection,
     assertion_id,
     projected_attribute,
 )
@@ -89,6 +90,7 @@ __all__ = [
     "fact_questions",
     "fact_rows",
     "open_attribute",
+    "prepared_model",
     "question_fallback",
 ]
 
@@ -148,6 +150,20 @@ def open_attribute(model: SystemModel, element_id: str, attribute: str) -> bool:
         attribute == ZONE_ATTRIBUTE and element_id in model.assumed_zone_elements()
     )
     return element is not None and (unverified or assumed)
+
+
+def prepared_model(model: SystemModel, catalog: AssertionCatalog | None) -> SystemModel:
+    """The model with the catalog's projection applied, as the lanes read it.
+
+    **The model every question reader asks :func:`open_attribute` of.** A
+    paused job's checkpoint holds the model before ``prepare`` projects the
+    catalog, so a fact the catalog states can still read ``unknown`` there.
+    Asked of that model, the early list would offer the fact and the check
+    would admit an answer that then supersedes what the sources stated. A
+    report's model is projected already, and projecting it again changes
+    nothing.
+    """
+    return model if catalog is None else apply_projection(model, catalog)[0]
 
 
 def fact_kind(key: UnknownKey) -> FactKind:
@@ -337,17 +353,20 @@ def fact_questions(
     named: dict[Finding, set[UnknownKey]] = {}
     refs: dict[UnknownKey, UnknownRef] = {}
     rejected: set[Finding] = set()
+    prepared = prepared_model(model, catalog)
     for block in analyses:
         for claim in block.all_claims():
             finding = (block.framework, claim.id)
             if claim.verdict.status == "rejected":
                 rejected.add(finding)
-            grounds = [ref for ref in claim.unknown_grounds() if _open(ref, model)]
+            grounds = [ref for ref in claim.unknown_grounds() if _open(ref, prepared)]
             evidence[finding] = {ref.key for ref in grounds}
             cited = list(grounds)
             if claim.verdict.status == "needs-info":
                 verdict = [
-                    ref for ref in claim.verdict.related_unknowns if _open(ref, model)
+                    ref
+                    for ref in claim.verdict.related_unknowns
+                    if _open(ref, prepared)
                 ]
                 named[finding] = {ref.key for ref in verdict}
                 cited += verdict
@@ -465,6 +484,7 @@ def check_fact_answers(
     ``unknown`` answer to a fact an earlier round settled is refused, because
     it would reopen the fact.
     """
+    prepared = prepared_model(model, catalog)
     answered_before = {answer.key for answer in earlier}
     settled_before = {answer.key for answer in earlier if answer.known}
     for answer in answers:
@@ -488,7 +508,7 @@ def check_fact_answers(
             if attribute not in answerable or attribute in _ENDPOINTS:
                 raise ValueError(f"no attribute {attribute!r} on {element_id!r}")
             if answer.key not in answered_before and not open_attribute(
-                model, element_id, attribute
+                prepared, element_id, attribute
             ):
                 raise ValueError(
                     f"{attribute!r} on {element_id!r} is stated, so it takes no answer"

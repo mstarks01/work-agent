@@ -54,6 +54,7 @@ from analysis_service.questions import (
     answer_choices,
     fact_kind,
     open_attribute,
+    prepared_model,
 )
 from analysis_service.system_model import Element, SystemModel
 
@@ -161,7 +162,12 @@ def early_questions(
     catalog: AssertionCatalog | None,
     prior: Mapping[FrameworkName, PriorRow] = QUESTION_PRIOR,
 ) -> tuple[EarlyQuestion, ...]:
-    """Every open fact the prior names for this model, the most likely cited first."""
+    """Every open fact the prior names for this model, the most likely cited first.
+
+    Read off the model with the catalog applied, which is the model the lanes
+    will read, so a fact the catalog states is not asked.
+    """
+    model = prepared_model(model, catalog)
     score: dict[UnknownKey, float] = {}
     reasons: dict[str, list[str]] = {}
     for name in frameworks:

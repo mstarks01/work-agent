@@ -27,7 +27,11 @@ its own dependencies (#1291), and not through this prior.
 **An answer binds to an open fact, or to a fact that an earlier round
 answered.** One rule, `questions.open_attribute`, decides when an attribute is
 open: it is unverified, or it is a zone that the service inferred. The early
-list, the report list and the answer check all read that rule. An answer to an
+list, the report list and the answer check all read that rule, and all read
+it of `questions.prepared_model`: the model with the catalog applied, as the
+lanes read it. A paused checkpoint holds the model before `prepare` applies the
+catalog, so without this a fact the catalog states still read as open at the
+pause. An answer to an
 attribute that the sources state is refused before admission. So a
 submission cannot overwrite a stated fact. The report list does not ask about
 a stated attribute, even where the critic names it. In the archive, 6% of the
