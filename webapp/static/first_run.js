@@ -3,6 +3,18 @@
   const ticks = document.getElementById("ticks");
   const problem = document.getElementById("problem");
   const go = document.getElementById("go");
+  const status = document.getElementById("status");
+  const statusText = document.getElementById("status-text");
+
+  // What the service is doing now, beside a spinner, from the moment a run
+  // starts until it stops for answers, ends, or fails.
+  const working = (message) => {
+    statusText.textContent = message;
+    status.hidden = false;
+  };
+  const idle = () => {
+    status.hidden = true;
+  };
 
   // The picker. A checkbox reaches its own option controls through the row
   // that contains them, never through a selector built from its value: the
@@ -49,6 +61,7 @@
     problem.replaceChildren(...content);
     problem.hidden = false;
     ticks.hidden = true;
+    idle();
     go.disabled = false;
   };
 
@@ -78,7 +91,14 @@
       fail((await started.json()).message);
       return;
     }
-    follow((await started.json()).run);
+    follow(
+      (await started.json()).run,
+      ask && ask.checked
+        ? "Reading your description and building the system model. The service"
+          + " stops for your answers before the threat analysis starts."
+        : "Reading your description and running the threat analysis. This takes"
+          + " a few minutes.",
+    );
   });
 
   // A paused run's questions: one select per principal. "" leaves a question
@@ -93,6 +113,21 @@
     pausedRun = data.run;
     factInputs = [];
     questions.replaceChildren();
+    const heading = (title, text) => {
+      const lead = document.createElement("p");
+      const bold = document.createElement("b");
+      bold.textContent = title;
+      const hint = document.createElement("div");
+      hint.className = "hint";
+      hint.textContent = text;
+      lead.append(bold, hint);
+      questions.append(lead);
+    };
+    if (data.questions.length) {
+      heading("Which element is each of these?",
+        "Your description states facts about these people or systems, but not"
+        + " which element of the model each one is.");
+    }
     for (const q of data.questions) {
       const row = document.createElement("p");
       const label = document.createElement("label");
@@ -121,6 +156,11 @@
     // The open facts, ranked before any finding exists. The first few in
     // full, the rest one click away; each says which rules make it matter.
     const SHOWN = 10;
+    if (data.facts.length) {
+      heading("Facts your description does not state",
+        "The first ten are the most likely to matter to the analysis. Leave any"
+        + " question blank that you cannot answer.");
+    }
     const more = document.createElement("details");
     const summary = document.createElement("summary");
     summary.textContent = `More questions (${data.facts.length - SHOWN})`;
@@ -150,14 +190,14 @@
         input = document.createElement("input");
         input.type = "text";
         input.maxLength = 1000;
-        input.placeholder = "the mechanism, and what matters about it";
+        input.placeholder = "type it, or pick a common one";
         const list = document.createElement("datalist");
         list.id = `early-suggest-${index}`;
         for (const suggestion of q.suggestions) list.append(optionOf(suggestion, suggestion));
         input.setAttribute("list", list.id);
         const state = document.createElement("select");
         state.append(optionOf("(leave unanswered)", ""), optionOf("There is none", "none"),
-          optionOf("I don't know", DONT_KNOW), optionOf("A mechanism:", "mechanism"));
+          optionOf("I don't know", DONT_KNOW), optionOf("A mechanism, in my own words:", "mechanism"));
         state.addEventListener("change", () => {
           const fixed = state.value === "none" || state.value === DONT_KNOW;
           input.value = fixed ? state.value : "";
@@ -210,18 +250,23 @@
       return;
     }
     asked.hidden = true;
-    follow((await resumed.json()).run);
+    follow(
+      (await resumed.json()).run,
+      "Running the threat analysis with your answers. This takes a few minutes.",
+    );
   });
 
   // Follow one run's progress to its end: a report, questions, or a failure.
-  const follow = (runId) => {
+  const follow = (runId, message) => {
     go.disabled = true;
+    working(message);
     ticks.replaceChildren();
     ticks.hidden = false;
     const stream = new EventSource("/events/" + runId);
     stream.addEventListener("questions", (event) => {
       stream.close();
       ticks.hidden = true;
+      idle();
       showQuestions(JSON.parse(event.data));
     });
     stream.addEventListener("node", (event) => {
@@ -256,4 +301,6 @@
   // A report page that started a resumed run sends the browser here to watch
   // it, because the report page shows one finished report and nothing else.
   const followed = new URLSearchParams(location.search).get("follow");
-  if (followed) follow(followed);
+  if (followed) {
+    follow(followed, "Running the analysis again with your answers. This takes a few minutes.");
+  }

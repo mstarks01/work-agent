@@ -789,14 +789,14 @@
           input = el("input");
           input.type = "text";
           input.maxLength = 1000;
-          input.placeholder = "the mechanism, and what matters about it";
+          input.placeholder = "type it, or pick a common one";
           const list = el("datalist");
           list.id = `suggest-${index}`;
           q.suggestions.forEach(s => list.append(option(s, s)));
           input.setAttribute("list", list.id);
           const state = el("select");
           state.append(option("(leave unanswered)", ""), option("There is none", "none"),
-            option("I don't know", DONT_KNOW), option("A mechanism:", "mechanism"));
+            option("I don't know", DONT_KNOW), option("A mechanism, in my own words:", "mechanism"));
           state.addEventListener("change", () => {
             const fixed = state.value === "none" || state.value === DONT_KNOW;
             input.value = fixed ? state.value : "";
