@@ -31,9 +31,15 @@ value from them in the kind's order, one clause per facet. So the line the
 lanes read has one writer, and a bad facet is refused before admission. A kind
 with facets takes no free text, except `unknown`.
 
-**An answer is known when one facet says more than `unknown`.** An answer whose
-facets are all `unknown` is the submitter's "I don't know": it covers no
-finding.
+**An answer reaches the lanes once one facet says more than `unknown`.** An
+answer whose facets are all `unknown` is the submitter's "I don't know".
+
+**An answer covers a finding only when every facet says more than `unknown`.**
+The critic names the kind a finding waits on, not a facet, so one answered
+facet cannot show that the finding's fact is settled. The report page counts a
+finding as covered only when each facet of each kind it waits on has `yes`,
+`no` or `not applicable`. The count can then say less than the answers settle,
+and never more.
 
 **The pause page shows a kind as a table**, with a column for each facet, a
 row for each element, and a first row that sets a whole column. A column that
@@ -49,7 +55,9 @@ answer than a sentence, and the first row sets a column at once.
 "Can the internet reach it?" is the risk. They are written as facts because
 the reversed wording reads badly.
 
-A facet adds no finding identity. A finding still waits on the kind, so an
-answer covers the kind's findings once one facet is known. Whether a facet
-should cover only the findings it bears on is not decided; it needs the
-critic to name facets, which it does not.
+A facet adds no finding identity. A finding still waits on the kind, so the
+count asks every facet of it. A finding that waits on one facet only, such as
+the rate limit, is counted only after the other facets are answered too. A
+count that follows the one facet needs the critic to name facets. That
+changes the critic's prompt and its provider schema, so it is a feature to
+measure, not a correction.
