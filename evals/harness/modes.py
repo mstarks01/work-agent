@@ -2549,6 +2549,10 @@ MODE_ENTRIES: dict[str, Entry] = {
     # The analysis mode with a case's signed answers, written in as a resumed
     # job writes them (#1225). Built by :func:`run_answered`.
     "answered": ENTRY_PREPARE,
+    # The analysis mode with the facts a case's answers file withholds taken
+    # out: the floor of the withheld-sentence test. See
+    # :mod:`evals.harness.withheld`.
+    "withheld": ENTRY_PREPARE,
 }
 
 #: The modes whose graph runs ``extract``, and so the ones whose sweep keeps
@@ -2565,7 +2569,7 @@ EXTRACTING_MODES: frozenset[str] = frozenset(
 #: no report to persist and says so rather than writing an empty file
 #: ([#180](https://github.com/mstarks01/work-agent/issues/180)).
 REPORTING_MODES: frozenset[str] = frozenset(
-    {"analysis", "answered", "direct-facts", "end-to-end"}
+    {"analysis", "answered", "direct-facts", "end-to-end", "withheld"}
 )
 
 
