@@ -1,0 +1,53 @@
+# No AI attribution: in a pull request's commits and body, and in every push
+# to main. The owner's rule, and the check .githooks/check-attribution holds;
+# the pre-push hook runs the same script over the commits it pushes.
+#
+# Its own workflow, so an edited pull request body is checked without running
+# the whole offline suite again.
+name: Attribution
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    types: [opened, edited, reopened, synchronize]
+
+permissions: {}
+
+jobs:
+  attribution:
+    name: No AI attribution
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - name: Check out
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      # The body reaches the script through the environment, never through the
+      # command line, because a pull request author writes it.
+      - name: Pull request commits and body
+        if: github.event_name == 'pull_request'
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          PR_BODY: ${{ github.event.pull_request.body }}
+        run: |
+          .githooks/check-attribution "$BASE_SHA..$HEAD_SHA"
+          printf '%s' "$PR_BODY" | .githooks/check-attribution --text
+
+      - name: Pushed commits
+        if: github.event_name == 'push'
+        env:
+          BEFORE: ${{ github.event.before }}
+          AFTER: ${{ github.event.after }}
+        run: |
+          if [ "$BEFORE" = "0000000000000000000000000000000000000000" ]; then
+            .githooks/check-attribution -1 "$AFTER"
+          else
+            .githooks/check-attribution "$BEFORE..$AFTER"
+          fi

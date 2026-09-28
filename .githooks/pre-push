@@ -26,6 +26,24 @@
 #
 set -euo pipefail
 
+# No AI attribution in the commits being pushed: in a message, an author or a
+# committer. Mirrors .github/workflows/attribution.yml. Git passes one line
+# per ref on standard input; a deleted ref has nothing to check, and a new one
+# is checked from what no remote holds yet.
+zero=0000000000000000000000000000000000000000
+while read -r _ local_sha _ remote_sha; do
+    [ "$local_sha" = "$zero" ] && continue
+    if [ "$remote_sha" = "$zero" ]; then
+        range=("$local_sha" --not --remotes)
+    else
+        range=("$remote_sha..$local_sha")
+    fi
+    if ! .githooks/check-attribution "${range[@]}"; then
+        echo "pre-push: fix the commits above, then push again." >&2
+        exit 1
+    fi
+done
+
 # Each tool is skipped independently, so an absent uv still leaves actionlint
 # to run and vice versa.
 if command -v uv >/dev/null 2>&1; then
