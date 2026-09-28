@@ -1,7 +1,7 @@
 {
   "case": "01-payments-checkout",
   "drafted_by": "agent",
-  "signed_by": null,
+  "signed_by": "mstarks01",
   "purpose": "withheld-sentence test (#1225): each withheld phrase states one control, the model fields that record or paraphrase it are set back, and each answer gives the same fact back in the blessed model's own value",
   "targets": [
     {
