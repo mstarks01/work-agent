@@ -28,10 +28,18 @@ def signed_copy(tmp_path, change=lambda raw: None):
     return load_answer_file(path)
 
 
-def test_the_draft_is_unsigned_and_so_is_refused(case):  # noqa: F811
-    assert load_answer_file(DRAFT) is None
+def test_the_signed_file_loads_and_applies(case):  # noqa: F811
+    loaded = run.signed_answers([case], DRAFT.parent)
+    assert loaded[case.id].signed_by == "mstarks01"
+    assert loaded[case.id].drafted_by == "agent"
+
+
+def test_an_unsigned_copy_is_refused(case, tmp_path):  # noqa: F811
+    raw = json.loads(DRAFT.read_text(encoding="utf-8"))
+    raw["signed_by"] = None
+    (tmp_path / DRAFT.name).write_text(json.dumps(raw), encoding="utf-8")
     with pytest.raises(modes.EvalRunError, match="no signed answers"):
-        run.signed_answers([case], DRAFT.parent)
+        run.signed_answers([case], tmp_path)
 
 
 def test_the_facts_leave_the_sources_and_the_model(case, tmp_path):  # noqa: F811
