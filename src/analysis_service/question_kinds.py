@@ -15,7 +15,8 @@ module imports neither.
 
 **The maintainer reviewed the wording.** An agent drafted every row from the
 typed questions, and ``reviewed_by`` names who accepted it. A new row carries
-``None`` until the maintainer reads it.
+``None`` until the maintainer reads it. ``answer`` follows from the wording: a
+question that opens with "Are", "Can" or "Does" asks whether something holds.
 """
 
 from __future__ import annotations
@@ -23,6 +24,7 @@ from __future__ import annotations
 from collections.abc import Mapping
 from dataclasses import dataclass
 from types import MappingProxyType
+from typing import Literal
 
 __all__ = ["QUESTION_KINDS", "QuestionKind"]
 
@@ -37,6 +39,10 @@ class QuestionKind:
     covers: str
     #: Who reviewed the wording, or ``None`` where nobody has.
     reviewed_by: str | None
+    #: How the question is answered: ``yes-no`` where it asks whether
+    #: something holds, so a page offers yes, no or "I don't know"; ``text``
+    #: where it asks who, what or how. No default, so a new row says which.
+    answer: Literal["yes-no", "text"]
 
 
 QUESTION_KINDS: Mapping[str, QuestionKind] = MappingProxyType(
@@ -46,84 +52,99 @@ QUESTION_KINDS: Mapping[str, QuestionKind] = MappingProxyType(
             " rate, size, concurrency, quotas or queue bounds?",
             covers="flooding, exhaustion, missing quotas or load shedding",
             reviewed_by="mstarks01",
+            answer="text",
         ),
         "audit-evidence": QuestionKind(
             template="What record shows who acted on {element}, and who can"
             " change or delete that record?",
             covers="attribution, audit trails, evidence that survives a dispute",
             reviewed_by="mstarks01",
+            answer="text",
         ),
         "authorization-scope": QuestionKind(
             template="Who may do what on {element}, and does it check each"
             " request against that?",
             covers="per-request authorization, roles, object ownership, grant scope",
             reviewed_by="mstarks01",
+            answer="text",
         ),
         "stored-copy-integrity": QuestionKind(
             template="Are backups, snapshots and restores of {element} checked"
             " for tampering before they are used?",
             covers="integrity of backups, snapshots, restores and stored media",
             reviewed_by="mstarks01",
+            answer="yes-no",
         ),
         "stored-copy-access": QuestionKind(
             template="Who can obtain a disk, backup or snapshot copy of {element}?",
             covers="access to the storage layer beneath an application",
             reviewed_by="mstarks01",
+            answer="text",
         ),
         "reachability": QuestionKind(
             template="Who can reach {element}'s interface, and from where?",
             covers="who can reach an interface where no `exposure` attribute answers it",
             reviewed_by="mstarks01",
+            answer="text",
         ),
         "provenance": QuestionKind(
             template="Does {element} check where what it takes came from, and"
             " that it was not altered?",
             covers="signatures, origin checks, supply-chain provenance",
             reviewed_by="mstarks01",
+            answer="yes-no",
         ),
         "code-execution": QuestionKind(
             template="Can content that {element} takes run code with its authority?",
             covers="loaders, build steps or parsers that execute supplied content",
             reviewed_by="mstarks01",
+            answer="yes-no",
         ),
         "physical-access": QuestionKind(
             template="Can someone with physical access to {element} read its"
             " secrets or change it?",
             covers="devices and hosts outside the operator's physical control",
             reviewed_by="mstarks01",
+            answer="yes-no",
         ),
         "content-validation": QuestionKind(
             template="Does {element} check the values it takes against what it"
             " expects, and encode or bind them where it uses them?",
             covers="input validation, output encoding, query construction",
             reviewed_by="mstarks01",
+            answer="yes-no",
         ),
         "destination": QuestionKind(
             template="Does {element} check that what it sends reaches the"
             " intended recipient?",
             covers="delivery to the right party, stale or altered destinations",
             reviewed_by="mstarks01",
+            answer="yes-no",
         ),
         "security-configuration": QuestionKind(
             template="Which security settings does {element} use, such as cookie"
             " attributes, response headers, cross-origin rules or secret storage?",
             covers="configuration a deployment sets rather than a design states",
             reviewed_by="mstarks01",
+            answer="text",
         ),
         "failure-handling": QuestionKind(
             template="What happens when {element} fails or stops, and who notices?",
             covers="failure detection, silent staleness, error handling",
             reviewed_by="mstarks01",
+            answer="text",
         ),
         "update-process": QuestionKind(
             template="How are {element}'s components kept up to date?",
             covers="patching, update windows, remediation time frames",
             reviewed_by="mstarks01",
+            answer="text",
         ),
         "data-exposure": QuestionKind(
             template="Which data does {element} return or record, and who can see it?",
             covers="response fields, data in URLs or logs, classification",
             reviewed_by="mstarks01",
+            answer="text",
         ),
     }
 )

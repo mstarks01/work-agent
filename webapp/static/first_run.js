@@ -153,18 +153,27 @@
       row.append(label);
       questions.append(row);
     }
-    // The open facts, ranked before any finding exists. The first few in
-    // full, the rest one click away; each says which rules make it matter.
-    const SHOWN = 10;
+    // The open facts, ranked before any finding exists, asked once per kind of
+    // question or attribute with a row per element. A group ranks by its best
+    // question, so the order of the list is kept. The first groups are open,
+    // and the rest are one click away.
+    const OPEN_GROUPS = 5;
     if (data.facts.length) {
       heading("Facts your description does not state",
-        "The first ten are the most likely to matter to the analysis. Leave any"
-        + " question blank that you cannot answer.");
+        "Each question is asked once, with a row for each part of your system it"
+        + " applies to. The first ones are the most likely to matter. Leave any"
+        + " row blank that you cannot answer.");
     }
-    const more = document.createElement("details");
-    const summary = document.createElement("summary");
-    summary.textContent = `More questions (${data.facts.length - SHOWN})`;
-    more.append(summary);
+    const groups = new Map();
+    for (const q of data.facts) {
+      if (!groups.has(q.group)) {
+        const box = document.createElement("details");
+        box.open = groups.size < OPEN_GROUPS;
+        const title = document.createElement("summary");
+        box.append(title);
+        groups.set(q.group, { box, title, heading: q.group_heading, count: 0 });
+      }
+    }
     const optionOf = (label, value) => {
       const choice = document.createElement("option");
       choice.value = value;
@@ -222,14 +231,18 @@
       input.dataset.key = JSON.stringify(q.key);
       factInputs.push(input);
       const label = document.createElement("b");
-      label.textContent = q.label;
-      const why = document.createElement("div");
-      why.className = "meta";
-      why.textContent = q.reasons.join(" ");
-      row.append(label, " ", ...beside, why);
-      (index < SHOWN ? questions : more).append(row);
+      label.textContent = q.element;
+      // Why the fact matters: the questions of the rules that fire on it.
+      label.title = q.reasons.join(" ");
+      row.append(label, " ", ...beside);
+      const group = groups.get(q.group);
+      group.count += 1;
+      group.box.append(row);
     });
-    if (data.facts.length > SHOWN) questions.append(more);
+    for (const group of groups.values()) {
+      group.title.textContent = `${group.heading} (${group.count})`;
+      questions.append(group.box);
+    }
     asked.hidden = false;
   };
 

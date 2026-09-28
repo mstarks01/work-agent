@@ -81,6 +81,7 @@ __all__ = [
     "ANSWERS_LABEL",
     "CONTROL_SUGGESTIONS",
     "MAX_FACT_ANSWERS",
+    "YES_NO",
     "AnswerForm",
     "FactAnswer",
     "FactQuestion",
@@ -255,8 +256,11 @@ def answer_choices(
     key: UnknownKey, model: SystemModel, catalog: AssertionCatalog | None
 ) -> tuple[str, ...]:
     """The values an answer to this fact may take, or empty for free text."""
-    element_id, attribute, assertion, _, _ = key
+    element_id, attribute, assertion, _, question = key
     kind = fact_kind(key)
+    if kind == "question":
+        asked = QUESTION_KINDS.get(question)
+        return YES_NO if asked is not None and asked.answer == "yes-no" else ()
     if kind == "attribute":
         special = _ATTRIBUTE_CHOICES.get(attribute)
         return (
@@ -281,6 +285,9 @@ def answer_choices(
             )
     return ()
 
+
+#: The answers a ``yes-no`` question kind takes.
+YES_NO: tuple[str, ...] = ("yes", "no")
 
 #: Starting points for a control answered in free text: common mechanisms, so
 #: a submitter can pick one and add what matters, such as how a key is rotated.

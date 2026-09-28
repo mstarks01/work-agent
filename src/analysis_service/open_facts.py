@@ -86,6 +86,22 @@ def label_of(ref: UnknownRef, names: Mapping[str, str]) -> str:
     return ref.subject
 
 
+def group_of(ref: UnknownRef) -> tuple[str, str]:
+    """The group a page shows this fact in, and the group's heading.
+
+    One group for each question kind and each attribute, so a page asks each
+    once and lists the elements under it. The heading is the kind's question
+    with its element made a pronoun, or the attribute's name.
+    """
+    kind = QUESTION_KINDS.get(ref.question) if ref.question else None
+    if kind is not None:
+        heading = kind.template.replace("{element}'s", "its").replace("{element}", "it")
+        return ref.question, heading
+    if ref.names_an_element:
+        return ref.attribute, ref.attribute.replace("_", " ").capitalize()
+    return label_of(ref, {}), label_of(ref, {})
+
+
 def open_facts(block: FrameworkAnalysis, model: SystemModel) -> tuple[OpenFact, ...]:
     """Every open fact this block's needs-info findings rest on, best first."""
     names = element_names(model)

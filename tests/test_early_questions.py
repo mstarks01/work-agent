@@ -9,7 +9,10 @@ from __future__ import annotations
 
 from collections import Counter
 
+import pytest
+
 from analysis_service.candidates import generate_candidates
+from analysis_service.claims import UnknownRef
 from analysis_service.early_questions import (
     QUESTION_PRIOR,
     PriorRow,
@@ -17,12 +20,19 @@ from analysis_service.early_questions import (
     element_type,
 )
 from analysis_service.frameworks import PACKAGES
+from analysis_service.open_facts import group_of
 from analysis_service.question_kinds import QUESTION_KINDS
-from analysis_service.questions import FactAnswer, check_fact_answers
+from analysis_service.questions import (
+    YES_NO,
+    FactAnswer,
+    answer_choices,
+    check_fact_answers,
+)
 from analysis_service.system_model import (
     UNKNOWN,
     ZONE_ATTRIBUTE,
     Assumption,
+    all_attribute_names,
     attribute_names,
 )
 from tests.factories import valid_model
@@ -184,3 +194,54 @@ def store_catalog(store, job):
 
     record = asyncio.run(store.get(job))
     return record.checkpoint.assertions.catalog
+
+
+class TestTheGroups:
+    """A page asks each kind or attribute once, with a row per element (#1289)."""
+
+    def test_every_kind_heading_names_no_element(self):
+        for name in QUESTION_KINDS:
+            _, heading = group_of(UnknownRef(element_id=PROCESS, question=name))
+            assert "{" not in heading
+            assert heading.endswith("?")
+
+    def test_an_attribute_groups_by_its_name(self):
+        ref = UnknownRef(element_id=STORE, attribute="encryption_at_rest")
+        assert group_of(ref) == ("encryption_at_rest", "Encryption at rest")
+
+    def test_each_question_carries_its_group_and_its_element(self):
+        (question,) = early_questions(
+            valid_model(),
+            ["stride"],
+            None,
+            prior_of({"DataStore": {"audit-evidence": 1.0}}),
+        )
+        assert question.group == "audit-evidence"
+        assert question.element == valid_model().get(STORE).name
+
+    def test_a_case_asks_few_groups_however_many_elements_it_holds(self):
+        """About 18 groups on every corpus case, where the list held 60-126."""
+        groups = {q.group for q in early_questions(valid_model(), ["stride"], None)}
+        assert len(groups) <= len(QUESTION_KINDS) + len(all_attribute_names())
+
+
+class TestTheYesNoKinds:
+    def test_a_yes_no_kind_opens_with_a_verb_that_asks_whether(self):
+        """The field follows the reviewed wording, so the two cannot drift."""
+        for name, kind in QUESTION_KINDS.items():
+            asks_whether = kind.template.split()[0] in {"Are", "Can", "Does"}
+            assert (kind.answer == "yes-no") == asks_whether, name
+
+    def test_a_yes_no_kind_takes_yes_no_or_unknown(self):
+        key = UnknownRef(element_id=STORE, question="stored-copy-integrity").key
+        assert answer_choices(key, valid_model(), None) == YES_NO
+        for value in (*YES_NO, "unknown"):
+            check_fact_answers([FactAnswer(key=key, value=value)], valid_model(), None)
+        with pytest.raises(ValueError, match="not one of"):
+            check_fact_answers(
+                [FactAnswer(key=key, value="sometimes")], valid_model(), None
+            )
+
+    def test_a_text_kind_stays_free_text(self):
+        key = UnknownRef(element_id=STORE, question="audit-evidence").key
+        assert answer_choices(key, valid_model(), None) == ()
