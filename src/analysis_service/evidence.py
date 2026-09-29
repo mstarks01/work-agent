@@ -512,6 +512,18 @@ def _one_ground_issue(
     )
 
 
+def _cell(value: str) -> str:
+    """``value`` as one table cell: its lines joined by a space, and ``|`` escaped.
+
+    **The one writer of a cell in the three tables below.** A gloss carries
+    words a model or a submitter wrote, and a line break or a ``|`` there ended
+    the row and let the rest read as a heading or a fence of its own. Every
+    terminator ``str.splitlines`` splits on is joined, U+2028 included. A cell
+    holds one line, so a fence or a heading inside it opens nothing.
+    """
+    return " ".join(value.splitlines()).replace("|", "\\|")
+
+
 def render_catalog(
     catalog: Mapping[str, Ground], assertions: AssertionCatalog | None = None
 ) -> str:
@@ -551,7 +563,7 @@ def render_catalog(
         else {subject.id: subject for subject in assertions.subjects}
     )
     rows = "\n".join(
-        f"| `{ref}` | {_gloss(ground, rows_by_id, subjects)} |"
+        f"| `{_cell(ref)}` | {_cell(_gloss(ground, rows_by_id, subjects))} |"
         for ref, ground in catalog.items()
     )
     return (
@@ -604,7 +616,7 @@ def render_rows(catalog: AssertionCatalog) -> str:
     """
     subjects = {subject.id: subject for subject in catalog.subjects}
     rows = "\n".join(
-        f"| `{assertion_id(row)}` | {_assertion_gloss(row, subjects)} |"
+        f"| `{_cell(assertion_id(row))}` | {_cell(_assertion_gloss(row, subjects))} |"
         for row in catalog.entries
     )
     return (
@@ -640,7 +652,8 @@ def render_element_roster(model: SystemModel) -> str:
     """
     elements = list(model.elements())
     rows = "\n".join(
-        f"| `{element.id}` | {_element_gloss(element)} |" for element in elements
+        f"| `{_cell(element.id)}` | {_cell(_element_gloss(element))} |"
+        for element in elements
     )
     return (
         f"{len(elements)} elements, and this table is all of them."
