@@ -81,7 +81,7 @@ class EarlyRule:
 
     ``floor`` is the score a question needs, and ``limit`` how many of the
     kind one pause asks in all. The two kinds' scores are not on one scale: a
-    field question's is findings expected to cite it, and a capability
+    field question's is a ranking value read off the prior, and a capability
     question's is units it could settle.
     """
 
@@ -90,10 +90,12 @@ class EarlyRule:
 
 
 #: The rule for each kind of early question: ``capability`` and ``field``,
-#: which is every other kind (``QA-2026-09-26-03-E20``). A field question
-#: under 1 is expected to change less than one finding, and the top 30 of a
-#: STRIDE list hold 99% of its score at that floor. A capability question
-#: under 2 settles one unit, and at ASVS level 2 that leaves 28 of 51.
+#: which is every other kind (``QA-2026-09-26-03-E20``). A field question's
+#: floor of 1 is where the ranking cuts: no measurement says how many findings
+#: an answer under it changes. The top 30 of a STRIDE list hold 99% of the
+#: ranking score at that floor, which is not a share of the report's value. A
+#: capability question under 2 settles one unit, and at ASVS level 2 that
+#: leaves 28 of 51.
 EARLY_RULES: Mapping[str, EarlyRule] = {
     "capability": EarlyRule(floor=2.0, limit=30),
     "field": EarlyRule(floor=1.0, limit=30),

@@ -167,10 +167,12 @@ class EarlyQuestion:
     group: str
     group_heading: str
     element: str
-    #: How much an answer is expected to change: for a field, the prior times
-    #: one plus the candidates, summed over the frameworks; for a capability,
-    #: how many units it could settle. The list is in this order, capabilities
-    #: first.
+    #: The value the list is ranked by. For a field, the prior's rate for the
+    #: field on the element's type times one plus the candidates the rules
+    #: raise on the element, summed over the frameworks: a ranking heuristic,
+    #: not a measured count of the findings an answer changes. For a
+    #: capability, how many units it could settle. The list is in this order,
+    #: capabilities first.
     score: float = 0.0
     #: The key of the question this one depends on: a capability's parent,
     #: whose "no" makes this one moot. ``None`` for every other question.
