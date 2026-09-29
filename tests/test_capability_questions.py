@@ -95,7 +95,9 @@ class TestWhatIsAsked:
             assert question.label == CAPABILITIES[question.key[5]].question
 
     def test_a_waiting_job_asks_them_and_admits_their_answers(self):
-        asked = question_set(valid_model(), None, ASVS_L1, [], waiting=True)
+        asked = question_set(
+            valid_model(), None, ASVS_L1, [], waiting=True, answered=[], rounds=0
+        )
         assert _key("oauth") in asked.asked
         admitted = asked.admit(
             sources=[Source.description("A system.")],
@@ -144,7 +146,13 @@ class TestTheAnswerCheck:
         """Two rounds left OAuth absent and its client present (#1289, F1)."""
         earlier = [_answer("oauth", "yes"), _answer("oauth-client", "yes")]
         asked = question_set(
-            answered_model(valid_model(), earlier), None, ASVS_L1, [], waiting=True
+            answered_model(valid_model(), earlier),
+            None,
+            ASVS_L1,
+            [],
+            waiting=True,
+            answered=earlier,
+            rounds=1,
         )
         with pytest.raises(ValueError, match="is part of 'oauth'"):
             asked.admit(
@@ -233,6 +241,7 @@ def test_a_resumed_asvs_run_reports_the_answered_absence():
         frameworks=[FrameworkSelection(name="asvs", options={"level": 1})],
         facts=[answer],
         resumption=Resumption(
+            round=1,
             parent_id="p",
             checkpoint=Checkpoint(system_model=valid_model(), assertions=None),
         ),

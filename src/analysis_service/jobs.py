@@ -146,6 +146,9 @@ class Resumption(BaseModel):
 
     parent_id: str
     checkpoint: Checkpoint
+    #: How many rounds of answers the lineage took, this job's own included.
+    #: :class:`~analysis_service.answer_round.QuestionSet` reads it to end them.
+    round: int = Field(ge=1)
     #: The parent's certification verdict. The resumed report rests on the
     #: model and catalog the parent's run built, so its own verdict is combined
     #: with this one.

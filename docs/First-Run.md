@@ -351,12 +351,16 @@ The app can ask you questions before the analysis, and after the report.
   such as how often a key is rotated. The resumed run decides whether each answer
   settles its finding. Answer as far as you like, by choosing a value or typing
   one line, and run the analysis again. This works on every install, with or
-  without an assertion catalog.
+  without an assertion catalog. You can answer three times in all, at the
+  pause and after each report, and the page says how many times remain. A
+  later round does not ask a fact you already answered, "I don't know"
+  included.
 
 An answer settles its fact, even where your description said otherwise. A run
 that waits for your answers is kept in the app's memory, like every other
-run, but the app removes it only after every run that does not wait. A restart
-of the app loses it.
+run, and the app never removes it to make room. When every run the app holds
+waits for answers, the app refuses a new run until you answer or continue
+one. A restart of the app loses it.
 
 ## Next steps
 

@@ -654,7 +654,14 @@ def _question_set(
         {selection.name: selection.options for selection in record.frameworks},
         analyses,
         waiting=record.status == "awaiting-answers",
+        answered=record.facts,
+        rounds=_rounds(record),
     )
+
+
+def _rounds(record: JobRecord) -> int:
+    """How many rounds of answers this job's lineage took."""
+    return 0 if record.resumption is None else record.resumption.round
 
 
 def _questions_payload(
@@ -981,6 +988,7 @@ def create_app(
                 parent_id=parent.id,
                 checkpoint=Checkpoint(system_model=model, assertions=assertions),
                 certification=parent.certification,
+                round=_rounds(parent) + 1,
             ),
             reserved_tokens=budgets.estimate(admitted.sources, parent.frameworks),
         )

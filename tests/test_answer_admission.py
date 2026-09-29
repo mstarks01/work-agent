@@ -13,7 +13,7 @@ import asyncio
 import pytest
 from pydantic import ValidationError
 
-from analysis_service.answer_round import question_set
+from analysis_service.answer_round import MAX_ANSWER_ROUNDS, question_set
 from analysis_service.assertions import MAX_QUOTE_CHARS, AssertionCatalog
 from analysis_service.links import (
     LinkAnswer,
@@ -134,6 +134,8 @@ class TestOnlyAnAskedFactTakesAnAnswer:
             {"stride": {}},
             [],
             waiting=True,
+            answered=[],
+            rounds=0,
         ).asked
 
     def unasked_kind(self):
@@ -203,7 +205,15 @@ class TestOnlyAnAskedFactTakesAnAnswer:
 
 
 def asked_of(catalog, *, waiting):
-    return question_set(valid_model(), catalog, {"stride": {}}, [], waiting=waiting)
+    return question_set(
+        valid_model(),
+        catalog,
+        {"stride": {}},
+        [],
+        waiting=waiting,
+        answered=[],
+        rounds=0,
+    )
 
 
 def admit(questions, links=(), facts=()):
@@ -228,3 +238,72 @@ class TestOneRoundHasOneAdmissionRule:
         link = LinkAnswer(principal="customer", element="entity:customer")
         with pytest.raises(NoCatalogError):
             admit(asked_of(None, waiting=True), links=[link])
+
+
+def _asked_after(answered, rounds, waiting=True):
+    checkpoint = held()
+    return question_set(
+        checkpoint.system_model,
+        checkpoint.assertions.catalog,
+        {"stride": {}},
+        [],
+        waiting=waiting,
+        answered=answered,
+        rounds=rounds,
+    )
+
+
+CAPACITY = ("process:web-app", "", "", "", "capacity-limits", "")
+
+
+class TestTheRoundsEnd:
+    """A later round asked "I don't know" facts again, and the rounds after a
+    report had no end."""
+
+    def test_i_do_not_know_is_not_asked_again(self):
+        first = _asked_after([], 0).early[0].key
+        again = _asked_after([FactAnswer(key=first, value="unknown")], 1)
+        assert first not in {question.key for question in again.early}
+
+    def test_a_facet_left_out_is_asked_again(self):
+        partial = FactAnswer(key=CAPACITY, facets={"rate": "yes"})
+        assert CAPACITY in {q.key for q in _asked_after([partial], 1).early}
+
+    def test_every_facet_answered_is_not_asked_again(self):
+        facets = {"rate": "yes", "size": "unknown", "concurrency": "no", "quota": "no"}
+        full = FactAnswer(key=CAPACITY, facets=facets)
+        assert CAPACITY not in {q.key for q in _asked_after([full], 1).early}
+
+    def test_a_lineage_at_the_limit_asks_nothing_and_admits_nothing(self):
+        final = _asked_after([], MAX_ANSWER_ROUNDS, waiting=False)
+        assert (final.early, final.facts, final.links) == ((), (), ())
+        assert final.to_json()["answer_rounds_left"] == 0
+        with pytest.raises(ValueError, match="its report is final"):
+            admit(final, facts=[FactAnswer(key=CAPACITY, value="unknown")])
+
+    def test_a_submitter_who_never_knows_reaches_the_end(self):
+        """Every round answers every question "I don't know"."""
+        answered: list[FactAnswer] = []
+        for rounds in range(MAX_ANSWER_ROUNDS + 1):
+            asked = _asked_after(answered, rounds)
+            if not asked.rounds_left:
+                break
+            given = [FactAnswer(key=q.key, value="unknown") for q in asked.early]
+            answered = merged_facts(answered, given)
+        assert rounds == MAX_ANSWER_ROUNDS
+        assert not asked.early
+
+    def test_the_route_counts_the_round_and_serves_what_is_left(self):
+        client, store = catalog_client()
+        job = waiting(store)
+        body = client.get(f"/v1/jobs/{job}/questions", headers=auth()).json()
+        assert body["answer_rounds_left"] == MAX_ANSWER_ROUNDS
+        key = body["early_questions"][0]["key"]
+        response = client.post(
+            f"/v1/jobs/{job}/answers",
+            json={"facts": [{"key": key, "value": "unknown"}]},
+            headers=auth(),
+        )
+        assert response.status_code == 201, response.text
+        child = asyncio.run(store.get(response.json()["job_id"]))
+        assert child.resumption.round == 1

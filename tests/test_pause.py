@@ -141,7 +141,9 @@ class TestTheWait:
             record.transition("running")
 
     def test_a_resumed_job_never_pauses(self):
-        resumed = asking_job(resumption=Resumption(parent_id="p", checkpoint=held()))
+        resumed = asking_job(
+            resumption=Resumption(round=1, parent_id="p", checkpoint=held())
+        )
         assert asking_job().pauses()
         assert not resumed.pauses()
         assert not asking_job(ask_questions=False).pauses()
@@ -413,7 +415,7 @@ class TestThePausePathIsCertified:
         job = asking_job(
             ask_questions=False,
             resumption=Resumption(
-                parent_id="job-parent", checkpoint=held(), certification=parent
+                round=1, parent_id="job-parent", checkpoint=held(), certification=parent
             ),
         )
         # The certifier reads a run's node and fingerprint and nothing else.
