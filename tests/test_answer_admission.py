@@ -393,3 +393,15 @@ class TestTheBoundedRounds:
         child = asyncio.run(store.get(response.json()["job_id"]))
         assert child.resumption.round == 1
         assert child.facts, "the saved answers reach the analysis"
+
+
+def test_a_pause_continued_with_no_answer_uses_no_round():
+    """ADR 0053: only a start that carries answers counts toward the limit."""
+    client, store = catalog_client()
+    job = waiting(store)
+    response = client.post(
+        f"/v1/jobs/{job}/answers", json={"links": [], "facts": []}, headers=auth()
+    )
+    assert response.status_code == 201, response.text
+    child = asyncio.run(store.get(response.json()["job_id"]))
+    assert child.resumption.round == 0

@@ -1013,7 +1013,7 @@ def create_app(
                 parent_id=parent.id,
                 checkpoint=Checkpoint(system_model=model, assertions=assertions),
                 certification=parent.certification,
-                round=_rounds(parent) + 1,
+                round=admitted.round_after(_rounds(parent)),
             ),
             reserved_tokens=budgets.estimate(admitted.sources, parent.frameworks),
         )
