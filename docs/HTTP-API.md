@@ -392,6 +392,13 @@ time — poll or subscribe to the jobs you have, then resubmit. The count is not
 a rate: nothing accrues over a window, and finishing a job immediately buys the
 next one. See [ADR 0007](adr/0007-per-caller-concurrency-ceiling.md).
 
+### How many event streams you may hold open
+
+A token may hold at most 8 streams from `GET /v1/jobs/{id}/events` open at
+once, over all its jobs. A stream stays open until its job reaches a terminal
+state or you close it, so a ninth stream gets `429`. Close a stream, or wait for
+its job to end, and open the next one.
+
 ### How much you may consume over time
 
 The count is not a rate, so the ceiling bounds no spend: one token that submits
