@@ -1135,3 +1135,11 @@ class TestAHeaderThatDoesNotSpellANumber:
         # Which is what a missing header does too: the value names no event,
         # so there is nothing to resume after.
         assert ascii_int(last_event_id, max_digits=18) is None
+
+
+@pytest.mark.parametrize("path", ["/docs", "/redoc", "/openapi.json"])
+def test_the_service_serves_no_schema_route(path):
+    """The schema states the bounds and the source kinds a caller may not send,
+    and the three webapps close these routes too (run 11)."""
+    client, _ = make_client()
+    assert client.get(path).status_code == 404

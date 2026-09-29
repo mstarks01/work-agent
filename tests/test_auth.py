@@ -22,6 +22,7 @@ from analysis_service.auth import (
     _CooldownSigningKeyClient,
     build_verifier,
 )
+from analysis_service.sources import plain_name
 
 ISSUER = "https://idp.example.com"
 AUDIENCE = "analysis-service"
@@ -116,6 +117,21 @@ class TestOidcJwtVerifier:
         # the subject reaches (CWE-117).
         with pytest.raises(AuthenticationError):
             verifier().verify(make_token(sub="alice\nCRITICAL forged"))
+
+    @pytest.mark.parametrize(
+        "char", ["\n", "\x1c", "\x85", "\u2028", "\u2029", "\u202e", "\u200b", "é"]
+    )
+    def test_the_subject_takes_what_a_source_label_takes(self, char):
+        """Two readers of one rule, held against each other. The subject read
+        the control categories and admitted U+2028 and U+2029 (run 11)."""
+        subject = f"alice{char}bob"
+        try:
+            plain_name(subject)
+        except ValueError:
+            with pytest.raises(AuthenticationError):
+                verifier().verify(make_token(sub=subject))
+        else:
+            assert verifier().verify(make_token(sub=subject)) == subject
 
     def test_hs256_token_rejected(self):
         claims = {
