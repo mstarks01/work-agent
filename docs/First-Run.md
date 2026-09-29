@@ -331,8 +331,18 @@ The app can ask you questions before the analysis, and after the report.
   install builds an assertion catalog (`ANALYSIS_ASSERTIONS=true`), it also
   asks which element each group of people or accounts is, such as "shopper
   accounts", so that facts about the group reach the model. Rows you leave
-  blank stay open. Click **Start the analysis**. The analysis then starts from
-  what was already read, so nothing is read again, and it reads your answers.
+  blank stay open.
+
+  The questions come in rounds of at most ten about the application and ten
+  about parts of your system, the most useful first. A line at the top says
+  about how many are left; your answers can change that number. Click **Save
+  and show more** for the next round. The app keeps your answers and runs no
+  model. **Your answers** lists every answer you saved, and **Change** opens
+  one again. A question with parts comes back while a part has no answer, with
+  the parts you answered filled in. Click **Start the analysis** at any time.
+  When no question is left, the analysis starts by itself. The analysis then
+  starts from what was already read, so nothing is read again, and it reads
+  your answers.
 - **After the report.** Where your install builds an assertion catalog, the
   report page lists the group questions under **Which element is each of
   these?**. Choose answers and click **Run the
@@ -351,8 +361,9 @@ The app can ask you questions before the analysis, and after the report.
   such as how often a key is rotated. The resumed run decides whether each answer
   settles its finding. Answer as far as you like, by choosing a value or typing
   one line, and run the analysis again. This works on every install, with or
-  without an assertion catalog. You can answer three times in all, at the
-  pause and after each report, and the page says how many times remain. A
+  without an assertion catalog. You can run the analysis with answers three
+  times in all, and the page says how many times remain. Saved rounds before
+  the analysis do not count. A
   later round does not ask a fact you already answered, "I don't know"
   included.
 

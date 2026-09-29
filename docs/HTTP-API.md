@@ -39,8 +39,8 @@ logged, never returned.
 | `GET` | `/v1/jobs/{id}` | Poll: status, per-node progress, timestamps. Never the report. |
 | `GET` | `/v1/jobs/{id}/events` | The same progression as Server-Sent Events; resumable via `Last-Event-ID`. |
 | `GET` | `/v1/jobs/{id}/report` | The full [report](Report-Schema.md) once completed; `409` before, and `409` if the report is withheld (below). |
-| `POST` | `/v1/jobs/{id}/answers` | Answer the questions of a completed job or a job in `awaiting-answers`. Starts a **new** job that resumes from this one's model and catalog; `201` with its `job_id`. |
-| `GET` | `/v1/jobs/{id}/questions` | What the job asks you, as `{"job_id", "link_questions", "fact_questions", "early_questions", "fallback", "answer_rounds_left"}`: a finished report's questions, or a waiting job's link and early questions. Derived from the report when you ask, under the report's own rules: `409` before completion and `409` when the report is withheld. |
+| `POST` | `/v1/jobs/{id}/answers` | Answer the questions of a completed job or a job in `awaiting-answers`. Starts a **new** job that resumes from this one's model and catalog; `201` with its `job_id`. With `"save": true`, a waiting job keeps the round and answers `200` with its own `job_id`, unless nothing is left to ask. |
+| `GET` | `/v1/jobs/{id}/questions` | What the job asks you, as `{"job_id", "link_questions", "fact_questions", "early_questions", "fallback", "answer_rounds_left", "early_remaining", "answered_early", "answered_links"}`: a finished report's questions, or a waiting job's link and early questions. Derived from the report when you ask, under the report's own rules: `409` before completion and `409` when the report is withheld. |
 | `GET` | `/healthz` | Unauthenticated liveness probe. |
 
 Errors are RFC 9457 `application/problem+json`.
@@ -173,10 +173,25 @@ group_heading, element}`. `kind`, `choices`, `form`, `suggestions` and
 once and list the elements under it by their `element` name. The list keeps
 its order within and across groups.
 `reasons` gives the questions of the rules that fire on the element, which say
-why the fact matters. An attribute is asked only where the model, with the
+why the fact matters. `score` is the value the list is ranked by. An attribute is asked only where the model, with the
 assertion catalog applied, leaves it open: `unknown`, possibly with a
 qualification after it, or a zone the service inferred. Answer them as `facts` on the route below. The analysis then
 reads your answers, so the findings rest on them.
+
+**A waiting job asks in rounds.** `early_questions` holds one round: at most
+10 capability questions and at most 10 questions about the model's elements.
+A field question needs a `score` of at least 1, and a capability question at
+least 2. One pause asks at most 30 of each kind in all. `early_remaining`
+estimates how many of each kind are left, this round included; answers can
+add or take away questions. Send a round with `"save": true` to keep it: the
+answers are written onto the job, no model runs, and the response is `200`
+with `{"job_id", "saved": true}`. Ask for the questions again for the next
+round. A saved round must answer at least one question. When the saved
+answers leave nothing to ask, the analysis starts, and the response is the
+new job's `201`. `answered_early` and `answered_links` list each saved answer
+with its question, and you can send a new answer to any of them. A question
+with facets comes back while a facet has no answer. A saved round does not
+count toward the three rounds of answers.
 
 **Limit:** a waiting job is held in the service's memory. A restart of the
 service loses it, with its extraction; submit it again.
@@ -304,7 +319,8 @@ same principal. A link answer may name only a principal that the job asked
 about, or one that an earlier round answered. The finished job's report is unchanged.
 
 **The rounds end.** A job lineage takes at most three rounds of answers: the
-answers at the pause and after each report, counted together.
+answers that start the analysis and those after each report, counted
+together. A saved round at the pause does not count.
 `answer_rounds_left` says how many rounds remain. A job with none left asks
 no questions, and its report is final. A later round does not ask a fact that
 an earlier round answered, and an "I don't know" answer counts. A question

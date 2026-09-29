@@ -135,6 +135,7 @@ class TestOnlyAnAskedFactTakesAnAnswer:
             [],
             waiting=True,
             answered=[],
+            answered_links=[],
             rounds=0,
         ).asked
 
@@ -178,10 +179,10 @@ class TestOnlyAnAskedFactTakesAnAnswer:
         client, store = catalog_client()
         job = waiting(store)
         body = client.get(f"/v1/jobs/{job}/questions", headers=auth()).json()
-        question = next(q for q in body["early_questions"] if q["choices"])
+        question = body["early_questions"][0]
         response = client.post(
             f"/v1/jobs/{job}/answers",
-            json={"facts": [{"key": question["key"], "value": question["choices"][0]}]},
+            json={"facts": [{"key": question["key"], "value": "unknown"}]},
             headers=auth(),
         )
         assert response.status_code == 201, response.text
@@ -212,13 +213,19 @@ def asked_of(catalog, *, waiting):
         [],
         waiting=waiting,
         answered=[],
+        answered_links=[],
         rounds=0,
     )
 
 
-def admit(questions, links=(), facts=()):
+def admit(questions, links=(), facts=(), save=False):
     return questions.admit(
-        sources=[], earlier_links=[], earlier_facts=[], links=links, facts=facts
+        sources=[],
+        earlier_links=[],
+        earlier_facts=[],
+        links=links,
+        facts=facts,
+        save=save,
     )
 
 
@@ -249,6 +256,7 @@ def _asked_after(answered, rounds, waiting=True):
         [],
         waiting=waiting,
         answered=answered,
+        answered_links=[],
         rounds=rounds,
     )
 
@@ -307,3 +315,81 @@ class TestTheRoundsEnd:
         assert response.status_code == 201, response.text
         child = asyncio.run(store.get(response.json()["job_id"]))
         assert child.resumption.round == 1
+
+
+class TestTheBoundedRounds:
+    """A waiting job asks in rounds (ADR 0053)."""
+
+    def test_a_round_shows_at_most_its_size_of_each_kind_above_the_floor(self):
+        from analysis_service.answer_round import EARLY_RULES, ROUND_SIZE
+
+        asked = _asked_after([], 0)
+        for kind, rule in EARLY_RULES.items():
+            shown = [
+                q
+                for q in asked.early
+                if (q.kind == "capability") == (kind == "capability")
+            ]
+            assert len(shown) <= ROUND_SIZE
+            assert all(q.score >= rule.floor for q in shown)
+        assert asked.early, "a control: the waiting job asks something"
+
+    def test_a_saved_answer_leaves_the_round_and_is_listed_with_its_answer(self):
+        first = _asked_after([], 0).early[0]
+        answer = FactAnswer(key=first.key, value="unknown")
+        after = _asked_after([answer], 0)
+        assert first.key not in {q.key for q in after.early}
+        assert [(q.key, a) for q, a in after.answered_early] == [(first.key, answer)]
+
+    def test_each_kind_stops_at_its_limit(self):
+        from analysis_service.answer_round import _round
+
+        listed = _asked_after([], 0).early
+        held = {
+            ("", "", "", f"subject {n}", "", ""): FactAnswer(
+                key=("", "", "", f"subject {n}", "", ""), value="unknown"
+            )
+            for n in range(30)
+        }
+        shown, remaining = _round(listed, frozenset(held), held)
+        assert not [q for q in shown if q.kind != "capability"]
+        assert remaining["field"] == 0
+
+    def test_a_saved_round_must_answer_something_and_only_a_waiting_job_saves(self):
+        with pytest.raises(ValueError, match="at least one question"):
+            admit(_asked_after([], 0), facts=[], save=True)
+        finished = _asked_after([], 0, waiting=False)
+        answer = FactAnswer(key=CAPACITY, value="unknown")
+        with pytest.raises(ValueError, match="only a job waiting"):
+            admit(finished, facts=[answer], save=True)
+
+    def test_the_route_saves_a_round_and_starts_when_nothing_is_left(self):
+        from analysis_service.sources import SourceLimits
+
+        client, store = catalog_client()
+        # Room for the answers source every round's answers compose.
+        client.app.state.limits = SourceLimits(max_total_bytes=100_000, max_sources=3)
+        job = waiting(store)
+        for _ in range(20):
+            body = client.get(f"/v1/jobs/{job}/questions", headers=auth()).json()
+            facts = [
+                {"key": q["key"], "value": "unknown"} for q in body["early_questions"]
+            ]
+            links = [
+                {"principal": q["principal"], "element": "none"}
+                for q in body["link_questions"]
+            ]
+            response = client.post(
+                f"/v1/jobs/{job}/answers",
+                json={"facts": facts, "links": links, "save": True},
+                headers=auth(),
+            )
+            if response.status_code == 201:
+                break
+            assert response.status_code == 200, response.text
+            assert response.json() == {"job_id": job, "saved": True}
+            assert asyncio.run(store.get(job)).checkpoint is not None
+        assert response.status_code == 201, "the rounds never ended"
+        child = asyncio.run(store.get(response.json()["job_id"]))
+        assert child.resumption.round == 1
+        assert child.facts, "the saved answers reach the analysis"

@@ -760,7 +760,14 @@ class TestTheAdmissionCheck:
         catalog = open_catalog(stated)
         assert link_questions(catalog, valid_model()) == ()
         questions = question_set(
-            valid_model(), catalog, {}, [], waiting=True, answered=[], rounds=0
+            valid_model(),
+            catalog,
+            {},
+            [],
+            waiting=True,
+            answered=[],
+            answered_links=[],
+            rounds=0,
         )
         link = LinkAnswer(principal="customer accounts", element="process:web-app")
         with pytest.raises(ValueError, match="asked no question about"):
