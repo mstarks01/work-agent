@@ -580,9 +580,10 @@ def fact_questions(
 
     Each question counts the findings of every framework together, because one
     answer settles a fact for every framework that cites it. ``cited_by`` and
-    ``covered_so_far`` count findings waiting on the fact, by their grounds or,
-    for a conditional finding, by its verdict too. A rejected draft ranks the
-    questions and is not counted, because no answer brings it into the report.
+    ``covered_so_far`` count only the conditional findings, which are the ones
+    waiting on an answer, by their grounds and their verdict. A confirmed
+    finding and a rejected draft rank the questions and are not counted: the
+    first waits on nothing, and no answer brings the second into the report.
 
     An attribute the model states is not asked, even where the critic names
     it, because :func:`check_fact_answers` refuses an answer to it.
@@ -590,17 +591,16 @@ def fact_questions(
     evidence: dict[Finding, set[UnknownKey]] = {}
     named: dict[Finding, set[UnknownKey]] = {}
     refs: dict[UnknownKey, UnknownRef] = {}
-    rejected: set[Finding] = set()
+    conditional: set[Finding] = set()
     prepared = prepared_model(model, catalog)
     for block in analyses:
         for claim in block.all_claims():
             finding = (block.framework, claim.id)
-            if claim.verdict.status == "rejected":
-                rejected.add(finding)
             grounds = [ref for ref in claim.unknown_grounds() if _open(ref, prepared)]
             evidence[finding] = {ref.key for ref in grounds}
             cited = list(grounds)
             if claim.verdict.status == "needs-info":
+                conditional.add(finding)
                 verdict = [
                     ref
                     for ref in claim.verdict.related_unknowns
@@ -620,7 +620,7 @@ def fact_questions(
     waiting = {
         finding: keys
         for finding, keys in waiting.items()
-        if keys and finding not in rejected
+        if keys and finding in conditional
     }
     names = element_names(model)
     asked: list[FactQuestion] = []
