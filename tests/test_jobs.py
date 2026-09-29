@@ -66,7 +66,10 @@ class FailingRunner:
 
 
 class MidGraphFailingRunner:
-    """A lane raised after extraction ran and was metered."""
+    """A lane raised after extraction ran and was metered at ``tokens``."""
+
+    def __init__(self, tokens: int = 100) -> None:
+        self.tokens = tokens
 
     async def run(self, job: JobRecord, on_node: NodeCallback) -> PipelineOutcome:
         await on_node("extract")
@@ -74,7 +77,11 @@ class MidGraphFailingRunner:
             RuntimeError("provider refused"),
             [
                 NodeRun(
-                    node="extract", duration_ms=10, usage=TokenUsage(prompt_tokens=100)
+                    node="extract",
+                    duration_ms=10,
+                    usage=TokenUsage(
+                        prompt_tokens=self.tokens, total_tokens=self.tokens
+                    ),
                 )
             ],
         )
@@ -523,10 +530,11 @@ class HangingRunner:
 
 class TestExecuteJob:
     @staticmethod
-    def run_with(runner, deadline_seconds: float = 30) -> JobRecord:
+    def run_with(runner, deadline_seconds: float = 30, reserved: int = 0) -> JobRecord:
         async def scenario():
             store = InMemoryJobStore()
             record = make_record()
+            record.reserved_tokens = reserved
             await admit(store, record)
             await execute_job(
                 store, runner, record.id, deadline_seconds=deadline_seconds
@@ -572,17 +580,23 @@ class TestExecuteJob:
         assert "hunter2" not in record.error
         assert record.report is None
 
-    def test_a_graph_that_raised_mid_run_keeps_its_reservation(self):
-        """The finishes come out of the executor now (#711), and the route
-        still does not settle from them: the raising node's own call is not
-        among them, so the figure is a floor, and a bound that must hold before
-        anything is spent errs upward. `transition` states the rule."""
-        record = self.run_with(MidGraphFailingRunner())
+    def test_a_graph_that_raised_mid_run_keeps_a_larger_reservation(self):
+        """The runs that finished are a floor on the spend: the raising node's
+        own call is not among them. So the reservation stays where it is the
+        larger figure, and a bound that must hold before anything is spent
+        errs upward. `transition` states the rule."""
+        record = self.run_with(MidGraphFailingRunner(tokens=1), reserved=3_857)
         assert record.status == "failed"
         assert record.error == GENERIC_FAILURE_MESSAGE
         assert "provider refused" not in record.error
-        assert record.unreported_nodes == []
-        assert record.measured_tokens is None, "unmeasured rather than free"
+        assert record.measured_tokens == 3_857
+
+    def test_a_graph_that_raised_mid_run_settles_to_a_larger_floor(self):
+        """A small job reserved 3,857 tokens while its instructions alone were
+        about 456,000, and the failure discarded that measurement (run 11)."""
+        record = self.run_with(MidGraphFailingRunner(tokens=456_000), reserved=3_857)
+        assert record.status == "failed"
+        assert record.measured_tokens == 456_000
 
 
 class TestJobDeadline:

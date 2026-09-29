@@ -14,6 +14,7 @@ import pytest
 
 from analysis_service import graph
 from analysis_service.api import create_app
+from analysis_service.budgets import widest_llm_calls
 from analysis_service.certification import MANIFEST_VERSION
 from analysis_service.compact import (
     COMPACT_FORMAT,
@@ -38,8 +39,8 @@ from analysis_service.model_gate import (
     emulates_structured_output,
     output_ceiling,
 )
-from analysis_service.model_tiers import LLM_NODES, ModelConfigError
 from analysis_service.model_tiers import SUPPORTED_VERSION as TIERS_SUPPORTED_VERSION
+from analysis_service.model_tiers import ModelConfigError
 from analysis_service.system_model import SystemModel
 from analysis_service.vendors import ProviderAuthError, vendor_for
 from tests.factories import DEFAULT_FRAMEWORKS, PROJECT_ROOT, translator_of
@@ -399,10 +400,10 @@ def test_both_tiers_draw_on_one_shared_retry_budget():
         id(nodes[name].model.retry_policy.budget) for name in pipeline.node_models
     }
     assert len(budgets) == 1
-    # Capacity is one retry per LLM node in the graph: what one job may spend
-    # from a cold bucket.
+    # Capacity is one retry per LLM call of the widest job: what one job may
+    # spend from a cold bucket.
     budget = nodes[CRITIC_NODE].model.retry_policy.budget
-    assert budget.capacity == len(LLM_NODES)
+    assert budget.capacity == widest_llm_calls()
     assert budget.ratio == 0.1
 
 

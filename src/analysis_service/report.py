@@ -46,7 +46,7 @@ from analysis_service.assertions import (
     catalog_coverage,
     contradiction_issues,
 )
-from analysis_service.charges import UPSTREAM_MAX_CHARS
+from analysis_service.charges import MAX_CALL_CHARGE_USD, UPSTREAM_MAX_CHARS
 from analysis_service.claims import FrameworkAnalysis, FrameworkName, SharedElementName
 from analysis_service.evidence import ground_issues
 from analysis_service.frameworks import block_type_for
@@ -495,7 +495,9 @@ class NodeRun(BaseModel):
     # validated, summed to ``inf`` through :func:`charges_by_node`, and
     # re-serialised as ``null`` — so a report read back and re-dumped moved the
     # bytes an attestation seals.
-    reported_charge_usd: float | None = Field(default=None, ge=0, allow_inf_nan=False)
+    reported_charge_usd: float | None = Field(
+        default=None, ge=0, le=MAX_CALL_CHARGE_USD, allow_inf_nan=False
+    )
     served_upstream: str | None = Field(default=None, max_length=UPSTREAM_MAX_CHARS)
 
     @model_validator(mode="before")

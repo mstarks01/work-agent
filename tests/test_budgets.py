@@ -13,6 +13,7 @@ from analysis_service.budgets import (
     llm_calls_for,
     measured_tokens,
     spent_tokens,
+    widest_llm_calls,
 )
 from analysis_service.frameworks import PACKAGES
 from analysis_service.jobs import Admission, InMemoryJobStore, JobRecord
@@ -65,8 +66,17 @@ class TestTheEstimate:
         # Derived from PACKAGES, so a framework registered tomorrow moves it
         # with no edit here -- the reason widest_fan_out() exists.
         one = [FrameworkSelection(name="stride", options={})]
-        expected = 2 + len(PACKAGES["stride"].lanes) + 2
+        expected = 3 + len(PACKAGES["stride"].lanes) + 2
         assert llm_calls_for(one) == expected
+
+    def test_the_widest_job_makes_one_call_per_llm_node_of_its_graph(self):
+        """Held against the built graph, not a number. The table left out the
+        ``assert`` node, and the retry bucket's capacity counted node names
+        rather than calls (run 11)."""
+        from tests.factories import scripted_pipeline
+
+        _, models = scripted_pipeline({}, frameworks=tuple(PACKAGES), assertions=True)
+        assert widest_llm_calls() == len(models)
 
     def test_naming_two_frameworks_costs_both(self):
         one = [FrameworkSelection(name="stride", options={})]

@@ -39,6 +39,7 @@ from analysis_service.assertions import AssertionRecord
 from analysis_service.budgets import BudgetPolicy, measured_tokens, spent_tokens
 from analysis_service.certification import CertifyResult
 from analysis_service.claims import FrameworkAnalysis
+from analysis_service.execution import GraphFailed
 from analysis_service.links import MAX_LINK_ANSWERS, LinkAnswer
 from analysis_service.questions import MAX_FACT_ANSWERS, FactAnswer
 from analysis_service.report import (
@@ -211,7 +212,8 @@ class JobRecord(BaseModel):
     # What the graph ran on a job that finished without a report. A rejected
     # input still paid for extraction and repair, and the report that would
     # normally carry that measurement does not exist, so it is kept here and
-    # settled from exactly as a completed job's is.
+    # settled from. A failed job's runs are what finished before a node
+    # raised, which is a floor on its spend.
     unreported_nodes: list[NodeRun] = Field(default_factory=list)
 
     @classmethod
@@ -279,11 +281,16 @@ class JobRecord(BaseModel):
         nine and paid for every call on the way, which turns the token budget
         into a bound any failing job clears: a caller whose submissions outrun
         the deadline would spend without limit while their window read empty.
-        The measurement is genuinely unavailable on that path — the graph raised
-        before it returned its node runs — and the reservation is the only
-        figure the service holds. It over-counts, which is the direction a bound
-        that must hold before anything is spent has to err in, and the window
-        rolls past it either way.
+        On the deadline path the graph is cancelled before it returns its node
+        runs, and the reservation is the only figure the service holds. It
+        over-counts, which is the direction a bound that must hold before
+        anything is spent has to err in, and the window rolls past it either
+        way.
+
+        **A failed job settles to the larger of the two.** A node that raised
+        leaves the runs that finished before it, which is a floor on the spend
+        and not the spend, so the reservation stays where it is larger and the
+        floor replaces it where the floor is larger.
         """
         if new_status not in _LEGAL_TRANSITIONS[self.status]:
             raise InvalidTransitionError(
@@ -292,6 +299,8 @@ class JobRecord(BaseModel):
         self.status = new_status
         if new_status in TERMINAL_STATUSES:
             measured = self.spent_tokens()
+            if measured is not None and new_status == "failed":
+                measured = max(measured, self.reserved_tokens)
             if measured is not None:
                 self.measured_tokens = measured
         self._append_event(kind="status", status=new_status)
@@ -302,11 +311,12 @@ class JobRecord(BaseModel):
         A completed job reads its report's node runs; a rejected one reads the
         runs the graph returned before the validity gate refused its output.
         Both are a real measurement, so both settle — including to zero, where a
-        provider declined to meter every call.
+        provider declined to meter every call. A failed job reads the runs that
+        finished before a node raised.
 
         ``None`` means no node run reached this record at all, which is a
         different fact from a measured zero and is why the two are not one value:
-        a job that failed mid-graph is unmeasured rather than free.
+        a job that ran out of time is unmeasured rather than free.
         """
         nodes = self.report.nodes if self.report is not None else self.unreported_nodes
         if not nodes:
@@ -832,8 +842,11 @@ async def execute_job(
         record.error = DEADLINE_FAILURE_MESSAGE
         await store.save(record)
         return
-    except Exception:
+    except Exception as error:
         logger.exception("job %s failed in the pipeline", job_id)
+        # The node runs first, for the settling reason below.
+        if isinstance(error, GraphFailed):
+            record.unreported_nodes = list(error.node_runs)
         record.transition("failed")
         record.error = GENERIC_FAILURE_MESSAGE
         await store.save(record)

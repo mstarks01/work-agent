@@ -19,6 +19,7 @@ from pydantic import ValidationError
 
 from analysis_service.charges import (
     CHARGE_METADATA_KEY,
+    MAX_CALL_CHARGE_USD,
     UPSTREAM_METADATA_KEY,
     ChargeModeMismatchError,
     charge_capturing_client_class,
@@ -107,6 +108,32 @@ class TestTheShapesAFigureArrivesIn:
     def test_a_value_outside_the_plausible_range_is_refused(self, value):
         """A cost cannot be negative, and no arithmetic here survives a NaN."""
         assert reported_charge_of(_with_charge(value)) is None
+
+    @pytest.mark.parametrize(
+        "value", [True, False, "1_000", "\u0661", " 1", "1e999", 1e308, 10**400]
+    )
+    def test_a_value_money_refuses_is_refused(self, value):
+        """``float()`` reads each of these, and ``money()`` refuses each (run 11).
+        Two charges near ``1e308`` also summed to ``inf``."""
+        assert reported_charge_of(_with_charge(value)) is None
+
+    def test_the_largest_charge_is_kept(self):
+        assert reported_charge_of(_with_charge(MAX_CALL_CHARGE_USD)) == (
+            MAX_CALL_CHARGE_USD
+        )
+        assert reported_charge_of(_with_charge("2.5e-4")) == pytest.approx(0.00025)
+
+    def test_the_stored_charge_has_the_reader_s_bound(self):
+        """The reader and the record hold one constant, so the record never
+        refuses what the reader writes, nor stores what it refuses."""
+        from analysis_service.report import NodeRun
+
+        kept = NodeRun(node="x", duration_ms=1, reported_charge_usd=MAX_CALL_CHARGE_USD)
+        assert kept.reported_charge_usd == MAX_CALL_CHARGE_USD
+        with pytest.raises(ValidationError):
+            NodeRun(
+                node="x", duration_ms=1, reported_charge_usd=MAX_CALL_CHARGE_USD * 2
+            )
 
 
 def _every_vendor_and_arrangement():
