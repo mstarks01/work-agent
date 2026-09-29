@@ -407,7 +407,7 @@ class TestFactAnswers:
             f"/answer/{finished}", json={"links": [LINK]}, headers=SAME_ORIGIN
         )
         assert response.status_code == 400
-        assert "no catalog" in response.json()["message"]
+        assert "no assertion catalog" in response.json()["message"]
 
     def test_a_fact_the_report_does_not_hold_is_refused(self, tiers, runner):
         client = client_for(tiers, runner)

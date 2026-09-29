@@ -38,11 +38,12 @@ from __future__ import annotations
 import asyncio
 import logging
 import time
-from collections.abc import Callable, Collection, Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from functools import partial
 from typing import Self
 
-from analysis_service.claims import FrameworkName, UnknownKey
+from analysis_service.answer_round import QuestionSet, question_set
+from analysis_service.claims import FrameworkName
 from analysis_service.deployment import Deployment
 from analysis_service.frameworks import PACKAGES
 from analysis_service.graph import Entry
@@ -56,13 +57,11 @@ from analysis_service.jobs import (
 )
 from analysis_service.links import (
     LinkAnswer,
-    check_answers,
-    resumed_sources,
     with_link_answers,
 )
 from analysis_service.pipeline import entry_of
 from analysis_service.questions import FactAnswer
-from analysis_service.report import FrameworkSelection
+from analysis_service.report import FrameworkSelection, Report
 from analysis_service.selection import SelectionError, resolve_selection
 from analysis_service.sources import Source, SourceLimits, clean_system_name
 
@@ -249,6 +248,21 @@ class Engine:
         )
         return await self._run(job, on_node)
 
+    def questions(
+        self, checkpoint: Checkpoint, report: Report | None = None
+    ) -> QuestionSet:
+        """Every question a run asks: a paused run's early list, or its report's.
+
+        ``report`` is the finished run's report, and ``None`` for a paused run.
+        """
+        return question_set(
+            checkpoint.system_model,
+            None if checkpoint.assertions is None else checkpoint.assertions.catalog,
+            self.frameworks,
+            () if report is None else report.analyses,
+            waiting=report is None,
+        )
+
     async def resume(
         self,
         sources: Sequence[Source],
@@ -256,7 +270,7 @@ class Engine:
         links: Sequence[LinkAnswer] = (),
         *,
         facts: Sequence[FactAnswer] = (),
-        asked: Collection[UnknownKey] = frozenset(),
+        report: Report | None = None,
         earlier_links: Sequence[LinkAnswer] = (),
         earlier_facts: Sequence[FactAnswer] = (),
         system_name: str | None = None,
@@ -266,43 +280,38 @@ class Engine:
         """Continue an earlier run from its checkpoint, with the submitter's answers.
 
         ``checkpoint`` is what a paused run held, or what a finished report's
-        model and catalog are. ``sources``, ``earlier_links`` and
-        ``earlier_facts`` are what that run was given; ``links`` and ``facts``
-        are the new answers, which go over the earlier ones. ``asked`` is the
-        facts the earlier run's questions named, from
-        :func:`~analysis_service.early_questions.asked_facts`, and a fact
-        answer to any other fact is refused. The run starts at
-        ``prepare``, so no extraction and no assertion pass runs again (#1252).
-        A link answer needs the checkpoint's catalog; a fact answer about an
-        attribute or a subject needs none.
+        model and catalog are, and ``report`` is that finished report.
+        ``sources``, ``earlier_links`` and ``earlier_facts`` are what that run
+        was given; ``links`` and ``facts`` are the new answers, which go over
+        the earlier ones. :meth:`questions` admits them, so an answer to a fact
+        the run did not ask is refused. The run starts at ``prepare``, so no
+        extraction and no assertion pass runs again (#1252).
         """
-        if links and (not self._carries_catalog or checkpoint.assertions is None):
+        if links and not self._carries_catalog:
             raise EngineInputError(
-                "this run built no assertion catalog, so nothing would read a"
-                " link answer"
+                "this deployment builds no assertion catalog, so nothing would"
+                " read a link answer"
             )
-        catalog = (
-            None if checkpoint.assertions is None else checkpoint.assertions.catalog
-        )
         try:
-            check_answers(
-                links, facts, checkpoint.system_model, catalog, asked, earlier_facts
-            )
-            carried, merged, answered = resumed_sources(
-                sources, earlier_links, links, earlier_facts, facts
+            admitted = self.questions(checkpoint, report).admit(
+                sources=sources,
+                earlier_links=earlier_links,
+                earlier_facts=earlier_facts,
+                links=links,
+                facts=facts,
             )
         except ValueError as exc:
             raise EngineInputError(str(exc)) from exc
-        breach = self._limits.breach(carried)
+        breach = self._limits.breach(admitted.sources)
         if breach is not None:
             raise EngineInputError(breach.message)
         job = JobRecord.create(
             owner_subject=caller,
-            sources=carried,
+            sources=admitted.sources,
             frameworks=self._frameworks,
             system_name=_engine_system_name(system_name),
-            links=merged,
-            facts=answered,
+            links=admitted.links,
+            facts=admitted.facts,
             resumption=Resumption(parent_id="in-process", checkpoint=checkpoint),
         )
         return await self._run(job, on_node)

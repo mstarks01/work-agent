@@ -44,6 +44,7 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.types import Receive, Scope, Send
 
 from analysis_service import budgets
+from analysis_service.answer_round import QuestionSet, question_set
 from analysis_service.assertions import AssertionRecord
 from analysis_service.auth import (
     AuthenticationError,
@@ -53,7 +54,6 @@ from analysis_service.auth import (
 from analysis_service.budgets import BudgetPolicy
 from analysis_service.claims import FrameworkAnalysis, FrameworkName
 from analysis_service.deployment import Deployment
-from analysis_service.early_questions import asked_facts, early_questions
 from analysis_service.errors import ConfigError
 from analysis_service.frameworks import PACKAGES
 from analysis_service.graph import ENTRY_EXTRACT
@@ -72,9 +72,7 @@ from analysis_service.jobs import (
 from analysis_service.links import (
     MAX_LINK_ANSWERS,
     LinkAnswer,
-    check_answers,
-    link_questions,
-    resumed_sources,
+    NoCatalogError,
     with_link_answers,
 )
 from analysis_service.parsing import ascii_int
@@ -82,7 +80,6 @@ from analysis_service.pipeline import entry_of
 from analysis_service.questions import (
     MAX_FACT_ANSWERS,
     FactAnswer,
-    fact_questions,
     question_fallback,
 )
 from analysis_service.report import FrameworkSelection
@@ -644,6 +641,22 @@ async def _owned_job(request: Request, job_id: str, subject: str) -> JobRecord:
     return record
 
 
+def _question_set(
+    record: JobRecord,
+    model: SystemModel,
+    assertions: AssertionRecord | None,
+    analyses: list[FrameworkAnalysis],
+) -> QuestionSet:
+    """Every question a job asks, from what :func:`_answerable` read."""
+    return question_set(
+        model,
+        None if assertions is None else assertions.catalog,
+        [selection.name for selection in record.frameworks],
+        analyses,
+        waiting=record.status == "awaiting-answers",
+    )
+
+
 def _questions_payload(
     record: JobRecord,
     model: SystemModel,
@@ -651,22 +664,8 @@ def _questions_payload(
     analyses: list[FrameworkAnalysis],
 ) -> dict[str, Any]:
     """Every question a job asks, as the questions route serves them."""
-    catalog = None if assertions is None else assertions.catalog
-    early = (
-        early_questions(
-            model, [selection.name for selection in record.frameworks], catalog
-        )
-        if record.status == "awaiting-answers"
-        else ()
-    )
-    return {
-        "link_questions": [q.to_json() for q in link_questions(catalog, model)],
-        "fact_questions": [
-            fact.to_json() for fact in fact_questions(analyses, model, catalog)
-        ],
-        "early_questions": [question.to_json() for question in early],
-        "fallback": question_fallback(analyses).to_json(),
-    }
+    questions = _question_set(record, model, assertions, analyses)
+    return questions.to_json() | {"fallback": question_fallback(analyses).to_json()}
 
 
 def _status_view(record: JobRecord) -> JobStatusView:
@@ -950,64 +949,40 @@ def create_app(
         answerable = await _answerable(request, job_id, subject)
         if isinstance(answerable, JSONResponse):
             return answerable
-        parent, model, assertions, analyses = answerable
-        catalog = None if assertions is None else assertions.catalog
-        if answers.links and assertions is None:
-            raise HTTPException(
-                status_code=409,
-                detail="this report carries no assertion catalog, so it asked"
-                " no link question",
-            )
-        if not (answers.links or answers.facts) and parent.status != "awaiting-answers":
-            raise HTTPException(
-                status_code=400,
-                detail="no answers were sent; only a job waiting on answers can"
-                " continue without them",
-            )
+        parent, model, assertions, _ = answerable
         # Derived from the report, as the questions route derives its lists, so
         # it runs off the event loop for the same reason.
-        asked = await anyio.to_thread.run_sync(
-            partial(
-                asked_facts,
-                model,
-                catalog,
-                [selection.name for selection in parent.frameworks],
-                analyses,
-                waiting=parent.status == "awaiting-answers",
-            )
-        )
+        questions = await anyio.to_thread.run_sync(_question_set, *answerable)
         try:
-            check_answers(
-                answers.links,
-                answers.facts,
-                model,
-                catalog,
-                asked,
-                parent.facts,
+            admitted = questions.admit(
+                sources=parent.sources,
+                earlier_links=parent.links,
+                earlier_facts=parent.facts,
+                links=answers.links,
+                facts=answers.facts,
             )
-            sources, links, facts = resumed_sources(
-                parent.sources, parent.links, answers.links, parent.facts, answers.facts
-            )
+        except NoCatalogError as exc:
+            raise HTTPException(status_code=409, detail=str(exc)) from exc
         except ValueError as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
-        breach = request.app.state.limits.breach(sources)
+        breach = request.app.state.limits.breach(admitted.sources)
         if breach is not None:
             raise HTTPException(
                 status_code=_STATUS_BY_RUNG[breach.rung], detail=breach.message
             )
         record = JobRecord.create(
             owner_subject=subject,
-            sources=sources,
+            sources=admitted.sources,
             frameworks=parent.frameworks,
             system_name=parent.system_name,
-            links=links,
-            facts=facts,
+            links=admitted.links,
+            facts=admitted.facts,
             resumption=Resumption(
                 parent_id=parent.id,
                 checkpoint=Checkpoint(system_model=model, assertions=assertions),
                 certification=parent.certification,
             ),
-            reserved_tokens=budgets.estimate(sources, parent.frameworks),
+            reserved_tokens=budgets.estimate(admitted.sources, parent.frameworks),
         )
         return await _admit_and_start(request, record, background_tasks, subject)
 
