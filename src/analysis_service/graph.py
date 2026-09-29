@@ -2496,6 +2496,7 @@ def _framework_block(
     claims, rejected = assemble_claims(drafts, rulings, model, schemas)
     marks = AnalysisMarks.model_validate(state.get(nodes.key("marks")) or {})
     retrieved = state.get(nodes.key("retrieved")) or {}
+    refusal = _refusal(package, state.get(nodes.key("precondition")))
     return schemas.block(
         framework=package.name,
         framework_version=package.version,
@@ -2506,9 +2507,13 @@ def _framework_block(
             lanes=package.lanes,
             claims=(*claims, *rejected),
             options=options,
-            refusal=_refusal(package, state.get(nodes.key("precondition"))),
+            refusal=refusal,
             deferred=state.get(nodes.key("deferred")) or {},
             ruled_out=state.get(nodes.key("ruled_out")) or {},
+        ),
+        # A refused precondition answers for every unit in the scope already.
+        applicability=(
+            package.record.applicability(model, options) if refusal is None else []
         ),
         coverage=[
             LaneCoverage.model_validate(row)

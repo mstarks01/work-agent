@@ -216,3 +216,104 @@ def test_a_resumed_asvs_run_reports_the_answered_absence():
     }
     assert sorted(ruled) == [f"V10.4.{n}" for n in range(1, 6)]
     assert "the answer is" in ruled["V10.4.1"].reason
+    decided = {entry.unit: entry for entry in block.applicability}
+    assert len(decided) == 70
+    assert decided["V10.4.1"].state == "not-applicable"
+    assert block.block_issues(known_element_ids=()) == []
+
+
+class TestTheReportStatesEachDecision:
+    def test_every_selected_requirement_has_one_entry(self):
+        from analysis_service.frameworks.asvs.catalog import requirements_for
+
+        for level in (1, 2, 3):
+            entries = DraftRequirementRuling.applicability(
+                valid_model(), {"level": level}
+            )
+            assert [entry.unit for entry in entries] == [
+                requirement.id for requirement in requirements_for(level)
+            ]
+
+    def test_an_unknown_names_the_question_that_would_settle_it(self):
+        entries = {
+            entry.unit: entry
+            for entry in DraftRequirementRuling.applicability(
+                valid_model(), {"level": 1}
+            )
+        }
+        entry = entries["V10.4.1"]
+        assert entry.state == "unknown"
+        assert entry.missing == ["oauth-authorization-server"]
+        assert CAPABILITIES["oauth-authorization-server"].question in entry.reason
+        assert entries["V1.2.1"].unconditional
+
+    def test_a_negative_carries_the_quote_that_decided_it(self):
+        model = answered_model(valid_model(), [_answer("oauth", "no")])
+        entries = {
+            entry.unit: entry
+            for entry in DraftRequirementRuling.applicability(model, {"level": 1})
+        }
+        (fact,) = entries["V10.4.1"].deciding
+        assert (fact.capability, fact.state, fact.derived_from) == (
+            "oauth-authorization-server",
+            "absent",
+            "oauth",
+        )
+        assert fact.quotes[0].startswith(f"{ANSWERS_LABEL}: Asked")
+
+    def test_ruled_out_is_the_chapter_s_negatives(self):
+        model = answered_model(valid_model(), [_answer("oauth", "no")])
+        entries = DraftRequirementRuling.applicability(model, {"level": 2})
+        ruled = DraftRequirementRuling.ruled_out(model, {"level": 2}, "oauth-and-oidc")
+        assert ruled == {
+            entry.unit: entry.reason
+            for entry in entries
+            if entry.state == "not-applicable" and entry.unit.startswith("V10.")
+        }
+
+    def test_a_framework_with_no_rule_writes_no_entry(self):
+        from analysis_service.frameworks import PACKAGES
+
+        assert PACKAGES["stride"].record.applicability(valid_model(), {}) == []
+
+
+class TestTheEntryShape:
+    @pytest.mark.parametrize(
+        "fields",
+        [
+            {"state": "applicable"},
+            {"state": "not-applicable", "unconditional": True},
+            {"state": "unknown"},
+            {"state": "unknown", "missing": ["oauth"], "unconditional": True},
+            {
+                "state": "not-applicable",
+                "missing": ["oauth"],
+                "deciding": [{"capability": "oauth", "state": "absent"}],
+            },
+        ],
+    )
+    def test_an_entry_that_says_less_than_its_state_needs_is_refused(self, fields):
+        from pydantic import ValidationError
+
+        from analysis_service.claims import ApplicabilityEntry
+
+        with pytest.raises(ValidationError):
+            ApplicabilityEntry(unit="V1.1.1", reason="why", **fields)
+
+    def test_the_block_holds_one_answer_per_unit(self):
+        from tests.test_asvs import _block
+
+        block = _block(1)
+        entries = DraftRequirementRuling.applicability(
+            _stating(valid_model(), "oauth", "absent"), {"level": 1}
+        )
+        with_entries = block.model_copy(update={"applicability": entries})
+        issues = with_entries.block_issues(known_element_ids=())
+        # The scope rules nothing out, so each negative disagrees with it.
+        assert issues == [
+            f"unit 'V10.4.{n}' is not applicable in one of scope and"
+            " applicability and not in the other"
+            for n in range(1, 6)
+        ]
+        doubled = block.model_copy(update={"applicability": entries[:1] * 2})
+        assert "more than one applicability entry" in doubled.block_issues(())[0]

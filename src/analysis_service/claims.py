@@ -944,6 +944,19 @@ class Claim(BaseModel):
         return {}
 
     @classmethod
+    def applicability(
+        cls, model: SystemModel, options: Mapping[str, Any]
+    ) -> list[ApplicabilityEntry]:
+        """Whether each unit a job with these options selects applies to ``model``.
+
+        A framework whose units apply by a rule over **Capabilities** answers
+        for every selected unit. The neutral answer is empty, which is what a
+        framework with no such rule inherits.
+        """
+        del model, options
+        return []
+
+    @classmethod
     def open_capabilities(
         cls, model: SystemModel, options: Mapping[str, Any]
     ) -> dict[str, int]:
@@ -2192,6 +2205,66 @@ class ScopeEntry(BaseModel):
         return self
 
 
+class DecidingFact(BaseModel):
+    """One capability that decided an applicability entry, with what states it."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    capability: str = Field(min_length=1, max_length=60)
+    state: Literal["present", "absent"]
+    #: The capability this state was implied by, a parent or a part, or ``""``
+    #: where a statement names this capability itself.
+    derived_from: str = Field(default="", max_length=60)
+    #: The statements' quotes, each as ``<source label>: <excerpt>``.
+    quotes: list[str] = Field(default_factory=list, max_length=8)
+
+
+class ApplicabilityEntry(BaseModel):
+    """Whether one unit applies to this application, and the facts that say so.
+
+    Written by a framework whose units apply by a rule over **Capabilities**:
+    one entry for each unit the job selected. ``applicable`` names the facts it
+    rests on, unless ``unconditional`` says the unit applies to every system in
+    the framework's scope. ``not-applicable`` names the stated absence that
+    ruled it out. ``unknown`` names the capabilities that would settle it and
+    no deciding fact, because silence decides nothing.
+
+    **Apart from** :class:`ScopeEntry`. A scope entry says what the analysis did
+    with a unit; this says whether the unit has a subject here. Each
+    ``not-applicable`` here is ``not-applicable`` in the scope too, which the
+    block's own check holds.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    unit: str = Field(min_length=1, max_length=300)
+    state: Literal["applicable", "not-applicable", "unknown"]
+    unconditional: bool = False
+    deciding: list[DecidingFact] = Field(default_factory=list, max_length=20)
+    missing: list[str] = Field(default_factory=list, max_length=20)
+    reason: str = Field(min_length=1, max_length=1000)
+
+    @model_validator(mode="after")
+    def _check_shape(self) -> Self:
+        rests = bool(self.deciding) or self.unconditional
+        shapes = {
+            "applicable": rests and not self.missing,
+            "not-applicable": bool(self.deciding)
+            and not self.missing
+            and not self.unconditional,
+            "unknown": bool(self.missing)
+            and not self.deciding
+            and not self.unconditional,
+        }
+        if not shapes[self.state]:
+            raise ValueError(
+                f"applicability entry {self.unit!r} is {self.state}: an applicable"
+                " entry names its facts or is unconditional, a not-applicable one"
+                " names the absence, and an unknown one names what is missing"
+            )
+        return self
+
+
 class LaneCoverage(BaseModel):
     """What one lane agent was offered, and how much of it its drafts cite.
 
@@ -2336,6 +2409,10 @@ class FrameworkAnalysis(BaseModel):
     claims: list[SerializeAsAny[RuledClaim]] = Field(default_factory=list)
     rejected_claims: list[SerializeAsAny[RuledClaim]] = Field(default_factory=list)
     scope: list[ScopeEntry] = Field(default_factory=list)
+    #: Whether each selected unit applies here, from the framework's rule over
+    #: capabilities. Empty for a framework with no such rule, and for a block
+    #: whose precondition refused the model, whose ``scope`` already answers.
+    applicability: list[ApplicabilityEntry] = Field(default_factory=list)
     coverage: list[LaneCoverage] = Field(default_factory=list)
     unverified_grounds: list[UnverifiedGround] = Field(default_factory=list)
     #: See :attr:`AnalysisMarks.unreconciled_rulings`; the marks are flattened
@@ -2478,6 +2555,7 @@ class FrameworkAnalysis(BaseModel):
             *self._claim_mark_issues(self.unresolved_evidence, "unresolved evidence"),
             *self._summary_issues(),
             *self._scope_issues(),
+            *self._applicability_issues(),
         ]
 
     def _verdict_placement_issues(self) -> list[str]:
@@ -2656,3 +2734,32 @@ class FrameworkAnalysis(BaseModel):
             for claim in self.all_claims()
             if claim.id in excluded
         ]
+
+    def _applicability_issues(self) -> list[str]:
+        """One unit, one answer: the applicability list and the scope agree.
+
+        A unit appears in the list once, and a unit the list rules out is the
+        unit the scope rules out, so the report page, the lanes and a scorer
+        read one decision.
+        """
+        if not self.applicability:
+            return []
+        units = [entry.unit for entry in self.applicability]
+        issues = [
+            f"unit {unit!r} has more than one applicability entry"
+            for unit in sorted({unit for unit in units if units.count(unit) > 1})
+        ]
+        ruled = {
+            entry.unit
+            for entry in self.applicability
+            if entry.state == "not-applicable"
+        }
+        excluded = {
+            entry.unit for entry in self.scope if entry.state == "not-applicable"
+        }
+        issues += [
+            f"unit {unit!r} is not applicable in one of scope and applicability"
+            " and not in the other"
+            for unit in sorted(ruled ^ excluded)
+        ]
+        return issues

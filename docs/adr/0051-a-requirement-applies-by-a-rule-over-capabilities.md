@@ -77,6 +77,14 @@ don't know" writes nothing. A capability the sources state takes no answer,
 unless an earlier round answered it. An open fact that names a capability is
 the fifth spelling of `UnknownRef`, and it stays off the critic's schema.
 
+**The report states each decision.** A framework block carries an
+`applicability` list: one entry for each selected unit, with its state, the
+facts that decided it and their first quotes, or the capabilities still
+missing, and a reason. `ruled_out` reads the same entries, and the block's own
+check refuses a unit that is `not-applicable` in one of `applicability` and
+`scope` and not in the other. A block whose precondition refused the model
+carries no entries, because its scope answers for every unit.
+
 **A subject that every web application has is `always`.** TLS, third-party
 components and error handling have one honest answer, so a question about them
 tells nothing. A subject that a real application can lack is a capability,

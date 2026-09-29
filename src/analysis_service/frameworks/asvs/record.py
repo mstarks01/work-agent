@@ -38,10 +38,17 @@ from typing import Any, Literal, Self, get_args
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 from pydantic.json_schema import SkipJsonSchema
 
-from analysis_service.capabilities import CapabilityFact, open_capability_counts
+from analysis_service.capabilities import (
+    CAPABILITIES,
+    CapabilityFact,
+    Decision,
+    open_capability_counts,
+)
 from analysis_service.claims import (
+    ApplicabilityEntry,
     BlockSummary,
     Claim,
+    DecidingFact,
     FrameworkAnalysis,
     Proposal,
     ProposalBatch,
@@ -196,24 +203,36 @@ class DraftRequirementRuling(Claim):
     verb: SkipJsonSchema[None] = None
 
     @classmethod
+    def applicability(
+        cls, model: SystemModel, options: Mapping[str, Any]
+    ) -> list[ApplicabilityEntry]:
+        """Whether each requirement at the job's level applies, and why.
+
+        **The one reader of a requirement's decision.** Each requirement's rule
+        in :mod:`~analysis_service.frameworks.asvs.applicability` is read over
+        the capabilities the model states. :meth:`ruled_out` reads these
+        entries, so the lanes, the scope and the report hold one answer.
+        """
+        level = AsvsOptions.model_validate(options).level
+        decisions = applicability_for(level, model.capability_facts())
+        return [_entry(unit, decision) for unit, decision in decisions.items()]
+
+    @classmethod
     def ruled_out(
         cls, model: SystemModel, options: Mapping[str, Any], lane: str
     ) -> dict[str, str]:
         """The chapter's requirements whose subject the input states is absent.
 
-        Each requirement's rule in
-        :mod:`~analysis_service.frameworks.asvs.applicability` is read over the
-        capabilities the model states. Only a stated absence rules a
-        requirement out: a capability the input does not mention is unknown,
-        and the lane still rules on the requirement.
+        Only a stated absence rules a requirement out: a capability the input
+        does not mention is unknown, and the lane still rules on the
+        requirement.
         """
         level = AsvsOptions.model_validate(options).level
         chapter = {requirement.id for requirement in requirements_for(level, lane)}
-        decisions = applicability_for(level, model.capability_facts())
         return {
-            unit: _not_applicable(unit, decision.deciding)
-            for unit, decision in decisions.items()
-            if unit in chapter and decision.state == "not-applicable"
+            entry.unit: entry.reason
+            for entry in cls.applicability(model, options)
+            if entry.unit in chapter and entry.state == "not-applicable"
         }
 
     @classmethod
@@ -297,19 +316,50 @@ class DraftRequirementRuling(Claim):
         }
 
 
-#: How much of one quote a scope entry's reason carries. A reason names each
-#: deciding fact's first quote only, so it stays inside the entry's bound.
+#: How much of one quote a reason carries. A reason names each deciding fact's
+#: first quote only, so it stays inside the entry's bound.
 _QUOTE_CHARS = 200
 
 
-def _not_applicable(unit: str, deciding: Sequence[CapabilityFact]) -> str:
-    """Why one requirement does not apply, naming the stated facts that decided it."""
-    stated = "; ".join(
-        f"{fact.derived_from or fact.key} is absent"
-        + "".join(f" ({quote[:_QUOTE_CHARS]})" for quote in fact.evidence[:1])
-        for fact in deciding
+def _deciding(fact: CapabilityFact) -> DecidingFact:
+    return DecidingFact(
+        capability=fact.key,
+        state="present" if fact.state == "present" else "absent",
+        derived_from=fact.derived_from,
+        quotes=[quote[:_QUOTE_CHARS] for quote in fact.evidence[:8]],
     )
-    return f"Not applicable: {RATIONALES[unit]}, and the input states {stated}."
+
+
+def _stated(fact: CapabilityFact) -> str:
+    quote = "".join(f" ({quote[:_QUOTE_CHARS]})" for quote in fact.evidence[:1])
+    return f"{fact.derived_from or fact.key} is {fact.state}{quote}"
+
+
+def _entry(unit: str, decision: Decision) -> ApplicabilityEntry:
+    """One requirement's decision as the entry a report carries."""
+    why = RATIONALES[unit]
+    if decision.state == "unknown":
+        asked = "; ".join(CAPABILITIES[key].question for key in decision.missing)
+        return ApplicabilityEntry(
+            unit=unit,
+            state="unknown",
+            missing=list(decision.missing),
+            reason=f"Unknown: {why}, and the input does not say. {asked}"[:1000],
+        )
+    stated = "; ".join(_stated(fact) for fact in decision.deciding)
+    if decision.state == "not-applicable":
+        reason = f"Not applicable: {why}, and the input states {stated}."
+    elif decision.deciding:
+        reason = f"Applies: {why}, and the input states {stated}."
+    else:
+        reason = f"Applies to every web application or service: {why}."
+    return ApplicabilityEntry(
+        unit=unit,
+        state=decision.state,
+        unconditional=not decision.deciding,
+        deciding=[_deciding(fact) for fact in decision.deciding],
+        reason=reason[:1000],
+    )
 
 
 class RequirementRuling(DraftRequirementRuling, RuledClaim):
