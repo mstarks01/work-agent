@@ -415,6 +415,9 @@
     if (!rows.length) return null;
     const byUnit = {};
     block.scope.forEach(e => { byUnit[e.unit] = e; });
+    // Whether the unit has a subject here, apart from what the run did with it.
+    const applies = {};
+    (block.applicability || []).forEach(e => { applies[e.unit] = e; });
     const byId = {};
     [...block.claims, ...block.rejected_claims].forEach(c => { byId[c.id] = c; });
 
@@ -441,6 +444,11 @@
       if (row.text) {
         body.append(el("div", "lbl", `What ${block.framework} ${block.framework_version} asks`));
         body.append(el("p", "req", row.text));
+      }
+      if (applies[row.unit]) {
+        body.append(el("div", "lbl", "Does it apply here?"));
+        // Plain text: the reason quotes the submitter, so no backtick is read.
+        body.append(el("p", null, applies[row.unit].reason));
       }
       body.append(el("div", "lbl", "This run"));
       body.append(el("p", null, meaning));
