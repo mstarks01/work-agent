@@ -28,6 +28,7 @@ import asyncio
 import logging
 from collections.abc import Callable, Mapping, Sequence
 from datetime import datetime
+from functools import partial
 from http import HTTPStatus
 from typing import Annotated, Any, TypeVar
 from uuid import uuid4
@@ -917,19 +918,25 @@ def create_app(
                 detail="no answers were sent; only a job waiting on answers can"
                 " continue without them",
             )
+        # Derived from the report, as the questions route derives its lists, so
+        # it runs off the event loop for the same reason.
+        asked = await anyio.to_thread.run_sync(
+            partial(
+                asked_facts,
+                model,
+                catalog,
+                [selection.name for selection in parent.frameworks],
+                analyses,
+                waiting=parent.status == "awaiting-answers",
+            )
+        )
         try:
             check_answers(
                 answers.links,
                 answers.facts,
                 model,
                 catalog,
-                asked_facts(
-                    model,
-                    catalog,
-                    [selection.name for selection in parent.frameworks],
-                    analyses,
-                    waiting=parent.status == "awaiting-answers",
-                ),
+                asked,
                 parent.facts,
             )
             sources, links, facts = resumed_sources(
