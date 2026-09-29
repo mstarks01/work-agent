@@ -153,7 +153,8 @@ class TestTheToggle:
 class TestTheRounds:
     """A paused run asks in rounds, and starts once nothing is left (ADR 0053)."""
 
-    def test_a_saved_round_shows_the_next_and_the_last_starts_the_analysis(self, tiers):
+    def test_a_saved_round_shows_the_next_and_only_the_start_button_starts(self, tiers):
+        """The last save started the analysis by itself (#1289, item 7)."""
         client = client_for(tiers, PausingRunner(catalog=False), catalog=False)
         paused = start(client, questions=True)
         shown = event(client.get(f"/events/{paused}").text, "questions")
@@ -165,17 +166,24 @@ class TestTheRounds:
                 headers=SAME_ORIGIN,
             )
             assert saved.status_code == 200, saved.text
-            if "facts" not in saved.json():
-                break
             before = {tuple(q["key"]) for q in shown["facts"]}
             shown = saved.json()
-            assert shown["run"] == paused
+            assert shown["run"] == paused, "a save starts no run"
             assert before <= {tuple(a["key"]) for a in shown["answered"]}
+            if not shown["facts"]:
+                break
+            assert shown["stop"] is None
             assert not before & {tuple(q["key"]) for q in shown["facts"]}
         else:
             pytest.fail("the rounds never ended")
-        assert saved.json()["withheld"] == 0, "every question was asked"
-        done = client.get(f"/events/{saved.json()['run']}").text
+        assert shown["stop"] == "nothing-left"
+        assert shown["withheld"] == 0
+
+        started = client.post(
+            f"/answer/{paused}", json={"links": [], "facts": []}, headers=SAME_ORIGIN
+        )
+        assert started.status_code == 200, started.text
+        done = client.get(f"/events/{started.json()['run']}").text
         assert "event: done" in done
 
     def test_a_refused_answer_names_its_question(self, tiers):
@@ -322,6 +330,7 @@ globalThis.document = {
   querySelectorAll: () => [],
 };
 globalThis.location = { href: "", search: SEARCH };
+globalThis.window = { scrollTo() {} };
 globalThis.fetch = async (url, init) => {
   calls.push({ url, body: init && init.body ? JSON.parse(init.body) : null });
   const next = url === "/analyze" ? "r1" : "r2";
@@ -1214,26 +1223,57 @@ await settle();
     assert not seen["asked"]
 
 
-def test_save_sends_the_round_and_follows_a_run_the_last_save_started():
-    steps = """
-await ids.analyze.listeners.submit({ preventDefault() {} }); await settle();
-streams[0].listeners.questions({ data: JSON.stringify({ run: "r1", questions: [
-  { principal: "shopper accounts", rows: 2,
-    options: [{ id: "entity:shopper", name: "Shopper" }] }], facts: [],
-  remaining: {}, answered: [], answered_links: [] }) });
+@pytest.mark.parametrize(
+    ("withheld", "said"), [(0, "No question is left."), (3, "3 more question(s)")]
+)
+def test_the_last_save_waits_for_the_start_button(withheld, said):
+    """A save that left nothing to ask started the analysis (#1289, item 7)."""
+    link = {"principal": "shopper accounts", "element": "entity:shopper"}
+    ready = {
+        "run": "r1",
+        "questions": [],
+        "facts": [],
+        "remaining": {},
+        "stop": "budget-exhausted" if withheld else "nothing-left",
+        "withheld": withheld,
+        "answered": [],
+        "answered_links": [
+            {
+                "principal": "shopper accounts",
+                "rows": 2,
+                "options": [{"id": "entity:shopper", "name": "Shopper"}],
+                "answer": link,
+            }
+        ],
+    }
+    steps = f"""
+await ids.analyze.listeners.submit({{ preventDefault() {{}} }}); await settle();
+streams[0].listeners.questions({{ data: JSON.stringify({{ run: "r1", questions: [
+  {{ principal: "shopper accounts", rows: 2,
+    options: [{{ id: "entity:shopper", name: "Shopper" }}] }}], facts: [],
+  remaining: {{}}, answered: [], answered_links: [] }}) }});
 ids.questions.querySelectorAll("select")[0].value = "entity:shopper";
+const answered = fetch;
+globalThis.fetch = async (url, init) => {{
+  calls.push({{ url, body: JSON.parse(init.body) }});
+  return {{ ok: true, json: async () => ({json.dumps(ready)}) }};
+}};
 await ids.save.listeners.click(); await settle();
+const text = (n) => typeof n === "string" ? n
+  : [n.textContent || "", ...(n.children || []).map(text)].join("");
+calls.push({{ waiting: streams.length === 1, saveShown: !ids.save.hidden,
+  asked: !ids.asked.hidden, said: text(ids.questions) }});
+globalThis.fetch = answered;
+await ids.continue.listeners.click(); await settle();
 """
     seen = _run_form_script(steps)
+    _, save, after, start = seen["calls"]
 
-    assert seen["calls"][1] == {
-        "url": "/answer/r1",
-        "body": {
-            "links": [{"principal": "shopper accounts", "element": "entity:shopper"}],
-            "facts": [],
-            "save": True,
-        },
-    }
+    assert save["body"] == {"links": [link], "facts": [], "save": True}
+    assert after["waiting"] and after["asked"] and not after["saveShown"]
+    assert said in after["said"]
+    assert "Nothing runs until you choose Start the analysis" in after["said"]
+    assert start["url"] == "/answer/r1" and "save" not in start["body"]
     assert seen["streams"] == ["/events/r1", "/events/r2"]
 
 

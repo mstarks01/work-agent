@@ -644,19 +644,13 @@ def create_app(
             # The answer rules' own refusals name the submitter's choices, so
             # they are safe to show.
             return JSONResponse({"message": str(exc)}, status_code=400)
-        withheld = 0
         if save:
             # A saved round runs no model: the answers go onto the paused run,
-            # and the next round is read off the model with them in.
+            # and the next round is read off the model with them in. Where
+            # none is left, the page says so and waits for its start button.
             parent.links, parent.facts = admitted.links, admitted.facts
             parent.shown = list(admitted.shown)
-            following = parent.questions()
-            if not following.done:
-                return JSONResponse(paused_payload(parent, following))
-            # Nothing is left to ask, so the analysis starts with no new
-            # answers, and the page says whether the limits held any back.
-            links, facts = [], []
-            withheld = following.withheld
+            return JSONResponse(paused_payload(parent, parent.questions()))
         try:
             run = analyses.claim(answering=parent)
         except RegistryFull as exc:
@@ -684,7 +678,7 @@ def create_app(
             system_name="Your system",
         )
         run.task = asyncio.create_task(_drive(analyses, run, start))
-        return JSONResponse({"run": run.id, "withheld": withheld})
+        return JSONResponse({"run": run.id})
 
     @app.get("/events/{run_id}")
     async def events(run_id: str) -> Response:
@@ -958,6 +952,8 @@ def paused_payload(run: Run, questions: QuestionSet) -> dict[str, object]:
         "questions": question_rows(questions),
         "facts": early_rows(questions),
         "remaining": dict(questions.remaining),
+        "stop": questions.stop,
+        "withheld": questions.withheld,
         "answered": [
             _early_row(question, names) | {"answer": answer.model_dump(mode="json")}
             for question, answer in questions.answered_early
@@ -1180,9 +1176,9 @@ _FORM_PAGE = (
   runs until you start it. The questions come a few at a time,
   the most useful first. Answer what you can and leave the rest blank. Choose
   <b>Save and show more</b> for the next questions, or <b>Start the
-  analysis</b> at any time. When no question is left, the analysis starts by
-  itself. The analysis reads your answers. After it, the report may offer one
-  optional follow-up.</p>
+  analysis</b> at any time. A save never starts the analysis: only the start
+  button does. The analysis reads your answers. After it, the report may offer
+  one optional follow-up.</p>
   <div id="questions"></div>
   <details id="earlier" hidden></details>
   <p><button type="button" id="save">Save and show more</button>

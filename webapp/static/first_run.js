@@ -69,6 +69,7 @@
   const ask = document.getElementById("ask");
   const asked = document.getElementById("asked");
   const questions = document.getElementById("questions");
+  const saveButton = document.getElementById("save");
   const earlierBox = document.getElementById("earlier");
 
   form.addEventListener("submit", async (event) => {
@@ -202,13 +203,17 @@
   // kind of question or attribute, and every earlier answer below them.
   // Every label and option is untrusted and lands as text.
   const showQuestions = (data) => {
-    // Nothing to ask: the analysis starts, with no page between.
-    if (!data.questions.length && !data.facts.length) {
+    const left = data.questions.length || data.facts.length;
+    const saved = (data.answered || []).length || (data.answered_links || []).length;
+    // A pause with nothing to ask and nothing answered starts the analysis,
+    // with no page between. After a save, only the start button starts it.
+    if (!left && !saved) {
       pausedRun = data.run;
       startAnalysis([], []);
       return;
     }
     pausedRun = data.run;
+    saveButton.hidden = !left;
     answers = [];
     questions.replaceChildren();
     earlierBox.replaceChildren();
@@ -231,6 +236,15 @@
     }
     if (remaining.field) {
       parts.push(`about ${remaining.field} question(s) about parts of your system`);
+    }
+    if (!left) {
+      const ready = document.createElement("p");
+      ready.className = "hint";
+      ready.textContent = (data.withheld
+        ? `The question limit is reached, so ${data.withheld} more question(s) will not be asked. `
+        : "No question is left. ")
+        + "You can still change an answer below. Nothing runs until you choose Start the analysis.";
+      questions.append(ready);
     }
     if (parts.length) {
       const estimate = document.createElement("p");
@@ -485,9 +499,9 @@
     startAnalysis(links, facts);
   });
 
-  // Save the round and show the next one. Where nothing is left to ask, the
-  // service starts the analysis and answers with the run to follow.
-  document.getElementById("save").addEventListener("click", async () => {
+  // Save the round and show the next one. A save never starts the analysis;
+  // where nothing is left to ask, the page says so and waits.
+  saveButton.addEventListener("click", async () => {
     const { links, facts } = roundAnswers();
     const saved = await fetch("/answer/" + pausedRun, {
       method: "POST",
@@ -500,17 +514,8 @@
       return;
     }
     answerProblem.hidden = true;
-    if (body.facts) {
-      showQuestions(body);
-      window.scrollTo(0, 0);
-      return;
-    }
-    asked.hidden = true;
-    // The limits can end the rounds with questions left: say so.
-    const held = body.withheld
-      ? `The question limit is reached, so ${body.withheld} more question(s) were not asked. `
-      : "";
-    follow(body.run, `${held}Running the threat analysis with your answers. This takes a few minutes.`);
+    showQuestions(body);
+    window.scrollTo(0, 0);
   });
 
   // Follow one run's progress to its end: a report, questions, or a failure.

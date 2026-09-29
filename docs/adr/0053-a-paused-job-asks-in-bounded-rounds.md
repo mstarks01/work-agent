@@ -39,11 +39,14 @@ would give a job that selects both frameworks no field question.
 counts toward its kind's limit. A question with facets that a round answered
 in part comes back first, and takes no place under the limit. Where the limits
 hold questions back, the question set says so: `stop` is `budget-exhausted`,
-not `nothing-left`, and the page states how many questions were not asked.
+not `nothing-left`, and the page states how many questions will not be asked.
 
-**When nothing is left, the analysis starts.** A save that leaves no question
-starts the analysis, as a continue with no new answers does. A pause that has
-no question at all starts it too, with no page between.
+**A save never starts the analysis.** A save that leaves no question shows
+that nothing is left, with the saved answers, which the submitter can still
+change. Only a continue starts the analysis. A person who saves progress does
+not expect a run to start, least of all where the limits ended the questions
+(#1289). A pause that has no question at all, before any answer, starts the
+analysis with no page between, because nobody saved anything.
 
 **A saved round does not count toward the three rounds of ADR 0052**, because
 it runs no analysis. Starting the analysis with answers counts, as before.

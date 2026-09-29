@@ -39,7 +39,7 @@ logged, never returned.
 | `GET` | `/v1/jobs/{id}` | Poll: status, per-node progress, timestamps. Never the report. |
 | `GET` | `/v1/jobs/{id}/events` | The same progression as Server-Sent Events; resumable via `Last-Event-ID`. |
 | `GET` | `/v1/jobs/{id}/report` | The full [report](Report-Schema.md) once completed; `409` before, and `409` if the report is withheld (below). |
-| `POST` | `/v1/jobs/{id}/answers` | Answer the questions of a completed job or a job in `awaiting-answers`. Starts a **new** job that resumes from this one's model and catalog; `201` with its `job_id`. With `"save": true`, a waiting job keeps the round and answers `200` with its own `job_id`, unless nothing is left to ask. |
+| `POST` | `/v1/jobs/{id}/answers` | Answer the questions of a completed job or a job in `awaiting-answers`. Starts a **new** job that resumes from this one's model and catalog; `201` with its `job_id`. With `"save": true`, a waiting job keeps the round and answers `200` with its own `job_id`; a save never starts a job. |
 | `GET` | `/v1/jobs/{id}/questions` | What the job asks you, as `{"job_id", "link_questions", "fact_questions", "early_questions", "fallback", "final", "early_remaining", "early_withheld", "early_stop", "answered_early", "answered_links"}`: a finished report's questions, or a waiting job's link and early questions. Derived from the report when you ask, under the report's own rules: `409` before completion and `409` when the report is withheld. |
 | `GET` | `/healthz` | Unauthenticated liveness probe. |
 
@@ -186,9 +186,9 @@ estimates how many of each kind are left, this round included; answers can
 add or take away questions. Send a round with `"save": true` to keep it: the
 answers are written onto the job, no model runs, and the response is `200`
 with `{"job_id", "saved": true}`. Ask for the questions again for the next
-round. A saved round must answer at least one question. When the saved
-answers leave nothing to ask, the analysis starts, and the response is the
-new job's `201`. `answered_early` and `answered_links` list each saved answer
+round. A saved round must answer at least one question. A save never starts
+the analysis: when the saved answers leave nothing to ask, the questions say
+so in `early_stop`, and a send without `"save"` starts it. `answered_early` and `answered_links` list each saved answer
 with its question, and you can send a new answer to any of them. A question
 with facets comes back while a facet has no answer, and it takes no place
 under the limit of 30. `early_withheld` counts the questions the limits hold
