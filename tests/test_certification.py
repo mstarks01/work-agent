@@ -267,3 +267,14 @@ class TestGatePolicy:
         assert not self.gate(require_certified=True).withholds(
             CertifyResult(certified=True)
         )
+
+
+def test_a_run_no_gate_checked_adds_nothing_to_a_combined_verdict():
+    from analysis_service.certification import CertifyResult, combined
+
+    verdict = CertifyResult(certified=False, unexercised=("strong",))
+    assert combined(None, verdict) == verdict
+    assert combined(verdict, None) == verdict
+    assert combined(None, None) is None
+    both = combined(CertifyResult(certified=True, unexercised=("base",)), verdict)
+    assert both == CertifyResult(certified=False, unexercised=("base", "strong"))

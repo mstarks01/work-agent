@@ -203,6 +203,30 @@ def certify(
     )
 
 
+def combined(
+    earlier: CertifyResult | None, later: CertifyResult | None
+) -> CertifyResult | None:
+    """One verdict over two runs that together made one report.
+
+    A resumed job's report rests on the model and catalog its parent's run
+    built, so it is certified only where both runs are. ``None`` is a run no
+    gate checked, and it adds nothing.
+    """
+    if earlier is None or later is None:
+        return later if earlier is None else earlier
+    unexercised = set(earlier.unexercised) | set(later.unexercised)
+    return CertifyResult(
+        certified=earlier.certified and later.certified,
+        uncertified=tuple(
+            sorted(
+                {*earlier.uncertified, *later.uncertified},
+                key=lambda node: (node.node, node.fingerprint),
+            )
+        ),
+        unexercised=tuple(tier for tier in TIER_NAMES if tier in unexercised),
+    )
+
+
 def fingerprints_of(nodes: Iterable[NodeRun]) -> dict[str, frozenset[str]]:
     """The node -> fingerprint sets a run of node executions presents.
 
@@ -285,10 +309,16 @@ class CertificationGate:
     tier_of: TierResolver
     require_certified: bool = False
 
-    def check(self, report: Report, expected_nodes: Iterable[str]) -> CertifyResult:
-        """Certify a finished report. Runs once, after every node has run."""
+    def check(
+        self, nodes: Iterable[NodeRun], expected_nodes: Iterable[str]
+    ) -> CertifyResult:
+        """Certify one run's node executions. Runs once, after every node has run.
+
+        A finished job passes its report's nodes; a job that paused passes the
+        nodes its head ran, because no report exists yet to carry them.
+        """
         return certify(
-            report_fingerprints(report),
+            fingerprints_of(nodes),
             self.manifest,
             self.tier_of,
             expected_nodes,

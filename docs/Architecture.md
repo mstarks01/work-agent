@@ -394,6 +394,21 @@ Withholding refuses the *report*; it never fails the job. A failed job carries n
 report at all, and the fingerprints that show what drifted live inside it.
 Nothing about certification appears in the job status view — it is operator-only.
 
+**A job that asks questions is certified in two parts.** It pauses after its
+head, and the service certifies the nodes the head ran at that point. The
+questions route and the answers route refuse a waiting job under the same rules
+as a report. The job that the answers start runs the rest of the graph and
+carries the head's result. Its report is served only where both parts pass. A
+job that answers a finished report carries that report's result in the same
+way.
+
+The two parts are two graphs, and the fingerprint of a node binds the digest of
+its whole graph's instructions. So an `end-to-end` sweep's fingerprints bless
+neither part. The paused head is the `heads` sweep's graph and the resumed run
+is the `analysis` sweep's graph, and `tests/test_pause.py` holds each pair to
+one digest. A deployment that serves jobs that ask questions promotes a `heads`
+sweep and an `analysis` sweep beside its `end-to-end` sweep.
+
 | Variable | Effect |
 | --- | --- |
 | `ANALYSIS_REQUIRE_CERTIFIED` | Withhold the report when the run is uncertified. Off by default. |

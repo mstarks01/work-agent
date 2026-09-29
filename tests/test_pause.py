@@ -18,6 +18,7 @@ from starlette.requests import ClientDisconnect
 
 from analysis_service import graph
 from analysis_service.assertions import AssertionRecord
+from analysis_service.frameworks import PACKAGES
 from analysis_service.jobs import (
     TERMINAL_STATUSES,
     Checkpoint,
@@ -27,7 +28,7 @@ from analysis_service.jobs import (
     Resumption,
     execute_job,
 )
-from analysis_service.pipeline import AdkPipelineRunner
+from analysis_service.pipeline import AdkPipelineRunner, entry_of
 from analysis_service.report import NodeRun
 from analysis_service.sources import Source
 from tests.factories import (
@@ -339,3 +340,138 @@ class TestTheEventStreamCap:
             return dict(app.state.event_streams)
 
         assert asyncio.run(scenario()) == {}
+
+
+class TestThePausePathIsCertified:
+    """The head's nodes were never checked against the manifest, and a waiting
+    job served its questions without asking the gate (#1294, item 1)."""
+
+    FP = "a" * 64
+
+    def gate(self, blessed=(), require_certified=True):
+        from analysis_service.certification import (
+            MANIFEST_VERSION,
+            BlessedManifest,
+            CertificationGate,
+        )
+
+        return CertificationGate(
+            manifest=BlessedManifest(
+                version=MANIFEST_VERSION,
+                tiers={"base": frozenset(blessed), "strong": frozenset(blessed)},
+            ),
+            tier_of=lambda _node: "base",
+            require_certified=require_certified,
+        )
+
+    def paused(self, gate):
+        pipeline, _ = scripted_pipeline(
+            {
+                "extract": valid_model().model_dump_json(),
+                graph.ASSERT_NODE: json.dumps({"assertions": []}),
+            },
+            entry=graph.ENTRY_HEAD_ONLY,
+            assertions=True,
+        )
+        record = asking_job()
+        record.transition("running")
+
+        async def on_node(node: str) -> None:
+            del node
+
+        runner = AdkPipelineRunner(pipeline, certification=gate)
+        return asyncio.run(runner.run(record, on_node))
+
+    def test_the_head_is_certified_at_the_pause(self):
+        outcome = self.paused(self.gate())
+        assert isinstance(outcome, PipelineAwaiting)
+        assert outcome.certification is not None
+        assert not outcome.certification.certified
+        head = {node.node for node in outcome.certification.uncertified}
+        assert head == {graph.EXTRACT_NODE, graph.ASSERT_NODE}
+
+    def test_a_head_the_manifest_blesses_is_certified(self):
+        first = self.paused(self.gate())
+        blessed = {node.fingerprint for node in first.certification.uncertified}
+        outcome = self.paused(self.gate(blessed))
+        assert outcome.certification.certified
+        assert outcome.certification.complete
+
+    @pytest.mark.parametrize("parent_certified", [True, False])
+    def test_a_resumed_run_answers_for_its_parent_too(self, parent_certified):
+        from analysis_service.certification import CertifyResult, UncertifiedNode
+
+        pipeline, _ = scripted_pipeline({}, entry=graph.ENTRY_RESUME)
+        parent = (
+            CertifyResult(certified=True)
+            if parent_certified
+            else CertifyResult(
+                certified=False,
+                uncertified=(UncertifiedNode(node="extract", fingerprint=self.FP),),
+            )
+        )
+        job = asking_job(
+            ask_questions=False,
+            resumption=Resumption(
+                parent_id="job-parent", checkpoint=held(), certification=parent
+            ),
+        )
+        # The certifier reads a run's node and fingerprint and nothing else.
+        runs = [
+            NodeRun.model_construct(node=node, execution_fingerprint=self.FP)
+            for node in pipeline.node_sampling
+        ]
+        runner = AdkPipelineRunner(pipeline, certification=self.gate({self.FP}))
+        result = runner._certify(job, runs)
+        assert result.certified is parent_certified
+        assert result.complete
+
+    def test_a_waiting_job_s_questions_and_answers_follow_the_gate(self):
+        from analysis_service.certification import CertifyResult, UncertifiedNode
+
+        client, store = catalog_client()
+        client.app.state.certification = self.gate()
+        job = waiting(store)
+        record = store._records[job]
+        record.certification = CertifyResult(
+            certified=False,
+            uncertified=(UncertifiedNode(node="extract", fingerprint=self.FP),),
+        )
+        questions = client.get(f"/v1/jobs/{job}/questions", headers=auth())
+        answers = client.post(
+            f"/v1/jobs/{job}/answers", json={"links": []}, headers=auth()
+        )
+        assert questions.status_code == 409
+        assert answers.status_code == 409
+        assert questions.json()["uncertified_nodes"][0]["node"] == "extract"
+
+    def test_the_resumed_job_carries_its_parent_s_verdict(self):
+        from analysis_service.certification import CertifyResult
+
+        client, store = catalog_client()
+        job = waiting(store)
+        store._records[job].certification = CertifyResult(certified=True)
+        response = client.post(
+            f"/v1/jobs/{job}/answers", json={"links": []}, headers=auth()
+        )
+        child = asyncio.run(store.get(response.json()["job_id"]))
+        assert child.resumption.certification == CertifyResult(certified=True)
+
+
+@pytest.mark.parametrize(
+    "frameworks", [*((name,) for name in PACKAGES), tuple(PACKAGES)], ids=str
+)
+def test_the_pause_path_runs_the_graphs_two_sweeps_bless(frameworks):
+    """A node's fingerprint binds its graph's instruction digest, so the pause
+    path is blessed only by the sweeps whose graphs it runs. Architecture.md
+    names them: the paused head is the ``heads`` sweep's graph, and the
+    resumed run is the ``analysis`` sweep's."""
+    from evals.harness.modes import MODE_ENTRIES
+
+    assert MODE_ENTRIES["heads"] == graph.ENTRY_HEAD_ONLY
+    assert entry_of(asking_job()) == graph.ENTRY_HEAD_ONLY
+    resumed, _ = scripted_pipeline({}, entry=graph.ENTRY_RESUME, frameworks=frameworks)
+    analysed, _ = scripted_pipeline(
+        {}, entry=MODE_ENTRIES["analysis"], frameworks=frameworks
+    )
+    assert resumed.instruction_sha256 == analysed.instruction_sha256
