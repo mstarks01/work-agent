@@ -11,6 +11,11 @@ list — never as silent guesses.
 
 Boundary crossings are derived, never extracted: a Data Flow crosses a trust
 boundary iff its endpoints' zones differ.
+
+The top-level ``capabilities`` list holds what the sources state about the whole
+application, such as whether it uses OAuth, each with the quote that states it.
+A capability the sources do not mention has no entry, and a reader takes it as
+unknown.
 """
 
 from __future__ import annotations
@@ -24,6 +29,7 @@ from typing import ClassVar, Literal, get_args, get_origin
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from analysis_service.capabilities import CAPABILITIES, CapabilityFact, Presence
 from analysis_service.references import canonical
 
 UNKNOWN = "unknown"
@@ -659,6 +665,31 @@ class Assumption(BaseModel):
     basis: str = Field(min_length=1, max_length=1000)
 
 
+class CapabilityStatement(BaseModel):
+    """One **Capability** a source states the application has or lacks.
+
+    It carries the source's own words, as an element does, so the validity gate
+    checks the quote against the source it names. A capability no source
+    mentions has no statement: silence is ``unknown``, and extraction never
+    writes an absence the source did not state.
+
+    ``capability`` lists the closed set in the provider-facing schema, on the
+    rule :class:`Assumption` follows, so a key outside the set stays an
+    ``invalid-reference`` that names this statement.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    capability: str = Field(
+        min_length=1,
+        max_length=60,
+        json_schema_extra={"enum": [*sorted(CAPABILITIES)]},
+    )
+    state: Literal["present", "absent"]
+    source_excerpt: str = Field(min_length=1, max_length=1000)
+    source_label: str = Field(min_length=1, max_length=200)
+
+
 class BoundaryCrossing(BaseModel):
     """Derived fact: a Data Flow whose endpoints the model cannot place together.
 
@@ -718,6 +749,7 @@ class SystemModel(BaseModel):
     data_flows: list[DataFlow] = Field(default_factory=list)
     trust_boundaries: list[TrustBoundary] = Field(default_factory=list)
     assumptions: list[Assumption] = Field(default_factory=list)
+    capabilities: list[CapabilityStatement] = Field(default_factory=list)
 
     def elements(self) -> list[Element]:
         """All elements in a stable order: :data:`ELEMENT_GROUPS`, each in list order."""
@@ -743,6 +775,30 @@ class SystemModel(BaseModel):
         bigger, and no production path takes this form.
         """
         return ModelIndex.of(self).get(element_id)
+
+    def capability_facts(self) -> dict[str, CapabilityFact]:
+        """What the statements say about each capability they name.
+
+        **The one reader of the model's capabilities.** A capability that one
+        statement says is present and another says is absent is ``unknown``:
+        the sources disagree, and this rule does not pick a side. A capability
+        no statement names is left out, which a reader takes as ``unknown``.
+        Each fact's evidence is the quotes that stated it.
+        """
+        stated: dict[str, dict[Presence, list[str]]] = {}
+        for statement in self.capabilities:
+            quotes = stated.setdefault(statement.capability, {}).setdefault(
+                statement.state, []
+            )
+            quotes.append(f"{statement.source_label}: {statement.source_excerpt}")
+        facts = {}
+        for key, states in stated.items():
+            if len(states) == 1:
+                ((state, quotes),) = states.items()
+                facts[key] = CapabilityFact(key, state, tuple(quotes))
+            else:
+                facts[key] = CapabilityFact(key, "unknown")
+        return facts
 
     def assumed_zone_elements(self) -> frozenset[str]:
         """Every element whose ``trust_zone`` the service inferred rather than read.
@@ -1098,9 +1154,9 @@ def normalize_element_ids(
         )
 
     if source_labels:
-        for element in normalized.elements():
-            element.source_label = (
-                canonical(element.source_label, source_labels) or element.source_label
+        for cited in (*normalized.elements(), *normalized.capabilities):
+            cited.source_label = (
+                canonical(cited.source_label, source_labels) or cited.source_label
             )
 
     return normalized

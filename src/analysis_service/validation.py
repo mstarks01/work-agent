@@ -28,6 +28,7 @@ from typing import Any, Literal
 from pydantic import BaseModel, ConfigDict, ValidationError
 
 from analysis_service.analysis import CONTROL_ATTRIBUTES, control_state, leading_word
+from analysis_service.capabilities import CAPABILITIES
 from analysis_service.grounding import normalize, verify_normalized
 from analysis_service.references import canonical
 from analysis_service.system_model import (
@@ -35,6 +36,7 @@ from analysis_service.system_model import (
     ELEMENT_GROUPS,
     UNKNOWN,
     Assumption,
+    CapabilityStatement,
     Element,
     SystemModel,
     assumable_attributes,
@@ -235,7 +237,18 @@ def validate(
     for assumption in model.assumptions:
         issues.extend(_assumption_issues(assumption, by_id))
 
-    issues.extend(_citation_issues(elements, sources))
+    for statement in model.capabilities:
+        if statement.capability not in CAPABILITIES:
+            issues.append(
+                ValidationIssue(
+                    code="invalid-reference",
+                    message=f"capability {statement.capability!r} is not one of"
+                    f" {sorted(CAPABILITIES)}",
+                    field="capabilities",
+                )
+            )
+
+    issues.extend(_citation_issues(elements, model.capabilities, sources))
     return issues
 
 
@@ -439,7 +452,9 @@ def _assumption_issues(
 
 
 def _citation_issues(
-    elements: Collection[Element], sources: Mapping[str, str]
+    elements: Collection[Element],
+    capabilities: Collection[CapabilityStatement],
+    sources: Mapping[str, str],
 ) -> list[ValidationIssue]:
     """The traceability chain exists, resolves *and* leads somewhere, or the model fails.
 
@@ -474,6 +489,9 @@ def _citation_issues(
     it, with the source still in front of it. That is the opposite of the draft
     seam, where the same failure has nowhere to go.
 
+    A **Capability** statement is cited by the same rule, because it asserts a
+    fact about the application in a source's words exactly as an element does.
+
     This is the one gate rule taking data from outside the model. Where no
     sources are supplied none of the three rungs runs: a hand-authored model
     checked without a job has nothing to check against, and inventing it would
@@ -487,8 +505,8 @@ def _citation_issues(
     if not sources:
         return []
 
-    # Folded once, then reused across every element's excerpt — the gate admits
-    # up to ``MAX_ELEMENTS`` of them against the same handful of sources.
+    # Folded once, then reused across every citation — the gate admits up to
+    # ``MAX_ELEMENTS`` elements against the same handful of sources.
     folded = {label: normalize(text) for label, text in sources.items()}
     issues: list[ValidationIssue] = []
     for element in elements:
@@ -504,44 +522,71 @@ def _citation_issues(
                 )
             )
             continue
-        if not element.source_label:
+        found = _quote_issue(
+            element.source_excerpt, element.source_label, sources, folded
+        )
+        if found is not None:
+            code, field, message = found
             issues.append(
                 ValidationIssue(
-                    code="invalid-reference",
-                    message="source_excerpt is present with no source_label naming"
-                    " the source it was quoted from",
-                    element_id=element.id,
-                    field="source_label",
+                    code=code, message=message, element_id=element.id, field=field
                 )
             )
-            continue
-        # Snapped rather than matched exactly, for the reason element IDs are
-        # derived: which spelling of the job's label arrived is mechanical, and
-        # ``repair``'s one pass is too scarce to spend on a re-cased word.
-        label = canonical(element.source_label, sources)
-        if not label:
+    for statement in capabilities:
+        found = _quote_issue(
+            statement.source_excerpt, statement.source_label, sources, folded
+        )
+        if found is not None:
+            code, field, message = found
             issues.append(
                 ValidationIssue(
-                    code="invalid-reference",
-                    message=f"source_label {element.source_label!r} does not name one"
-                    f" of this job's sources {sorted(sources)}",
-                    element_id=element.id,
-                    field="source_label",
-                )
-            )
-        elif sources[label] and not verify_normalized(
-            element.source_excerpt, folded[label]
-        ):
-            issues.append(
-                ValidationIssue(
-                    code="unverifiable-excerpt",
-                    message=f"source_excerpt {element.source_excerpt!r} is not found"
-                    f" in the source it cites, {label!r}",
-                    element_id=element.id,
-                    field="source_excerpt",
+                    code=code,
+                    message=f"capability {statement.capability!r}: {message}",
+                    field=field,
                 )
             )
     return issues
+
+
+def _quote_issue(
+    excerpt: str,
+    label: str,
+    sources: Mapping[str, str],
+    folded: Mapping[str, str],
+) -> tuple[IssueCode, str, str] | None:
+    """What is wrong with one quote and the label it cites, or ``None``."""
+    if not label:
+        return (
+            "invalid-reference",
+            "source_label",
+            (
+                "source_excerpt is present with no source_label naming the source"
+                " it was quoted from"
+            ),
+        )
+    # Snapped rather than matched exactly, for the reason element IDs are
+    # derived: which spelling of the job's label arrived is mechanical, and
+    # ``repair``'s one pass is too scarce to spend on a re-cased word.
+    snapped = canonical(label, sources)
+    if not snapped:
+        return (
+            "invalid-reference",
+            "source_label",
+            (
+                f"source_label {label!r} does not name one of this job's sources"
+                f" {sorted(sources)}"
+            ),
+        )
+    if sources[snapped] and not verify_normalized(excerpt, folded[snapped]):
+        return (
+            "unverifiable-excerpt",
+            "source_excerpt",
+            (
+                f"source_excerpt {excerpt!r} is not found in the source it cites,"
+                f" {snapped!r}"
+            ),
+        )
+    return None
 
 
 def parse_and_validate(
@@ -731,7 +776,9 @@ def restore_unimplicated(
     repointing one arrives as the cited flow deleted and a new flow added,
     and both halves are permitted. ``assumptions`` are the repair's own:
     the prompt tells it to add one for every value it inferred, and the gate
-    checks each against the model.
+    checks each against the model. ``capabilities`` are the repair's own too:
+    a statement the repair drops leaves its capability unknown, which removes
+    no requirement from the analysis.
     """
     named = set(implicated)
     result: dict[str, Any] = dict(repaired)

@@ -99,7 +99,8 @@ def test_an_absent_parent_makes_every_descendant_absent():
     facts = resolve(_facts(oauth="absent"))
     for key in ("oauth-client", "oauth-resource-server", "oidc"):
         assert facts[key].state == "absent"
-        assert facts[key].evidence == ("capability:oauth",)
+        assert facts[key].evidence == ("a:oauth",)
+        assert facts[key].derived_from == "oauth"
     deep = resolve(_facts(webrtc="absent"))
     assert deep["media-recording"].state == "absent"
 
@@ -107,7 +108,8 @@ def test_an_absent_parent_makes_every_descendant_absent():
 def test_a_present_child_makes_its_parent_present():
     facts = resolve(_facts(turn_server="present"))
     assert facts["webrtc"].state == "present"
-    assert facts["webrtc"].evidence == ("capability:turn-server",)
+    assert facts["webrtc"].evidence == ("a:turn_server",)
+    assert facts["webrtc"].derived_from == "turn-server"
     assert facts["media-server"].state == "unknown"
 
 

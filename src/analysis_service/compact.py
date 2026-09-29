@@ -104,6 +104,7 @@ from analysis_service.system_model import (
     CORE_ASSET_TAGS,
     ELEMENT_GROUPS,
     UNKNOWN,
+    CapabilityStatement,
     DataFlow,
     DataStore,
     Element,
@@ -373,6 +374,9 @@ class CompactSystemModel(BaseModel):
     data_flows: list[CompactDataFlow] = Field(default_factory=list)
     trust_boundaries: list[CompactTrustBoundary] = Field(default_factory=list)
     assumptions: list[CompactAssumption] = Field(default_factory=list)
+    # The full class, because a capability statement names no element and so
+    # carries no ID for this transport to shorten.
+    capabilities: list[CapabilityStatement] = Field(default_factory=list)
 
 
 #: Each compact element class against the full-model class it expands into, in
@@ -507,6 +511,9 @@ def expand(payload: object) -> tuple[dict[str, Any] | None, list[ValidationIssue
             "basis": entry.basis,
         }
         for entry in compact.assumptions
+    ]
+    expanded["capabilities"] = [
+        statement.model_dump() for statement in compact.capabilities
     ]
     return expanded, [
         ValidationIssue(

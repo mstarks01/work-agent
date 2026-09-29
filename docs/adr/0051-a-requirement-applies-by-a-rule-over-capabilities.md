@@ -46,6 +46,21 @@ rule applies because users sign in with a password. A rule that asks for a
 second factor applies because the application authenticates, and not because
 a second factor exists.
 
+**The System Model carries the capabilities a source states.** Its
+`capabilities` list holds one entry for each statement: the capability,
+`present` or `absent`, and the `source_excerpt` and `source_label` that say so.
+The validity gate checks the quote as it checks an element's. Extraction writes
+`absent` only where a source says so, and writes no entry for a capability the
+text does not mention. Two statements that disagree leave the capability
+`unknown`. The list is on the model, and not in the assertion catalog, because
+the assertion pass is off by default and a default job must still read its
+capabilities.
+
+**A stated absence rules a requirement out before its lane runs.** ASVS's
+`ruled_out` hook evaluates each requirement of the lane's chapter. A
+`not-applicable` becomes a scope entry whose reason names the absent capability
+and its quote, and the lane agent is told not to rule on it.
+
 **A subject that every web application has is `always`.** TLS, third-party
 components and error handling have one honest answer, so a question about them
 tells nothing. A subject that a real application can lack is a capability,
@@ -53,13 +68,16 @@ even where a description rarely states it.
 
 ## Consequences
 
-Nothing rules a requirement out until a capability can be stated. The next
-steps give capabilities a source: assertion rows that extraction writes,
-answers to early questions, and the `ruled_out` hook that tells a lane which
-requirements are settled.
+A job rules a requirement out only when a source states the absence of its
+subject. Descriptions rarely state one, so most conditional requirements stay
+`unknown` until early questions ask for the capabilities that settle the most
+of them.
 
 An agent drafted every row and every question. `reviewed_by` is `None` on each
 until the maintainer reads it.
 
 The presence tests in `frameworks/asvs/rules.py` stay as leads for a lane. They
 decide no applicability.
+
+The facts-first extraction route writes no capability, so its jobs leave every
+capability `unknown`.
