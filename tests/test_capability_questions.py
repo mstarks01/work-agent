@@ -140,6 +140,42 @@ class TestTheAnswerCheck:
         with pytest.raises(ValueError, match="is part of 'oauth'"):
             check_fact_answers(answers, valid_model(), None)
 
+    def test_a_no_over_an_earlier_yes_below_it_is_refused(self):
+        """Two rounds left OAuth absent and its client present (#1289, F1)."""
+        earlier = [_answer("oauth", "yes"), _answer("oauth-client", "yes")]
+        asked = question_set(
+            answered_model(valid_model(), earlier), None, ASVS_L1, [], waiting=True
+        )
+        with pytest.raises(ValueError, match="is part of 'oauth'"):
+            asked.admit(
+                sources=[Source.description("A system.")],
+                earlier_links=[],
+                earlier_facts=earlier,
+                links=[],
+                facts=[_answer("oauth", "no")],
+            )
+
+    def test_a_revision_that_answers_both_is_admitted(self):
+        earlier = [_answer("oauth", "yes"), _answer("oauth-client", "yes")]
+        model = answered_model(valid_model(), earlier)
+        both = [_answer("oauth", "no"), _answer("oauth-client", "no")]
+        check_fact_answers(both, model, None, earlier)
+
+    def test_a_yes_under_a_stated_absence_is_refused(self):
+        model = _stating(valid_model(), "oauth", "absent")
+        with pytest.raises(ValueError, match="is part of 'oauth'"):
+            check_fact_answers([_answer("oauth-client", "yes")], model, None)
+
+    def test_a_contradiction_the_sources_hold_alone_refuses_nothing(self):
+        """The sources' own conflict is for a person to settle, not a reason to
+        refuse an unrelated answer."""
+        model = _stating(valid_model(), "oauth", "absent")
+        client = _stating(valid_model(), "oauth-client", "present").capabilities
+        model = model.model_copy(
+            update={"capabilities": [*model.capabilities, *client]}
+        )
+        check_fact_answers([_answer("cookies", "yes")], model, None)
+
 
 class TestTheAnswerIsWritten:
     def test_an_answer_becomes_a_statement_that_quotes_its_line(self):

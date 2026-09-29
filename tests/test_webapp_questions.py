@@ -692,6 +692,44 @@ def test_the_registry_removes_a_run_that_waits_for_answers_last():
     assert analyses.get(run.id) is run
 
 
+def _waiting_registry():
+    from analysis_service.jobs import Checkpoint
+    from tests.factories import valid_model
+    from webapp.main import Analyses
+
+    analyses = Analyses(max_runs=2)
+    held = []
+    for _ in range(2):
+        run = analyses.claim()
+        run.checkpoint = Checkpoint(system_model=valid_model(), assertions=None)
+        analyses.release()
+        held.append(run)
+    return analyses, held
+
+
+def test_a_full_registry_of_waiting_runs_refuses_a_new_one():
+    """A third run evicted the oldest paused one while it still waited
+    (#1289, F4)."""
+    from webapp.main import RegistryFull
+
+    analyses, held = _waiting_registry()
+
+    with pytest.raises(RegistryFull, match="wait for answers"):
+        analyses.claim()
+    assert [analyses.get(run.id) for run in held] == held
+    assert analyses.claim(answering=held[1]) is not None, "the refusal held the gate"
+
+
+def test_answers_to_a_waiting_run_may_take_its_place():
+    analyses, (first, second) = _waiting_registry()
+
+    run = analyses.claim(answering=first)
+
+    assert analyses.get(first.id) is None
+    assert analyses.get(second.id) is second
+    assert analyses.get(run.id) is run
+
+
 CONTROL = {
     "key": list(FACT["key"]),
     "kind": "attribute",

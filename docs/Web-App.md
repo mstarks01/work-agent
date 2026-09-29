@@ -153,8 +153,10 @@ credential case, which is the common one at this point.
 - **One run at a time.** A second submission while one is running is refused with
   a message rather than queued.
 - **Nothing is persisted.** Runs are held in memory, capped, oldest evicted
-  first, and lost on restart. This is a demo surface, not a job store — `/v1`
-  already is one.
+  first, and lost on restart. A run that waits for your answers is never
+  evicted. When every held run waits for answers, a new submission is refused
+  until you answer or continue one. This is a demo surface, not a job store —
+  `/v1` already is one.
 - **No history, no export, no accounts.** If you want the JSON, take it from the
   engine directly; [`examples/embed.py`](../examples/embed.py) is four lines from
   `report.model_dump_json()`.

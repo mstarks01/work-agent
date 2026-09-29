@@ -90,7 +90,16 @@ class QuestionSet:
                 "no answers were sent; only a job waiting on answers can continue"
                 " without them"
             )
-        check_answers(links, facts, self.model, self.catalog, self.asked, earlier_facts)
+        check_answers(
+            links,
+            facts,
+            self.model,
+            self.catalog,
+            self.asked,
+            earlier_facts,
+            asked_links=[question.key for question in self.links],
+            earlier_links=earlier_links,
+        )
         return AdmittedRound(
             *resumed_sources(sources, earlier_links, links, earlier_facts, facts)
         )

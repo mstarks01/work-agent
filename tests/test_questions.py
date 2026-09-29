@@ -14,6 +14,7 @@ import pytest
 
 from analysis_service import graph
 from analysis_service.analysis import CONTROL_ATTRIBUTES, control_state
+from analysis_service.answer_round import question_set
 from analysis_service.assertions import (
     UNKNOWN,
     Assertion,
@@ -23,6 +24,7 @@ from analysis_service.assertions import (
     Subject,
     SupportSpan,
     assertion_id,
+    support_span,
 )
 from analysis_service.claims import UnknownRef
 from analysis_service.jobs import (
@@ -35,6 +37,7 @@ from analysis_service.links import (
     LinkAnswer,
     apply_answers,
     check_answers,
+    link_questions,
     resumed_sources,
     with_link_answers,
 )
@@ -437,6 +440,8 @@ class TestTheRoutes:
 
 
 PRINCIPAL = "principal:customer-accounts"
+#: The link question :func:`open_catalog` raises, as its fold key.
+ASKED = ("customer account",)
 OPEN_ROW = Assertion(
     subject=PRINCIPAL,
     predicate="mfa-requirement",
@@ -727,11 +732,42 @@ class TestTheAdmissionCheck:
     )
     def test_a_link_that_would_place_nothing_is_refused(self, link):
         with pytest.raises(ValueError):
-            check_answers([link], [], valid_model(), open_catalog(), ())
+            check_answers(
+                [link], [], valid_model(), open_catalog(), (), asked_links=ASKED
+            )
 
     def test_a_link_that_places_is_admitted(self):
         link = LinkAnswer(principal="customer accounts", element="entity:customer")
-        check_answers([link], [], valid_model(), open_catalog(), ())
+        check_answers([link], [], valid_model(), open_catalog(), (), asked_links=ASKED)
+
+    def test_a_link_to_a_principal_nobody_asked_about_is_refused(self):
+        """A stated link was replaced by an answer to no question (#1289, F3)."""
+        stated = Assertion(
+            subject=PRINCIPAL,
+            predicate="represented-by",
+            value="entity:customer",
+            basis="stated",
+            support=[support_span("customer", DESCRIPTION.label, DESCRIPTION.text)],
+        )
+        catalog = open_catalog(stated)
+        assert link_questions(catalog, valid_model()) == ()
+        questions = question_set(valid_model(), catalog, {}, [], waiting=True)
+        link = LinkAnswer(principal="customer accounts", element="process:web-app")
+        with pytest.raises(ValueError, match="asked no question about"):
+            questions.admit(
+                sources=[],
+                earlier_links=[],
+                earlier_facts=[],
+                links=[link],
+                facts=[],
+            )
+
+    def test_an_earlier_link_answer_may_be_answered_again(self):
+        earlier = LinkAnswer(principal="customer accounts", element="entity:customer")
+        again = LinkAnswer(principal="customer account", element="none")
+        check_answers(
+            [again], [], valid_model(), open_catalog(), (), earlier_links=[earlier]
+        )
 
 
 def test_the_same_answers_twice_give_the_same_catalog():

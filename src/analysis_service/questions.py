@@ -83,7 +83,7 @@ from analysis_service.assertions import (
     assertion_id,
     projected_attribute,
 )
-from analysis_service.capabilities import CAPABILITIES
+from analysis_service.capabilities import CAPABILITIES, lineage
 from analysis_service.claims import FrameworkAnalysis, UnknownKey, UnknownRef
 from analysis_service.open_facts import element_names, label_of
 from analysis_service.question_kinds import QUESTION_KINDS, Facet
@@ -116,9 +116,11 @@ __all__ = [
     "fact_line",
     "fact_questions",
     "fact_rows",
+    "merged_facts",
     "open_attribute",
     "prepared_model",
     "question_fallback",
+    "refuse_repeated_facts",
 ]
 
 #: How many fact answers one submission carries. The largest report measured
@@ -199,7 +201,7 @@ class FactAnswer(BaseModel):
         """Bound each part, and blank every part the fact's spelling does not read.
 
         Two keys that differ only in a part nobody reads name one fact, and
-        :func:`~analysis_service.links.merged_facts` would keep both. A key that
+        :func:`merged_facts` would keep both. A key that
         uses more than one spelling is left as sent, for the check to refuse.
         """
         if not isinstance(key, list | tuple) or len(key) != 6:
@@ -248,6 +250,39 @@ def fact_line(fact: FactAnswer) -> str:
     if fact.kind == "assertion":
         return f'The open question {assertion} is answered "{fact.value}".'
     return f'Asked "{subject}", the answer is "{fact.value}".'
+
+
+def refuse_repeated_facts(facts: Sequence[FactAnswer]) -> None:
+    """Refuse two answers to one open fact in one submission.
+
+    Refused rather than resolved by order: the service cannot know which of the
+    two the submitter meant.
+    """
+    keys = [fact.key for fact in facts]
+    if len(set(keys)) != len(keys):
+        raise ValueError("facts answers one open fact twice")
+
+
+def merged_facts(
+    earlier: Sequence[FactAnswer], later: Sequence[FactAnswer]
+) -> list[FactAnswer]:
+    """A resumed job's fact answers: the parent's, with the new ones over them.
+
+    **A facet answer adds to the earlier one.** A page sends only the facets
+    the submitter chose, so a facet the later answer leaves out keeps its
+    earlier answer, and a later answer to a facet replaces it. Every other
+    answer replaces the earlier answer to its fact.
+    """
+    refuse_repeated_facts(later)
+    merged = {fact.key: fact for fact in earlier}
+    for fact in later:
+        before = merged.get(fact.key)
+        if fact.facets is not None and before is not None and before.facets:
+            fact = FactAnswer.model_validate(
+                {"key": fact.key, "facets": {**before.facets, **fact.facets}}
+            )
+        merged[fact.key] = fact
+    return list(merged.values())
 
 
 def open_attribute(model: SystemModel, element_id: str, attribute: str) -> bool:
@@ -759,30 +794,43 @@ def check_fact_answers(
                 f"{answer.value!r} is not one of {', '.join(choices)} for"
                 f" {attribute or assertion or subject or capability!r}"
             )
-    _check_capability_lineage(answers)
     _check_attribute_values(answers, model)
+    _check_capability_lineage(answers, prepared, earlier)
 
 
-def _check_capability_lineage(answers: Sequence[FactAnswer]) -> None:
-    """Refuse a "yes" to a capability whose parent the same round answers "no".
+def _check_capability_lineage(
+    answers: Sequence[FactAnswer],
+    prepared: SystemModel,
+    earlier: Sequence[FactAnswer],
+) -> None:
+    """Refuse a round that would leave a capability present under an absent ancestor.
 
-    An absent parent makes each child absent, so the two answers cannot both
-    hold, and the round would leave the child present under an absent parent.
+    **Checked on the model the round produces**, with every earlier answer and
+    every source statement in it, so a contradiction is refused whether it
+    arrives in one round, across two, or against what the sources state. A
+    contradiction this round's answers take no part in is left as it is:
+    :func:`~analysis_service.capabilities.resolve` keeps it for a person to
+    settle.
     """
-    said = {
-        answer.key[5]: answer.value
+    answering = {
+        answer.key[5]
         for answer in answers
         if answer.kind == "capability" and answer.known
     }
-    for key, value in said.items():
-        parent = CAPABILITIES[key].parent if key in CAPABILITIES else ""
-        while parent:
-            if value == "yes" and said.get(parent) == "no":
+    if not answering:
+        return
+    held = answered_model(prepared, merged_facts(earlier, answers)).capability_facts()
+    for key, fact in held.items():
+        if fact.state != "present" or key not in CAPABILITIES:
+            continue
+        for ancestor in lineage(key):
+            absent = ancestor in held and held[ancestor].state == "absent"
+            if absent and answering & {key, ancestor}:
                 raise ValueError(
-                    f"{key!r} is part of {parent!r}, which the same answers say"
-                    " the application does not have"
+                    f"{key!r} is part of {ancestor!r}, and these answers would"
+                    f" leave {key!r} present while {ancestor!r} is absent;"
+                    " answer both"
                 )
-            parent = CAPABILITIES[parent].parent
 
 
 def _check_attribute_values(answers: Sequence[FactAnswer], model: SystemModel) -> None:
