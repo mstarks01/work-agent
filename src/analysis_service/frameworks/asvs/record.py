@@ -38,7 +38,7 @@ from typing import Any, Literal, Self, get_args
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 from pydantic.json_schema import SkipJsonSchema
 
-from analysis_service.capabilities import CapabilityFact
+from analysis_service.capabilities import CapabilityFact, open_capability_counts
 from analysis_service.claims import (
     BlockSummary,
     Claim,
@@ -215,6 +215,20 @@ class DraftRequirementRuling(Claim):
             for unit, decision in decisions.items()
             if unit in chapter and decision.state == "not-applicable"
         }
+
+    @classmethod
+    def open_capabilities(
+        cls, model: SystemModel, options: Mapping[str, Any]
+    ) -> dict[str, int]:
+        """How many requirements at the job's level each unknown capability could settle.
+
+        A requirement is counted once for each capability its decision misses,
+        and once for each ancestor of one: an absent parent settles every
+        requirement that reads a child, so the parent's count includes them.
+        """
+        level = AsvsOptions.model_validate(options).level
+        decisions = applicability_for(level, model.capability_facts())
+        return open_capability_counts(decisions.values())
 
     @classmethod
     def units_for(cls, options: Mapping[str, Any], lane: str) -> tuple[str, ...]:

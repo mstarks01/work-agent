@@ -651,7 +651,7 @@ def _question_set(
     return question_set(
         model,
         None if assertions is None else assertions.catalog,
-        [selection.name for selection in record.frameworks],
+        {selection.name: selection.options for selection in record.frameworks},
         analyses,
         waiting=record.status == "awaiting-answers",
     )

@@ -117,7 +117,7 @@ class TestTheRanking:
 
         Asking the most cited fact first asks A and completes none.
         """
-        key = lambda name: ("", "", "", name, "")
+        key = lambda name: ("", "", "", name, "", "")
         waiting = {
             ("stride", f"T-{i}"): {key("A"), key("B"), key("C")} for i in range(10)
         }
@@ -189,7 +189,7 @@ class TestTheAnswerForms:
 
     def test_a_closed_attribute_offers_its_values_but_unknown(self):
         process = valid_model().processes[0].id
-        assert self.question_for((process, "exposure", "", "", "")) == (
+        assert self.question_for((process, "exposure", "", "", "", "")) == (
             "internet-facing",
             "internal",
         )
@@ -197,39 +197,46 @@ class TestTheAnswerForms:
     def test_a_zone_is_answered_by_a_boundary(self):
         store = valid_model().data_stores[0].id
         boundaries = tuple(b.id for b in valid_model().trust_boundaries)
-        assert self.question_for((store, "trust_zone", "", "", "")) == boundaries
+        assert self.question_for((store, "trust_zone", "", "", "", "")) == boundaries
 
     def test_a_mechanism_is_answered_in_words(self):
-        assert self.question_for((flow_id(), "encryption_in_transit", "", "", "")) == ()
+        assert (
+            self.question_for((flow_id(), "encryption_in_transit", "", "", "", ""))
+            == ()
+        )
 
 
 class TestTheChecks:
     def test_an_attribute_the_element_lacks_is_refused(self):
-        wrong = FactAnswer(key=(flow_id(), "exposure", "", "", ""), value="internal")
+        wrong = FactAnswer(
+            key=(flow_id(), "exposure", "", "", "", ""), value="internal"
+        )
         with pytest.raises(ValueError, match="no attribute"):
             check_fact_answers([wrong], valid_model(), None)
 
     def test_a_value_outside_the_choices_is_refused(self):
         process = valid_model().processes[0].id
-        wrong = FactAnswer(key=(process, "exposure", "", "", ""), value="everywhere")
+        wrong = FactAnswer(
+            key=(process, "exposure", "", "", "", ""), value="everywhere"
+        )
         with pytest.raises(ValueError, match="not one of"):
             check_fact_answers([wrong], open_model(), None)
 
     def test_an_open_row_the_catalog_lacks_is_refused(self):
-        wrong = FactAnswer(key=("", "", "missing-row", "", ""), value="required")
+        wrong = FactAnswer(key=("", "", "missing-row", "", "", ""), value="required")
         with pytest.raises(ValueError, match="no open assertion row"):
             check_fact_answers([wrong], valid_model(), AssertionCatalog())
 
     @pytest.mark.parametrize("field", ["id", "name", "notes", "source_excerpt"])
     def test_a_field_that_says_what_an_element_is_is_refused(self, field):
         process = valid_model().processes[0].id
-        wrong = FactAnswer(key=(process, field, "", "", ""), value="process:other")
+        wrong = FactAnswer(key=(process, field, "", "", "", ""), value="process:other")
         with pytest.raises(ValueError, match="no attribute"):
             check_fact_answers([wrong], valid_model(), None)
 
     @pytest.mark.parametrize("field", ["source", "destination"])
     def test_a_flow_endpoint_is_refused(self, field):
-        wrong = FactAnswer(key=(flow_id(), field, "", "", ""), value="entity:other")
+        wrong = FactAnswer(key=(flow_id(), field, "", "", "", ""), value="entity:other")
         with pytest.raises(ValueError, match="no attribute"):
             check_fact_answers([wrong], valid_model(), None)
 
@@ -241,12 +248,16 @@ class TestTheChecks:
             basis="inferred",
             explanation="the description names two factors",
         )
-        wrong = FactAnswer(key=("", "", assertion_id(settled), "", ""), value="absent")
+        wrong = FactAnswer(
+            key=("", "", assertion_id(settled), "", "", ""), value="absent"
+        )
         with pytest.raises(ValueError, match="no open assertion row"):
             check_fact_answers([wrong], valid_model(), open_catalog(settled))
 
     def test_a_row_an_earlier_answer_settled_can_be_answered_again(self):
-        first = FactAnswer(key=("", "", assertion_id(OPEN_ROW), "", ""), value="absent")
+        first = FactAnswer(
+            key=("", "", assertion_id(OPEN_ROW), "", "", ""), value="absent"
+        )
         written, _ = apply_answers(open_catalog(), valid_model(), [], [first])
         again = first.model_copy(update={"value": "required"})
         check_fact_answers([again], valid_model(), written)
@@ -260,24 +271,26 @@ class TestTheChecks:
         ],
     )
     def test_a_value_the_validity_gate_refuses_is_refused(self, value, rule):
-        wrong = FactAnswer(key=(flow_id(), "authentication", "", "", ""), value=value)
+        wrong = FactAnswer(
+            key=(flow_id(), "authentication", "", "", "", ""), value=value
+        )
         with pytest.raises(ValueError, match=rule):
             check_fact_answers([wrong], open_model(), None)
 
     def test_a_subject_answer_is_free_text(self):
         fine = FactAnswer(
-            key=("", "", "", "whether queries are bound", ""), value="yes"
+            key=("", "", "", "whether queries are bound", "", ""), value="yes"
         )
         check_fact_answers([fine], valid_model(), None)
 
     def test_an_answer_is_one_line(self):
         with pytest.raises(ValueError):
-            FactAnswer(key=("", "", "", "q", ""), value="two\nlines")
+            FactAnswer(key=("", "", "", "q", "", ""), value="two\nlines")
 
 
 def test_an_attribute_answer_is_written_onto_the_model_and_noted():
     answer = FactAnswer(
-        key=(flow_id(), "encryption_in_transit", "", "", ""), value="TLS 1.3"
+        key=(flow_id(), "encryption_in_transit", "", "", "", ""), value="TLS 1.3"
     )
     model = answered_model(valid_model(), [answer])
     flow = model.data_flows[0]
@@ -287,7 +300,7 @@ def test_an_attribute_answer_is_written_onto_the_model_and_noted():
 
 def test_an_attribute_answer_is_noted_once_however_many_rounds_carry_it():
     answer = FactAnswer(
-        key=(flow_id(), "encryption_in_transit", "", "", ""), value="TLS 1.3"
+        key=(flow_id(), "encryption_in_transit", "", "", "", ""), value="TLS 1.3"
     )
     once = answered_model(valid_model(), [answer])
     twice = answered_model(once, [answer])
@@ -308,7 +321,9 @@ def test_an_assertion_answer_replaces_its_open_row_and_passes_the_gate():
         subjects=[Subject(id=subject, type="principal", label="customer accounts")],
         entries=[open_row],
     )
-    answer = FactAnswer(key=("", "", assertion_id(open_row), "", ""), value="absent")
+    answer = FactAnswer(
+        key=("", "", assertion_id(open_row), "", "", ""), value="absent"
+    )
     written, issues = apply_answers(catalog, valid_model(), [], [answer])
     sources = with_link_answers([DESCRIPTION], [], [answer])
     record = AssertionRecord.over(
@@ -329,7 +344,7 @@ class TestTheResumedRunWithoutACatalog:
 
     def test_an_attribute_answer_reaches_the_report(self):
         answer = FactAnswer(
-            key=(flow_id(), "encryption_in_transit", "", "", ""), value="TLS 1.3"
+            key=(flow_id(), "encryption_in_transit", "", "", "", ""), value="TLS 1.3"
         )
         record = JobRecord.create(
             owner_subject="idp|user-1",
@@ -388,6 +403,7 @@ class TestTheRoutes:
                 "",
                 "",
                 "",
+                "",
             ],
             "value": "TLS 1.3",
         }
@@ -404,7 +420,7 @@ class TestTheRoutes:
 
         client, store = make_client()
         job = self.completed(store)
-        wrong = {"key": [flow_id(), "exposure", "", "", ""], "value": "internal"}
+        wrong = {"key": [flow_id(), "exposure", "", "", "", ""], "value": "internal"}
         response = client.post(
             f"/v1/jobs/{job}/answers", json={"facts": [wrong]}, headers=auth()
         )
@@ -467,8 +483,10 @@ class TestASecondRound:
     Source again from the merged answers.
     """
 
-    FIRST = FactAnswer(key=("", "", assertion_id(OPEN_ROW), "", ""), value="required")
-    LATER = FactAnswer(key=("", "", "", "who rotates the keys?", ""), value="ops")
+    FIRST = FactAnswer(
+        key=("", "", assertion_id(OPEN_ROW), "", "", ""), value="required"
+    )
+    LATER = FactAnswer(key=("", "", "", "who rotates the keys?", "", ""), value="ops")
 
     def first_round(self):
         return resume(
@@ -585,7 +603,7 @@ class TestAnAttributeAnswerOverACatalogRow:
     """
 
     TLS = FactAnswer(
-        key=(flow_id(), "encryption_in_transit", "", "", ""), value="TLS 1.3"
+        key=(flow_id(), "encryption_in_transit", "", "", "", ""), value="TLS 1.3"
     )
 
     def checkpoint(self):
@@ -675,7 +693,9 @@ class TestAnAnsweredZone:
         zones = [boundary.id for boundary in model.trust_boundaries]
         held = model.get(self.PROCESS).trust_zone
         value = held if confirm else next(zone for zone in zones if zone != held)
-        answer = FactAnswer(key=(self.PROCESS, ZONE_ATTRIBUTE, "", "", ""), value=value)
+        answer = FactAnswer(
+            key=(self.PROCESS, ZONE_ATTRIBUTE, "", "", "", ""), value=value
+        )
 
         answered = answered_model(model, [answer])
 
@@ -689,9 +709,9 @@ class TestTheAdmissionCheck:
     @pytest.mark.parametrize(
         "key",
         [
-            (flow_id(), "authentication", "", "", "capacity-limits"),
-            (flow_id(), "authentication", "", "who rotates keys?", ""),
-            ("", "", "", "", ""),
+            (flow_id(), "authentication", "", "", "capacity-limits", ""),
+            (flow_id(), "authentication", "", "who rotates keys?", "", ""),
+            ("", "", "", "", "", ""),
         ],
     )
     def test_a_key_that_names_two_facts_or_none_is_refused(self, key):
@@ -728,7 +748,7 @@ class TestAnAnswerBindsToAnOpenFact:
     """A submission answers what is open, or what an earlier round answered (D2)."""
 
     STATED = FactAnswer(
-        key=(flow_id(), "encryption_in_transit", "", "", ""), value="plaintext"
+        key=(flow_id(), "encryption_in_transit", "", "", "", ""), value="plaintext"
     )
 
     def test_an_attribute_the_model_states_is_refused(self):
@@ -743,7 +763,7 @@ class TestAnAnswerBindsToAnOpenFact:
         model = TestAnAnsweredZone().model()
         zone = model.get(TestAnAnsweredZone.PROCESS).trust_zone
         answer = FactAnswer(
-            key=(TestAnAnsweredZone.PROCESS, ZONE_ATTRIBUTE, "", "", ""), value=zone
+            key=(TestAnAnsweredZone.PROCESS, ZONE_ATTRIBUTE, "", "", "", ""), value=zone
         )
         check_fact_answers([answer], model, None)
 
@@ -759,13 +779,13 @@ class TestAnUnknownAnswer:
     """``unknown`` says the submitter does not know, and the fact stays open (D3)."""
 
     DONT_KNOW = FactAnswer(
-        key=(valid_model().data_flows[1].id, "encryption_in_transit", "", "", ""),
+        key=(valid_model().data_flows[1].id, "encryption_in_transit", "", "", "", ""),
         value=UNKNOWN,
     )
 
     def test_it_is_admitted_for_a_closed_attribute_too(self):
         process = valid_model().processes[0].id
-        answer = FactAnswer(key=(process, "exposure", "", "", ""), value=UNKNOWN)
+        answer = FactAnswer(key=(process, "exposure", "", "", "", ""), value=UNKNOWN)
         check_fact_answers([answer], open_model(), None)
 
     def test_it_writes_only_a_note(self):
@@ -776,7 +796,9 @@ class TestAnUnknownAnswer:
         assert "does not know encryption_in_transit" in flow.notes
 
     def test_it_leaves_an_open_row_open(self):
-        answer = FactAnswer(key=("", "", assertion_id(OPEN_ROW), "", ""), value=UNKNOWN)
+        answer = FactAnswer(
+            key=("", "", assertion_id(OPEN_ROW), "", "", ""), value=UNKNOWN
+        )
         written, issues = apply_answers(open_catalog(), valid_model(), [], [answer])
 
         assert written.entries == [OPEN_ROW]
@@ -788,7 +810,7 @@ class TestAnUnknownAnswer:
         answer = FactAnswer(key=self.DONT_KNOW.key, value=typed)
         model = valid_model()
         model.data_flows[1].authentication = UNKNOWN
-        key = (model.data_flows[1].id, "authentication", "", "", "")
+        key = (model.data_flows[1].id, "authentication", "", "", "", "")
         with pytest.raises(ValueError, match="opens with"):
             check_fact_answers([answer.model_copy(update={"key": key})], model, None)
 
@@ -820,7 +842,7 @@ class TestTheControlForm:
             for attribute in CONTROL_ATTRIBUTES
             if attribute in type(element).model_fields
             and not answer_choices(
-                (element.id, attribute, "", "", ""), valid_model(), None
+                (element.id, attribute, "", "", "", ""), valid_model(), None
             )
         }
         assert set(CONTROL_SUGGESTIONS) == free_text
@@ -837,7 +859,7 @@ class TestTheControlForm:
         store = model.data_stores[0]
         store.encryption_at_rest = UNKNOWN
         element = store.id if attribute == "encryption_at_rest" else flow_id()
-        answer = FactAnswer(key=(element, attribute, "", "", ""), value=value)
+        answer = FactAnswer(key=(element, attribute, "", "", "", ""), value=value)
 
         check_fact_answers([answer], model, None)
         assert control_state(value) == "stated"
@@ -845,11 +867,11 @@ class TestTheControlForm:
     @pytest.mark.parametrize(
         ("key", "form"),
         [
-            ((flow_id(), "authentication", "", "", ""), "control"),
-            (("process:web-app", "exposure", "", "", ""), "choice"),
-            (("process:web-app", "", "", "", "capacity-limits"), "facets"),
-            (("process:web-app", "", "", "", "code-execution"), "choice"),
-            (("", "", "", "who rotates the keys?", ""), "text"),
+            ((flow_id(), "authentication", "", "", "", ""), "control"),
+            (("process:web-app", "exposure", "", "", "", ""), "choice"),
+            (("process:web-app", "", "", "", "capacity-limits", ""), "facets"),
+            (("process:web-app", "", "", "", "code-execution", ""), "choice"),
+            (("", "", "", "who rotates the keys?", "", ""), "text"),
         ],
     )
     def test_each_fact_takes_its_form(self, key, form):

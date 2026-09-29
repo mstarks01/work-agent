@@ -61,6 +61,22 @@ capabilities.
 `not-applicable` becomes a scope entry whose reason names the absent capability
 and its quote, and the lane agent is told not to rule on it.
 
+**A paused job asks the unknown capabilities its rule needs.** Each
+framework counts, for each unknown capability, how many of its units at the
+job's options an answer could settle; an absent parent settles every unit that
+reads a child, so a parent's count includes them. The capability questions come
+first in the early list, a parent before its parts, and need no prior from
+earlier runs. Each takes "yes", "no" or "I don't know". The pause page shows a
+part only once its parent is "yes", and the answer check refuses a "yes" to a
+part whose parent the same answers call "no".
+
+**An answer writes the capability.** A "yes" or "no" replaces every statement
+about that capability with one that quotes the answer's line of the answers
+Source, so the resumed job's `ruled_out` reads it before any lane runs. "I
+don't know" writes nothing. A capability the sources state takes no answer,
+unless an earlier round answered it. An open fact that names a capability is
+the fifth spelling of `UnknownRef`, and it stays off the critic's schema.
+
 **A subject that every web application has is `always`.** TLS, third-party
 components and error handling have one honest answer, so a question about them
 tells nothing. A subject that a real application can lack is a capability,
@@ -70,8 +86,12 @@ even where a description rarely states it.
 
 A job rules a requirement out only when a source states the absence of its
 subject. Descriptions rarely state one, so most conditional requirements stay
-`unknown` until early questions ask for the capabilities that settle the most
-of them.
+`unknown` until an early question asks for the capability. A job with questions
+off keeps them `unknown`, and its lanes rule on them.
+
+The page asks every part in the same round as its parent, because a resumed
+job does not pause again. So a "yes" to OAuth asks the role questions at once,
+on the same page.
 
 An agent drafted every row and every question. `reviewed_by` is `None` on each
 until the maintainer reads it.

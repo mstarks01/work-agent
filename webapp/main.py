@@ -417,7 +417,7 @@ def render_report(report: Report) -> RenderedPage:
     asked = question_set(
         report.system_model,
         report.assertions.catalog if report.assertions else None,
-        (),
+        {},
         report.analyses,
         waiting=False,
     ).to_json()

@@ -32,7 +32,7 @@ longer than :data:`~analysis_service.assertions.MAX_QUOTE_CHARS`.
 nothing structured, the fact stays open, and it covers no finding. It reaches
 the lanes as its line of the answers Source.
 
-**Three kinds of fact, and an answer to each is written by code.**
+**Four kinds of fact, and an answer to each is written by code.**
 
 * An **attribute** of an element the model left ``unknown``. The answer is
   written onto the model the resumed run analyses, and the element's notes say
@@ -44,6 +44,9 @@ the lanes as its line of the answers Source.
   or a free-text **subject** where no kind fits. Nothing structured can hold
   either answer, so it reaches the lanes only as its line of the answers
   Source.
+* A **capability** of the whole application, answered yes or no. The answer
+  replaces what the sources stated about it with a statement on the model
+  that quotes its line of the answers Source.
 
 An answer to a question this service asked settles the fact, even against the
 sources (the maintainer's decision of 2026-09-25 on #1225).
@@ -80,6 +83,7 @@ from analysis_service.assertions import (
     assertion_id,
     projected_attribute,
 )
+from analysis_service.capabilities import CAPABILITIES
 from analysis_service.claims import FrameworkAnalysis, UnknownKey, UnknownRef
 from analysis_service.open_facts import element_names, label_of
 from analysis_service.question_kinds import QUESTION_KINDS, Facet
@@ -129,7 +133,16 @@ ANSWERS_LABEL = "Answers to link questions"
 #: flow would then carry an ID its endpoints no longer derive.
 _ENDPOINTS = frozenset({"source", "destination"})
 
-FactKind = Literal["attribute", "assertion", "question", "subject"]
+FactKind = Literal["attribute", "assertion", "question", "subject", "capability"]
+#: The fields of :class:`~analysis_service.claims.UnknownRef`, in key order.
+_KEY_FIELDS = (
+    "element_id",
+    "attribute",
+    "assertion",
+    "subject",
+    "question",
+    "capability",
+)
 Basis = Literal["evidence", "critic"]
 #: One finding: its framework and its claim ID.
 Finding = tuple[str, str]
@@ -154,7 +167,7 @@ class FactAnswer(BaseModel):
         if not isinstance(data, dict) or data.get("facets") is None:
             return data
         facets, key = data["facets"], data.get("key")
-        question = key[4] if isinstance(key, list | tuple) and len(key) == 5 else ""
+        question = key[4] if isinstance(key, list | tuple) and len(key) == 6 else ""
         kind = QUESTION_KINDS.get(question)
         if kind is None or kind.answer != "facets":
             raise ValueError("facets answer only a question kind that has facets")
@@ -189,26 +202,20 @@ class FactAnswer(BaseModel):
         :func:`~analysis_service.links.merged_facts` would keep both. A key that
         uses more than one spelling is left as sent, for the check to refuse.
         """
-        if not isinstance(key, list | tuple) or len(key) != 5:
+        if not isinstance(key, list | tuple) or len(key) != 6:
             return key
-        ref = UnknownRef.model_validate(
-            dict(
-                zip(
-                    ("element_id", "attribute", "assertion", "subject", "question"),
-                    key,
-                    strict=True,
-                )
-            )
-        )
+        ref = UnknownRef.model_validate(dict(zip(_KEY_FIELDS, key, strict=True)))
         match ref.spellings:
             case ("question",):
-                return (ref.element_id, "", "", "", ref.question)
+                return (ref.element_id, "", "", "", ref.question, "")
             case ("attribute",):
-                return (ref.element_id, ref.attribute, "", "", "")
+                return (ref.element_id, ref.attribute, "", "", "", "")
             case ("assertion",):
-                return ("", "", ref.assertion, "", "")
+                return ("", "", ref.assertion, "", "", "")
             case ("subject",):
-                return ("", "", "", ref.subject, "")
+                return ("", "", "", ref.subject, "", "")
+            case ("capability",):
+                return ("", "", "", "", "", ref.capability)
         return ref.key
 
     @field_validator("value")
@@ -228,7 +235,10 @@ class FactAnswer(BaseModel):
 
 def fact_line(fact: FactAnswer) -> str:
     """The answer as its line of the answers Source, which its span quotes."""
-    element_id, attribute, assertion, subject, question = fact.key
+    element_id, attribute, assertion, subject, question, capability = fact.key
+    if fact.kind == "capability":
+        asked = CAPABILITIES[capability].question
+        return f'Asked "{asked}", the answer is "{fact.value}".'
     if fact.kind == "question":
         kind = QUESTION_KINDS[question]
         asked = kind.template.format(element=element_id)
@@ -272,8 +282,10 @@ def prepared_model(model: SystemModel, catalog: AssertionCatalog | None) -> Syst
 
 
 def fact_kind(key: UnknownKey) -> FactKind:
-    """Which of the four kinds of fact this key names."""
-    element_id, attribute, assertion, _, question = key
+    """Which of the five kinds of fact this key names."""
+    element_id, attribute, assertion, _, question, capability = key
+    if capability:
+        return "capability"
     if question:
         return "question"
     if assertion:
@@ -359,8 +371,10 @@ def answer_choices(
     key: UnknownKey, model: SystemModel, catalog: AssertionCatalog | None
 ) -> tuple[str, ...]:
     """The values an answer to this fact may take, or empty for free text."""
-    element_id, attribute, assertion, _, question = key
+    element_id, attribute, assertion, _, question, _ = key
     kind = fact_kind(key)
+    if kind == "capability":
+        return YES_NO
     if kind == "question":
         asked = QUESTION_KINDS.get(question)
         return YES_NO if asked is not None and asked.answer == "yes-no" else ()
@@ -671,7 +685,7 @@ def check_fact_answers(
 
     Checked before a resumed run is admitted, against the model and catalog
     the questions were asked about, so a wrong answer costs nothing. A key
-    names one fact in one of the four spellings, as
+    names one fact in one of the five spellings, as
     :attr:`~analysis_service.claims.UnknownRef.spellings` reads them.
 
     ``earlier`` is what the earlier rounds answered. An attribute one of them
@@ -682,14 +696,16 @@ def check_fact_answers(
     prepared = prepared_model(model, catalog)
     answered_before = {answer.key for answer in earlier}
     settled_before = {answer.key for answer in earlier if answer.known}
+    stated = prepared.capability_facts()
     for answer in answers:
-        element_id, attribute, assertion, subject, question = answer.key
+        element_id, attribute, assertion, subject, question, capability = answer.key
         ref = UnknownRef.model_construct(
             element_id=element_id,
             attribute=attribute,
             assertion=assertion,
             subject=subject,
             question=question,
+            capability=capability,
         )
         if len(ref.spellings) != 1:
             raise ValueError(f"an answer's key names one fact, not {answer.key!r}")
@@ -714,6 +730,18 @@ def check_fact_answers(
             catalog is None or _answered_row(catalog, assertion) is None
         ):
             raise ValueError(f"no open assertion row {assertion!r}")
+        elif kind == "capability":
+            if capability not in CAPABILITIES:
+                raise ValueError(f"no capability {capability!r}")
+            known = stated.get(capability)
+            if (
+                answer.key not in answered_before
+                and known is not None
+                and known.state != UNKNOWN
+            ):
+                raise ValueError(
+                    f"the sources state {capability!r}, so it takes no answer"
+                )
         if len(fact_line(answer)) > MAX_QUOTE_CHARS:
             raise ValueError(
                 f"an answer's line may hold {MAX_QUOTE_CHARS} characters; shorten"
@@ -729,9 +757,32 @@ def check_fact_answers(
         if choices and answer.value not in choices:
             raise ValueError(
                 f"{answer.value!r} is not one of {', '.join(choices)} for"
-                f" {attribute or assertion or subject!r}"
+                f" {attribute or assertion or subject or capability!r}"
             )
+    _check_capability_lineage(answers)
     _check_attribute_values(answers, model)
+
+
+def _check_capability_lineage(answers: Sequence[FactAnswer]) -> None:
+    """Refuse a "yes" to a capability whose parent the same round answers "no".
+
+    An absent parent makes each child absent, so the two answers cannot both
+    hold, and the round would leave the child present under an absent parent.
+    """
+    said = {
+        answer.key[5]: answer.value
+        for answer in answers
+        if answer.kind == "capability" and answer.known
+    }
+    for key, value in said.items():
+        parent = CAPABILITIES[key].parent if key in CAPABILITIES else ""
+        while parent:
+            if value == "yes" and said.get(parent) == "no":
+                raise ValueError(
+                    f"{key!r} is part of {parent!r}, which the same answers say"
+                    " the application does not have"
+                )
+            parent = CAPABILITIES[parent].parent
 
 
 def _check_attribute_values(answers: Sequence[FactAnswer], model: SystemModel) -> None:
@@ -761,12 +812,17 @@ def _check_attribute_values(answers: Sequence[FactAnswer], model: SystemModel) -
 
 
 def answered_model(model: SystemModel, answers: Sequence[FactAnswer]) -> SystemModel:
-    """The model with every attribute answer written in, and noted on its element.
+    """The model with every attribute and capability answer written in.
 
-    The answer settles the attribute, so an
+    An attribute answer settles the attribute, so an
     :class:`~analysis_service.system_model.Assumption` that named it as inferred
     is removed. The note keeps who settled it. An ``unknown`` answer writes only
     the note, so the attribute stays open.
+
+    A capability answer replaces every statement about that capability with
+    one that quotes the answer's line of the answers Source: "yes" is
+    ``present`` and "no" is ``absent``. An ``unknown`` answer writes nothing,
+    so the capability stays open.
     """
     data = model.model_dump(mode="json")
     by_id = {
@@ -783,7 +839,7 @@ def answered_model(model: SystemModel, answers: Sequence[FactAnswer]) -> SystemM
     for answer in answers:
         if answer.kind != "attribute":
             continue
-        element_id, attribute, _, _, _ = answer.key
+        element_id, attribute, *_ = answer.key
         element = by_id.get(element_id)
         if element is None:
             continue
@@ -805,6 +861,24 @@ def answered_model(model: SystemModel, answers: Sequence[FactAnswer]) -> SystemM
         assumption
         for assumption in data.get("assumptions", [])
         if (assumption["element_id"], assumption["attribute"]) not in answered
+    ]
+    capabilities = {
+        answer.key[5]: answer
+        for answer in answers
+        if answer.kind == "capability" and answer.known
+    }
+    data["capabilities"] = [
+        statement
+        for statement in data.get("capabilities", [])
+        if statement["capability"] not in capabilities
+    ] + [
+        {
+            "capability": key,
+            "state": "present" if answer.value == "yes" else "absent",
+            "source_excerpt": fact_line(answer),
+            "source_label": ANSWERS_LABEL,
+        }
+        for key, answer in capabilities.items()
     ]
     return SystemModel.model_validate(data)
 

@@ -111,6 +111,7 @@
         "authentication",
         "",
         "",
+        "",
         ""
       ],
       "value": "session cookie issued after email and password login; no MFA"
@@ -121,6 +122,7 @@
         "authentication",
         "",
         "",
+        "",
         ""
       ],
       "value": "none; accepted by network position"
@@ -129,6 +131,7 @@
       "key": [
         "flow:process:order-service>store:orders-db>read-write-orders",
         "authentication",
+        "",
         "",
         "",
         ""

@@ -47,9 +47,9 @@ def sized(key, length):
 @pytest.mark.parametrize(
     "key",
     [
-        ("", "", "", "who rotates the signing keys?", ""),
-        ("", "", "", "s" * 300, ""),
-        (FLOW, "data_description", "", "", ""),
+        ("", "", "", "who rotates the signing keys?", "", ""),
+        ("", "", "", "s" * 300, "", ""),
+        (FLOW, "data_description", "", "", "", ""),
     ],
     ids=["subject", "longest-subject", "attribute"],
 )
@@ -80,25 +80,28 @@ class TestOneFactHasOneSpelling:
         ("sent", "kept"),
         [
             (
-                (FLOW, "", " ", " ", "code-execution"),
-                (FLOW, "", "", "", "code-execution"),
+                (FLOW, "", " ", " ", "code-execution", ""),
+                (FLOW, "", "", "", "code-execution", ""),
             ),
-            ((FLOW, "exposure", " ", "", ""), (FLOW, "exposure", "", "", "")),
-            (("", "", "", "who?", ""), ("", "", "", "who?", "")),
+            ((FLOW, "exposure", " ", "", "", ""), (FLOW, "exposure", "", "", "", "")),
+            (("", "", "", "who?", "", ""), ("", "", "", "who?", "", "")),
+            (("", "", " ", "", "", "oauth"), ("", "", "", "", "", "oauth")),
         ],
-        ids=["question", "attribute", "subject"],
+        ids=["question", "attribute", "subject", "capability"],
     )
     def test_a_part_the_spelling_does_not_read_is_blank(self, sent, kept):
         assert FactAnswer(key=sent, value="yes").key == kept
 
     def test_two_spellings_of_one_fact_merge_to_one_answer(self):
         """Both answers landed, and every lane prompt carried both lines."""
-        first = FactAnswer(key=(FLOW, "", "", "", "code-execution"), value="yes")
-        second = FactAnswer(key=(FLOW, "", " ", "", "code-execution"), value="no")
+        first = FactAnswer(key=(FLOW, "", "", "", "code-execution", ""), value="yes")
+        second = FactAnswer(key=(FLOW, "", " ", "", "code-execution", ""), value="no")
         assert merged_facts([first], [second]) == [second]
 
     def test_a_key_with_two_spellings_is_still_refused(self):
-        answer = FactAnswer(key=(FLOW, "exposure", "", "who?", ""), value="internal")
+        answer = FactAnswer(
+            key=(FLOW, "exposure", "", "who?", "", ""), value="internal"
+        )
         with pytest.raises(ValueError, match="names one fact"):
             check_fact_answers([answer], valid_model(), None)
 
@@ -112,7 +115,7 @@ class TestOnlyAnAskedFactTakesAnAnswer:
         return question_set(
             checkpoint.system_model,
             checkpoint.assertions.catalog,
-            ["stride"],
+            {"stride": {}},
             [],
             waiting=True,
         ).asked
@@ -121,7 +124,7 @@ class TestOnlyAnAskedFactTakesAnAnswer:
         asked = self.asked()
         for element in valid_model().elements():
             for name, kind in QUESTION_KINDS.items():
-                key = (element.id, "", "", "", name)
+                key = (element.id, "", "", "", name, "")
                 if key not in asked and kind.answer == "yes-no":
                     return key
         pytest.fail("every yes-no kind is asked of every element")
@@ -139,7 +142,7 @@ class TestOnlyAnAskedFactTakesAnAnswer:
         assert served, "a control: the waiting job asks something"
 
     @pytest.mark.parametrize(
-        "key", ["unasked-kind", ("", "", "", "an invented question", "")]
+        "key", ["unasked-kind", ("", "", "", "an invented question", "", "")]
     )
     def test_an_unasked_fact_is_refused_at_the_route(self, key):
         client, store = catalog_client()
@@ -171,7 +174,7 @@ class TestOnlyAnAskedFactTakesAnAnswer:
         """A stated attribute is no longer asked, and the round that stated it
         may change it."""
         checkpoint = held()
-        earlier = FactAnswer(key=(FLOW, "", "", "", "code-execution"), value="yes")
+        earlier = FactAnswer(key=(FLOW, "", "", "", "code-execution", ""), value="yes")
         again = FactAnswer(key=earlier.key, value="no")
         check_answers(
             [],
@@ -184,7 +187,7 @@ class TestOnlyAnAskedFactTakesAnAnswer:
 
 
 def asked_of(catalog, *, waiting):
-    return question_set(valid_model(), catalog, ["stride"], [], waiting=waiting)
+    return question_set(valid_model(), catalog, {"stride": {}}, [], waiting=waiting)
 
 
 def admit(questions, links=(), facts=()):

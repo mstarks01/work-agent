@@ -27,9 +27,9 @@ from tests.factories import sample_selection
 from tests.test_evals_modes import build, case  # noqa: F401  (fixture)
 
 STORE = "store:orders-db"
-AT_REST = FactAnswer(key=(STORE, "encryption_at_rest", "", "", ""), value="AES-256")
+AT_REST = FactAnswer(key=(STORE, "encryption_at_rest", "", "", "", ""), value="AES-256")
 KIND = FactAnswer(
-    key=(STORE, "", "", "", "audit-evidence"), value="an append-only audit table"
+    key=(STORE, "", "", "", "audit-evidence", ""), value="an append-only audit table"
 )
 
 
@@ -102,7 +102,7 @@ class TestTheSignedAnswers:
 
     def test_an_answer_the_model_cannot_take_is_refused(self, tmp_path, case):  # noqa: F811
         wrong = FactAnswer(
-            key=("store:nowhere", "", "", "", "audit-evidence"), value="x"
+            key=("store:nowhere", "", "", "", "audit-evidence", ""), value="x"
         )
         signed_file(tmp_path, case.id, [wrong])
         with pytest.raises(modes.EvalRunError, match="no question"):

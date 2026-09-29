@@ -89,7 +89,7 @@ def test_the_label_is_the_kind_s_question_about_the_element_s_name():
 
 
 class TestTheAnswer:
-    KEY = (STORE, "", "", "", "audit-evidence")
+    KEY = (STORE, "", "", "", "audit-evidence", "")
 
     def test_it_is_answered_in_its_facets(self):
         answer = FactAnswer(key=self.KEY, facets={"records-actor": "yes"})
@@ -103,7 +103,7 @@ class TestTheAnswer:
 
     def test_it_is_refused_about_an_element_that_does_not(self):
         wrong = FactAnswer(
-            key=("store:nowhere", "", "", "", "audit-evidence"),
+            key=("store:nowhere", "", "", "", "audit-evidence", ""),
             facets={"records-actor": "yes"},
         )
         with pytest.raises(ValueError, match="no question"):
@@ -206,7 +206,7 @@ class TestTheFacets:
                 assert facet.question.endswith("?")
 
     def test_the_value_lists_the_facets_in_the_kind_s_order(self):
-        key = (STORE, "", "", "", "capacity-limits")
+        key = (STORE, "", "", "", "capacity-limits", "")
         answer = FactAnswer(key=key, facets={"quota": "no", "rate": "yes"})
         assert answer.value == (
             "Does it limit the rate of requests? yes;"
@@ -214,7 +214,7 @@ class TestTheFacets:
         )
 
     def test_only_unknown_facets_are_an_unknown_answer(self):
-        key = (STORE, "", "", "", "capacity-limits")
+        key = (STORE, "", "", "", "capacity-limits", "")
         answer = FactAnswer(key=key, facets={"rate": UNKNOWN})
         assert not answer.known
         assert answer.value == UNKNOWN
@@ -229,14 +229,16 @@ class TestTheFacets:
     )
     def test_a_bad_facet_answer_is_refused(self, facets, error):
         with pytest.raises(ValueError, match=error):
-            FactAnswer(key=(STORE, "", "", "", "capacity-limits"), facets=facets)
+            FactAnswer(key=(STORE, "", "", "", "capacity-limits", ""), facets=facets)
 
     def test_facets_are_refused_for_a_kind_without_them(self):
         with pytest.raises(ValueError, match="only a question kind that has facets"):
-            FactAnswer(key=(STORE, "", "", "", "code-execution"), facets={"x": "yes"})
+            FactAnswer(
+                key=(STORE, "", "", "", "code-execution", ""), facets={"x": "yes"}
+            )
 
     def test_a_value_beside_facets_must_be_the_written_one(self):
-        key = (STORE, "", "", "", "capacity-limits")
+        key = (STORE, "", "", "", "capacity-limits", "")
         with pytest.raises(ValueError, match="writes a facet answer"):
             FactAnswer(key=key, facets={"rate": "yes"}, value="something else")
         written = FactAnswer(key=key, facets={"rate": "yes"})
