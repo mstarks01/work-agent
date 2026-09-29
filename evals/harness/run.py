@@ -1524,6 +1524,14 @@ def command_migrate(args: argparse.Namespace) -> int:
     lifted, refused = 0, 0
     for source in sorted(Path(p) for p in args.artifact):
         target = out / source.name if out.is_dir() or len(args.artifact) > 1 else out
+        if target.resolve() == source.resolve():
+            print(
+                f"cannot lift {source}: the copy would replace it; name another --out",
+                file=sys.stderr,
+            )
+            refused += 1
+            continue
+        before = target.read_bytes() if target.is_file() else None
         # Per file, and the walk carries on. This exists to lift an archive,
         # and an archive holds files a lift cannot help: a sweep from before
         # execution identities were recorded is refused by the loader for a
@@ -1536,7 +1544,11 @@ def command_migrate(args: argparse.Namespace) -> int:
             load_artifact(target)
         except ProvenanceError as error:
             print(f"cannot lift {source}: {error}", file=sys.stderr)
-            target.unlink(missing_ok=True)
+            # Put back what was there, so a refusal removes only its own copy.
+            if before is None:
+                target.unlink(missing_ok=True)
+            else:
+                target.write_bytes(before)
             refused += 1
             continue
         print(f"{source} (version {was}) -> {target}")
