@@ -33,14 +33,13 @@ from __future__ import annotations
 import logging
 import os
 import time
-import unicodedata
 from collections.abc import Callable, Mapping
 from typing import Any, Protocol
 
 import jwt
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator
 
-from analysis_service.sources import FORMATTING_CATEGORIES
+from analysis_service.sources import plain_name
 
 logger = logging.getLogger(__name__)
 
@@ -112,13 +111,6 @@ JWKS_TIMEOUT_SECONDS = 5.0
 # the key cache. This caps re-fetches to one per interval: a `kid` missing from
 # the cached set fails fast while the cooldown holds.
 JWKS_REFRESH_COOLDOWN_SECONDS = 60.0
-
-# Unicode general categories refused in a token subject: ``Cc`` the C0/C1
-# control characters (a newline here forges a log record), ``Cf`` the invisible
-# formatting ones. **The source label's own set, called rather than restated**:
-# the two spelled it apart, and a category added to one would have left the
-# other admitting what its neighbour refuses.
-_SUBJECT_REJECTED_CATEGORIES = FORMATTING_CATEGORIES
 
 
 class AuthConfigError(ValueError):
@@ -264,17 +256,17 @@ def _clean_subject(subject: str) -> str:
     ``require: ["sub"]`` only proves the claim is present, so PyJWT accepts an
     empty or whitespace ``sub``. That is the sole ownership key, with no RBAC
     above it, so two callers issued a blank ``sub`` would collapse into one
-    owner. A control character is rejected for a second reason: the subject
-    reaches a log line, and a newline would forge a second record there
-    (CWE-117).
+    owner. A line break or a control character is rejected for a second
+    reason: the subject reaches a log line, and a line break would forge a
+    second record there (CWE-117). :func:`~analysis_service.sources.plain_name`
+    is the rule, as it is for a source label.
     """
     if not subject.strip():
         raise AuthenticationError("token subject is empty")
-    if any(
-        unicodedata.category(char) in _SUBJECT_REJECTED_CATEGORIES for char in subject
-    ):
-        raise AuthenticationError("token subject contains a control character")
-    return subject
+    try:
+        return plain_name(subject)
+    except ValueError as error:
+        raise AuthenticationError(f"token subject {error}") from None
 
 
 class SigningKeyClient(Protocol):

@@ -128,8 +128,8 @@ API_REQUESTS: dict[str, ApiRequest] = {
     "/api/review-states": ApiRequest("get", writes=False),
     "/api/read-only": ApiRequest("get", params={"case": CASE}, writes=False),
     # Reads the operator's `gh` login, which is a fact about their machine
-    # rather than anything in the store. It takes the token for that reason
-    # and is tested for it in tests/test_sitting_feedback.py.
+    # rather than anything in the store. It takes the origin check and the
+    # token for that reason, and tests/test_sitting_feedback.py tests both.
     "/api/contribution-status": ApiRequest("get", writes=False),
     "/api/own-list": ApiRequest(
         "post", json={"case": CASE, "items": OWN_LIST}, writes=True

@@ -754,7 +754,14 @@ def create_app(
     behind their back is how an app comes to enforce bounds its deployment never
     chose.
     """
-    app = FastAPI(title="Security Analysis Service")
+    # No schema routes: the schema states the bounds and the source kinds a
+    # caller may not send, and the three webapps close them too.
+    app = FastAPI(
+        title="Security Analysis Service",
+        docs_url=None,
+        redoc_url=None,
+        openapi_url=None,
+    )
     app.state.store = store if store is not None else build_store()
     if runner is not None:
         app.state.runner_for = lambda selection, entry=ENTRY_EXTRACT: runner

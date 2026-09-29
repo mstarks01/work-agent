@@ -458,6 +458,7 @@ def create_app(session: Session) -> FastAPI:
         # operator's machine. It goes only to a request that proved it read
         # the page, which is what the token proves; a read that never did is
         # a stranger asking.
+        base.refuse_cross_origin(request)
         base.require_token(request, session)
         login = _gh_login(session.root)
         return JSONResponse({"mode": "direct" if login else "browser", "author": login})

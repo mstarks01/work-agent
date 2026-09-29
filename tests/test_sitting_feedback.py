@@ -410,7 +410,8 @@ def test_contribution_status_needs_the_page_token(tmp_path: Path, monkeypatch):
     """Whether a `gh` login exists is a fact about the operator's machine.
 
     It reaches a request that read the page and no other, which is what the
-    token proves. The page sends it on that one read.
+    token proves, and that the page's own origin sent. The page sends the
+    token on that one read.
     """
     tree = tree_for(tmp_path)
     client, _ = client_for(tree)
@@ -418,6 +419,12 @@ def test_contribution_status_needs_the_page_token(tmp_path: Path, monkeypatch):
 
     bare = TestClient(client.app, base_url=str(client.base_url))
     assert bare.get("/api/contribution-status").status_code == 403
+    cross = TestClient(
+        client.app,
+        base_url=str(client.base_url),
+        headers={"X-Sitting-Token": client.headers["X-Sitting-Token"]},
+    )
+    assert cross.get("/api/contribution-status").status_code == 403
     told = client.get("/api/contribution-status")
     assert told.status_code == 200
     assert told.json() == {"mode": "direct", "author": "ada"}
