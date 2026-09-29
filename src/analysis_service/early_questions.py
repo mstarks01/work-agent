@@ -27,7 +27,11 @@ list and covered one more finding in 337 (``QA-2026-09-26-03-E17``).
 **The prior is a table with its provenance.** ``question_prior.json`` holds one
 row per framework in :data:`~analysis_service.frameworks.PACKAGES`, and each
 row names the runs it was counted from. ``run.py question-prior`` writes a
-row. A framework whose row counted no run asks nothing early.
+row. A framework whose row counted no run asks nothing ranked by it.
+
+**A capability question needs no prior.** A framework whose units apply by a
+rule over capabilities counts how many units each unknown capability could
+settle, and those questions come first (:func:`capability_questions`).
 
 An answer takes the path a fact answer after the report takes: a
 :class:`~analysis_service.answer_round.QuestionSet` admits it, and the resumed
@@ -38,13 +42,15 @@ from __future__ import annotations
 
 import json
 from collections import Counter
-from collections.abc import Mapping, Sequence
+from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
 from types import MappingProxyType
+from typing import Any
 
 from analysis_service.assertions import AssertionCatalog
 from analysis_service.candidates import generate_candidates
+from analysis_service.capabilities import CAPABILITIES, lineage
 from analysis_service.claims import (
     FrameworkName,
     UnknownKey,
@@ -54,6 +60,7 @@ from analysis_service.frameworks import PACKAGES
 from analysis_service.open_facts import element_names, group_of, label_of
 from analysis_service.question_kinds import QUESTION_KINDS, Facet
 from analysis_service.questions import (
+    YES_NO,
     AnswerForm,
     FactKind,
     answer_choices,
@@ -72,6 +79,7 @@ __all__ = [
     "QUESTION_PRIOR_PATH",
     "EarlyQuestion",
     "PriorRow",
+    "capability_questions",
     "early_questions",
     "element_type",
     "load_prior",
@@ -156,6 +164,9 @@ class EarlyQuestion:
     group: str
     group_heading: str
     element: str
+    #: The key of the question this one depends on: a capability's parent,
+    #: whose "no" makes this one moot. ``None`` for every other question.
+    parent: UnknownKey | None = None
 
     def to_json(self) -> dict[str, object]:
         return {
@@ -170,6 +181,7 @@ class EarlyQuestion:
             "group": self.group,
             "group_heading": self.group_heading,
             "element": self.element,
+            "parent": None if self.parent is None else list(self.parent),
         }
 
 
@@ -184,14 +196,16 @@ def _open_key(model: SystemModel, element: Element, field: str) -> UnknownKey | 
 
 def early_questions(
     model: SystemModel,
-    frameworks: Sequence[FrameworkName],
+    frameworks: Mapping[FrameworkName, Mapping[str, Any]],
     catalog: AssertionCatalog | None,
     prior: Mapping[FrameworkName, PriorRow] = QUESTION_PRIOR,
 ) -> tuple[EarlyQuestion, ...]:
     """Every open fact the prior names for this model, the most likely cited first.
 
-    Read off the model with the catalog applied, which is the model the lanes
-    will read, so a fact the catalog states is not asked.
+    ``frameworks`` maps each framework the job selected to its options. Read
+    off the model with the catalog applied, which is the model the lanes will
+    read, so a fact the catalog states is not asked. The capability questions
+    come first (:func:`capability_questions`).
     """
     model = prepared_model(model, catalog)
     score: dict[UnknownKey, float] = {}
@@ -235,4 +249,63 @@ def early_questions(
                 element=names.get(key[0], key[0]),
             )
         )
-    return tuple(asked)
+    return (*capability_questions(model, frameworks), *asked)
+
+
+def capability_questions(
+    model: SystemModel, frameworks: Mapping[FrameworkName, Mapping[str, Any]]
+) -> tuple[EarlyQuestion, ...]:
+    """Every unknown capability a selected framework's applicability rule needs.
+
+    **No prior decides these.** A framework's own rule says which of its units
+    an answer settles, so the need is proven before any run. Each question
+    states how many units it could settle, summed over the frameworks.
+
+    **A parent comes first, and its children follow it.** Roots are ordered by
+    their count, and each root is followed by its descendants in the same
+    order. A child names its parent, so a page can hide it until the parent is
+    answered "yes", and the answer check refuses a "yes" under a "no".
+    """
+    counts: Counter[str] = Counter()
+    for name, options in frameworks.items():
+        counts.update(PACKAGES[name].record.open_capabilities(model, options))
+
+    def asked_parent(key: str) -> str:
+        return next((parent for parent in lineage(key) if parent in counts), "")
+
+    def root(key: str) -> str:
+        parent = asked_parent(key)
+        return root(parent) if parent else key
+
+    def depth(key: str) -> int:
+        parent = asked_parent(key)
+        return depth(parent) + 1 if parent else 0
+
+    order = sorted(
+        counts,
+        key=lambda key: (-counts[root(key)], root(key), depth(key), -counts[key], key),
+    )
+    questions = []
+    for key in order:
+        ref = UnknownRef(capability=key)
+        group, heading = group_of(ref)
+        parent = asked_parent(key)
+        questions.append(
+            EarlyQuestion(
+                key=ref.key,
+                kind="capability",
+                label=CAPABILITIES[key].question,
+                reasons=(
+                    f"An answer settles whether up to {counts[key]} units apply.",
+                ),
+                choices=YES_NO,
+                form="choice",
+                suggestions=(),
+                facets=(),
+                group=group,
+                group_heading=heading,
+                element=CAPABILITIES[key].question,
+                parent=UnknownRef(capability=parent).key if parent else None,
+            )
+        )
+    return tuple(questions)

@@ -223,6 +223,9 @@
       for (const [label, value] of FACET_CHOICES) select.append(optionOf(label, value));
       return select;
     };
+    // Each answer's input by its key, so a capability that is part of another
+    // can follow its parent's answer.
+    const inputs = new Map();
     data.facts.forEach((q, index) => {
       const group = groups.get(q.group);
       group.count += 1;
@@ -304,9 +307,19 @@
         beside = [input, " ", dontKnow];
       }
       input.dataset.key = JSON.stringify(q.key);
+      inputs.set(input.dataset.key, input);
+      // A part of another capability is asked only once its parent is "yes".
+      // A hidden row sends no answer, so a "no" to the parent is never
+      // contradicted by an answer to its part.
+      const parent = q.parent ? inputs.get(JSON.stringify(q.parent)) : null;
+      if (parent) {
+        const follow = () => { row.hidden = parent.value !== "yes"; };
+        parent.addEventListener("change", follow);
+        follow();
+      }
       answers.push(() => {
         const value = input.value.trim();
-        return value ? { key: q.key, value } : null;
+        return value && !row.hidden ? { key: q.key, value } : null;
       });
       row.append(label, " ", ...beside);
       group.box.append(row);

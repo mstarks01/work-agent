@@ -15,8 +15,9 @@ may continue with no answers, and a finished one has nothing to continue.
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
+from typing import Any
 
 from analysis_service.assertions import AssertionCatalog
 from analysis_service.claims import FrameworkAnalysis, FrameworkName, UnknownKey
@@ -98,15 +99,16 @@ class QuestionSet:
 def question_set(
     model: SystemModel,
     catalog: AssertionCatalog | None,
-    frameworks: Sequence[FrameworkName],
+    frameworks: Mapping[FrameworkName, Mapping[str, Any]],
     analyses: Sequence[FrameworkAnalysis],
     *,
     waiting: bool,
 ) -> QuestionSet:
     """The questions a job asks: a waiting job's early list, or its report's list.
 
-    ``frameworks`` ranks the early list and ``analyses`` the report's list, so
-    a waiting job passes no analyses and a finished one's frameworks go unread.
+    ``frameworks`` maps each selected framework to its options, and ranks the
+    early list; ``analyses`` ranks the report's list. So a waiting job passes
+    no analyses, and a finished one's frameworks go unread.
     """
     return QuestionSet(
         model=model,

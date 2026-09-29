@@ -335,8 +335,8 @@ await ids.continue.listeners.click(); await settle();
 
 
 def test_the_form_script_sends_an_early_answer_with_the_links():
-    key = [valid_model().data_flows[0].id, "encryption_in_transit", "", "", ""]
-    kind = [valid_model().data_stores[0].id, "", "", "", "audit-evidence"]
+    key = [valid_model().data_flows[0].id, "encryption_in_transit", "", "", "", ""]
+    kind = [valid_model().data_stores[0].id, "", "", "", "audit-evidence", ""]
     facts = [
         {
             "key": key,
@@ -376,7 +376,14 @@ def test_the_form_script_follows_a_run_the_report_page_started():
 #: One answer to the valid model's first flow's transport protection.
 FACT = MappingProxyType(
     {
-        "key": (valid_model().data_flows[1].id, "encryption_in_transit", "", "", ""),
+        "key": (
+            valid_model().data_flows[1].id,
+            "encryption_in_transit",
+            "",
+            "",
+            "",
+            "",
+        ),
         "value": "TLS 1.3",
     }
 )
@@ -413,7 +420,10 @@ class TestFactAnswers:
         client = client_for(tiers, runner)
         finished = start(client, questions=False)
         client.get(f"/events/{finished}")
-        wrong = {"key": [FACT["key"][0], "exposure", "", "", ""], "value": "internal"}
+        wrong = {
+            "key": [FACT["key"][0], "exposure", "", "", "", ""],
+            "value": "internal",
+        }
         response = client.post(
             f"/answer/{finished}",
             json={"links": [], "facts": [wrong]},
@@ -516,7 +526,7 @@ def test_the_report_page_sends_both_kinds_of_answer_and_follows_the_run():
                 "findings": ["stride/I-01", "stride/T-01"],
             },
             {
-                "key": ["", "", "", "whether queries are bound", ""],
+                "key": ["", "", "", "whether queries are bound", "", ""],
                 "kind": "subject",
                 "label": "whether queries are bound",
                 "cited_by": 1,
@@ -613,7 +623,7 @@ class TestTheRunningCount:
     def test_it_counts_answers_given_out_of_order(self):
         questions = [
             {
-                "key": ["", "", "", "a", ""],
+                "key": ["", "", "", "a", "", ""],
                 "kind": "subject",
                 "basis": "critic",
                 "label": "a",
@@ -623,7 +633,7 @@ class TestTheRunningCount:
                 "findings": ["stride/S-01"],
             },
             {
-                "key": ["", "", "", "b", ""],
+                "key": ["", "", "", "b", "", ""],
                 "kind": "subject",
                 "basis": "critic",
                 "label": "b",
@@ -639,7 +649,7 @@ class TestTheRunningCount:
 
 def test_the_report_page_says_how_many_facts_fell_back_to_free_text():
     question = {
-        "key": ["", "", "", "a", ""],
+        "key": ["", "", "", "a", "", ""],
         "kind": "subject",
         "basis": "critic",
         "label": "a",
@@ -753,7 +763,7 @@ calls.push({ list: list.id, points: input.list,
 
 def test_the_form_script_sends_a_control_s_state():
     """At the pause too, "There is none" sends ``none``."""
-    key = [valid_model().data_flows[0].id, "encryption_in_transit", "", "", ""]
+    key = [valid_model().data_flows[0].id, "encryption_in_transit", "", "", "", ""]
     facts = [
         {
             "key": key,
@@ -809,7 +819,7 @@ def test_the_form_script_asks_each_group_once_with_a_row_per_element():
 
     def fact(element, name, choices):
         return {
-            "key": [element.id, "", "", "", name],
+            "key": [element.id, "", "", "", name, ""],
             "kind": "question",
             "label": name,
             "reasons": ["why"],
@@ -857,7 +867,7 @@ await ids.continue.listeners.click(); await settle();
 def facet_fact(element, kind="capacity-limits"):
     facets = QUESTION_KINDS[kind].facets
     return {
-        "key": [element.id, "", "", "", kind],
+        "key": [element.id, "", "", "", kind, ""],
         "kind": "question",
         "label": kind,
         "reasons": [],

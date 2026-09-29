@@ -55,7 +55,9 @@ def prior_of(rates) -> dict[str, PriorRow]:
 
 
 def keys(rates, model=None):
-    asked = early_questions(model or valid_model(), ["stride"], None, prior_of(rates))
+    asked = early_questions(
+        model or valid_model(), {"stride": {}}, None, prior_of(rates)
+    )
     return [question.key for question in asked]
 
 
@@ -83,11 +85,11 @@ class TestThePriorTable:
 class TestWhatIsAsked:
     def test_an_unknown_attribute_is_asked_and_a_stated_one_is_not(self):
         asked = keys({"DataStore": {"encryption_at_rest": 1.0, "technology": 1.0}})
-        assert asked == [(STORE, "encryption_at_rest", "", "", "")]
+        assert asked == [(STORE, "encryption_at_rest", "", "", "", "")]
 
     def test_every_kind_the_prior_names_is_asked(self):
         asked = keys({"DataStore": {"audit-evidence": 1.0}})
-        assert asked == [(STORE, "", "", "", "audit-evidence")]
+        assert asked == [(STORE, "", "", "", "audit-evidence", "")]
 
     def test_a_zone_is_asked_only_where_the_service_inferred_it(self):
         rates = {"DataStore": {ZONE_ATTRIBUTE: 1.0}}
@@ -101,24 +103,26 @@ class TestWhatIsAsked:
                 basis="the sources are silent",
             )
         )
-        assert keys(rates, model) == [(STORE, ZONE_ATTRIBUTE, "", "", "")]
+        assert keys(rates, model) == [(STORE, ZONE_ATTRIBUTE, "", "", "", "")]
 
     def test_a_qualified_unknown_is_asked(self):
         """The reading the evidence catalog uses, not an exact match (#1289, Q4)."""
         model = valid_model()
         model.get(STORE).encryption_at_rest = "unknown; the sources are silent"
         asked = keys({"DataStore": {"encryption_at_rest": 1.0}}, model)
-        assert asked == [(STORE, "encryption_at_rest", "", "", "")]
+        assert asked == [(STORE, "encryption_at_rest", "", "", "", "")]
 
     def test_an_unknown_zone_is_asked_without_an_assumption(self):
         model = valid_model()
         model.get(STORE).trust_zone = "unknown"
         assert keys({"DataStore": {ZONE_ATTRIBUTE: 1.0}}, model) == [
-            (STORE, ZONE_ATTRIBUTE, "", "", "")
+            (STORE, ZONE_ATTRIBUTE, "", "", "", "")
         ]
 
-    def test_a_framework_whose_row_counted_no_run_asks_nothing(self):
-        assert early_questions(valid_model(), ["asvs"], None) == ()
+    def test_a_framework_whose_row_counted_no_run_asks_only_capabilities(self):
+        asked = early_questions(valid_model(), {"asvs": {"level": 1}}, None)
+        assert asked
+        assert {question.kind for question in asked} == {"capability"}
 
 
 class TestTheOrder:
@@ -141,7 +145,7 @@ class TestTheOrder:
     def test_a_question_says_which_rules_make_it_matter(self):
         (question,) = early_questions(
             valid_model(),
-            ["stride"],
+            {"stride": {}},
             None,
             prior_of({"DataStore": {"audit-evidence": 1.0}}),
         )
@@ -153,7 +157,7 @@ class TestTheOrder:
 def test_every_early_question_takes_an_answer_the_answer_rules_accept():
     """The early list and the answers route are two readers of one model."""
     model = valid_model()
-    for question in early_questions(model, ["stride"], None):
+    for question in early_questions(model, {"stride": {}}, None):
         if question.facets:
             answer = FactAnswer(key=question.key, facets={question.facets[0].id: "yes"})
         else:
@@ -164,10 +168,11 @@ def test_every_early_question_takes_an_answer_the_answer_rules_accept():
 
 def test_the_shipped_prior_puts_an_unknown_attribute_near_the_top():
     asked = [
-        question.key for question in early_questions(valid_model(), ["stride"], None)
+        question.key
+        for question in early_questions(valid_model(), {"stride": {}}, None)
     ]
     assert asked[0][1] or asked[0][4]
-    assert (STORE, "encryption_at_rest", "", "", "") in asked[:3]
+    assert (STORE, "encryption_at_rest", "", "", "", "") in asked[:3]
     assert all(
         getattr(valid_model().get(key[0]), key[1]) == UNKNOWN
         for key in asked
@@ -180,7 +185,9 @@ class TestTheRoute:
         client, store = catalog_client()
         job = waiting(store)
         body = client.get(f"/v1/jobs/{job}/questions", headers=auth()).json()
-        expected = early_questions(valid_model(), ["stride"], store_catalog(store, job))
+        expected = early_questions(
+            valid_model(), {"stride": {}}, store_catalog(store, job)
+        )
         assert body["early_questions"] == [q.to_json() for q in expected]
         assert body["early_questions"]
 
@@ -216,7 +223,7 @@ class TestTheGroups:
     def test_each_question_carries_its_group_and_its_element(self):
         (question,) = early_questions(
             valid_model(),
-            ["stride"],
+            {"stride": {}},
             None,
             prior_of({"DataStore": {"audit-evidence": 1.0}}),
         )
@@ -225,7 +232,7 @@ class TestTheGroups:
 
     def test_a_case_asks_few_groups_however_many_elements_it_holds(self):
         """About 18 groups on every corpus case, where the list held 60-126."""
-        groups = {q.group for q in early_questions(valid_model(), ["stride"], None)}
+        groups = {q.group for q in early_questions(valid_model(), {"stride": {}}, None)}
         assert len(groups) <= len(QUESTION_KINDS) + len(all_attribute_names())
 
 

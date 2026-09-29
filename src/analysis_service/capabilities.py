@@ -34,7 +34,7 @@ maintainer reads it.
 
 from __future__ import annotations
 
-from collections.abc import Iterator, Mapping, Sequence
+from collections.abc import Iterable, Iterator, Mapping, Sequence
 from dataclasses import dataclass
 from types import MappingProxyType
 from typing import Literal, TypeAlias
@@ -51,6 +51,8 @@ __all__ = [
     "evaluate",
     "expression_issues",
     "expression_keys",
+    "lineage",
+    "open_capability_counts",
     "resolve",
 ]
 
@@ -421,7 +423,7 @@ class Decision:
     missing: tuple[str, ...] = ()
 
 
-def _lineage(key: str) -> Iterator[str]:
+def lineage(key: str) -> Iterator[str]:
     """The key's ancestors, nearest first."""
     parent = CAPABILITIES[key].parent
     while parent:
@@ -446,13 +448,13 @@ def resolve(known: Mapping[str, CapabilityFact]) -> Mapping[str, CapabilityFact]
             continue
         absent = [
             ancestor
-            for ancestor in _lineage(key)
+            for ancestor in lineage(key)
             if ancestor in known and known[ancestor].state == "absent"
         ]
         present = [
             other
             for other, found in known.items()
-            if found.state == "present" and key in _lineage(other)
+            if found.state == "present" and key in lineage(other)
         ]
         if absent and not present:
             source = known[absent[0]]
@@ -462,6 +464,22 @@ def resolve(known: Mapping[str, CapabilityFact]) -> Mapping[str, CapabilityFact]
             fact = CapabilityFact(key, "present", source.evidence, source.key)
         resolved[key] = fact
     return MappingProxyType(resolved)
+
+
+def open_capability_counts(decisions: Iterable[Decision]) -> dict[str, int]:
+    """How many unknown decisions each capability, or a descendant of it, would settle.
+
+    A decision counts once for a capability, however many of its missing keys
+    sit under it.
+    """
+    counts: dict[str, int] = {}
+    for decision in decisions:
+        credited = {
+            key for missing in decision.missing for key in (missing, *lineage(missing))
+        }
+        for key in credited:
+            counts[key] = counts.get(key, 0) + 1
+    return counts
 
 
 def _union(decisions: Sequence[Decision], field: str) -> tuple:

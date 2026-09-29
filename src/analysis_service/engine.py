@@ -258,7 +258,7 @@ class Engine:
         return question_set(
             checkpoint.system_model,
             None if checkpoint.assertions is None else checkpoint.assertions.catalog,
-            self.frameworks,
+            {selection.name: selection.options for selection in self._frameworks},
             () if report is None else report.analyses,
             waiting=report is None,
         )

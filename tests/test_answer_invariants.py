@@ -153,7 +153,7 @@ def checkpoint(rows: list[Assertion]) -> Checkpoint:
 
 
 def answer(attribute: str, value: str) -> FactAnswer:
-    return FactAnswer(key=(FLOW, attribute, "", "", ""), value=value)
+    return FactAnswer(key=(FLOW, attribute, "", "", "", ""), value=value)
 
 
 def reaching(report, attribute: str) -> list[Assertion]:
@@ -256,7 +256,7 @@ def early_keys(checkpoint):
     return {
         question.key
         for question in early_questions(
-            checkpoint.system_model, ["stride"], catalog, PRIOR
+            checkpoint.system_model, {"stride": {}}, catalog, PRIOR
         )
     }
 
@@ -267,7 +267,7 @@ def test_every_early_question_is_admitted(reason):
     _, rows = SHAPES[reason]
     held = checkpoint(rows)
     catalog = held.assertions.catalog
-    for question in early_questions(held.system_model, ["stride"], catalog, PRIOR):
+    for question in early_questions(held.system_model, {"stride": {}}, catalog, PRIOR):
         attribute = question.key[1]
         value = (
             question.choices[0]
@@ -301,7 +301,7 @@ def test_the_pause_asks_exactly_what_the_lanes_read_open(reason, stated_by_extra
     held = checkpoint(rows)
     if stated_by_extraction:
         setattr(held.system_model.data_flows[0], attribute, "TLS 1.2")
-    key = (FLOW, attribute, "", "", "")
+    key = (FLOW, attribute, "", "", "", "")
     given = [answer(attribute, ANSWERS[attribute][0])]
     catalog = held.assertions.catalog
 

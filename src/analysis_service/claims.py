@@ -249,9 +249,9 @@ AttributeName = Annotated[str, BeforeValidator(_bare_attribute)]
 
 #: An open fact's identity: element, attribute, assertion row, subject and
 #: question kind. Read off :attr:`UnknownRef.key`, which is the one reader of it.
-UnknownKey = tuple[str, str, str, str, str]
-#: The four ways :class:`UnknownRef` names an open fact.
-Spelling = Literal["question", "attribute", "assertion", "subject"]
+UnknownKey = tuple[str, str, str, str, str, str]
+#: The five ways :class:`UnknownRef` names an open fact.
+Spelling = Literal["question", "attribute", "assertion", "subject", "capability"]
 
 
 class UnknownRef(BaseModel):
@@ -338,6 +338,11 @@ class UnknownRef(BaseModel):
             ),
         },
     )
+    #: The fifth spelling: a **Capability** of the whole application, by its
+    #: key in :data:`~analysis_service.capabilities.CAPABILITIES`. A framework's
+    #: applicability rule asks it before any finding exists, so no critic names
+    #: one, and the field stays off the provider schema.
+    capability: SkipJsonSchema[str] = Field(default="", max_length=60)
 
     @property
     def names_an_element(self) -> bool:
@@ -350,7 +355,7 @@ class UnknownRef(BaseModel):
 
     @property
     def spellings(self) -> tuple[Spelling, ...]:
-        """Which of the four spellings this reference uses. A sound one uses one.
+        """Which of the five spellings this reference uses. A sound one uses one.
 
         **The one reader of "how is this fact named".** The review seam sends
         back an entry that uses more than one,
@@ -367,12 +372,13 @@ class UnknownRef(BaseModel):
             or (bool(self.element_id) and not self.question),
             "assertion": bool(self.assertion.strip()),
             "subject": bool(self.subject.strip()),
+            "capability": bool(self.capability),
         }
         return tuple(name for name, on in used.items() if on)
 
     @property
     def key(self) -> UnknownKey:
-        """The four reference fields as one comparable value.
+        """The reference fields as one comparable value.
 
         **The one reader of "are these two references the same".** The pair
         was the whole of it while a reference could only name an element, and
@@ -388,6 +394,7 @@ class UnknownRef(BaseModel):
             self.assertion,
             self.subject,
             self.question,
+            self.capability,
         )
 
 
@@ -403,6 +410,8 @@ def name_unknown(ref: UnknownRef) -> str:
         return f"the open fact `{ref.assertion}`"
     if ref.names_an_element:
         return f"`{ref.attribute}` on `{ref.element_id}`"
+    if ref.capability:
+        return f"the capability `{ref.capability}`"
     return f"`{ref.subject}`"
 
 
@@ -932,6 +941,21 @@ class Claim(BaseModel):
         framework whose claims rest on the system's own shape inherits.
         """
         del model, options, lane
+        return {}
+
+    @classmethod
+    def open_capabilities(
+        cls, model: SystemModel, options: Mapping[str, Any]
+    ) -> dict[str, int]:
+        """Each unknown **Capability** whose answer this framework needs, and how much.
+
+        A framework whose units apply by a rule over capabilities counts, for
+        each capability the model leaves unknown, how many of its units that
+        answer could settle. The early questions ask those capabilities, the
+        largest count first. The neutral answer needs none, which is what a
+        framework with no applicability rule inherits.
+        """
+        del model, options
         return {}
 
     @classmethod
