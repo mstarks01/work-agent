@@ -41,7 +41,10 @@ attribute questions came from the critic section and named a stated attribute.
 takes it. Code writes nothing for it: an attribute keeps its value, an open
 assertion row stays open, and the fact covers no finding. The analysis reads
 it as a line of the answers Source. An `unknown` answer to a fact that an
-earlier round settled is refused, because it would reopen the fact.
+earlier round settled reopens the fact. A job waiting at its pause takes it,
+so a submitter can take back an answer they guessed, and every later round is
+read off the model without the old answer (#1289). A report's follow-up
+refuses it.
 
 **A rejected draft ranks the questions and is not counted.** Its facts still
 rank the evidence section, which keeps ADR 0046's stable order. No answer

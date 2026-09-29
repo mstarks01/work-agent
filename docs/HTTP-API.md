@@ -306,7 +306,9 @@ or where an earlier round of answers answered it. The model is read with the
 assertion catalog applied, as the analysis reads it, so a fact the catalog
 states takes no answer even while the job waits at its pause. An answer to an attribute that
 the sources state is refused with `400`. An `unknown` answer to a fact that an
-earlier round settled is refused too: send a value to change it.
+earlier round settled takes the earlier answer back while the job waits at its
+pause, and the fact is open again. A report's follow-up refuses it: send a
+value to change it.
 
 An attribute answer is written onto the model the new job analyses, and the
 element's notes say you gave it. The answer removes each unscoped catalog fact

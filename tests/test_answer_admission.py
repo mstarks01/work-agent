@@ -32,6 +32,7 @@ from analysis_service.questions import (
     answered_keys,
     check_fact_answers,
     fact_line,
+    open_attribute,
 )
 from analysis_service.system_model import attribute_names
 from tests.factories import valid_model
@@ -679,3 +680,69 @@ class TestTheRoundRevision:
         assert save(0)
         assert not save(0)
         assert save(1)
+
+
+class TestTakingAnAnswerBack:
+    """A guessed answer could be changed to anything but "I don't know" (#1289)."""
+
+    def attribute_question(self):
+        asked = _asked_after([])
+        question = next((q for q in asked.early if q.kind == "attribute"), None)
+        if question is None:
+            pytest.skip("the test model asks no attribute early")
+        return question
+
+    def known(self, question):
+        value = question.choices[0] if question.choices else "TLS 1.3"
+        return FactAnswer(key=question.key, value=value)
+
+    def test_the_pause_takes_an_answer_back_and_the_fact_is_open_again(self):
+        question = self.attribute_question()
+        earlier = [self.known(question)]
+        back = FactAnswer(key=question.key, value="unknown")
+        admitted = _asked_after(earlier).admit(
+            sources=[],
+            earlier_links=[],
+            earlier_facts=earlier,
+            links=[],
+            facts=[back],
+            save=True,
+        )
+        assert admitted.facts == [back]
+        after = _asked_after(admitted.facts)
+        element_id, attribute = question.key[:2]
+        assert open_attribute(after.model, element_id, attribute)
+        assert [a for q, a in after.answered_early if q.key == question.key] == [back]
+
+    def test_the_pause_takes_a_facet_answer_back(self):
+        earlier = [
+            FactAnswer(
+                key=CAPACITY,
+                facets=dict.fromkeys(("rate", "size", "concurrency", "quota"), "yes"),
+            )
+        ]
+        back = FactAnswer(
+            key=CAPACITY,
+            facets={
+                "rate": "unknown",
+                "size": "unknown",
+                "concurrency": "unknown",
+                "quota": "unknown",
+            },
+        )
+        check_fact_answers([back], valid_model(), None, earlier, reopen=True)
+        with pytest.raises(ValueError, match="earlier answer settled"):
+            check_fact_answers([back], valid_model(), None, earlier)
+
+    def test_a_report_s_follow_up_still_refuses_it(self):
+        question = self.attribute_question()
+        earlier = [self.known(question)]
+        finished = _asked_after(earlier, waiting=False)
+        with pytest.raises(ValueError, match="earlier answer settled"):
+            finished.admit(
+                sources=[],
+                earlier_links=[],
+                earlier_facts=earlier,
+                links=[],
+                facts=[FactAnswer(key=question.key, value="unknown")],
+            )

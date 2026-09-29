@@ -236,6 +236,7 @@ class QuestionSet:
             earlier_facts,
             asked_links=[question.key for question in self.links],
             earlier_links=earlier_links,
+            reopen=self.waiting,
         )
         answered = {fact.key for fact in facts}
         return AdmittedRound(
