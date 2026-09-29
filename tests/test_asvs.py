@@ -71,7 +71,7 @@ from analysis_service.report import (
 )
 from analysis_service.skills import lane_skill_doc
 from analysis_service.sources import SourceLimits
-from analysis_service.system_model import Process, SystemModel
+from analysis_service.system_model import CapabilityStatement, Process, SystemModel
 from tests.factories import PROJECT_ROOT, sample_draft, valid_model
 
 ASVS = PACKAGES["asvs"]
@@ -1175,14 +1175,37 @@ class TestNothingIsRuledOutByVocabulary:
                     == {}
                 ), f"{case_dir.name}/{lane}"
 
-    def test_the_package_inherits_the_neutral_hook(self):
-        """It overrides nothing, which is the written statement that it rules
-        nothing out. A package that can refute a unit from *stated* facts may
-        still override; silence is what this one stopped reading."""
-        from analysis_service.claims import Claim
+    def test_only_a_stated_capability_rules_a_requirement_out(self):
+        """Prose that says "no OAuth" rules nothing out; a statement does."""
+        base = SystemModel.model_validate(
+            json.loads((CORPUS_DIR / "01-payments-checkout" / "model.json").read_text())
+        )
+        worded = base.model_copy(deep=True)
+        worded.processes[0].description = "The service uses no OAuth at all."
+        assert (
+            DraftRequirementRuling.ruled_out(worded, {"level": 1}, "oauth-and-oidc")
+            == {}
+        )
 
-        assert "ruled_out" not in vars(DraftRequirementRuling)
-        assert DraftRequirementRuling.ruled_out.__func__ is Claim.ruled_out.__func__
+        stated = base.model_copy(
+            update={
+                "capabilities": [
+                    CapabilityStatement(
+                        capability="oauth",
+                        state="absent",
+                        source_excerpt="The service uses no OAuth at all.",
+                        source_label="description",
+                    )
+                ]
+            }
+        )
+        ruled = DraftRequirementRuling.ruled_out(stated, {"level": 1}, "oauth-and-oidc")
+        assert sorted(ruled) == [f"V10.4.{n}" for n in range(1, 6)]
+        assert (
+            "oauth is absent (description: The service uses no OAuth"
+            in ruled["V10.4.1"]
+        )
+        assert DraftRequirementRuling.ruled_out(stated, {"level": 1}, "webrtc") == {}
 
     def test_every_requirement_still_appears_exactly_once(self):
         """The block's own rule, with no exclusions to satisfy it."""

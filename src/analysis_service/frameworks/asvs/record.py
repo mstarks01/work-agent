@@ -38,6 +38,7 @@ from typing import Any, Literal, Self, get_args
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 from pydantic.json_schema import SkipJsonSchema
 
+from analysis_service.capabilities import CapabilityFact
 from analysis_service.claims import (
     BlockSummary,
     Claim,
@@ -51,6 +52,10 @@ from analysis_service.claims import (
     ScopeEntry,
     build_block_summary,
 )
+from analysis_service.frameworks.asvs.applicability import (
+    RATIONALES,
+    applicability_for,
+)
 from analysis_service.frameworks.asvs.catalog import (
     ASVS_VERSION,
     CHAPTER_NUMBERS,
@@ -60,6 +65,7 @@ from analysis_service.frameworks.asvs.catalog import (
     requirement_text,
     requirements_for,
 )
+from analysis_service.system_model import SystemModel
 
 __all__ = [
     "ASVS_ID_FORMAT",
@@ -190,6 +196,27 @@ class DraftRequirementRuling(Claim):
     verb: SkipJsonSchema[None] = None
 
     @classmethod
+    def ruled_out(
+        cls, model: SystemModel, options: Mapping[str, Any], lane: str
+    ) -> dict[str, str]:
+        """The chapter's requirements whose subject the input states is absent.
+
+        Each requirement's rule in
+        :mod:`~analysis_service.frameworks.asvs.applicability` is read over the
+        capabilities the model states. Only a stated absence rules a
+        requirement out: a capability the input does not mention is unknown,
+        and the lane still rules on the requirement.
+        """
+        level = AsvsOptions.model_validate(options).level
+        chapter = {requirement.id for requirement in requirements_for(level, lane)}
+        decisions = applicability_for(level, model.capability_facts())
+        return {
+            unit: _not_applicable(unit, decision.deciding)
+            for unit, decision in decisions.items()
+            if unit in chapter and decision.state == "not-applicable"
+        }
+
+    @classmethod
     def units_for(cls, options: Mapping[str, Any], lane: str) -> tuple[str, ...]:
         """The chapter's requirement identifiers at the level the job asked for."""
         level = AsvsOptions.model_validate(options).level
@@ -254,6 +281,21 @@ class DraftRequirementRuling(Claim):
             requirement_id(lane, proposal.requirement): proposal.needs_evidence
             for proposal in defer
         }
+
+
+#: How much of one quote a scope entry's reason carries. A reason names each
+#: deciding fact's first quote only, so it stays inside the entry's bound.
+_QUOTE_CHARS = 200
+
+
+def _not_applicable(unit: str, deciding: Sequence[CapabilityFact]) -> str:
+    """Why one requirement does not apply, naming the stated facts that decided it."""
+    stated = "; ".join(
+        f"{fact.derived_from or fact.key} is absent"
+        + "".join(f" ({quote[:_QUOTE_CHARS]})" for quote in fact.evidence[:1])
+        for fact in deciding
+    )
+    return f"Not applicable: {RATIONALES[unit]}, and the input states {stated}."
 
 
 class RequirementRuling(DraftRequirementRuling, RuledClaim):

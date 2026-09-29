@@ -395,13 +395,15 @@ CAPABILITIES: Mapping[str, Capability] = MappingProxyType(
 class CapabilityFact:
     """What one job knows about one capability, and what says so.
 
-    ``evidence`` names what decided the state: an assertion ID, or the key of
-    a parent or child capability the state was derived from.
+    ``evidence`` holds the quotes that stated the state. A state that a parent
+    or a child implies carries that capability's quotes, and ``derived_from``
+    names it.
     """
 
     key: str
     state: Presence
     evidence: tuple[str, ...] = ()
+    derived_from: str = ""
 
 
 @dataclass(frozen=True)
@@ -453,9 +455,11 @@ def resolve(known: Mapping[str, CapabilityFact]) -> Mapping[str, CapabilityFact]
             if found.state == "present" and key in _lineage(other)
         ]
         if absent and not present:
-            fact = CapabilityFact(key, "absent", (f"capability:{absent[0]}",))
+            source = known[absent[0]]
+            fact = CapabilityFact(key, "absent", source.evidence, source.key)
         elif present and not absent:
-            fact = CapabilityFact(key, "present", (f"capability:{present[0]}",))
+            source = known[present[0]]
+            fact = CapabilityFact(key, "present", source.evidence, source.key)
         resolved[key] = fact
     return MappingProxyType(resolved)
 
