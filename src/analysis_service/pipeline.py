@@ -27,6 +27,7 @@ per process and hands back a configured runner.
 from __future__ import annotations
 
 import logging
+from collections.abc import Sequence
 from datetime import UTC, datetime
 from typing import Any
 
@@ -62,12 +63,14 @@ from analysis_service.jobs import (
     PipelineOutcome,
     PipelineRejected,
 )
-from analysis_service.questions import answered_model
+from analysis_service.links import LinkAnswer
+from analysis_service.questions import FactAnswer, answered_model
 from analysis_service.report import (
     InputRef,
     Job,
     NodeRun,
 )
+from analysis_service.system_model import SystemModel
 
 logger = logging.getLogger(__name__)
 
@@ -155,9 +158,7 @@ class AdkPipelineRunner:
                     selection.name: dict(selection.options)
                     for selection in job.frameworks
                 },
-                STATE_LINK_ANSWERS: [link.model_dump() for link in job.links],
-                STATE_FACT_ANSWERS: [fact.model_dump() for fact in job.facts],
-                **_resumed_state(job),
+                **_seeded_state(job),
             },
             on_node=on_node,
         )
@@ -230,21 +231,41 @@ def entry_of(job: JobRecord) -> Entry:
     return ENTRY_HEAD_ONLY if job.pauses() else ENTRY_EXTRACT
 
 
-def _resumed_state(job: JobRecord) -> dict[str, Any]:
-    """What a resumed job's run starts from: its parent's model and catalog.
+def answered_state(
+    model: SystemModel | None,
+    links: Sequence[LinkAnswer],
+    facts: Sequence[FactAnswer],
+) -> dict[str, Any]:
+    """The state a run starts from with a submitter's answers.
 
-    Seeded at the keys the validity gate and ``prepare`` write in a full run,
-    so the resumed graph's ``prepare`` reads them exactly as it reads its own.
-    Empty for a job that starts from its sources.
+    **The one writer of answers into a run.** A job and the eval ``answered``
+    mode both call it. ``model`` is the model the run analyses, seeded with
+    each attribute answer written in, or ``None`` for a run that extracts its
+    own. The catalog pass reads the link and fact answers: it writes each
+    assertion answer over its open row, and removes every row that reaches an
+    answered attribute.
     """
-    if job.resumption is None:
-        return {}
-    held = job.resumption.checkpoint
-    # An attribute answer settles the attribute, so the resumed run analyses
-    # the model with it written in.
-    model = answered_model(held.system_model, job.facts)
-    seeded: dict[str, Any] = {STATE_VALID_MODEL: model.model_dump(mode="json")}
-    if held.assertions is not None:
+    state: dict[str, Any] = {
+        STATE_LINK_ANSWERS: [link.model_dump() for link in links],
+        STATE_FACT_ANSWERS: [fact.model_dump() for fact in facts],
+    }
+    if model is not None:
+        state[STATE_VALID_MODEL] = answered_model(model, facts).model_dump(mode="json")
+    return state
+
+
+def _seeded_state(job: JobRecord) -> dict[str, Any]:
+    """What a job's run starts from: its answers, and a resumed job's checkpoint.
+
+    A resumed job is seeded at the keys the validity gate and ``prepare`` write
+    in a full run, so the resumed graph's ``prepare`` reads them exactly as it
+    reads its own. A job that starts from its sources carries only its answers.
+    """
+    held = None if job.resumption is None else job.resumption.checkpoint
+    seeded = answered_state(
+        None if held is None else held.system_model, job.links, job.facts
+    )
+    if held is not None and held.assertions is not None:
         seeded[STATE_ASSERTION_CATALOG] = held.assertions.model_dump(mode="json")
     return seeded
 
