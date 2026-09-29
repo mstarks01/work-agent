@@ -894,6 +894,78 @@ def test_a_fact_answered_i_do_not_know_leaves_the_list_and_the_count(report):
     assert not counted & set(first.findings)
 
 
+CAPACITY_FACETS = ("rate", "size", "concurrency", "quota")
+RATE_ONLY = {"rate": "yes"}
+MIXED = {"rate": "yes"} | dict.fromkeys(CAPACITY_FACETS[1:], "unknown")
+ALL_UNKNOWN = dict.fromkeys(CAPACITY_FACETS, "unknown")
+ALL_KNOWN = dict.fromkeys(CAPACITY_FACETS, "yes")
+
+
+class TestAFacetAnswerCoversOnlyWhenEveryFacetIsKnown:
+    """A capacity answer of rate "yes" and the rest "unknown" counted a finding
+    as covered once its other fact was answered (#1289, B2).
+
+    One conditional finding waits on the capacity limits of a process, as the
+    critic names a kind, and on one other fact.
+    """
+
+    @pytest.fixture
+    def waiting(self, report):
+        """The report, the finding, its other fact and the capacity fact."""
+        report = report.model_copy(deep=True)
+        other = next(
+            (q for q in ask(report) if len(q.findings) == 1 and q.cited_by == 1), None
+        )
+        if other is None or not report.system_model.processes:
+            pytest.skip("no fact that one conditional finding alone waits on")
+        (finding,) = other.findings
+        framework, claim_id = finding.split("/")
+        capacity = UnknownRef(
+            element_id=report.system_model.processes[0].id, question="capacity-limits"
+        )
+        (claim,) = (
+            claim
+            for block in report.analyses
+            if block.framework == framework
+            for claim in block.all_claims()
+            if claim.id == claim_id
+        )
+        claim.verdict.related_unknowns.append(capacity)
+        assert finding in next(q for q in ask(report) if q.key == capacity.key).findings
+        return report, finding, other.key, capacity.key
+
+    def again(self, report, capacity, facets):
+        catalog = report.assertions.catalog if report.assertions else None
+        earlier = [FactAnswer.model_validate({"key": capacity, "facets": facets})]
+        return {
+            question.key: question
+            for question in fact_questions(
+                report.analyses, report.system_model, catalog, earlier
+            )
+        }
+
+    @pytest.mark.parametrize("facets", [MIXED, ALL_UNKNOWN])
+    def test_an_unknown_facet_is_not_asked_again_and_covers_nothing(
+        self, waiting, facets
+    ):
+        report, finding, _, capacity = waiting
+        again = self.again(report, capacity, facets)
+        assert capacity not in again
+        assert all(finding not in question.findings for question in again.values())
+
+    def test_a_facet_left_out_is_asked_again_and_the_finding_still_waits(self, waiting):
+        report, finding, other, capacity = waiting
+        again = self.again(report, capacity, RATE_ONLY)
+        assert finding in again[capacity].findings
+        assert finding in again[other].findings
+
+    def test_every_facet_known_leaves_the_other_fact_to_cover_it(self, waiting):
+        report, finding, other, capacity = waiting
+        again = self.again(report, capacity, ALL_KNOWN)
+        assert capacity not in again
+        assert finding in again[other].findings
+
+
 def test_only_a_conditional_finding_is_counted(report):
     """A confirmed finding's grounds counted as waiting (#1289 audit, point 4)."""
     counted = {f for question in ask(report) for f in question.findings}

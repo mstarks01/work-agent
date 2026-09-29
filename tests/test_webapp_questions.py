@@ -174,6 +174,7 @@ class TestTheRounds:
             assert not before & {tuple(q["key"]) for q in shown["facts"]}
         else:
             pytest.fail("the rounds never ended")
+        assert saved.json()["withheld"] == 0, "every question was asked"
         done = client.get(f"/events/{saved.json()['run']}").text
         assert "event: done" in done
 
@@ -868,6 +869,74 @@ await ids.continue.listeners.click(); await settle();
         "links": [],
         "facts": [{"key": key, "value": "none"}],
     }
+
+
+#: Each state a control's selector takes, and what the row then sends.
+CONTROL_SENDS = {"": None, "none": "none", "unknown": "unknown", "mechanism": "mTLS"}
+
+#: Choose ``state`` on the control's selector, and type a mechanism under it.
+_CHOOSE = """
+state.value = {state!r}; state.listeners.change();
+if (state.value === "mechanism") {{ input.value = "mTLS"; input.listeners.input(); }}
+"""
+
+
+def _control_steps(states) -> str:
+    return "".join(_CHOOSE.format(state=state) for state in states)
+
+
+def _early_control_sent(steps: str) -> list:
+    """What the form page sends for its control after ``steps``."""
+    key = [valid_model().data_flows[0].id, "encryption_in_transit", "", "", "", ""]
+    facts = [
+        {
+            "key": key,
+            "kind": "attribute",
+            "label": "login: encryption in transit",
+            "reasons": [],
+            "choices": [],
+            "form": "control",
+            "suggestions": [],
+        }
+    ]
+    steps = f"""
+await ids.analyze.listeners.submit({{ preventDefault() {{}} }}); await settle();
+streams[0].listeners.questions({{ data: JSON.stringify({{ run: "r1", questions: [],
+  facts: {json.dumps(facts)} }}) }});
+const [state] = ids.questions.querySelectorAll("select");
+const [input] = ids.questions.querySelectorAll("input");
+{steps}
+await ids.continue.listeners.click(); await settle();
+"""
+    return [
+        fact["value"] for fact in _run_form_script(steps)["calls"][1]["body"]["facts"]
+    ]
+
+
+def _report_control_sent(steps: str) -> list:
+    """What the report page sends for its control after ``steps``."""
+    found = 'const [state] = box.all("select");\nconst [input] = box.all("input");\n'
+    return [fact["value"] for fact in control_answer(found + steps)]
+
+
+@pytest.mark.parametrize("send", [_early_control_sent, _report_control_sent])
+@pytest.mark.parametrize("before", list(CONTROL_SENDS))
+@pytest.mark.parametrize("after", list(CONTROL_SENDS))
+def test_a_control_sends_the_state_chosen_last(send, before, after):
+    """Blank after "There is none" sent ``none`` (#1289, B1).
+
+    Both pages read one rule: the selector is the answer, and the text is
+    read only under "mechanism".
+    """
+    expected = CONTROL_SENDS[after]
+    assert send(_control_steps([before, after])) == (
+        [] if expected is None else [expected]
+    )
+
+
+@pytest.mark.parametrize("send", [_early_control_sent, _report_control_sent])
+def test_typing_a_mechanism_chooses_it(send):
+    assert send('input.value = "mTLS"; input.listeners.input();') == ["mTLS"]
 
 
 def test_the_form_script_shows_what_the_service_is_doing():

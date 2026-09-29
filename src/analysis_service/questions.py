@@ -232,6 +232,21 @@ class FactAnswer(BaseModel):
         """False where the submitter answered that they do not know."""
         return self.value != UNKNOWN
 
+    @property
+    def settles(self) -> bool:
+        """True where the answer settles its fact for a finding that waits on it.
+
+        A facet answer settles it only once every facet has an answer other
+        than "I don't know": a finding names the kind, not a facet, so a
+        facet left unknown can be the one it waits on.
+        """
+        if self.facets is None:
+            return self.known
+        return all(
+            self.facets.get(facet.id, UNKNOWN) != UNKNOWN
+            for facet in answer_facets(self.key)
+        )
+
 
 def fact_line(fact: FactAnswer) -> str:
     """The answer as its line of the answers Source, which its span quotes."""
@@ -592,8 +607,9 @@ def fact_questions(
 
     ``earlier`` is the fact answers of the earlier rounds. A fact they answer
     in full (:func:`answered_keys`) is not asked again. A finding that waits on
-    a fact answered "I don't know" is not counted, because no answer in this
-    list can cover it.
+    a fact they answer without settling it (:attr:`FactAnswer.settles`), such
+    as "I don't know" or a facet answered so, is not counted, because no
+    answer in this list can cover it.
 
     **Two sections, and the first does not depend on the critic.** The
     evidence section ranks the open facts each finding's own grounds cite, for
@@ -621,7 +637,7 @@ def fact_questions(
     conditional: set[Finding] = set()
     prepared = prepared_model(model, catalog)
     done = answered_keys(earlier)
-    unknown = {answer.key for answer in earlier if not answer.known} & done
+    unknown = {answer.key for answer in earlier if not answer.settles} & done
     for block in analyses:
         for claim in block.all_claims():
             finding = (block.framework, claim.id)

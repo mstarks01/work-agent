@@ -16,8 +16,11 @@ may continue with no answers, and a finished one has nothing to continue.
 :data:`ROUND_SIZE` capability questions and as many questions about the
 model's elements. A question is shown only at or above its kind's floor, and
 one pause asks each kind at most its limit in all: :data:`EARLY_RULES` is the
-table. A submitter saves a round's answers, which writes them onto the job and
-runs no model, and the next round is read off the model with them in. So an
+table. A question answered in part comes back first, outside the limit, and
+where the limits hold questions back the job says so
+(:attr:`QuestionSet.stop`). A submitter saves a round's answers, which writes
+them onto the job and runs no model, and the next round is read off the model
+with them in. So an
 answer can hide the parts of a capability it rules out, and a named mechanism
 lowers the questions that rested on its lead.
 
@@ -135,6 +138,20 @@ class QuestionSet:
     #: its answer, so a page can show it and take a new answer.
     answered_early: tuple[tuple[EarlyQuestion, FactAnswer], ...]
     answered_links: tuple[tuple[LinkQuestion, LinkAnswer], ...]
+    #: For a waiting job, how many questions the limits of :data:`EARLY_RULES`
+    #: hold back from every round.
+    withheld: int
+
+    @property
+    def stop(self) -> str | None:
+        """Why a waiting job asks nothing more, or ``None`` while it asks.
+
+        ``budget-exhausted`` where the limits hold questions back, and
+        ``nothing-left`` where no question is left to ask.
+        """
+        if not self.done:
+            return None
+        return "budget-exhausted" if self.withheld else "nothing-left"
 
     @property
     def asked(self) -> frozenset[UnknownKey]:
@@ -149,6 +166,8 @@ class QuestionSet:
             "early_questions": [question.to_json() for question in self.early],
             "final": self.final,
             "early_remaining": dict(self.remaining),
+            "early_withheld": self.withheld,
+            "early_stop": self.stop,
             "answered_early": [
                 question.to_json() | {"answer": answer.model_dump(mode="json")}
                 for question, answer in self.answered_early
@@ -239,7 +258,7 @@ def question_set(
     """
     if final:
         return QuestionSet(
-            model, catalog, False, (), (), (), True, tuple(shown), {}, (), ()
+            model, catalog, False, (), (), (), True, tuple(shown), {}, (), (), 0
         )
     if not waiting:
         showed = frozenset(shown)
@@ -258,6 +277,7 @@ def question_set(
             remaining={},
             answered_early=(),
             answered_links=(),
+            withheld=0,
         )
     done = answered_keys(answered)
     held = {answer.key: answer for answer in answered}
@@ -266,7 +286,7 @@ def question_set(
     view = answered_model(model, answered)
     if catalog is not None:
         catalog = apply_answers(catalog, view, answered_links, answered)[0]
-    this_round, remaining = _round(
+    this_round, remaining, withheld = _round(
         early_questions(view, frameworks, catalog), done, held
     )
     linked = {fold(link.principal): link for link in answered_links}
@@ -288,6 +308,7 @@ def question_set(
             for question in asked_links
             if question.key in linked
         ),
+        withheld=withheld,
     )
 
 
@@ -295,14 +316,17 @@ def _round(
     listed: Sequence[EarlyQuestion],
     done: frozenset[UnknownKey],
     held: Mapping[UnknownKey, FactAnswer],
-) -> tuple[tuple[EarlyQuestion, ...], dict[str, int]]:
-    """This round's questions of each kind, and how many each kind has left.
+) -> tuple[tuple[EarlyQuestion, ...], dict[str, int], int]:
+    """This round's questions, how many each kind has left, and how many the limits hold back.
 
-    A question an earlier round answered in full is not asked again, and each
-    earlier answer counts toward its kind's limit.
+    A question an earlier round answered in full is not asked again. One it
+    answered in part comes first, and takes no place under the limit, which
+    it already counts toward: each earlier answer counts toward its kind's
+    limit, and the limit bounds only the questions not yet answered at all.
     """
     shown: list[EarlyQuestion] = []
     remaining = {}
+    withheld = 0
     for kind, rule in EARLY_RULES.items():
         asked = sum(1 for key in held if (kind == "capability") == bool(key[5]))
         left = max(rule.limit - asked, 0)
@@ -313,6 +337,11 @@ def _round(
             and question.score >= rule.floor
             and question.key not in done
         ]
-        remaining[kind] = min(len(eligible), left)
-        shown.extend(eligible[: min(ROUND_SIZE, left)])
-    return tuple(shown), remaining
+        started = [question for question in eligible if question.key in held]
+        fresh = [question for question in eligible if question.key not in held]
+        remaining[kind] = len(started) + min(len(fresh), left)
+        withheld += max(len(fresh) - left, 0)
+        this_kind = started[:ROUND_SIZE]
+        this_kind += fresh[: min(ROUND_SIZE - len(this_kind), left)]
+        shown.extend(this_kind)
+    return tuple(shown), remaining, withheld
