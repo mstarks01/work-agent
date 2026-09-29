@@ -18,6 +18,7 @@ from starlette.requests import ClientDisconnect
 
 from analysis_service import graph
 from analysis_service.assertions import AssertionRecord
+from analysis_service.frameworks import PACKAGES
 from analysis_service.jobs import (
     TERMINAL_STATUSES,
     Checkpoint,
@@ -457,7 +458,9 @@ class TestThePausePathIsCertified:
         assert child.resumption.certification == CertifyResult(certified=True)
 
 
-@pytest.mark.parametrize("frameworks", [("stride",), ("asvs",), ("stride", "asvs")])
+@pytest.mark.parametrize(
+    "frameworks", [*((name,) for name in PACKAGES), tuple(PACKAGES)], ids=str
+)
 def test_the_pause_path_runs_the_graphs_two_sweeps_bless(frameworks):
     """A node's fingerprint binds its graph's instruction digest, so the pause
     path is blessed only by the sweeps whose graphs it runs. Architecture.md
