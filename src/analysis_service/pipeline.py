@@ -32,7 +32,11 @@ from typing import Any
 
 from google.adk.sessions import BaseSessionService
 
-from analysis_service.certification import CertificationGate, CertifyResult
+from analysis_service.certification import (
+    CertificationGate,
+    CertifyResult,
+    combined,
+)
 from analysis_service.execution import GraphExecutor, GraphRun
 from analysis_service.graph import (
     ENTRY_EXTRACT,
@@ -62,7 +66,7 @@ from analysis_service.questions import answered_model
 from analysis_service.report import (
     InputRef,
     Job,
-    Report,
+    NodeRun,
 )
 
 logger = logging.getLogger(__name__)
@@ -158,7 +162,7 @@ class AdkPipelineRunner:
             on_node=on_node,
         )
         if job.pauses():
-            return _paused(job, graph_run)
+            return _paused(job, graph_run, self._certify(job, graph_run.node_runs))
         try:
             result = graph_run.report(
                 job=Job(
@@ -182,16 +186,18 @@ class AdkPipelineRunner:
             # measurement exists but no report will carry it.
             return PipelineRejected(issues=result.issues, nodes=graph_run.node_runs)
         return PipelineCompleted(
-            report=result, certification=self._certify(job, result)
+            report=result, certification=self._certify(job, result.nodes)
         )
 
-    def _certify(self, job: JobRecord, report: Report) -> CertifyResult | None:
-        """Certify the finished report against this deployment's manifest.
+    def _certify(self, job: JobRecord, nodes: list[NodeRun]) -> CertifyResult | None:
+        """Certify this run's node executions against this deployment's manifest.
 
-        Runs **once, after the report is built**: a fingerprint exists only per
-        node execution, and the expectation of what should have run is only
+        Runs **once, after the graph has returned**: a fingerprint exists only
+        per node execution, and the expectation of what should have run is only
         complete once every node has, so certifying earlier would certify a
-        partial run.
+        partial run. A job that pauses is certified over its head's nodes, and
+        a resumed job's verdict is combined with its parent's, because its
+        report rests on the model and catalog that run built.
 
         Logged for the operator, never surfaced to the client (OWASP A09):
         hashes and node names, never the report's contents. A client learns
@@ -199,7 +205,9 @@ class AdkPipelineRunner:
         """
         if self._certification is None:
             return None
-        result = self._certification.check(report, self._pipeline.node_sampling)
+        result = self._certification.check(nodes, self._pipeline.node_sampling)
+        if job.resumption is not None:
+            result = combined(job.resumption.certification, result) or result
         if not result.certified or not result.complete:
             logger.warning(
                 "job %s certification: certified=%s uncertified=%s unexercised=%s",
@@ -241,11 +249,15 @@ def _resumed_state(job: JobRecord) -> dict[str, Any]:
     return seeded
 
 
-def _paused(job: JobRecord, graph_run: GraphRun) -> PipelineOutcome:
+def _paused(
+    job: JobRecord, graph_run: GraphRun, certification: CertifyResult | None
+) -> PipelineOutcome:
     """A job that stopped after its head, as the outcome it waits in.
 
     Its checkpoint holds the catalog where the head built one, and none where
-    the deployment runs no pass that makes one.
+    the deployment runs no pass that makes one. ``certification`` is the
+    verdict over the head's nodes, which the questions and the resumed report
+    both answer to.
     """
     try:
         held = paused_at(graph_run.final_state)
@@ -257,4 +269,5 @@ def _paused(job: JobRecord, graph_run: GraphRun) -> PipelineOutcome:
     return PipelineAwaiting(
         checkpoint=Checkpoint(system_model=model, assertions=assertions),
         nodes=graph_run.node_runs,
+        certification=certification,
     )

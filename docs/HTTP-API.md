@@ -47,7 +47,8 @@ Errors are RFC 9457 `application/problem+json`.
 
 ### When the report is withheld
 
-A completed job's report can still be refused. Before serving it, the service
+A completed job's report can still be refused, and so can a waiting job's
+questions and answers. Before serving it, the service
 checks the run's **fingerprints** — a per-node hash of the model build that
 answered plus that tier's decoding parameters — against the list this deployment
 has **blessed** (approved by a measured run, in
@@ -57,6 +58,11 @@ has **blessed** (approved by a measured run, in
   `ANALYSIS_REQUIRE_CERTIFIED` is set — off by default;
 - the run is **unexercised** (a tier the graph declares produced no fingerprint
   at all) — always refused, and not reachable on a run that produced a report.
+
+A job that waits on answers is checked over the nodes it ran before it paused,
+and the questions route and the answers route refuse under the same two rules.
+The job that your answers start carries the result of the job you answered,
+waiting or finished, and its report is served only where both runs pass.
 
 The problem body names the unblessed nodes and their hashes, and the tiers that
 went unexercised. It never includes the analysis. The job itself stays

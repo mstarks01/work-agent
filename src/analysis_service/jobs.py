@@ -146,6 +146,10 @@ class Resumption(BaseModel):
 
     parent_id: str
     checkpoint: Checkpoint
+    #: The parent's certification verdict. The resumed report rests on the
+    #: model and catalog the parent's run built, so its own verdict is combined
+    #: with this one.
+    certification: CertifyResult | None = None
 
 
 class JobRecord(BaseModel):
@@ -689,6 +693,8 @@ class PipelineAwaiting:
 
     checkpoint: Checkpoint
     nodes: list[NodeRun] = field(default_factory=list)
+    #: The verdict over the head's nodes; ``None`` where no gate is configured.
+    certification: CertifyResult | None = None
 
 
 PipelineOutcome = PipelineCompleted | PipelineRejected | PipelineAwaiting
@@ -862,6 +868,7 @@ async def execute_job(
     elif isinstance(outcome, PipelineAwaiting):
         # The node runs first, for the settling reason below.
         record.checkpoint = outcome.checkpoint
+        record.certification = outcome.certification
         record.unreported_nodes = outcome.nodes
         record.transition("awaiting-answers")
     else:

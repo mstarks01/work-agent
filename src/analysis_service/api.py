@@ -476,6 +476,11 @@ async def _answerable(
     store: JobStore = request.app.state.store
     record = await _owned_job(request, job_id, subject)
     if record.status == "awaiting-answers":
+        # The questions are read off what the head built, so they answer to
+        # the head's verdict as a report answers to its run's.
+        refused = _withheld_report(request, record)
+        if refused is not None:
+            return refused
         held = await store.checkpoint(job_id, subject)
         if held is None:
             logger.error("waiting job %s holds no checkpoint", record.id)
@@ -524,7 +529,7 @@ async def _servable_report(
 
 
 def _withheld_report(request: Request, record: JobRecord) -> JSONResponse | None:
-    """The problem response for a report this deployment must not serve, if any.
+    """Why this deployment must not serve a report or a waiting job, if it must not.
 
     Withholding the report rather than failing the job is deliberate: a
     ``failed`` job carries no report at all, and the fingerprints that *prove*
@@ -541,8 +546,8 @@ def _withheld_report(request: Request, record: JobRecord) -> JSONResponse | None
         return None
     return _problem_response(
         409,
-        "the report is withheld: its execution identity is not blessed by this"
-        " deployment's manifest",
+        "the job's output is withheld: its execution identity is not blessed by"
+        " this deployment's manifest",
         uncertified_nodes=[node.to_json() for node in result.uncertified],
         unexercised_tiers=list(result.unexercised),
     )
@@ -1000,6 +1005,7 @@ def create_app(
             resumption=Resumption(
                 parent_id=parent.id,
                 checkpoint=Checkpoint(system_model=model, assertions=assertions),
+                certification=parent.certification,
             ),
             reserved_tokens=budgets.estimate(sources, parent.frameworks),
         )
