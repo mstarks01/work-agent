@@ -73,3 +73,16 @@ ledger reader call it before they ask git about a commit.
 A configuration label such as `6bff717-gpt-5.6-terra-24dda4db` starts with the
 commit's first seven characters. Find the old ID in the map by that prefix.
 
+
+## Squash merges
+
+A pull request merges as one squashed commit, and its branch commits are not
+on `main`. An experiment ledger row that names a branch commit as its
+`revision` then names a commit that a fresh clone does not hold, and the
+ledger reader answers "undecidable".
+
+`squash-merges.tsv` maps each such branch commit to the squashed commit on
+`main`, in the same shape as the other maps. For each pair, the two trees
+differ only in ledger and experiment files, never in a file a row reads.
+Record a new row with a commit on `main` where one holds the code the
+experiment ran.
