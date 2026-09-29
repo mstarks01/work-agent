@@ -224,6 +224,8 @@ class Run:
     final: bool = False
     #: Every early question the pause showed.
     shown: list[UnknownKey] = field(default_factory=list)
+    #: Every early question the submitter skipped for now.
+    skipped: list[UnknownKey] = field(default_factory=list)
     #: True once a submitter's answers started a run from this one.
     answered: bool = False
 
@@ -243,6 +245,7 @@ class Run:
             answered_links=self.links,
             final=self.final,
             shown=self.shown,
+            skipped=self.skipped,
         )
 
 
@@ -621,6 +624,7 @@ def create_app(
             save = body.get("save", False)
             if not isinstance(save, bool):
                 raise TypeError
+            skips = _skips(body.get("skip", []))
         except RefusedAnswer as exc:
             return JSONResponse({"message": str(exc)}, status_code=400)
         except (ValidationError, ValueError, KeyError, TypeError):
@@ -639,6 +643,7 @@ def create_app(
                 links=links,
                 facts=facts,
                 save=save,
+                skips=skips,
             )
         except ValueError as exc:
             # The answer rules' own refusals name the submitter's choices, so
@@ -650,6 +655,7 @@ def create_app(
             # none is left, the page says so and waits for its start button.
             parent.links, parent.facts = admitted.links, admitted.facts
             parent.shown = list(admitted.shown)
+            parent.skipped = list(admitted.skipped)
             return JSONResponse(paused_payload(parent, parent.questions()))
         try:
             run = analyses.claim(answering=parent)
@@ -892,6 +898,22 @@ def _early_row(question: EarlyQuestion, names: Mapping[str, str]) -> dict[str, o
     }
 
 
+def _skips(raw: object) -> list[UnknownKey]:
+    """The keys a save skips: a list of six-part keys, or a ``TypeError``."""
+    if not isinstance(raw, list) or len(raw) > MAX_FACT_ANSWERS:
+        raise TypeError
+    keys = []
+    for key in raw:
+        if not (
+            isinstance(key, list)
+            and len(key) == 6
+            and all(isinstance(part, str) for part in key)
+        ):
+            raise TypeError
+        keys.append(tuple(key))
+    return keys
+
+
 class RefusedAnswer(Exception):
     """One fact answer the page sent does not parse; the message names its question."""
 
@@ -954,6 +976,7 @@ def paused_payload(run: Run, questions: QuestionSet) -> dict[str, object]:
         "remaining": dict(questions.remaining),
         "stop": questions.stop,
         "withheld": questions.withheld,
+        "skipped": [_early_row(question, names) for question in questions.skipped],
         "answered": [
             _early_row(question, names) | {"answer": answer.model_dump(mode="json")}
             for question, answer in questions.answered_early
@@ -1174,14 +1197,19 @@ _FORM_PAGE = (
   and checked it. It stopped before the threat analysis so that you can add
   facts your description does not state. These rounds are free: no analysis
   runs until you start it. The questions come a few at a time,
-  the most useful first. Answer what you can and leave the rest blank. Choose
-  <b>Save and show more</b> for the next questions, or <b>Start the
+  the most useful first. Answer what you can. <b>Save and show more</b> keeps
+  your answers, and a question you left blank comes back.
+  <b>Skip the rest and show more</b> sets the blank ones aside, under
+  <b>Skipped for now</b>, where you can still answer them. A skipped question
+  is not an answer: the analysis treats it as open. Choose <b>Start the
   analysis</b> at any time. A save never starts the analysis: only the start
   button does. The analysis reads your answers. After it, the report may offer
   one optional follow-up.</p>
   <div id="questions"></div>
   <details id="earlier" hidden></details>
+  <details id="skipped" hidden></details>
   <p><button type="button" id="save">Save and show more</button>
+  <button type="button" id="skip">Skip the rest and show more</button>
   <button type="button" id="continue">Start the analysis</button></p>
   <div id="answer-problem" class="problem" role="alert" hidden></div>
 </div>

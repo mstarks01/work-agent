@@ -191,6 +191,11 @@ class JobRecord(BaseModel):
     shown_early: list[UnknownKey] = Field(
         default_factory=list, max_length=MAX_FACT_ANSWERS
     )
+    # Every early question a waiting job's submitter skipped for now and has
+    # not answered since. No round shows it again.
+    skipped_early: list[UnknownKey] = Field(
+        default_factory=list, max_length=MAX_FACT_ANSWERS
+    )
     # Set on a job resumed from a finished one: its run starts at ``prepare``
     # from these, and runs no extraction and no assertion pass.
     resumption: Resumption | None = None
@@ -455,6 +460,7 @@ class JobStore(Protocol):
         links: Sequence[LinkAnswer],
         facts: Sequence[FactAnswer],
         shown: Sequence[UnknownKey],
+        skipped: Sequence[UnknownKey],
     ) -> bool: ...
 
 
@@ -647,11 +653,12 @@ class InMemoryJobStore:
         links: Sequence[LinkAnswer],
         facts: Sequence[FactAnswer],
         shown: Sequence[UnknownKey],
+        skipped: Sequence[UnknownKey],
     ) -> bool:
         """Keep a saved round's answers on a job that still waits for them.
 
-        ``shown`` is every early question the pause has shown. Only these
-        change, so the checkpoint an envelope read leaves
+        ``shown`` is every early question the pause has shown, and ``skipped``
+        every one its submitter skipped for now. Only these change, so the checkpoint an envelope read leaves
         behind is kept. False where the job is not the subject's or no longer
         waits, and nothing is written.
         """
@@ -665,6 +672,7 @@ class InMemoryJobStore:
         record.links = list(links)
         record.facts = list(facts)
         record.shown_early = list(shown)
+        record.skipped_early = list(skipped)
         record.updated_at = datetime.now(UTC)
         return True
 

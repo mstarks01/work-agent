@@ -52,7 +52,7 @@ from analysis_service.auth import (
     build_verifier,
 )
 from analysis_service.budgets import BudgetPolicy
-from analysis_service.claims import FrameworkAnalysis, FrameworkName
+from analysis_service.claims import FrameworkAnalysis, FrameworkName, UnknownKey
 from analysis_service.deployment import Deployment
 from analysis_service.errors import ConfigError
 from analysis_service.frameworks import PACKAGES
@@ -341,7 +341,8 @@ class AnswersSubmission(BaseModel):
     open facts a report's conditional findings rest on. Both empty is legal
     only for a job waiting on answers, where it means "continue without
     answers"; against a finished report it answers nothing. ``save`` keeps a
-    waiting job's round without starting the analysis (ADR 0053).
+    waiting job's round without starting the analysis (ADR 0053), and
+    ``skip`` names questions of that round the submitter skips for now.
     """
 
     model_config = ConfigDict(extra="forbid")
@@ -349,6 +350,7 @@ class AnswersSubmission(BaseModel):
     links: list[LinkAnswer] = Field(default_factory=list, max_length=MAX_LINK_ANSWERS)
     facts: list[FactAnswer] = Field(default_factory=list, max_length=MAX_FACT_ANSWERS)
     save: bool = False
+    skip: list[UnknownKey] = Field(default_factory=list, max_length=MAX_FACT_ANSWERS)
 
 
 class NodeCompletion(BaseModel):
@@ -660,6 +662,7 @@ def _question_set(
         answered_links=record.links,
         final=record.resumption is not None and record.resumption.follow_up,
         shown=record.shown_early,
+        skipped=record.skipped_early,
     )
 
 
@@ -972,6 +975,7 @@ def create_app(
                 links=answers.links,
                 facts=answers.facts,
                 save=answers.save,
+                skips=answers.skip,
             )
         except NoCatalogError as exc:
             raise HTTPException(status_code=409, detail=str(exc)) from exc
@@ -980,7 +984,12 @@ def create_app(
         if answers.save:
             store: JobStore = request.app.state.store
             if not await store.save_round(
-                parent.id, subject, admitted.links, admitted.facts, admitted.shown
+                parent.id,
+                subject,
+                admitted.links,
+                admitted.facts,
+                admitted.shown,
+                admitted.skipped,
             ):
                 raise HTTPException(
                     status_code=409, detail="the job no longer waits on answers"

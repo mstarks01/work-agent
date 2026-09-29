@@ -70,6 +70,8 @@
   const asked = document.getElementById("asked");
   const questions = document.getElementById("questions");
   const saveButton = document.getElementById("save");
+  const skipButton = document.getElementById("skip");
+  const skippedBox = document.getElementById("skipped");
   const earlierBox = document.getElementById("earlier");
 
   form.addEventListener("submit", async (event) => {
@@ -109,6 +111,9 @@
   let pausedRun = null;
   // One reader per question: its answer as the service takes it, or null.
   let answers = [];
+  // This round's questions, each with its key and reader, so "Skip the rest"
+  // can name the ones left blank.
+  let roundRows = [];
   // The answer that says the submitter does not know. The service writes
   // nothing for it, so the fact stays open.
   const DONT_KNOW = "unknown";
@@ -213,10 +218,12 @@
       return;
     }
     pausedRun = data.run;
-    saveButton.hidden = !left;
+    saveButton.hidden = skipButton.hidden = !left;
     answers = [];
+    roundRows = [];
     questions.replaceChildren();
     earlierBox.replaceChildren();
+    skippedBox.replaceChildren();
     const heading = (title, text) => {
       const lead = document.createElement("p");
       const bold = document.createElement("b");
@@ -374,7 +381,9 @@
       if (q.form === "facets") {
         group.grid = group.grid || facetTable(group.box, q, true);
         const before = earlier.get(JSON.stringify(q.key));
-        answers.push(facetRow(group.grid, q, label, before && before.facets));
+        const read = facetRow(group.grid, q, label, before && before.facets);
+        answers.push(read);
+        roundRows.push({ key: q.key, read });
         return;
       }
       const row = document.createElement("p");
@@ -389,10 +398,12 @@
         parent.addEventListener("change", follow);
         follow();
       }
-      answers.push(() => {
+      const answer = () => {
         const value = read();
         return value && !row.hidden ? { key: q.key, value } : null;
-      });
+      };
+      answers.push(answer);
+      roundRows.push({ key: q.key, read: answer });
       row.append(label, " ", ...beside);
       group.box.append(row);
     });
@@ -457,6 +468,36 @@
       });
       earlierBox.append(row);
     }
+    // Every question skipped for now. A skip is not an answer: no round shows
+    // it again, and "Answer it" opens it here.
+    const skipped = data.skipped || [];
+    skippedBox.hidden = !skipped.length;
+    const skippedTitle = document.createElement("summary");
+    skippedTitle.textContent = `Skipped for now (${skipped.length})`;
+    skippedBox.append(skippedTitle);
+    for (const q of skipped) {
+      const row = document.createElement("p");
+      const label = document.createElement("b");
+      label.textContent = q.label;
+      row.append(label);
+      const open = document.createElement("button");
+      open.type = "button";
+      open.textContent = "Answer it";
+      open.addEventListener("click", () => {
+        open.hidden = true;
+        if (q.form === "facets") {
+          const name = document.createElement("b");
+          name.textContent = q.element;
+          answers.push(facetRow(facetTable(row, q, false), q, name, null));
+          return;
+        }
+        const { beside, read } = inputFor(q, "");
+        row.append(" ", ...beside);
+        answers.push(() => (read() ? { key: q.key, value: read() } : null));
+      });
+      row.append(" ", open);
+      skippedBox.append(row);
+    }
     asked.hidden = false;
   };
 
@@ -501,12 +542,14 @@
 
   // Save the round and show the next one. A save never starts the analysis;
   // where nothing is left to ask, the page says so and waits.
-  saveButton.addEventListener("click", async () => {
+  // `skipAll` also skips every question of this round left blank.
+  const saveRound = async (skipAll) => {
     const { links, facts } = roundAnswers();
+    const skip = skipAll ? roundRows.filter((row) => !row.read()).map((row) => row.key) : [];
     const saved = await fetch("/answer/" + pausedRun, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ links, facts, save: true }),
+      body: JSON.stringify({ links, facts, save: true, skip }),
     });
     const body = await saved.json();
     if (!saved.ok) {
@@ -516,7 +559,9 @@
     answerProblem.hidden = true;
     showQuestions(body);
     window.scrollTo(0, 0);
-  });
+  };
+  saveButton.addEventListener("click", () => saveRound(false));
+  skipButton.addEventListener("click", () => saveRound(true));
 
   // Follow one run's progress to its end: a report, questions, or a failure.
   const follow = (runId, message) => {
