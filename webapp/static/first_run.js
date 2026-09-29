@@ -153,7 +153,7 @@
       // mechanism. The suggestions are a start; the text is the answer.
       input = document.createElement("input");
       input.type = "text";
-      input.maxLength = 1000;
+      input.maxLength = q.max_length;
       input.placeholder = "type it, or pick a common one";
       const list = document.createElement("datalist");
       list.id = `early-suggest-${suggestLists++}`;
@@ -178,7 +178,7 @@
     } else {
       input = document.createElement("input");
       input.type = "text";
-      input.maxLength = 1000;
+      input.maxLength = q.max_length;
       input.placeholder = "(leave unanswered)";
       const box = document.createElement("input");
       box.type = "checkbox";
@@ -454,6 +454,14 @@
     facts: answers.map((read) => read()).filter(Boolean),
   });
 
+  // A refused answer is shown beside the buttons that sent it, and every
+  // answer stays as it was, for the submitter to correct.
+  const answerProblem = document.getElementById("answer-problem");
+  const refuse = (message) => {
+    answerProblem.textContent = message;
+    answerProblem.hidden = false;
+  };
+
   const startAnalysis = async (links, facts) => {
     const resumed = await fetch("/answer/" + pausedRun, {
       method: "POST",
@@ -461,9 +469,10 @@
       body: JSON.stringify({ links, facts }),
     });
     if (!resumed.ok) {
-      fail((await resumed.json()).message);
+      refuse((await resumed.json()).message);
       return;
     }
+    answerProblem.hidden = true;
     asked.hidden = true;
     follow(
       (await resumed.json()).run,
@@ -487,10 +496,10 @@
     });
     const body = await saved.json();
     if (!saved.ok) {
-      fail(body.message);
+      refuse(body.message);
       return;
     }
-    problem.hidden = true;
+    answerProblem.hidden = true;
     if (body.facts) {
       showQuestions(body);
       window.scrollTo(0, 0);

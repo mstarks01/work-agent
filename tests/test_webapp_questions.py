@@ -178,6 +178,22 @@ class TestTheRounds:
         done = client.get(f"/events/{saved.json()['run']}").text
         assert "event: done" in done
 
+    def test_a_refused_answer_names_its_question(self, tiers):
+        """Every malformed answer got one message that named nothing (#1289)."""
+        client = client_for(tiers, PausingRunner(catalog=False), catalog=False)
+        paused = start(client, questions=True)
+        first = event(client.get(f"/events/{paused}").text, "questions")["facts"][0]
+        saved = client.post(
+            f"/answer/{paused}",
+            json={"links": [], "facts": [{"key": first["key"], "value": "x" * 1001}]},
+            headers=SAME_ORIGIN,
+        )
+        assert saved.status_code == 400
+        assert saved.json()["message"] == (
+            f'The answer to "{first["label"]}" was refused:'
+            " String should have at most 1000 characters"
+        )
+
     def test_a_save_with_no_answer_is_refused(self, tiers):
         client = client_for(tiers, PausingRunner(catalog=False), catalog=False)
         paused = start(client, questions=True)
@@ -297,7 +313,7 @@ class Node {
 const ids = {};
 for (const id of ["analyze","description","ticks","problem","go","load","ask",
                   "asked","questions","earlier","save","continue","status",
-                  "status-text"])
+                  "status-text","answer-problem"])
   ids[id] = new Node(id);
 ids.ask.checked = true;
 globalThis.document = {
@@ -781,6 +797,7 @@ CONTROL = {
     "choices": [],
     "form": "control",
     "suggestions": ["HTTPS", "TLS 1.3"],
+    "max_length": 200,
     "findings": ["stride/I-01"],
 }
 
@@ -885,8 +902,11 @@ def _control_steps(states) -> str:
     return "".join(_CHOOSE.format(state=state) for state in states)
 
 
-def _early_control_sent(steps: str) -> list:
-    """What the form page sends for its control after ``steps``."""
+def _early_control_calls(steps: str) -> list:
+    """Every call the form page records, with one control asked, after ``steps``.
+
+    ``steps`` ends with a click on "Start the analysis".
+    """
     key = [valid_model().data_flows[0].id, "encryption_in_transit", "", "", "", ""]
     facts = [
         {
@@ -897,6 +917,7 @@ def _early_control_sent(steps: str) -> list:
             "choices": [],
             "form": "control",
             "suggestions": [],
+            "max_length": 200,
         }
     ]
     steps = f"""
@@ -908,9 +929,12 @@ const [input] = ids.questions.querySelectorAll("input");
 {steps}
 await ids.continue.listeners.click(); await settle();
 """
-    return [
-        fact["value"] for fact in _run_form_script(steps)["calls"][1]["body"]["facts"]
-    ]
+    return _run_form_script(steps)["calls"]
+
+
+def _early_control_sent(steps: str) -> list:
+    """What the form page sends for its control after ``steps``."""
+    return [fact["value"] for fact in _early_control_calls(steps)[1]["body"]["facts"]]
 
 
 def _report_control_sent(steps: str) -> list:
@@ -932,6 +956,34 @@ def test_a_control_sends_the_state_chosen_last(send, before, after):
     assert send(_control_steps([before, after])) == (
         [] if expected is None else [expected]
     )
+
+
+@pytest.mark.parametrize("button", ["save", "continue"])
+def test_a_refused_answer_shows_beside_the_buttons_and_keeps_the_answers(button):
+    """The refusal showed above the description, out of sight (#1289)."""
+    steps = f"""
+state.value = "none"; state.listeners.change();
+globalThis.fetch = async (url, init) => {{
+  calls.push({{ url, body: JSON.parse(init.body) }});
+  return {{ ok: false, json: async () => ({{ message: "refused" }}) }};
+}};
+await ids[{button!r}].listeners.click(); await settle();
+calls.push({{ shown: !ids["answer-problem"].hidden,
+  said: ids["answer-problem"].textContent, state: state.value,
+  asked: !ids.asked.hidden }});
+"""
+    _, sent, seen, again = _early_control_calls(steps)
+    assert seen == {"shown": True, "said": "refused", "state": "none", "asked": True}
+    assert again["body"]["facts"] == sent["body"]["facts"], "the answers stand"
+
+
+@pytest.mark.parametrize("send", [_early_control_sent, _report_control_sent])
+def test_a_text_box_takes_no_more_than_its_field_holds(send):
+    """Every box took 1,000 characters where the field held 200 (#1289)."""
+    steps = """
+input.value = "x".repeat(input.maxLength); input.listeners.input();
+"""
+    assert send(steps) == ["x" * 200]
 
 
 @pytest.mark.parametrize("send", [_early_control_sent, _report_control_sent])

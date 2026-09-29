@@ -66,6 +66,7 @@ from analysis_service.questions import (
     answer_choices,
     answer_facets,
     answer_form,
+    answer_limit,
     answer_suggestions,
     facets_json,
     fact_kind,
@@ -159,6 +160,8 @@ class EarlyQuestion:
     suggestions: tuple[str, ...]
     #: The parts a ``facets`` answer is given in.
     facets: tuple[Facet, ...]
+    #: The longest answer it admits (:func:`~analysis_service.questions.answer_limit`).
+    max_length: int
     #: The group a page shows it in, the group's heading, and the element's
     #: name as its row in that group (:func:`~analysis_service.open_facts.group_of`).
     group: str
@@ -183,6 +186,7 @@ class EarlyQuestion:
             "form": self.form,
             "suggestions": list(self.suggestions),
             "facets": facets_json(self.facets),
+            "max_length": self.max_length,
             "group": self.group,
             "group_heading": self.group_heading,
             "element": self.element,
@@ -249,6 +253,7 @@ def early_questions(
                 form=answer_form(key, model, catalog),
                 suggestions=answer_suggestions(key),
                 facets=answer_facets(key),
+                max_length=answer_limit(key, model),
                 group=group,
                 group_heading=heading,
                 element=names.get(key[0], key[0]),
@@ -308,6 +313,7 @@ def capability_questions(
                 form="choice",
                 suggestions=(),
                 facets=(),
+                max_length=answer_limit(ref.key, model),
                 group=group,
                 group_heading=heading,
                 element=CAPABILITIES[key].question,
