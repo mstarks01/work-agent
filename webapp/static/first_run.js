@@ -135,6 +135,8 @@
   let suggestLists = 0;
   const inputFor = (q, prefill) => {
     let input;
+    // `read` is the answer the row sends, or "" for none.
+    let read = () => input.value.trim();
     // `beside` is what follows the label.
     let beside;
     if (q.choices.length) {
@@ -160,20 +162,18 @@
       const state = document.createElement("select");
       state.append(optionOf("(leave unanswered)", ""), optionOf("There is none", "none"),
         optionOf("I don't know", DONT_KNOW), optionOf("A mechanism, in my own words:", "mechanism"));
-      const fix = () => {
-        const fixed = state.value === "none" || state.value === DONT_KNOW;
-        input.value = fixed ? state.value : input.value;
-        input.disabled = fixed;
-      };
-      state.addEventListener("change", () => {
-        if (state.value === "mechanism") input.value = "";
-        fix();
-      });
+      // The state is the answer: blank sends nothing, and the text is read
+      // only under "mechanism". Typing a mechanism chooses it.
+      const fix = () => { input.disabled = state.value === "none" || state.value === DONT_KNOW; };
+      state.addEventListener("change", fix);
+      input.addEventListener("input", () => { if (input.value.trim()) state.value = "mechanism"; });
       if (prefill) {
-        state.value = prefill === "none" || prefill === DONT_KNOW ? prefill : "mechanism";
-        input.value = prefill;
+        const fixed = prefill === "none" || prefill === DONT_KNOW;
+        state.value = fixed ? prefill : "mechanism";
+        input.value = fixed ? "" : prefill;
         fix();
       }
+      read = () => (state.value === "mechanism" ? input.value.trim() : state.value);
       beside = [state, " ", input, list];
     } else {
       input = document.createElement("input");
@@ -195,7 +195,7 @@
       beside = [input, " ", dontKnow];
     }
     input.dataset.key = JSON.stringify(q.key);
-    return { input, beside };
+    return { input, beside, read };
   };
 
   // A paused run's round: the link questions, then the open facts grouped by
@@ -364,7 +364,7 @@
         return;
       }
       const row = document.createElement("p");
-      const { input, beside } = inputFor(q, "");
+      const { input, beside, read } = inputFor(q, "");
       inputs.set(input.dataset.key, input);
       // A part of another capability is asked only once its parent is "yes".
       // A hidden row sends no answer, so a "no" to the parent is never
@@ -376,7 +376,7 @@
         follow();
       }
       answers.push(() => {
-        const value = input.value.trim();
+        const value = read();
         return value && !row.hidden ? { key: q.key, value } : null;
       });
       row.append(label, " ", ...beside);
@@ -434,10 +434,10 @@
           shown.hidden = true;
           return;
         }
-        const { input, beside } = inputFor(a, a.answer.value);
+        const { beside, read } = inputFor(a, a.answer.value);
         shown.replaceChildren(" — ", ...beside);
         answers.push(() => {
-          const value = input.value.trim();
+          const value = read();
           return value && value !== a.answer.value ? { key: a.key, value } : null;
         });
       });
@@ -497,7 +497,11 @@
       return;
     }
     asked.hidden = true;
-    follow(body.run, "Running the threat analysis with your answers. This takes a few minutes.");
+    // The limits can end the rounds with questions left: say so.
+    const held = body.withheld
+      ? `The question limit is reached, so ${body.withheld} more question(s) were not asked. `
+      : "";
+    follow(body.run, `${held}Running the threat analysis with your answers. This takes a few minutes.`);
   });
 
   // Follow one run's progress to its end: a report, questions, or a failure.

@@ -840,6 +840,8 @@
         // "unknown" is the answer that says you do not know: the fact stays
         // open, and it covers no finding. `beside` is what follows the label.
         let beside;
+        // `read` is the answer the row sends, or "" for none.
+        let read = () => input.value.trim();
         if (q.choices.length) {
           input = el("select");
           input.append(option("(leave unanswered)", ""));
@@ -860,12 +862,17 @@
           const state = el("select");
           state.append(option("(leave unanswered)", ""), option("There is none", "none"),
             option("I don't know", DONT_KNOW), option("A mechanism, in my own words:", "mechanism"));
+          // The state is the answer: blank sends nothing, and the text is
+          // read only under "mechanism". Typing a mechanism chooses it.
           state.addEventListener("change", () => {
-            const fixed = state.value === "none" || state.value === DONT_KNOW;
-            input.value = fixed ? state.value : "";
-            input.disabled = fixed;
+            input.disabled = state.value === "none" || state.value === DONT_KNOW;
             recount();
           });
+          input.addEventListener("input", () => {
+            if (input.value.trim()) state.value = "mechanism";
+            recount();
+          });
+          read = () => (state.value === "mechanism" ? input.value.trim() : state.value);
           beside = [state, " ", input, list];
         } else {
           input = el("input");
@@ -884,14 +891,14 @@
           beside = [input, " ", dontKnow];
         }
         input.dataset.key = JSON.stringify(q.key);
-        input.addEventListener(q.choices.length ? "change" : "input", recount);
+        if (q.form !== "control") input.addEventListener(q.choices.length ? "change" : "input", recount);
         row.append(el("b", null, q.label), why(q),
           ` \u2014 ${q.cited_by} finding(s) wait on it; answering down to here covers ${q.covered_so_far} `,
           ...beside);
         into.append(row);
         factAnswers.push({
-          read: () => input.value.trim() ? { key: q.key, value: input.value.trim() } : null,
-          known: () => Boolean(input.value.trim()) && input.value.trim() !== DONT_KNOW,
+          read: () => read() ? { key: q.key, value: read() } : null,
+          known: () => Boolean(read()) && read() !== DONT_KNOW,
         });
       });
       if (FACT_QUESTIONS.length > SHOWN) box.append(more);

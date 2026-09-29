@@ -9,6 +9,8 @@ never asked.
 from __future__ import annotations
 
 import asyncio
+from dataclasses import replace
+from types import SimpleNamespace
 
 import pytest
 from pydantic import ValidationError
@@ -23,7 +25,12 @@ from analysis_service.links import (
     merged_facts,
 )
 from analysis_service.question_kinds import QUESTION_KINDS
-from analysis_service.questions import FactAnswer, check_fact_answers, fact_line
+from analysis_service.questions import (
+    FactAnswer,
+    answered_keys,
+    check_fact_answers,
+    fact_line,
+)
 from tests.factories import valid_model
 from tests.test_api import auth
 from tests.test_links import catalog_client
@@ -366,9 +373,58 @@ class TestTheBoundedRounds:
             )
             for n in range(30)
         }
-        shown, remaining = _round(listed, frozenset(held), held)
+        shown, remaining, withheld = _round(listed, frozenset(held), held)
         assert not [q for q in shown if q.kind != "capability"]
         assert remaining["field"] == 0
+        assert withheld == len([q for q in listed if q.kind != "capability"])
+
+    def test_a_question_answered_in_part_comes_back_outside_the_limit(self):
+        """Thirty partial answers hid every question and started the analysis
+        as if nothing were left (#1289, B3)."""
+        from analysis_service.answer_round import ROUND_SIZE, _round
+
+        def capacity_of(n):
+            key = (f"process:p{n}", "", "", "", "capacity-limits", "")
+            return SimpleNamespace(key=key, kind="question", score=5.0)
+
+        listed = [capacity_of(n) for n in range(31)]
+        held = {
+            q.key: FactAnswer(key=q.key, facets={"rate": "yes"}) for q in listed[:30]
+        }
+        shown, remaining, withheld = _round(listed, answered_keys(held.values()), held)
+        assert [q.key for q in shown] == [q.key for q in listed[:ROUND_SIZE]]
+        assert remaining["field"] == 30
+        assert withheld == 1
+
+    def test_a_stop_says_whether_the_limits_held_questions_back(self):
+        asked = _asked_after([])
+        assert asked.stop is None
+        ended = replace(asked, early=(), links=(), withheld=0)
+        assert ended.stop == "nothing-left"
+        held_back = replace(ended, withheld=3)
+        assert held_back.stop == "budget-exhausted"
+        assert held_back.to_json()["early_stop"] == "budget-exhausted"
+        assert held_back.to_json()["early_withheld"] == 3
+
+    def test_a_submitter_who_answers_one_facet_a_round_reaches_the_end(self):
+        answered: list[FactAnswer] = []
+        for _ in range(40):
+            asked = _asked_after(answered)
+            if not asked.early:
+                break
+            given = []
+            for question in asked.early:
+                if not question.facets:
+                    given.append(FactAnswer(key=question.key, value="unknown"))
+                    continue
+                before = next((a for a in answered if a.key == question.key), None)
+                said = before.facets if before else {}
+                facet = next(f.id for f in question.facets if f.id not in said)
+                given.append(FactAnswer(key=question.key, facets={facet: "unknown"}))
+            answered = merged_facts(answered, given)
+        assert not asked.early
+        assert asked.links, "a control: the link questions still stand"
+        assert asked.stop is None, "a job that still asks a link has not stopped"
 
     def test_a_saved_round_must_answer_something_and_only_a_waiting_job_saves(self):
         with pytest.raises(ValueError, match="at least one question"):

@@ -35,6 +35,12 @@ analysis" is available in every round.
 Two limits, not one: capability questions come first, so one shared limit
 would give a job that selects both frameworks no field question.
 
+**A limit bounds the questions not yet answered at all.** Every saved answer
+counts toward its kind's limit. A question with facets that a round answered
+in part comes back first, and takes no place under the limit. Where the limits
+hold questions back, the question set says so: `stop` is `budget-exhausted`,
+not `nothing-left`, and the page states how many questions were not asked.
+
 **When nothing is left, the analysis starts.** A save that leaves no question
 starts the analysis, as a continue with no new answers does. A pause that has
 no question at all starts it too, with no page between.

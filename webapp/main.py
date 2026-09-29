@@ -641,6 +641,7 @@ def create_app(
             # The answer rules' own refusals name the submitter's choices, so
             # they are safe to show.
             return JSONResponse({"message": str(exc)}, status_code=400)
+        withheld = 0
         if save:
             # A saved round runs no model: the answers go onto the paused run,
             # and the next round is read off the model with them in.
@@ -649,8 +650,10 @@ def create_app(
             following = parent.questions()
             if not following.done:
                 return JSONResponse(paused_payload(parent, following))
-            # Nothing is left to ask, so the analysis starts with no new answers.
+            # Nothing is left to ask, so the analysis starts with no new
+            # answers, and the page says whether the limits held any back.
             links, facts = [], []
+            withheld = following.withheld
         try:
             run = analyses.claim(answering=parent)
         except RegistryFull as exc:
@@ -678,7 +681,7 @@ def create_app(
             system_name="Your system",
         )
         run.task = asyncio.create_task(_drive(analyses, run, start))
-        return JSONResponse({"run": run.id})
+        return JSONResponse({"run": run.id, "withheld": withheld})
 
     @app.get("/events/{run_id}")
     async def events(run_id: str) -> Response:
