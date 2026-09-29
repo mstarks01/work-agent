@@ -1,0 +1,28 @@
+{
+  "test_class": "conformance-bait",
+  "drafted_by": "agent",
+  "signed_by": null,
+  "note": "A missing second factor is the gap V6.3.3 asks about, so it cannot rule V6.3.3 out; it only removes the recovery of a lost factor.",
+  "framework": "asvs",
+  "options": {
+    "level": 2
+  },
+  "statements": [
+    {
+      "capability": "authentication",
+      "state": "present",
+      "quote": "Users log in."
+    },
+    {
+      "capability": "multi-factor-authentication",
+      "state": "absent",
+      "quote": "We have not rolled out MFA yet."
+    }
+  ],
+  "answers": {},
+  "expected": {
+    "V6.3.3": "applicable",
+    "V6.4.4": "not-applicable",
+    "V16.3.1": "applicable"
+  }
+}

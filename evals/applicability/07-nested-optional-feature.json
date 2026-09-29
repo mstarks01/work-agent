@@ -1,0 +1,29 @@
+{
+  "test_class": "nested",
+  "drafted_by": "agent",
+  "signed_by": null,
+  "note": "WebRTC is present and TURN is absent: only the TURN rules leave.",
+  "framework": "asvs",
+  "options": {
+    "level": 2
+  },
+  "statements": [
+    {
+      "capability": "webrtc",
+      "state": "present",
+      "quote": "Agents talk to customers over WebRTC video."
+    },
+    {
+      "capability": "turn-server",
+      "state": "absent",
+      "quote": "We do not run a TURN server."
+    }
+  ],
+  "answers": {},
+  "expected": {
+    "V17.1.1": "not-applicable",
+    "V17.2.1": "applicable",
+    "V17.2.2": "unknown",
+    "V17.3.1": "unknown"
+  }
+}

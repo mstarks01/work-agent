@@ -1,0 +1,29 @@
+{
+  "test_class": "role-specific",
+  "drafted_by": "agent",
+  "signed_by": null,
+  "note": "OAuth is present, but the application is not the authorization server.",
+  "framework": "asvs",
+  "options": {
+    "level": 2
+  },
+  "statements": [
+    {
+      "capability": "oauth-client",
+      "state": "present",
+      "quote": "The app signs users in through Okta."
+    },
+    {
+      "capability": "oauth-authorization-server",
+      "state": "absent",
+      "quote": "We do not issue tokens ourselves."
+    }
+  ],
+  "answers": {},
+  "expected": {
+    "V10.2.1": "applicable",
+    "V10.4.1": "not-applicable",
+    "V10.6.1": "not-applicable",
+    "V10.3.1": "unknown"
+  }
+}
