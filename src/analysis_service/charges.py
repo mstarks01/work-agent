@@ -60,6 +60,7 @@ from __future__ import annotations
 import contextvars
 import logging
 import math
+import re
 from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Any
@@ -131,6 +132,17 @@ _UPSTREAM_FIELD = "provider"
 #: a literal in both of those, so widening the producer's bound would have made
 #: the readers refuse what it writes.
 UPSTREAM_MAX_CHARS = 100
+
+#: The largest charge one call may report, in USD, and the bound that
+#: :class:`analysis_service.report.NodeRun` stores it under. Far above what one
+#: call costs, and small enough that a job's sum stays finite: two reported
+#: charges near ``1e308`` summed to ``inf``.
+MAX_CALL_CHARGE_USD = 1000.0
+
+#: A charge in a header's text: ASCII digits, a decimal point and an exponent.
+#: ``float()`` also reads ``"1_000"`` and non-ASCII digits, which no provider
+#: writes.
+_CHARGE_TEXT = re.compile(r"\d+(?:\.\d*)?(?:[eE][+-]?\d+)?", re.ASCII)
 
 #: Where litellm files a charge a provider reported. Its OpenRouter config sets
 #: ``usage.include`` on every request and copies ``usage.cost`` out of the
@@ -273,9 +285,11 @@ def reported_charge_of(response: Any) -> float | None:
     mapping without the key, and the value has been a string in litellm's header
     dictionaries before it was a float here.
 
-    A value that is negative, infinite or not a number is refused and logged. A
-    charge of exactly zero is kept: a cached or free-tier call really can cost
-    nothing, and turning that into "unreported" would hide a measurement.
+    A value that is negative, infinite, not a number or above
+    :data:`MAX_CALL_CHARGE_USD` is refused and logged, and so is a boolean or a
+    string that is not plain decimal text. A charge of exactly zero is kept: a
+    cached or free-tier call really can cost nothing, and turning that into
+    "unreported" would hide a measurement.
     """
     hidden = getattr(response, "_hidden_params", None)
     if not isinstance(hidden, Mapping):
@@ -286,12 +300,16 @@ def reported_charge_of(response: Any) -> float | None:
     raw = headers.get(_COST_HEADER)
     if raw is None:
         return None
-    try:
-        charge = float(raw)
-    except (TypeError, ValueError):
+    text = isinstance(raw, str) and _CHARGE_TEXT.fullmatch(raw) is not None
+    number = isinstance(raw, int | float) and not isinstance(raw, bool)
+    if not (text or number):
         logger.warning("provider reported a charge that is not a number; ignoring it")
         return None
-    if not math.isfinite(charge) or charge < 0:
+    try:
+        charge = float(raw)
+    except OverflowError:
+        charge = math.inf
+    if not math.isfinite(charge) or not 0 <= charge <= MAX_CALL_CHARGE_USD:
         logger.warning("provider reported a charge outside the plausible range")
         return None
     return charge

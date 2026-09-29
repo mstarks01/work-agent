@@ -76,10 +76,10 @@ from analysis_service.report import (
 )
 from analysis_service.sources import Source
 
-# Calls every job makes whatever it selects: one extraction, and the repair that
-# may follow it. Counted whether or not repair fires, because a bound has to
-# hold for the job that needs it.
-_SHARED_LLM_CALLS = 2
+# Calls a job makes whatever it selects: one extraction, the repair that may
+# follow it, and the assertion pass. Each is counted whether or not it runs,
+# because a bound has to hold for the job that needs it.
+_SHARED_LLM_CALLS = 3
 
 # Calls one framework adds beyond its lanes: its critic and the bounded re-ask.
 _PER_FRAMEWORK_REVIEW_CALLS = 2
@@ -97,6 +97,11 @@ def llm_calls_for(frameworks: Sequence[FrameworkSelection]) -> int:
         len(PACKAGES[selection.name].lanes) + _PER_FRAMEWORK_REVIEW_CALLS
         for selection in frameworks
     )
+
+
+def widest_llm_calls() -> int:
+    """The LLM calls of a job that selects every framework in ``PACKAGES``."""
+    return llm_calls_for([FrameworkSelection(name=name) for name in PACKAGES])
 
 
 def estimate(

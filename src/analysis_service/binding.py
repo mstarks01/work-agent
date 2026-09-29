@@ -78,6 +78,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Self
 
+from analysis_service.budgets import widest_llm_calls
 from analysis_service.charges import (
     charge_capturing_client_class,
     charge_reporting_llm_class,
@@ -94,7 +95,6 @@ from analysis_service.model_gate import (
     output_ceiling,
 )
 from analysis_service.model_tiers import (
-    LLM_NODES,
     TIER_NAMES,
     ModelTierConfig,
     ReviewIndependence,
@@ -401,9 +401,9 @@ def build_tier_adapters(
     # One policy, so one budget, shared by every tier and every node on them.
     # A per-tier budget would let the lane agents storm the strong tier while
     # the base tier's untouched allowance sat beside it; a storm is a property
-    # of the process, not of a tier. Capacity is one retry per LLM node in the
-    # graph — what a single job may spend from a cold bucket.
-    policy = resilience.retry_policy(budget_capacity=len(LLM_NODES))
+    # of the process, not of a tier. Capacity is one retry per LLM call of the
+    # widest job — what a single job may spend from a cold bucket.
+    policy = resilience.retry_policy(budget_capacity=widest_llm_calls())
     # The charge layer sits on the translator, below the seam, because reading
     # what a provider said about money needs the provider's own response. The
     # retry loop sits above it in ``ExecutedLlm``, so every attempt it makes
