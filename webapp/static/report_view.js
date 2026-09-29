@@ -680,7 +680,7 @@
       section.append(el("h3", null, "Conditional \u2014 grouped by the open fact that would settle them"));
       section.append(el("div", "meta",
         `${grouped.size} finding(s) wait on ${facts.length} open fact(s). ` +
-        "Each finding is shown once, under the fact that settles the most findings on its own."));
+        "Each finding is shown once, under the fact that alone covers the most findings."));
       facts.filter(f => f.placed.length).forEach(f => {
         const box = el("details", "openfact");
         const head = el("summary");
@@ -744,8 +744,9 @@
       box.append(el("h2", null, "What would settle the conditional findings?"));
       box.append(el("div", "meta",
         "Each question is a fact the conditional findings wait on, the most useful " +
-        "first. Beside each is how many findings have every fact answered once it " +
-        "and every question above it is answered. Answer as far down as you like; " +
+        "first. Beside each is how many findings have every question answered once it " +
+        "and every question above it is answered. A question with parts asks only " +
+        "the parts listed, which may not be every fact a finding needs. Answer as far down as you like; " +
         "the line under the questions counts the findings your answers cover. The " +
         "analysis decides again whether each answer settles its finding. Choose " +
         "\"I don't know\" where nobody knows: the fact stays open."));
@@ -774,7 +775,7 @@
         const known = index => factAnswers[index].known();
         const covered = [...waitsOn.values()].filter(asked => asked.every(known)).length;
         tally.textContent =
-          `Your answers cover every fact for ${covered} of the ${waitsOn.size} findings ` +
+          `Your answers cover every question for ${covered} of the ${waitsOn.size} findings ` +
           "that wait on one. The analysis decides again whether they are settled.";
       }
       FACT_QUESTIONS.forEach((q, index) => {

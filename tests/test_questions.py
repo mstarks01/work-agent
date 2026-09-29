@@ -80,10 +80,11 @@ def ask(report):
 
 class TestTheRanking:
     def test_answering_every_question_covers_every_waiting_finding(self, report):
-        """A finding waits on the open facts its grounds cite, and its verdict's.
+        """A conditional finding waits on the open facts its grounds cite, and
+        its verdict's.
 
-        A rejected draft is not counted, and an attribute the model states is
-        not an open fact.
+        Only a conditional finding is counted, and an attribute the model
+        states is not an open fact.
         """
         model = report.system_model
 
@@ -99,13 +100,10 @@ class TestTheRanking:
             1
             for block in report.analyses
             for claim in block.all_claims()
-            if claim.verdict.status != "rejected"
+            if claim.verdict.status == "needs-info"
             and (
                 open_refs(claim.unknown_grounds())
-                or (
-                    claim.verdict.status == "needs-info"
-                    and open_refs(claim.verdict.related_unknowns)
-                )
+                or open_refs(claim.verdict.related_unknowns)
             )
         )
         questions = ask(report)
@@ -181,6 +179,15 @@ class TestTheCriticCannotReorderTheEvidence:
 
     def test_a_free_text_fact_is_only_ever_the_critic_s(self, report):
         assert all(q.basis == "critic" for q in ask(report) if q.kind == "subject")
+
+    def test_a_confirmed_finding_ranks_the_questions_and_counts_nowhere(self, report):
+        """A confirmed finding waits on no answer (#1289 audit, point 4)."""
+        confirmed = ask(self.rewritten(report))
+        assert [q.key for q in confirmed if q.basis == "evidence"] == self.evidence(
+            report
+        )
+        assert all(q.cited_by == q.covered_so_far == 0 for q in confirmed)
+        assert not any(q.findings for q in confirmed)
 
 
 class TestTheAnswerForms:
@@ -856,15 +863,16 @@ class TestAnUnknownAnswer:
             check_fact_answers([self.DONT_KNOW], valid_model(), None, [earlier])
 
 
-def test_a_rejected_draft_ranks_the_questions_but_is_not_counted(report):
+def test_only_a_conditional_finding_is_counted(report):
+    """A confirmed finding's grounds counted as waiting (#1289 audit, point 4)."""
     counted = {f for question in ask(report) for f in question.findings}
-    rejected = {
+    conditional = {
         f"{block.framework}/{claim.id}"
         for block in report.analyses
         for claim in block.all_claims()
-        if claim.verdict.status == "rejected"
+        if claim.verdict.status == "needs-info"
     }
-    assert not counted & rejected
+    assert counted <= conditional
 
 
 class TestTheControlForm:

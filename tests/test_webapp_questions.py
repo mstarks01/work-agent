@@ -598,7 +598,7 @@ def test_an_answer_of_unknown_covers_no_finding(report):
     if not questions:
         pytest.skip("this report waits on no fact")
     total = len({f for q in questions for f in q["findings"]})
-    line = f"Your answers cover every fact for 0 of the {total} findings"
+    line = f"Your answers cover every question for 0 of the {total} findings"
     assert tallies(questions, questions, value="unknown") == [
         f"{line} that wait on one. {DECIDED}"
     ]
@@ -615,7 +615,7 @@ class TestTheRunningCount:
         total = len({f for q in questions for f in q["findings"]})
         for depth in sorted({0, 1, len(questions) // 2, len(questions)}):
             covered = questions[depth - 1]["covered_so_far"] if depth else 0
-            line = f"Your answers cover every fact for {covered} of the {total}"
+            line = f"Your answers cover every question for {covered} of the {total}"
             assert tallies(questions, questions[:depth]) == [
                 f"{line} findings that wait on one. {DECIDED}"
             ]
@@ -643,7 +643,7 @@ class TestTheRunningCount:
                 "findings": ["stride/S-02"],
             },
         ]
-        line = "Your answers cover every fact for 1 of the 2 findings that wait on one."
+        line = "Your answers cover every question for 1 of the 2 findings that wait on one."
         assert tallies(questions, questions[1:]) == [f"{line} {DECIDED}"]
 
 
@@ -1008,9 +1008,9 @@ await box.all("button")[0].listeners.click();
 """
     seen = _run_answer_block(payloads, steps)["calls"]
 
-    assert seen[0]["one_known"].startswith("Your answers cover every fact for 0")
-    assert seen[1]["one_unknown"].startswith("Your answers cover every fact for 0")
-    assert seen[2]["both_known"].startswith("Your answers cover every fact for 1")
+    assert seen[0]["one_known"].startswith("Your answers cover every question for 0")
+    assert seen[1]["one_unknown"].startswith("Your answers cover every question for 0")
+    assert seen[2]["both_known"].startswith("Your answers cover every question for 1")
     assert seen[3]["body"]["facts"] == [
         {
             "key": question["key"],

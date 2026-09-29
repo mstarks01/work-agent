@@ -342,8 +342,9 @@ The app can ask you questions before the analysis, and after the report.
 - **The report's open facts.** Most findings are conditional: they rest on
   facts your description never states, such as how a flow is protected. Under
   **What would settle the conditional findings?** the report lists every such
-  fact, the most useful first, with how many findings have every fact answered
-  once you answer down to it. Choose "I don't know" where nobody knows: the
+  fact, the most useful first, with how many findings have every question
+  answered once you answer down to it. A question with parts asks only the
+  parts listed, which may not be every fact a finding needs. Choose "I don't know" where nobody knows: the
   fact stays open. For a control such as authentication or encryption, first
   choose "There is none", "I don't know" or "A mechanism". For a mechanism, the
   text box suggests common ones as you type, and you can add what matters,
