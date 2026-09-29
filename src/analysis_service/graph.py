@@ -891,6 +891,10 @@ FRAMEWORK_STRUCTURED_ARTIFACTS: tuple[str, ...] = (
     # any lane ran. Written by ``prepare``, read by ``assemble``, and empty
     # for a package whose rules rule nothing out.
     "ruled_out",
+    # Unit -> why the package's own rules say it applies to this model.
+    # Written by ``prepare``, read by the fan-in, which refuses a draft that
+    # rules such a unit out; empty for a package with no applicability rule.
+    "ruled_in",
     "marks",
     "precondition",
     "retrieved",
@@ -1742,6 +1746,7 @@ def prepare_analysis(
         )
         retrieved: list[str] = []
         ruled_out: dict[str, str] = {}
+        ruled_in: dict[str, str] = {}
         for position, lane in enumerate(nodes.lanes):
             candidate_set = candidates[lane.lane]
             # The package's own rules may rule a lane's units out of this model
@@ -1751,6 +1756,9 @@ def prepare_analysis(
                 model, options.get(name) or {}, lane.lane
             )
             ruled_out.update(lane_ruled_out)
+            ruled_in.update(
+                package.record.ruled_in(model, options.get(name) or {}, lane.lane)
+            )
             # Retrieval is by *fired* rule, so a lane that triggered nothing gets
             # nothing: the material follows the leads rather than the lane.
             notes = notes_by_lane[position]
@@ -1785,6 +1793,7 @@ def prepare_analysis(
         # them. Sorted and deduplicated: it is a set of rules that matched, and
         # firing order across independent lanes is not a fact about anything.
         state.put(nodes.key("ruled_out"), ruled_out)
+        state.put(nodes.key("ruled_in"), ruled_in)
         state.put(
             nodes.key("retrieved"),
             {
@@ -2039,6 +2048,7 @@ def merge_drafts(
         source_texts or {},
         state.get(nodes.key("ruled_out")) or {},
         _held_assertions(state),
+        state.get(nodes.key("ruled_in")) or {},
     )
     state.put(nodes.key("deferred"), merged.deferred)
     state.put(
