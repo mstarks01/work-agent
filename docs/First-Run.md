@@ -343,7 +343,8 @@ The app can ask you questions before the analysis, and after the report.
   **Skipped for now**, where **Answer it** opens one again. A skipped question
   is not an answer, and the analysis treats its fact as open.
   **Your answers** lists every answer you saved, and **Change** opens
-  one again. A question with parts comes back while a part has no answer, with
+  one again. If an answer was a guess, change it to "I don't know": the fact
+  is open again, and the questions that rested on it come back. A question with parts comes back while a part has no answer, with
   the parts you answered filled in. Click **Start the analysis** at any time.
   A save never starts the analysis. When no question is left, the page says
   so, and you can still change an answer. Only **Start the analysis** starts

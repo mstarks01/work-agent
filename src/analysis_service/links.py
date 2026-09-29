@@ -329,6 +329,7 @@ def check_answers(
     *,
     asked_links: Collection[str] = (),
     earlier_links: Sequence[LinkAnswer] = (),
+    reopen: bool = False,
 ) -> None:
     """Refuse an answer that would place nothing, before a resumed run is admitted.
 
@@ -341,7 +342,8 @@ def check_answers(
     principals they ask about; ``earlier`` and ``earlier_links`` are the
     answers of the earlier rounds, which a later round may answer again. A
     link to any other principal is refused, so a submission cannot replace a
-    ``represented-by`` row the sources stated.
+    ``represented-by`` row the sources stated. ``reopen`` lets an ``unknown``
+    answer take back an earlier one (:func:`check_fact_answers`).
     """
     if links and catalog is None:
         raise NoCatalogError(
@@ -351,7 +353,7 @@ def check_answers(
     for link in links:
         if fold(link.principal) not in answerable:
             raise ValueError(f"this job asked no question about {link.principal!r}")
-    check_fact_answers(facts, model, catalog, earlier)
+    check_fact_answers(facts, model, catalog, earlier, reopen=reopen)
     answered_before = {fact.key for fact in earlier}
     for fact in facts:
         if fact.key not in asked and fact.key not in answered_before:

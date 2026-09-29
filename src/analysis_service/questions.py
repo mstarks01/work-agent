@@ -795,6 +795,8 @@ def check_fact_answers(
     model: SystemModel,
     catalog: AssertionCatalog | None,
     earlier: Sequence[FactAnswer] = (),
+    *,
+    reopen: bool = False,
 ) -> None:
     """Refuse an answer that names no open fact here, or a value the fact cannot hold.
 
@@ -805,8 +807,10 @@ def check_fact_answers(
 
     ``earlier`` is what the earlier rounds answered. An attribute one of them
     answered is stated now, and may be answered again with another value. An
-    ``unknown`` answer to a fact an earlier round settled is refused, because
-    it would reopen the fact.
+    ``unknown`` answer to a fact an earlier round settled reopens the fact, so
+    it is refused unless ``reopen``: a job waiting at its pause lets a
+    submitter take back an answer they guessed, and a report's follow-up does
+    not.
     """
     prepared = prepared_model(model, catalog)
     answered_before = {answer.key for answer in earlier}
@@ -863,7 +867,7 @@ def check_fact_answers(
                 f" the answer to {answer.key!r}"
             )
         if not answer.known:
-            if answer.key in settled_before:
+            if answer.key in settled_before and not reopen:
                 raise ValueError(
                     "an earlier answer settled this fact; send a value to change it"
                 )
