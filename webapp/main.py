@@ -226,6 +226,9 @@ class Run:
     shown: list[UnknownKey] = field(default_factory=list)
     #: Every early question the submitter skipped for now.
     skipped: list[UnknownKey] = field(default_factory=list)
+    #: How many rounds a paused run has saved. A page sends the revision it
+    #: read, so a page left open on an earlier round cannot write over a later one.
+    revision: int = 0
     #: True once a submitter's answers started a run from this one.
     answered: bool = False
 
@@ -625,6 +628,13 @@ def create_app(
             if not isinstance(save, bool):
                 raise TypeError
             skips = _skips(body.get("skip", []))
+            revision = body.get("revision")
+            if revision is None and questions.waiting:
+                raise TypeError
+            if revision is not None and (
+                not isinstance(revision, int) or isinstance(revision, bool)
+            ):
+                raise TypeError
         except RefusedAnswer as exc:
             return JSONResponse({"message": str(exc)}, status_code=400)
         except (ValidationError, ValueError, KeyError, TypeError):
@@ -634,6 +644,14 @@ def create_app(
                     " 'facts' list of answers this report asked for."
                 },
                 status_code=400,
+            )
+        if questions.waiting and revision != parent.revision:
+            return JSONResponse(
+                {
+                    "message": "Your saved answers changed in another tab or"
+                    " window. Reload this page to see them."
+                },
+                status_code=409,
             )
         try:
             admitted = questions.admit(
@@ -656,6 +674,7 @@ def create_app(
             parent.links, parent.facts = admitted.links, admitted.facts
             parent.shown = list(admitted.shown)
             parent.skipped = list(admitted.skipped)
+            parent.revision += 1
             return JSONResponse(paused_payload(parent, parent.questions()))
         try:
             run = analyses.claim(answering=parent)
@@ -971,6 +990,7 @@ def paused_payload(run: Run, questions: QuestionSet) -> dict[str, object]:
     names = _element_names(questions)
     return {
         "run": run.id,
+        "revision": run.revision,
         "questions": question_rows(questions),
         "facts": early_rows(questions),
         "remaining": dict(questions.remaining),

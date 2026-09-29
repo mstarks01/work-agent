@@ -217,7 +217,7 @@ class TestOnlyAnAskedFactTakesAnAnswer:
         key = self.unasked_kind() if key == "unasked-kind" else key
         response = client.post(
             f"/v1/jobs/{job}/answers",
-            json={"facts": [{"key": list(key), "value": "yes"}]},
+            json={"facts": [{"key": list(key), "value": "yes"}], "revision": 0},
             headers=auth(),
         )
         assert response.status_code == 400
@@ -230,7 +230,10 @@ class TestOnlyAnAskedFactTakesAnAnswer:
         question = body["early_questions"][0]
         response = client.post(
             f"/v1/jobs/{job}/answers",
-            json={"facts": [{"key": question["key"], "value": "unknown"}]},
+            json={
+                "facts": [{"key": question["key"], "value": "unknown"}],
+                "revision": 0,
+            },
             headers=auth(),
         )
         assert response.status_code == 201, response.text
@@ -363,7 +366,9 @@ class TestTheRoundsEnd:
         client, store = catalog_client()
         waited = waiting(store)
         response = client.post(
-            f"/v1/jobs/{waited}/answers", json={"links": []}, headers=auth()
+            f"/v1/jobs/{waited}/answers",
+            json={"links": [], "revision": 0},
+            headers=auth(),
         )
         assert response.status_code == 201, response.text
         started = asyncio.run(store.get(response.json()["job_id"]))
@@ -523,7 +528,12 @@ class TestTheBoundedRounds:
             ]
             response = client.post(
                 f"/v1/jobs/{job}/answers",
-                json={"facts": facts, "links": links, "save": True},
+                json={
+                    "facts": facts,
+                    "links": links,
+                    "save": True,
+                    "revision": body["revision"],
+                },
                 headers=auth(),
             )
             assert response.status_code == 200, response.text
@@ -534,7 +544,9 @@ class TestTheBoundedRounds:
         assert body["early_stop"] == "nothing-left"
 
         response = client.post(
-            f"/v1/jobs/{job}/answers", json={"links": []}, headers=auth()
+            f"/v1/jobs/{job}/answers",
+            json={"links": [], "revision": body["revision"]},
+            headers=auth(),
         )
         assert response.status_code == 201, response.text
         child = asyncio.run(store.get(response.json()["job_id"]))
@@ -612,7 +624,7 @@ class TestSkipForNow:
         key = body["early_questions"][0]["key"]
         response = client.post(
             f"/v1/jobs/{job}/answers",
-            json={"save": True, "skip": [key]},
+            json={"save": True, "skip": [key], "revision": 0},
             headers=auth(),
         )
         assert response.status_code == 200, response.text
@@ -620,3 +632,50 @@ class TestSkipForNow:
         assert [q["key"] for q in after["skipped_early"]] == [key]
         assert key not in [q["key"] for q in after["early_questions"]]
         assert asyncio.run(store.get(job)).skipped_early == [tuple(key)]
+
+
+class TestTheRoundRevision:
+    """A page left open on an earlier round saved over a later one (#1289)."""
+
+    def post(self, client, job, **body):
+        return client.post(f"/v1/jobs/{job}/answers", json=body, headers=auth())
+
+    def test_of_two_saves_that_read_one_revision_only_the_first_lands(self):
+        client, store = catalog_client()
+        job = waiting(store)
+        body = client.get(f"/v1/jobs/{job}/questions", headers=auth()).json()
+        first, second = (q["key"] for q in body["early_questions"][:2])
+        landed = self.post(client, job, save=True, skip=[first], revision=0)
+        stale = self.post(client, job, save=True, skip=[second], revision=0)
+        assert landed.status_code == 200, landed.text
+        assert stale.status_code == 409
+        after = client.get(f"/v1/jobs/{job}/questions", headers=auth()).json()
+        assert after["revision"] == 1
+        assert [q["key"] for q in after["skipped_early"]] == [first]
+
+    def test_a_stale_continue_is_refused(self):
+        client, store = catalog_client()
+        job = waiting(store)
+        body = client.get(f"/v1/jobs/{job}/questions", headers=auth()).json()
+        key = body["early_questions"][0]["key"]
+        self.post(client, job, save=True, skip=[key], revision=0)
+        assert self.post(client, job, links=[], revision=0).status_code == 409
+
+    def test_a_waiting_job_requires_a_revision(self):
+        client, store = catalog_client()
+        job = waiting(store)
+        assert self.post(client, job, links=[]).status_code == 400
+
+    def test_the_store_refuses_a_save_against_an_old_revision(self):
+        _, store = catalog_client()
+        job = waiting(store)
+        record = asyncio.run(store.get(job))
+
+        def save(revision):
+            return asyncio.run(
+                store.save_round(job, record.owner_subject, [], [], [], [], revision)
+            )
+
+        assert save(0)
+        assert not save(0)
+        assert save(1)

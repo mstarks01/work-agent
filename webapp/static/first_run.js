@@ -109,6 +109,9 @@
   // unanswered; "none" says the principal is no element. Every label and
   // option is untrusted and lands as text.
   let pausedRun = null;
+  // The paused run's round revision this page read. A save or a start sends
+  // it, so a page left open on an earlier round cannot write over a later one.
+  let revision = 0;
   // One reader per question: its answer as the service takes it, or null.
   let answers = [];
   // This round's questions, each with its key and reader, so "Skip the rest"
@@ -209,6 +212,7 @@
   // Every label and option is untrusted and lands as text.
   const showQuestions = (data) => {
     const left = data.questions.length || data.facts.length;
+    revision = data.revision;
     const saved = (data.answered || []).length || (data.answered_links || []).length;
     // A pause with nothing to ask and nothing answered starts the analysis,
     // with no page between. After a save, only the start button starts it.
@@ -522,7 +526,7 @@
     const resumed = await fetch("/answer/" + pausedRun, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ links, facts }),
+      body: JSON.stringify({ links, facts, revision }),
     });
     if (!resumed.ok) {
       refuse((await resumed.json()).message);
@@ -550,7 +554,7 @@
     const saved = await fetch("/answer/" + pausedRun, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ links, facts, save: true, skip }),
+      body: JSON.stringify({ links, facts, save: true, skip, revision }),
     });
     const body = await saved.json();
     if (!saved.ok) {

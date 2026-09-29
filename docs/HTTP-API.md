@@ -40,7 +40,7 @@ logged, never returned.
 | `GET` | `/v1/jobs/{id}/events` | The same progression as Server-Sent Events; resumable via `Last-Event-ID`. |
 | `GET` | `/v1/jobs/{id}/report` | The full [report](Report-Schema.md) once completed; `409` before, and `409` if the report is withheld (below). |
 | `POST` | `/v1/jobs/{id}/answers` | Answer the questions of a completed job or a job in `awaiting-answers`. Starts a **new** job that resumes from this one's model and catalog; `201` with its `job_id`. With `"save": true`, a waiting job keeps the round and answers `200` with its own `job_id`; a save never starts a job. |
-| `GET` | `/v1/jobs/{id}/questions` | What the job asks you, as `{"job_id", "link_questions", "fact_questions", "early_questions", "fallback", "final", "early_remaining", "early_withheld", "early_stop", "skipped_early", "answered_early", "answered_links"}`: a finished report's questions, or a waiting job's link and early questions. Derived from the report when you ask, under the report's own rules: `409` before completion and `409` when the report is withheld. |
+| `GET` | `/v1/jobs/{id}/questions` | What the job asks you, as `{"job_id", "link_questions", "fact_questions", "early_questions", "fallback", "final", "early_remaining", "early_withheld", "early_stop", "skipped_early", "answered_early", "answered_links", "revision"}`: a finished report's questions, or a waiting job's link and early questions. Derived from the report when you ask, under the report's own rules: `409` before completion and `409` when the report is withheld. |
 | `GET` | `/healthz` | Unauthenticated liveness probe. |
 
 Errors are RFC 9457 `application/problem+json`.
@@ -192,7 +192,15 @@ round. A saved round may also send `"skip"`, a list of keys of this round's
 questions that you set aside for now. A skip is not an answer: the fact stays
 open, no later round shows it, and it takes no place under the limit.
 `skipped_early` lists every skipped question, and an answer to one is still
-taken. A saved round must answer or skip at least one question. A save never starts
+taken. A saved round must answer or skip at least one question.
+
+**Send the revision you read.** `revision` counts a waiting job's saved rounds.
+Every answer to a waiting job, a save or a continue, carries the `revision` its
+questions were read with: `400` where it is missing, and `409` where another
+save landed first. Of two saves that read one revision, only the first lands,
+so a page left open on an earlier round cannot write over a later one. Read the
+questions again after a `409`. A finished report's follow-up takes no
+revision. A save never starts
 the analysis: when the saved answers leave nothing to ask, the questions say
 so in `early_stop`, and a send without `"save"` starts it. `answered_early` and `answered_links` list each saved answer
 with its question, and you can send a new answer to any of them. A question
