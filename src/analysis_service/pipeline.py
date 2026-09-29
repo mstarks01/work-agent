@@ -242,8 +242,8 @@ def answered_state(
     mode both call it. ``model`` is the model the run analyses, seeded with
     each attribute answer written in, or ``None`` for a run that extracts its
     own. The catalog pass reads the link and fact answers: it writes each
-    assertion answer over its open row, and removes every row that reaches an
-    answered attribute.
+    assertion answer over its open row, and removes every unscoped row that
+    reaches an answered attribute.
     """
     state: dict[str, Any] = {
         STATE_LINK_ANSWERS: [link.model_dump() for link in links],

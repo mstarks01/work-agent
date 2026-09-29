@@ -55,6 +55,10 @@ SourceKind = Literal["description", "transcript", "answers"]
 DEFAULT_DESCRIPTION_LABEL = "System description"
 DEFAULT_TRANSCRIPT_LABEL = "Call transcript"
 
+#: The label of the Source the submitter's answers become. A caller's own
+#: source may not use it: the job refuses two sources that share a label.
+ANSWERS_LABEL = "Answers to link questions"
+
 # A label is a citation key, so it is bounded but never rewritten: trimming or
 # escaping one would mean the report cites something the caller did not submit.
 MAX_LABEL_CHARS = 200
