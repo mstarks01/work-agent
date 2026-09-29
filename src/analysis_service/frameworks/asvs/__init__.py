@@ -19,6 +19,10 @@ and the development team, and a job here carries prose. See
 :mod:`analysis_service.frameworks.asvs.record` for what the three **Verdict**
 states carry instead, and ``disclaimer.md`` for what the report's reader is
 told.
+
+Whether one requirement applies is a rule this package states for each of the
+345, in :mod:`analysis_service.frameworks.asvs.applicability`. It is imported
+here, so its check against the catalog runs whenever the package loads.
 """
 
 from __future__ import annotations
@@ -30,6 +34,7 @@ from analysis_service.frameworks import (
     IdRule,
     KnowledgeTables,
 )
+from analysis_service.frameworks.asvs.applicability import applicability_for
 from analysis_service.frameworks.asvs.catalog import (
     ASVS_VERSION,
     CHAPTER_NUMBERS,
@@ -47,7 +52,7 @@ from analysis_service.frameworks.asvs.rules import (
     asvs_precondition,
 )
 
-__all__ = ["ASVS", "AsvsOptions"]
+__all__ = ["ASVS", "AsvsOptions", "applicability_for"]
 
 
 # One note per recurring applicability question, against the rules that select

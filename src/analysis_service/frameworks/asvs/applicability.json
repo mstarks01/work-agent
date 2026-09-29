@@ -1,0 +1,2200 @@
+{
+  "version": "5.0.0",
+  "requirements": [
+    {
+      "id": "V1.1.1",
+      "applies_if": "always",
+      "rationale": "every web application or service receives untrusted input",
+      "reviewed_by": null
+    },
+    {
+      "id": "V1.1.2",
+      "applies_if": "always",
+      "rationale": "every application passes data to at least one interpreter",
+      "reviewed_by": null
+    },
+    {
+      "id": "V1.2.1",
+      "applies_if": "always",
+      "rationale": "every web application or service builds HTTP responses",
+      "reviewed_by": null
+    },
+    {
+      "id": "V1.2.2",
+      "applies_if": "always",
+      "rationale": "every web application builds URLs",
+      "reviewed_by": null
+    },
+    {
+      "id": "V1.2.3",
+      "applies_if": "always",
+      "rationale": "every web application or service emits JavaScript or JSON",
+      "reviewed_by": null
+    },
+    {
+      "id": "V1.2.4",
+      "applies_if": "database",
+      "rationale": "the subject is a database query",
+      "reviewed_by": null
+    },
+    {
+      "id": "V1.2.5",
+      "applies_if": "os-command",
+      "rationale": "the subject is an operating system command",
+      "reviewed_by": null
+    },
+    {
+      "id": "V1.2.6",
+      "applies_if": "ldap",
+      "rationale": "the subject is an LDAP query",
+      "reviewed_by": null
+    },
+    {
+      "id": "V1.2.7",
+      "applies_if": "xpath",
+      "rationale": "the subject is an XPath query",
+      "reviewed_by": null
+    },
+    {
+      "id": "V1.2.8",
+      "applies_if": "latex",
+      "rationale": "the subject is a LaTeX processor",
+      "reviewed_by": null
+    },
+    {
+      "id": "V1.2.9",
+      "applies_if": "dynamic-regex",
+      "rationale": "the subject is a regular expression built from input",
+      "reviewed_by": null
+    },
+    {
+      "id": "V1.2.10",
+      "applies_if": "spreadsheet-export",
+      "rationale": "the subject is a CSV or spreadsheet export",
+      "reviewed_by": null
+    },
+    {
+      "id": "V1.3.1",
+      "applies_if": "rich-text-input",
+      "rationale": "the subject is HTML a user authors",
+      "reviewed_by": null
+    },
+    {
+      "id": "V1.3.2",
+      "applies_if": "always",
+      "rationale": "avoiding dynamic code execution is the control, and every application can use it",
+      "reviewed_by": null
+    },
+    {
+      "id": "V1.3.3",
+      "applies_if": "always",
+      "rationale": "every web application or service receives untrusted input",
+      "reviewed_by": null
+    },
+    {
+      "id": "V1.3.4",
+      "applies_if": "rich-text-input",
+      "rationale": "the subject is SVG a user supplies",
+      "reviewed_by": null
+    },
+    {
+      "id": "V1.3.5",
+      "applies_if": "rich-text-input",
+      "rationale": "the subject is markup or style content a user supplies",
+      "reviewed_by": null
+    },
+    {
+      "id": "V1.3.6",
+      "applies_if": "url-fetch",
+      "rationale": "the subject is a request to a URL that untrusted input shapes",
+      "reviewed_by": null
+    },
+    {
+      "id": "V1.3.7",
+      "applies_if": "template-engine",
+      "rationale": "the subject is a server-side template",
+      "reviewed_by": null
+    },
+    {
+      "id": "V1.3.8",
+      "applies_if": "jndi",
+      "rationale": "the subject is a JNDI lookup",
+      "reviewed_by": null
+    },
+    {
+      "id": "V1.3.9",
+      "applies_if": "cache-service",
+      "rationale": "the subject is data sent to a cache service",
+      "reviewed_by": null
+    },
+    {
+      "id": "V1.3.10",
+      "applies_if": "always",
+      "rationale": "every language the application can be written in has format strings",
+      "reviewed_by": null
+    },
+    {
+      "id": "V1.3.11",
+      "applies_if": "mail-sending",
+      "rationale": "the subject is input passed to a mail system",
+      "reviewed_by": null
+    },
+    {
+      "id": "V1.3.12",
+      "applies_if": "always",
+      "rationale": "every application matches untrusted input against regular expressions",
+      "reviewed_by": null
+    },
+    {
+      "id": "V1.4.1",
+      "applies_if": "memory-unsafe-code",
+      "rationale": "the subject is code without memory safety",
+      "reviewed_by": null
+    },
+    {
+      "id": "V1.4.2",
+      "applies_if": "memory-unsafe-code",
+      "rationale": "the section governs code without memory safety",
+      "reviewed_by": null
+    },
+    {
+      "id": "V1.4.3",
+      "applies_if": "memory-unsafe-code",
+      "rationale": "the subject is manually managed memory",
+      "reviewed_by": null
+    },
+    {
+      "id": "V1.5.1",
+      "applies_if": "xml-parsing",
+      "rationale": "the subject is an XML parser",
+      "reviewed_by": null
+    },
+    {
+      "id": "V1.5.2",
+      "applies_if": "always",
+      "rationale": "every web application or service deserializes the requests it receives",
+      "reviewed_by": null
+    },
+    {
+      "id": "V1.5.3",
+      "applies_if": "always",
+      "rationale": "a web request passes through more than one parser in every deployment",
+      "reviewed_by": null
+    },
+    {
+      "id": "V2.1.1",
+      "applies_if": "always",
+      "rationale": "the subject is present in every application in scope, so its document is too",
+      "reviewed_by": null
+    },
+    {
+      "id": "V2.1.2",
+      "applies_if": "always",
+      "rationale": "the subject is present in every application in scope, so its document is too",
+      "reviewed_by": null
+    },
+    {
+      "id": "V2.1.3",
+      "applies_if": "always",
+      "rationale": "the subject is present in every application in scope, so its document is too",
+      "reviewed_by": null
+    },
+    {
+      "id": "V2.2.1",
+      "applies_if": "always",
+      "rationale": "every web application or service receives untrusted input",
+      "reviewed_by": null
+    },
+    {
+      "id": "V2.2.2",
+      "applies_if": "always",
+      "rationale": "server-side validation is required whatever client the application has",
+      "reviewed_by": null
+    },
+    {
+      "id": "V2.2.3",
+      "applies_if": "always",
+      "rationale": "every web application or service receives untrusted input",
+      "reviewed_by": null
+    },
+    {
+      "id": "V2.3.1",
+      "applies_if": "multi-step-flow",
+      "rationale": "the subject is a flow of ordered steps",
+      "reviewed_by": null
+    },
+    {
+      "id": "V2.3.2",
+      "applies_if": "always",
+      "rationale": "every application has business rules that set limits",
+      "reviewed_by": null
+    },
+    {
+      "id": "V2.3.3",
+      "applies_if": "always",
+      "rationale": "every application that changes state has operations that must complete whole",
+      "reviewed_by": null
+    },
+    {
+      "id": "V2.3.4",
+      "applies_if": "limited-resource",
+      "rationale": "the subject is a resource of limited quantity",
+      "reviewed_by": null
+    },
+    {
+      "id": "V2.3.5",
+      "applies_if": "high-value-flow",
+      "rationale": "the subject is a high-value business flow",
+      "reviewed_by": null
+    },
+    {
+      "id": "V2.4.1",
+      "applies_if": "always",
+      "rationale": "every application has functions a caller can call too often",
+      "reviewed_by": null
+    },
+    {
+      "id": "V2.4.2",
+      "applies_if": {
+        "any": [
+          "browser-frontend",
+          "native-client"
+        ]
+      },
+      "rationale": "the subject is a business flow that people perform through a user interface",
+      "reviewed_by": null
+    },
+    {
+      "id": "V3.1.1",
+      "applies_if": "browser-frontend",
+      "rationale": "the subject is content or behaviour a web browser receives",
+      "reviewed_by": null
+    },
+    {
+      "id": "V3.2.1",
+      "applies_if": "browser-frontend",
+      "rationale": "the subject is content or behaviour a web browser receives",
+      "reviewed_by": null
+    },
+    {
+      "id": "V3.2.2",
+      "applies_if": "browser-frontend",
+      "rationale": "the subject is content or behaviour a web browser receives",
+      "reviewed_by": null
+    },
+    {
+      "id": "V3.2.3",
+      "applies_if": "browser-frontend",
+      "rationale": "the subject is content or behaviour a web browser receives",
+      "reviewed_by": null
+    },
+    {
+      "id": "V3.3.1",
+      "applies_if": {
+        "all": [
+          "browser-frontend",
+          "cookies"
+        ]
+      },
+      "rationale": "the subject is a cookie the application sets for a browser",
+      "reviewed_by": null
+    },
+    {
+      "id": "V3.3.2",
+      "applies_if": {
+        "all": [
+          "browser-frontend",
+          "cookies"
+        ]
+      },
+      "rationale": "the subject is a cookie the application sets for a browser",
+      "reviewed_by": null
+    },
+    {
+      "id": "V3.3.3",
+      "applies_if": {
+        "all": [
+          "browser-frontend",
+          "cookies"
+        ]
+      },
+      "rationale": "the subject is a cookie the application sets for a browser",
+      "reviewed_by": null
+    },
+    {
+      "id": "V3.3.4",
+      "applies_if": {
+        "all": [
+          "browser-frontend",
+          "cookies"
+        ]
+      },
+      "rationale": "the subject is a cookie the application sets for a browser",
+      "reviewed_by": null
+    },
+    {
+      "id": "V3.3.5",
+      "applies_if": {
+        "all": [
+          "browser-frontend",
+          "cookies"
+        ]
+      },
+      "rationale": "the subject is a cookie the application sets for a browser",
+      "reviewed_by": null
+    },
+    {
+      "id": "V3.4.1",
+      "applies_if": "browser-frontend",
+      "rationale": "the subject is content or behaviour a web browser receives",
+      "reviewed_by": null
+    },
+    {
+      "id": "V3.4.2",
+      "applies_if": "cors",
+      "rationale": "the subject is a cross-origin response",
+      "reviewed_by": null
+    },
+    {
+      "id": "V3.4.3",
+      "applies_if": "browser-frontend",
+      "rationale": "the subject is content or behaviour a web browser receives",
+      "reviewed_by": null
+    },
+    {
+      "id": "V3.4.4",
+      "applies_if": "browser-frontend",
+      "rationale": "the subject is content or behaviour a web browser receives",
+      "reviewed_by": null
+    },
+    {
+      "id": "V3.4.5",
+      "applies_if": "browser-frontend",
+      "rationale": "the subject is content or behaviour a web browser receives",
+      "reviewed_by": null
+    },
+    {
+      "id": "V3.4.6",
+      "applies_if": "browser-frontend",
+      "rationale": "the subject is content or behaviour a web browser receives",
+      "reviewed_by": null
+    },
+    {
+      "id": "V3.4.7",
+      "applies_if": "browser-frontend",
+      "rationale": "the subject is content or behaviour a web browser receives",
+      "reviewed_by": null
+    },
+    {
+      "id": "V3.4.8",
+      "applies_if": "browser-frontend",
+      "rationale": "the subject is content or behaviour a web browser receives",
+      "reviewed_by": null
+    },
+    {
+      "id": "V3.5.1",
+      "applies_if": "browser-frontend",
+      "rationale": "the subject is content or behaviour a web browser receives",
+      "reviewed_by": null
+    },
+    {
+      "id": "V3.5.2",
+      "applies_if": "browser-frontend",
+      "rationale": "the subject is content or behaviour a web browser receives",
+      "reviewed_by": null
+    },
+    {
+      "id": "V3.5.3",
+      "applies_if": "browser-frontend",
+      "rationale": "the subject is content or behaviour a web browser receives",
+      "reviewed_by": null
+    },
+    {
+      "id": "V3.5.4",
+      "applies_if": "browser-frontend",
+      "rationale": "the subject is content or behaviour a web browser receives",
+      "reviewed_by": null
+    },
+    {
+      "id": "V3.5.5",
+      "applies_if": "browser-frontend",
+      "rationale": "the subject is content or behaviour a web browser receives",
+      "reviewed_by": null
+    },
+    {
+      "id": "V3.5.6",
+      "applies_if": "browser-frontend",
+      "rationale": "the subject is content or behaviour a web browser receives",
+      "reviewed_by": null
+    },
+    {
+      "id": "V3.5.7",
+      "applies_if": "browser-frontend",
+      "rationale": "the subject is content or behaviour a web browser receives",
+      "reviewed_by": null
+    },
+    {
+      "id": "V3.5.8",
+      "applies_if": "browser-frontend",
+      "rationale": "the subject is content or behaviour a web browser receives",
+      "reviewed_by": null
+    },
+    {
+      "id": "V3.6.1",
+      "applies_if": "browser-frontend",
+      "rationale": "the subject is content or behaviour a web browser receives",
+      "reviewed_by": null
+    },
+    {
+      "id": "V3.7.1",
+      "applies_if": "browser-frontend",
+      "rationale": "the subject is content or behaviour a web browser receives",
+      "reviewed_by": null
+    },
+    {
+      "id": "V3.7.2",
+      "applies_if": "browser-frontend",
+      "rationale": "the subject is content or behaviour a web browser receives",
+      "reviewed_by": null
+    },
+    {
+      "id": "V3.7.3",
+      "applies_if": "browser-frontend",
+      "rationale": "the subject is content or behaviour a web browser receives",
+      "reviewed_by": null
+    },
+    {
+      "id": "V3.7.4",
+      "applies_if": "browser-frontend",
+      "rationale": "the subject is content or behaviour a web browser receives",
+      "reviewed_by": null
+    },
+    {
+      "id": "V3.7.5",
+      "applies_if": "browser-frontend",
+      "rationale": "the subject is content or behaviour a web browser receives",
+      "reviewed_by": null
+    },
+    {
+      "id": "V4.1.1",
+      "applies_if": "always",
+      "rationale": "every web application or service builds HTTP responses",
+      "reviewed_by": null
+    },
+    {
+      "id": "V4.1.2",
+      "applies_if": "always",
+      "rationale": "every web application or service answers HTTP",
+      "reviewed_by": null
+    },
+    {
+      "id": "V4.1.3",
+      "applies_if": "always",
+      "rationale": "every deployment sets some headers at a layer in front of the application",
+      "reviewed_by": null
+    },
+    {
+      "id": "V4.1.4",
+      "applies_if": "always",
+      "rationale": "every web application or service receives HTTP methods",
+      "reviewed_by": null
+    },
+    {
+      "id": "V4.1.5",
+      "applies_if": "high-value-flow",
+      "rationale": "the subject is a highly sensitive request or transaction",
+      "reviewed_by": null
+    },
+    {
+      "id": "V4.2.1",
+      "applies_if": "always",
+      "rationale": "every web application or service receives HTTP messages",
+      "reviewed_by": null
+    },
+    {
+      "id": "V4.2.2",
+      "applies_if": "always",
+      "rationale": "every web application or service generates HTTP messages",
+      "reviewed_by": null
+    },
+    {
+      "id": "V4.2.3",
+      "applies_if": "always",
+      "rationale": "the HTTP version a deployment accepts is not a fact the input carries",
+      "reviewed_by": null
+    },
+    {
+      "id": "V4.2.4",
+      "applies_if": "always",
+      "rationale": "the HTTP version a deployment accepts is not a fact the input carries",
+      "reviewed_by": null
+    },
+    {
+      "id": "V4.2.5",
+      "applies_if": "outbound-http",
+      "rationale": "the subject is an HTTP request the application builds and sends",
+      "reviewed_by": null
+    },
+    {
+      "id": "V4.3.1",
+      "applies_if": "graphql",
+      "rationale": "the subject is a GraphQL API",
+      "reviewed_by": null
+    },
+    {
+      "id": "V4.3.2",
+      "applies_if": "graphql",
+      "rationale": "the subject is a GraphQL API",
+      "reviewed_by": null
+    },
+    {
+      "id": "V4.4.1",
+      "applies_if": "websocket",
+      "rationale": "the subject is a WebSocket connection",
+      "reviewed_by": null
+    },
+    {
+      "id": "V4.4.2",
+      "applies_if": "websocket",
+      "rationale": "the subject is a WebSocket handshake",
+      "reviewed_by": null
+    },
+    {
+      "id": "V4.4.3",
+      "applies_if": "websocket",
+      "rationale": "the subject is the session of a WebSocket connection",
+      "reviewed_by": null
+    },
+    {
+      "id": "V4.4.4",
+      "applies_if": "websocket",
+      "rationale": "the subject is the session of a WebSocket connection",
+      "reviewed_by": null
+    },
+    {
+      "id": "V5.1.1",
+      "applies_if": "file-upload",
+      "rationale": "the subject is a file the application accepts",
+      "reviewed_by": null
+    },
+    {
+      "id": "V5.2.1",
+      "applies_if": "file-upload",
+      "rationale": "the subject is a file the application accepts",
+      "reviewed_by": null
+    },
+    {
+      "id": "V5.2.2",
+      "applies_if": "file-upload",
+      "rationale": "the subject is a file the application accepts",
+      "reviewed_by": null
+    },
+    {
+      "id": "V5.2.3",
+      "applies_if": "archive-files",
+      "rationale": "the subject is a compressed file the application accepts",
+      "reviewed_by": null
+    },
+    {
+      "id": "V5.2.4",
+      "applies_if": "file-upload",
+      "rationale": "the subject is a file the application accepts",
+      "reviewed_by": null
+    },
+    {
+      "id": "V5.2.5",
+      "applies_if": "archive-files",
+      "rationale": "the subject is a compressed file the application accepts",
+      "reviewed_by": null
+    },
+    {
+      "id": "V5.2.6",
+      "applies_if": "image-files",
+      "rationale": "the subject is an image the application accepts",
+      "reviewed_by": null
+    },
+    {
+      "id": "V5.3.1",
+      "applies_if": "file-upload",
+      "rationale": "the subject is a stored file that untrusted input produced",
+      "reviewed_by": null
+    },
+    {
+      "id": "V5.3.2",
+      "applies_if": "file-upload",
+      "rationale": "the subject is a file path that a submitted filename can shape",
+      "reviewed_by": null
+    },
+    {
+      "id": "V5.3.3",
+      "applies_if": "archive-files",
+      "rationale": "the subject is a compressed file the application unpacks",
+      "reviewed_by": null
+    },
+    {
+      "id": "V5.4.1",
+      "applies_if": {
+        "any": [
+          "file-upload",
+          "file-download"
+        ]
+      },
+      "rationale": "the subject is a filename the application receives or serves",
+      "reviewed_by": null
+    },
+    {
+      "id": "V5.4.2",
+      "applies_if": "file-download",
+      "rationale": "the subject is a file the application serves",
+      "reviewed_by": null
+    },
+    {
+      "id": "V5.4.3",
+      "applies_if": "file-upload",
+      "rationale": "the subject is a file from an untrusted source",
+      "reviewed_by": null
+    },
+    {
+      "id": "V6.1.1",
+      "applies_if": "authentication",
+      "rationale": "the subject is an authentication function",
+      "reviewed_by": null
+    },
+    {
+      "id": "V6.1.2",
+      "applies_if": "password-authentication",
+      "rationale": "the subject is a password users choose",
+      "reviewed_by": null
+    },
+    {
+      "id": "V6.1.3",
+      "applies_if": "authentication",
+      "rationale": "the subject is an authentication pathway",
+      "reviewed_by": null
+    },
+    {
+      "id": "V6.2.1",
+      "applies_if": "password-authentication",
+      "rationale": "the subject is a password users choose",
+      "reviewed_by": null
+    },
+    {
+      "id": "V6.2.2",
+      "applies_if": "password-authentication",
+      "rationale": "the subject is a password users choose",
+      "reviewed_by": null
+    },
+    {
+      "id": "V6.2.3",
+      "applies_if": "password-authentication",
+      "rationale": "the subject is a password users choose",
+      "reviewed_by": null
+    },
+    {
+      "id": "V6.2.4",
+      "applies_if": "password-authentication",
+      "rationale": "the subject is a password users choose",
+      "reviewed_by": null
+    },
+    {
+      "id": "V6.2.5",
+      "applies_if": "password-authentication",
+      "rationale": "the subject is a password users choose",
+      "reviewed_by": null
+    },
+    {
+      "id": "V6.2.6",
+      "applies_if": "password-authentication",
+      "rationale": "the subject is a password users choose",
+      "reviewed_by": null
+    },
+    {
+      "id": "V6.2.7",
+      "applies_if": "password-authentication",
+      "rationale": "the subject is a password users choose",
+      "reviewed_by": null
+    },
+    {
+      "id": "V6.2.8",
+      "applies_if": "password-authentication",
+      "rationale": "the subject is a password users choose",
+      "reviewed_by": null
+    },
+    {
+      "id": "V6.2.9",
+      "applies_if": "password-authentication",
+      "rationale": "the subject is a password users choose",
+      "reviewed_by": null
+    },
+    {
+      "id": "V6.2.10",
+      "applies_if": "password-authentication",
+      "rationale": "the subject is a password users choose",
+      "reviewed_by": null
+    },
+    {
+      "id": "V6.2.11",
+      "applies_if": "password-authentication",
+      "rationale": "the subject is a password users choose",
+      "reviewed_by": null
+    },
+    {
+      "id": "V6.2.12",
+      "applies_if": "password-authentication",
+      "rationale": "the subject is a password users choose",
+      "reviewed_by": null
+    },
+    {
+      "id": "V6.3.1",
+      "applies_if": "authentication",
+      "rationale": "the subject is an authentication function",
+      "reviewed_by": null
+    },
+    {
+      "id": "V6.3.2",
+      "applies_if": "always",
+      "rationale": "every application and its platform can ship default accounts",
+      "reviewed_by": null
+    },
+    {
+      "id": "V6.3.3",
+      "applies_if": "authentication",
+      "rationale": "the subject is the authentication of access; a second factor is the control",
+      "reviewed_by": null
+    },
+    {
+      "id": "V6.3.4",
+      "applies_if": "authentication",
+      "rationale": "the subject is an authentication pathway",
+      "reviewed_by": null
+    },
+    {
+      "id": "V6.3.5",
+      "applies_if": "authentication",
+      "rationale": "the subject is an authentication attempt",
+      "reviewed_by": null
+    },
+    {
+      "id": "V6.3.6",
+      "applies_if": "authentication",
+      "rationale": "the subject is an authentication factor",
+      "reviewed_by": null
+    },
+    {
+      "id": "V6.3.7",
+      "applies_if": "authentication",
+      "rationale": "the subject is a change to authentication details",
+      "reviewed_by": null
+    },
+    {
+      "id": "V6.3.8",
+      "applies_if": "authentication",
+      "rationale": "the subject is an authentication challenge",
+      "reviewed_by": null
+    },
+    {
+      "id": "V6.4.1",
+      "applies_if": "authentication",
+      "rationale": "the subject is an initial secret the application issues for sign-in",
+      "reviewed_by": null
+    },
+    {
+      "id": "V6.4.2",
+      "applies_if": "authentication",
+      "rationale": "the subject is account recovery; the absence of hints is the control",
+      "reviewed_by": null
+    },
+    {
+      "id": "V6.4.3",
+      "applies_if": "password-authentication",
+      "rationale": "the subject is the reset of a forgotten password",
+      "reviewed_by": null
+    },
+    {
+      "id": "V6.4.4",
+      "applies_if": "multi-factor-authentication",
+      "rationale": "the subject is the recovery of a lost second factor",
+      "reviewed_by": null
+    },
+    {
+      "id": "V6.4.5",
+      "applies_if": "authentication",
+      "rationale": "the subject is an authentication mechanism that expires",
+      "reviewed_by": null
+    },
+    {
+      "id": "V6.4.6",
+      "applies_if": "password-authentication",
+      "rationale": "the subject is a password reset an administrator starts",
+      "reviewed_by": null
+    },
+    {
+      "id": "V6.5.1",
+      "applies_if": "one-time-codes",
+      "rationale": "the subject is a one-time code",
+      "reviewed_by": null
+    },
+    {
+      "id": "V6.5.2",
+      "applies_if": "one-time-codes",
+      "rationale": "the subject is a stored lookup secret",
+      "reviewed_by": null
+    },
+    {
+      "id": "V6.5.3",
+      "applies_if": "one-time-codes",
+      "rationale": "the subject is the generation of a one-time code",
+      "reviewed_by": null
+    },
+    {
+      "id": "V6.5.4",
+      "applies_if": "one-time-codes",
+      "rationale": "the subject is a one-time code",
+      "reviewed_by": null
+    },
+    {
+      "id": "V6.5.5",
+      "applies_if": "one-time-codes",
+      "rationale": "the subject is a one-time code",
+      "reviewed_by": null
+    },
+    {
+      "id": "V6.5.6",
+      "applies_if": "authentication",
+      "rationale": "the subject is an authentication factor",
+      "reviewed_by": null
+    },
+    {
+      "id": "V6.5.7",
+      "applies_if": "biometric-authentication",
+      "rationale": "the subject is a biometric factor",
+      "reviewed_by": null
+    },
+    {
+      "id": "V6.5.8",
+      "applies_if": "one-time-codes",
+      "rationale": "the subject is a time-based one-time password",
+      "reviewed_by": null
+    },
+    {
+      "id": "V6.6.1",
+      "applies_if": "one-time-codes",
+      "rationale": "the subject is a code sent by phone or SMS",
+      "reviewed_by": null
+    },
+    {
+      "id": "V6.6.2",
+      "applies_if": "one-time-codes",
+      "rationale": "the subject is an out-of-band code",
+      "reviewed_by": null
+    },
+    {
+      "id": "V6.6.3",
+      "applies_if": "one-time-codes",
+      "rationale": "the subject is an out-of-band code",
+      "reviewed_by": null
+    },
+    {
+      "id": "V6.6.4",
+      "applies_if": "one-time-codes",
+      "rationale": "the subject is a push notification for sign-in",
+      "reviewed_by": null
+    },
+    {
+      "id": "V6.7.1",
+      "applies_if": "cryptographic-authenticators",
+      "rationale": "the subject is a cryptographic authenticator",
+      "reviewed_by": null
+    },
+    {
+      "id": "V6.7.2",
+      "applies_if": "cryptographic-authenticators",
+      "rationale": "the subject is a cryptographic authenticator",
+      "reviewed_by": null
+    },
+    {
+      "id": "V6.8.1",
+      "applies_if": "federated-identity",
+      "rationale": "the subject is an identity provider",
+      "reviewed_by": null
+    },
+    {
+      "id": "V6.8.2",
+      "applies_if": "federated-identity",
+      "rationale": "the subject is an assertion from an identity provider",
+      "reviewed_by": null
+    },
+    {
+      "id": "V6.8.3",
+      "applies_if": "saml",
+      "rationale": "the subject is a SAML assertion",
+      "reviewed_by": null
+    },
+    {
+      "id": "V6.8.4",
+      "applies_if": "federated-identity",
+      "rationale": "the subject is an identity provider",
+      "reviewed_by": null
+    },
+    {
+      "id": "V7.1.1",
+      "applies_if": "sessions",
+      "rationale": "the subject is a user session",
+      "reviewed_by": null
+    },
+    {
+      "id": "V7.1.2",
+      "applies_if": "sessions",
+      "rationale": "the subject is a user session",
+      "reviewed_by": null
+    },
+    {
+      "id": "V7.1.3",
+      "applies_if": {
+        "all": [
+          "sessions",
+          "federated-identity"
+        ]
+      },
+      "rationale": "the subject is a session shared with an identity provider",
+      "reviewed_by": null
+    },
+    {
+      "id": "V7.2.1",
+      "applies_if": "sessions",
+      "rationale": "the subject is a session token",
+      "reviewed_by": null
+    },
+    {
+      "id": "V7.2.2",
+      "applies_if": "sessions",
+      "rationale": "the subject is a session token",
+      "reviewed_by": null
+    },
+    {
+      "id": "V7.2.3",
+      "applies_if": "reference-session-tokens",
+      "rationale": "the subject is an opaque session token",
+      "reviewed_by": null
+    },
+    {
+      "id": "V7.2.4",
+      "applies_if": "sessions",
+      "rationale": "the subject is a session token",
+      "reviewed_by": null
+    },
+    {
+      "id": "V7.3.1",
+      "applies_if": "sessions",
+      "rationale": "the subject is a user session",
+      "reviewed_by": null
+    },
+    {
+      "id": "V7.3.2",
+      "applies_if": "sessions",
+      "rationale": "the subject is a user session",
+      "reviewed_by": null
+    },
+    {
+      "id": "V7.4.1",
+      "applies_if": "sessions",
+      "rationale": "the subject is a user session",
+      "reviewed_by": null
+    },
+    {
+      "id": "V7.4.2",
+      "applies_if": "sessions",
+      "rationale": "the subject is a user session",
+      "reviewed_by": null
+    },
+    {
+      "id": "V7.4.3",
+      "applies_if": "sessions",
+      "rationale": "the subject is a user session",
+      "reviewed_by": null
+    },
+    {
+      "id": "V7.4.4",
+      "applies_if": {
+        "all": [
+          "sessions",
+          {
+            "any": [
+              "browser-frontend",
+              "native-client"
+            ]
+          }
+        ]
+      },
+      "rationale": "the subject is a user interface that shows a session",
+      "reviewed_by": null
+    },
+    {
+      "id": "V7.4.5",
+      "applies_if": "sessions",
+      "rationale": "the subject is a user session",
+      "reviewed_by": null
+    },
+    {
+      "id": "V7.5.1",
+      "applies_if": "authentication",
+      "rationale": "the subject is an account attribute that authentication rests on",
+      "reviewed_by": null
+    },
+    {
+      "id": "V7.5.2",
+      "applies_if": "sessions",
+      "rationale": "the subject is a user session",
+      "reviewed_by": null
+    },
+    {
+      "id": "V7.5.3",
+      "applies_if": {
+        "all": [
+          "authentication",
+          "high-value-flow"
+        ]
+      },
+      "rationale": "the subject is a highly sensitive operation by an authenticated user",
+      "reviewed_by": null
+    },
+    {
+      "id": "V7.6.1",
+      "applies_if": {
+        "all": [
+          "sessions",
+          "federated-identity"
+        ]
+      },
+      "rationale": "the subject is a session shared with an identity provider",
+      "reviewed_by": null
+    },
+    {
+      "id": "V7.6.2",
+      "applies_if": {
+        "all": [
+          "sessions",
+          "federated-identity"
+        ]
+      },
+      "rationale": "the subject is a session created through an identity provider",
+      "reviewed_by": null
+    },
+    {
+      "id": "V8.1.1",
+      "applies_if": "restricted-access",
+      "rationale": "the subject is a restriction on who may reach a function or data",
+      "reviewed_by": null
+    },
+    {
+      "id": "V8.1.2",
+      "applies_if": "restricted-access",
+      "rationale": "the subject is a restriction on who may reach a function or data",
+      "reviewed_by": null
+    },
+    {
+      "id": "V8.1.3",
+      "applies_if": "restricted-access",
+      "rationale": "the subject is a restriction on who may reach a function or data",
+      "reviewed_by": null
+    },
+    {
+      "id": "V8.1.4",
+      "applies_if": "restricted-access",
+      "rationale": "the subject is a restriction on who may reach a function or data",
+      "reviewed_by": null
+    },
+    {
+      "id": "V8.2.1",
+      "applies_if": "restricted-access",
+      "rationale": "the subject is a restriction on who may reach a function or data",
+      "reviewed_by": null
+    },
+    {
+      "id": "V8.2.2",
+      "applies_if": "restricted-access",
+      "rationale": "the subject is a restriction on who may reach a function or data",
+      "reviewed_by": null
+    },
+    {
+      "id": "V8.2.3",
+      "applies_if": "restricted-access",
+      "rationale": "the subject is a restriction on who may reach a function or data",
+      "reviewed_by": null
+    },
+    {
+      "id": "V8.2.4",
+      "applies_if": "restricted-access",
+      "rationale": "the subject is a restriction on who may reach a function or data",
+      "reviewed_by": null
+    },
+    {
+      "id": "V8.3.1",
+      "applies_if": "restricted-access",
+      "rationale": "the subject is a restriction on who may reach a function or data",
+      "reviewed_by": null
+    },
+    {
+      "id": "V8.3.2",
+      "applies_if": "restricted-access",
+      "rationale": "the subject is a restriction on who may reach a function or data",
+      "reviewed_by": null
+    },
+    {
+      "id": "V8.3.3",
+      "applies_if": "restricted-access",
+      "rationale": "the subject is a restriction on who may reach a function or data",
+      "reviewed_by": null
+    },
+    {
+      "id": "V8.4.1",
+      "applies_if": "multi-tenancy",
+      "rationale": "the subject is the separation of tenants",
+      "reviewed_by": null
+    },
+    {
+      "id": "V8.4.2",
+      "applies_if": "administrative-interface",
+      "rationale": "the subject is an administrative interface",
+      "reviewed_by": null
+    },
+    {
+      "id": "V9.1.1",
+      "applies_if": "self-contained-tokens",
+      "rationale": "the subject is a self-contained token",
+      "reviewed_by": null
+    },
+    {
+      "id": "V9.1.2",
+      "applies_if": "self-contained-tokens",
+      "rationale": "the subject is a self-contained token",
+      "reviewed_by": null
+    },
+    {
+      "id": "V9.1.3",
+      "applies_if": "self-contained-tokens",
+      "rationale": "the subject is a self-contained token",
+      "reviewed_by": null
+    },
+    {
+      "id": "V9.2.1",
+      "applies_if": "self-contained-tokens",
+      "rationale": "the subject is a self-contained token",
+      "reviewed_by": null
+    },
+    {
+      "id": "V9.2.2",
+      "applies_if": "self-contained-tokens",
+      "rationale": "the subject is a self-contained token",
+      "reviewed_by": null
+    },
+    {
+      "id": "V9.2.3",
+      "applies_if": "self-contained-tokens",
+      "rationale": "the subject is a self-contained token",
+      "reviewed_by": null
+    },
+    {
+      "id": "V9.2.4",
+      "applies_if": "self-contained-tokens",
+      "rationale": "the subject is a self-contained token",
+      "reviewed_by": null
+    },
+    {
+      "id": "V10.1.1",
+      "applies_if": "oauth",
+      "rationale": "the subject is an OAuth token",
+      "reviewed_by": null
+    },
+    {
+      "id": "V10.1.2",
+      "applies_if": "oauth-client",
+      "rationale": "the subject is an OAuth client",
+      "reviewed_by": null
+    },
+    {
+      "id": "V10.2.1",
+      "applies_if": "oauth-client",
+      "rationale": "the subject is an OAuth client",
+      "reviewed_by": null
+    },
+    {
+      "id": "V10.2.2",
+      "applies_if": "oauth-client",
+      "rationale": "the subject is an OAuth client",
+      "reviewed_by": null
+    },
+    {
+      "id": "V10.2.3",
+      "applies_if": "oauth-client",
+      "rationale": "the subject is an OAuth client",
+      "reviewed_by": null
+    },
+    {
+      "id": "V10.3.1",
+      "applies_if": "oauth-resource-server",
+      "rationale": "the subject is an OAuth resource server",
+      "reviewed_by": null
+    },
+    {
+      "id": "V10.3.2",
+      "applies_if": "oauth-resource-server",
+      "rationale": "the subject is an OAuth resource server",
+      "reviewed_by": null
+    },
+    {
+      "id": "V10.3.3",
+      "applies_if": "oauth-resource-server",
+      "rationale": "the subject is an OAuth resource server",
+      "reviewed_by": null
+    },
+    {
+      "id": "V10.3.4",
+      "applies_if": "oauth-resource-server",
+      "rationale": "the subject is an OAuth resource server",
+      "reviewed_by": null
+    },
+    {
+      "id": "V10.3.5",
+      "applies_if": "oauth-resource-server",
+      "rationale": "the subject is an OAuth resource server",
+      "reviewed_by": null
+    },
+    {
+      "id": "V10.4.1",
+      "applies_if": "oauth-authorization-server",
+      "rationale": "the subject is an OAuth authorization server",
+      "reviewed_by": null
+    },
+    {
+      "id": "V10.4.2",
+      "applies_if": "oauth-authorization-server",
+      "rationale": "the subject is an OAuth authorization server",
+      "reviewed_by": null
+    },
+    {
+      "id": "V10.4.3",
+      "applies_if": "oauth-authorization-server",
+      "rationale": "the subject is an OAuth authorization server",
+      "reviewed_by": null
+    },
+    {
+      "id": "V10.4.4",
+      "applies_if": "oauth-authorization-server",
+      "rationale": "the subject is an OAuth authorization server",
+      "reviewed_by": null
+    },
+    {
+      "id": "V10.4.5",
+      "applies_if": "oauth-authorization-server",
+      "rationale": "the subject is an OAuth authorization server",
+      "reviewed_by": null
+    },
+    {
+      "id": "V10.4.6",
+      "applies_if": "oauth-authorization-server",
+      "rationale": "the subject is an OAuth authorization server",
+      "reviewed_by": null
+    },
+    {
+      "id": "V10.4.7",
+      "applies_if": "oauth-authorization-server",
+      "rationale": "the subject is an OAuth authorization server",
+      "reviewed_by": null
+    },
+    {
+      "id": "V10.4.8",
+      "applies_if": "oauth-authorization-server",
+      "rationale": "the subject is an OAuth authorization server",
+      "reviewed_by": null
+    },
+    {
+      "id": "V10.4.9",
+      "applies_if": "oauth-authorization-server",
+      "rationale": "the subject is an OAuth authorization server",
+      "reviewed_by": null
+    },
+    {
+      "id": "V10.4.10",
+      "applies_if": "oauth-authorization-server",
+      "rationale": "the subject is an OAuth authorization server",
+      "reviewed_by": null
+    },
+    {
+      "id": "V10.4.11",
+      "applies_if": "oauth-authorization-server",
+      "rationale": "the subject is an OAuth authorization server",
+      "reviewed_by": null
+    },
+    {
+      "id": "V10.4.12",
+      "applies_if": "oauth-authorization-server",
+      "rationale": "the subject is an OAuth authorization server",
+      "reviewed_by": null
+    },
+    {
+      "id": "V10.4.13",
+      "applies_if": "oauth-authorization-server",
+      "rationale": "the subject is an OAuth authorization server",
+      "reviewed_by": null
+    },
+    {
+      "id": "V10.4.14",
+      "applies_if": "oauth-authorization-server",
+      "rationale": "the subject is an OAuth authorization server",
+      "reviewed_by": null
+    },
+    {
+      "id": "V10.4.15",
+      "applies_if": "oauth-authorization-server",
+      "rationale": "the subject is an OAuth authorization server",
+      "reviewed_by": null
+    },
+    {
+      "id": "V10.4.16",
+      "applies_if": "oauth-authorization-server",
+      "rationale": "the subject is an OAuth authorization server",
+      "reviewed_by": null
+    },
+    {
+      "id": "V10.5.1",
+      "applies_if": {
+        "all": [
+          "oauth-client",
+          "oidc"
+        ]
+      },
+      "rationale": "the subject is an OpenID Connect relying party",
+      "reviewed_by": null
+    },
+    {
+      "id": "V10.5.2",
+      "applies_if": {
+        "all": [
+          "oauth-client",
+          "oidc"
+        ]
+      },
+      "rationale": "the subject is an OpenID Connect relying party",
+      "reviewed_by": null
+    },
+    {
+      "id": "V10.5.3",
+      "applies_if": {
+        "all": [
+          "oauth-client",
+          "oidc"
+        ]
+      },
+      "rationale": "the subject is an OpenID Connect relying party",
+      "reviewed_by": null
+    },
+    {
+      "id": "V10.5.4",
+      "applies_if": {
+        "all": [
+          "oauth-client",
+          "oidc"
+        ]
+      },
+      "rationale": "the subject is an OpenID Connect relying party",
+      "reviewed_by": null
+    },
+    {
+      "id": "V10.5.5",
+      "applies_if": {
+        "all": [
+          "oauth-client",
+          "oidc"
+        ]
+      },
+      "rationale": "the subject is an OpenID Connect relying party",
+      "reviewed_by": null
+    },
+    {
+      "id": "V10.6.1",
+      "applies_if": {
+        "all": [
+          "oauth-authorization-server",
+          "oidc"
+        ]
+      },
+      "rationale": "the subject is an OpenID provider",
+      "reviewed_by": null
+    },
+    {
+      "id": "V10.6.2",
+      "applies_if": {
+        "all": [
+          "oauth-authorization-server",
+          "oidc"
+        ]
+      },
+      "rationale": "the subject is an OpenID provider",
+      "reviewed_by": null
+    },
+    {
+      "id": "V10.7.1",
+      "applies_if": "oauth-authorization-server",
+      "rationale": "the subject is consent at an OAuth authorization server",
+      "reviewed_by": null
+    },
+    {
+      "id": "V10.7.2",
+      "applies_if": "oauth-authorization-server",
+      "rationale": "the subject is consent at an OAuth authorization server",
+      "reviewed_by": null
+    },
+    {
+      "id": "V10.7.3",
+      "applies_if": "oauth-authorization-server",
+      "rationale": "the subject is consent at an OAuth authorization server",
+      "reviewed_by": null
+    },
+    {
+      "id": "V11.1.1",
+      "applies_if": "always",
+      "rationale": "every web application holds keys, at least for TLS",
+      "reviewed_by": null
+    },
+    {
+      "id": "V11.1.2",
+      "applies_if": "always",
+      "rationale": "every web application uses cryptography, at least for TLS",
+      "reviewed_by": null
+    },
+    {
+      "id": "V11.1.3",
+      "applies_if": "always",
+      "rationale": "every web application uses cryptography, at least for TLS",
+      "reviewed_by": null
+    },
+    {
+      "id": "V11.1.4",
+      "applies_if": "always",
+      "rationale": "every web application uses cryptography, at least for TLS",
+      "reviewed_by": null
+    },
+    {
+      "id": "V11.2.1",
+      "applies_if": "always",
+      "rationale": "every web application performs cryptographic operations",
+      "reviewed_by": null
+    },
+    {
+      "id": "V11.2.2",
+      "applies_if": "always",
+      "rationale": "every web application performs cryptographic operations",
+      "reviewed_by": null
+    },
+    {
+      "id": "V11.2.3",
+      "applies_if": "always",
+      "rationale": "every web application uses cryptographic primitives",
+      "reviewed_by": null
+    },
+    {
+      "id": "V11.2.4",
+      "applies_if": "always",
+      "rationale": "every web application performs cryptographic operations",
+      "reviewed_by": null
+    },
+    {
+      "id": "V11.2.5",
+      "applies_if": "always",
+      "rationale": "every web application performs cryptographic operations",
+      "reviewed_by": null
+    },
+    {
+      "id": "V11.3.1",
+      "applies_if": "encryption",
+      "rationale": "the subject is encryption the application performs",
+      "reviewed_by": null
+    },
+    {
+      "id": "V11.3.2",
+      "applies_if": "encryption",
+      "rationale": "the subject is encryption the application performs",
+      "reviewed_by": null
+    },
+    {
+      "id": "V11.3.3",
+      "applies_if": "encryption",
+      "rationale": "the subject is data the application encrypts",
+      "reviewed_by": null
+    },
+    {
+      "id": "V11.3.4",
+      "applies_if": "encryption",
+      "rationale": "the subject is encryption the application performs",
+      "reviewed_by": null
+    },
+    {
+      "id": "V11.3.5",
+      "applies_if": "encryption",
+      "rationale": "the subject is encryption the application performs",
+      "reviewed_by": null
+    },
+    {
+      "id": "V11.4.1",
+      "applies_if": "always",
+      "rationale": "every web application uses hash functions",
+      "reviewed_by": null
+    },
+    {
+      "id": "V11.4.2",
+      "applies_if": "password-authentication",
+      "rationale": "the subject is a stored password",
+      "reviewed_by": null
+    },
+    {
+      "id": "V11.4.3",
+      "applies_if": "always",
+      "rationale": "every web application relies on signatures, at least for TLS",
+      "reviewed_by": null
+    },
+    {
+      "id": "V11.4.4",
+      "applies_if": "always",
+      "rationale": "keys derived from passwords are not a fact the input carries",
+      "reviewed_by": null
+    },
+    {
+      "id": "V11.5.1",
+      "applies_if": "always",
+      "rationale": "every web application generates values that must not be guessed",
+      "reviewed_by": null
+    },
+    {
+      "id": "V11.5.2",
+      "applies_if": "always",
+      "rationale": "every web application generates random values",
+      "reviewed_by": null
+    },
+    {
+      "id": "V11.6.1",
+      "applies_if": "always",
+      "rationale": "every web application relies on key generation and signatures, at least for TLS",
+      "reviewed_by": null
+    },
+    {
+      "id": "V11.6.2",
+      "applies_if": "always",
+      "rationale": "every web application relies on key exchange, at least for TLS",
+      "reviewed_by": null
+    },
+    {
+      "id": "V11.7.1",
+      "applies_if": "sensitive-data",
+      "rationale": "the subject is sensitive data in use",
+      "reviewed_by": null
+    },
+    {
+      "id": "V11.7.2",
+      "applies_if": "sensitive-data",
+      "rationale": "the subject is sensitive data in use",
+      "reviewed_by": null
+    },
+    {
+      "id": "V12.1.1",
+      "applies_if": "always",
+      "rationale": "every web application or service speaks TLS",
+      "reviewed_by": null
+    },
+    {
+      "id": "V12.1.2",
+      "applies_if": "always",
+      "rationale": "every web application or service speaks TLS",
+      "reviewed_by": null
+    },
+    {
+      "id": "V12.1.3",
+      "applies_if": "mutual-tls",
+      "rationale": "the subject is a TLS client certificate",
+      "reviewed_by": null
+    },
+    {
+      "id": "V12.1.4",
+      "applies_if": "always",
+      "rationale": "every web application or service presents a certificate",
+      "reviewed_by": null
+    },
+    {
+      "id": "V12.1.5",
+      "applies_if": "always",
+      "rationale": "every web application or service speaks TLS",
+      "reviewed_by": null
+    },
+    {
+      "id": "V12.2.1",
+      "applies_if": "always",
+      "rationale": "every web application or service faces its clients over HTTP",
+      "reviewed_by": null
+    },
+    {
+      "id": "V12.2.2",
+      "applies_if": "always",
+      "rationale": "every web application or service faces its clients over HTTP",
+      "reviewed_by": null
+    },
+    {
+      "id": "V12.3.1",
+      "applies_if": "always",
+      "rationale": "every application makes inbound and outbound connections",
+      "reviewed_by": null
+    },
+    {
+      "id": "V12.3.2",
+      "applies_if": "always",
+      "rationale": "every application connects to at least one TLS server, such as its database or a provider",
+      "reviewed_by": null
+    },
+    {
+      "id": "V12.3.3",
+      "applies_if": "internal-services",
+      "rationale": "the subject is a connection between the application's own components",
+      "reviewed_by": null
+    },
+    {
+      "id": "V12.3.4",
+      "applies_if": "internal-services",
+      "rationale": "the subject is a connection between the application's own components",
+      "reviewed_by": null
+    },
+    {
+      "id": "V12.3.5",
+      "applies_if": "internal-services",
+      "rationale": "the subject is a connection between the application's own components",
+      "reviewed_by": null
+    },
+    {
+      "id": "V13.1.1",
+      "applies_if": "always",
+      "rationale": "the subject is present in every application in scope, so its document is too",
+      "reviewed_by": null
+    },
+    {
+      "id": "V13.1.2",
+      "applies_if": "always",
+      "rationale": "every application uses at least one other service",
+      "reviewed_by": null
+    },
+    {
+      "id": "V13.1.3",
+      "applies_if": "always",
+      "rationale": "every application uses external resources, such as connections and threads",
+      "reviewed_by": null
+    },
+    {
+      "id": "V13.1.4",
+      "applies_if": "always",
+      "rationale": "every application holds secrets, at least a TLS key",
+      "reviewed_by": null
+    },
+    {
+      "id": "V13.2.1",
+      "applies_if": "internal-services",
+      "rationale": "the subject is communication between backend components",
+      "reviewed_by": null
+    },
+    {
+      "id": "V13.2.2",
+      "applies_if": "internal-services",
+      "rationale": "the subject is communication between backend components",
+      "reviewed_by": null
+    },
+    {
+      "id": "V13.2.3",
+      "applies_if": "internal-services",
+      "rationale": "the subject is a credential one backend component presents to another",
+      "reviewed_by": null
+    },
+    {
+      "id": "V13.2.4",
+      "applies_if": "always",
+      "rationale": "every application communicates with some external resource",
+      "reviewed_by": null
+    },
+    {
+      "id": "V13.2.5",
+      "applies_if": "always",
+      "rationale": "every application server can send requests or load files",
+      "reviewed_by": null
+    },
+    {
+      "id": "V13.2.6",
+      "applies_if": "internal-services",
+      "rationale": "the subject is a connection to a separate service",
+      "reviewed_by": null
+    },
+    {
+      "id": "V13.3.1",
+      "applies_if": "always",
+      "rationale": "every application holds backend secrets",
+      "reviewed_by": null
+    },
+    {
+      "id": "V13.3.2",
+      "applies_if": "always",
+      "rationale": "every application holds backend secrets",
+      "reviewed_by": null
+    },
+    {
+      "id": "V13.3.3",
+      "applies_if": "always",
+      "rationale": "every application holds key material",
+      "reviewed_by": null
+    },
+    {
+      "id": "V13.3.4",
+      "applies_if": "always",
+      "rationale": "every application holds secrets",
+      "reviewed_by": null
+    },
+    {
+      "id": "V13.4.1",
+      "applies_if": "always",
+      "rationale": "every deployment can expose something it did not intend",
+      "reviewed_by": null
+    },
+    {
+      "id": "V13.4.2",
+      "applies_if": "always",
+      "rationale": "every deployment can expose something it did not intend",
+      "reviewed_by": null
+    },
+    {
+      "id": "V13.4.3",
+      "applies_if": "always",
+      "rationale": "every deployment can expose something it did not intend",
+      "reviewed_by": null
+    },
+    {
+      "id": "V13.4.4",
+      "applies_if": "always",
+      "rationale": "every deployment can expose something it did not intend",
+      "reviewed_by": null
+    },
+    {
+      "id": "V13.4.5",
+      "applies_if": "always",
+      "rationale": "every deployment can expose something it did not intend",
+      "reviewed_by": null
+    },
+    {
+      "id": "V13.4.6",
+      "applies_if": "always",
+      "rationale": "every deployment can expose something it did not intend",
+      "reviewed_by": null
+    },
+    {
+      "id": "V13.4.7",
+      "applies_if": "always",
+      "rationale": "every deployment can expose something it did not intend",
+      "reviewed_by": null
+    },
+    {
+      "id": "V14.1.1",
+      "applies_if": "sensitive-data",
+      "rationale": "the subject is sensitive data; classifying it is the control",
+      "reviewed_by": null
+    },
+    {
+      "id": "V14.1.2",
+      "applies_if": "sensitive-data",
+      "rationale": "the subject is sensitive data",
+      "reviewed_by": null
+    },
+    {
+      "id": "V14.2.1",
+      "applies_if": {
+        "any": [
+          "sensitive-data",
+          "authentication"
+        ]
+      },
+      "rationale": "the subject is sensitive data in a request, and a credential or session token is such data",
+      "reviewed_by": null
+    },
+    {
+      "id": "V14.2.2",
+      "applies_if": "sensitive-data",
+      "rationale": "the subject is sensitive data in a server cache",
+      "reviewed_by": null
+    },
+    {
+      "id": "V14.2.3",
+      "applies_if": "sensitive-data",
+      "rationale": "the subject is sensitive data sent to other parties",
+      "reviewed_by": null
+    },
+    {
+      "id": "V14.2.4",
+      "applies_if": "sensitive-data",
+      "rationale": "the subject is sensitive data",
+      "reviewed_by": null
+    },
+    {
+      "id": "V14.2.5",
+      "applies_if": "sensitive-data",
+      "rationale": "the subject is sensitive content a cache can hold",
+      "reviewed_by": null
+    },
+    {
+      "id": "V14.2.6",
+      "applies_if": "sensitive-data",
+      "rationale": "the subject is sensitive data in a response",
+      "reviewed_by": null
+    },
+    {
+      "id": "V14.2.7",
+      "applies_if": "sensitive-data",
+      "rationale": "the subject is stored sensitive data",
+      "reviewed_by": null
+    },
+    {
+      "id": "V14.2.8",
+      "applies_if": "file-upload",
+      "rationale": "the subject is the metadata of a file users submit",
+      "reviewed_by": null
+    },
+    {
+      "id": "V14.3.1",
+      "applies_if": {
+        "all": [
+          "authentication",
+          {
+            "any": [
+              "browser-frontend",
+              "native-client"
+            ]
+          }
+        ]
+      },
+      "rationale": "the subject is authenticated data held on a client",
+      "reviewed_by": null
+    },
+    {
+      "id": "V14.3.2",
+      "applies_if": {
+        "all": [
+          "browser-frontend",
+          "sensitive-data"
+        ]
+      },
+      "rationale": "the subject is sensitive data a browser can cache",
+      "reviewed_by": null
+    },
+    {
+      "id": "V14.3.3",
+      "applies_if": "browser-frontend",
+      "rationale": "the subject is data a browser stores",
+      "reviewed_by": null
+    },
+    {
+      "id": "V15.1.1",
+      "applies_if": "always",
+      "rationale": "every application depends on third-party components",
+      "reviewed_by": null
+    },
+    {
+      "id": "V15.1.2",
+      "applies_if": "always",
+      "rationale": "every application depends on third-party components",
+      "reviewed_by": null
+    },
+    {
+      "id": "V15.1.3",
+      "applies_if": "always",
+      "rationale": "identifying costly functions is the control, and every application has some",
+      "reviewed_by": null
+    },
+    {
+      "id": "V15.1.4",
+      "applies_if": "always",
+      "rationale": "every application depends on third-party components",
+      "reviewed_by": null
+    },
+    {
+      "id": "V15.1.5",
+      "applies_if": "always",
+      "rationale": "identifying dangerous functions is the control",
+      "reviewed_by": null
+    },
+    {
+      "id": "V15.2.1",
+      "applies_if": "always",
+      "rationale": "every application depends on third-party components",
+      "reviewed_by": null
+    },
+    {
+      "id": "V15.2.2",
+      "applies_if": "always",
+      "rationale": "every application has functions that cost time or resources",
+      "reviewed_by": null
+    },
+    {
+      "id": "V15.2.3",
+      "applies_if": "always",
+      "rationale": "every production environment can carry functionality it does not need",
+      "reviewed_by": null
+    },
+    {
+      "id": "V15.2.4",
+      "applies_if": "always",
+      "rationale": "every application depends on third-party components",
+      "reviewed_by": null
+    },
+    {
+      "id": "V15.2.5",
+      "applies_if": "always",
+      "rationale": "documenting and protecting dangerous functions is the control",
+      "reviewed_by": null
+    },
+    {
+      "id": "V15.3.1",
+      "applies_if": "always",
+      "rationale": "every web application or service returns data objects",
+      "reviewed_by": null
+    },
+    {
+      "id": "V15.3.2",
+      "applies_if": "outbound-http",
+      "rationale": "the subject is a call the backend makes to an external URL",
+      "reviewed_by": null
+    },
+    {
+      "id": "V15.3.3",
+      "applies_if": "always",
+      "rationale": "every web application or service binds request data to objects",
+      "reviewed_by": null
+    },
+    {
+      "id": "V15.3.4",
+      "applies_if": "always",
+      "rationale": "every deployment reads the client address through some layer",
+      "reviewed_by": null
+    },
+    {
+      "id": "V15.3.5",
+      "applies_if": "always",
+      "rationale": "every application compares values",
+      "reviewed_by": null
+    },
+    {
+      "id": "V15.3.6",
+      "applies_if": {
+        "any": [
+          "browser-frontend",
+          "server-side-javascript"
+        ]
+      },
+      "rationale": "the subject is JavaScript code",
+      "reviewed_by": null
+    },
+    {
+      "id": "V15.3.7",
+      "applies_if": "always",
+      "rationale": "every web application or service reads request parameters",
+      "reviewed_by": null
+    },
+    {
+      "id": "V15.4.1",
+      "applies_if": "always",
+      "rationale": "every web application or service handles concurrent requests",
+      "reviewed_by": null
+    },
+    {
+      "id": "V15.4.2",
+      "applies_if": "always",
+      "rationale": "every web application or service handles concurrent requests",
+      "reviewed_by": null
+    },
+    {
+      "id": "V15.4.3",
+      "applies_if": "always",
+      "rationale": "every web application or service handles concurrent requests",
+      "reviewed_by": null
+    },
+    {
+      "id": "V15.4.4",
+      "applies_if": "always",
+      "rationale": "every web application or service handles concurrent requests",
+      "reviewed_by": null
+    },
+    {
+      "id": "V16.1.1",
+      "applies_if": "always",
+      "rationale": "every application must log; the inventory is the control",
+      "reviewed_by": null
+    },
+    {
+      "id": "V16.2.1",
+      "applies_if": "always",
+      "rationale": "every application must log; the metadata is the control",
+      "reviewed_by": null
+    },
+    {
+      "id": "V16.2.2",
+      "applies_if": "always",
+      "rationale": "every application must log; the time source is the control",
+      "reviewed_by": null
+    },
+    {
+      "id": "V16.2.3",
+      "applies_if": "always",
+      "rationale": "every application must log",
+      "reviewed_by": null
+    },
+    {
+      "id": "V16.2.4",
+      "applies_if": "always",
+      "rationale": "every application must log",
+      "reviewed_by": null
+    },
+    {
+      "id": "V16.2.5",
+      "applies_if": "sensitive-data",
+      "rationale": "the subject is sensitive data that can reach a log",
+      "reviewed_by": null
+    },
+    {
+      "id": "V16.3.1",
+      "applies_if": "authentication",
+      "rationale": "the subject is an authentication operation; logging it is the control",
+      "reviewed_by": null
+    },
+    {
+      "id": "V16.3.2",
+      "applies_if": "restricted-access",
+      "rationale": "the subject is an authorization decision; logging it is the control",
+      "reviewed_by": null
+    },
+    {
+      "id": "V16.3.3",
+      "applies_if": "always",
+      "rationale": "every application has security controls whose bypass must be logged",
+      "reviewed_by": null
+    },
+    {
+      "id": "V16.3.4",
+      "applies_if": "always",
+      "rationale": "every application can meet an unexpected error",
+      "reviewed_by": null
+    },
+    {
+      "id": "V16.4.1",
+      "applies_if": "always",
+      "rationale": "every application must log",
+      "reviewed_by": null
+    },
+    {
+      "id": "V16.4.2",
+      "applies_if": "always",
+      "rationale": "every application must log",
+      "reviewed_by": null
+    },
+    {
+      "id": "V16.4.3",
+      "applies_if": "always",
+      "rationale": "every application must log",
+      "reviewed_by": null
+    },
+    {
+      "id": "V16.5.1",
+      "applies_if": "always",
+      "rationale": "every application can meet an unexpected error",
+      "reviewed_by": null
+    },
+    {
+      "id": "V16.5.2",
+      "applies_if": "always",
+      "rationale": "every application depends on some external resource",
+      "reviewed_by": null
+    },
+    {
+      "id": "V16.5.3",
+      "applies_if": "always",
+      "rationale": "every application can meet an unexpected error",
+      "reviewed_by": null
+    },
+    {
+      "id": "V16.5.4",
+      "applies_if": "always",
+      "rationale": "every application can meet an unexpected error",
+      "reviewed_by": null
+    },
+    {
+      "id": "V17.1.1",
+      "applies_if": "turn-server",
+      "rationale": "the subject is a TURN server",
+      "reviewed_by": null
+    },
+    {
+      "id": "V17.1.2",
+      "applies_if": "turn-server",
+      "rationale": "the subject is a TURN server",
+      "reviewed_by": null
+    },
+    {
+      "id": "V17.2.1",
+      "applies_if": "webrtc",
+      "rationale": "the subject is a DTLS certificate that WebRTC uses",
+      "reviewed_by": null
+    },
+    {
+      "id": "V17.2.2",
+      "applies_if": "media-server",
+      "rationale": "the subject is a WebRTC media server",
+      "reviewed_by": null
+    },
+    {
+      "id": "V17.2.3",
+      "applies_if": "media-server",
+      "rationale": "the subject is a WebRTC media server",
+      "reviewed_by": null
+    },
+    {
+      "id": "V17.2.4",
+      "applies_if": "media-server",
+      "rationale": "the subject is a WebRTC media server",
+      "reviewed_by": null
+    },
+    {
+      "id": "V17.2.5",
+      "applies_if": "media-server",
+      "rationale": "the subject is a WebRTC media server",
+      "reviewed_by": null
+    },
+    {
+      "id": "V17.2.6",
+      "applies_if": "media-server",
+      "rationale": "the subject is a WebRTC media server",
+      "reviewed_by": null
+    },
+    {
+      "id": "V17.2.7",
+      "applies_if": "media-recording",
+      "rationale": "the subject is recording at a WebRTC media server",
+      "reviewed_by": null
+    },
+    {
+      "id": "V17.2.8",
+      "applies_if": "webrtc",
+      "rationale": "the subject is a DTLS certificate that WebRTC uses",
+      "reviewed_by": null
+    },
+    {
+      "id": "V17.3.1",
+      "applies_if": "signaling-server",
+      "rationale": "the subject is a WebRTC signaling server",
+      "reviewed_by": null
+    },
+    {
+      "id": "V17.3.2",
+      "applies_if": "signaling-server",
+      "rationale": "the subject is a WebRTC signaling server",
+      "reviewed_by": null
+    }
+  ]
+}

@@ -20,8 +20,11 @@ Each rule reads free text by string match, because no attribute in the **System
 Model** is a closed enum an ASVS predicate can test. #162 ruled that controls
 stay string attributes, so this is the mechanism the model offers.
 
-A **Candidate** is a lead rather than a gate. A lane agent still analyses its
-chapter when no rule fires. Rules are authored for the level 1 requirements
+A **Candidate** is a lead rather than a gate, and it decides no applicability.
+Whether one requirement applies is the rule in
+:mod:`analysis_service.frameworks.asvs.applicability`, which reads typed
+capabilities and never a term. A lane agent still analyses its chapter when no
+rule fires. Rules are authored for the level 1 requirements
 first, so a requirement at level 2 or 3 with no rule reaches its lane agent
 without a candidate. That is a weaker lead rather than an absent one.
 
