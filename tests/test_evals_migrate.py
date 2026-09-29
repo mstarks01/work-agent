@@ -267,3 +267,53 @@ def test_the_repeat_archive_is_what_this_was_written_for(tmp_path):
 
     assert migrate_file(older_files[0], out) == 6
     assert json.loads(out.read_text())["artifact_version"] == ARTIFACT_VERSION
+
+
+class TestTheCommandNeverReplacesItsSource:
+    def test_an_out_directory_that_holds_the_source_is_refused(
+        self,
+        tmp_path,
+        sampling,  # noqa: F811
+        capsys,
+    ):
+        """``--out`` naming the source's own directory made the copy the source,
+        and a refused lift then unlinked it."""
+        from argparse import Namespace
+
+        from evals.harness import run
+
+        path = older(tmp_path, "old.json", provenance(sampling))
+        raw = json.loads(path.read_text(encoding="utf-8"))
+        del raw["provenance"]
+        path.write_text(json.dumps(raw), encoding="utf-8")
+        before = path.read_bytes()
+
+        code = run.command_migrate(Namespace(artifact=[str(path)], out=str(tmp_path)))
+
+        assert code == 1
+        assert "would replace it" in capsys.readouterr().err
+        assert path.read_bytes() == before
+
+    def test_a_refused_lift_keeps_a_copy_it_did_not_write(
+        self,
+        tmp_path,
+        sampling,  # noqa: F811
+    ):
+        from argparse import Namespace
+
+        from evals.harness import run
+
+        path = older(tmp_path, "old.json", provenance(sampling))
+        raw = json.loads(path.read_text(encoding="utf-8"))
+        del raw["provenance"]
+        path.write_text(json.dumps(raw), encoding="utf-8")
+        target = tmp_path / "lifted" / "old.json"
+        target.parent.mkdir()
+        target.write_bytes(b"an earlier copy")
+
+        code = run.command_migrate(
+            Namespace(artifact=[str(path)], out=str(target.parent))
+        )
+
+        assert code == 1
+        assert target.read_bytes() == b"an earlier copy"
