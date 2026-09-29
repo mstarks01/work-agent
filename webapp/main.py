@@ -132,24 +132,19 @@ from analysis_service import (
     Report,
     Source,
 )
+from analysis_service.answer_round import QuestionSet, question_set
 from analysis_service.deployment import Deployment
-from analysis_service.early_questions import asked_facts, early_questions
 from analysis_service.frameworks import package_for
 from analysis_service.jobs import Checkpoint, PipelineAwaiting, PipelineOutcome
 from analysis_service.links import (
     MAX_LINK_ANSWERS,
     LinkAnswer,
-    check_answers,
-    link_questions,
-    merged_facts,
-    merged_links,
 )
 from analysis_service.model_tiers import ModelTierConfig
 from analysis_service.open_facts import open_facts_by_framework
 from analysis_service.questions import (
     MAX_FACT_ANSWERS,
     FactAnswer,
-    fact_questions,
     question_fallback,
 )
 from analysis_service.selection import SelectionError, resolve_selection
@@ -227,6 +222,12 @@ class Run:
     def paused(self) -> bool:
         """True while the run waits for answers before its analysis."""
         return self.checkpoint is not None and self.report is None
+
+    def questions(self) -> QuestionSet:
+        """Every question this run asks, from the engine and checkpoint it holds."""
+        if self.engine is None or self.checkpoint is None:
+            raise RuntimeError(f"run {self.id} has reached no checkpoint")
+        return self.engine.questions(self.checkpoint, self.report)
 
 
 class Analyses:
@@ -413,6 +414,13 @@ def render_report(report: Report) -> RenderedPage:
     A viewer that lost its payload placeholder raises at
     :func:`~webapp.page.render` rather than serving a report of nothing.
     """
+    asked = question_set(
+        report.system_model,
+        report.assertions.catalog if report.assertions else None,
+        (),
+        report.analyses,
+        waiting=False,
+    ).to_json()
     return render(
         VIEWER.read_text(encoding="utf-8"),
         _REPORT_GRANTS,
@@ -422,26 +430,9 @@ def render_report(report: Report) -> RenderedPage:
         open_facts=script_json(
             open_facts_by_framework(report.analyses, report.system_model)
         ),
-        fact_questions=script_json(
-            [
-                question.to_json()
-                for question in fact_questions(
-                    report.analyses,
-                    report.system_model,
-                    report.assertions.catalog if report.assertions else None,
-                )
-            ]
-        ),
+        fact_questions=script_json(asked["fact_questions"]),
         question_fallback=script_json(question_fallback(report.analyses).to_json()),
-        link_questions=script_json(
-            [
-                question.to_json()
-                for question in link_questions(
-                    report.assertions.catalog if report.assertions else None,
-                    report.system_model,
-                )
-            ]
-        ),
+        link_questions=script_json(asked["link_questions"]),
     )
 
 
@@ -586,33 +577,18 @@ def create_app(
                 },
                 status_code=400,
             )
-        held = parent.checkpoint
-        catalog = None if held.assertions is None else held.assertions.catalog
-        asked = asked_facts(
-            held.system_model,
-            catalog,
-            parent.engine.frameworks,
-            () if parent.report is None else parent.report.analyses,
-            waiting=parent.paused,
-        )
         try:
-            if links and held.assertions is None:
-                raise ValueError("this report built no catalog, so it asks no link")
-            check_answers(links, facts, held.system_model, catalog, asked, parent.facts)
-            merged = merged_links(parent.links, links)
-            answered = merged_facts(parent.facts, facts)
+            admitted = parent.questions().admit(
+                sources=parent.sources,
+                earlier_links=parent.links,
+                earlier_facts=parent.facts,
+                links=links,
+                facts=facts,
+            )
         except ValueError as exc:
             # The answer rules' own refusals name the submitter's choices, so
             # they are safe to show.
             return JSONResponse({"message": str(exc)}, status_code=400)
-        if not (links or facts) and parent.report is not None:
-            return JSONResponse(
-                {
-                    "message": "No answers were sent, and a finished run has nothing"
-                    " to continue."
-                },
-                status_code=400,
-            )
         run = analyses.claim()
         if run is None:
             return JSONResponse(
@@ -620,14 +596,14 @@ def create_app(
                 status_code=409,
             )
         run.engine, run.sources = parent.engine, parent.sources
-        run.links, run.facts = merged, answered
+        run.links, run.facts = admitted.links, admitted.facts
         start = partial(
             parent.engine.resume,
             parent.sources,
             parent.checkpoint,
             links,
             facts=facts,
-            asked=asked,
+            report=parent.report,
             earlier_links=parent.links,
             earlier_facts=parent.facts,
             system_name="Your system",
@@ -799,16 +775,14 @@ async def _drive(
             await _emit(run, "done", {"url": f"/report/{run.id}"})
         elif isinstance(outcome, PipelineAwaiting):
             run.checkpoint = outcome.checkpoint
+            questions = run.questions()
             await _emit(
                 run,
                 "questions",
                 {
                     "run": run.id,
-                    "questions": question_rows(outcome.checkpoint),
-                    "facts": early_rows(
-                        outcome.checkpoint,
-                        () if run.engine is None else run.engine.frameworks,
-                    ),
+                    "questions": question_rows(questions),
+                    "facts": early_rows(questions),
                 },
             )
         else:
@@ -827,14 +801,17 @@ async def _drive(
         await run.events.put(("", ""))  # sentinel: closes the SSE stream
 
 
-def question_rows(checkpoint: Checkpoint) -> list[dict[str, object]]:
-    """A checkpoint's link questions, with each option's element name beside it.
+def _element_names(questions: QuestionSet) -> dict[str, str]:
+    return {element.id: element.name for element in questions.model.elements()}
+
+
+def question_rows(questions: QuestionSet) -> list[dict[str, object]]:
+    """A run's link questions, with each option's element name beside it.
 
     The form page has no report to look names up in, so they travel with the
     questions. Every string is untrusted and lands on the page as text.
     """
-    model = checkpoint.system_model
-    names = {element.id: element.name for element in model.elements()}
+    names = _element_names(questions)
     return [
         {
             "principal": question.principal,
@@ -844,22 +821,16 @@ def question_rows(checkpoint: Checkpoint) -> list[dict[str, object]]:
                 for option in question.options
             ],
         }
-        for question in link_questions(
-            None if checkpoint.assertions is None else checkpoint.assertions.catalog,
-            model,
-        )
+        for question in questions.links
     ]
 
 
-def early_rows(
-    checkpoint: Checkpoint, frameworks: Sequence[FrameworkName]
-) -> list[dict[str, object]]:
+def early_rows(questions: QuestionSet) -> list[dict[str, object]]:
     """A paused run's open facts, ranked before any finding, with choice names.
 
     Every string is untrusted and lands on the page as text.
     """
-    model = checkpoint.system_model
-    names = {element.id: element.name for element in model.elements()}
+    names = _element_names(questions)
     return [
         {
             **question.to_json(),
@@ -868,11 +839,7 @@ def early_rows(
                 for choice in question.choices
             ],
         }
-        for question in early_questions(
-            model,
-            frameworks,
-            None if checkpoint.assertions is None else checkpoint.assertions.catalog,
-        )
+        for question in questions.early
     ]
 
 

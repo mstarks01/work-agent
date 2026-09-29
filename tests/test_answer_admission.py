@@ -13,9 +13,15 @@ import asyncio
 import pytest
 from pydantic import ValidationError
 
+from analysis_service.answer_round import question_set
 from analysis_service.assertions import MAX_QUOTE_CHARS, AssertionCatalog
-from analysis_service.early_questions import asked_facts
-from analysis_service.links import apply_answers, check_answers, merged_facts
+from analysis_service.links import (
+    LinkAnswer,
+    NoCatalogError,
+    apply_answers,
+    check_answers,
+    merged_facts,
+)
 from analysis_service.question_kinds import QUESTION_KINDS
 from analysis_service.questions import FactAnswer, check_fact_answers, fact_line
 from tests.factories import valid_model
@@ -103,13 +109,13 @@ class TestOnlyAnAskedFactTakesAnAnswer:
 
     def asked(self):
         checkpoint = held()
-        return asked_facts(
+        return question_set(
             checkpoint.system_model,
             checkpoint.assertions.catalog,
             ["stride"],
             [],
             waiting=True,
-        )
+        ).asked
 
     def unasked_kind(self):
         asked = self.asked()
@@ -175,3 +181,31 @@ class TestOnlyAnAskedFactTakesAnAnswer:
             frozenset(),
             [earlier],
         )
+
+
+def asked_of(catalog, *, waiting):
+    return question_set(valid_model(), catalog, ["stride"], [], waiting=waiting)
+
+
+def admit(questions, links=(), facts=()):
+    return questions.admit(
+        sources=[], earlier_links=[], earlier_facts=[], links=links, facts=facts
+    )
+
+
+class TestOneRoundHasOneAdmissionRule:
+    """The HTTP route, the first-run app and the engine each kept their own
+    copy of these two rules, and two of the copies disagreed."""
+
+    def test_a_waiting_job_continues_without_answers(self):
+        admitted = admit(asked_of(held().assertions.catalog, waiting=True))
+        assert (admitted.links, admitted.facts) == ([], [])
+
+    def test_a_finished_job_has_nothing_to_continue(self):
+        with pytest.raises(ValueError, match="no answers were sent"):
+            admit(asked_of(held().assertions.catalog, waiting=False))
+
+    def test_a_link_answer_without_a_catalog_is_refused(self):
+        link = LinkAnswer(principal="customer", element="entity:customer")
+        with pytest.raises(NoCatalogError):
+            admit(asked_of(None, waiting=True), links=[link])

@@ -62,6 +62,7 @@ __all__ = [
     "NONE_OF_THESE",
     "LinkAnswer",
     "LinkQuestion",
+    "NoCatalogError",
     "apply_answers",
     "check_answers",
     "fold",
@@ -329,6 +330,10 @@ def apply_answers(
     return answered, [*issues, *unmatched]
 
 
+class NoCatalogError(ValueError):
+    """A link answer to a job whose checkpoint holds no assertion catalog."""
+
+
 def check_answers(
     links: Sequence[LinkAnswer],
     facts: Sequence[FactAnswer],
@@ -339,14 +344,18 @@ def check_answers(
 ) -> None:
     """Refuse an answer that would place nothing, before a resumed run is admitted.
 
-    **The one admission check of a submission's answers.** The HTTP route, the
-    first-run app and the in-process engine all call it. A link answer is
+    **The one admission check of a submission's answers.** Its caller is
+    :meth:`~analysis_service.answer_round.QuestionSet.admit`. A link answer is
     written by :func:`apply_answers` here, and each issue it would raise is a
-    refusal, so a wrong link costs nothing. ``asked`` is the facts the job's
-    questions name, from :func:`~analysis_service.early_questions.asked_facts`;
-    ``earlier`` is the fact answers of the earlier rounds, which a later round
-    may answer again.
+    refusal, so a wrong link costs nothing. A link answer with no catalog to
+    write it into raises :class:`NoCatalogError`. ``asked`` is the facts the
+    job's questions name; ``earlier`` is the fact answers of the earlier
+    rounds, which a later round may answer again.
     """
+    if links and catalog is None:
+        raise NoCatalogError(
+            "this report carries no assertion catalog, so it asked no link question"
+        )
     check_fact_answers(facts, model, catalog, earlier)
     answered_before = {fact.key for fact in earlier}
     for fact in facts:
