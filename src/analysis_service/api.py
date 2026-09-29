@@ -26,6 +26,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+from collections import Counter
 from collections.abc import Callable, Mapping, Sequence
 from datetime import datetime
 from functools import partial
@@ -40,6 +41,7 @@ from fastapi.responses import JSONResponse, StreamingResponse
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 from starlette.exceptions import HTTPException as StarletteHTTPException
+from starlette.types import Receive, Scope, Send
 
 from analysis_service import budgets
 from analysis_service.assertions import AssertionRecord
@@ -100,6 +102,12 @@ logger = logging.getLogger(__name__)
 _BODY_SLACK = 2
 
 _SSE_POLL_SECONDS = 0.2
+
+#: How many event streams one subject may hold open at once. Each stream polls
+#: the store until its job is terminal, and a job that waits on answers is not,
+#: so a stream can stay open for as long as its caller keeps it. A page follows
+#: one job at a time; eight leaves room for a few tabs and a reconnect.
+MAX_EVENT_STREAMS_PER_SUBJECT = 8
 
 #: How long a ``Last-Event-ID`` may be. The shape itself is
 #: :func:`~analysis_service.parsing.ascii_int`'s question, and this is the
@@ -540,6 +548,31 @@ def _withheld_report(request: Request, record: JobRecord) -> JSONResponse | None
     )
 
 
+class _CountedStream(StreamingResponse):
+    """A stream that gives its slot back however it ends.
+
+    Released around the whole response rather than in the generator: a client
+    that leaves before the first frame never starts the generator, and under
+    ASGI 2.4 a disconnect raises before a background task runs.
+    """
+
+    def __init__(self, release: Callable[[], None], *args: Any, **kwargs: Any):
+        super().__init__(*args, **kwargs)
+        self._release = release
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        try:
+            await super().__call__(scope, receive, send)
+        finally:
+            self._release()
+
+
+def _release_stream(streams: Counter[str], subject: str) -> None:
+    streams[subject] -= 1
+    if streams[subject] <= 0:
+        del streams[subject]
+
+
 def _problem_response(
     status_code: int,
     detail: str,
@@ -763,6 +796,7 @@ def create_app(
         openapi_url=None,
     )
     app.state.store = store if store is not None else build_store()
+    app.state.event_streams = Counter()
     if runner is not None:
         app.state.runner_for = lambda selection, entry=ENTRY_EXTRACT: runner
         app.state.certification = None
@@ -1013,6 +1047,14 @@ def create_app(
         job_id: str, request: Request, subject: str = Depends(require_subject)
     ) -> StreamingResponse:
         await _owned_job(request, job_id, subject)
+        streams: Counter[str] = request.app.state.event_streams
+        if streams[subject] >= MAX_EVENT_STREAMS_PER_SUBJECT:
+            raise HTTPException(
+                status_code=429,
+                detail=f"{MAX_EVENT_STREAMS_PER_SUBJECT} event streams are open"
+                " for this token; close one first",
+            )
+        streams[subject] += 1
         last_event_id = request.headers.get("last-event-id", "")
         seen = ascii_int(last_event_id, max_digits=_LAST_EVENT_ID_DIGITS) or 0
         store: JobStore = request.app.state.store
@@ -1027,11 +1069,15 @@ def create_app(
                 for event in events:
                     seen = event.seq
                     yield _sse_frame(event)
-                if status in TERMINAL_STATUSES:
+                # A job that emits nothing sends nothing, so a send to a client
+                # that left never fails; asked here, the stream ends and gives
+                # its slot back.
+                if status in TERMINAL_STATUSES or await request.is_disconnected():
                     return
                 await asyncio.sleep(_SSE_POLL_SECONDS)
 
-        return StreamingResponse(
+        return _CountedStream(
+            partial(_release_stream, streams, subject),
             event_stream(),
             media_type="text/event-stream",
             headers={"Cache-Control": "no-store"},

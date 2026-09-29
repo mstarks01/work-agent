@@ -10,9 +10,11 @@ autonomous run, with the toggle off, never pauses.
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import json
 
 import pytest
+from starlette.requests import ClientDisconnect
 
 from analysis_service import graph
 from analysis_service.assertions import AssertionRecord
@@ -248,3 +250,92 @@ class TestTheRoutes:
 def test_the_link_question_s_principal_is_the_catalog_s():
     """The fixture's principal is the one the paused catalog holds."""
     assert PRINCIPAL in {subject.id for subject in parent_catalog().subjects}
+
+
+class TestTheEventStreamCap:
+    """A stream stays open until its job is terminal, and nothing bounded how
+    many one caller held open (run 11).
+
+    Driven at the ASGI level: the test client waits for a whole body, so it
+    cannot hold a stream open. Both disconnect paths are driven, because under
+    ASGI 2.4 a disconnect raises before a background task runs.
+    """
+
+    @staticmethod
+    def queued(store, subject="alice") -> str:
+        record = asking_job(owner_subject=subject)
+        asyncio.run(admit(store, record))
+        return record.id
+
+    @staticmethod
+    async def open_stream(app, job, token, spec):
+        """Open one stream; return its status, a way to leave, and its task."""
+        started, gone = asyncio.Event(), asyncio.Event()
+        status = []
+        requested = False
+
+        async def receive():
+            nonlocal requested
+            if not requested:
+                requested = True
+                return {"type": "http.request", "body": b"", "more_body": False}
+            await gone.wait()
+            return {"type": "http.disconnect"}
+
+        async def send(message):
+            if gone.is_set():
+                raise OSError("the client left")
+            if message["type"] == "http.response.start":
+                status.append(message["status"])
+                started.set()
+
+        scope = {
+            "type": "http",
+            "asgi": {"version": "3.0", "spec_version": spec},
+            "http_version": "1.1",
+            "method": "GET",
+            "scheme": "http",
+            "path": f"/v1/jobs/{job}/events",
+            "raw_path": f"/v1/jobs/{job}/events".encode(),
+            "query_string": b"",
+            "root_path": "",
+            "headers": [
+                (b"host", b"testserver"),
+                (b"authorization", f"Bearer {token}".encode()),
+            ],
+            "client": ("127.0.0.1", 1),
+            "server": ("testserver", 80),
+        }
+        task = asyncio.create_task(app(scope, receive, send))
+        await asyncio.wait_for(started.wait(), 5)
+        return status[0], gone, task
+
+    @pytest.mark.parametrize("spec", ["2.0", "2.4"])
+    def test_a_subject_past_the_cap_is_refused_and_every_slot_comes_back(self, spec):
+        from analysis_service.api import MAX_EVENT_STREAMS_PER_SUBJECT
+
+        client, store = catalog_client()
+        app = client.app
+        mine = self.queued(store)
+        theirs = self.queued(store, subject="bob")
+
+        async def scenario():
+            held = [
+                await self.open_stream(app, mine, "alice-token", spec)
+                for _ in range(MAX_EVENT_STREAMS_PER_SUBJECT)
+            ]
+            assert [status for status, _, _ in held] == [200] * len(held)
+            refused, _, done = await self.open_stream(app, mine, "alice-token", spec)
+            await done
+            assert refused == 429
+            other, leave, task = await self.open_stream(app, theirs, "bob-token", spec)
+            assert other == 200
+            for _, gone, stream in [*held, (other, leave, task)]:
+                gone.set()
+                # Under ASGI 2.4 the closing frame goes to a client that left,
+                # and a server handles the disconnect that raises.
+                with contextlib.suppress(ClientDisconnect):
+                    await asyncio.wait_for(stream, 5)
+            return dict(app.state.event_streams)
+
+        assert asyncio.run(scenario()) == {}
