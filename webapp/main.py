@@ -178,8 +178,8 @@ PORT = 8000
 
 # The registry is a demo surface, not a job store — /v1 already is one. It holds
 # untrusted prose and its report, in memory, per process, never persisted, and
-# oldest-first evicted, a run that waits for answers last. A restart loses
-# history, which is correct here.
+# oldest-first evicted. A run that waits for answers is never evicted: a new run
+# is refused instead. A restart loses history, which is correct here.
 MAX_RUNS = 20
 
 #: The report page loads nothing external. It reaches its own origin for one
@@ -217,17 +217,23 @@ class Run:
     links: list[LinkAnswer] = field(default_factory=list)
     facts: list[FactAnswer] = field(default_factory=list)
     checkpoint: Checkpoint | None = None
+    #: True once a submitter's answers started a run from this one.
+    answered: bool = False
 
     @property
-    def paused(self) -> bool:
+    def waiting(self) -> bool:
         """True while the run waits for answers before its analysis."""
-        return self.checkpoint is not None and self.report is None
+        return self.checkpoint is not None and self.report is None and not self.answered
 
     def questions(self) -> QuestionSet:
         """Every question this run asks, from the engine and checkpoint it holds."""
         if self.engine is None or self.checkpoint is None:
             raise RuntimeError(f"run {self.id} has reached no checkpoint")
         return self.engine.questions(self.checkpoint, self.report)
+
+
+class RegistryFull(Exception):
+    """Every run the registry holds waits for answers, so none can make room."""
 
 
 class Analyses:
@@ -244,22 +250,31 @@ class Analyses:
         self._max_runs = max_runs
         self._busy = False
 
-    def claim(self) -> Run | None:
-        """Start a run, or ``None`` if one is already going."""
+    def claim(self, answering: Run | None = None) -> Run | None:
+        """Start a run, or ``None`` if one is already going.
+
+        A full registry removes its oldest run that waits for no answers, and
+        ``answering``, the run these answers resume from, only where nothing
+        else can go. Where every run waits for answers, it raises
+        :class:`RegistryFull` rather than remove one.
+        """
         if self._busy:
             return None
+        removable = [
+            key
+            for key, held in self._runs.items()
+            if not held.waiting or held is answering
+        ]
+        if len(self._runs) >= self._max_runs:
+            if not removable:
+                raise RegistryFull(
+                    f"{len(self._runs)} analyses wait for answers. Answer or"
+                    " continue one of them before you start another."
+                )
+            self._runs.pop(min(removable, key=lambda key: self._runs[key] is answering))
         self._busy = True
         run = Run(id=secrets.token_urlsafe(16))
         self._runs[run.id] = run
-        while len(self._runs) > self._max_runs:
-            # A paused run waits for its submitter's answers, so it goes after
-            # every finished one, and the run just claimed is never removed.
-            self._runs.pop(
-                min(
-                    self._runs,
-                    key=lambda key: (key == run.id, self._runs[key].paused),
-                )
-            )
         return run
 
     def release(self) -> None:
@@ -521,7 +536,10 @@ def create_app(
             logger.error("could not build an engine for %s: %s", selection, exc)
             return JSONResponse({"message": str(exc)}, status_code=503)
 
-        run = analyses.claim()
+        try:
+            run = analyses.claim()
+        except RegistryFull as exc:
+            return JSONResponse({"message": str(exc)}, status_code=409)
         if run is None:
             return JSONResponse(
                 {"message": "An analysis is already running. Wait for it to finish."},
@@ -589,12 +607,16 @@ def create_app(
             # The answer rules' own refusals name the submitter's choices, so
             # they are safe to show.
             return JSONResponse({"message": str(exc)}, status_code=400)
-        run = analyses.claim()
+        try:
+            run = analyses.claim(answering=parent)
+        except RegistryFull as exc:
+            return JSONResponse({"message": str(exc)}, status_code=409)
         if run is None:
             return JSONResponse(
                 {"message": "An analysis is already running. Wait for it to finish."},
                 status_code=409,
             )
+        parent.answered = True
         run.engine, run.sources = parent.engine, parent.sources
         run.links, run.facts = admitted.links, admitted.facts
         start = partial(

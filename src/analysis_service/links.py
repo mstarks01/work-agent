@@ -52,6 +52,8 @@ from analysis_service.questions import (
     check_fact_answers,
     fact_line,
     fact_rows,
+    merged_facts,
+    refuse_repeated_facts,
 )
 from analysis_service.sources import Source, plain_name, text_digest
 from analysis_service.system_model import PLAIN_ID_RE, SystemModel
@@ -160,23 +162,6 @@ def _refuse_repeats(links: Sequence[LinkAnswer]) -> None:
         raise ValueError(f"links answers one principal twice: {', '.join(repeated)}")
 
 
-def _refuse_repeated_facts(facts: Sequence[FactAnswer]) -> None:
-    """Refuse two answers to one open fact in one submission, as for links."""
-    keys = [fact.key for fact in facts]
-    if len(set(keys)) != len(keys):
-        raise ValueError("facts answers one open fact twice")
-
-
-def merged_facts(
-    earlier: Sequence[FactAnswer], later: Sequence[FactAnswer]
-) -> list[FactAnswer]:
-    """A resumed job's fact answers: the parent's, with the new ones over them."""
-    _refuse_repeated_facts(later)
-    merged = {fact.key: fact for fact in earlier}
-    merged.update({fact.key: fact for fact in later})
-    return list(merged.values())
-
-
 def merged_links(
     earlier: Sequence[LinkAnswer], later: Sequence[LinkAnswer]
 ) -> list[LinkAnswer]:
@@ -211,7 +196,7 @@ def with_link_answers(
     if not links and not facts:
         return list(sources)
     _refuse_repeats(links)
-    _refuse_repeated_facts(facts)
+    refuse_repeated_facts(facts)
     text, _, _ = _composed(links, facts)
     return [*sources, Source(kind="answers", label=ANSWERS_LABEL, text=text)]
 
@@ -341,6 +326,9 @@ def check_answers(
     catalog: AssertionCatalog | None,
     asked: Collection[UnknownKey],
     earlier: Sequence[FactAnswer] = (),
+    *,
+    asked_links: Collection[str] = (),
+    earlier_links: Sequence[LinkAnswer] = (),
 ) -> None:
     """Refuse an answer that would place nothing, before a resumed run is admitted.
 
@@ -349,13 +337,20 @@ def check_answers(
     written by :func:`apply_answers` here, and each issue it would raise is a
     refusal, so a wrong link costs nothing. A link answer with no catalog to
     write it into raises :class:`NoCatalogError`. ``asked`` is the facts the
-    job's questions name; ``earlier`` is the fact answers of the earlier
-    rounds, which a later round may answer again.
+    job's questions name, and ``asked_links`` the :func:`fold` keys of the
+    principals they ask about; ``earlier`` and ``earlier_links`` are the
+    answers of the earlier rounds, which a later round may answer again. A
+    link to any other principal is refused, so a submission cannot replace a
+    ``represented-by`` row the sources stated.
     """
     if links and catalog is None:
         raise NoCatalogError(
             "this report carries no assertion catalog, so it asked no link question"
         )
+    answerable = {*asked_links, *(fold(link.principal) for link in earlier_links)}
+    for link in links:
+        if fold(link.principal) not in answerable:
+            raise ValueError(f"this job asked no question about {link.principal!r}")
     check_fact_answers(facts, model, catalog, earlier)
     answered_before = {fact.key for fact in earlier}
     for fact in facts:

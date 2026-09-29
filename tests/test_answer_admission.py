@@ -98,6 +98,22 @@ class TestOneFactHasOneSpelling:
         second = FactAnswer(key=(FLOW, "", " ", "", "code-execution", ""), value="no")
         assert merged_facts([first], [second]) == [second]
 
+    def test_a_later_facet_answer_keeps_the_earlier_facets(self):
+        """A size answer in round two lost the rate answer of round one
+        (#1289, F2)."""
+        key = (FLOW, "", "", "", "capacity-limits", "")
+        rate = FactAnswer(key=key, facets={"rate": "yes"})
+        size = FactAnswer(key=key, facets={"size": "yes"})
+        both = FactAnswer(key=key, facets={"rate": "yes", "size": "yes"})
+
+        assert merged_facts([rate], [size]) == [both]
+        assert merged_facts([size], [rate]) == [both]
+        assert merged_facts([both], [size]) == [both]
+        changed = FactAnswer(key=key, facets={"rate": "no"})
+        assert merged_facts([both], [changed]) == [
+            FactAnswer(key=key, facets={"rate": "no", "size": "yes"})
+        ]
+
     def test_a_key_with_two_spellings_is_still_refused(self):
         answer = FactAnswer(
             key=(FLOW, "exposure", "", "who?", "", ""), value="internal"
