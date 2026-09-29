@@ -39,36 +39,56 @@ def _package_modules() -> set[str]:
     return {path.stem for path in PACKAGE.glob("*.py")}
 
 
-def _imported_modules(source: Path, modules: set[str]) -> set[str]:
-    """Which package modules ``source`` imports, however it spells the import."""
+def _module_file(dotted: str) -> Path | None:
+    """The file behind one ``analysis_service`` module, or ``None``."""
+    path = PACKAGE.parent.joinpath(*dotted.split("."))
+    for candidate in (path.with_suffix(".py"), path / "__init__.py"):
+        if candidate.is_file():
+            return candidate
+    return None
+
+
+def _imported(source: Path) -> set[str]:
+    """Every ``analysis_service`` module ``source`` imports, dotted.
+
+    A ``from`` import names a module or a name inside one, so each name is
+    tried as a submodule and kept only where a file stands behind it.
+    """
     found = set()
     for node in ast.walk(parse(source)):
         if isinstance(node, ast.ImportFrom):
             module = node.module or ""
             if module.startswith("analysis_service"):
-                head = module.split(".")[1:2]
-                found |= set(head) & modules
-                if not head:
-                    found |= {alias.name for alias in node.names} & modules
+                found.add(module)
+                found |= {f"{module}.{alias.name}" for alias in node.names}
         elif isinstance(node, ast.Import):
-            for alias in node.names:
-                found |= set(alias.name.split(".")[1:2]) & modules
-    return found
+            found |= {
+                alias.name
+                for alias in node.names
+                if alias.name.startswith("analysis_service")
+            }
+    return {module for module in found if _module_file(module) is not None}
 
 
 def _reachable_from_evals() -> set[str]:
-    """Every package module the eval harness reaches, directly or transitively."""
-    modules = _package_modules()
-    pending = set()
-    for source in source_files("evals"):
-        pending |= _imported_modules(source, modules)
+    """Every top-level package module the eval harness reaches, at any depth.
 
+    The walk follows imports through subpackages too: a module that only a
+    framework package imports is still on the eval path. The package's own
+    ``__init__`` is not walked, because it re-exports every public name and
+    reaching one of them reaches only the module that defines it.
+    """
+    pending: set[str] = set()
+    for source in source_files("evals"):
+        pending |= _imported(source)
     reached: set[str] = set()
     while pending:
         module = pending.pop()
         reached.add(module)
-        pending |= _imported_modules(PACKAGE / f"{module}.py", modules) - reached
-    return reached
+        path = _module_file(module)
+        if path is not None and module != "analysis_service":
+            pending |= _imported(path) - reached
+    return {module.split(".")[1] for module in reached if module.count(".") >= 1}
 
 
 def _filter_paths(workflow: Path = WORKFLOW) -> list[str]:
@@ -116,6 +136,11 @@ def test_the_closure_is_not_vacuously_empty():
     """Guards the guard: an import walk that finds nothing would agree with anything."""
     reachable = _reachable_from_evals()
     assert {"graph", "report", "sampling", "grounding"} <= reachable
+
+
+def test_the_walk_follows_a_subpackage():
+    """``capabilities`` is reached only through ``frameworks/asvs``."""
+    assert "capabilities" in _reachable_from_evals()
 
 
 @pytest.mark.parametrize("workflow", FILTERED_WORKFLOWS, ids=lambda path: path.name)
