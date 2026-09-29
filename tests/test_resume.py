@@ -85,6 +85,7 @@ class TestTheResumedRun:
             frameworks=sample_selection(),
             links=links,
             resumption=Resumption(
+                round=1,
                 parent_id="job-parent",
                 checkpoint=Checkpoint(
                     system_model=valid_model(),

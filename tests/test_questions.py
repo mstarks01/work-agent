@@ -362,6 +362,7 @@ class TestTheResumedRunWithoutACatalog:
             frameworks=sample_selection(),
             facts=[answer],
             resumption=Resumption(
+                round=1,
                 parent_id="p",
                 checkpoint=Checkpoint(system_model=valid_model(), assertions=None),
             ),
@@ -474,7 +475,7 @@ def resume(checkpoint, facts=(), earlier=(), given=(DESCRIPTION,)):
         frameworks=sample_selection(),
         links=links,
         facts=answered,
-        resumption=Resumption(parent_id="job-parent", checkpoint=checkpoint),
+        resumption=Resumption(round=1, parent_id="job-parent", checkpoint=checkpoint),
     )
     job.transition("running")
     pipeline, _ = scripted_pipeline({}, entry=graph.ENTRY_RESUME)
@@ -587,7 +588,7 @@ def resume_links(checkpoint, links, earlier=()):
         frameworks=sample_selection(),
         links=merged,
         facts=facts,
-        resumption=Resumption(parent_id="job-parent", checkpoint=checkpoint),
+        resumption=Resumption(round=1, parent_id="job-parent", checkpoint=checkpoint),
     )
     job.transition("running")
     pipeline, _ = scripted_pipeline({}, entry=graph.ENTRY_RESUME)
@@ -758,7 +759,9 @@ class TestTheAdmissionCheck:
         )
         catalog = open_catalog(stated)
         assert link_questions(catalog, valid_model()) == ()
-        questions = question_set(valid_model(), catalog, {}, [], waiting=True)
+        questions = question_set(
+            valid_model(), catalog, {}, [], waiting=True, answered=[], rounds=0
+        )
         link = LinkAnswer(principal="customer accounts", element="process:web-app")
         with pytest.raises(ValueError, match="asked no question about"):
             questions.admit(
@@ -861,6 +864,22 @@ class TestAnUnknownAnswer:
         earlier = self.DONT_KNOW.model_copy(update={"value": "TLS 1.3"})
         with pytest.raises(ValueError, match="earlier answer settled"):
             check_fact_answers([self.DONT_KNOW], valid_model(), None, [earlier])
+
+
+def test_a_fact_answered_i_do_not_know_leaves_the_list_and_the_count(report):
+    """A later round asked it again, and counted findings no answer can cover."""
+    questions = ask(report)
+    if not questions:
+        pytest.skip("this report asks nothing")
+    first = questions[0]
+    earlier = [FactAnswer(key=first.key, value="unknown")]
+    catalog = report.assertions.catalog if report.assertions else None
+
+    again = fact_questions(report.analyses, report.system_model, catalog, earlier)
+
+    assert first.key not in {question.key for question in again}
+    counted = {finding for question in again for finding in question.findings}
+    assert not counted & set(first.findings)
 
 
 def test_only_a_conditional_finding_is_counted(report):

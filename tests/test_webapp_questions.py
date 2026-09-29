@@ -1017,3 +1017,21 @@ await box.all("button")[0].listeners.click();
             "facets": {"records-actor": "yes", "record-protected": "no"},
         }
     ]
+
+
+def test_the_report_page_says_how_many_rounds_of_answers_are_left():
+    payloads = {
+        "report": {"system_model": valid_model().model_dump(mode="json")},
+        "link_questions": [
+            {
+                "principal": "customer accounts",
+                "rows": 1,
+                "options": ["entity:customer"],
+            }
+        ],
+        "fact_questions": [],
+        "answer_rounds_left": 2,
+    }
+    steps = "calls.push(box.all('div').map(node => node.textContent));"
+    [lines] = _run_answer_block(payloads, steps)["calls"]
+    assert any(line.startswith("You can answer 2 more time(s).") for line in lines)

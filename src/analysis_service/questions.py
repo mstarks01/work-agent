@@ -110,6 +110,7 @@ __all__ = [
     "answer_facets",
     "answer_form",
     "answer_suggestions",
+    "answered_keys",
     "answered_model",
     "check_fact_answers",
     "facets_json",
@@ -280,6 +281,22 @@ def merged_facts(
             )
         merged[fact.key] = fact
     return list(merged.values())
+
+
+def answered_keys(answers: Sequence[FactAnswer]) -> frozenset[UnknownKey]:
+    """The facts these answers answer in full, which a later round does not ask.
+
+    An answer of "I don't know" answers its fact: asking it again in every
+    round would ask a submitter who does not know until they stop. A facet
+    answer answers its fact once every facet has an answer, "I don't know"
+    included, so a later round still asks the facets left out.
+    """
+    return frozenset(
+        answer.key
+        for answer in answers
+        if answer.facets is None
+        or {facet.id for facet in answer_facets(answer.key)} <= answer.facets.keys()
+    )
 
 
 def open_attribute(model: SystemModel, element_id: str, attribute: str) -> bool:
@@ -565,8 +582,14 @@ def fact_questions(
     analyses: Sequence[FrameworkAnalysis],
     model: SystemModel,
     catalog: AssertionCatalog | None,
+    earlier: Sequence[FactAnswer] = (),
 ) -> tuple[FactQuestion, ...]:
     """Every open fact a report's findings rest on, the most completing first.
+
+    ``earlier`` is the fact answers of the earlier rounds. A fact they answer
+    in full (:func:`answered_keys`) is not asked again. A finding that waits on
+    a fact answered "I don't know" is not counted, because no answer in this
+    list can cover it.
 
     **Two sections, and the first does not depend on the critic.** The
     evidence section ranks the open facts each finding's own grounds cite, for
@@ -593,18 +616,27 @@ def fact_questions(
     refs: dict[UnknownKey, UnknownRef] = {}
     conditional: set[Finding] = set()
     prepared = prepared_model(model, catalog)
+    done = answered_keys(earlier)
+    unknown = {answer.key for answer in earlier if not answer.known} & done
     for block in analyses:
         for claim in block.all_claims():
             finding = (block.framework, claim.id)
-            grounds = [ref for ref in claim.unknown_grounds() if _open(ref, prepared)]
+            cites = [*claim.unknown_grounds(), *claim.verdict.related_unknowns]
+            stuck = bool(unknown & {ref.key for ref in cites})
+            if claim.verdict.status == "needs-info" and not stuck:
+                conditional.add(finding)
+            grounds = [
+                ref
+                for ref in claim.unknown_grounds()
+                if _open(ref, prepared) and ref.key not in done
+            ]
             evidence[finding] = {ref.key for ref in grounds}
             cited = list(grounds)
             if claim.verdict.status == "needs-info":
-                conditional.add(finding)
                 verdict = [
                     ref
                     for ref in claim.verdict.related_unknowns
-                    if _open(ref, prepared)
+                    if _open(ref, prepared) and ref.key not in done
                 ]
                 named[finding] = {ref.key for ref in verdict}
                 cited += verdict

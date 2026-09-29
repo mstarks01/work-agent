@@ -249,11 +249,19 @@ class Engine:
         return await self._run(job, on_node)
 
     def questions(
-        self, checkpoint: Checkpoint, report: Report | None = None
+        self,
+        checkpoint: Checkpoint,
+        report: Report | None = None,
+        *,
+        answered: Sequence[FactAnswer],
+        rounds: int,
     ) -> QuestionSet:
         """Every question a run asks: a paused run's early list, or its report's.
 
         ``report`` is the finished run's report, and ``None`` for a paused run.
+        ``answered`` is the fact answers the run was given, and ``rounds`` how
+        many rounds of answers its lineage took; a run started from sources
+        took none.
         """
         return question_set(
             checkpoint.system_model,
@@ -261,6 +269,8 @@ class Engine:
             {selection.name: selection.options for selection in self._frameworks},
             () if report is None else report.analyses,
             waiting=report is None,
+            answered=answered,
+            rounds=rounds,
         )
 
     async def resume(
@@ -273,6 +283,7 @@ class Engine:
         report: Report | None = None,
         earlier_links: Sequence[LinkAnswer] = (),
         earlier_facts: Sequence[FactAnswer] = (),
+        rounds: int,
         system_name: str | None = None,
         caller: str = DEFAULT_CALLER,
         on_node: NodeCallback | None = None,
@@ -283,7 +294,8 @@ class Engine:
         model and catalog are, and ``report`` is that finished report.
         ``sources``, ``earlier_links`` and ``earlier_facts`` are what that run
         was given; ``links`` and ``facts`` are the new answers, which go over
-        the earlier ones. :meth:`questions` admits them, so an answer to a fact
+        the earlier ones. ``rounds`` is how many rounds of answers that run's
+        lineage took. :meth:`questions` admits them, so an answer to a fact
         the run did not ask is refused. The run starts at ``prepare``, so no
         extraction and no assertion pass runs again (#1252).
         """
@@ -293,7 +305,9 @@ class Engine:
                 " read a link answer"
             )
         try:
-            admitted = self.questions(checkpoint, report).admit(
+            admitted = self.questions(
+                checkpoint, report, answered=earlier_facts, rounds=rounds
+            ).admit(
                 sources=sources,
                 earlier_links=earlier_links,
                 earlier_facts=earlier_facts,
@@ -312,7 +326,9 @@ class Engine:
             system_name=_engine_system_name(system_name),
             links=admitted.links,
             facts=admitted.facts,
-            resumption=Resumption(parent_id="in-process", checkpoint=checkpoint),
+            resumption=Resumption(
+                parent_id="in-process", checkpoint=checkpoint, round=rounds + 1
+            ),
         )
         return await self._run(job, on_node)
 

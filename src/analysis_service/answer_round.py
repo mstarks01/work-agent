@@ -11,6 +11,14 @@ cannot differ.
 **A job waiting on answers asks the early list; a finished one asks the
 report's list.** Both ask the link questions its catalog raises. A waiting job
 may continue with no answers, and a finished one has nothing to continue.
+
+**The rounds end.** A fact an earlier round answered is not asked again, and
+an answer of "I don't know" counts, so a submitter who does not know is not
+asked the same question in every round. A job lineage takes at most
+:data:`MAX_ANSWER_ROUNDS` rounds of answers. Each round after a report runs
+the analysis again, and its reviewer can name new facts each time, so without
+the limit the rounds need not end. A job that reached the limit asks nothing,
+and its report is the final one.
 """
 
 from __future__ import annotations
@@ -29,11 +37,20 @@ from analysis_service.links import (
     link_questions,
     resumed_sources,
 )
-from analysis_service.questions import FactAnswer, FactQuestion, fact_questions
+from analysis_service.questions import (
+    FactAnswer,
+    FactQuestion,
+    answered_keys,
+    fact_questions,
+)
 from analysis_service.sources import Source
 from analysis_service.system_model import SystemModel
 
-__all__ = ["AdmittedRound", "QuestionSet", "question_set"]
+__all__ = ["MAX_ANSWER_ROUNDS", "AdmittedRound", "QuestionSet", "question_set"]
+
+#: How many rounds of answers one job lineage takes: the answers at the pause
+#: and after each report, counted together.
+MAX_ANSWER_ROUNDS = 3
 
 
 @dataclass(frozen=True)
@@ -55,6 +72,13 @@ class QuestionSet:
     early: tuple[EarlyQuestion, ...]
     facts: tuple[FactQuestion, ...]
     links: tuple[LinkQuestion, ...]
+    #: How many rounds of answers the job's lineage took before this job.
+    rounds: int
+
+    @property
+    def rounds_left(self) -> int:
+        """How many more rounds of answers the lineage takes."""
+        return max(MAX_ANSWER_ROUNDS - self.rounds, 0)
 
     @property
     def asked(self) -> frozenset[UnknownKey]:
@@ -62,11 +86,12 @@ class QuestionSet:
         early = frozenset(question.key for question in self.early)
         return early | frozenset(question.key for question in self.facts)
 
-    def to_json(self) -> dict[str, list[dict[str, object]]]:
+    def to_json(self) -> dict[str, object]:
         return {
             "link_questions": [question.to_json() for question in self.links],
             "fact_questions": [question.to_json() for question in self.facts],
             "early_questions": [question.to_json() for question in self.early],
+            "answer_rounds_left": self.rounds_left,
         }
 
     def admit(
@@ -85,6 +110,11 @@ class QuestionSet:
         so its message is safe to show. A link answer to a job with no catalog
         raises :class:`~analysis_service.links.NoCatalogError`.
         """
+        if not self.rounds_left:
+            raise ValueError(
+                f"this job's answers have run {MAX_ANSWER_ROUNDS} rounds, the most"
+                " one job lineage takes, so its report is final"
+            )
         if not (links or facts or self.waiting):
             raise ValueError(
                 "no answers were sent; only a job waiting on answers can continue"
@@ -112,18 +142,32 @@ def question_set(
     analyses: Sequence[FrameworkAnalysis],
     *,
     waiting: bool,
+    answered: Sequence[FactAnswer],
+    rounds: int,
 ) -> QuestionSet:
     """The questions a job asks: a waiting job's early list, or its report's list.
 
     ``frameworks`` maps each selected framework to its options, and ranks the
     early list; ``analyses`` ranks the report's list. So a waiting job passes
-    no analyses, and a finished one's frameworks go unread.
+    no analyses, and a finished one's frameworks go unread. ``answered`` is the
+    fact answers of the earlier rounds, which are not asked again, and
+    ``rounds`` is how many rounds the lineage took.
     """
+    if rounds >= MAX_ANSWER_ROUNDS:
+        return QuestionSet(model, catalog, waiting, (), (), (), rounds)
+    done = answered_keys(answered)
     return QuestionSet(
         model=model,
         catalog=catalog,
         waiting=waiting,
-        early=early_questions(model, frameworks, catalog) if waiting else (),
-        facts=fact_questions(analyses, model, catalog),
+        early=tuple(
+            question
+            for question in (
+                early_questions(model, frameworks, catalog) if waiting else ()
+            )
+            if question.key not in done
+        ),
+        facts=fact_questions(analyses, model, catalog, answered),
         links=link_questions(catalog, model),
+        rounds=rounds,
     )

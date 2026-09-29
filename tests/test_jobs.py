@@ -215,7 +215,7 @@ class TestInMemoryJobStore:
             store = InMemoryJobStore()
             held = Checkpoint(system_model=valid_model(), assertions=None)
             record = make_record()
-            record.resumption = Resumption(parent_id="parent", checkpoint=held)
+            record.resumption = Resumption(round=1, parent_id="parent", checkpoint=held)
             await admit(store, record)
             record.transition("running")
             record.checkpoint = held

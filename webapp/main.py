@@ -217,6 +217,8 @@ class Run:
     links: list[LinkAnswer] = field(default_factory=list)
     facts: list[FactAnswer] = field(default_factory=list)
     checkpoint: Checkpoint | None = None
+    #: How many rounds of answers the run's lineage took.
+    rounds: int = 0
     #: True once a submitter's answers started a run from this one.
     answered: bool = False
 
@@ -229,7 +231,9 @@ class Run:
         """Every question this run asks, from the engine and checkpoint it holds."""
         if self.engine is None or self.checkpoint is None:
             raise RuntimeError(f"run {self.id} has reached no checkpoint")
-        return self.engine.questions(self.checkpoint, self.report)
+        return self.engine.questions(
+            self.checkpoint, self.report, answered=self.facts, rounds=self.rounds
+        )
 
 
 class RegistryFull(Exception):
@@ -411,8 +415,13 @@ def unit_rows(report: Report) -> dict[str, list[dict[str, str]]]:
     return rows
 
 
-def render_report(report: Report) -> RenderedPage:
+def render_report(
+    report: Report, *, answered: Sequence[FactAnswer], rounds: int
+) -> RenderedPage:
     """``report_view.html``, carrying this run's report.
+
+    ``answered`` and ``rounds`` are the run's fact answers and how many rounds
+    of answers its lineage took, which decide what the page still asks.
 
     The template is a self-contained renderer for the report schema — no build
     step, no framework, its own inline CSS and JS. This fills its one payload
@@ -435,6 +444,8 @@ def render_report(report: Report) -> RenderedPage:
         {},
         report.analyses,
         waiting=False,
+        answered=answered,
+        rounds=rounds,
     ).to_json()
     return render(
         VIEWER.read_text(encoding="utf-8"),
@@ -448,6 +459,7 @@ def render_report(report: Report) -> RenderedPage:
         fact_questions=script_json(asked["fact_questions"]),
         question_fallback=script_json(question_fallback(report.analyses).to_json()),
         link_questions=script_json(asked["link_questions"]),
+        answer_rounds_left=script_json(asked["answer_rounds_left"]),
     )
 
 
@@ -619,6 +631,7 @@ def create_app(
         parent.answered = True
         run.engine, run.sources = parent.engine, parent.sources
         run.links, run.facts = admitted.links, admitted.facts
+        run.rounds = parent.rounds + 1
         start = partial(
             parent.engine.resume,
             parent.sources,
@@ -628,6 +641,7 @@ def create_app(
             report=parent.report,
             earlier_links=parent.links,
             earlier_facts=parent.facts,
+            rounds=parent.rounds,
             system_name="Your system",
         )
         run.task = asyncio.create_task(_drive(analyses, run, start))
@@ -649,7 +663,9 @@ def create_app(
         run = analyses.get(run_id)
         if run is None or run.report is None:
             return PlainTextResponse("no such report", status_code=404)
-        return response(render_report(run.report))
+        return response(
+            render_report(run.report, answered=run.facts, rounds=run.rounds)
+        )
 
     return app
 

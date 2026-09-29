@@ -36,6 +36,9 @@
   // How many of the reviewer's open facts used the fixed list of questions,
   // and how many it wrote in its own words, counted server-side.
   const FALLBACK = JSON.parse(document.getElementById("question_fallback").textContent);
+  // How many more rounds of answers this report's lineage takes, counted
+  // server-side. At zero the service asks nothing and the report is final.
+  const ROUNDS_LEFT = JSON.parse(document.getElementById("answer_rounds_left").textContent);
   const $ = (id) => document.getElementById(id);
   const el = (tag, cls, text) => {
     const n = document.createElement(tag);
@@ -710,6 +713,11 @@
   // Answers go to /answer/{run}, which starts a run from this report's model
   // and catalog; code writes every answer, so no model reads one. Every label
   // is untrusted and lands as text.
+  if (!ROUNDS_LEFT) {
+    $("links").append(el("div", "meta",
+      "This report is final. Its analysis has taken the most rounds of answers " +
+      "one analysis takes, so it asks no more questions."));
+  }
   if (LINK_QUESTIONS.length || FACT_QUESTIONS.length) {
     const names = {};
     [...R.system_model.external_entities, ...R.system_model.processes,
@@ -720,6 +728,9 @@
     // One reader per fact question: `read` is its answer as the service takes
     // it, or null; `known` is whether that answer says more than "I don't know".
     const factAnswers = [];
+    box.append(el("div", "meta",
+      `You can answer ${ROUNDS_LEFT} more time(s). Each answer runs the analysis ` +
+      "again. A fact you answered, \"I don't know\" included, is not asked again."));
 
     if (LINK_QUESTIONS.length) {
       box.append(el("h2", null, "Which element is each of these?"));

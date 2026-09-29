@@ -65,6 +65,7 @@ def test_the_mode_seeds_the_run_a_resumed_job_seeds(case, monkeypatch):  # noqa:
         frameworks=sample_selection(),
         facts=[AT_REST, KIND],
         resumption=Resumption(
+            round=1,
             parent_id="job-parent",
             checkpoint=Checkpoint(system_model=case.model, assertions=None),
         ),
