@@ -1,0 +1,23 @@
+{
+  "test_class": "explicit-positive",
+  "drafted_by": "agent",
+  "signed_by": null,
+  "note": "A stated OAuth client makes the client rules apply and OAuth present; the server role stays open.",
+  "framework": "asvs",
+  "options": {
+    "level": 2
+  },
+  "statements": [
+    {
+      "capability": "oauth-client",
+      "state": "present",
+      "quote": "Users sign in with their Google account through OAuth."
+    }
+  ],
+  "answers": {},
+  "expected": {
+    "V10.2.1": "applicable",
+    "V10.1.1": "applicable",
+    "V10.4.1": "unknown"
+  }
+}

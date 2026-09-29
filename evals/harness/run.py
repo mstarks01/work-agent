@@ -98,6 +98,7 @@ from evals.harness import (
     queue,
     replay,
     roster,
+    rule_applicability,
     score_arms,
     standings,
     submit,
@@ -2735,6 +2736,12 @@ COMMANDS: dict[str, Command] = {
         " deterministic path and charge each loss to a stage (no credentials)",
         run=oracle.command_oracle,
         arguments=corpus_argument,
+    ),
+    "rule-applicability": Command(
+        help="score the applicability rule against the labelled fixtures and"
+        " simulate the early capability questions (no credentials)",
+        run=rule_applicability.command_rule_applicability,
+        arguments=rule_applicability.arguments,
     ),
     "experiments": Command(
         help="what a prior quality audit already tested, and whether the tree"

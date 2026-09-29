@@ -1,0 +1,25 @@
+{
+  "test_class": "explicit-negative",
+  "drafted_by": "agent",
+  "signed_by": null,
+  "note": "A stated absence of OAuth rules out every OAuth requirement at level 1.",
+  "framework": "asvs",
+  "options": {
+    "level": 1
+  },
+  "statements": [
+    {
+      "capability": "oauth",
+      "state": "absent",
+      "quote": "The service does not use OAuth or OpenID Connect."
+    }
+  ],
+  "answers": {},
+  "expected": {
+    "V10.4.1": "not-applicable",
+    "V10.4.2": "not-applicable",
+    "V10.4.3": "not-applicable",
+    "V10.4.4": "not-applicable",
+    "V10.4.5": "not-applicable"
+  }
+}

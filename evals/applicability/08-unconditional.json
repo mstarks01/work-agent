@@ -1,0 +1,18 @@
+{
+  "test_class": "unconditional",
+  "drafted_by": "agent",
+  "signed_by": null,
+  "note": "A requirement every web application has applies without any fact and is never asked about.",
+  "framework": "asvs",
+  "options": {
+    "level": 1
+  },
+  "statements": [],
+  "answers": {},
+  "expected": {
+    "V1.2.1": "applicable",
+    "V11.4.1": "applicable",
+    "V13.4.1": "applicable",
+    "V15.3.1": "applicable"
+  }
+}

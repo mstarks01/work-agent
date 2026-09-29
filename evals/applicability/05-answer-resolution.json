@@ -1,0 +1,44 @@
+{
+  "test_class": "answer-resolution",
+  "drafted_by": "agent",
+  "signed_by": null,
+  "note": "Answers settle what the sources left open. The truth is a web shop with password sign-in and no OAuth.",
+  "framework": "asvs",
+  "options": {
+    "level": 1
+  },
+  "statements": [],
+  "answers": {
+    "oauth": "no",
+    "browser-frontend": "yes",
+    "cookies": "yes",
+    "database": "yes"
+  },
+  "expected": {
+    "V10.4.1": "not-applicable",
+    "V3.3.1": "applicable",
+    "V1.2.4": "applicable"
+  },
+  "truth": {
+    "browser-frontend": "present",
+    "native-client": "absent",
+    "cookies": "present",
+    "cors": "absent",
+    "websocket": "absent",
+    "database": "present",
+    "os-command": "absent",
+    "rich-text-input": "absent",
+    "xml-parsing": "absent",
+    "multi-step-flow": "present",
+    "file-upload": "absent",
+    "authentication": "present",
+    "password-authentication": "present",
+    "sessions": "present",
+    "reference-session-tokens": "present",
+    "self-contained-tokens": "absent",
+    "oauth": "absent",
+    "encryption": "absent",
+    "sensitive-data": "present",
+    "restricted-access": "present"
+  }
+}

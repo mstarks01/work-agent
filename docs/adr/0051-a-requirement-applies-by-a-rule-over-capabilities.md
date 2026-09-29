@@ -85,6 +85,13 @@ check refuses a unit that is `not-applicable` in one of `applicability` and
 `scope` and not in the other. A block whose precondition refused the model
 carries no entries, because its scope answers for every unit.
 
+**The rule has its own benchmark.** `run.py rule-applicability` scores the
+rule against labelled fixtures in `evals/applicability/`, one for each test
+class #1291 lists, and simulates the early questions from a fixture's truth.
+It reports false exclusions, false inclusions, unknown accuracy and how many
+questions settle 50%, 75%, 90% and 100% of what the answers can settle. It
+reads no claim, so it is apart from the conformance and disposition scores.
+
 **A subject that every web application has is `always`.** TLS, third-party
 components and error handling have one honest answer, so a question about them
 tells nothing. A subject that a real application can lack is a capability,
