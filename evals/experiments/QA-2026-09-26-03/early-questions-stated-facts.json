@@ -1,0 +1,27 @@
+{
+  "figures": {
+    "exposure": {
+      "models": 248,
+      "asked on a stated exposure": 340,
+      "of them at or above the floor": 19
+    },
+    "catalog": {
+      "reports with a catalog": 6,
+      "settled unscoped rows on an element": 6,
+      "asked although stated": 6
+    }
+  },
+  "pairs_ruled_unsound": {
+    "network-membership -> reachability.named-callers": "a zone is not an allow-list",
+    "storage-encryption -> stored-copy-access.encrypted": "data at rest is not its backups",
+    "content-validation -> content-validation.validates": "a flow's fact, asked of the element for every input",
+    "signature-verification -> provenance.integrity": "a flow's fact, asked of the element for every input",
+    "origin-verification -> provenance.sender": "a flow's fact, asked of the element for every input",
+    "destination-verification -> destination": "a flow's fact, asked of the element for every output"
+  },
+  "pairs_sound": {
+    "exposure (internet-exposure projects into it) -> reachability.internet": "internet-facing is yes, internal is no",
+    "record-attribution -> audit-evidence.records-actor": "principal is yes, intermediary is no"
+  },
+  "script": "\"\"\"E24: early questions that ask a fact the sources already state (#1289, item 4).\"\"\"\nimport json\nfrom collections import Counter\nfrom pathlib import Path\n\nfrom analysis_service.assertions import settled\nfrom analysis_service.early_questions import early_questions\nfrom analysis_service.questions import prepared_model\nfrom analysis_service.report import Report\n\nKIND = {\"internet-exposure\": \"reachability\", \"record-attribution\": \"audit-evidence\"}\nexposure = Counter()\ncatalog = Counter()\nfor path in sorted(Path(\"evals\").rglob(\"*.report.json\")):\n    report = Report.model_validate_json(path.read_text())\n    rows = report.assertions.catalog if report.assertions else None\n    model = prepared_model(report.system_model, rows)\n    frameworks = {s.name: s.options for s in report.job.frameworks}\n    asked = early_questions(report.system_model, frameworks, rows)\n    exposure[\"models\"] += 1\n    for question in asked:\n        if question.key[4] != \"reachability\":\n            continue\n        element = model.get(question.key[0])\n        value = getattr(element, \"exposure\", None)\n        if value in (\"internet-facing\", \"internal\"):\n            exposure[\"asked on a stated exposure\"] += 1\n            exposure[\"of them at or above the floor\"] += question.score >= 1\n    if rows is None:\n        continue\n    catalog[\"reports with a catalog\"] += 1\n    ids = {e.id for e in report.system_model.elements()}\n    stated = {(r.subject, KIND[r.predicate]) for r in settled(rows)\n              if r.predicate in KIND and not r.scope and r.subject in ids}\n    catalog[\"settled unscoped rows on an element\"] += len(stated)\n    catalog[\"asked although stated\"] += len(stated & {(q.key[0], q.key[4]) for q in asked})\nprint(json.dumps({\"exposure\": exposure, \"catalog\": catalog}, indent=2))\n"
+}
