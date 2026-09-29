@@ -33,24 +33,20 @@ import argparse
 import json
 import statistics
 import sys
-from collections.abc import Callable, Mapping
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any
 
 from analysis_service.analysis import control_state
-from analysis_service.answer_round import question_set
+from analysis_service.answer_round import EARLY_RULES, QuestionSet, question_set
 from analysis_service.assertions import UNKNOWN
 from analysis_service.claims import FrameworkName, UnknownKey
-from analysis_service.early_questions import EarlyQuestion
-from analysis_service.questions import FactAnswer, answered_model, merged_facts
+from analysis_service.early_questions import EarlyQuestion, early_questions
+from analysis_service.questions import FactAnswer, merged_facts
 from analysis_service.report import Report
 from analysis_service.system_model import SystemModel
 
-#: How many questions one round shows, and the score a question needs to be
-#: shown. The defaults are the plan's proposal (#1289).
-BUDGET = 10
-FLOOR = 1.0
 #: A replay that has not ended by this round is reported as not ending.
 MAX_ROUNDS = 50
 
@@ -126,22 +122,25 @@ class Replay:
     asked: int
     rounds: int
     #: Questions that reached the floor only after an answer, and questions at
-    #: the floor at the start that an answer took away unasked.
+    #: the floor at the start that were never asked: an answer took them away,
+    #: or their kind's limit cut them.
     added: int
     removed: int
     ended: bool
 
 
-def _admitted(
-    model: SystemModel,
-    frameworks: Mapping[FrameworkName, Mapping[str, Any]],
-    answered: list[FactAnswer],
-    given: list[FactAnswer],
-) -> list[FactAnswer]:
-    """``given`` as the service admits it; a refused answer becomes "I don't know"."""
-    asked = question_set(
-        model, None, frameworks, [], waiting=True, answered=answered, rounds=0
-    )
+def _eligible(listed: Sequence[EarlyQuestion]) -> set[UnknownKey]:
+    """The questions at or above their kind's floor, before any answer."""
+    return {
+        question.key
+        for question in listed
+        if question.score
+        >= EARLY_RULES["capability" if question.kind == "capability" else "field"].floor
+    }
+
+
+def _admitted(asked: QuestionSet, answered: list[FactAnswer], given: list[FactAnswer]):
+    """``given`` as the service saves it; a refused answer becomes "I don't know"."""
     kept: list[FactAnswer] = []
     for answer in given:
         try:
@@ -151,6 +150,7 @@ def _admitted(
                 earlier_facts=answered,
                 links=[],
                 facts=[*kept, answer],
+                save=True,
             )
         except ValueError:
             question = next(q for q in asked.early if q.key == answer.key)
@@ -165,42 +165,39 @@ def replay(
     blessed: SystemModel,
     frameworks: Mapping[FrameworkName, Mapping[str, Any]],
     name: str,
-    *,
-    budget: int = BUDGET,
-    floor: float = FLOOR,
 ) -> Replay:
-    """Answer ``extracted``'s early questions round after round with one answerer."""
+    """Answer ``extracted``'s early rounds, as the service shows them, with one answerer."""
     answerer = ANSWERERS[name]
     answered: list[FactAnswer] = []
-    model = extracted
+    listed = early_questions(extracted, frameworks, None)
+    first = _eligible(listed)
     seen: set[UnknownKey] = set()
-    first: set[UnknownKey] = set()
     asked_keys: set[UnknownKey] = set()
-    listed = 0
     rounds = 0
     for rounds in range(MAX_ROUNDS):
-        early = question_set(
-            model, None, frameworks, [], waiting=True, answered=answered, rounds=0
-        ).early
-        shown = [question for question in early if question.score >= floor]
-        if rounds == 0:
-            listed = len(early)
-            first = {question.key for question in shown}
-        seen |= {question.key for question in shown}
-        if not shown:
+        asked = question_set(
+            extracted,
+            None,
+            frameworks,
+            [],
+            waiting=True,
+            answered=answered,
+            answered_links=[],
+            rounds=0,
+        )
+        if asked.done:
             break
-        batch = shown[:budget]
-        given = [answerer(question, blessed) for question in batch]
-        answered = merged_facts(answered, _admitted(model, frameworks, answered, given))
-        asked_keys |= {question.key for question in batch}
-        model = answered_model(extracted, answered)
+        seen |= {question.key for question in asked.early}
+        given = [answerer(question, blessed) for question in asked.early]
+        answered = merged_facts(answered, _admitted(asked, answered, given))
+        asked_keys |= {question.key for question in asked.early}
     else:
         rounds = MAX_ROUNDS
     return Replay(
         case=case,
         framework=",".join(frameworks),
         answerer=name,
-        listed=listed,
+        listed=len(listed),
         above_floor=len(first),
         asked=len(asked_keys),
         rounds=rounds,

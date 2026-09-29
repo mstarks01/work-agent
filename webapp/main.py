@@ -134,11 +134,13 @@ from analysis_service import (
 )
 from analysis_service.answer_round import QuestionSet, question_set
 from analysis_service.deployment import Deployment
+from analysis_service.early_questions import EarlyQuestion
 from analysis_service.frameworks import package_for
 from analysis_service.jobs import Checkpoint, PipelineAwaiting, PipelineOutcome
 from analysis_service.links import (
     MAX_LINK_ANSWERS,
     LinkAnswer,
+    LinkQuestion,
 )
 from analysis_service.model_tiers import ModelTierConfig
 from analysis_service.open_facts import open_facts_by_framework
@@ -232,7 +234,11 @@ class Run:
         if self.engine is None or self.checkpoint is None:
             raise RuntimeError(f"run {self.id} has reached no checkpoint")
         return self.engine.questions(
-            self.checkpoint, self.report, answered=self.facts, rounds=self.rounds
+            self.checkpoint,
+            self.report,
+            answered=self.facts,
+            answered_links=self.links,
+            rounds=self.rounds,
         )
 
 
@@ -416,7 +422,11 @@ def unit_rows(report: Report) -> dict[str, list[dict[str, str]]]:
 
 
 def render_report(
-    report: Report, *, answered: Sequence[FactAnswer], rounds: int
+    report: Report,
+    *,
+    answered: Sequence[FactAnswer],
+    answered_links: Sequence[LinkAnswer],
+    rounds: int,
 ) -> RenderedPage:
     """``report_view.html``, carrying this run's report.
 
@@ -445,6 +455,7 @@ def render_report(
         report.analyses,
         waiting=False,
         answered=answered,
+        answered_links=answered_links,
         rounds=rounds,
     ).to_json()
     return render(
@@ -599,6 +610,9 @@ def create_app(
             if not isinstance(raw_facts, list) or len(raw_facts) > MAX_FACT_ANSWERS:
                 raise TypeError
             facts = [FactAnswer.model_validate(fact) for fact in raw_facts]
+            save = body.get("save", False)
+            if not isinstance(save, bool):
+                raise TypeError
         except (ValidationError, ValueError, KeyError, TypeError):
             return JSONResponse(
                 {
@@ -614,11 +628,21 @@ def create_app(
                 earlier_facts=parent.facts,
                 links=links,
                 facts=facts,
+                save=save,
             )
         except ValueError as exc:
             # The answer rules' own refusals name the submitter's choices, so
             # they are safe to show.
             return JSONResponse({"message": str(exc)}, status_code=400)
+        if save:
+            # A saved round runs no model: the answers go onto the paused run,
+            # and the next round is read off the model with them in.
+            parent.links, parent.facts = admitted.links, admitted.facts
+            following = parent.questions()
+            if not following.done:
+                return JSONResponse(paused_payload(parent, following))
+            # Nothing is left to ask, so the analysis starts with no new answers.
+            links, facts = [], []
         try:
             run = analyses.claim(answering=parent)
         except RegistryFull as exc:
@@ -664,7 +688,12 @@ def create_app(
         if run is None or run.report is None:
             return PlainTextResponse("no such report", status_code=404)
         return response(
-            render_report(run.report, answered=run.facts, rounds=run.rounds)
+            render_report(
+                run.report,
+                answered=run.facts,
+                answered_links=run.links,
+                rounds=run.rounds,
+            )
         )
 
     return app
@@ -813,16 +842,7 @@ async def _drive(
             await _emit(run, "done", {"url": f"/report/{run.id}"})
         elif isinstance(outcome, PipelineAwaiting):
             run.checkpoint = outcome.checkpoint
-            questions = run.questions()
-            await _emit(
-                run,
-                "questions",
-                {
-                    "run": run.id,
-                    "questions": question_rows(questions),
-                    "facts": early_rows(questions),
-                },
-            )
+            await _emit(run, "questions", paused_payload(run, run.questions()))
         else:
             await _emit(
                 run,
@@ -843,6 +863,25 @@ def _element_names(questions: QuestionSet) -> dict[str, str]:
     return {element.id: element.name for element in questions.model.elements()}
 
 
+def _link_row(question: LinkQuestion, names: Mapping[str, str]) -> dict[str, object]:
+    return {
+        "principal": question.principal,
+        "rows": question.rows,
+        "options": [
+            {"id": option, "name": names.get(option, "")} for option in question.options
+        ],
+    }
+
+
+def _early_row(question: EarlyQuestion, names: Mapping[str, str]) -> dict[str, object]:
+    return {
+        **question.to_json(),
+        "choices": [
+            {"id": choice, "name": names.get(choice, "")} for choice in question.choices
+        ],
+    }
+
+
 def question_rows(questions: QuestionSet) -> list[dict[str, object]]:
     """A run's link questions, with each option's element name beside it.
 
@@ -850,17 +889,7 @@ def question_rows(questions: QuestionSet) -> list[dict[str, object]]:
     questions. Every string is untrusted and lands on the page as text.
     """
     names = _element_names(questions)
-    return [
-        {
-            "principal": question.principal,
-            "rows": question.rows,
-            "options": [
-                {"id": option, "name": names.get(option, "")}
-                for option in question.options
-            ],
-        }
-        for question in questions.links
-    ]
+    return [_link_row(question, names) for question in questions.links]
 
 
 def early_rows(questions: QuestionSet) -> list[dict[str, object]]:
@@ -869,16 +898,30 @@ def early_rows(questions: QuestionSet) -> list[dict[str, object]]:
     Every string is untrusted and lands on the page as text.
     """
     names = _element_names(questions)
-    return [
-        {
-            **question.to_json(),
-            "choices": [
-                {"id": choice, "name": names.get(choice, "")}
-                for choice in question.choices
-            ],
-        }
-        for question in questions.early
-    ]
+    return [_early_row(question, names) for question in questions.early]
+
+
+def paused_payload(run: Run, questions: QuestionSet) -> dict[str, object]:
+    """What the form page shows for one round at the pause (ADR 0053).
+
+    This round's questions, how many each kind has left, and every earlier
+    answer with its question, so the page can show it and take a new one.
+    """
+    names = _element_names(questions)
+    return {
+        "run": run.id,
+        "questions": question_rows(questions),
+        "facts": early_rows(questions),
+        "remaining": dict(questions.remaining),
+        "answered": [
+            _early_row(question, names) | {"answer": answer.model_dump(mode="json")}
+            for question, answer in questions.answered_early
+        ],
+        "answered_links": [
+            _link_row(question, names) | {"answer": answer.model_dump(mode="json")}
+            for question, answer in questions.answered_links
+        ],
+    }
 
 
 def _ticker(run: Run):
@@ -1088,11 +1131,15 @@ _FORM_PAGE = (
   <h2>Your system model is ready. The threat analysis has not started.</h2>
   <p class="sub">The service read your description, built a model of your system
   and checked it. It stopped before the threat analysis so that you can add
-  facts your description does not state. Answer what you can, leave the rest
-  blank, and choose <b>Start the analysis</b>. The analysis reads your
-  answers.</p>
+  facts your description does not state. The questions come a few at a time,
+  the most useful first. Answer what you can and leave the rest blank. Choose
+  <b>Save and show more</b> for the next questions, or <b>Start the
+  analysis</b> at any time. When no question is left, the analysis starts by
+  itself. The analysis reads your answers.</p>
   <div id="questions"></div>
-  <p><button type="button" id="continue">Start the analysis</button></p>
+  <details id="earlier" hidden></details>
+  <p><button type="button" id="save">Save and show more</button>
+  <button type="button" id="continue">Start the analysis</button></p>
 </div>
 <script nonce="__CSP_NONCE__"><!--script--></script>
 </body></html>

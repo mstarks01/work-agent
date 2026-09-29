@@ -441,6 +441,14 @@ class JobStore(Protocol):
 
     async def save(self, record: JobRecord) -> None: ...
 
+    async def save_round(
+        self,
+        job_id: str,
+        subject: str,
+        links: Sequence[LinkAnswer],
+        facts: Sequence[FactAnswer],
+    ) -> bool: ...
+
 
 class InMemoryJobStore:
     """Dict-backed store; hands out copies so callers must ``save`` mutations."""
@@ -623,6 +631,31 @@ class InMemoryJobStore:
         if record.id not in self._records:
             raise ValueError(f"job {record.id!r} does not exist")
         self._records[record.id] = record.model_copy(deep=True)
+
+    async def save_round(
+        self,
+        job_id: str,
+        subject: str,
+        links: Sequence[LinkAnswer],
+        facts: Sequence[FactAnswer],
+    ) -> bool:
+        """Keep a saved round's answers on a job that still waits for them.
+
+        Only the answers change, so the checkpoint an envelope read leaves
+        behind is kept. False where the job is not the subject's or no longer
+        waits, and nothing is written.
+        """
+        record = self._records.get(job_id)
+        if (
+            record is None
+            or record.owner_subject != subject
+            or record.status != "awaiting-answers"
+        ):
+            return False
+        record.links = list(links)
+        record.facts = list(facts)
+        record.updated_at = datetime.now(UTC)
+        return True
 
 
 class JobStoreConfigError(ValueError):

@@ -12,6 +12,16 @@ cannot differ.
 report's list.** Both ask the link questions its catalog raises. A waiting job
 may continue with no answers, and a finished one has nothing to continue.
 
+**A waiting job asks in rounds** (ADR 0053). A round shows at most
+:data:`ROUND_SIZE` capability questions and as many questions about the
+model's elements. A question is shown only at or above its kind's floor, and
+one pause asks each kind at most its limit in all: :data:`EARLY_RULES` is the
+table. A submitter saves a round's answers, which writes them onto the job and
+runs no model, and the next round is read off the model with them in. So an
+answer can hide the parts of a capability it rules out, and a named mechanism
+lowers the questions that rested on its lead. A saved round does not count
+toward :data:`MAX_ANSWER_ROUNDS`, because it runs no analysis.
+
 **The rounds end.** A fact an earlier round answered is not asked again, and
 an answer of "I don't know" counts, so a submitter who does not know is not
 asked the same question in every round. A job lineage takes at most
@@ -33,7 +43,9 @@ from analysis_service.early_questions import EarlyQuestion, early_questions
 from analysis_service.links import (
     LinkAnswer,
     LinkQuestion,
+    apply_answers,
     check_answers,
+    fold,
     link_questions,
     resumed_sources,
 )
@@ -41,16 +53,57 @@ from analysis_service.questions import (
     FactAnswer,
     FactQuestion,
     answered_keys,
+    answered_model,
     fact_questions,
 )
 from analysis_service.sources import Source
 from analysis_service.system_model import SystemModel
 
-__all__ = ["MAX_ANSWER_ROUNDS", "AdmittedRound", "QuestionSet", "question_set"]
+__all__ = [
+    "EARLY_RULES",
+    "MAX_ANSWER_ROUNDS",
+    "ROUND_SIZE",
+    "AdmittedRound",
+    "EarlyRule",
+    "QuestionSet",
+    "question_set",
+]
 
-#: How many rounds of answers one job lineage takes: the answers at the pause
-#: and after each report, counted together.
+#: How many rounds of answers one job lineage takes: the answers when the
+#: analysis starts and after each report, counted together.
 MAX_ANSWER_ROUNDS = 3
+
+#: How many questions of each kind one round at the pause shows.
+ROUND_SIZE = 10
+
+
+@dataclass(frozen=True)
+class EarlyRule:
+    """Which early questions of one kind a round may show.
+
+    ``floor`` is the score a question needs, and ``limit`` how many of the
+    kind one pause asks in all. The two kinds' scores are not on one scale: a
+    field question's is findings expected to cite it, and a capability
+    question's is units it could settle.
+    """
+
+    floor: float
+    limit: int
+
+
+#: The rule for each kind of early question: ``capability`` and ``field``,
+#: which is every other kind (``QA-2026-09-26-03-E20``). A field question
+#: under 1 is expected to change less than one finding, and the top 30 of a
+#: STRIDE list hold 99% of its score at that floor. A capability question
+#: under 2 settles one unit, and at ASVS level 2 that leaves 28 of 51.
+EARLY_RULES: Mapping[str, EarlyRule] = {
+    "capability": EarlyRule(floor=2.0, limit=30),
+    "field": EarlyRule(floor=1.0, limit=30),
+}
+
+
+def _early_kind(question: EarlyQuestion) -> str:
+    return "capability" if question.kind == "capability" else "field"
 
 
 @dataclass(frozen=True)
@@ -74,6 +127,14 @@ class QuestionSet:
     links: tuple[LinkQuestion, ...]
     #: How many rounds of answers the job's lineage took before this job.
     rounds: int
+    #: For a waiting job, how many questions of each kind the rounds are still
+    #: expected to ask, this round's included. An estimate: answers can add
+    #: or take away questions.
+    remaining: Mapping[str, int]
+    #: For a waiting job, each early question an earlier round answered, with
+    #: its answer, so a page can show it and take a new answer.
+    answered_early: tuple[tuple[EarlyQuestion, FactAnswer], ...]
+    answered_links: tuple[tuple[LinkQuestion, LinkAnswer], ...]
 
     @property
     def rounds_left(self) -> int:
@@ -92,7 +153,21 @@ class QuestionSet:
             "fact_questions": [question.to_json() for question in self.facts],
             "early_questions": [question.to_json() for question in self.early],
             "answer_rounds_left": self.rounds_left,
+            "early_remaining": dict(self.remaining),
+            "answered_early": [
+                question.to_json() | {"answer": answer.model_dump(mode="json")}
+                for question, answer in self.answered_early
+            ],
+            "answered_links": [
+                question.to_json() | {"answer": answer.model_dump(mode="json")}
+                for question, answer in self.answered_links
+            ],
         }
+
+    @property
+    def done(self) -> bool:
+        """True where a waiting job has nothing left to ask, so it starts."""
+        return self.waiting and not (self.early or self.links)
 
     def admit(
         self,
@@ -102,14 +177,21 @@ class QuestionSet:
         earlier_facts: Sequence[FactAnswer],
         links: Sequence[LinkAnswer],
         facts: Sequence[FactAnswer],
+        save: bool = False,
     ) -> AdmittedRound:
         """The resumed job this round's answers start, or a ``ValueError``.
 
         ``sources``, ``earlier_links`` and ``earlier_facts`` are what the
         answered job was given. A refusal names the submitter's own choices,
         so its message is safe to show. A link answer to a job with no catalog
-        raises :class:`~analysis_service.links.NoCatalogError`.
+        raises :class:`~analysis_service.links.NoCatalogError`. ``save`` admits
+        a round a waiting job keeps, which must answer something and starts
+        nothing.
         """
+        if save and not self.waiting:
+            raise ValueError("only a job waiting on answers saves a round")
+        if save and not (links or facts):
+            raise ValueError("a saved round answers at least one question")
         if not self.rounds_left:
             raise ValueError(
                 f"this job's answers have run {MAX_ANSWER_ROUNDS} rounds, the most"
@@ -143,31 +225,87 @@ def question_set(
     *,
     waiting: bool,
     answered: Sequence[FactAnswer],
+    answered_links: Sequence[LinkAnswer],
     rounds: int,
 ) -> QuestionSet:
-    """The questions a job asks: a waiting job's early list, or its report's list.
+    """The questions a job asks: a waiting job's round, or its report's list.
 
     ``frameworks`` maps each selected framework to its options, and ranks the
     early list; ``analyses`` ranks the report's list. So a waiting job passes
-    no analyses, and a finished one's frameworks go unread. ``answered`` is the
-    fact answers of the earlier rounds, which are not asked again, and
-    ``rounds`` is how many rounds the lineage took.
+    no analyses, and a finished one's frameworks go unread. ``answered`` and
+    ``answered_links`` are the answers of the earlier rounds, which are not
+    asked again, and ``rounds`` is how many rounds the lineage took. A waiting
+    job's ``model`` and ``catalog`` are its checkpoint's, and the saved answers
+    are written in here, as the resumed run writes them.
     """
     if rounds >= MAX_ANSWER_ROUNDS:
-        return QuestionSet(model, catalog, waiting, (), (), (), rounds)
+        return QuestionSet(model, catalog, waiting, (), (), (), rounds, {}, (), ())
+    if not waiting:
+        return QuestionSet(
+            model=model,
+            catalog=catalog,
+            waiting=False,
+            early=(),
+            facts=fact_questions(analyses, model, catalog, answered),
+            links=link_questions(catalog, model),
+            rounds=rounds,
+            remaining={},
+            answered_early=(),
+            answered_links=(),
+        )
     done = answered_keys(answered)
+    held = {answer.key: answer for answer in answered}
+    before = early_questions(model, frameworks, catalog)
+    asked_links = link_questions(catalog, model)
+    view = answered_model(model, answered)
+    if catalog is not None:
+        catalog = apply_answers(catalog, view, answered_links, answered)[0]
+    shown, remaining = _round(early_questions(view, frameworks, catalog), done, held)
+    linked = {fold(link.principal): link for link in answered_links}
     return QuestionSet(
-        model=model,
+        model=view,
         catalog=catalog,
-        waiting=waiting,
-        early=tuple(
-            question
-            for question in (
-                early_questions(model, frameworks, catalog) if waiting else ()
-            )
-            if question.key not in done
-        ),
-        facts=fact_questions(analyses, model, catalog, answered),
-        links=link_questions(catalog, model),
+        waiting=True,
+        early=shown,
+        facts=(),
+        links=link_questions(catalog, view),
         rounds=rounds,
+        remaining=remaining,
+        answered_early=tuple(
+            (question, held[question.key])
+            for question in before
+            if question.key in held
+        ),
+        answered_links=tuple(
+            (question, linked[question.key])
+            for question in asked_links
+            if question.key in linked
+        ),
     )
+
+
+def _round(
+    listed: Sequence[EarlyQuestion],
+    done: frozenset[UnknownKey],
+    held: Mapping[UnknownKey, FactAnswer],
+) -> tuple[tuple[EarlyQuestion, ...], dict[str, int]]:
+    """This round's questions of each kind, and how many each kind has left.
+
+    A question an earlier round answered in full is not asked again, and each
+    earlier answer counts toward its kind's limit.
+    """
+    shown: list[EarlyQuestion] = []
+    remaining = {}
+    for kind, rule in EARLY_RULES.items():
+        asked = sum(1 for key in held if (kind == "capability") == bool(key[5]))
+        left = max(rule.limit - asked, 0)
+        eligible = [
+            question
+            for question in listed
+            if _early_kind(question) == kind
+            and question.score >= rule.floor
+            and question.key not in done
+        ]
+        remaining[kind] = min(len(eligible), left)
+        shown.extend(eligible[: min(ROUND_SIZE, left)])
+    return tuple(shown), remaining

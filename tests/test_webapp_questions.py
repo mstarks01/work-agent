@@ -150,6 +150,46 @@ class TestTheToggle:
         assert answered.status_code == 200, answered.text
 
 
+class TestTheRounds:
+    """A paused run asks in rounds, and starts once nothing is left (ADR 0053)."""
+
+    def test_a_saved_round_shows_the_next_and_the_last_starts_the_analysis(self, tiers):
+        client = client_for(tiers, PausingRunner(catalog=False), catalog=False)
+        paused = start(client, questions=True)
+        shown = event(client.get(f"/events/{paused}").text, "questions")
+        for _ in range(20):
+            facts = [{"key": q["key"], "value": "unknown"} for q in shown["facts"]]
+            saved = client.post(
+                f"/answer/{paused}",
+                json={"links": [], "facts": facts, "save": True},
+                headers=SAME_ORIGIN,
+            )
+            assert saved.status_code == 200, saved.text
+            if "facts" not in saved.json():
+                break
+            before = {tuple(q["key"]) for q in shown["facts"]}
+            shown = saved.json()
+            assert shown["run"] == paused
+            assert before <= {tuple(a["key"]) for a in shown["answered"]}
+            assert not before & {tuple(q["key"]) for q in shown["facts"]}
+        else:
+            pytest.fail("the rounds never ended")
+        done = client.get(f"/events/{saved.json()['run']}").text
+        assert "event: done" in done
+
+    def test_a_save_with_no_answer_is_refused(self, tiers):
+        client = client_for(tiers, PausingRunner(catalog=False), catalog=False)
+        paused = start(client, questions=True)
+        client.get(f"/events/{paused}")
+        saved = client.post(
+            f"/answer/{paused}",
+            json={"links": [], "facts": [], "save": True},
+            headers=SAME_ORIGIN,
+        )
+        assert saved.status_code == 400
+        assert "at least one question" in saved.json()["message"]
+
+
 class TestTheWholeFlow:
     def test_a_paused_run_asks_and_its_answers_reach_a_report(self, tiers, runner):
         client = client_for(tiers, runner)
@@ -255,7 +295,8 @@ class Node {
 }
 const ids = {};
 for (const id of ["analyze","description","ticks","problem","go","load","ask",
-                  "asked","questions","continue","status","status-text"])
+                  "asked","questions","earlier","save","continue","status",
+                  "status-text"])
   ids[id] = new Node(id);
 ids.ask.checked = true;
 globalThis.document = {
@@ -1035,3 +1076,93 @@ def test_the_report_page_says_how_many_rounds_of_answers_are_left():
     steps = "calls.push(box.all('div').map(node => node.textContent));"
     [lines] = _run_answer_block(payloads, steps)["calls"]
     assert any(line.startswith("You can answer 2 more time(s).") for line in lines)
+
+
+def test_a_pause_with_nothing_to_ask_starts_the_analysis_at_once():
+    steps = """
+await ids.analyze.listeners.submit({ preventDefault() {} }); await settle();
+streams[0].listeners.questions({ data: JSON.stringify({ run: "r1", questions: [],
+  facts: [], remaining: {}, answered: [], answered_links: [] }) });
+await settle();
+"""
+    seen = _run_form_script(steps)
+
+    assert seen["calls"][1] == {"url": "/answer/r1", "body": {"links": [], "facts": []}}
+    assert seen["streams"] == ["/events/r1", "/events/r2"]
+    assert not seen["asked"]
+
+
+def test_save_sends_the_round_and_follows_a_run_the_last_save_started():
+    steps = """
+await ids.analyze.listeners.submit({ preventDefault() {} }); await settle();
+streams[0].listeners.questions({ data: JSON.stringify({ run: "r1", questions: [
+  { principal: "shopper accounts", rows: 2,
+    options: [{ id: "entity:shopper", name: "Shopper" }] }], facts: [],
+  remaining: {}, answered: [], answered_links: [] }) });
+ids.questions.querySelectorAll("select")[0].value = "entity:shopper";
+await ids.save.listeners.click(); await settle();
+"""
+    seen = _run_form_script(steps)
+
+    assert seen["calls"][1] == {
+        "url": "/answer/r1",
+        "body": {
+            "links": [{"principal": "shopper accounts", "element": "entity:shopper"}],
+            "facts": [],
+            "save": True,
+        },
+    }
+    assert seen["streams"] == ["/events/r1", "/events/r2"]
+
+
+def test_an_earlier_answer_can_be_changed():
+    key = ["flow:a>b:x", "encryption_in_transit", "", "", "", ""]
+    answered = {
+        "key": key,
+        "kind": "attribute",
+        "label": "x: encryption in transit",
+        "element": "x",
+        "form": "control",
+        "choices": [],
+        "suggestions": ["TLS 1.3"],
+        "facets": [],
+        "answer": {"key": key, "value": "none", "facets": None},
+    }
+    pending = {**answered, "key": ["process:p", "", "", "", "capacity-limits", ""]}
+    pending |= {"form": "text", "group": "g", "group_heading": "G", "reasons": []}
+    del pending["answer"]
+    steps = f"""
+await ids.analyze.listeners.submit({{ preventDefault() {{}} }}); await settle();
+streams[0].listeners.questions({{ data: JSON.stringify({{ run: "r1", questions: [],
+  facts: [{json.dumps(pending)}], remaining: {{ field: 1 }},
+  answered: [{json.dumps(answered)}], answered_links: [] }}) }});
+const walk = (n, tag, out = []) => {{ for (const c of n.children || [])
+  if (typeof c === "object") {{ if (c.tag === tag) out.push(c); walk(c, tag, out); }}
+  return out; }};
+walk(ids.earlier, "button")[0].listeners.click();
+const [state] = walk(ids.earlier, "select");
+const [text] = walk(ids.earlier, "input");
+state.value = "mechanism"; state.listeners.change();
+text.value = "TLS 1.3";
+await ids.continue.listeners.click(); await settle();
+"""
+    seen = _run_form_script(steps)
+
+    assert seen["calls"][1]["body"]["facts"] == [{"key": key, "value": "TLS 1.3"}]
+
+
+def test_a_table_that_comes_back_keeps_its_earlier_facets():
+    """A size answer in a later round kept the rate answer (#1289, F2)."""
+    store = valid_model().data_stores[0]
+    fact = facet_fact(store)
+    earlier = {**fact, "answer": {"key": fact["key"], "facets": {"rate": "yes"}}}
+    steps = f"""
+await ids.analyze.listeners.submit({{ preventDefault() {{}} }}); await settle();
+streams[0].listeners.questions({{ data: JSON.stringify({{ run: "r1", questions: [],
+  facts: [{json.dumps(fact)}], answered: [{json.dumps(earlier)}] }}) }});
+await ids.continue.listeners.click(); await settle();
+"""
+    seen = _run_form_script(steps)["calls"]
+    (sent,) = [c for c in seen if c.get("url") == "/answer/r1"]
+
+    assert sent["body"]["facts"] == [{"key": fact["key"], "facets": {"rate": "yes"}}]

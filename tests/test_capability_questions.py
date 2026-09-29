@@ -96,7 +96,14 @@ class TestWhatIsAsked:
 
     def test_a_waiting_job_asks_them_and_admits_their_answers(self):
         asked = question_set(
-            valid_model(), None, ASVS_L1, [], waiting=True, answered=[], rounds=0
+            valid_model(),
+            None,
+            ASVS_L1,
+            [],
+            waiting=True,
+            answered=[],
+            answered_links=[],
+            rounds=0,
         )
         assert _key("oauth") in asked.asked
         admitted = asked.admit(
@@ -152,6 +159,7 @@ class TestTheAnswerCheck:
             [],
             waiting=True,
             answered=earlier,
+            answered_links=[],
             rounds=1,
         )
         with pytest.raises(ValueError, match="is part of 'oauth'"):

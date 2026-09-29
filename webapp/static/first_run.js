@@ -69,6 +69,7 @@
   const ask = document.getElementById("ask");
   const asked = document.getElementById("asked");
   const questions = document.getElementById("questions");
+  const earlierBox = document.getElementById("earlier");
 
   form.addEventListener("submit", async (event) => {
     event.preventDefault();
@@ -115,10 +116,102 @@
     ["yes", "yes"], ["no", "no"], ["not applicable", "not applicable"],
     ["I don't know", DONT_KNOW],
   ];
+  // The inputs for one early question: a select of its choices, a control's
+  // none / don't know / mechanism, or a line of text. `prefill` is an earlier
+  // answer's value. The round and "Your answers" both build with this, so
+  // the two cannot differ.
+  const optionOf = (label, value) => {
+    const choice = document.createElement("option");
+    choice.value = value;
+    choice.textContent = label;
+    return choice;
+  };
+  const facetSelect = (blank) => {
+    const select = document.createElement("select");
+    select.append(optionOf(blank, ""));
+    for (const [label, value] of FACET_CHOICES) select.append(optionOf(label, value));
+    return select;
+  };
+  let suggestLists = 0;
+  const inputFor = (q, prefill) => {
+    let input;
+    // `beside` is what follows the label.
+    let beside;
+    if (q.choices.length) {
+      input = document.createElement("select");
+      input.append(optionOf("(leave unanswered)", ""));
+      for (const option of q.choices) {
+        input.append(optionOf(option.name ? `${option.name} (${option.id})` : option.id, option.id));
+      }
+      input.append(optionOf("I don't know", DONT_KNOW));
+      input.value = prefill || "";
+      beside = [input];
+    } else if (q.form === "control") {
+      // A control: say there is none, say you do not know, or name the
+      // mechanism. The suggestions are a start; the text is the answer.
+      input = document.createElement("input");
+      input.type = "text";
+      input.maxLength = 1000;
+      input.placeholder = "type it, or pick a common one";
+      const list = document.createElement("datalist");
+      list.id = `early-suggest-${suggestLists++}`;
+      for (const suggestion of q.suggestions) list.append(optionOf(suggestion, suggestion));
+      input.setAttribute("list", list.id);
+      const state = document.createElement("select");
+      state.append(optionOf("(leave unanswered)", ""), optionOf("There is none", "none"),
+        optionOf("I don't know", DONT_KNOW), optionOf("A mechanism, in my own words:", "mechanism"));
+      const fix = () => {
+        const fixed = state.value === "none" || state.value === DONT_KNOW;
+        input.value = fixed ? state.value : input.value;
+        input.disabled = fixed;
+      };
+      state.addEventListener("change", () => {
+        if (state.value === "mechanism") input.value = "";
+        fix();
+      });
+      if (prefill) {
+        state.value = prefill === "none" || prefill === DONT_KNOW ? prefill : "mechanism";
+        input.value = prefill;
+        fix();
+      }
+      beside = [state, " ", input, list];
+    } else {
+      input = document.createElement("input");
+      input.type = "text";
+      input.maxLength = 1000;
+      input.placeholder = "(leave unanswered)";
+      const box = document.createElement("input");
+      box.type = "checkbox";
+      box.addEventListener("change", () => {
+        input.value = box.checked ? DONT_KNOW : "";
+        input.disabled = box.checked;
+      });
+      const dontKnow = document.createElement("label");
+      dontKnow.append(box, " I don't know");
+      if (prefill) {
+        input.value = prefill;
+        box.checked = input.disabled = prefill === DONT_KNOW;
+      }
+      beside = [input, " ", dontKnow];
+    }
+    input.dataset.key = JSON.stringify(q.key);
+    return { input, beside };
+  };
+
+  // A paused run's round: the link questions, then the open facts grouped by
+  // kind of question or attribute, and every earlier answer below them.
+  // Every label and option is untrusted and lands as text.
   const showQuestions = (data) => {
+    // Nothing to ask: the analysis starts, with no page between.
+    if (!data.questions.length && !data.facts.length) {
+      pausedRun = data.run;
+      startAnalysis([], []);
+      return;
+    }
     pausedRun = data.run;
     answers = [];
     questions.replaceChildren();
+    earlierBox.replaceChildren();
     const heading = (title, text) => {
       const lead = document.createElement("p");
       const bold = document.createElement("b");
@@ -129,40 +222,51 @@
       lead.append(bold, hint);
       questions.append(lead);
     };
+    // How much is left: an estimate, because an answer can add or take away
+    // questions (ADR 0053).
+    const remaining = data.remaining || {};
+    const parts = [];
+    if (remaining.capability) {
+      parts.push(`about ${remaining.capability} yes/no question(s) about the application`);
+    }
+    if (remaining.field) {
+      parts.push(`about ${remaining.field} question(s) about parts of your system`);
+    }
+    if (parts.length) {
+      const estimate = document.createElement("p");
+      estimate.className = "hint";
+      estimate.textContent = `There are ${parts.join(" and ")} that can change the`
+        + ` analysis. This round shows ${data.facts.length}.`;
+      questions.append(estimate);
+    }
     if (data.questions.length) {
       heading("Which element is each of these?",
         "Your description states facts about these people or systems, but not"
         + " which element of the model each one is.");
     }
+    const linkSelect = (q, prefill) => {
+      const select = document.createElement("select");
+      select.dataset.principal = q.principal;
+      select.append(optionOf("(leave unanswered)", ""));
+      for (const option of q.options) {
+        select.append(optionOf(option.name ? `${option.name} (${option.id})` : option.id, option.id));
+      }
+      select.append(optionOf("None of these", "none"));
+      select.value = prefill || "";
+      return select;
+    };
     for (const q of data.questions) {
       const row = document.createElement("p");
       const label = document.createElement("label");
       const name = document.createElement("b");
       name.textContent = q.principal;
-      const select = document.createElement("select");
-      select.dataset.principal = q.principal;
-      const skip = document.createElement("option");
-      skip.value = "";
-      skip.textContent = "(leave unanswered)";
-      select.append(skip);
-      for (const option of q.options) {
-        const choice = document.createElement("option");
-        choice.value = option.id;
-        choice.textContent = option.name ? `${option.name} (${option.id})` : option.id;
-        select.append(choice);
-      }
-      const none = document.createElement("option");
-      none.value = "none";
-      none.textContent = "None of these";
-      select.append(none);
-      label.append(name, ` \u2014 places ${q.rows} stated fact(s) `, select);
+      label.append(name, ` — places ${q.rows} stated fact(s) `, linkSelect(q, ""));
       row.append(label);
       questions.append(row);
     }
-    // The open facts, ranked before any finding exists, asked once per kind of
-    // question or attribute with a row per element. A group ranks by its best
-    // question, so the order of the list is kept. The first groups are open,
-    // and the rest are one click away.
+    // The open facts, asked once per kind of question or attribute with a row
+    // per element. A group ranks by its best question, so the order of the
+    // list is kept. The first groups are open, and the rest are one click away.
     const OPEN_GROUPS = 5;
     if (data.facts.length) {
       heading("Facts your description does not state",
@@ -170,6 +274,9 @@
         + " applies to. The first ones are the most likely to matter. Leave any"
         + " row blank that you cannot answer.");
     }
+    // An earlier answer by its key: a question with facets comes back while a
+    // facet has no answer, and its answered facets are filled in.
+    const earlier = new Map((data.answered || []).map((a) => [JSON.stringify(a.key), a.answer]));
     const groups = new Map();
     for (const q of data.facts) {
       if (!groups.has(q.group)) {
@@ -180,15 +287,9 @@
         groups.set(q.group, { box, title, heading: q.group_heading, count: 0 });
       }
     }
-    const optionOf = (label, value) => {
-      const choice = document.createElement("option");
-      choice.value = value;
-      choice.textContent = label;
-      return choice;
-    };
     // A question with facets is a table: a column per facet, a row per
     // element, and a first row that sets the whole column.
-    const facetTable = (group, q) => {
+    const facetTable = (into, q, withAll) => {
       const table = document.createElement("table");
       const head = document.createElement("tr");
       const corner = document.createElement("th");
@@ -200,33 +301,56 @@
         head.append(cell);
         return [];
       });
-      const all = document.createElement("tr");
-      const allLabel = document.createElement("td");
-      allLabel.textContent = "Same for all";
-      all.append(allLabel);
-      q.facets.forEach((facet, column) => {
-        const cell = document.createElement("td");
-        const every = facetSelect("(set every row)");
-        every.addEventListener("change", () => {
-          for (const select of columns[column]) select.value = every.value;
+      table.append(head);
+      if (withAll) {
+        const all = document.createElement("tr");
+        const allLabel = document.createElement("td");
+        allLabel.textContent = "Same for all";
+        all.append(allLabel);
+        q.facets.forEach((facet, column) => {
+          const cell = document.createElement("td");
+          const every = facetSelect("(set every row)");
+          every.addEventListener("change", () => {
+            for (const select of columns[column]) select.value = every.value;
+          });
+          cell.append(every);
+          all.append(cell);
         });
-        cell.append(every);
-        all.append(cell);
-      });
-      table.append(head, all);
-      group.box.append(table);
+        table.append(all);
+      }
+      into.append(table);
       return { table, columns };
     };
-    const facetSelect = (blank) => {
-      const select = document.createElement("select");
-      select.append(optionOf(blank, ""));
-      for (const [label, value] of FACET_CHOICES) select.append(optionOf(label, value));
-      return select;
+    // One row of a facet table, filled in from `prefill`, and its reader.
+    const facetRow = (grid, q, label, prefill) => {
+      const row = document.createElement("tr");
+      const name = document.createElement("td");
+      name.append(label);
+      row.append(name);
+      const selects = q.facets.map((facet, column) => {
+        const select = facetSelect("(leave unanswered)");
+        select.dataset.key = JSON.stringify(q.key);
+        select.dataset.facet = facet.id;
+        select.value = (prefill && prefill[facet.id]) || "";
+        grid.columns[column].push(select);
+        const cell = document.createElement("td");
+        cell.append(select);
+        row.append(cell);
+        return select;
+      });
+      grid.table.append(row);
+      return () => {
+        const given = {};
+        for (const select of selects) {
+          if (select.value) given[select.dataset.facet] = select.value;
+        }
+        return Object.keys(given).length ? { key: q.key, facets: given } : null;
+      };
     };
     // Each answer's input by its key, so a capability that is part of another
     // can follow its parent's answer.
     const inputs = new Map();
-    data.facts.forEach((q, index) => {
+    data.facts.forEach((q) => {
       const group = groups.get(q.group);
       group.count += 1;
       const label = document.createElement("b");
@@ -234,79 +358,13 @@
       // Why the fact matters: the questions of the rules that fire on it.
       label.title = q.reasons.join(" ");
       if (q.form === "facets") {
-        group.grid = group.grid || facetTable(group, q);
-        const row = document.createElement("tr");
-        const name = document.createElement("td");
-        name.append(label);
-        row.append(name);
-        const selects = q.facets.map((facet, column) => {
-          const select = facetSelect("(leave unanswered)");
-          select.dataset.key = JSON.stringify(q.key);
-          select.dataset.facet = facet.id;
-          group.grid.columns[column].push(select);
-          const cell = document.createElement("td");
-          cell.append(select);
-          row.append(cell);
-          return select;
-        });
-        group.grid.table.append(row);
-        answers.push(() => {
-          const given = {};
-          for (const select of selects) {
-            if (select.value) given[select.dataset.facet] = select.value;
-          }
-          return Object.keys(given).length ? { key: q.key, facets: given } : null;
-        });
+        group.grid = group.grid || facetTable(group.box, q, true);
+        const before = earlier.get(JSON.stringify(q.key));
+        answers.push(facetRow(group.grid, q, label, before && before.facets));
         return;
       }
       const row = document.createElement("p");
-      let input;
-      // `beside` is what follows the label.
-      let beside;
-      if (q.choices.length) {
-        input = document.createElement("select");
-        input.append(optionOf("(leave unanswered)", ""));
-        for (const option of q.choices) {
-          input.append(optionOf(option.name ? `${option.name} (${option.id})` : option.id, option.id));
-        }
-        input.append(optionOf("I don't know", DONT_KNOW));
-        beside = [input];
-      } else if (q.form === "control") {
-        // A control: say there is none, say you do not know, or name the
-        // mechanism. The suggestions are a start; the text is the answer.
-        input = document.createElement("input");
-        input.type = "text";
-        input.maxLength = 1000;
-        input.placeholder = "type it, or pick a common one";
-        const list = document.createElement("datalist");
-        list.id = `early-suggest-${index}`;
-        for (const suggestion of q.suggestions) list.append(optionOf(suggestion, suggestion));
-        input.setAttribute("list", list.id);
-        const state = document.createElement("select");
-        state.append(optionOf("(leave unanswered)", ""), optionOf("There is none", "none"),
-          optionOf("I don't know", DONT_KNOW), optionOf("A mechanism, in my own words:", "mechanism"));
-        state.addEventListener("change", () => {
-          const fixed = state.value === "none" || state.value === DONT_KNOW;
-          input.value = fixed ? state.value : "";
-          input.disabled = fixed;
-        });
-        beside = [state, " ", input, list];
-      } else {
-        input = document.createElement("input");
-        input.type = "text";
-        input.maxLength = 1000;
-        input.placeholder = "(leave unanswered)";
-        const box = document.createElement("input");
-        box.type = "checkbox";
-        box.addEventListener("change", () => {
-          input.value = box.checked ? DONT_KNOW : "";
-          input.disabled = box.checked;
-        });
-        const dontKnow = document.createElement("label");
-        dontKnow.append(box, " I don't know");
-        beside = [input, " ", dontKnow];
-      }
-      input.dataset.key = JSON.stringify(q.key);
+      const { input, beside } = inputFor(q, "");
       inputs.set(input.dataset.key, input);
       // A part of another capability is asked only once its parent is "yes".
       // A hidden row sends no answer, so a "no" to the parent is never
@@ -328,14 +386,75 @@
       group.title.textContent = `${group.heading} (${group.count})`;
       questions.append(group.box);
     }
+    // Every earlier answer, each with a button that opens it again. An
+    // answer opened and changed is sent with this round's answers.
+    const answeredLinks = data.answered_links || [];
+    const answeredFacts = (data.answered || []).filter(
+      (a) => !data.facts.some((q) => JSON.stringify(q.key) === JSON.stringify(a.key)));
+    earlierBox.hidden = !(answeredLinks.length || answeredFacts.length);
+    const title = document.createElement("summary");
+    title.textContent = `Your answers (${answeredLinks.length + answeredFacts.length})`;
+    earlierBox.append(title);
+    const said = (answer) => answer.facets
+      ? Object.entries(answer.facets).map(([facet, value]) => `${facet}: ${value}`).join("; ")
+      : (answer.value === DONT_KNOW ? "I don't know" : answer.value);
+    const change = (row, open) => {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.textContent = "Change";
+      button.addEventListener("click", () => {
+        button.hidden = true;
+        open();
+      });
+      row.append(" ", button);
+    };
+    for (const a of answeredLinks) {
+      const row = document.createElement("p");
+      const name = document.createElement("b");
+      name.textContent = a.principal;
+      const shown = document.createElement("span");
+      shown.textContent = ` — ${a.answer.element === "none" ? "none of these" : a.answer.element}`;
+      row.append(name, shown);
+      change(row, () => { shown.replaceChildren(" — ", linkSelect(a, a.answer.element)); });
+      earlierBox.append(row);
+    }
+    for (const a of answeredFacts) {
+      const row = document.createElement("p");
+      const label = document.createElement("b");
+      label.textContent = a.label;
+      const shown = document.createElement("span");
+      shown.textContent = ` — ${said(a.answer)}`;
+      row.append(label, shown);
+      change(row, () => {
+        if (a.form === "facets") {
+          const grid = facetTable(row, a, false);
+          const name = document.createElement("b");
+          name.textContent = a.element;
+          answers.push(facetRow(grid, a, name, a.answer.facets));
+          shown.hidden = true;
+          return;
+        }
+        const { input, beside } = inputFor(a, a.answer.value);
+        shown.replaceChildren(" — ", ...beside);
+        answers.push(() => {
+          const value = input.value.trim();
+          return value && value !== a.answer.value ? { key: a.key, value } : null;
+        });
+      });
+      earlierBox.append(row);
+    }
     asked.hidden = false;
   };
 
-  document.getElementById("continue").addEventListener("click", async () => {
-    const links = [...questions.querySelectorAll("select")]
+  // The round's answers, as the service takes them.
+  const roundAnswers = () => ({
+    links: [...questions.querySelectorAll("select"), ...earlierBox.querySelectorAll("select")]
       .filter((select) => select.dataset.principal && select.value)
-      .map((select) => ({ principal: select.dataset.principal, element: select.value }));
-    const facts = answers.map((read) => read()).filter(Boolean);
+      .map((select) => ({ principal: select.dataset.principal, element: select.value })),
+    facts: answers.map((read) => read()).filter(Boolean),
+  });
+
+  const startAnalysis = async (links, facts) => {
     const resumed = await fetch("/answer/" + pausedRun, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -350,6 +469,35 @@
       (await resumed.json()).run,
       "Running the threat analysis with your answers. This takes a few minutes.",
     );
+  };
+
+  document.getElementById("continue").addEventListener("click", () => {
+    const { links, facts } = roundAnswers();
+    startAnalysis(links, facts);
+  });
+
+  // Save the round and show the next one. Where nothing is left to ask, the
+  // service starts the analysis and answers with the run to follow.
+  document.getElementById("save").addEventListener("click", async () => {
+    const { links, facts } = roundAnswers();
+    const saved = await fetch("/answer/" + pausedRun, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ links, facts, save: true }),
+    });
+    const body = await saved.json();
+    if (!saved.ok) {
+      fail(body.message);
+      return;
+    }
+    problem.hidden = true;
+    if (body.facts) {
+      showQuestions(body);
+      window.scrollTo(0, 0);
+      return;
+    }
+    asked.hidden = true;
+    follow(body.run, "Running the threat analysis with your answers. This takes a few minutes.");
   });
 
   // Follow one run's progress to its end: a report, questions, or a failure.

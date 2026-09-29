@@ -254,12 +254,14 @@ class Engine:
         report: Report | None = None,
         *,
         answered: Sequence[FactAnswer],
+        answered_links: Sequence[LinkAnswer],
         rounds: int,
     ) -> QuestionSet:
         """Every question a run asks: a paused run's early list, or its report's.
 
         ``report`` is the finished run's report, and ``None`` for a paused run.
-        ``answered`` is the fact answers the run was given, and ``rounds`` how
+        ``answered`` and ``answered_links`` are the answers the run was given,
+        a paused run's saved rounds included, and ``rounds`` how
         many rounds of answers its lineage took; a run started from sources
         took none.
         """
@@ -270,6 +272,7 @@ class Engine:
             () if report is None else report.analyses,
             waiting=report is None,
             answered=answered,
+            answered_links=answered_links,
             rounds=rounds,
         )
 
@@ -306,7 +309,11 @@ class Engine:
             )
         try:
             admitted = self.questions(
-                checkpoint, report, answered=earlier_facts, rounds=rounds
+                checkpoint,
+                report,
+                answered=earlier_facts,
+                answered_links=earlier_links,
+                rounds=rounds,
             ).admit(
                 sources=sources,
                 earlier_links=earlier_links,

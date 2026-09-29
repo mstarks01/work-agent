@@ -340,13 +340,15 @@ class AnswersSubmission(BaseModel):
     ``links`` answers which element a principal is, and ``facts`` answers the
     open facts a report's conditional findings rest on. Both empty is legal
     only for a job waiting on answers, where it means "continue without
-    answers"; against a finished report it answers nothing.
+    answers"; against a finished report it answers nothing. ``save`` keeps a
+    waiting job's round without starting the analysis (ADR 0053).
     """
 
     model_config = ConfigDict(extra="forbid")
 
     links: list[LinkAnswer] = Field(default_factory=list, max_length=MAX_LINK_ANSWERS)
     facts: list[FactAnswer] = Field(default_factory=list, max_length=MAX_FACT_ANSWERS)
+    save: bool = False
 
 
 class NodeCompletion(BaseModel):
@@ -655,6 +657,7 @@ def _question_set(
         analyses,
         waiting=record.status == "awaiting-answers",
         answered=record.facts,
+        answered_links=record.links,
         rounds=_rounds(record),
     )
 
@@ -946,6 +949,11 @@ def create_app(
         question, and no extraction or assertion pass runs again (#1252). It
         is admitted as a new job, against the ceiling and the token budget,
         because its lanes and critics spend model calls.
+
+        With ``save``, a waiting job keeps the round's answers and answers
+        ``200`` with its own ID; no model runs. Where the saved answers leave
+        nothing to ask, the analysis starts as a continue would, and the
+        response is the new job's ``201``.
         """
         if answers.links and not request.app.state.carries_catalog:
             raise HTTPException(
@@ -967,11 +975,28 @@ def create_app(
                 earlier_facts=parent.facts,
                 links=answers.links,
                 facts=answers.facts,
+                save=answers.save,
             )
         except NoCatalogError as exc:
             raise HTTPException(status_code=409, detail=str(exc)) from exc
         except ValueError as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
+        if answers.save:
+            store: JobStore = request.app.state.store
+            if not await store.save_round(
+                parent.id, subject, admitted.links, admitted.facts
+            ):
+                raise HTTPException(
+                    status_code=409, detail="the job no longer waits on answers"
+                )
+            parent.links, parent.facts = admitted.links, admitted.facts
+            following = await anyio.to_thread.run_sync(
+                _question_set, parent, model, assertions, []
+            )
+            if not following.done:
+                return JSONResponse({"job_id": parent.id, "saved": True})
+            # Nothing is left to ask, so the analysis starts, as a continue
+            # with no new answers would.
         breach = request.app.state.limits.breach(admitted.sources)
         if breach is not None:
             raise HTTPException(
