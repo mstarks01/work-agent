@@ -166,9 +166,9 @@ asks no link question, and asks its early questions.
 
 A waiting job also lists `early_questions`: the open facts of its model, most
 likely needed first, before any finding exists. Each entry is
-`{key, kind, label, reasons, choices, form, suggestions, facets, group,
-group_heading, element}`. `kind`, `choices`, `form`, `suggestions` and
-`facets` are as they are for a report's open facts below. `group` is the question kind or the attribute, and
+`{key, kind, label, reasons, choices, form, suggestions, facets, max_length,
+group, group_heading, element}`. `kind`, `choices`, `form`, `suggestions`,
+`facets` and `max_length` are as they are for a report's open facts below. `group` is the question kind or the attribute, and
 `group_heading` is its question with no element named, so a page can ask each
 once and list the elements under it by their `element` name. The list keeps
 its order within and across groups.
@@ -211,6 +211,7 @@ findings, so that each has every fact it waits on answered:
  "label": "Customer → Web App: encryption in transit",
  "cited_by": 4, "covered_so_far": 3, "choices": [],
  "form": "control", "suggestions": ["HTTPS", "TLS 1.3", "TLS 1.2"],
+ "max_length": 200,
  "findings": ["stride/I-01", "stride/I-02", "stride/T-03", "stride/T-04"]}
 ```
 
@@ -245,6 +246,9 @@ findings, so that each has every fact it waits on answered:
   can with `yes`, `no`, `not applicable` or `unknown`, and send them as a
   `facets` map in place of `value`. The service writes the answer's line from
   them. `text` means free text.
+- `max_length` is the longest answer the fact admits, in characters. It is the
+  least of the attribute's own limit, such as 200 for `authentication`, and
+  the room on the line the answer writes. One character more is refused.
 - `choices` lists the values the fact takes. A question kind that asks
   whether something holds, such as "Can content it takes run code with its
   authority?", takes `yes` or `no`. Empty means free text on one

@@ -607,6 +607,7 @@ def create_app(
                 {"message": "That run asks no question, or no longer exists."},
                 status_code=404,
             )
+        questions = parent.questions()
         try:
             body = await request.json()
             raw = body["links"]
@@ -616,10 +617,12 @@ def create_app(
             raw_facts = body.get("facts", [])
             if not isinstance(raw_facts, list) or len(raw_facts) > MAX_FACT_ANSWERS:
                 raise TypeError
-            facts = [FactAnswer.model_validate(fact) for fact in raw_facts]
+            facts = [_fact_answer(fact, questions) for fact in raw_facts]
             save = body.get("save", False)
             if not isinstance(save, bool):
                 raise TypeError
+        except RefusedAnswer as exc:
+            return JSONResponse({"message": str(exc)}, status_code=400)
         except (ValidationError, ValueError, KeyError, TypeError):
             return JSONResponse(
                 {
@@ -629,7 +632,7 @@ def create_app(
                 status_code=400,
             )
         try:
-            admitted = parent.questions().admit(
+            admitted = questions.admit(
                 sources=parent.sources,
                 earlier_links=parent.links,
                 earlier_facts=parent.facts,
@@ -895,6 +898,35 @@ def _early_row(question: EarlyQuestion, names: Mapping[str, str]) -> dict[str, o
     }
 
 
+class RefusedAnswer(Exception):
+    """One fact answer the page sent does not parse; the message names its question."""
+
+
+def _fact_answer(raw: object, questions: QuestionSet) -> FactAnswer:
+    """The answer, or a :class:`RefusedAnswer` that names the question it answers.
+
+    The message is the validator's own, which names the submitter's choices,
+    so it is safe to show.
+    """
+    try:
+        return FactAnswer.model_validate(raw)
+    except ValidationError as error:
+        reason = error.errors()[0]["msg"].removeprefix("Value error, ")
+        labels = {question.key: question.label for question in questions.facts}
+        labels |= {question.key: question.label for question in questions.early}
+        labels |= {
+            question.key: question.label for question, _ in questions.answered_early
+        }
+        key = raw.get("key") if isinstance(raw, dict) else None
+        label = (
+            labels.get(tuple(key))
+            if isinstance(key, list) and all(isinstance(part, str) for part in key)
+            else None
+        )
+        lead = "An answer" if label is None else f'The answer to "{label}"'
+        raise RefusedAnswer(f"{lead} was refused: {reason}") from None
+
+
 def question_rows(questions: QuestionSet) -> list[dict[str, object]]:
     """A run's link questions, with each option's element name beside it.
 
@@ -1155,6 +1187,7 @@ _FORM_PAGE = (
   <details id="earlier" hidden></details>
   <p><button type="button" id="save">Save and show more</button>
   <button type="button" id="continue">Start the analysis</button></p>
+  <div id="answer-problem" class="problem" role="alert" hidden></div>
 </div>
 <script nonce="__CSP_NONCE__"><!--script--></script>
 </body></html>

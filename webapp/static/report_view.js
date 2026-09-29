@@ -853,7 +853,7 @@
           // mechanism. The suggestions are a start; the text is the answer.
           input = el("input");
           input.type = "text";
-          input.maxLength = 1000;
+          input.maxLength = q.max_length;
           input.placeholder = "type it, or pick a common one";
           const list = el("datalist");
           list.id = `suggest-${index}`;
@@ -877,7 +877,7 @@
         } else {
           input = el("input");
           input.type = "text";
-          input.maxLength = 1000;
+          input.maxLength = q.max_length;
           input.placeholder = "(leave unanswered)";
           const box = el("input");
           box.type = "checkbox";

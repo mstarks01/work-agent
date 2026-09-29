@@ -382,6 +382,8 @@ class FactQuestion:
     suggestions: tuple[str, ...]
     #: The parts a ``facets`` answer is given in.
     facets: tuple[Facet, ...]
+    #: The longest answer it admits (:func:`answer_limit`).
+    max_length: int
     #: Every finding that waits on it, as ``framework/claim``. A finding is
     #: covered once every question that names it has an answer, whichever
     #: questions those are.
@@ -403,6 +405,7 @@ class FactQuestion:
             "form": self.form,
             "suggestions": list(self.suggestions),
             "facets": facets_json(self.facets),
+            "max_length": self.max_length,
             "findings": list(self.findings),
         }
 
@@ -539,6 +542,33 @@ def answer_facets(key: UnknownKey) -> tuple[Facet, ...]:
 def answer_suggestions(key: UnknownKey) -> tuple[str, ...]:
     """Common mechanisms for a control answered in free text, or empty."""
     return CONTROL_SUGGESTIONS.get(key[1], ()) if fact_kind(key) == "attribute" else ()
+
+
+def answer_limit(key: UnknownKey, model: SystemModel) -> int:
+    """The longest answer this fact admits, in characters.
+
+    **The one reader of "how long may this answer be".** A page's text box
+    takes it, and :func:`check_fact_answers` refuses one character more. It is
+    the least of three bounds: an answer's own, the line the answer writes
+    into the answers Source, and an attribute's field on its element.
+    """
+    bounds = [
+        _max_length(FactAnswer, "value"),
+        MAX_QUOTE_CHARS - (len(fact_line(FactAnswer(key=key, value="x"))) - 1),
+    ]
+    element = model.get(key[0]) if fact_kind(key) == "attribute" else None
+    if element is not None and key[1] in type(element).model_fields:
+        bounds.append(_max_length(type(element), key[1]))
+    return min(bound for bound in bounds if bound is not None)
+
+
+def _max_length(model_class: type[BaseModel], field: str) -> int | None:
+    """The field's ``max_length``, which pydantic keeps in its metadata."""
+    metadata = model_class.model_fields[field].metadata
+    return next(
+        (bound.max_length for bound in metadata if hasattr(bound, "max_length")),
+        None,
+    )
 
 
 def facets_json(facets: Sequence[Facet]) -> list[dict[str, str]]:
@@ -703,6 +733,7 @@ def fact_questions(
                     form=answer_form(key, model, catalog),
                     suggestions=answer_suggestions(key),
                     facets=answer_facets(key),
+                    max_length=answer_limit(key, model),
                     findings=tuple(
                         sorted(
                             f"{framework}/{claim}"

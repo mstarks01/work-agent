@@ -27,10 +27,13 @@ from analysis_service.links import (
 from analysis_service.question_kinds import QUESTION_KINDS
 from analysis_service.questions import (
     FactAnswer,
+    answer_choices,
+    answer_limit,
     answered_keys,
     check_fact_answers,
     fact_line,
 )
+from analysis_service.system_model import attribute_names
 from tests.factories import valid_model
 from tests.test_api import auth
 from tests.test_links import catalog_client
@@ -75,6 +78,43 @@ class TestTheLineAnAnswerWrites:
             check_fact_answers(
                 [sized(key, MAX_QUOTE_CHARS + 1)], open_description(), None
             )
+
+
+def _admits_text(model, key):
+    try:
+        check_fact_answers([FactAnswer(key=key, value="x")], model, None)
+    except ValueError:
+        return False
+    return True
+
+
+def _free_text_facts():
+    """Every attribute of the model that takes an answer in text, opened."""
+    for element in valid_model().elements():
+        for attribute in attribute_names(element):
+            model = valid_model()
+            opened = model.get(element.id)
+            if not isinstance(getattr(opened, attribute), str):
+                continue
+            setattr(opened, attribute, "unknown")
+            key = (element.id, attribute, "", "", "", "")
+            if not answer_choices(key, model, None) and _admits_text(model, key):
+                yield pytest.param(model, key, id=f"{element.id}.{attribute}")
+    subject = ("", "", "", "who rotates the signing keys?", "", "")
+    yield pytest.param(valid_model(), subject, id="subject")
+
+
+@pytest.mark.parametrize(("model", "key"), list(_free_text_facts()))
+def test_the_limit_a_page_shows_is_the_limit_the_check_admits(model, key):
+    """A text box took 1,000 characters where the field held 200 (#1289).
+
+    The page's limit and the admission check are two readers of one bound,
+    so each is asked at the limit and one character over it.
+    """
+    limit = answer_limit(key, model)
+    check_fact_answers([FactAnswer(key=key, value="x" * limit)], model, None)
+    with pytest.raises((ValueError, ValidationError)):
+        check_fact_answers([FactAnswer(key=key, value="x" * (limit + 1))], model, None)
 
 
 def test_a_subject_longer_than_a_reference_holds_is_refused():
