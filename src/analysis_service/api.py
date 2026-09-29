@@ -658,13 +658,9 @@ def _question_set(
         waiting=record.status == "awaiting-answers",
         answered=record.facts,
         answered_links=record.links,
-        rounds=_rounds(record),
+        final=record.resumption is not None and record.resumption.follow_up,
+        shown=record.shown_early,
     )
-
-
-def _rounds(record: JobRecord) -> int:
-    """How many rounds of answers this job's lineage took."""
-    return 0 if record.resumption is None else record.resumption.round
 
 
 def _questions_payload(
@@ -984,12 +980,13 @@ def create_app(
         if answers.save:
             store: JobStore = request.app.state.store
             if not await store.save_round(
-                parent.id, subject, admitted.links, admitted.facts
+                parent.id, subject, admitted.links, admitted.facts, admitted.shown
             ):
                 raise HTTPException(
                     status_code=409, detail="the job no longer waits on answers"
                 )
             parent.links, parent.facts = admitted.links, admitted.facts
+            parent.shown_early = list(admitted.shown)
             following = await anyio.to_thread.run_sync(
                 _question_set, parent, model, assertions, []
             )
@@ -1009,11 +1006,12 @@ def create_app(
             system_name=parent.system_name,
             links=admitted.links,
             facts=admitted.facts,
+            shown_early=admitted.shown,
             resumption=Resumption(
                 parent_id=parent.id,
                 checkpoint=Checkpoint(system_model=model, assertions=assertions),
                 certification=parent.certification,
-                round=admitted.round_after(_rounds(parent)),
+                follow_up=not questions.waiting,
             ),
             reserved_tokens=budgets.estimate(admitted.sources, parent.frameworks),
         )

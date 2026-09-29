@@ -103,7 +103,8 @@ class TestWhatIsAsked:
             waiting=True,
             answered=[],
             answered_links=[],
-            rounds=0,
+            final=False,
+            shown=[],
         )
         assert _key("oauth") in asked.asked
         admitted = asked.admit(
@@ -160,7 +161,8 @@ class TestTheAnswerCheck:
             waiting=True,
             answered=earlier,
             answered_links=[],
-            rounds=1,
+            final=False,
+            shown=[],
         )
         with pytest.raises(ValueError, match="is part of 'oauth'"):
             asked.admit(
@@ -249,7 +251,7 @@ def test_a_resumed_asvs_run_reports_the_answered_absence():
         frameworks=[FrameworkSelection(name="asvs", options={"level": 1})],
         facts=[answer],
         resumption=Resumption(
-            round=1,
+            follow_up=False,
             parent_id="p",
             checkpoint=Checkpoint(system_model=valid_model(), assertions=None),
         ),

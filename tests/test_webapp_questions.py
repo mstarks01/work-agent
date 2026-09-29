@@ -1060,7 +1060,7 @@ await box.all("button")[0].listeners.click();
     ]
 
 
-def test_the_report_page_says_how_many_rounds_of_answers_are_left():
+def test_the_report_page_offers_one_optional_follow_up():
     payloads = {
         "report": {"system_model": valid_model().model_dump(mode="json")},
         "link_questions": [
@@ -1071,11 +1071,12 @@ def test_the_report_page_says_how_many_rounds_of_answers_are_left():
             }
         ],
         "fact_questions": [],
-        "answer_rounds_left": 2,
+        "final": False,
     }
-    steps = "calls.push(box.all('div').map(node => node.textContent));"
+    steps = "calls.push(box.all('summary').map(node => node.textContent));"
     [lines] = _run_answer_block(payloads, steps)["calls"]
-    assert any(line.startswith("You can answer 2 more time(s).") for line in lines)
+    assert lines[0].startswith("Optional follow-up: 1 question(s).")
+    assert "After that, the report is final." in lines[0]
 
 
 def test_a_pause_with_nothing_to_ask_starts_the_analysis_at_once():
@@ -1166,3 +1167,39 @@ await ids.continue.listeners.click(); await settle();
     (sent,) = [c for c in seen if c.get("url") == "/answer/r1"]
 
     assert sent["body"]["facts"] == [{"key": fact["key"], "facets": {"rate": "yes"}}]
+
+
+def test_a_follow_up_question_says_why_it_is_asked():
+    """Skipped before the analysis, or new from it (ADR 0054)."""
+
+    def fact(label, basis, asked_before):
+        return {
+            "key": ["", "", "", label, "", ""],
+            "kind": "subject",
+            "basis": basis,
+            "asked_before": asked_before,
+            "label": label,
+            "cited_by": 1,
+            "covered_so_far": 1,
+            "choices": [],
+            "findings": ["stride/T-01"],
+        }
+
+    payloads = {
+        "report": {"system_model": valid_model().model_dump(mode="json")},
+        "link_questions": [],
+        "fact_questions": [
+            fact("skipped", "evidence", True),
+            fact("new", "evidence", False),
+            fact("reviewer", "critic", False),
+        ],
+        "final": False,
+    }
+    steps = """
+calls.push(box.all("p").map(p => p.children.filter(c => typeof c === "string")
+  .join("")).filter(text => text.includes("wait on it")));
+"""
+    [lines] = _run_answer_block(payloads, steps)["calls"]
+    assert "(you skipped this before the analysis)" in lines[0]
+    assert "(new from the analysis)" in lines[1]
+    assert "skipped" not in lines[2] and "new from" not in lines[2]

@@ -19,22 +19,21 @@ one pause asks each kind at most its limit in all: :data:`EARLY_RULES` is the
 table. A submitter saves a round's answers, which writes them onto the job and
 runs no model, and the next round is read off the model with them in. So an
 answer can hide the parts of a capability it rules out, and a named mechanism
-lowers the questions that rested on its lead. A saved round does not count
-toward :data:`MAX_ANSWER_ROUNDS`, because it runs no analysis.
+lowers the questions that rested on its lead.
 
-**The rounds end.** A fact an earlier round answered is not asked again, and
-an answer of "I don't know" counts, so a submitter who does not know is not
-asked the same question in every round. A job lineage takes at most
-:data:`MAX_ANSWER_ROUNDS` rounds of answers. Each round after a report runs
-the analysis again, and its reviewer can name new facts each time, so without
-the limit the rounds need not end. A job that reached the limit asks nothing,
-and its report is the final one.
+**A report offers one follow-up** (ADR 0054). A fact an earlier round
+answered is not asked again, and an answer of "I don't know" counts. A report
+lists every open fact its conditional findings wait on, so one follow-up can
+answer them all. The analysis then runs once more, and the report it writes
+is final: it asks nothing and admits no answer. A second follow-up would mostly
+answer the facts a reviewer names differently on each run
+(``QA-2026-09-26-03-E22``).
 """
 
 from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Any
 
 from analysis_service.assertions import AssertionCatalog
@@ -61,17 +60,12 @@ from analysis_service.system_model import SystemModel
 
 __all__ = [
     "EARLY_RULES",
-    "MAX_ANSWER_ROUNDS",
     "ROUND_SIZE",
     "AdmittedRound",
     "EarlyRule",
     "QuestionSet",
     "question_set",
 ]
-
-#: How many rounds of answers one job lineage takes: the answers when the
-#: analysis starts and after each report, counted together.
-MAX_ANSWER_ROUNDS = 3
 
 #: How many questions of each kind one round at the pause shows.
 ROUND_SIZE = 10
@@ -113,15 +107,9 @@ class AdmittedRound:
     sources: list[Source]
     links: list[LinkAnswer]
     facts: list[FactAnswer]
-
-    def round_after(self, rounds: int) -> int:
-        """The resumed job's round count, from its parent's.
-
-        **The one reader of "does this resume count".** A resume counts only
-        where the job carries answers, so a paused job that continues with
-        none uses no round (ADR 0053).
-        """
-        return rounds + 1 if self.links or self.facts else rounds
+    #: Every early question the pause showed, this round's included, which
+    #: the report reads to say a follow-up question was skipped before.
+    shown: tuple[UnknownKey, ...]
 
 
 @dataclass(frozen=True)
@@ -134,8 +122,11 @@ class QuestionSet:
     early: tuple[EarlyQuestion, ...]
     facts: tuple[FactQuestion, ...]
     links: tuple[LinkQuestion, ...]
-    #: How many rounds of answers the job's lineage took before this job.
-    rounds: int
+    #: True for a report the follow-up wrote: it asks nothing and admits no
+    #: answer.
+    final: bool
+    #: Every early question the pause showed before this round.
+    shown: tuple[UnknownKey, ...]
     #: For a waiting job, how many questions of each kind the rounds are still
     #: expected to ask, this round's included. An estimate: answers can add
     #: or take away questions.
@@ -144,11 +135,6 @@ class QuestionSet:
     #: its answer, so a page can show it and take a new answer.
     answered_early: tuple[tuple[EarlyQuestion, FactAnswer], ...]
     answered_links: tuple[tuple[LinkQuestion, LinkAnswer], ...]
-
-    @property
-    def rounds_left(self) -> int:
-        """How many more rounds of answers the lineage takes."""
-        return max(MAX_ANSWER_ROUNDS - self.rounds, 0)
 
     @property
     def asked(self) -> frozenset[UnknownKey]:
@@ -161,7 +147,7 @@ class QuestionSet:
             "link_questions": [question.to_json() for question in self.links],
             "fact_questions": [question.to_json() for question in self.facts],
             "early_questions": [question.to_json() for question in self.early],
-            "answer_rounds_left": self.rounds_left,
+            "final": self.final,
             "early_remaining": dict(self.remaining),
             "answered_early": [
                 question.to_json() | {"answer": answer.model_dump(mode="json")}
@@ -201,10 +187,9 @@ class QuestionSet:
             raise ValueError("only a job waiting on answers saves a round")
         if save and not (links or facts):
             raise ValueError("a saved round answers at least one question")
-        if not self.rounds_left:
+        if self.final:
             raise ValueError(
-                f"this job's answers have run {MAX_ANSWER_ROUNDS} rounds, the most"
-                " one job lineage takes, so its report is final"
+                "this report is final: its follow-up has run, so it takes no answers"
             )
         if not (links or facts or self.waiting):
             raise ValueError(
@@ -222,7 +207,10 @@ class QuestionSet:
             earlier_links=earlier_links,
         )
         return AdmittedRound(
-            *resumed_sources(sources, earlier_links, links, earlier_facts, facts)
+            *resumed_sources(sources, earlier_links, links, earlier_facts, facts),
+            shown=tuple(
+                dict.fromkeys([*self.shown, *(question.key for question in self.early)])
+            ),
         )
 
 
@@ -235,7 +223,8 @@ def question_set(
     waiting: bool,
     answered: Sequence[FactAnswer],
     answered_links: Sequence[LinkAnswer],
-    rounds: int,
+    final: bool,
+    shown: Sequence[UnknownKey],
 ) -> QuestionSet:
     """The questions a job asks: a waiting job's round, or its report's list.
 
@@ -243,47 +232,56 @@ def question_set(
     early list; ``analyses`` ranks the report's list. So a waiting job passes
     no analyses, and a finished one's frameworks go unread. ``answered`` and
     ``answered_links`` are the answers of the earlier rounds, which are not
-    asked again, and ``rounds`` is how many rounds the lineage took. A waiting
+    asked again. ``final`` marks a report the follow-up wrote, and ``shown``
+    is every early question the pause showed. A waiting
     job's ``model`` and ``catalog`` are its checkpoint's, and the saved answers
     are written in here, as the resumed run writes them.
     """
-    if rounds >= MAX_ANSWER_ROUNDS:
-        return QuestionSet(model, catalog, waiting, (), (), (), rounds, {}, (), ())
+    if final:
+        return QuestionSet(
+            model, catalog, False, (), (), (), True, tuple(shown), {}, (), ()
+        )
     if not waiting:
+        showed = frozenset(shown)
         return QuestionSet(
             model=model,
             catalog=catalog,
             waiting=False,
             early=(),
-            facts=fact_questions(analyses, model, catalog, answered),
+            facts=tuple(
+                replace(question, asked_before=question.key in showed)
+                for question in fact_questions(analyses, model, catalog, answered)
+            ),
             links=link_questions(catalog, model),
-            rounds=rounds,
+            final=False,
+            shown=tuple(shown),
             remaining={},
             answered_early=(),
             answered_links=(),
         )
     done = answered_keys(answered)
     held = {answer.key: answer for answer in answered}
-    before = early_questions(model, frameworks, catalog)
+    first = early_questions(model, frameworks, catalog)
     asked_links = link_questions(catalog, model)
     view = answered_model(model, answered)
     if catalog is not None:
         catalog = apply_answers(catalog, view, answered_links, answered)[0]
-    shown, remaining = _round(early_questions(view, frameworks, catalog), done, held)
+    this_round, remaining = _round(
+        early_questions(view, frameworks, catalog), done, held
+    )
     linked = {fold(link.principal): link for link in answered_links}
     return QuestionSet(
         model=view,
         catalog=catalog,
         waiting=True,
-        early=shown,
+        early=this_round,
         facts=(),
         links=link_questions(catalog, view),
-        rounds=rounds,
+        final=False,
+        shown=tuple(shown),
         remaining=remaining,
         answered_early=tuple(
-            (question, held[question.key])
-            for question in before
-            if question.key in held
+            (question, held[question.key]) for question in first if question.key in held
         ),
         answered_links=tuple(
             (question, linked[question.key])

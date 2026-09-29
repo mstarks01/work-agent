@@ -1,6 +1,7 @@
 # 52. The answer rounds end
 
-- **Status**: accepted
+- **Status**: accepted; its limit of three rounds is superseded by
+  [ADR 0054](0054-a-report-offers-one-follow-up.md)
 - **Date**: 2026-09-29
 - **Effort**: [#1289](https://github.com/mstarks01/work-agent/issues/1289)
 - **Relates to**: [ADR 0046](0046-every-open-fact-is-asked-and-code-writes-the-answer.md),

@@ -13,7 +13,7 @@ import asyncio
 import pytest
 from pydantic import ValidationError
 
-from analysis_service.answer_round import MAX_ANSWER_ROUNDS, question_set
+from analysis_service.answer_round import question_set
 from analysis_service.assertions import MAX_QUOTE_CHARS, AssertionCatalog
 from analysis_service.links import (
     LinkAnswer,
@@ -136,7 +136,8 @@ class TestOnlyAnAskedFactTakesAnAnswer:
             waiting=True,
             answered=[],
             answered_links=[],
-            rounds=0,
+            final=False,
+            shown=[],
         ).asked
 
     def unasked_kind(self):
@@ -214,7 +215,8 @@ def asked_of(catalog, *, waiting):
         waiting=waiting,
         answered=[],
         answered_links=[],
-        rounds=0,
+        final=False,
+        shown=[],
     )
 
 
@@ -247,7 +249,7 @@ class TestOneRoundHasOneAdmissionRule:
             admit(asked_of(None, waiting=True), links=[link])
 
 
-def _asked_after(answered, rounds, waiting=True):
+def _asked_after(answered, *, waiting=True, final=False, shown=()):
     checkpoint = held()
     return question_set(
         checkpoint.system_model,
@@ -257,7 +259,8 @@ def _asked_after(answered, rounds, waiting=True):
         waiting=waiting,
         answered=answered,
         answered_links=[],
-        rounds=rounds,
+        final=final,
+        shown=shown,
     )
 
 
@@ -269,52 +272,64 @@ class TestTheRoundsEnd:
     report had no end."""
 
     def test_i_do_not_know_is_not_asked_again(self):
-        first = _asked_after([], 0).early[0].key
-        again = _asked_after([FactAnswer(key=first, value="unknown")], 1)
+        first = _asked_after([]).early[0].key
+        again = _asked_after([FactAnswer(key=first, value="unknown")])
         assert first not in {question.key for question in again.early}
 
     def test_a_facet_left_out_is_asked_again(self):
         partial = FactAnswer(key=CAPACITY, facets={"rate": "yes"})
-        assert CAPACITY in {q.key for q in _asked_after([partial], 1).early}
+        assert CAPACITY in {q.key for q in _asked_after([partial]).early}
 
     def test_every_facet_answered_is_not_asked_again(self):
         facets = {"rate": "yes", "size": "unknown", "concurrency": "no", "quota": "no"}
         full = FactAnswer(key=CAPACITY, facets=facets)
-        assert CAPACITY not in {q.key for q in _asked_after([full], 1).early}
+        assert CAPACITY not in {q.key for q in _asked_after([full]).early}
 
-    def test_a_lineage_at_the_limit_asks_nothing_and_admits_nothing(self):
-        final = _asked_after([], MAX_ANSWER_ROUNDS, waiting=False)
+    def test_a_final_report_asks_nothing_and_admits_nothing(self):
+        final = _asked_after([], waiting=False, final=True)
         assert (final.early, final.facts, final.links) == ((), (), ())
-        assert final.to_json()["answer_rounds_left"] == 0
-        with pytest.raises(ValueError, match="its report is final"):
+        assert final.to_json()["final"] is True
+        with pytest.raises(ValueError, match="this report is final"):
             admit(final, facts=[FactAnswer(key=CAPACITY, value="unknown")])
 
     def test_a_submitter_who_never_knows_reaches_the_end(self):
-        """Every round answers every question "I don't know"."""
+        """Every round at the pause answers every question "I don't know"."""
         answered: list[FactAnswer] = []
-        for rounds in range(MAX_ANSWER_ROUNDS + 1):
-            asked = _asked_after(answered, rounds)
-            if not asked.rounds_left:
+        for _ in range(20):
+            asked = _asked_after(answered)
+            if not asked.early:
                 break
             given = [FactAnswer(key=q.key, value="unknown") for q in asked.early]
             answered = merged_facts(answered, given)
-        assert rounds == MAX_ANSWER_ROUNDS
         assert not asked.early
 
-    def test_the_route_counts_the_round_and_serves_what_is_left(self):
+    def test_the_pause_carries_what_it_showed_and_the_report_says_so(self):
+        asked = _asked_after([])
+        admitted = admit(asked)
+        assert set(admitted.shown) == {q.key for q in asked.early}
+
+    def test_the_route_marks_a_report_s_follow_up_and_its_report_is_final(self):
+        from tests.test_questions import TestTheRoutes
+
         client, store = catalog_client()
-        job = waiting(store)
-        body = client.get(f"/v1/jobs/{job}/questions", headers=auth()).json()
-        assert body["answer_rounds_left"] == MAX_ANSWER_ROUNDS
-        key = body["early_questions"][0]["key"]
+        waited = waiting(store)
         response = client.post(
-            f"/v1/jobs/{job}/answers",
-            json={"facts": [{"key": key, "value": "unknown"}]},
-            headers=auth(),
+            f"/v1/jobs/{waited}/answers", json={"links": []}, headers=auth()
         )
         assert response.status_code == 201, response.text
-        child = asyncio.run(store.get(response.json()["job_id"]))
-        assert child.resumption.round == 1
+        started = asyncio.run(store.get(response.json()["job_id"]))
+        assert started.resumption.follow_up is False
+
+        finished = TestTheRoutes().completed(store)
+        body = client.get(f"/v1/jobs/{finished}/questions", headers=auth()).json()
+        assert body["final"] is False
+        facts = [{"key": body["fact_questions"][0]["key"], "value": "unknown"}]
+        response = client.post(
+            f"/v1/jobs/{finished}/answers", json={"facts": facts}, headers=auth()
+        )
+        assert response.status_code == 201, response.text
+        follow_up = asyncio.run(store.get(response.json()["job_id"]))
+        assert follow_up.resumption.follow_up is True
 
 
 class TestTheBoundedRounds:
@@ -323,7 +338,7 @@ class TestTheBoundedRounds:
     def test_a_round_shows_at_most_its_size_of_each_kind_above_the_floor(self):
         from analysis_service.answer_round import EARLY_RULES, ROUND_SIZE
 
-        asked = _asked_after([], 0)
+        asked = _asked_after([])
         for kind, rule in EARLY_RULES.items():
             shown = [
                 q
@@ -335,16 +350,16 @@ class TestTheBoundedRounds:
         assert asked.early, "a control: the waiting job asks something"
 
     def test_a_saved_answer_leaves_the_round_and_is_listed_with_its_answer(self):
-        first = _asked_after([], 0).early[0]
+        first = _asked_after([]).early[0]
         answer = FactAnswer(key=first.key, value="unknown")
-        after = _asked_after([answer], 0)
+        after = _asked_after([answer])
         assert first.key not in {q.key for q in after.early}
         assert [(q.key, a) for q, a in after.answered_early] == [(first.key, answer)]
 
     def test_each_kind_stops_at_its_limit(self):
         from analysis_service.answer_round import _round
 
-        listed = _asked_after([], 0).early
+        listed = _asked_after([]).early
         held = {
             ("", "", "", f"subject {n}", "", ""): FactAnswer(
                 key=("", "", "", f"subject {n}", "", ""), value="unknown"
@@ -357,8 +372,8 @@ class TestTheBoundedRounds:
 
     def test_a_saved_round_must_answer_something_and_only_a_waiting_job_saves(self):
         with pytest.raises(ValueError, match="at least one question"):
-            admit(_asked_after([], 0), facts=[], save=True)
-        finished = _asked_after([], 0, waiting=False)
+            admit(_asked_after([]), facts=[], save=True)
+        finished = _asked_after([], waiting=False)
         answer = FactAnswer(key=CAPACITY, value="unknown")
         with pytest.raises(ValueError, match="only a job waiting"):
             admit(finished, facts=[answer], save=True)
@@ -391,17 +406,6 @@ class TestTheBoundedRounds:
             assert asyncio.run(store.get(job)).checkpoint is not None
         assert response.status_code == 201, "the rounds never ended"
         child = asyncio.run(store.get(response.json()["job_id"]))
-        assert child.resumption.round == 1
+        assert child.resumption.follow_up is False
         assert child.facts, "the saved answers reach the analysis"
-
-
-def test_a_pause_continued_with_no_answer_uses_no_round():
-    """ADR 0053: only a start that carries answers counts toward the limit."""
-    client, store = catalog_client()
-    job = waiting(store)
-    response = client.post(
-        f"/v1/jobs/{job}/answers", json={"links": [], "facts": []}, headers=auth()
-    )
-    assert response.status_code == 201, response.text
-    child = asyncio.run(store.get(response.json()["job_id"]))
-    assert child.resumption.round == 0
+        assert child.shown_early, "the report can say what the pause showed"

@@ -362,7 +362,7 @@ class TestTheResumedRunWithoutACatalog:
             frameworks=sample_selection(),
             facts=[answer],
             resumption=Resumption(
-                round=1,
+                follow_up=False,
                 parent_id="p",
                 checkpoint=Checkpoint(system_model=valid_model(), assertions=None),
             ),
@@ -475,7 +475,9 @@ def resume(checkpoint, facts=(), earlier=(), given=(DESCRIPTION,)):
         frameworks=sample_selection(),
         links=links,
         facts=answered,
-        resumption=Resumption(round=1, parent_id="job-parent", checkpoint=checkpoint),
+        resumption=Resumption(
+            follow_up=False, parent_id="job-parent", checkpoint=checkpoint
+        ),
     )
     job.transition("running")
     pipeline, _ = scripted_pipeline({}, entry=graph.ENTRY_RESUME)
@@ -588,7 +590,9 @@ def resume_links(checkpoint, links, earlier=()):
         frameworks=sample_selection(),
         links=merged,
         facts=facts,
-        resumption=Resumption(round=1, parent_id="job-parent", checkpoint=checkpoint),
+        resumption=Resumption(
+            follow_up=False, parent_id="job-parent", checkpoint=checkpoint
+        ),
     )
     job.transition("running")
     pipeline, _ = scripted_pipeline({}, entry=graph.ENTRY_RESUME)
@@ -767,7 +771,8 @@ class TestTheAdmissionCheck:
             waiting=True,
             answered=[],
             answered_links=[],
-            rounds=0,
+            final=False,
+            shown=[],
         )
         link = LinkAnswer(principal="customer accounts", element="process:web-app")
         with pytest.raises(ValueError, match="asked no question about"):
@@ -947,3 +952,26 @@ class TestTheControlForm:
     def test_each_fact_takes_its_form(self, key, form):
         assert answer_form(key, valid_model(), None) == form
         assert bool(answer_suggestions(key)) == (form == "control")
+
+
+def test_a_report_question_the_pause_showed_is_marked_asked_before(report):
+    """The report labels a question the pause showed and got no answer to."""
+    catalog = report.assertions.catalog if report.assertions else None
+    listed = ask(report)
+    if not listed:
+        pytest.skip("this report asks nothing")
+    first = listed[0].key
+    asked = question_set(
+        report.system_model,
+        catalog,
+        {},
+        report.analyses,
+        waiting=False,
+        answered=[],
+        answered_links=[],
+        final=False,
+        shown=[first],
+    )
+    marks = {question.key: question.asked_before for question in asked.facts}
+    assert marks[first] is True
+    assert not any(marks[key] for key in marks if key != first)

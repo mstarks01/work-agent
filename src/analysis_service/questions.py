@@ -371,12 +371,16 @@ class FactQuestion:
     #: covered once every question that names it has an answer, whichever
     #: questions those are.
     findings: tuple[str, ...]
+    #: True where the pause showed this question and got no answer, so a page
+    #: can say it was skipped before the analysis.
+    asked_before: bool = False
 
     def to_json(self) -> dict[str, object]:
         return {
             "key": list(self.key),
             "kind": self.kind,
             "basis": self.basis,
+            "asked_before": self.asked_before,
             "label": self.label,
             "cited_by": self.cited_by,
             "covered_so_far": self.covered_so_far,
