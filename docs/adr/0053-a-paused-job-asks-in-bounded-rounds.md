@@ -32,7 +32,7 @@ analysis" is available in every round.
 
 | Kind | Floor | Limit | Why |
 | --- | --- | --- | --- |
-| Field | 1 | 30 | Under 1, a question is expected to change less than one finding. The top 30 hold 99% of a STRIDE list's score at the floor (E20). |
+| Field | 1 | 30 | The score is a ranking heuristic, the prior's citation rate times one plus the candidates, and 1 is where the ranking cuts. No measurement says how many findings an answer changes, so the floor is not a count of findings. The top 30 hold 99% of a STRIDE list's ranking score at the floor (E20), which is not a share of the report's value. |
 | Capability | 2 | 30 | A capability's score counts the units it could settle, not findings, so it takes its own floor. Under 2, it settles one unit. At ASVS level 2 the floor leaves 28 of 51. |
 
 Two limits, not one: capability questions come first, so one shared limit
