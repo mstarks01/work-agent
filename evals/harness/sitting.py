@@ -49,6 +49,7 @@ from __future__ import annotations
 
 import hashlib
 import os
+import tempfile
 from collections import Counter
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
@@ -246,15 +247,22 @@ def save_draft(root: Path, login: str, draft: Draft) -> Path:
 
     Written beside the target and moved into place, because a half-written
     draft would refuse its own case and the file holds an hour of somebody's
-    attention. The store is one reader's own, so it is created readable by
-    them alone.
+    attention. Each save writes a scratch file of its own, because two tabs
+    that saved one draft through one scratch name moved it from under each
+    other. The store is one reader's own, so it is created readable by them
+    alone; ``mkstemp`` creates the scratch file that way.
     """
     path = draft_path(root, login, draft.case)
     path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
-    scratch = path.with_name(f"{path.name}.part")
-    scratch.write_text(draft.model_dump_json(indent=2) + "\n", encoding="utf-8")
-    scratch.chmod(0o600)
-    os.replace(scratch, path)
+    handle, name = tempfile.mkstemp(dir=path.parent, prefix=path.name, suffix=".part")
+    scratch = Path(name)
+    try:
+        with os.fdopen(handle, "w", encoding="utf-8") as file:
+            file.write(draft.model_dump_json(indent=2) + "\n")
+        os.replace(scratch, path)
+    except BaseException:
+        scratch.unlink(missing_ok=True)
+        raise
     return path
 
 
@@ -277,13 +285,13 @@ def load_draft(root: Path, login: str, case_id: str) -> Draft | None:
     try:
         draft = Draft.model_validate_json(text)
     except ValidationError as exc:
-        raise DraftError(f"{path}: {_first_problem(exc)}") from exc
+        raise DraftError(f"{path}: {first_problem(exc)}") from exc
     if draft.case != case_id:
         raise DraftError(f"{path}: this draft names the case {draft.case!r}")
     return draft
 
 
-def _first_problem(error: ValidationError) -> str:
+def first_problem(error: ValidationError) -> str:
     """One problem out of a validation report, for a reader to act on.
 
     The whole report names every field at once and reads as a stack trace.

@@ -977,6 +977,33 @@ def push_remote(root: Path, author: str) -> str:
     return f"https://github.com/{author}/{name}.git"
 
 
+def push_commit(
+    root: Path, remote: str, branch: str, title: str, files: Mapping[str, bytes]
+) -> None:
+    """Commit ``files`` on :data:`BASE_REF` and push the commit as ``branch``.
+
+    **The one packaging step of every contribution.** The commit is made in a
+    throwaway worktree, so the contributor's own checkout is never switched,
+    and on a detached HEAD, so no local branch is left behind. A local branch
+    that a failed push left made every retry that day refuse to create it.
+    """
+    with TemporaryDirectory(prefix="submit-") as scratch:
+        worktree = Path(scratch) / "worktree"
+        run_command(
+            ["git", "worktree", "add", "--detach", str(worktree), BASE_REF], root
+        )
+        try:
+            for rel, data in files.items():
+                target = worktree / rel
+                target.parent.mkdir(parents=True, exist_ok=True)
+                target.write_bytes(data)
+            run_command(["git", "add", "--", *files], worktree)
+            run_command(["git", "commit", "-m", title], worktree)
+            run_command(["git", "push", remote, f"HEAD:refs/heads/{branch}"], worktree)
+        finally:
+            run_command(["git", "worktree", "remove", "--force", str(worktree)], root)
+
+
 def pr_head(remote: str, author: str, branch: str) -> str:
     return branch if remote == "origin" else f"{author}:{branch}"
 
@@ -999,27 +1026,12 @@ def open_pr(root: Path, kind_name: str, author: str) -> str:
         "This PR was opened by `submit`; the checked facts live in the files"
         " the code reads, never in this body."
     )
-    with TemporaryDirectory(prefix="submit-") as scratch:
-        worktree = Path(scratch) / "worktree"
-        run_command(
-            ["git", "worktree", "add", "--detach", str(worktree), BASE_REF], root
-        )
-        try:
-            staged = []
-            for rel in kind.allowlist(root, author):
-                source = root / rel
-                if not source.exists():
-                    continue
-                target = worktree / rel
-                target.parent.mkdir(parents=True, exist_ok=True)
-                target.write_text(source.read_text(encoding="utf-8"), encoding="utf-8")
-                staged.append(rel)
-            run_command(["git", "checkout", "-b", branch], worktree)
-            run_command(["git", "add", "--", *staged], worktree)
-            run_command(["git", "commit", "-m", title], worktree)
-            run_command(["git", "push", remote, f"HEAD:refs/heads/{branch}"], worktree)
-        finally:
-            run_command(["git", "worktree", "remove", "--force", str(worktree)], root)
+    files = {
+        rel: (root / rel).read_bytes()
+        for rel in kind.allowlist(root, author)
+        if (root / rel).exists()
+    }
+    push_commit(root, remote, branch, title, files)
     return run_command(
         [
             "gh",

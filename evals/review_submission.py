@@ -17,7 +17,6 @@ from __future__ import annotations
 from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
-from tempfile import TemporaryDirectory
 from typing import Literal
 from urllib.parse import quote, urlencode
 
@@ -473,35 +472,9 @@ def open_pull_request(root: Path, envelope: envelopes.Envelope) -> str:
         submit_spine.run_command(["git", "fetch", "origin"], root)
         remote = submit_spine.push_remote(root, author)
         branch = submit_spine.branch_name(root, "review", author, remote)
-        with TemporaryDirectory(prefix="review-submit-") as scratch:
-            worktree = Path(scratch) / "worktree"
-            submit_spine.run_command(
-                [
-                    "git",
-                    "worktree",
-                    "add",
-                    "--detach",
-                    str(worktree),
-                    submit_spine.BASE_REF,
-                ],
-                root,
-            )
-            try:
-                target = worktree / rel
-                target.parent.mkdir(parents=True, exist_ok=True)
-                target.write_bytes(serialize(envelope))
-                submit_spine.run_command(["git", "checkout", "-b", branch], worktree)
-                submit_spine.run_command(["git", "add", "--", rel], worktree)
-                submit_spine.run_command(
-                    ["git", "commit", "-m", _title(envelope)], worktree
-                )
-                submit_spine.run_command(
-                    ["git", "push", remote, f"HEAD:refs/heads/{branch}"], worktree
-                )
-            finally:
-                submit_spine.run_command(
-                    ["git", "worktree", "remove", "--force", str(worktree)], root
-                )
+        submit_spine.push_commit(
+            root, remote, branch, _title(envelope), {rel: serialize(envelope)}
+        )
         return submit_spine.run_command(
             [
                 "gh",

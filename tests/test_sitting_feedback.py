@@ -6,6 +6,7 @@ import json
 import shutil
 from pathlib import Path
 
+import pytest
 from fastapi.testclient import TestClient
 
 from evals import review_submission as review_submissions
@@ -478,3 +479,22 @@ def test_the_way_out_sits_above_the_file_preview():
     assert 'hide("filePreview");' in script.split('$("submit").addEventListener', 1)[1]
     assert "$(steps).scrollIntoView" in script
     assert page.index('id="uploadSteps"') < page.index('id="filePreview"')
+
+
+@pytest.mark.parametrize("route", ["/api/contribute", "/api/contribution-preview"])
+def test_a_hand_edited_draft_is_refused_by_name(tmp_path: Path, monkeypatch, route):
+    """A reader owns the draft file, and a line break typed into it made both
+    routes answer 500 (run 11). The envelope's rules decide, as a 409."""
+    tree = tree_for(tmp_path)
+    client, session = client_for(tree)
+    record_one(client)
+    monkeypatch.setattr(sitting.submit_spine, "gh_login", lambda root: "ada")
+    path = sittings.draft_path(session.drafts, session.submitted_by, CASE)
+    raw = json.loads(path.read_text(encoding="utf-8"))
+    raw["own_list"] = ["first line # a heading"]
+    path.write_text(json.dumps(raw), encoding="utf-8")
+
+    response = client.post(route, json={"reviewer": "anonymous"})
+
+    assert response.status_code == 409
+    assert CASE in response.json()["detail"]

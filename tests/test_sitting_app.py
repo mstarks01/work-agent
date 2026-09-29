@@ -1745,6 +1745,21 @@ class TestTheDraftStore:
         assert path.stat().st_mode & 0o777 == 0o600
         assert (root / "ada").stat().st_mode & 0o777 == 0o700
 
+    def test_two_tabs_saving_one_draft_lose_no_save(self, tmp_path):
+        """One scratch name for every save lost 19 of 1,500 saves to a 409
+        when two tabs saved at once (run 11)."""
+        from concurrent.futures import ThreadPoolExecutor
+
+        root = self.store(tmp_path)
+
+        def save(n):
+            sittings.save_draft(root, "ada", sittings.Draft(case=CASE, notes=str(n)))
+
+        with ThreadPoolExecutor(max_workers=8) as pool:
+            list(pool.map(save, range(400)))
+        assert sittings.load_draft(root, "ada", CASE) is not None
+        assert [path.name for path in (root / "ada").iterdir()] == [f"{CASE}.json"]
+
     def test_a_field_the_shape_does_not_name_is_refused(self, tmp_path):
         root = self.store(tmp_path)
         path = sittings.draft_path(root, "ada", CASE)
