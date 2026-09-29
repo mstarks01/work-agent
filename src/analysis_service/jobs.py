@@ -38,7 +38,7 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 from analysis_service.assertions import AssertionRecord
 from analysis_service.budgets import BudgetPolicy, measured_tokens, spent_tokens
 from analysis_service.certification import CertifyResult
-from analysis_service.claims import FrameworkAnalysis
+from analysis_service.claims import FrameworkAnalysis, UnknownKey
 from analysis_service.execution import GraphFailed
 from analysis_service.links import MAX_LINK_ANSWERS, LinkAnswer
 from analysis_service.questions import MAX_FACT_ANSWERS, FactAnswer
@@ -146,11 +146,9 @@ class Resumption(BaseModel):
 
     parent_id: str
     checkpoint: Checkpoint
-    #: How many rounds of answers the lineage took, this job's own included,
-    #: as :meth:`~analysis_service.answer_round.AdmittedRound.round_after`
-    #: counts them. :class:`~analysis_service.answer_round.QuestionSet` reads
-    #: it to end them. A paused job that continued with no answers took none.
-    round: int = Field(ge=0)
+    #: True where the job resumes from a finished report's answers: the one
+    #: follow-up. Its own report is final (ADR 0054).
+    follow_up: bool
     #: The parent's certification verdict. The resumed report rests on the
     #: model and catalog the parent's run built, so its own verdict is combined
     #: with this one.
@@ -188,6 +186,11 @@ class JobRecord(BaseModel):
     # job and also composed into its answers Source. See
     # :mod:`analysis_service.questions`.
     facts: list[FactAnswer] = Field(default_factory=list, max_length=MAX_FACT_ANSWERS)
+    # Every early question the pause showed, answered or not. The report reads
+    # it to say a follow-up question was skipped before the analysis.
+    shown_early: list[UnknownKey] = Field(
+        default_factory=list, max_length=MAX_FACT_ANSWERS
+    )
     # Set on a job resumed from a finished one: its run starts at ``prepare``
     # from these, and runs no extraction and no assertion pass.
     resumption: Resumption | None = None
@@ -235,6 +238,7 @@ class JobRecord(BaseModel):
         system_name: str | None = None,
         links: Sequence[LinkAnswer] = (),
         facts: Sequence[FactAnswer] = (),
+        shown_early: Sequence[UnknownKey] = (),
         resumption: Resumption | None = None,
         ask_questions: bool = False,
         reserved_tokens: int = 0,
@@ -249,6 +253,7 @@ class JobRecord(BaseModel):
             system_name=system_name,
             links=list(links),
             facts=list(facts),
+            shown_early=list(shown_early),
             resumption=resumption,
             ask_questions=ask_questions,
             created_at=now,
@@ -449,6 +454,7 @@ class JobStore(Protocol):
         subject: str,
         links: Sequence[LinkAnswer],
         facts: Sequence[FactAnswer],
+        shown: Sequence[UnknownKey],
     ) -> bool: ...
 
 
@@ -640,10 +646,12 @@ class InMemoryJobStore:
         subject: str,
         links: Sequence[LinkAnswer],
         facts: Sequence[FactAnswer],
+        shown: Sequence[UnknownKey],
     ) -> bool:
         """Keep a saved round's answers on a job that still waits for them.
 
-        Only the answers change, so the checkpoint an envelope read leaves
+        ``shown`` is every early question the pause has shown. Only these
+        change, so the checkpoint an envelope read leaves
         behind is kept. False where the job is not the subject's or no longer
         waits, and nothing is written.
         """
@@ -656,6 +664,7 @@ class InMemoryJobStore:
             return False
         record.links = list(links)
         record.facts = list(facts)
+        record.shown_early = list(shown)
         record.updated_at = datetime.now(UTC)
         return True
 

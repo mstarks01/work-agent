@@ -343,29 +343,35 @@ The app can ask you questions before the analysis, and after the report.
   When no question is left, the analysis starts by itself. The analysis then
   starts from what was already read, so nothing is read again, and it reads
   your answers.
-- **After the report.** Where your install builds an assertion catalog, the
-  report page lists the group questions under **Which element is each of
-  these?**. Choose answers and click **Run the
-  analysis again with these answers**. The app shows the new run's progress
-  and then its report.
+- **After the report: one optional follow-up.** The report may offer a
+  closed **Optional follow-up** section. It says how many questions it asks
+  and how many conditional findings wait on them. You do not need it: the
+  report is complete without it. Open it, answer what you can, and click
+  **Run the follow-up with these answers**. The analysis runs once more, and
+  the app shows its progress and then its report. That report is final: it
+  asks no more questions, and it lists the facts still open under its
+  conditional findings. Where your install builds an assertion catalog, the
+  follow-up also lists the group questions under **Which element is each of
+  these?**.
 
 - **The report's open facts.** Most findings are conditional: they rest on
   facts your description never states, such as how a flow is protected. Under
   **What would settle the conditional findings?** the report lists every such
   fact, the most useful first, with how many findings have every question
-  answered once you answer down to it. A question with parts asks only the
+  answered once you answer down to it. A question marked "you skipped this
+  before the analysis" was shown at the pause and left blank. One marked "new
+  from the analysis" was never asked before, because the analysis found
+  something that depends on it. The reviewer's own questions come last,
+  because they can change when the analysis runs again. A question with parts asks only the
   parts listed, which may not be every fact a finding needs. Choose "I don't know" where nobody knows: the
   fact stays open. For a control such as authentication or encryption, first
   choose "There is none", "I don't know" or "A mechanism". For a mechanism, the
   text box suggests common ones as you type, and you can add what matters,
   such as how often a key is rotated. The resumed run decides whether each answer
   settles its finding. Answer as far as you like, by choosing a value or typing
-  one line, and run the analysis again. This works on every install, with or
-  without an assertion catalog. You can run the analysis with answers three
-  times in all, and the page says how many times remain. Saved rounds before
-  the analysis do not count. A
-  later round does not ask a fact you already answered, "I don't know"
-  included.
+  one line, and run the follow-up. This works on every install, with or
+  without an assertion catalog. A later round does not ask a fact you
+  already answered, "I don't know" included.
 
 An answer settles its fact, even where your description said otherwise. A run
 that waits for your answers is kept in the app's memory, like every other

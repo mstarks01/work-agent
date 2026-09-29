@@ -36,9 +36,8 @@
   // How many of the reviewer's open facts used the fixed list of questions,
   // and how many it wrote in its own words, counted server-side.
   const FALLBACK = JSON.parse(document.getElementById("question_fallback").textContent);
-  // How many more rounds of answers this report's lineage takes, counted
-  // server-side. At zero the service asks nothing and the report is final.
-  const ROUNDS_LEFT = JSON.parse(document.getElementById("answer_rounds_left").textContent);
+  // True for a report the follow-up wrote: it asks nothing more (ADR 0054).
+  const FINAL = JSON.parse(document.getElementById("final").textContent);
   const $ = (id) => document.getElementById(id);
   const el = (tag, cls, text) => {
     const n = document.createElement(tag);
@@ -713,24 +712,35 @@
   // Answers go to /answer/{run}, which starts a run from this report's model
   // and catalog; code writes every answer, so no model reads one. Every label
   // is untrusted and lands as text.
-  if (!ROUNDS_LEFT) {
+  if (FINAL) {
     $("links").append(el("div", "meta",
-      "This report is final. Its analysis has taken the most rounds of answers " +
-      "one analysis takes, so it asks no more questions."));
+      "This report is final. Its one follow-up has run, so it asks no more " +
+      "questions. The facts still open are listed under the conditional findings."));
   }
   if (LINK_QUESTIONS.length || FACT_QUESTIONS.length) {
     const names = {};
     [...R.system_model.external_entities, ...R.system_model.processes,
      ...R.system_model.data_stores].forEach(e => { names[e.id] = e.name; });
-    const box = $("links");
+    // The follow-up is optional and starts closed: the report is complete
+    // without it, and answering runs the analysis once more.
+    const box = el("details", "followup");
+    const waiting = new Set(FACT_QUESTIONS.flatMap(q => q.findings)).size;
+    box.append(el("summary", null,
+      `Optional follow-up: ${FACT_QUESTIONS.length + LINK_QUESTIONS.length} question(s)` +
+      (waiting ? ` about facts that ${waiting} conditional finding(s) wait on` : "") +
+      ". Answer what you can, and the analysis runs once more, which takes a " +
+      "few minutes. After that, the report is final."));
+    $("links").append(box);
     const option = (label, value) => Object.assign(el("option", null, label), { value });
     const linkSelects = [];
     // One reader per fact question: `read` is its answer as the service takes
     // it, or null; `known` is whether that answer says more than "I don't know".
     const factAnswers = [];
-    box.append(el("div", "meta",
-      `You can answer ${ROUNDS_LEFT} more time(s). Each answer runs the analysis ` +
-      "again. A fact you answered, \"I don't know\" included, is not asked again."));
+    // Why a question is here: skipped before the analysis, or new from it.
+    // The reviewer's own questions are headed apart below.
+    const why = q => q.asked_before
+      ? " (you skipped this before the analysis)"
+      : q.basis === "evidence" ? " (new from the analysis)" : "";
 
     if (LINK_QUESTIONS.length) {
       box.append(el("h2", null, "Which element is each of these?"));
@@ -820,7 +830,7 @@
             // it is covered only once every facet says more than "I don't know".
             known: () => selects.every(s => s.value && s.value !== DONT_KNOW),
           });
-          row.append(el("b", null, q.label),
+          row.append(el("b", null, q.label), why(q),
             ` \u2014 ${q.cited_by} finding(s) wait on it; answering down to here covers ${q.covered_so_far}`,
             list);
           into.append(row);
@@ -875,7 +885,7 @@
         }
         input.dataset.key = JSON.stringify(q.key);
         input.addEventListener(q.choices.length ? "change" : "input", recount);
-        row.append(el("b", null, q.label),
+        row.append(el("b", null, q.label), why(q),
           ` \u2014 ${q.cited_by} finding(s) wait on it; answering down to here covers ${q.covered_so_far} `,
           ...beside);
         into.append(row);
@@ -889,7 +899,7 @@
       recount();
     }
 
-    const again = el("button", null, "Run the analysis again with these answers");
+    const again = el("button", null, "Run the follow-up with these answers");
     const note = el("div", "meta");
     again.addEventListener("click", async () => {
       const links = linkSelects

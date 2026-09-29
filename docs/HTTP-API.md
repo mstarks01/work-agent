@@ -40,7 +40,7 @@ logged, never returned.
 | `GET` | `/v1/jobs/{id}/events` | The same progression as Server-Sent Events; resumable via `Last-Event-ID`. |
 | `GET` | `/v1/jobs/{id}/report` | The full [report](Report-Schema.md) once completed; `409` before, and `409` if the report is withheld (below). |
 | `POST` | `/v1/jobs/{id}/answers` | Answer the questions of a completed job or a job in `awaiting-answers`. Starts a **new** job that resumes from this one's model and catalog; `201` with its `job_id`. With `"save": true`, a waiting job keeps the round and answers `200` with its own `job_id`, unless nothing is left to ask. |
-| `GET` | `/v1/jobs/{id}/questions` | What the job asks you, as `{"job_id", "link_questions", "fact_questions", "early_questions", "fallback", "answer_rounds_left", "early_remaining", "answered_early", "answered_links"}`: a finished report's questions, or a waiting job's link and early questions. Derived from the report when you ask, under the report's own rules: `409` before completion and `409` when the report is withheld. |
+| `GET` | `/v1/jobs/{id}/questions` | What the job asks you, as `{"job_id", "link_questions", "fact_questions", "early_questions", "fallback", "final", "early_remaining", "answered_early", "answered_links"}`: a finished report's questions, or a waiting job's link and early questions. Derived from the report when you ask, under the report's own rules: `409` before completion and `409` when the report is withheld. |
 | `GET` | `/healthz` | Unauthenticated liveness probe. |
 
 Errors are RFC 9457 `application/problem+json`.
@@ -190,9 +190,7 @@ round. A saved round must answer at least one question. When the saved
 answers leave nothing to ask, the analysis starts, and the response is the
 new job's `201`. `answered_early` and `answered_links` list each saved answer
 with its question, and you can send a new answer to any of them. A question
-with facets comes back while a facet has no answer. A saved round does not
-count toward the three rounds of answers.
-
+with facets comes back while a facet has no answer. 
 **Limit:** a waiting job is held in the service's memory. A restart of the
 service loses it, with its extraction; submit it again.
 
@@ -318,21 +316,20 @@ answer about a principal replaces the finished job's earlier answer about the
 same principal. A link answer may name only a principal that the job asked
 about, or one that an earlier round answered. The finished job's report is unchanged.
 
-**The rounds end.** A job lineage takes at most three rounds of answers: the
-answers that start the analysis and those after each report, counted
-together. A saved round at the pause does not count.
-`answer_rounds_left` says how many rounds remain. A job with none left asks
-no questions, and its report is final. A later round does not ask a fact that
-an earlier round answered, and an "I don't know" answer counts. A question
-with facets is asked again only for the facets that no round answered. You
-can still send a new answer to a fact that an earlier round answered, to
-change it.
+**A report offers one follow-up.** A report's questions are its follow-up.
+Answer them, and the analysis runs once more. The report that run writes is
+final: `final` is `true`, it asks no questions, and an answer to it is refused
+with `400`. A later round does not ask a fact that an earlier round answered,
+and an "I don't know" answer counts. A question with facets is asked again
+only for the facets that no round answered. You can still send a new answer
+to a fact that an earlier round answered, to change it. Each fact question
+carries `asked_before`: `true` where the pause showed it and got no answer.
 
 | Status | Cause |
 | --- | --- |
 | `400` | `links` is sent and this deployment builds no assertion catalog; two answers name the same principal or the same fact; a link answer names a principal the job did not ask about; a fact answer names a fact the job did not ask, or a value the fact cannot take, or a line longer than 1,000 characters; or the answers would leave a capability present while an ancestor capability is absent. |
 | `404` | The job is not yours, or does not exist. |
-| `400` | `links` and `facts` are both empty and the job is not waiting on answers. Empty means "continue without answers". Or the job's lineage took three rounds of answers already. |
+| `400` | `links` and `facts` are both empty and the job is not waiting on answers. Empty means "continue without answers". Or the job's report is final: its follow-up has run. |
 | `409` | The job is neither completed nor waiting on answers, its report is withheld, or its report carries no catalog. |
 | `422` | An entry of `links` or `facts` is malformed, or a list holds more than its limit: 50 links, 200 facts. |
 

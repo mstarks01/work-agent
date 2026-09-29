@@ -183,7 +183,8 @@ def replay(
             waiting=True,
             answered=answered,
             answered_links=[],
-            rounds=0,
+            final=False,
+            shown=[],
         )
         if asked.done:
             break

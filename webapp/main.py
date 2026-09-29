@@ -133,6 +133,7 @@ from analysis_service import (
     Source,
 )
 from analysis_service.answer_round import QuestionSet, question_set
+from analysis_service.claims import UnknownKey
 from analysis_service.deployment import Deployment
 from analysis_service.early_questions import EarlyQuestion
 from analysis_service.frameworks import package_for
@@ -219,8 +220,10 @@ class Run:
     links: list[LinkAnswer] = field(default_factory=list)
     facts: list[FactAnswer] = field(default_factory=list)
     checkpoint: Checkpoint | None = None
-    #: How many rounds of answers the run's lineage took.
-    rounds: int = 0
+    #: True for a run the report's follow-up started: its report is final.
+    final: bool = False
+    #: Every early question the pause showed.
+    shown: list[UnknownKey] = field(default_factory=list)
     #: True once a submitter's answers started a run from this one.
     answered: bool = False
 
@@ -238,7 +241,8 @@ class Run:
             self.report,
             answered=self.facts,
             answered_links=self.links,
-            rounds=self.rounds,
+            final=self.final,
+            shown=self.shown,
         )
 
 
@@ -426,12 +430,14 @@ def render_report(
     *,
     answered: Sequence[FactAnswer],
     answered_links: Sequence[LinkAnswer],
-    rounds: int,
+    final: bool,
+    shown: Sequence[UnknownKey],
 ) -> RenderedPage:
     """``report_view.html``, carrying this run's report.
 
-    ``answered`` and ``rounds`` are the run's fact answers and how many rounds
-    of answers its lineage took, which decide what the page still asks.
+    ``answered``, ``answered_links``, ``final`` and ``shown`` are the run's
+    answers, whether a follow-up wrote its report, and what the pause showed,
+    which decide what the page still asks and how it labels each question.
 
     The template is a self-contained renderer for the report schema — no build
     step, no framework, its own inline CSS and JS. This fills its one payload
@@ -456,7 +462,8 @@ def render_report(
         waiting=False,
         answered=answered,
         answered_links=answered_links,
-        rounds=rounds,
+        final=final,
+        shown=shown,
     ).to_json()
     return render(
         VIEWER.read_text(encoding="utf-8"),
@@ -470,7 +477,7 @@ def render_report(
         fact_questions=script_json(asked["fact_questions"]),
         question_fallback=script_json(question_fallback(report.analyses).to_json()),
         link_questions=script_json(asked["link_questions"]),
-        answer_rounds_left=script_json(asked["answer_rounds_left"]),
+        final=script_json(asked["final"]),
     )
 
 
@@ -638,6 +645,7 @@ def create_app(
             # A saved round runs no model: the answers go onto the paused run,
             # and the next round is read off the model with them in.
             parent.links, parent.facts = admitted.links, admitted.facts
+            parent.shown = list(admitted.shown)
             following = parent.questions()
             if not following.done:
                 return JSONResponse(paused_payload(parent, following))
@@ -655,7 +663,8 @@ def create_app(
         parent.answered = True
         run.engine, run.sources = parent.engine, parent.sources
         run.links, run.facts = admitted.links, admitted.facts
-        run.rounds = admitted.round_after(parent.rounds)
+        run.final = parent.report is not None
+        run.shown = list(admitted.shown)
         start = partial(
             parent.engine.resume,
             parent.sources,
@@ -665,7 +674,7 @@ def create_app(
             report=parent.report,
             earlier_links=parent.links,
             earlier_facts=parent.facts,
-            rounds=parent.rounds,
+            final=parent.final,
             system_name="Your system",
         )
         run.task = asyncio.create_task(_drive(analyses, run, start))
@@ -692,7 +701,8 @@ def create_app(
                 run.report,
                 answered=run.facts,
                 answered_links=run.links,
-                rounds=run.rounds,
+                final=run.final,
+                shown=run.shown,
             )
         )
 
@@ -1131,11 +1141,13 @@ _FORM_PAGE = (
   <h2>Your system model is ready. The threat analysis has not started.</h2>
   <p class="sub">The service read your description, built a model of your system
   and checked it. It stopped before the threat analysis so that you can add
-  facts your description does not state. The questions come a few at a time,
+  facts your description does not state. These rounds are free: no analysis
+  runs until you start it. The questions come a few at a time,
   the most useful first. Answer what you can and leave the rest blank. Choose
   <b>Save and show more</b> for the next questions, or <b>Start the
   analysis</b> at any time. When no question is left, the analysis starts by
-  itself. The analysis reads your answers.</p>
+  itself. The analysis reads your answers. After it, the report may offer one
+  optional follow-up.</p>
   <div id="questions"></div>
   <details id="earlier" hidden></details>
   <p><button type="button" id="save">Save and show more</button>
@@ -1149,7 +1161,16 @@ _FORM_PAGE = (
 #: The question toggle. Every install can pause: one with no catalog asks its
 #: early questions and no link question.
 _QUESTIONS_FIELD = """<p><label><input type="checkbox" id="ask" name="ask">
-    Ask me questions before the analysis runs, and wait for my answers</label></p>"""
+    Ask me questions before the analysis runs, and wait for my answers</label></p>
+<ol class="sub">
+  <li><b>Facts.</b> With the box ticked, the app asks what your description
+  leaves out, a few questions at a time. These rounds are free: no analysis runs until you
+  start it.</li>
+  <li><b>Analysis.</b> The threat analysis runs once, in a few minutes.</li>
+  <li><b>Follow-up, optional.</b> The report may ask about facts its findings
+  depend on. Answering runs the analysis once more, and that report is
+  final.</li>
+</ol>"""
 
 _DIAGNOSTIC_PAGE = (
     """<!doctype html>
