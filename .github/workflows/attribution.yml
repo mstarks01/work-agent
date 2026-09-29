@@ -28,7 +28,9 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
-      # The body reaches the script through the environment, never through the
+      # The base branch's copy of the script, never the pull request's: a pull
+      # request that edited the script would otherwise pass its own check. The
+      # body reaches the script through the environment, never through the
       # command line, because a pull request author writes it.
       - name: Pull request commits and body
         if: github.event_name == 'pull_request'
@@ -37,8 +39,11 @@ jobs:
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
           PR_BODY: ${{ github.event.pull_request.body }}
         run: |
-          .githooks/check-attribution "$BASE_SHA..$HEAD_SHA"
-          printf '%s' "$PR_BODY" | .githooks/check-attribution --text
+          check="$RUNNER_TEMP/check-attribution"
+          git show "$BASE_SHA:.githooks/check-attribution" > "$check"
+          chmod +x "$check"
+          "$check" "$BASE_SHA..$HEAD_SHA"
+          printf '%s' "$PR_BODY" | "$check" --text
 
       - name: Pushed commits
         if: github.event_name == 'push'
@@ -47,9 +52,14 @@ jobs:
           AFTER: ${{ github.event.after }}
         # A new branch, or a forced push whose old tip this clone does not
         # hold, has no range to read, so the whole history of the tip is read.
+        # The old tip's copy of the script reads the range where it exists, so
+        # a push that edited the script is not checked by its own edit.
         run: |
+          check="$RUNNER_TEMP/check-attribution"
           if git cat-file -e "$BEFORE^{commit}" 2>/dev/null; then
-            .githooks/check-attribution "$BEFORE..$AFTER"
+            git show "$BEFORE:.githooks/check-attribution" > "$check"
+            chmod +x "$check"
+            "$check" "$BEFORE..$AFTER"
           else
             .githooks/check-attribution "$AFTER"
           fi

@@ -5,23 +5,41 @@
 #
 # The owner's rule: work in this repository names no AI as its author, its
 # co-author or its source, in any form. The pre-push hook runs this over the
-# commits being pushed, and .github/workflows/attribution.yml runs it over a
-# pull request's commits and body and over every push to main.
+# commits being pushed, and .github/workflows/attribution.yml runs the base
+# branch's copy of it over a pull request's commits and body and over every
+# push to main.
 #
 #     check-attribution <git log range arguments>   e.g. origin/main..HEAD
 #     check-attribution --text                      reads standard input
 set -euo pipefail
+export LC_ALL=C.UTF-8
 
 names='claude|anthropic|copilot|chatgpt|openai|gemini|cursor|codeium|devin'
-pattern="co-authored-by:.*(${names})|(generated|written|created|authored) (with|by) \[?(${names})|claude-session:|claude\.ai/code/session|@anthropic\.com|@openai\.com"
+# An author or committer name is a person's name too, so it is read against
+# the products only: "cursor" and "devin" are ordinary words and names.
+agents='claude|anthropic|copilot|chatgpt|openai|gemini|codeium'
+pattern="co-authored-by:.*(${names})|(generated|written|created|authored) (with|by|using) \[?(${names})|claude-session:|claude\.ai/code/session|@anthropic\.com|@openai\.com|(^|	)(author|committer) .*(${agents})"
+
+# Cyrillic and Greek letters that look like Latin ones, read as the Latin
+# letter, so "Сlaude" with a Cyrillic С reads as "Claude".
+fold() {
+    sed 'y/АВЕКМНОРСТХаеорсухіјѕӏΑΒΕΗΙΚΜΝΟΡΤΧΥαεικνορτυχ/ABEKMHOPCTXaeopcyxijslABEHIKMNOPTXYaeiknoptux/'
+}
 
 if [ "${1:-}" = "--text" ]; then
-    found=$(grep -inE "$pattern" || true)
+    text=$(cat)
+    # A trailer folded over two lines is read as the one line git reads. Git
+    # reads the first paragraph as a subject, so the text gets one first.
+    trailers=$(printf 'subject\n\n%s\n' "$text" | git interpret-trailers --parse)
+    found=$(printf '%s\n%s\n' "$text" "$trailers" | fold | grep -inE "$pattern" || true)
 else
     # Read first and fail on a range git cannot read: inside a pipe, a failed
     # git log would leave nothing to search, and the check would pass.
-    log=$(git log --format='commit %h%nauthor %an <%ae>%ncommitter %cn <%ce>%n%B' "$@")
-    found=$(printf '%s\n' "$log" | grep -iE "^commit |$pattern" | grep -iE -B1 "$pattern" || true)
+    log=$(git log --format='commit %h%nauthor %an <%ae>%ncommitter %cn <%ce>%n%B%n%(trailers:unfold=true)' "$@")
+    # Each line carries its commit, so a finding names where it is.
+    found=$(printf '%s\n' "$log" | fold \
+        | awk '/^commit /{commit=$2; next} {print commit "\t" $0}' \
+        | grep -iE "$pattern" || true)
 fi
 
 if [ -n "$found" ]; then
