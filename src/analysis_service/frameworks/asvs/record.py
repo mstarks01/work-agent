@@ -236,6 +236,24 @@ class DraftRequirementRuling(Claim):
         }
 
     @classmethod
+    def ruled_in(
+        cls, model: SystemModel, options: Mapping[str, Any], lane: str
+    ) -> dict[str, str]:
+        """The chapter's requirements the rule says apply, read off :meth:`applicability`."""
+        level = AsvsOptions.model_validate(options).level
+        chapter = {requirement.id for requirement in requirements_for(level, lane)}
+        return {
+            entry.unit: entry.reason
+            for entry in cls.applicability(model, options)
+            if entry.unit in chapter and entry.state == "applicable"
+        }
+
+    @classmethod
+    def excludes(cls, draft: Claim) -> bool:
+        """A draft whose lane stated ``excluded`` rules its requirement out."""
+        return getattr(draft, "direction", "") == "excluded"
+
+    @classmethod
     def open_capabilities(
         cls, model: SystemModel, options: Mapping[str, Any]
     ) -> dict[str, int]:

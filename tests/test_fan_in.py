@@ -1139,6 +1139,37 @@ class TestFanIn:
             "ruled out in code by a test",
         )
 
+    def test_a_draft_that_rules_out_a_ruled_in_unit_is_refused(
+        self, model, monkeypatch
+    ):
+        """A lane may not give a unit the rule says applies a second answer."""
+        monkeypatch.setattr(
+            DraftThreat, "unit_of", classmethod(lambda cls, draft: draft.id)
+        )
+        monkeypatch.setattr(
+            DraftThreat, "excludes", classmethod(lambda cls, draft: True)
+        )
+        merged = fan_in.fan_in(
+            batches(spoofing=[sample_proposal("S-01")]),
+            STRIDE,
+            model,
+            ruled_in={"S-01": "Applies: the rule says so."},
+        )
+
+        assert merged.drafts == []
+        (dropped,) = merged.marks.dropped_claims
+        assert dropped.reason.startswith("rules out a unit its framework's rule")
+
+    def test_a_draft_that_rules_nothing_out_keeps_a_ruled_in_unit(self, model):
+        merged = fan_in.fan_in(
+            batches(spoofing=[sample_proposal("S-01")]),
+            STRIDE,
+            model,
+            ruled_in={"S-01": "Applies: the rule says so."},
+        )
+
+        assert [draft.id for draft in merged.drafts] == ["S-01"]
+
     def test_coverage_is_accounted_per_lane_over_the_resolved_drafts(self, model):
         merged = fan_in.fan_in(
             batches(

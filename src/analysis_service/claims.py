@@ -957,6 +957,29 @@ class Claim(BaseModel):
         return []
 
     @classmethod
+    def ruled_in(
+        cls, model: SystemModel, options: Mapping[str, Any], lane: str
+    ) -> dict[str, str]:
+        """Units of ``lane`` this framework's own rules say apply to a model, with why.
+
+        The mirror of :meth:`ruled_out`. The fan-in refuses a draft that rules
+        one of them out (:meth:`excludes`), so a lane cannot give a unit a
+        second answer. The neutral answer names none.
+        """
+        del model, options, lane
+        return {}
+
+    @classmethod
+    def excludes(cls, draft: Claim) -> bool:
+        """Whether this draft says its unit does not apply to the system.
+
+        The neutral answer is no: a framework whose drafts carry no direction
+        never rules a unit out through a draft.
+        """
+        del draft
+        return False
+
+    @classmethod
     def open_capabilities(
         cls, model: SystemModel, options: Mapping[str, Any]
     ) -> dict[str, int]:

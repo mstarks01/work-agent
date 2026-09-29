@@ -353,3 +353,15 @@ class TestTheEntryShape:
         ]
         doubled = block.model_copy(update={"applicability": entries[:1] * 2})
         assert "more than one applicability entry" in doubled.block_issues(())[0]
+
+
+def test_asvs_rules_in_what_applies_and_reads_an_exclusion_off_the_direction():
+    from tests.factories import sample_draft
+
+    ruled = DraftRequirementRuling.ruled_in(
+        valid_model(), {"level": 1}, "encoding-and-sanitization"
+    )
+    assert "V1.2.1" in ruled and "V1.2.4" not in ruled
+    assert ruled["V1.2.1"].startswith("Applies to every web application")
+    draft = sample_draft("S-01")
+    assert not DraftRequirementRuling.excludes(draft)

@@ -120,6 +120,7 @@ def fan_in(
     sources: Mapping[str, str] = _NO_TEXTS,
     ruled_out: Mapping[str, str] = _NO_TEXTS,
     assertions: AssertionCatalog | None = None,
+    ruled_in: Mapping[str, str] = _NO_TEXTS,
 ) -> FanIn:
     """Merge one framework's lane batches into the drafts its critic sees.
 
@@ -148,6 +149,9 @@ def fan_in(
     the evidence catalog is derived from the model *and* this, so it is
     handed in exactly as ``prepare`` held it — code resolved it once from the
     node's proposal, and a second resolution here would be a second reader.
+    ``ruled_in`` is each unit the package's rules say applies, against the
+    reason; a draft that rules one of them out is refused, because the rule is
+    the one answer to whether a unit applies (#1291).
 
     Raises :class:`DraftJoinError` when a lane emitted more than
     :data:`~analysis_service.claims.MAX_CLAIMS_PER_BATCH` proposals. This is
@@ -249,6 +253,16 @@ def fan_in(
         )
         for draft in joined.drafts
         if (unit := package.record.unit_of(draft)) in ruled_out
+    ] + [
+        DroppedClaim.of(
+            claim_id=draft.id,
+            title=draft.title,
+            reason=f"rules out a unit its framework's rule says applies."
+            f" {ruled_in[unit]}"[:1000],
+        )
+        for draft in joined.drafts
+        if package.record.excludes(draft)
+        and (unit := package.record.unit_of(draft)) in ruled_in
     ]
     refused_ids = {dropped.claim_id for dropped in refused}
     merged = [draft for draft in joined.drafts if draft.id not in refused_ids]
