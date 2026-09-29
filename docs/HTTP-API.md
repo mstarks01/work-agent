@@ -256,7 +256,8 @@ Answer with `facts` beside or instead of `links`:
 ```
 
 A question kind with facets takes only a `facets` map, or the value `unknown`.
-A facet you leave out is not answered. An answer whose facets are all
+A facet you leave out is not answered. In a later round, a facet answer adds to
+the earlier answer: a facet you leave out keeps its earlier answer. An answer whose facets are all
 `unknown` says that you do not know. A finding counts as covered only when
 every facet of the kind has `yes`, `no` or `not applicable`, because the
 reviewer names the kind a finding waits on, not a facet.
@@ -273,8 +274,10 @@ the sources state is refused with `400`. An `unknown` answer to a fact that an
 earlier round settled is refused too: send a value to change it.
 
 An attribute answer is written onto the model the new job analyses, and the
-element's notes say you gave it. The answer removes each catalog fact about
-that attribute, and a `superseded-by-answer` issue names each removed fact. An
+element's notes say you gave it. The answer removes each unscoped catalog fact
+about that attribute, and a `superseded-by-answer` issue names each removed
+fact. A fact that the sources state only for a scope, such as one environment,
+stays in the catalog beside your answer, and your answer settles the attribute. An
 inferred trust zone that you answer is no longer marked as inferred. An
 assertion answer replaces the open fact with a stated one. A subject answer reaches the analysis as your words in the
 answers source. Your answer settles the fact, even where the sources said
@@ -297,11 +300,12 @@ catalog that asked the question, and only the analysis and review steps
 spend model calls. It is a new job: it counts toward your jobs in flight and
 your token budget, and it is refused the same ways a submission is (`429`). An
 answer about a principal replaces the finished job's earlier answer about the
-same principal. The finished job's report is unchanged.
+same principal. A link answer may name only a principal that the job asked
+about, or one that an earlier round answered. The finished job's report is unchanged.
 
 | Status | Cause |
 | --- | --- |
-| `400` | `links` is sent and this deployment builds no assertion catalog; two answers name the same principal or the same fact; or a fact answer names a fact the job did not ask, or a value the fact cannot take, or a line longer than 1,000 characters. |
+| `400` | `links` is sent and this deployment builds no assertion catalog; two answers name the same principal or the same fact; a link answer names a principal the job did not ask about; a fact answer names a fact the job did not ask, or a value the fact cannot take, or a line longer than 1,000 characters; or the answers would leave a capability present while an ancestor capability is absent. |
 | `404` | The job is not yours, or does not exist. |
 | `400` | `links` and `facts` are both empty and the job is not waiting on answers. Empty means "continue without answers". |
 | `409` | The job is neither completed nor waiting on answers, its report is withheld, or its report carries no catalog. |

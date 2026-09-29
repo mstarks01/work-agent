@@ -25,6 +25,8 @@ from analysis_service.assertions import (
     AssertionRecord,
     Qualifier,
     Subject,
+    answered,
+    assertion_id,
     project,
     projected_attribute,
     support_span,
@@ -165,6 +167,14 @@ def reaching(report, attribute: str) -> list[Assertion]:
     ]
 
 
+def settled_by_the_answer(report, attribute: str, rows: list[Assertion]) -> None:
+    """Only the scoped rows and the answer's own unscoped row still reach it."""
+    reached = reaching(report, attribute)
+    kept = {assertion_id(entry) for entry in reached if not answered(entry)}
+    assert kept == {assertion_id(entry) for entry in rows if entry.scope}
+    assert not any(entry.scope for entry in reached if answered(entry))
+
+
 def effective(report, attribute: str) -> str:
     """What every reader of the report sees for the attribute."""
     model = report.system_model
@@ -202,13 +212,27 @@ def test_an_answer_is_the_fact_every_reader_sees(reason, value_index):
     report = resume(checkpoint(rows), [given], given=SOURCES)
 
     assert effective(report, attribute) == given.value
-    assert reaching(report, attribute) == []
+    settled_by_the_answer(report, attribute, rows)
     superseded = [
         issue
         for issue in report.assertions.issues
         if issue.code == "superseded-by-answer"
     ]
-    assert len(superseded) == len(rows)
+    assert len(superseded) == sum(1 for entry in rows if not entry.scope)
+
+
+def test_an_answer_keeps_a_scoped_fact_beside_it():
+    """Staging-only TLS was removed by an answer about the flow as a whole
+    (#1289, F5). The answer settles the attribute, and the staging row stays."""
+    staging = tls(scope=[Qualifier(kind="environment", value="staging")])
+
+    report = resume(
+        checkpoint([staging]), [answer("encryption_in_transit", "none")], given=SOURCES
+    )
+
+    assert effective(report, "encryption_in_transit") == "none"
+    assert staging in report.assertions.catalog.entries
+    assert "superseded-by-answer" not in {i.code for i in report.assertions.issues}
 
 
 @pytest.mark.parametrize("reason", sorted(SHAPES))
@@ -225,8 +249,9 @@ def test_the_answer_holds_in_a_later_round_and_a_revision_replaces_it(reason):
     assert effective(kept, attribute) == first_value
     assert effective(revised, attribute) == second_value
     for later in (kept, revised):
-        assert reaching(later, attribute) == []
-        assert "superseded-by-answer" in {i.code for i in later.assertions.issues}
+        settled_by_the_answer(later, attribute, rows)
+        codes = {issue.code for issue in later.assertions.issues}
+        assert ("superseded-by-answer" in codes) == any(not r.scope for r in rows)
 
 
 @pytest.mark.parametrize("reason", sorted(SHAPES))

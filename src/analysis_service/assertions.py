@@ -80,7 +80,7 @@ from analysis_service.grounding import (
     verify_quote,
 )
 from analysis_service.references import canonical
-from analysis_service.sources import text_digest
+from analysis_service.sources import ANSWERS_LABEL, text_digest
 from analysis_service.system_model import (
     ELEMENT_ID,
     UNKNOWN,
@@ -142,6 +142,7 @@ __all__ = [
     "UnknownReason",
     "admissible",
     "answer",
+    "answered",
     "apply_projection",
     "assertion_id",
     "catalog_coverage",
@@ -241,11 +242,16 @@ REGISTRY_VERSION = 8
 #: ``supported`` writes a qualified ``unknown`` rather than the control
 #: (:func:`_unchecked_over_lead`).
 #:
+#: Version 6 lets a submitter's answer settle an attribute beside scoped rows:
+#: an unscoped row that quotes the answers Source outranks every other row
+#: (:func:`answered`), and the scoped rows stay in the catalog as the scoped
+#: facts they state (#1289, F5).
+#:
 #: Version 4 separates a hedge from silence. Rows that all read ``unknown``
 #: left the attribute alone whatever their reason; a source that *said* it was
 #: unsure now writes a qualified ``unknown`` over a definite extracted value,
 #: and silence still does not (#926).
-PROJECTION_VERSION = 5
+PROJECTION_VERSION = 6
 
 #: The value that says a source stated this fact is **not there**. A positive
 #: statement about an absence, which :attr:`Assertion.basis` then attributes:
@@ -789,7 +795,7 @@ CatalogIssueCode = Literal[
     # A submitter's answer to an open row this catalog does not hold.
     "unmatched-answer",
     # Not a refused row. A submitter's answer to a graph attribute replaced
-    # this row, which reached the same attribute; see
+    # this unscoped row, which reached the same attribute; see
     # :func:`~analysis_service.questions.fact_rows`.
     "superseded-by-answer",
 ]
@@ -1598,6 +1604,18 @@ def admissible(entry: Assertion) -> bool:
         and entry.basis != "legacy"
         and PROJECTS_UNDER[entry.assessment]
     )
+
+
+def answered(entry: Assertion) -> bool:
+    """Whether this row writes a submitter's answer: it quotes the answers Source.
+
+    **The one reader of "is this row an answer".** An answer to a question this
+    service asked settles the fact, even against the sources (the maintainer's
+    decision of 2026-09-25 on #1225), so :func:`project` lets an unscoped one
+    outrank every other row, and the question readers find the row an earlier
+    round wrote by it.
+    """
+    return any(span.source_label == ANSWERS_LABEL for span in entry.support)
 
 
 def answer(catalog: AssertionCatalog, subject: str, predicate: str) -> Answer:
@@ -2951,6 +2969,8 @@ def _unchecked_over_lead(
     """
     if control_state(projection.value) != "stated":
         return False
+    if any(answered(entry) for entry in rows):
+        return False
     if control_state(str(held)) == "stated":
         return False
     return not any(entry.assessment == "supported" for entry in rows)
@@ -3068,6 +3088,11 @@ def _projected(
     ids = tuple(sorted(identity for identity, _ in rows))
     valued = [entry for _, entry in rows if entry.value != UNKNOWN]
     stated = [entry for entry in valued if admissible(entry)]
+    # An answer settles the attribute; the scoped rows beside it stay in the
+    # catalog as the narrower facts they state.
+    answers = [entry for entry in stated if answered(entry) and not entry.scope]
+    if answers:
+        stated = answers
 
     def projected(value: str, reason: ProjectionReason) -> Projection:
         return Projection(element_id, attribute, value, reason, ids)

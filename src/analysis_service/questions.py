@@ -79,6 +79,7 @@ from analysis_service.assertions import (
     AssertionCatalog,
     CatalogIssue,
     SupportSpan,
+    answered,
     apply_projection,
     assertion_id,
     projected_attribute,
@@ -87,7 +88,7 @@ from analysis_service.capabilities import CAPABILITIES, lineage
 from analysis_service.claims import FrameworkAnalysis, UnknownKey, UnknownRef
 from analysis_service.open_facts import element_names, label_of
 from analysis_service.question_kinds import QUESTION_KINDS, Facet
-from analysis_service.sources import plain_name
+from analysis_service.sources import ANSWERS_LABEL, plain_name
 from analysis_service.system_model import (
     ZONE_ATTRIBUTE,
     SystemModel,
@@ -126,10 +127,6 @@ __all__ = [
 #: How many fact answers one submission carries. The largest report measured
 #: raised 85 open facts, so this bounds the body above any real use.
 MAX_FACT_ANSWERS = 200
-
-#: The label of the Source the answers become. A caller's own source may not
-#: use it: the job refuses two sources that share a label.
-ANSWERS_LABEL = "Answers to link questions"
 
 #: The fields a flow's ID is built from. An answer cannot move one, because the
 #: flow would then carry an ID its endpoints no longer derive.
@@ -525,7 +522,7 @@ def _answered_row(catalog: AssertionCatalog, identity: str) -> Assertion | None:
     for entry in catalog.entries:
         if entry.value == UNKNOWN:
             reopened = entry
-        elif any(span.source_label == ANSWERS_LABEL for span in entry.support):
+        elif answered(entry):
             reopened = entry.model_copy(update={"value": UNKNOWN})
         else:
             continue
@@ -936,32 +933,37 @@ def fact_rows(
     answers: Sequence[FactAnswer],
     spans: Sequence[SupportSpan],
 ) -> tuple[AssertionCatalog, list[CatalogIssue]]:
-    """The catalog with each assertion answer written over the open row it answers.
+    """The catalog with each answer written over the rows it settles.
 
     ``spans`` are where each answer's line sits in the answers Source, in the
-    order of ``answers``. The stated row keeps the open row's subject,
-    predicate and scope, so it answers exactly what was asked. An earlier
-    round's answer is written again over the row it wrote, so its quote reads
-    this round's answers Source.
+    order of ``answers``. An assertion answer replaces the open row it answers,
+    and the stated row keeps the open row's subject, predicate and scope, so it
+    answers exactly what was asked. An earlier round's answer is written again
+    over the row it wrote, so its quote reads this round's answers Source.
 
-    **An attribute answer removes every row that reaches its attribute**, scoped
-    rows too. The answer settles the attribute, and a row left beside it would
-    project over the answer or reach the lanes as the opposite fact. Each
-    removed row is named by a ``superseded-by-answer`` issue, which later
-    rounds keep.
+    **An attribute answer removes every unscoped row that reaches its
+    attribute.** The answer settles the attribute, and such a row left beside it
+    would reach the lanes as the opposite fact. Each removed row is named by a
+    ``superseded-by-answer`` issue, which later rounds keep. **A scoped row
+    stays**, because it states a narrower fact that the answer does not settle.
+    Where one stays, the answer is written as an unscoped row beside it, which
+    :func:`~analysis_service.assertions.project` lets outrank it.
     """
     replaced: dict[str, Assertion] = {}
     issues: list[CatalogIssue] = []
-    answered = {
-        answer.key[:2]
-        for answer in answers
+    attributes = {
+        answer.key[:2]: (answer, span)
+        for answer, span in zip(answers, spans, strict=True)
         if answer.kind == "attribute" and answer.known
     }
+
+    def reached(entry: Assertion) -> tuple[str, str]:
+        return entry.subject, projected_attribute(entry.predicate, entry.subject)
+
     superseded = {
         assertion_id(entry)
         for entry in catalog.entries
-        if (entry.subject, projected_attribute(entry.predicate, entry.subject))
-        in answered
+        if reached(entry) in attributes and not entry.scope
     }
     issues.extend(
         CatalogIssue(
@@ -971,8 +973,30 @@ def fact_rows(
             assertion=assertion_id(entry),
         )
         for entry in catalog.entries
-        if assertion_id(entry) in superseded
+        if assertion_id(entry) in superseded and not answered(entry)
     )
+    scoped = sorted(
+        (
+            entry
+            for entry in catalog.entries
+            if reached(entry) in attributes and entry.scope
+        ),
+        key=assertion_id,
+    )
+    written: dict[tuple[str, str], Assertion] = {}
+    for entry in scoped:
+        answer, span = attributes[reached(entry)]
+        value = ABSENT if control_state(answer.value) == "absent" else answer.value
+        written.setdefault(
+            reached(entry),
+            Assertion(
+                subject=entry.subject,
+                predicate=entry.predicate,
+                value=value,
+                basis="stated",
+                support=[span],
+            ),
+        )
     for answer, span in zip(answers, spans, strict=True):
         if answer.kind != "assertion" or not answer.known:
             continue
@@ -999,4 +1023,7 @@ def fact_rows(
         for entry in catalog.entries
         if assertion_id(entry) not in superseded
     ]
-    return catalog.model_copy(update={"entries": entries}), issues
+    return (
+        catalog.model_copy(update={"entries": [*entries, *written.values()]}),
+        issues,
+    )
