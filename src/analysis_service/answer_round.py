@@ -114,6 +114,15 @@ class AdmittedRound:
     links: list[LinkAnswer]
     facts: list[FactAnswer]
 
+    def round_after(self, rounds: int) -> int:
+        """The resumed job's round count, from its parent's.
+
+        **The one reader of "does this resume count".** A resume counts only
+        where the job carries answers, so a paused job that continues with
+        none uses no round (ADR 0053).
+        """
+        return rounds + 1 if self.links or self.facts else rounds
+
 
 @dataclass(frozen=True)
 class QuestionSet:

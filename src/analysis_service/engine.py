@@ -334,7 +334,9 @@ class Engine:
             links=admitted.links,
             facts=admitted.facts,
             resumption=Resumption(
-                parent_id="in-process", checkpoint=checkpoint, round=rounds + 1
+                parent_id="in-process",
+                checkpoint=checkpoint,
+                round=admitted.round_after(rounds),
             ),
         )
         return await self._run(job, on_node)

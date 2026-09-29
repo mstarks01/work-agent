@@ -655,7 +655,7 @@ def create_app(
         parent.answered = True
         run.engine, run.sources = parent.engine, parent.sources
         run.links, run.facts = admitted.links, admitted.facts
-        run.rounds = parent.rounds + 1
+        run.rounds = admitted.round_after(parent.rounds)
         start = partial(
             parent.engine.resume,
             parent.sources,
