@@ -133,7 +133,7 @@ from analysis_service import (
     Source,
 )
 from analysis_service.deployment import Deployment
-from analysis_service.early_questions import early_questions
+from analysis_service.early_questions import asked_facts, early_questions
 from analysis_service.frameworks import package_for
 from analysis_service.jobs import Checkpoint, PipelineAwaiting, PipelineOutcome
 from analysis_service.links import (
@@ -587,16 +587,18 @@ def create_app(
                 status_code=400,
             )
         held = parent.checkpoint
+        catalog = None if held.assertions is None else held.assertions.catalog
+        asked = asked_facts(
+            held.system_model,
+            catalog,
+            parent.engine.frameworks,
+            () if parent.report is None else parent.report.analyses,
+            waiting=parent.paused,
+        )
         try:
             if links and held.assertions is None:
                 raise ValueError("this report built no catalog, so it asks no link")
-            check_answers(
-                links,
-                facts,
-                held.system_model,
-                None if held.assertions is None else held.assertions.catalog,
-                parent.facts,
-            )
+            check_answers(links, facts, held.system_model, catalog, asked, parent.facts)
             merged = merged_links(parent.links, links)
             answered = merged_facts(parent.facts, facts)
         except ValueError as exc:
@@ -625,6 +627,7 @@ def create_app(
             parent.checkpoint,
             links,
             facts=facts,
+            asked=asked,
             earlier_links=parent.links,
             earlier_facts=parent.facts,
             system_name="Your system",

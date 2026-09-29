@@ -24,6 +24,7 @@ from analysis_service.assertions import (
     SupportSpan,
     assertion_id,
 )
+from analysis_service.claims import UnknownRef
 from analysis_service.jobs import (
     Checkpoint,
     JobRecord,
@@ -359,14 +360,18 @@ class TestTheRoutes:
     """Fact answers need no catalog, so they work on a default deployment."""
 
     def completed(self, store):
-        from tests.factories import sample_report
+        from tests.factories import asking_threat, sample_report
         from tests.test_api import admit
 
         record = JobRecord.create(
             owner_subject="alice", sources=[DESCRIPTION], frameworks=sample_selection()
         )
         record.transition("running")
-        record.report = sample_report()
+        asked = UnknownRef(
+            element_id=valid_model().data_flows[1].id,
+            attribute="encryption_in_transit",
+        )
+        record.report = sample_report([asking_threat(asked)])
         record.transition("completed")
         asyncio.run(admit(store, record))
         return record.id
@@ -702,11 +707,11 @@ class TestTheAdmissionCheck:
     )
     def test_a_link_that_would_place_nothing_is_refused(self, link):
         with pytest.raises(ValueError):
-            check_answers([link], [], valid_model(), open_catalog())
+            check_answers([link], [], valid_model(), open_catalog(), ())
 
     def test_a_link_that_places_is_admitted(self):
         link = LinkAnswer(principal="customer accounts", element="entity:customer")
-        check_answers([link], [], valid_model(), open_catalog())
+        check_answers([link], [], valid_model(), open_catalog(), ())
 
 
 def test_the_same_answers_twice_give_the_same_catalog():

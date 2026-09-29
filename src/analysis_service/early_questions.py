@@ -45,7 +45,12 @@ from types import MappingProxyType
 
 from analysis_service.assertions import AssertionCatalog
 from analysis_service.candidates import generate_candidates
-from analysis_service.claims import FrameworkName, UnknownKey, UnknownRef
+from analysis_service.claims import (
+    FrameworkAnalysis,
+    FrameworkName,
+    UnknownKey,
+    UnknownRef,
+)
 from analysis_service.frameworks import PACKAGES
 from analysis_service.open_facts import element_names, group_of, label_of
 from analysis_service.question_kinds import QUESTION_KINDS, Facet
@@ -58,6 +63,7 @@ from analysis_service.questions import (
     answer_suggestions,
     facets_json,
     fact_kind,
+    fact_questions,
     open_attribute,
     prepared_model,
 )
@@ -68,6 +74,7 @@ __all__ = [
     "QUESTION_PRIOR_PATH",
     "EarlyQuestion",
     "PriorRow",
+    "asked_facts",
     "early_questions",
     "element_type",
     "load_prior",
@@ -232,3 +239,21 @@ def early_questions(
             )
         )
     return tuple(asked)
+
+
+def asked_facts(
+    model: SystemModel,
+    catalog: AssertionCatalog | None,
+    frameworks: Sequence[FrameworkName],
+    analyses: Sequence[FrameworkAnalysis],
+    *,
+    waiting: bool,
+) -> frozenset[UnknownKey]:
+    """Every fact a job's questions name, which is every fact it takes an answer to.
+
+    A job waiting on answers asks the early list; a finished one asks the
+    report's list, read off its findings.
+    """
+    early = early_questions(model, frameworks, catalog) if waiting else ()
+    after = fact_questions(analyses, model, catalog)
+    return frozenset(q.key for q in early) | frozenset(q.key for q in after)

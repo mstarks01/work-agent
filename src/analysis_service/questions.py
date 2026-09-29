@@ -17,10 +17,16 @@ run rules on a finding again. A rejected draft still ranks the questions, and
 is left out of every count. A submitter answers from the top as far as they
 choose.
 
-**Only an open fact is asked, and only an open fact takes an answer.** An
+**Only an open fact is asked, and only an asked fact takes an answer.** An
 attribute is open where :func:`open_attribute` says so. An answer to an
 attribute the model states is refused, unless an earlier round answered it,
-so a submission cannot overwrite what the sources said.
+so a submission cannot overwrite what the sources said. An answer to a fact
+the job did not ask is refused by :func:`~analysis_service.links.check_answers`,
+so a submission cannot write a question of its own into every lane prompt.
+
+**An answer's line fits the span that quotes it.** :func:`fact_line` writes
+each answer as one line of the answers Source, and the check refuses a line
+longer than :data:`~analysis_service.assertions.MAX_QUOTE_CHARS`.
 
 **An answer of** ``unknown`` **says the submitter does not know.** It writes
 nothing structured, the fact stays open, and it covers no finding. It reaches
@@ -63,6 +69,7 @@ from pydantic import (
 from analysis_service.analysis import control_state
 from analysis_service.assertions import (
     ABSENT,
+    MAX_QUOTE_CHARS,
     REGISTRY,
     UNKNOWN,
     Assertion,
@@ -102,6 +109,7 @@ __all__ = [
     "check_fact_answers",
     "facets_json",
     "fact_kind",
+    "fact_line",
     "fact_questions",
     "fact_rows",
     "open_attribute",
@@ -172,6 +180,37 @@ class FactAnswer(BaseModel):
             raise ValueError("the service writes a facet answer's value")
         return {**data, "value": value}
 
+    @field_validator("key", mode="before")
+    @classmethod
+    def _one_spelling(cls, key: Any) -> Any:
+        """Bound each part, and blank every part the fact's spelling does not read.
+
+        Two keys that differ only in a part nobody reads name one fact, and
+        :func:`~analysis_service.links.merged_facts` would keep both. A key that
+        uses more than one spelling is left as sent, for the check to refuse.
+        """
+        if not isinstance(key, list | tuple) or len(key) != 5:
+            return key
+        ref = UnknownRef.model_validate(
+            dict(
+                zip(
+                    ("element_id", "attribute", "assertion", "subject", "question"),
+                    key,
+                    strict=True,
+                )
+            )
+        )
+        match ref.spellings:
+            case ("question",):
+                return (ref.element_id, "", "", "", ref.question)
+            case ("attribute",):
+                return (ref.element_id, ref.attribute, "", "", "")
+            case ("assertion",):
+                return ("", "", ref.assertion, "", "")
+            case ("subject",):
+                return ("", "", "", ref.subject, "")
+        return ref.key
+
     @field_validator("value")
     @classmethod
     def _one_line(cls, value: str) -> str:
@@ -185,6 +224,20 @@ class FactAnswer(BaseModel):
     def known(self) -> bool:
         """False where the submitter answered that they do not know."""
         return self.value != UNKNOWN
+
+
+def fact_line(fact: FactAnswer) -> str:
+    """The answer as its line of the answers Source, which its span quotes."""
+    element_id, attribute, assertion, subject, question = fact.key
+    if fact.kind == "question":
+        kind = QUESTION_KINDS[question]
+        asked = kind.template.format(element=element_id)
+        return f'Asked "{asked}", the answer is "{fact.value}".'
+    if fact.kind == "attribute":
+        return f'The {attribute} of {element_id} is "{fact.value}".'
+    if fact.kind == "assertion":
+        return f'The open question {assertion} is answered "{fact.value}".'
+    return f'Asked "{subject}", the answer is "{fact.value}".'
 
 
 def open_attribute(model: SystemModel, element_id: str, attribute: str) -> bool:
@@ -661,6 +714,11 @@ def check_fact_answers(
             catalog is None or _answered_row(catalog, assertion) is None
         ):
             raise ValueError(f"no open assertion row {assertion!r}")
+        if len(fact_line(answer)) > MAX_QUOTE_CHARS:
+            raise ValueError(
+                f"an answer's line may hold {MAX_QUOTE_CHARS} characters; shorten"
+                f" the answer to {answer.key!r}"
+            )
         if not answer.known:
             if answer.key in settled_before:
                 raise ValueError(

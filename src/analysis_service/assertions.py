@@ -637,7 +637,9 @@ class SupportSpan(BaseModel):
     never the whole quote, so the gate can hold each span to what its offsets
     hold.
 
-    Built by :func:`support_span` and by nothing else.
+    Built by :func:`support_span` for a model's quote, and by
+    :mod:`analysis_service.links` for the line of the answers Source that an
+    answer writes.
     """
 
     model_config = ConfigDict(extra="forbid", frozen=True)

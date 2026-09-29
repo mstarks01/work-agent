@@ -28,6 +28,7 @@ import asyncio
 import logging
 from collections.abc import Callable, Mapping, Sequence
 from datetime import datetime
+from functools import partial
 from http import HTTPStatus
 from typing import Annotated, Any, TypeVar
 from uuid import uuid4
@@ -50,7 +51,7 @@ from analysis_service.auth import (
 from analysis_service.budgets import BudgetPolicy
 from analysis_service.claims import FrameworkAnalysis, FrameworkName
 from analysis_service.deployment import Deployment
-from analysis_service.early_questions import early_questions
+from analysis_service.early_questions import asked_facts, early_questions
 from analysis_service.errors import ConfigError
 from analysis_service.frameworks import PACKAGES
 from analysis_service.graph import ENTRY_EXTRACT
@@ -903,7 +904,8 @@ def create_app(
         answerable = await _answerable(request, job_id, subject)
         if isinstance(answerable, JSONResponse):
             return answerable
-        parent, model, assertions, _ = answerable
+        parent, model, assertions, analyses = answerable
+        catalog = None if assertions is None else assertions.catalog
         if answers.links and assertions is None:
             raise HTTPException(
                 status_code=409,
@@ -916,12 +918,25 @@ def create_app(
                 detail="no answers were sent; only a job waiting on answers can"
                 " continue without them",
             )
+        # Derived from the report, as the questions route derives its lists, so
+        # it runs off the event loop for the same reason.
+        asked = await anyio.to_thread.run_sync(
+            partial(
+                asked_facts,
+                model,
+                catalog,
+                [selection.name for selection in parent.frameworks],
+                analyses,
+                waiting=parent.status == "awaiting-answers",
+            )
+        )
         try:
             check_answers(
                 answers.links,
                 answers.facts,
                 model,
-                None if assertions is None else assertions.catalog,
+                catalog,
+                asked,
                 parent.facts,
             )
             sources, links, facts = resumed_sources(

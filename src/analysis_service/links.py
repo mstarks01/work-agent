@@ -29,7 +29,7 @@ from __future__ import annotations
 
 import re
 from collections import defaultdict
-from collections.abc import Sequence
+from collections.abc import Collection, Sequence
 from dataclasses import dataclass
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
@@ -45,11 +45,12 @@ from analysis_service.assertions import (
     answer,
     settled,
 )
-from analysis_service.question_kinds import QUESTION_KINDS
+from analysis_service.claims import UnknownKey
 from analysis_service.questions import (
     ANSWERS_LABEL,
     FactAnswer,
     check_fact_answers,
+    fact_line,
     fact_rows,
 )
 from analysis_service.sources import Source, plain_name, text_digest
@@ -131,19 +132,6 @@ def _line(link: LinkAnswer) -> str:
     return f'"{link.principal}" is {target}.'
 
 
-def _fact_line(fact: FactAnswer) -> str:
-    element_id, attribute, assertion, subject, question = fact.key
-    if fact.kind == "question":
-        kind = QUESTION_KINDS[question]
-        asked = kind.template.format(element=element_id)
-        return f'Asked "{asked}", the answer is "{fact.value}".'
-    if fact.kind == "attribute":
-        return f'The {attribute} of {element_id} is "{fact.value}".'
-    if fact.kind == "assertion":
-        return f'The open question {assertion} is answered "{fact.value}".'
-    return f'Asked "{subject}", the answer is "{fact.value}".'
-
-
 Spans = tuple[tuple[int, int], ...]
 
 
@@ -151,7 +139,7 @@ def _composed(
     links: Sequence[LinkAnswer], facts: Sequence[FactAnswer] = ()
 ) -> tuple[str, Spans, Spans]:
     """The answers Source's text, and where each answer's line sits in it."""
-    lines = [*map(_line, links), *map(_fact_line, facts)]
+    lines = [*map(_line, links), *map(fact_line, facts)]
     spans, at = [], 0
     for line in lines:
         spans.append((at, at + len(line)))
@@ -346,6 +334,7 @@ def check_answers(
     facts: Sequence[FactAnswer],
     model: SystemModel,
     catalog: AssertionCatalog | None,
+    asked: Collection[UnknownKey],
     earlier: Sequence[FactAnswer] = (),
 ) -> None:
     """Refuse an answer that would place nothing, before a resumed run is admitted.
@@ -353,10 +342,16 @@ def check_answers(
     **The one admission check of a submission's answers.** The HTTP route, the
     first-run app and the in-process engine all call it. A link answer is
     written by :func:`apply_answers` here, and each issue it would raise is a
-    refusal, so a wrong link costs nothing. ``earlier`` is the fact answers of
-    the earlier rounds.
+    refusal, so a wrong link costs nothing. ``asked`` is the facts the job's
+    questions name, from :func:`~analysis_service.early_questions.asked_facts`;
+    ``earlier`` is the fact answers of the earlier rounds, which a later round
+    may answer again.
     """
     check_fact_answers(facts, model, catalog, earlier)
+    answered_before = {fact.key for fact in earlier}
+    for fact in facts:
+        if fact.key not in asked and fact.key not in answered_before:
+            raise ValueError(f"this job asked no question {fact.key!r}")
     if links and catalog is not None:
         _, issues = apply_answers(catalog, model, links)
         if issues:
