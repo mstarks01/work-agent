@@ -225,8 +225,10 @@ findings, so that each has every fact it waits on answered:
 - `choices` lists the values the fact takes. A question kind that asks
   whether something holds, such as "Can content it takes run code with its
   authority?", takes `yes` or `no`. Empty means free text on one
-  line: at most 1,000 characters, and at most 200 for an attribute other than
-  `data_description`. An answer
+  line. The service writes each answer as one line of the answers source, and
+  that line may hold at most 1,000 characters, so the line's own words and the
+  fact's name leave less than that for the answer. An attribute other than
+  `data_description` takes at most 200 characters. An answer
   about a control, such as `authentication`, names the mechanism, or is `none`
   where there is none. It may not be blank or open with another negation, such
   as "no" or "not". It may not open with a doubt either, such as "TBD" or
@@ -252,6 +254,10 @@ A facet you leave out is not answered. An answer whose facets are all
 `unknown` says that you do not know. A finding counts as covered only when
 every facet of the kind has `yes`, `no` or `not applicable`, because the
 reviewer names the kind a finding waits on, not a facet.
+
+A fact answer is accepted only for a fact that this job asked: a question in
+`early_questions` while the job waits at its pause, or in `fact_questions` once
+it is finished. A fact that an earlier round answered may be answered again.
 
 An attribute answer is accepted only where the model leaves the attribute open,
 or where an earlier round of answers answered it. The model is read with the
@@ -289,7 +295,7 @@ same principal. The finished job's report is unchanged.
 
 | Status | Cause |
 | --- | --- |
-| `400` | `links` is sent and this deployment builds no assertion catalog; two answers name the same principal or the same fact; or a fact answer names a fact the report does not hold, or a value the fact cannot take. |
+| `400` | `links` is sent and this deployment builds no assertion catalog; two answers name the same principal or the same fact; or a fact answer names a fact the job did not ask, or a value the fact cannot take, or a line longer than 1,000 characters. |
 | `404` | The job is not yours, or does not exist. |
 | `400` | `links` and `facts` are both empty and the job is not waiting on answers. Empty means "continue without answers". |
 | `409` | The job is neither completed nor waiting on answers, its report is withheld, or its report carries no catalog. |

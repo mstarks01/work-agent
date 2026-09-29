@@ -19,11 +19,12 @@ from fastapi.testclient import TestClient
 
 from analysis_service import Engine, StubPipelineRunner
 from analysis_service.assertions import AssertionRecord
+from analysis_service.claims import UnknownRef
 from analysis_service.jobs import Checkpoint, PipelineAwaiting, PipelineCompleted
 from analysis_service.question_kinds import QUESTION_KINDS
 from analysis_service.questions import FACET_ANSWERS, FactAnswer
 from tests import test_open_facts, test_questions, test_webapp
-from tests.factories import valid_model
+from tests.factories import asking_threat, sample_analysis, valid_model
 from tests.test_resume import parent_catalog
 from tests.test_webapp import (
     CARRIED,
@@ -42,6 +43,11 @@ tiers = test_webapp.tiers
 HELD = Checkpoint(
     system_model=valid_model(),
     assertions=AssertionRecord(proposed=1, catalog=parent_catalog()),
+)
+
+#: The fact a finished report asks: the valid model's first flow's transport.
+FACT_REF = UnknownRef(
+    element_id=valid_model().data_flows[1].id, attribute="encryption_in_transit"
 )
 
 
@@ -69,6 +75,7 @@ class PausingRunner(StubPipelineRunner):
             update={
                 "assertions": HELD.assertions if self.catalog else None,
                 "system_model": HELD.system_model,
+                "analyses": [sample_analysis([asking_threat(FACT_REF)])],
             }
         )
         return PipelineCompleted(report=report)

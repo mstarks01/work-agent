@@ -46,6 +46,7 @@ from analysis_service.claims import (
     ProposedVerdict,
     Rating,
     Severity,
+    UnknownRef,
     Verdict,
 )
 from analysis_service.compact import FULL_FORMAT, ExtractionFormat
@@ -642,6 +643,17 @@ def sample_threat(
     }
     fields.update(overrides)
     return Threat(**fields)
+
+
+def asking_threat(*refs: UnknownRef) -> Threat:
+    """A ``needs-info`` threat whose verdict names ``refs``, so a report asks them."""
+    return sample_threat(
+        verdict=Verdict(
+            status="needs-info",
+            reason="The sources do not state this.",
+            related_unknowns=list(refs),
+        )
+    )
 
 
 def sample_analysis(

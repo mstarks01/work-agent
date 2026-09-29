@@ -38,11 +38,11 @@ from __future__ import annotations
 import asyncio
 import logging
 import time
-from collections.abc import Callable, Mapping, Sequence
+from collections.abc import Callable, Collection, Mapping, Sequence
 from functools import partial
 from typing import Self
 
-from analysis_service.claims import FrameworkName
+from analysis_service.claims import FrameworkName, UnknownKey
 from analysis_service.deployment import Deployment
 from analysis_service.frameworks import PACKAGES
 from analysis_service.graph import Entry
@@ -256,6 +256,7 @@ class Engine:
         links: Sequence[LinkAnswer] = (),
         *,
         facts: Sequence[FactAnswer] = (),
+        asked: Collection[UnknownKey] = frozenset(),
         earlier_links: Sequence[LinkAnswer] = (),
         earlier_facts: Sequence[FactAnswer] = (),
         system_name: str | None = None,
@@ -267,7 +268,10 @@ class Engine:
         ``checkpoint`` is what a paused run held, or what a finished report's
         model and catalog are. ``sources``, ``earlier_links`` and
         ``earlier_facts`` are what that run was given; ``links`` and ``facts``
-        are the new answers, which go over the earlier ones. The run starts at
+        are the new answers, which go over the earlier ones. ``asked`` is the
+        facts the earlier run's questions named, from
+        :func:`~analysis_service.early_questions.asked_facts`, and a fact
+        answer to any other fact is refused. The run starts at
         ``prepare``, so no extraction and no assertion pass runs again (#1252).
         A link answer needs the checkpoint's catalog; a fact answer about an
         attribute or a subject needs none.
@@ -281,7 +285,9 @@ class Engine:
             None if checkpoint.assertions is None else checkpoint.assertions.catalog
         )
         try:
-            check_answers(links, facts, checkpoint.system_model, catalog, earlier_facts)
+            check_answers(
+                links, facts, checkpoint.system_model, catalog, asked, earlier_facts
+            )
             carried, merged, answered = resumed_sources(
                 sources, earlier_links, links, earlier_facts, facts
             )
