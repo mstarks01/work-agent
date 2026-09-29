@@ -77,6 +77,7 @@ from evals.harness import (
     consent,
     critic_replay,
     descendants,
+    early_rounds,
     envelope,
     extraction_losses,
     falsify,
@@ -2687,6 +2688,12 @@ COMMANDS: dict[str, Command] = {
         help="record a returned near-miss ballot's 'same' rows as signed rulings",
         run=command_near_miss_rulings,
         arguments=_near_miss_rulings_arguments,
+    ),
+    "early-rounds": Command(
+        help="answer archived models' early questions round after round and"
+        " count how the list moves (offline, no credentials)",
+        run=early_rounds.command_early_rounds,
+        arguments=early_rounds.arguments,
     ),
     "question-prior": Command(
         help="count one framework's early-question prior from a sweep's"

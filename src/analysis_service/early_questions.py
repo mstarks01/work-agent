@@ -164,6 +164,11 @@ class EarlyQuestion:
     group: str
     group_heading: str
     element: str
+    #: How much an answer is expected to change: for a field, the prior times
+    #: one plus the candidates, summed over the frameworks; for a capability,
+    #: how many units it could settle. The list is in this order, capabilities
+    #: first.
+    score: float = 0.0
     #: The key of the question this one depends on: a capability's parent,
     #: whose "no" makes this one moot. ``None`` for every other question.
     parent: UnknownKey | None = None
@@ -247,6 +252,7 @@ def early_questions(
                 group=group,
                 group_heading=heading,
                 element=names.get(key[0], key[0]),
+                score=score[key],
             )
         )
     return (*capability_questions(model, frameworks), *asked)
@@ -305,6 +311,7 @@ def capability_questions(
                 group=group,
                 group_heading=heading,
                 element=CAPABILITIES[key].question,
+                score=float(counts[key]),
                 parent=UnknownRef(capability=parent).key if parent else None,
             )
         )
