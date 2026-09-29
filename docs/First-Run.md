@@ -337,7 +337,11 @@ The app can ask you questions before the analysis, and after the report.
   about parts of your system, the most useful first. A line at the top says
   about how many are left; your answers can change that number. Click **Save
   and show more** for the next round. The app keeps your answers and runs no
-  model. **Your answers** lists every answer you saved, and **Change** opens
+  model. A question you leave blank comes back in the next round. **Skip the
+  rest and show more** sets the blank questions aside instead: they move to
+  **Skipped for now**, where **Answer it** opens one again. A skipped question
+  is not an answer, and the analysis treats its fact as open.
+  **Your answers** lists every answer you saved, and **Change** opens
   one again. A question with parts comes back while a part has no answer, with
   the parts you answered filled in. Click **Start the analysis** at any time.
   A save never starts the analysis. When no question is left, the page says

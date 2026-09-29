@@ -186,6 +186,34 @@ class TestTheRounds:
         done = client.get(f"/events/{started.json()['run']}").text
         assert "event: done" in done
 
+    def test_a_round_of_skips_alone_is_saved_and_listed(self, tiers):
+        client = client_for(tiers, PausingRunner(catalog=False), catalog=False)
+        paused = start(client, questions=True)
+        shown = event(client.get(f"/events/{paused}").text, "questions")
+        keys = [q["key"] for q in shown["facts"]]
+        saved = client.post(
+            f"/answer/{paused}",
+            json={"links": [], "facts": [], "save": True, "skip": keys},
+            headers=SAME_ORIGIN,
+        )
+        assert saved.status_code == 200, saved.text
+        after = saved.json()
+        assert [q["key"] for q in after["skipped"]] == keys
+        assert not {tuple(k) for k in keys} & {tuple(q["key"]) for q in after["facts"]}
+        assert after["answered"] == []
+
+    @pytest.mark.parametrize("skip", ["x", [["a", "b"]], [[1, 2, 3, 4, 5, 6]]])
+    def test_a_malformed_skip_is_refused(self, tiers, skip):
+        client = client_for(tiers, PausingRunner(catalog=False), catalog=False)
+        paused = start(client, questions=True)
+        client.get(f"/events/{paused}")
+        saved = client.post(
+            f"/answer/{paused}",
+            json={"links": [], "facts": [], "save": True, "skip": skip},
+            headers=SAME_ORIGIN,
+        )
+        assert saved.status_code == 400
+
     def test_a_refused_answer_names_its_question(self, tiers):
         """Every malformed answer got one message that named nothing (#1289)."""
         client = client_for(tiers, PausingRunner(catalog=False), catalog=False)
@@ -321,7 +349,7 @@ class Node {
 const ids = {};
 for (const id of ["analyze","description","ticks","problem","go","load","ask",
                   "asked","questions","earlier","save","continue","status",
-                  "status-text","answer-problem"])
+                  "status-text","answer-problem","skip","skipped"])
   ids[id] = new Node(id);
 ids.ask.checked = true;
 globalThis.document = {
@@ -1269,12 +1297,77 @@ await ids.continue.listeners.click(); await settle();
     seen = _run_form_script(steps)
     _, save, after, start = seen["calls"]
 
-    assert save["body"] == {"links": [link], "facts": [], "save": True}
+    assert save["body"] == {"links": [link], "facts": [], "save": True, "skip": []}
     assert after["waiting"] and after["asked"] and not after["saveShown"]
     assert said in after["said"]
     assert "Nothing runs until you choose Start the analysis" in after["said"]
     assert start["url"] == "/answer/r1" and "save" not in start["body"]
     assert seen["streams"] == ["/events/r1", "/events/r2"]
+
+
+def _text_row(key, label):
+    return {
+        "key": key,
+        "kind": "subject",
+        "label": label,
+        "element": label,
+        "form": "text",
+        "choices": [],
+        "suggestions": [],
+        "facets": [],
+        "max_length": 500,
+        "group": "g",
+        "group_heading": "G",
+        "reasons": [],
+    }
+
+
+def test_skip_the_rest_skips_only_the_blank_questions():
+    answered, blank = (["", "", "", name, "", ""] for name in ("who?", "when?"))
+    rows = [_text_row(answered, "who?"), _text_row(blank, "when?")]
+    steps = f"""
+await ids.analyze.listeners.submit({{ preventDefault() {{}} }}); await settle();
+streams[0].listeners.questions({{ data: JSON.stringify({{ run: "r1", questions: [],
+  facts: {json.dumps(rows)}, remaining: {{ field: 2 }},
+  answered: [], answered_links: [] }}) }});
+ids.questions.querySelectorAll("input")[0].value = "the admins";
+globalThis.fetch = async (url, init) => {{
+  calls.push({{ url, body: JSON.parse(init.body) }});
+  return {{ ok: false, json: async () => ({{ message: "stop here" }}) }};
+}};
+await ids.skip.listeners.click(); await settle();
+"""
+    (_, sent) = _run_form_script(steps)["calls"]
+    assert sent["body"] == {
+        "links": [],
+        "facts": [{"key": answered, "value": "the admins"}],
+        "save": True,
+        "skip": [blank],
+    }
+
+
+def test_a_skipped_question_can_be_answered_from_its_list():
+    kept, skipped = (["", "", "", name, "", ""] for name in ("who?", "when?"))
+    steps = f"""
+await ids.analyze.listeners.submit({{ preventDefault() {{}} }}); await settle();
+streams[0].listeners.questions({{ data: JSON.stringify({{ run: "r1", questions: [],
+  facts: [{json.dumps(_text_row(kept, "who?"))}], remaining: {{ field: 1 }},
+  skipped: [{json.dumps(_text_row(skipped, "when?"))}],
+  answered: [], answered_links: [] }}) }});
+calls.push({{ listed: !ids.skipped.hidden }});
+const [open] = ids.skipped.querySelectorAll("button");
+open.listeners.click();
+ids.skipped.querySelectorAll("input")[0].value = "nightly";
+globalThis.fetch = async (url, init) => {{
+  calls.push({{ url, body: JSON.parse(init.body) }});
+  return {{ ok: false, json: async () => ({{ message: "stop here" }}) }};
+}};
+await ids.save.listeners.click(); await settle();
+"""
+    _, listed, sent = _run_form_script(steps)["calls"]
+    assert listed == {"listed": True}
+    assert sent["body"]["facts"] == [{"key": skipped, "value": "nightly"}]
+    assert sent["body"]["skip"] == []
 
 
 def test_an_earlier_answer_can_be_changed():

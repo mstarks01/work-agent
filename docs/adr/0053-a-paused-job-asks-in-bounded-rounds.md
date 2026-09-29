@@ -41,6 +41,15 @@ in part comes back first, and takes no place under the limit. Where the limits
 hold questions back, the question set says so: `stop` is `budget-exhausted`,
 not `nothing-left`, and the page states how many questions will not be asked.
 
+**A submitter can skip a question for now.** A save may name questions of its
+round to skip. A skip is not a fact, not an absence and not an "I don't
+know": the fact stays open, and the analysis treats it as open. No later
+round shows a skipped question, and a skip takes no place under a limit, so
+a submitter who cannot answer reaches the next useful questions. The skipped
+questions stay listed, and an answer to one is still admitted. A question the
+submitter leaves blank without a skip comes back, as before: only an explicit
+skip sets a question aside (#1289).
+
 **A save never starts the analysis.** A save that leaves no question shows
 that nothing is left, with the saved answers, which the submitter can still
 change. Only a continue starts the analysis. A person who saves progress does

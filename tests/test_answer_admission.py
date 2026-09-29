@@ -267,7 +267,7 @@ def asked_of(catalog, *, waiting):
     )
 
 
-def admit(questions, links=(), facts=(), save=False):
+def admit(questions, links=(), facts=(), save=False, skips=()):
     return questions.admit(
         sources=[],
         earlier_links=[],
@@ -275,6 +275,7 @@ def admit(questions, links=(), facts=(), save=False):
         links=links,
         facts=facts,
         save=save,
+        skips=skips,
     )
 
 
@@ -296,7 +297,7 @@ class TestOneRoundHasOneAdmissionRule:
             admit(asked_of(None, waiting=True), links=[link])
 
 
-def _asked_after(answered, *, waiting=True, final=False, shown=()):
+def _asked_after(answered, *, waiting=True, final=False, shown=(), skipped=()):
     checkpoint = held()
     return question_set(
         checkpoint.system_model,
@@ -308,6 +309,7 @@ def _asked_after(answered, *, waiting=True, final=False, shown=()):
         answered_links=[],
         final=final,
         shown=shown,
+        skipped=skipped,
     )
 
 
@@ -467,7 +469,7 @@ class TestTheBoundedRounds:
         assert asked.stop is None, "a job that still asks a link has not stopped"
 
     def test_a_saved_round_must_answer_something_and_only_a_waiting_job_saves(self):
-        with pytest.raises(ValueError, match="at least one question"):
+        with pytest.raises(ValueError, match="answers or skips at least one"):
             admit(_asked_after([]), facts=[], save=True)
         finished = _asked_after([], waiting=False)
         answer = FactAnswer(key=CAPACITY, value="unknown")
@@ -513,3 +515,82 @@ class TestTheBoundedRounds:
         assert child.resumption.follow_up is False
         assert child.facts, "the saved answers reach the analysis"
         assert child.shown_early, "the report can say what the pause showed"
+
+
+class TestSkipForNow:
+    """A blank row came back every round, and a wholly blank round could not
+    be saved, so a submitter who could not answer had no way on (#1289)."""
+
+    def test_a_skipped_question_leaves_the_rounds_and_is_listed(self):
+        first = _asked_after([]).early[0]
+        admitted = admit(_asked_after([]), save=True, skips=[first.key])
+        after = _asked_after([], skipped=admitted.skipped)
+        assert admitted.skipped == (first.key,)
+        assert first.key not in {q.key for q in after.early}
+        assert [q.key for q in after.skipped] == [first.key]
+        assert after.to_json()["skipped_early"][0]["key"] == list(first.key)
+
+    def test_a_skip_writes_no_answer_and_leaves_one_question_fewer(self):
+        first = _asked_after([]).early[0]
+        after = _asked_after([], skipped=[first.key])
+        admitted = admit(after, save=True, skips=[after.early[0].key])
+        assert admitted.facts == []
+        assert after.remaining == {
+            kind: count
+            - (kind == ("capability" if first.kind == "capability" else "field"))
+            for kind, count in _asked_after([]).remaining.items()
+        }
+
+    def test_a_skipped_question_can_still_be_answered_and_leaves_the_list(self):
+        first = _asked_after([]).early[0]
+        after = _asked_after([], skipped=[first.key])
+        answer = FactAnswer(key=first.key, value="unknown")
+        admitted = admit(after, facts=[answer], save=True)
+        assert admitted.skipped == ()
+        assert admitted.facts == [answer]
+
+    def test_a_submitter_who_skips_every_round_reaches_the_end(self):
+        skipped: tuple = ()
+        for _ in range(40):
+            asked = _asked_after([], skipped=skipped)
+            if not asked.early:
+                break
+            skipped = admit(
+                asked, save=True, skips=[q.key for q in asked.early]
+            ).skipped
+        assert not asked.early
+        assert len(asked.skipped) == len(skipped)
+
+    @pytest.mark.parametrize(
+        ("save", "which", "answer", "refusal"),
+        [
+            (False, "shown", False, "only a saved round skips"),
+            (True, "unshown", False, "only a question this round shows"),
+            (True, "shown", True, "answered or skipped, not both"),
+        ],
+    )
+    def test_a_skip_is_refused(self, save, which, answer, refusal):
+        asked = _asked_after([])
+        key = asked.early[0].key if which == "shown" else CAPACITY[:4] + ("x", "")
+        facts = [FactAnswer(key=key, value="unknown")] if answer else []
+        with pytest.raises(ValueError, match=refusal):
+            admit(asked, facts=facts, save=save, skips=[key])
+
+    def test_the_route_keeps_a_skip_on_the_job(self):
+        from analysis_service.sources import SourceLimits
+
+        client, store = catalog_client()
+        client.app.state.limits = SourceLimits(max_total_bytes=100_000, max_sources=3)
+        job = waiting(store)
+        body = client.get(f"/v1/jobs/{job}/questions", headers=auth()).json()
+        key = body["early_questions"][0]["key"]
+        response = client.post(
+            f"/v1/jobs/{job}/answers",
+            json={"save": True, "skip": [key]},
+            headers=auth(),
+        )
+        assert response.status_code == 200, response.text
+        after = client.get(f"/v1/jobs/{job}/questions", headers=auth()).json()
+        assert [q["key"] for q in after["skipped_early"]] == [key]
+        assert key not in [q["key"] for q in after["early_questions"]]
+        assert asyncio.run(store.get(job)).skipped_early == [tuple(key)]
