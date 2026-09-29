@@ -180,7 +180,7 @@ class QuestionSet:
 
     @property
     def done(self) -> bool:
-        """True where a waiting job has nothing left to ask, so it starts."""
+        """True where a waiting job has nothing left to ask."""
         return self.waiting and not (self.early or self.links)
 
     def admit(

@@ -474,7 +474,8 @@ class TestTheBoundedRounds:
         with pytest.raises(ValueError, match="only a job waiting"):
             admit(finished, facts=[answer], save=True)
 
-    def test_the_route_saves_a_round_and_starts_when_nothing_is_left(self):
+    def test_the_route_saves_every_round_and_only_a_continue_starts(self):
+        """The last save started the analysis by itself (#1289, item 7)."""
         from analysis_service.sources import SourceLimits
 
         client, store = catalog_client()
@@ -483,6 +484,8 @@ class TestTheBoundedRounds:
         job = waiting(store)
         for _ in range(20):
             body = client.get(f"/v1/jobs/{job}/questions", headers=auth()).json()
+            if body["early_stop"] is not None:
+                break
             facts = [
                 {"key": q["key"], "value": "unknown"} for q in body["early_questions"]
             ]
@@ -495,12 +498,17 @@ class TestTheBoundedRounds:
                 json={"facts": facts, "links": links, "save": True},
                 headers=auth(),
             )
-            if response.status_code == 201:
-                break
             assert response.status_code == 200, response.text
             assert response.json() == {"job_id": job, "saved": True}
             assert asyncio.run(store.get(job)).checkpoint is not None
-        assert response.status_code == 201, "the rounds never ended"
+        else:
+            pytest.fail("the rounds never ended")
+        assert body["early_stop"] == "nothing-left"
+
+        response = client.post(
+            f"/v1/jobs/{job}/answers", json={"links": []}, headers=auth()
+        )
+        assert response.status_code == 201, response.text
         child = asyncio.run(store.get(response.json()["job_id"]))
         assert child.resumption.follow_up is False
         assert child.facts, "the saved answers reach the analysis"

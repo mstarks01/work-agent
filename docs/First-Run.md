@@ -340,9 +340,10 @@ The app can ask you questions before the analysis, and after the report.
   model. **Your answers** lists every answer you saved, and **Change** opens
   one again. A question with parts comes back while a part has no answer, with
   the parts you answered filled in. Click **Start the analysis** at any time.
-  When no question is left, the analysis starts by itself. The analysis then
-  starts from what was already read, so nothing is read again, and it reads
-  your answers.
+  A save never starts the analysis. When no question is left, the page says
+  so, and you can still change an answer. Only **Start the analysis** starts
+  it. The analysis then starts from what was already read, so nothing is read
+  again, and it reads your answers.
 - **After the report: one optional follow-up.** The report may offer a
   closed **Optional follow-up** section. It says how many questions it asks
   and how many conditional findings wait on them. You do not need it: the

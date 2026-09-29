@@ -985,15 +985,8 @@ def create_app(
                 raise HTTPException(
                     status_code=409, detail="the job no longer waits on answers"
                 )
-            parent.links, parent.facts = admitted.links, admitted.facts
-            parent.shown_early = list(admitted.shown)
-            following = await anyio.to_thread.run_sync(
-                _question_set, parent, model, assertions, []
-            )
-            if not following.done:
-                return JSONResponse({"job_id": parent.id, "saved": True})
-            # Nothing is left to ask, so the analysis starts, as a continue
-            # with no new answers would.
+            # A saved round never starts the analysis: a continue does.
+            return JSONResponse({"job_id": parent.id, "saved": True})
         breach = request.app.state.limits.breach(admitted.sources)
         if breach is not None:
             raise HTTPException(
