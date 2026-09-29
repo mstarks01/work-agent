@@ -256,8 +256,9 @@
     if (parts.length) {
       const estimate = document.createElement("p");
       estimate.className = "hint";
+      const choices = data.facts.reduce((sum, q) => sum + q.decisions, 0);
       estimate.textContent = `There are ${parts.join(" and ")} that can change the`
-        + ` analysis. This round shows ${data.facts.length}.`;
+        + ` analysis. This round asks ${choices} choice(s).`;
       questions.append(estimate);
     }
     if (data.questions.length) {

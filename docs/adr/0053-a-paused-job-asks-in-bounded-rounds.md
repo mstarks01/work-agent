@@ -17,9 +17,12 @@ Any answer started the analysis, so a submitter had one chance to answer.
 
 ## Decision
 
-**A paused job asks in rounds.** A round shows at most 10 capability
-questions and at most 10 questions about the model's elements (field
-questions). A submitter saves a round, which writes the answers onto the job
+**A paused job asks in rounds.** A round asks up to 10 choices of capability
+questions and up to 10 choices of questions about the model's elements (field
+questions). A question with facets costs one choice a facet it leaves open,
+and any other question costs one. A round of 10 questions asked 17 to 24
+choices on the 13 Baseline models, so the unit is the choice, not the
+question (#1289). A question wider than the round is still asked alone. A submitter saves a round, which writes the answers onto the job
 and runs no model. The next round is built from the model with every saved
 answer in it, so an answer hides the parts of a capability it rules out, and
 a named mechanism lowers the questions that rested on its lead. "Start the
@@ -69,9 +72,16 @@ with its answered facets filled in.
 
 ## Consequences
 
-In E21 every replay ended in three rounds. A STRIDE job asks at most 30
-questions, and the limit cuts at most 12. An ASVS job asks 26 yes/no
-questions.
+In E21, with rounds of 10 questions, every replay ended in three rounds. A
+STRIDE job asks at most 30 questions, and the limit cuts at most 12. An ASVS
+job asks 26 yes/no questions.
+
+In E23 the round size in choices moved only how the work is split. A STRIDE
+pause answered in full asks a median of 58 choices at every budget, because
+the limit of 30 questions sets the total. At 10 choices a round it takes 7
+rounds (5 when every control is named), and an ASVS pause takes 3. A
+submitter can stop at any round, and skip, so a smaller page costs a person
+who answers everything more rounds, and nobody else anything.
 
 A saved round is kept on the waiting job, through `JobStore.save_round`, which
 writes the answers and nothing else. A first-run app restart still loses a

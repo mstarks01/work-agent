@@ -178,8 +178,10 @@ assertion catalog applied, leaves it open: `unknown`, possibly with a
 qualification after it, or a zone the service inferred. Answer them as `facts` on the route below. The analysis then
 reads your answers, so the findings rest on them.
 
-**A waiting job asks in rounds.** `early_questions` holds one round: at most
-10 capability questions and at most 10 questions about the model's elements.
+**A waiting job asks in rounds.** `early_questions` holds one round: up to 10
+choices of capability questions and up to 10 choices of questions about the
+model's elements. Each question's `decisions` counts its choices: one a facet,
+else one. A question wider than the round is still asked alone.
 A field question needs a `score` of at least 1, and a capability question at
 least 2. One pause asks at most 30 of each kind in all. `early_remaining`
 estimates how many of each kind are left, this round included; answers can

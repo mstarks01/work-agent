@@ -121,6 +121,10 @@ class Replay:
     #: How many questions the rounds showed and the submitter answered.
     asked: int
     rounds: int
+    #: The choices the rounds asked of a person in all, and the most in one
+    #: round: a facet is one choice, and any other question one.
+    decisions: int
+    widest: int
     #: Questions that reached the floor only after an answer, and questions at
     #: the floor at the start that were never asked: an answer took them away,
     #: or their kind's limit cut them.
@@ -173,6 +177,7 @@ def replay(
     first = _eligible(listed)
     seen: set[UnknownKey] = set()
     asked_keys: set[UnknownKey] = set()
+    per_round: list[int] = []
     rounds = 0
     for rounds in range(MAX_ROUNDS):
         asked = question_set(
@@ -189,6 +194,7 @@ def replay(
         if asked.done:
             break
         seen |= {question.key for question in asked.early}
+        per_round.append(sum(question.decisions for question in asked.early))
         given = [answerer(question, blessed) for question in asked.early]
         answered = merged_facts(answered, _admitted(asked, answered, given))
         asked_keys |= {question.key for question in asked.early}
@@ -202,6 +208,8 @@ def replay(
         above_floor=len(first),
         asked=len(asked_keys),
         rounds=rounds,
+        decisions=sum(per_round),
+        widest=max(per_round, default=0),
         added=len(seen - first),
         removed=len(first - asked_keys),
         ended=rounds < MAX_ROUNDS,
@@ -236,6 +244,8 @@ FIGURES: Mapping[str, Callable[[Replay], int]] = {
     "above_floor": lambda row: row.above_floor,
     "asked": lambda row: row.asked,
     "rounds": lambda row: row.rounds,
+    "decisions": lambda row: row.decisions,
+    "widest": lambda row: row.widest,
     "added": lambda row: row.added,
     "removed": lambda row: row.removed,
 }

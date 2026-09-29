@@ -333,8 +333,9 @@ The app can ask you questions before the analysis, and after the report.
   accounts", so that facts about the group reach the model. Rows you leave
   blank stay open.
 
-  The questions come in rounds of at most ten about the application and ten
-  about parts of your system, the most useful first. A line at the top says
+  The questions come in rounds of up to ten choices about the application and
+  ten about parts of your system, the most useful first. A question with
+  parts counts one choice a part. A line at the top says
   about how many are left; your answers can change that number. Click **Save
   and show more** for the next round. The app keeps your answers and runs no
   model. A question you leave blank comes back in the next round. **Skip the

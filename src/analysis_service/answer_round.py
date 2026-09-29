@@ -12,9 +12,10 @@ cannot differ.
 report's list.** Both ask the link questions its catalog raises. A waiting job
 may continue with no answers, and a finished one has nothing to continue.
 
-**A waiting job asks in rounds** (ADR 0053). A round shows at most
-:data:`ROUND_SIZE` capability questions and as many questions about the
-model's elements. A question is shown only at or above its kind's floor, and
+**A waiting job asks in rounds** (ADR 0053). A round shows capability
+questions and questions about the model's elements up to
+:data:`ROUND_DECISIONS` choices of each kind: a question with facets costs
+one choice a facet it still leaves open, any other question one. A question is shown only at or above its kind's floor, and
 one pause asks each kind at most its limit in all: :data:`EARLY_RULES` is the
 table. A question answered in part comes back first, outside the limit, and
 where the limits hold questions back the job says so
@@ -63,15 +64,15 @@ from analysis_service.system_model import SystemModel
 
 __all__ = [
     "EARLY_RULES",
-    "ROUND_SIZE",
+    "ROUND_DECISIONS",
     "AdmittedRound",
     "EarlyRule",
     "QuestionSet",
     "question_set",
 ]
 
-#: How many questions of each kind one round at the pause shows.
-ROUND_SIZE = 10
+#: How many choices of each kind one round at the pause asks of a person.
+ROUND_DECISIONS = 10
 
 
 @dataclass(frozen=True)
@@ -371,6 +372,9 @@ def _round(
     answered in part comes first, and takes no place under the limit, which
     it already counts toward: each earlier answer counts toward its kind's
     limit, and the limit bounds only the questions not yet answered at all.
+
+    A round takes questions in order until the next would pass
+    :data:`ROUND_DECISIONS` for its kind, and always takes the first.
     """
     shown: list[EarlyQuestion] = []
     remaining = {}
@@ -389,7 +393,18 @@ def _round(
         fresh = [question for question in eligible if question.key not in held]
         remaining[kind] = len(started) + min(len(fresh), left)
         withheld += max(len(fresh) - left, 0)
-        this_kind = started[:ROUND_SIZE]
-        this_kind += fresh[: min(ROUND_SIZE - len(this_kind), left)]
-        shown.extend(this_kind)
+        budget = ROUND_DECISIONS
+        for question in [*started, *fresh[:left]]:
+            cost = _open_decisions(question, held.get(question.key))
+            if cost > budget and budget < ROUND_DECISIONS:
+                break
+            shown.append(question)
+            budget -= cost
     return tuple(shown), remaining, withheld
+
+
+def _open_decisions(question: EarlyQuestion, answer: FactAnswer | None) -> int:
+    """The choices a question still asks: its facets with no answer, else all."""
+    if answer is None or not answer.facets:
+        return question.decisions
+    return sum(1 for facet in question.facets if facet.id not in answer.facets)
