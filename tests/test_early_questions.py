@@ -11,7 +11,7 @@ from collections import Counter
 
 import pytest
 
-from analysis_service.answer_round import EARLY_RULES, ROUND_SIZE
+from analysis_service.answer_round import EARLY_RULES, ROUND_DECISIONS
 from analysis_service.candidates import generate_candidates
 from analysis_service.claims import UnknownRef
 from analysis_service.early_questions import (
@@ -189,12 +189,18 @@ class TestTheRoute:
         listed = early_questions(
             valid_model(), {"stride": {}}, store_catalog(store, job)
         )
-        expected = [
+        eligible = [
             question
             for question in listed
             if question.score >= EARLY_RULES["field"].floor
             and question.kind != "capability"
-        ][:ROUND_SIZE]
+        ]
+        expected, budget = [], ROUND_DECISIONS
+        for question in eligible:
+            if question.decisions > budget and expected:
+                break
+            expected.append(question)
+            budget -= question.decisions
         assert body["early_questions"] == [q.to_json() for q in expected]
         assert body["early_questions"]
 

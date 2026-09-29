@@ -176,6 +176,11 @@ class EarlyQuestion:
     #: whose "no" makes this one moot. ``None`` for every other question.
     parent: UnknownKey | None = None
 
+    @property
+    def decisions(self) -> int:
+        """The choices a person makes to answer it: one a facet, else one."""
+        return len(self.facets) or 1
+
     def to_json(self) -> dict[str, object]:
         return {
             "key": list(self.key),
@@ -187,6 +192,7 @@ class EarlyQuestion:
             "suggestions": list(self.suggestions),
             "facets": facets_json(self.facets),
             "max_length": self.max_length,
+            "decisions": self.decisions,
             "group": self.group,
             "group_heading": self.group_heading,
             "element": self.element,

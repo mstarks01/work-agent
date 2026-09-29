@@ -384,8 +384,9 @@ class TestTheRoundsEnd:
 class TestTheBoundedRounds:
     """A waiting job asks in rounds (ADR 0053)."""
 
-    def test_a_round_shows_at_most_its_size_of_each_kind_above_the_floor(self):
-        from analysis_service.answer_round import EARLY_RULES, ROUND_SIZE
+    def test_a_round_asks_at_most_its_choices_of_each_kind_above_the_floor(self):
+        """A round of 10 questions asked 17-24 choices (#1289, item 2)."""
+        from analysis_service.answer_round import EARLY_RULES, ROUND_DECISIONS
 
         asked = _asked_after([])
         for kind, rule in EARLY_RULES.items():
@@ -394,9 +395,29 @@ class TestTheBoundedRounds:
                 for q in asked.early
                 if (q.kind == "capability") == (kind == "capability")
             ]
-            assert len(shown) <= ROUND_SIZE
+            assert sum(q.decisions for q in shown) <= max(
+                ROUND_DECISIONS, shown[0].decisions if shown else 0
+            )
             assert all(q.score >= rule.floor for q in shown)
         assert asked.early, "a control: the waiting job asks something"
+
+    def test_a_question_wider_than_the_round_is_still_asked(self):
+        from analysis_service.answer_round import ROUND_DECISIONS, _round
+
+        wide = SimpleNamespace(
+            key=CAPACITY, kind="question", score=5.0, decisions=ROUND_DECISIONS + 1
+        )
+        shown, _, _ = _round([wide], frozenset(), {})
+        assert shown == (wide,)
+
+    def test_a_started_question_costs_only_its_open_facets(self):
+        from analysis_service.answer_round import _open_decisions
+
+        facets = QUESTION_KINDS["capacity-limits"].facets
+        question = SimpleNamespace(key=CAPACITY, facets=facets, decisions=len(facets))
+        answer = FactAnswer(key=CAPACITY, facets={facets[0].id: "yes"})
+        assert _open_decisions(question, answer) == len(facets) - 1
+        assert _open_decisions(question, None) == len(facets)
 
     def test_a_saved_answer_leaves_the_round_and_is_listed_with_its_answer(self):
         first = _asked_after([]).early[0]
@@ -423,18 +444,23 @@ class TestTheBoundedRounds:
     def test_a_question_answered_in_part_comes_back_outside_the_limit(self):
         """Thirty partial answers hid every question and started the analysis
         as if nothing were left (#1289, B3)."""
-        from analysis_service.answer_round import ROUND_SIZE, _round
+        from analysis_service.answer_round import ROUND_DECISIONS, _round
+
+        facets = QUESTION_KINDS["capacity-limits"].facets
 
         def capacity_of(n):
             key = (f"process:p{n}", "", "", "", "capacity-limits", "")
-            return SimpleNamespace(key=key, kind="question", score=5.0)
+            return SimpleNamespace(
+                key=key, kind="question", score=5.0, facets=facets, decisions=4
+            )
 
         listed = [capacity_of(n) for n in range(31)]
         held = {
             q.key: FactAnswer(key=q.key, facets={"rate": "yes"}) for q in listed[:30]
         }
         shown, remaining, withheld = _round(listed, answered_keys(held.values()), held)
-        assert [q.key for q in shown] == [q.key for q in listed[:ROUND_SIZE]]
+        # Each started question still asks its three open facets.
+        assert [q.key for q in shown] == [q.key for q in listed[: ROUND_DECISIONS // 3]]
         assert remaining["field"] == 30
         assert withheld == 1
 
