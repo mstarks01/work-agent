@@ -945,3 +945,44 @@ class TestOnlyAnAddedSweepIsABaselineSubmission:
                 title=lambda root, author: "",
                 closing=lambda root, author: "",
             )
+
+
+class TestThePushLeavesNoLocalBranch:
+    """A failed push left ``submit/review/<login>-<date>`` behind, and every
+    retry that day refused to create it again (run 11)."""
+
+    @staticmethod
+    def repository(tmp_path):
+        from evals.harness import submit
+
+        def git(cwd, *args):
+            submit.run_command(["git", *args], cwd)
+
+        origin = tmp_path / "origin.git"
+        git(tmp_path, "init", "--bare", "-b", "main", str(origin))
+        local = tmp_path / "local"
+        git(tmp_path, "init", "-b", "main", str(local))
+        git(local, "config", "user.email", "t@example.test")
+        git(local, "config", "user.name", "T")
+        (local / "f").write_text("x", encoding="utf-8")
+        git(local, "add", "f")
+        git(local, "commit", "-m", "seed")
+        git(local, "remote", "add", "origin", str(origin))
+        git(local, "push", "-u", "origin", "main")
+        return local, origin
+
+    def test_a_failed_push_can_be_retried_under_the_same_name(self, tmp_path):
+        from evals.harness import submit
+
+        local, origin = self.repository(tmp_path)
+        branch = "submit/review/ada-2026-09-29"
+        files = {"evals/review/one.json": b"{}\n"}
+        with pytest.raises(submit.SubmitError):
+            submit.push_commit(local, str(tmp_path / "gone.git"), branch, "t", files)
+        assert submit.run_command(["git", "branch", "--list", branch], local) == ""
+
+        submit.push_commit(local, "origin", branch, "t", files)
+        pushed = submit.run_command(
+            ["git", "ls-remote", str(origin), f"refs/heads/{branch}"], local
+        )
+        assert pushed.strip()

@@ -20,7 +20,7 @@ if __package__ in {None, ""}:
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 from evals import review_submission as review_submissions
 from evals.harness import envelope as envelopes
@@ -135,22 +135,38 @@ def _review_envelope(
                 detail=f"{row.case_id}: {', '.join(moved)} changed since you"
                 " recorded it; open the case, read what moved, and record again",
             )
-        cases[row.case_id] = envelopes.CaseAnswers(
-            own_list=held.own_list,
-            marks=held.marks,
-            missing=held.missing,
-            notes=held.notes,
-            opened_digests=held.opened_digests,
-        )
+        # A draft is the reader's own file, and a hand edit can hold what an
+        # envelope refuses. The envelope's rules decide, and the refusal names
+        # the case rather than failing the request.
+        try:
+            cases[row.case_id] = envelopes.CaseAnswers(
+                own_list=held.own_list,
+                marks=held.marks,
+                missing=held.missing,
+                notes=held.notes,
+                opened_digests=held.opened_digests,
+            )
+        except ValidationError as exc:
+            raise HTTPException(
+                status_code=409,
+                detail=f"{row.case_id}: the recorded review will not package —"
+                f" {sittings.first_problem(exc)}",
+            ) from None
     if not cases:
         raise HTTPException(status_code=409, detail="record a review first")
-    envelope = envelopes.Envelope(
-        envelope=envelopes.VERSION,
-        submitted_by=author,
-        submitted_for=_reviewer(author, reviewer_mode),
-        generated=datetime.now(UTC).date().isoformat(),
-        cases=cases,
-    )
+    try:
+        envelope = envelopes.Envelope(
+            envelope=envelopes.VERSION,
+            submitted_by=author,
+            submitted_for=_reviewer(author, reviewer_mode),
+            generated=datetime.now(UTC).date().isoformat(),
+            cases=cases,
+        )
+    except ValidationError as exc:
+        raise HTTPException(
+            status_code=409,
+            detail=f"the review will not package — {sittings.first_problem(exc)}",
+        ) from None
     problems = review_submissions.validate(envelope, session.root, author=author)
     if problems:
         raise HTTPException(status_code=409, detail="; ".join(problems))
