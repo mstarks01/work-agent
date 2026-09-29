@@ -191,6 +191,10 @@ class JobRecord(BaseModel):
     shown_early: list[UnknownKey] = Field(
         default_factory=list, max_length=MAX_FACT_ANSWERS
     )
+    # How many rounds a waiting job has saved. A save or a continue names the
+    # revision it read, so a page left open on an earlier round cannot write
+    # over a later one.
+    round_revision: int = 0
     # Every early question a waiting job's submitter skipped for now and has
     # not answered since. No round shows it again.
     skipped_early: list[UnknownKey] = Field(
@@ -461,6 +465,7 @@ class JobStore(Protocol):
         facts: Sequence[FactAnswer],
         shown: Sequence[UnknownKey],
         skipped: Sequence[UnknownKey],
+        revision: int,
     ) -> bool: ...
 
 
@@ -654,11 +659,15 @@ class InMemoryJobStore:
         facts: Sequence[FactAnswer],
         shown: Sequence[UnknownKey],
         skipped: Sequence[UnknownKey],
+        revision: int,
     ) -> bool:
         """Keep a saved round's answers on a job that still waits for them.
 
         ``shown`` is every early question the pause has shown, and ``skipped``
-        every one its submitter skipped for now. Only these change, so the checkpoint an envelope read leaves
+        every one its submitter skipped for now. ``revision`` is the round
+        revision the save read: the check and the next revision are one step,
+        so of two saves that read one revision only the first lands. Only these
+        change, so the checkpoint an envelope read leaves
         behind is kept. False where the job is not the subject's or no longer
         waits, and nothing is written.
         """
@@ -667,8 +676,10 @@ class InMemoryJobStore:
             record is None
             or record.owner_subject != subject
             or record.status != "awaiting-answers"
+            or record.round_revision != revision
         ):
             return False
+        record.round_revision += 1
         record.links = list(links)
         record.facts = list(facts)
         record.shown_early = list(shown)

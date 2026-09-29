@@ -120,7 +120,9 @@ def event(stream: str, name: str) -> dict:
 
 def answer(client, run_id: str, *links) -> dict:
     response = client.post(
-        f"/answer/{run_id}", json={"links": list(links)}, headers=SAME_ORIGIN
+        f"/answer/{run_id}",
+        json={"links": list(links), "revision": 0},
+        headers=SAME_ORIGIN,
     )
     return response
 
@@ -144,6 +146,7 @@ class TestTheToggle:
             json={
                 "links": [],
                 "facts": [{"key": asked["facts"][0]["key"], "value": "yes"}],
+                "revision": 0,
             },
             headers=SAME_ORIGIN,
         )
@@ -162,7 +165,12 @@ class TestTheRounds:
             facts = [{"key": q["key"], "value": "unknown"} for q in shown["facts"]]
             saved = client.post(
                 f"/answer/{paused}",
-                json={"links": [], "facts": facts, "save": True},
+                json={
+                    "links": [],
+                    "facts": facts,
+                    "save": True,
+                    "revision": shown["revision"],
+                },
                 headers=SAME_ORIGIN,
             )
             assert saved.status_code == 200, saved.text
@@ -180,11 +188,40 @@ class TestTheRounds:
         assert shown["withheld"] == 0
 
         started = client.post(
-            f"/answer/{paused}", json={"links": [], "facts": []}, headers=SAME_ORIGIN
+            f"/answer/{paused}",
+            json={"links": [], "facts": [], "revision": shown["revision"]},
+            headers=SAME_ORIGIN,
         )
         assert started.status_code == 200, started.text
         done = client.get(f"/events/{started.json()['run']}").text
         assert "event: done" in done
+
+    def test_a_save_from_a_page_left_on_an_earlier_round_is_refused(self, tiers):
+        """A page left open on an earlier round saved over a later one (#1289)."""
+        client = client_for(tiers, PausingRunner(catalog=False), catalog=False)
+        paused = start(client, questions=True)
+        shown = event(client.get(f"/events/{paused}").text, "questions")
+        assert shown["revision"] == 0
+        first, second = (q["key"] for q in shown["facts"][:2])
+
+        def save(key, revision):
+            body = {"links": [], "facts": [], "save": True, "skip": [key]}
+            return client.post(
+                f"/answer/{paused}",
+                json=body | {"revision": revision},
+                headers=SAME_ORIGIN,
+            )
+
+        landed = save(first, 0)
+        assert landed.status_code == 200, landed.text
+        assert landed.json()["revision"] == 1
+        stale = save(second, 0)
+        assert stale.status_code == 409
+        assert "another tab" in stale.json()["message"]
+        missing = client.post(
+            f"/answer/{paused}", json={"links": [], "facts": []}, headers=SAME_ORIGIN
+        )
+        assert missing.status_code == 400
 
     def test_a_round_of_skips_alone_is_saved_and_listed(self, tiers):
         client = client_for(tiers, PausingRunner(catalog=False), catalog=False)
@@ -193,7 +230,7 @@ class TestTheRounds:
         keys = [q["key"] for q in shown["facts"]]
         saved = client.post(
             f"/answer/{paused}",
-            json={"links": [], "facts": [], "save": True, "skip": keys},
+            json={"links": [], "facts": [], "save": True, "skip": keys, "revision": 0},
             headers=SAME_ORIGIN,
         )
         assert saved.status_code == 200, saved.text
@@ -209,7 +246,7 @@ class TestTheRounds:
         client.get(f"/events/{paused}")
         saved = client.post(
             f"/answer/{paused}",
-            json={"links": [], "facts": [], "save": True, "skip": skip},
+            json={"links": [], "facts": [], "save": True, "skip": skip, "revision": 0},
             headers=SAME_ORIGIN,
         )
         assert saved.status_code == 400
@@ -221,7 +258,11 @@ class TestTheRounds:
         first = event(client.get(f"/events/{paused}").text, "questions")["facts"][0]
         saved = client.post(
             f"/answer/{paused}",
-            json={"links": [], "facts": [{"key": first["key"], "value": "x" * 1001}]},
+            json={
+                "links": [],
+                "facts": [{"key": first["key"], "value": "x" * 1001}],
+                "revision": 0,
+            },
             headers=SAME_ORIGIN,
         )
         assert saved.status_code == 400
@@ -236,7 +277,7 @@ class TestTheRounds:
         client.get(f"/events/{paused}")
         saved = client.post(
             f"/answer/{paused}",
-            json={"links": [], "facts": [], "save": True},
+            json={"links": [], "facts": [], "save": True, "revision": 0},
             headers=SAME_ORIGIN,
         )
         assert saved.status_code == 400
@@ -1259,6 +1300,7 @@ def test_the_last_save_waits_for_the_start_button(withheld, said):
     link = {"principal": "shopper accounts", "element": "entity:shopper"}
     ready = {
         "run": "r1",
+        "revision": 4,
         "questions": [],
         "facts": [],
         "remaining": {},
@@ -1279,7 +1321,7 @@ await ids.analyze.listeners.submit({{ preventDefault() {{}} }}); await settle();
 streams[0].listeners.questions({{ data: JSON.stringify({{ run: "r1", questions: [
   {{ principal: "shopper accounts", rows: 2,
     options: [{{ id: "entity:shopper", name: "Shopper" }}] }}], facts: [],
-  remaining: {{}}, answered: [], answered_links: [] }}) }});
+  remaining: {{}}, answered: [], answered_links: [], revision: 3 }}) }});
 ids.questions.querySelectorAll("select")[0].value = "entity:shopper";
 const answered = fetch;
 globalThis.fetch = async (url, init) => {{
@@ -1297,7 +1339,14 @@ await ids.continue.listeners.click(); await settle();
     seen = _run_form_script(steps)
     _, save, after, start = seen["calls"]
 
-    assert save["body"] == {"links": [link], "facts": [], "save": True, "skip": []}
+    assert save["body"] == {
+        "links": [link],
+        "facts": [],
+        "save": True,
+        "skip": [],
+        "revision": 3,
+    }
+    assert start["body"]["revision"] == 4, "the start sends the revision it read"
     assert after["waiting"] and after["asked"] and not after["saveShown"]
     assert said in after["said"]
     assert "Nothing runs until you choose Start the analysis" in after["said"]

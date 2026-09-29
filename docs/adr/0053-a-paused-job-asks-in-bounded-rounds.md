@@ -53,6 +53,11 @@ questions stay listed, and an answer to one is still admitted. A question the
 submitter leaves blank without a skip comes back, as before: only an explicit
 skip sets a question aside (#1289).
 
+**A waiting job counts its saved rounds.** Every answer to a waiting job names
+the round revision it was read against, and a save checks it and writes the
+next one in one step. Without it, a page left open on an earlier round saved
+its answers over a later round's, and nothing said so (#1289).
+
 **A save never starts the analysis.** A save that leaves no question shows
 that nothing is left, with the saved answers, which the submitter can still
 change. Only a continue starts the analysis. A person who saves progress does

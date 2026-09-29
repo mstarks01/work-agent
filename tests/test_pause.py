@@ -208,7 +208,7 @@ class TestTheRoutes:
         entries = recorded_entries(client)
         response = client.post(
             f"/v1/jobs/{job}/answers",
-            json={"links": [LINK.model_dump()]},
+            json={"links": [LINK.model_dump()], "revision": 0},
             headers=auth(),
         )
         assert response.status_code == 201
@@ -221,7 +221,7 @@ class TestTheRoutes:
         client, store = catalog_client()
         job = waiting(store)
         response = client.post(
-            f"/v1/jobs/{job}/answers", json={"links": []}, headers=auth()
+            f"/v1/jobs/{job}/answers", json={"links": [], "revision": 0}, headers=auth()
         )
         assert response.status_code == 201
         child = asyncio.run(store.get(response.json()["job_id"]))
@@ -444,7 +444,7 @@ class TestThePausePathIsCertified:
         )
         questions = client.get(f"/v1/jobs/{job}/questions", headers=auth())
         answers = client.post(
-            f"/v1/jobs/{job}/answers", json={"links": []}, headers=auth()
+            f"/v1/jobs/{job}/answers", json={"links": [], "revision": 0}, headers=auth()
         )
         assert questions.status_code == 409
         assert answers.status_code == 409
@@ -457,7 +457,7 @@ class TestThePausePathIsCertified:
         job = waiting(store)
         store._records[job].certification = CertifyResult(certified=True)
         response = client.post(
-            f"/v1/jobs/{job}/answers", json={"links": []}, headers=auth()
+            f"/v1/jobs/{job}/answers", json={"links": [], "revision": 0}, headers=auth()
         )
         child = asyncio.run(store.get(response.json()["job_id"]))
         assert child.resumption.certification == CertifyResult(certified=True)

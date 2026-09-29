@@ -343,6 +343,8 @@ class AnswersSubmission(BaseModel):
     answers"; against a finished report it answers nothing. ``save`` keeps a
     waiting job's round without starting the analysis (ADR 0053), and
     ``skip`` names questions of that round the submitter skips for now.
+    ``revision`` is the waiting job's round revision the answers were read
+    against, which a waiting job requires.
     """
 
     model_config = ConfigDict(extra="forbid")
@@ -351,6 +353,7 @@ class AnswersSubmission(BaseModel):
     facts: list[FactAnswer] = Field(default_factory=list, max_length=MAX_FACT_ANSWERS)
     save: bool = False
     skip: list[UnknownKey] = Field(default_factory=list, max_length=MAX_FACT_ANSWERS)
+    revision: int | None = Field(default=None, ge=0)
 
 
 class NodeCompletion(BaseModel):
@@ -666,6 +669,21 @@ def _question_set(
     )
 
 
+def _check_revision(sent: int | None, current: int) -> None:
+    """Refuse answers to a waiting job that name no round revision, or an old one."""
+    if sent is None:
+        raise HTTPException(
+            status_code=400,
+            detail="send the revision the questions were read with",
+        )
+    if sent != current:
+        raise HTTPException(
+            status_code=409,
+            detail="the saved answers changed since these questions were read;"
+            " read the questions again",
+        )
+
+
 def _questions_payload(
     record: JobRecord,
     model: SystemModel,
@@ -674,7 +692,10 @@ def _questions_payload(
 ) -> dict[str, Any]:
     """Every question a job asks, as the questions route serves them."""
     questions = _question_set(record, model, assertions, analyses)
-    return questions.to_json() | {"fallback": question_fallback(analyses).to_json()}
+    return questions.to_json() | {
+        "fallback": question_fallback(analyses).to_json(),
+        "revision": record.round_revision,
+    }
 
 
 def _status_view(record: JobRecord) -> JobStatusView:
@@ -950,9 +971,9 @@ def create_app(
         because its lanes and critics spend model calls.
 
         With ``save``, a waiting job keeps the round's answers and answers
-        ``200`` with its own ID; no model runs. Where the saved answers leave
-        nothing to ask, the analysis starts as a continue would, and the
-        response is the new job's ``201``.
+        ``200`` with its own ID; no model runs, and a save never starts the
+        analysis. A waiting job takes answers only against its current round
+        revision: ``400`` where none is sent, ``409`` where it has moved.
         """
         if answers.links and not request.app.state.carries_catalog:
             raise HTTPException(
@@ -964,6 +985,8 @@ def create_app(
         if isinstance(answerable, JSONResponse):
             return answerable
         parent, model, assertions, _ = answerable
+        if parent.status == "awaiting-answers":
+            _check_revision(answers.revision, parent.round_revision)
         # Derived from the report, as the questions route derives its lists, so
         # it runs off the event loop for the same reason.
         questions = await anyio.to_thread.run_sync(_question_set, *answerable)
@@ -990,9 +1013,12 @@ def create_app(
                 admitted.facts,
                 admitted.shown,
                 admitted.skipped,
+                parent.round_revision,
             ):
                 raise HTTPException(
-                    status_code=409, detail="the job no longer waits on answers"
+                    status_code=409,
+                    detail="the job no longer waits on answers, or another save"
+                    " landed first; read the questions again",
                 )
             # A saved round never starts the analysis: a continue does.
             return JSONResponse({"job_id": parent.id, "saved": True})
