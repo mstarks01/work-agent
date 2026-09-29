@@ -106,7 +106,8 @@ from analysis_service.graph import (
     tier_node_by_graph_node,
 )
 from analysis_service.links import with_link_answers
-from analysis_service.questions import FactAnswer, answered_model
+from analysis_service.pipeline import answered_state
+from analysis_service.questions import FactAnswer
 from analysis_service.report import (
     FrameworkSelection,
     InputRef,
@@ -2410,20 +2411,21 @@ async def run_answered(
     """The ``answered`` mode: ``analysis`` mode with a submitter's signed answers.
 
     The answers reach the graph as they reach a resumed production job, through
-    the two functions that job calls: the attribute answers written onto the
-    model, and every answer as a line of the answers Source.
+    the two functions that job calls: :func:`with_link_answers` composes every
+    answer as a line of the answers Source, and
+    :func:`~analysis_service.pipeline.answered_state` seeds the model and the
+    catalog pass.
     """
     # One case for the graph and the report, so the report names the answers
     # Source it ran with and a quote from it verifies against its text.
     answered = replace(
         case, sources=tuple(with_link_answers(case.sources, [], answers))
     )
-    model = answered_model(case.model, answers)
     graph_run = await run_graph(
         pipeline,
         answered.sources,
         {
-            STATE_VALID_MODEL: model.model_dump(mode="json"),
+            **answered_state(case.model, [], answers),
             STATE_FRAMEWORK_OPTIONS: case_framework_options(case),
         },
     )
