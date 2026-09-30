@@ -225,7 +225,10 @@ class QuestionSet:
             raise ValueError("only a job waiting on answers saves a round")
         if save and not (links or facts or skips):
             raise ValueError("a saved round answers or skips at least one question")
-        self._check_skips(skips, facts, save)
+        complete = answered_keys(merged_facts(earlier_facts, facts)) & {
+            fact.key for fact in facts
+        }
+        self._check_skips(skips, complete, save)
         if self.final:
             raise ValueError(
                 "this report is final: its follow-up has run, so it takes no answers"
@@ -254,7 +257,6 @@ class QuestionSet:
                 ' "I don\'t know" or repeats an earlier answer. The follow-up'
                 " has not run, and it is still available"
             )
-        answered = {fact.key for fact in facts}
         return AdmittedRound(
             *resumed_sources(sources, earlier_links, links, earlier_facts, facts),
             shown=tuple(
@@ -264,7 +266,7 @@ class QuestionSet:
                 dict.fromkeys(
                     key
                     for key in [*(question.key for question in self.skipped), *skips]
-                    if key not in answered
+                    if key not in complete
                 )
             ),
         )
@@ -307,22 +309,27 @@ class QuestionSet:
         return merged_facts(corrections, facts)
 
     def _check_skips(
-        self, skips: Sequence[UnknownKey], facts: Sequence[FactAnswer], save: bool
+        self, skips: Sequence[UnknownKey], complete: frozenset[UnknownKey], save: bool
     ) -> None:
         """Refuse a skip outside a saved round, of a question it does not show,
-        or of a question the same submission answers."""
+        or of a question the same submission answers in full.
+
+        A question with facets answered in part may be skipped with it: the
+        facets given are kept, and the rest are set aside for now, so a
+        question the owner can answer only in part does not come back first
+        in every round.
+        """
         if not skips:
             return
         if not save:
             raise ValueError("only a saved round skips questions")
         shown = {question.key for question in self.early}
-        answered = {fact.key for fact in facts}
         for key in skips:
             if key not in shown:
                 raise ValueError(
                     f"only a question this round shows is skipped: {key!r}"
                 )
-            if key in answered:
+            if key in complete:
                 raise ValueError(
                     f"a question is answered or skipped, not both: {key!r}"
                 )

@@ -193,7 +193,9 @@ round. A saved round may also send `"skip"`, a list of keys of this round's
 questions that you set aside for now. A skip is not an answer: the fact stays
 open, no later round shows it, and it takes no place under the limit.
 `skipped_early` lists every skipped question, and an answer to one is still
-taken. A saved round must answer or skip at least one question.
+taken. A question with facets may be skipped beside a part answer to it: the
+facets sent are kept, and the rest are set aside. A skip beside a complete
+answer is refused. A saved round must answer or skip at least one question.
 
 **Send the revision you read.** `revision` counts a waiting job's saved rounds.
 Every answer to a waiting job, a save or a continue, carries the `revision` its

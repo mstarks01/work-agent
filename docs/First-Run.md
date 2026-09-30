@@ -351,8 +351,10 @@ The app can ask you questions before the analysis, and after the report.
   about how many are left; your answers can change that number. Click **Save
   and show more** for the next round. The app keeps your answers and runs no
   model. A question you leave blank comes back in the next round. **Skip the
-  rest and show more** sets the blank questions aside instead: they move to
-  **Skipped for now**, where **Answer it** opens one again. A skipped question
+  rest and show more** sets the blank questions aside instead. It also sets
+  aside a question with parts that you answered only in part, and keeps the
+  parts you gave. The questions set aside move to **Skipped for now**, where
+  **Answer it** opens one again. A skipped question
   is not an answer, and the analysis treats its fact as open.
   **Your answers** lists every answer you saved, and **Change** opens
   one again. If an answer was a guess, change it to "I don't know": the fact
