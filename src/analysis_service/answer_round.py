@@ -384,7 +384,19 @@ def question_set(
     """
     if final:
         return QuestionSet(
-            model, catalog, False, (), (), (), True, tuple(shown), {}, (), (), 0, ()
+            model=model,
+            catalog=catalog,
+            waiting=False,
+            early=(),
+            facts=(),
+            links=(),
+            final=True,
+            shown=tuple(shown),
+            remaining={},
+            answered_early=(),
+            answered_links=(),
+            withheld=0,
+            skipped=(),
         )
     if not waiting:
         showed = frozenset(shown)

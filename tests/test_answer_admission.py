@@ -35,10 +35,14 @@ from analysis_service.questions import (
     open_attribute,
 )
 from analysis_service.system_model import attribute_names
+from tests import test_webapp
 from tests.factories import valid_model
 from tests.test_api import auth
 from tests.test_links import catalog_client
 from tests.test_pause import held, waiting
+
+#: The shipped tier config, as the webapp tests build it.
+tiers = test_webapp.tiers
 
 FLOW = valid_model().data_flows[1].id
 
@@ -926,3 +930,93 @@ class TestARefusalNamesItsFactByLabel:
                 [], [FactAnswer(key=key, value="orders")], model, None, frozenset()
             )
         self.assert_readable(excinfo, fact_label(key, model))
+
+
+class TestOneResumedJob:
+    """A job's answers started any number of resumed jobs, so one report took
+    many follow-ups (#1289, ADR 0054)."""
+
+    def answer(self, client, job_id, body):
+        return client.post(f"/v1/jobs/{job_id}/answers", json=body, headers=auth())
+
+    def test_a_report_takes_one_follow_up(self):
+        from tests.test_questions import TestTheRoutes
+
+        client, store = catalog_client()
+        finished = TestTheRoutes().completed(store)
+        body = client.get(f"/v1/jobs/{finished}/questions", headers=auth()).json()
+        facts = {"facts": [_known_answer(body["fact_questions"][0])]}
+
+        assert self.answer(client, finished, facts).status_code == 201
+        again = self.answer(client, finished, facts)
+
+        assert again.status_code == 409
+        assert "already started a job" in again.json()["detail"]
+
+    def test_a_waiting_job_starts_one_analysis(self):
+        client, store = catalog_client()
+        waited = waiting(store)
+        body = {"links": [], "revision": 0}
+
+        assert self.answer(client, waited, body).status_code == 201
+        assert self.answer(client, waited, body).status_code == 409
+
+    @pytest.mark.parametrize("status", ["failed", "rejected"])
+    def test_a_resumed_job_that_read_nothing_frees_its_parent(self, status):
+        client, store = catalog_client()
+        waited = waiting(store)
+        body = {"links": [], "revision": 0}
+        first = self.answer(client, waited, body).json()["job_id"]
+        spent = asyncio.run(store.get(first))
+        asyncio.run(store.save(spent.model_copy(update={"status": status})))
+
+        assert self.answer(client, waited, body).status_code == 201
+
+
+def test_a_save_after_the_start_is_refused():
+    """A save after the start landed on the paused job, and no job read it."""
+    client, store = catalog_client()
+    waited = waiting(store)
+    started = client.post(
+        f"/v1/jobs/{waited}/answers",
+        json={"links": [], "revision": 0},
+        headers=auth(),
+    )
+    assert started.status_code == 201
+    body = client.get(f"/v1/jobs/{waited}/questions", headers=auth()).json()
+    question = body["early_questions"][0]
+
+    saved = client.post(
+        f"/v1/jobs/{waited}/answers",
+        json={"facts": [_known_answer(question)], "save": True, "revision": 0},
+        headers=auth(),
+    )
+
+    assert saved.status_code == 409
+
+
+@pytest.mark.parametrize(
+    "odd", [{"revision": True}, {"revision": "0"}, {"save": "yes"}, {"save": 1}]
+)
+def test_both_routes_refuse_one_set_of_odd_fields(odd, tiers):
+    """/v1 read ``revision: true`` as 1 and ``save: "yes"`` as a save, where
+    the first-run app refused both."""
+    from tests.test_webapp_questions import (
+        SAME_ORIGIN,
+        PausingRunner,
+        client_for,
+        event,
+        start,
+    )
+
+    client, store = catalog_client()
+    waited = waiting(store)
+    body = {"links": [], "revision": 0} | odd
+    api = client.post(f"/v1/jobs/{waited}/answers", json=body, headers=auth())
+
+    app = client_for(tiers, PausingRunner(catalog=False), catalog=False)
+    paused = start(app, questions=True)
+    event(app.get(f"/events/{paused}").text, "questions")
+    page = app.post(f"/answer/{paused}", json=body | {"facts": []}, headers=SAME_ORIGIN)
+
+    assert (api.status_code, page.status_code) == (422, 400)

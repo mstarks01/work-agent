@@ -371,7 +371,7 @@ or waits on it. The analysis does not run again.
 | `400` | `links` is sent and this deployment builds no assertion catalog; two answers name the same principal or the same fact; a link answer names a principal the job did not ask about; a fact answer names a fact the job did not ask, or a value the fact cannot take, or a line longer than 1,000 characters; or the answers would leave a capability present while an ancestor capability is absent. |
 | `404` | The job is not yours, or does not exist. |
 | `400` | `links` and `facts` are both empty and the job is not waiting on answers. Empty means "continue without answers". Or the job's report is final: its follow-up has run. |
-| `409` | The job is neither completed nor waiting on answers, its report is withheld, or its report carries no catalog. |
+| `409` | The job is neither completed nor waiting on answers, its report is withheld, or its report carries no catalog. Or the job's answers already started a job that is in flight or finished: a job takes one resumed job, and takes answers again only where that job failed or was rejected. |
 | `422` | An entry of `links` or `facts` is malformed, or a list holds more than its limit: 50 links, 200 facts. |
 
 **Or answer in a new submission** of the same system, beside the sources. That

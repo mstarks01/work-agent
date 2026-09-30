@@ -258,6 +258,19 @@ class Run:
         resumed = self.resumed_by is not None and self.resumed_by.report is not None
         return self.checkpoint is not None and self.report is None and not resumed
 
+    @property
+    def resumed(self) -> bool:
+        """True where a run this one's answers started is running or has a report.
+
+        Such a run takes no more answers, as a ``/v1`` job takes one resumed
+        job. A resumed run that failed read nothing into a report, so this one
+        takes answers again.
+        """
+        run = self.resumed_by
+        if run is None:
+            return False
+        return run.report is not None or run.task is None or not run.task.done()
+
     def questions(self) -> QuestionSet:
         """Every question this run asks, from the engine and checkpoint it holds."""
         if self.engine is None or self.checkpoint is None:
@@ -734,6 +747,14 @@ def create_app(
                 },
                 status_code=409,
             )
+        if parent.resumed:
+            return JSONResponse(
+                {
+                    "message": "These answers already started an analysis. Open"
+                    " its report, or answer again only if it fails."
+                },
+                status_code=409,
+            )
         try:
             admitted = questions.admit(
                 sources=parent.sources,
@@ -1072,15 +1093,12 @@ def _fact_answer(raw: object, questions: QuestionSet) -> FactAnswer:
         return FactAnswer.model_validate(raw)
     except ValidationError as error:
         reason = error.errors()[0]["msg"].removeprefix("Value error, ")
-        labels = {question.key: question.label for question in questions.facts}
-        labels |= {question.key: question.label for question in questions.early}
-        labels |= {
-            question.key: question.label for question, _ in questions.answered_early
-        }
+        known = questions.asked | {q.key for q, _ in questions.answered_early}
         key = raw.get("key") if isinstance(raw, dict) else None
+        parts = tuple(key) if isinstance(key, list) else ()
         label = (
-            labels.get(tuple(key))
-            if isinstance(key, list) and all(isinstance(part, str) for part in key)
+            fact_label(parts, questions.model)
+            if all(isinstance(part, str) for part in parts) and parts in known
             else None
         )
         lead = "An answer" if label is None else f'The answer to "{label}"'

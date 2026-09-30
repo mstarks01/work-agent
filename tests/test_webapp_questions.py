@@ -1883,3 +1883,59 @@ await box.all("button")[1].listeners.click();
         assert sent["body"] == {
             "facts": [{"key": list(FACT["key"]), "value": "unknown"}]
         }
+
+
+def test_a_paused_run_starts_one_analysis(tiers):
+    """A paused run's answers started a second analysis once the first ended
+    (#1289, ADR 0054)."""
+    client = client_for(tiers, PausingRunner(catalog=False), catalog=False)
+    paused = start(client, questions=True)
+    event(client.get(f"/events/{paused}").text, "questions")
+    body = {"links": [], "facts": [], "revision": 0}
+    first = client.post(f"/answer/{paused}", json=body, headers=SAME_ORIGIN)
+    assert "event: done" in client.get(f"/events/{first.json()['run']}").text
+
+    again = client.post(f"/answer/{paused}", json=body, headers=SAME_ORIGIN)
+
+    assert again.status_code == 409
+    assert "already started an analysis" in again.json()["message"]
+
+
+def test_a_refused_answer_to_a_skipped_question_names_it(tiers):
+    """The label map left out skipped questions, which still take answers."""
+    client = client_for(tiers, PausingRunner(catalog=False), catalog=False)
+    paused = start(client, questions=True)
+    first = event(client.get(f"/events/{paused}").text, "questions")["facts"][0]
+    body = {"links": [], "facts": [], "save": True, "skip": [first["key"]]}
+    client.post(f"/answer/{paused}", json=body | {"revision": 0}, headers=SAME_ORIGIN)
+
+    refused = client.post(
+        f"/answer/{paused}",
+        json={
+            "links": [],
+            "facts": [{"key": first["key"], "value": ""}],
+            "revision": 1,
+        },
+        headers=SAME_ORIGIN,
+    )
+
+    assert refused.status_code == 400
+    assert f'The answer to "{first["label"]}"' in refused.json()["message"]
+
+
+def test_a_save_after_the_start_is_refused(tiers):
+    """A save after the start landed on the paused run, and no run read it."""
+    client = client_for(tiers, PausingRunner(catalog=False), catalog=False)
+    paused = start(client, questions=True)
+    first = event(client.get(f"/events/{paused}").text, "questions")["facts"][0]
+    body = {"links": [], "facts": [], "revision": 0}
+    run = client.post(f"/answer/{paused}", json=body, headers=SAME_ORIGIN)
+    client.get(f"/events/{run.json()['run']}")
+
+    saved = client.post(
+        f"/answer/{paused}",
+        json=body | {"save": True, "skip": [first["key"]]},
+        headers=SAME_ORIGIN,
+    )
+
+    assert saved.status_code == 409
