@@ -25,6 +25,16 @@ level, with level 1 first. A package that grades nothing returns one band for
 every claim. Importance is judgement about a framework's own method, which is
 why a package declares it: a new package fails to construct until it answers.
 
+**Every package's highest band ranks equal.** A package declares its bands
+from the highest down (`FrameworkPackage.bands`), and a band's order is its
+position from the top (`bands.band_of`): 0 for the highest band, then -1,
+-2 and so on. A job that selects two packages ranks their findings in one
+list, so a critical STRIDE threat and a level 1 ASVS requirement rank equal,
+as the most important findings of their packages. The rule is a property of
+the scale and not of a framework, so it holds for a package with any number
+of bands: a package with two bands does not rank its highest band below
+another package's highest.
+
 **The order is lexicographic by band, with no weights.** The next question
 completes the most findings in the highest band, then in the next band down,
 and so on. Where none completes a finding, the next are the facts of the

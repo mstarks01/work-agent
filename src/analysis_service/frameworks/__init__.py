@@ -32,11 +32,12 @@ from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from types import MappingProxyType
-from typing import Literal, NamedTuple, get_args
+from typing import Literal, get_args
 
 from pydantic import BaseModel
 
 from analysis_service.assertions import REGISTRY, projection_fields
+from analysis_service.bands import Band
 from analysis_service.candidates import Rule
 from analysis_service.claims import (
     Claim,
@@ -233,7 +234,7 @@ class IdRule:
     """How one package composes a claim ID, **as data rather than code**.
 
     Three parts, one member. Keeping them together is what lets the package
-    contract stay at ten members while the ID rule carries everything the one
+    contract hold one member for the ID rule while it carries everything the one
     neutral resolver needs: without the lane field the resolver could not stamp
     the lane it is resolving, and stamping it is what makes a draft's lane, its
     ID's prefix and the node that produced it agree by construction.
@@ -285,22 +286,11 @@ class IdRule:
         return True if self.known is None else self.known(lane, key)
 
 
-class Band(NamedTuple):
-    """How important one claim is, as its package ranks it.
-
-    ``order`` ranks the bands, the higher first; ``label`` is what a page
-    shows, and empty for a package that grades nothing.
-    """
-
-    order: int
-    label: str
-
-
 @dataclass(frozen=True)
 class FrameworkPackage:
     """One security framework as an object the service can run.
 
-    Eleven members, plus text under one root by convention.
+    Twelve members, plus text under one root by convention.
 
     ``name``
         The closed :data:`~analysis_service.claims.FrameworkName`. A package
@@ -346,12 +336,17 @@ class FrameworkPackage:
         gate refuses a table that omits a predicate or names a rule this
         package does not declare, so a predicate added to the registry fails
         every package until each one answers for it.
+    ``bands``
+        The labels of this package's bands, the highest first. A package that
+        grades nothing declares one. Each band's order is its position from
+        the top (:func:`~analysis_service.bands.band_of`), so every package's
+        highest band ranks equal in a job that selects two.
     ``rank``
-        How important one of this package's claims is, as a :class:`Band`.
-        A report's follow-up asks first for the facts that the highest band
-        of conditional findings waits on. How important a claim is, is
-        judgement about a framework's own method, so a package declares it: a
-        package that grades nothing returns one band for every claim.
+        How important one of this package's claims is, as a
+        :class:`~analysis_service.bands.Band` of ``bands``. A report's
+        follow-up asks first for the facts that the highest band of
+        conditional findings waits on. How important a claim is, is judgement
+        about a framework's own method, so a package declares it.
     """
 
     name: FrameworkName
@@ -364,6 +359,7 @@ class FrameworkPackage:
     precondition: Precondition
     knowledge: KnowledgeTables
     predicate_readers: Mapping[str, PredicateReader]
+    bands: tuple[str, ...]
     rank: Callable[[Claim], Band]
 
     def rules_for(self, lane: str) -> tuple[Rule, ...]:
@@ -695,6 +691,10 @@ def _declaration_issues(package: FrameworkPackage) -> list[str]:
         issues.append("version is empty")
     if not package.lanes:
         issues.append("lanes is empty")
+    if not package.bands:
+        issues.append("bands is empty; a package that grades nothing declares one")
+    if len(set(package.bands)) != len(package.bands):
+        issues.append(f"bands names a band twice: {package.bands!r}")
     duplicates = sorted(
         {lane for lane in package.lanes if package.lanes.count(lane) > 1}
     )

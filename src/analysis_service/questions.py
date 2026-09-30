@@ -34,6 +34,7 @@ from analysis_service.answer_forms import (
     facets_json,
 )
 from analysis_service.assertions import AssertionCatalog
+from analysis_service.bands import UNRANKED, Band
 from analysis_service.claims import FrameworkAnalysis, UnknownKey, UnknownRef
 from analysis_service.fact_answers import (
     FactAnswer,
@@ -42,7 +43,7 @@ from analysis_service.fact_answers import (
     answered_keys,
     fact_kind,
 )
-from analysis_service.frameworks import PACKAGES, Band
+from analysis_service.frameworks import PACKAGES
 from analysis_service.open_facts import (
     element_names,
     label_of,
@@ -125,10 +126,6 @@ class FactQuestion:
             "band": self.band,
             "findings": list(self.findings),
         }
-
-
-#: The band of a question no finding waits on: below every package's.
-_UNRANKED = Band(-1, "")
 
 
 def _greedy(
@@ -304,7 +301,7 @@ def fact_questions(
                     band=max(
                         (bands[f] for f, facts in waiting.items() if key in facts),
                         key=lambda band: band.order,
-                        default=_UNRANKED,
+                        default=UNRANKED,
                     ).label,
                 )
             )

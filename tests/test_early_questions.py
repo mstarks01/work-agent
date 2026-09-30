@@ -314,12 +314,12 @@ class TestCapabilityBands:
         asked = early_questions(valid_model(), {"asvs": {"level": 2}}, None)
         capabilities = [q for q in asked if q.kind == "capability"]
         roots = [q for q in capabilities if q.parent is None]
-        assert {q.band for q in capabilities} == {2, 3}, "a control: two bands"
+        assert {q.band for q in capabilities} == {-1, 0}, "a control: two bands"
         assert [q.band for q in roots] == sorted((q.band for q in roots), reverse=True)
 
     def test_a_level_1_job_has_one_band(self):
         asked = early_questions(valid_model(), {"asvs": {"level": 1}}, None)
-        assert {q.band for q in asked if q.kind == "capability"} == {3}
+        assert {q.band for q in asked if q.kind == "capability"} == {0}
 
     @pytest.mark.parametrize("level", [1, 2, 3])
     def test_every_parent_is_asked_before_its_children(self, level):
