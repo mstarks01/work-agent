@@ -13,6 +13,7 @@ import json
 
 import pytest
 
+from analysis_service.fact_answers import FactAnswer
 from analysis_service.graph import (
     ENTRY_PREPARE,
     STATE_FRAMEWORK_OPTIONS,
@@ -21,7 +22,6 @@ from analysis_service.graph import (
 from analysis_service.jobs import Checkpoint, JobRecord, Resumption
 from analysis_service.links import ANSWERS_LABEL
 from analysis_service.pipeline import _seeded_state
-from analysis_service.questions import FactAnswer
 from evals.harness import modes, run
 from tests.factories import sample_selection
 from tests.test_evals_modes import build, case  # noqa: F401  (fixture)

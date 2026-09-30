@@ -77,6 +77,7 @@ from analysis_service.execution import (
     GraphRun,
     emitted_state,
 )
+from analysis_service.fact_answers import FactAnswer
 from analysis_service.frameworks.stride.record import DraftThreat
 from analysis_service.graph import (
     ASSERT_NODE,
@@ -107,7 +108,6 @@ from analysis_service.graph import (
 )
 from analysis_service.links import with_link_answers
 from analysis_service.pipeline import answered_state
-from analysis_service.questions import FactAnswer
 from analysis_service.report import (
     FrameworkSelection,
     InputRef,

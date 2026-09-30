@@ -39,6 +39,8 @@ from analysis_service.certification import (
     combined,
 )
 from analysis_service.execution import GraphExecutor, GraphRun
+from analysis_service.fact_answers import FactAnswer
+from analysis_service.fact_writes import answered_model
 from analysis_service.graph import (
     ENTRY_EXTRACT,
     ENTRY_HEAD_ONLY,
@@ -64,7 +66,6 @@ from analysis_service.jobs import (
     PipelineRejected,
 )
 from analysis_service.links import LinkAnswer
-from analysis_service.questions import FactAnswer, answered_model
 from analysis_service.report import (
     InputRef,
     Job,

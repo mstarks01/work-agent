@@ -37,7 +37,8 @@ from pathlib import Path
 from typing import Any, cast
 
 from analysis_service.claims import FrameworkName
-from analysis_service.questions import FactAnswer, check_fact_answers
+from analysis_service.fact_answers import FactAnswer
+from analysis_service.fact_writes import check_fact_answers
 from analysis_service.sources import Source
 from analysis_service.system_model import SystemModel
 from evals.harness.modes import EvalRunError
@@ -152,7 +153,7 @@ def answers_within_rounds(
     """
     from analysis_service.answer_round import question_set
     from analysis_service.assertions import UNKNOWN
-    from analysis_service.questions import merged_facts
+    from analysis_service.fact_answers import merged_facts
     from evals.harness.modes import case_framework_options, select_frameworks
 
     signed = {answer.key: answer for answer in answer_file.answers}

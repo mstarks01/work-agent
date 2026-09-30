@@ -633,7 +633,7 @@ def test_no_site_reads_an_open_attribute_by_exact_match():
 
     assert not offenders, (
         f"these compare an attribute to 'unknown' exactly: {sorted(offenders)}."
-        " Ask analysis.control_state, or questions.open_attribute."
+        " Ask analysis.control_state, or open_facts.open_attribute."
     )
 
 

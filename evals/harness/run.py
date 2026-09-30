@@ -57,9 +57,7 @@ from analysis_service.frameworks import PACKAGES
 from analysis_service.graph import Pipeline
 from analysis_service.identity import build_identity
 from analysis_service.model_tiers import ModelTierConfig, TierSelection
-from analysis_service.questions import (
-    question_fallback,
-)
+from analysis_service.questions import question_fallback
 from analysis_service.report import (
     NodeLatency,
     NodeRun,

@@ -16,7 +16,7 @@ cannot see the main reason to ask early: the lanes then write their findings
 with the answer in hand.
 
 **Only what is open is asked.** An attribute or a zone is asked where
-:func:`~analysis_service.questions.open_attribute` says it is open, the rule
+:func:`~analysis_service.open_facts.open_attribute` says it is open, the rule
 the answer check reads too. A question kind has no field, so each kind the
 prior names for the element's type is asked.
 
@@ -48,6 +48,15 @@ from pathlib import Path
 from types import MappingProxyType
 from typing import Any
 
+from analysis_service.answer_forms import (
+    YES_NO,
+    AnswerForm,
+    answer_choices,
+    answer_form,
+    answer_limit,
+    answer_suggestions,
+    facets_json,
+)
 from analysis_service.assertions import AssertionCatalog
 from analysis_service.candidates import generate_candidates
 from analysis_service.capabilities import CAPABILITIES, lineage
@@ -56,23 +65,16 @@ from analysis_service.claims import (
     UnknownKey,
     UnknownRef,
 )
+from analysis_service.fact_answers import FactKind, answer_facets, fact_kind
 from analysis_service.frameworks import PACKAGES
-from analysis_service.open_facts import element_names, group_of, label_of
-from analysis_service.question_kinds import QUESTION_KINDS, Facet
-from analysis_service.questions import (
-    YES_NO,
-    AnswerForm,
-    FactKind,
-    answer_choices,
-    answer_facets,
-    answer_form,
-    answer_limit,
-    answer_suggestions,
-    facets_json,
-    fact_kind,
+from analysis_service.open_facts import (
+    element_names,
+    group_of,
+    label_of,
     open_attribute,
     prepared_model,
 )
+from analysis_service.question_kinds import QUESTION_KINDS, Facet
 from analysis_service.system_model import Element, SystemModel
 
 __all__ = [
@@ -154,13 +156,13 @@ class EarlyQuestion:
     reasons: tuple[str, ...]
     #: The answers it takes, or empty where the answer is free text.
     choices: tuple[str, ...]
-    #: How a page takes the answer; see :data:`~analysis_service.questions.AnswerForm`.
+    #: How a page takes the answer; see :data:`~analysis_service.answer_forms.AnswerForm`.
     form: AnswerForm
     #: Common mechanisms a ``control`` answer may start from.
     suggestions: tuple[str, ...]
     #: The parts a ``facets`` answer is given in.
     facets: tuple[Facet, ...]
-    #: The longest answer it admits (:func:`~analysis_service.questions.answer_limit`).
+    #: The longest answer it admits (:func:`~analysis_service.answer_forms.answer_limit`).
     max_length: int
     #: The group a page shows it in, the group's heading, and the element's
     #: name as its row in that group (:func:`~analysis_service.open_facts.group_of`).

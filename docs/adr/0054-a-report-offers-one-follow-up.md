@@ -31,7 +31,7 @@ The correction is kept beside the report, apart from the answers the run read
 (`JobRecord.corrections`, `Run.corrections`), and the report marks each
 finding that rests on a corrected fact: one that quotes the fact's line of the
 answers Source, grounds on the same element's attribute, or waits on the fact
-(`questions.corrected_findings`). The analysis does not run again. A report
+(`report_conditions.corrected_findings`). The analysis does not run again. A report
 that is not final still has its follow-up, which takes a changed answer, so
 only a final report takes corrections (#1289). A rerun after a final report,
 as a separate action with its cost shown and accepted, is not built.

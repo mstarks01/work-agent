@@ -55,6 +55,7 @@ from analysis_service.budgets import BudgetPolicy
 from analysis_service.claims import FrameworkAnalysis, FrameworkName, UnknownKey
 from analysis_service.deployment import Deployment
 from analysis_service.errors import ConfigError
+from analysis_service.fact_answers import MAX_FACT_ANSWERS, FactAnswer
 from analysis_service.frameworks import PACKAGES
 from analysis_service.graph import ENTRY_EXTRACT
 from analysis_service.jobs import (
@@ -77,13 +78,9 @@ from analysis_service.links import (
 )
 from analysis_service.parsing import ascii_int
 from analysis_service.pipeline import entry_of
-from analysis_service.questions import (
-    MAX_FACT_ANSWERS,
-    FactAnswer,
-    corrected_findings,
-    question_fallback,
-)
+from analysis_service.questions import question_fallback
 from analysis_service.report import FrameworkSelection
+from analysis_service.report_conditions import corrected_findings
 from analysis_service.selection import SelectionError, resolve_selection
 from analysis_service.sources import Source, SourceLimits, clean_system_name
 from analysis_service.system_model import SystemModel

@@ -796,7 +796,7 @@ CatalogIssueCode = Literal[
     "unmatched-answer",
     # Not a refused row. A submitter's answer to a graph attribute replaced
     # this unscoped row, which reached the same attribute; see
-    # :func:`~analysis_service.questions.fact_rows`.
+    # :func:`~analysis_service.fact_writes.fact_rows`.
     "superseded-by-answer",
 ]
 

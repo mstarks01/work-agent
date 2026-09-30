@@ -14,6 +14,12 @@ import pytest
 
 from analysis_service import graph
 from analysis_service.analysis import CONTROL_ATTRIBUTES, control_state
+from analysis_service.answer_forms import (
+    CONTROL_SUGGESTIONS,
+    answer_choices,
+    answer_form,
+    answer_suggestions,
+)
 from analysis_service.answer_round import question_set
 from analysis_service.assertions import (
     UNKNOWN,
@@ -27,6 +33,8 @@ from analysis_service.assertions import (
     support_span,
 )
 from analysis_service.claims import UnknownRef
+from analysis_service.fact_answers import FactAnswer, fact_kind
+from analysis_service.fact_writes import answered_model, check_fact_answers
 from analysis_service.jobs import (
     Checkpoint,
     JobRecord,
@@ -41,23 +49,11 @@ from analysis_service.links import (
     resumed_sources,
     with_link_answers,
 )
+from analysis_service.open_facts import open_attribute
 from analysis_service.pipeline import AdkPipelineRunner
-from analysis_service.questions import (
-    ANSWERS_LABEL,
-    CONTROL_SUGGESTIONS,
-    FactAnswer,
-    _greedy,
-    answer_choices,
-    answer_form,
-    answer_suggestions,
-    answered_model,
-    check_fact_answers,
-    conditions,
-    fact_kind,
-    fact_questions,
-    open_attribute,
-)
-from analysis_service.sources import Source, text_digest
+from analysis_service.questions import _greedy, fact_questions
+from analysis_service.report_conditions import conditions
+from analysis_service.sources import ANSWERS_LABEL, Source, text_digest
 from analysis_service.system_model import ZONE_ATTRIBUTE, Assumption
 from tests import test_open_facts
 from tests.factories import (
@@ -229,7 +225,7 @@ class TestTheCriticCannotReorderTheEvidence:
 class TestTheAnswerForms:
     def question_for(self, key):
         """A one-finding report is overkill here; the forms read the key alone."""
-        from analysis_service.questions import answer_choices
+        from analysis_service.answer_forms import answer_choices
 
         return answer_choices(key, valid_model(), None)
 

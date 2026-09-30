@@ -15,15 +15,13 @@ import pytest
 
 from analysis_service.claims import ProposedVerdict, UnknownRef
 from analysis_service.critic import review_issues, snap_rulings
+from analysis_service.fact_answers import FactAnswer
+from analysis_service.fact_writes import check_fact_answers
 from analysis_service.links import with_link_answers
 from analysis_service.open_facts import element_names, label_of
 from analysis_service.prompts import compose_critic_prompt
 from analysis_service.question_kinds import QUESTION_KINDS
-from analysis_service.questions import (
-    FactAnswer,
-    check_fact_answers,
-    question_fallback,
-)
+from analysis_service.questions import question_fallback
 from analysis_service.sources import Source
 from analysis_service.system_model import UNKNOWN
 from tests import test_critic_review_replay

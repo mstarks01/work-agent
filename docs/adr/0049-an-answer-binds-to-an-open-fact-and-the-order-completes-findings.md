@@ -25,10 +25,10 @@ framework whose claims depend on requirements can make a fact eligible through
 its own dependencies (#1291), and not through this prior.
 
 **An answer binds to an open fact, or to a fact that an earlier round
-answered.** One rule, `questions.open_attribute`, decides when an attribute is
+answered.** One rule, `open_facts.open_attribute`, decides when an attribute is
 open: it is unverified, or it is a zone that the service inferred. The early
 list, the report list and the answer check all read that rule, and all read
-it of `questions.prepared_model`: the model with the catalog applied, as the
+it of `open_facts.prepared_model`: the model with the catalog applied, as the
 lanes read it. A paused checkpoint holds the model before `prepare` applies the
 catalog, so without this a fact the catalog states still read as open at the
 pause. An answer to an

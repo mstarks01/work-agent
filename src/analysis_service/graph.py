@@ -168,6 +168,7 @@ from analysis_service.evidence import (
     render_element_roster,
     render_rows,
 )
+from analysis_service.fact_answers import FactAnswer
 from analysis_service.factbundle import (
     DispositionRow,
     EmittedFactBundle,
@@ -211,7 +212,6 @@ from analysis_service.prompts import (
     compose_rows_prompt,
     lane_closing,
 )
-from analysis_service.questions import FactAnswer
 from analysis_service.report import (
     AnalysisContext,
     ExecutionEnvelope,

@@ -15,7 +15,7 @@ import subprocess
 import pytest
 
 from analysis_service.claims import UnknownRef
-from analysis_service.questions import FactAnswer
+from analysis_service.fact_answers import FactAnswer
 from tests.factories import asking_threat, sample_report, valid_model
 from webapp.main import render_report
 
@@ -164,7 +164,7 @@ def test_a_corrected_finding_is_marked_on_its_card():
 def test_an_owner_s_answer_is_marked_as_unchecked():
     """A quote of the owner's answer read like the description (#1289, PR 4)."""
     from analysis_service.claims import Ground
-    from analysis_service.questions import fact_line
+    from analysis_service.fact_answers import fact_line
     from analysis_service.sources import ANSWERS_LABEL
     from tests.factories import sample_threat
 
@@ -184,7 +184,7 @@ def test_every_reason_a_fact_is_open_has_a_line_on_the_page():
     """The page's WHY_OPEN and OPEN_SUMMARY tables and FactStatus are one set."""
     from typing import get_args
 
-    from analysis_service.questions import FactStatus
+    from analysis_service.report_conditions import FactStatus
     from tests.test_webapp import viewer_javascript
 
     for name in ("WHY_OPEN", "OPEN_SUMMARY"):

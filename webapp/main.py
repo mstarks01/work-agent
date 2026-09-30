@@ -132,10 +132,24 @@ from analysis_service import (
     Report,
     Source,
 )
+from analysis_service.answer_forms import (
+    answer_choices,
+    answer_form,
+    answer_limit,
+    answer_suggestions,
+    facets_json,
+)
 from analysis_service.answer_round import QuestionSet, question_set
 from analysis_service.claims import UnknownKey
 from analysis_service.deployment import Deployment
 from analysis_service.early_questions import EarlyQuestion
+from analysis_service.fact_answers import (
+    MAX_FACT_ANSWERS,
+    FactAnswer,
+    answer_facets,
+    fact_label,
+    merged_facts,
+)
 from analysis_service.frameworks import package_for
 from analysis_service.jobs import (
     Checkpoint,
@@ -153,21 +167,8 @@ from analysis_service.model_tiers import ModelTierConfig
 from analysis_service.open_facts import (
     open_facts_by_framework,
 )
-from analysis_service.questions import (
-    MAX_FACT_ANSWERS,
-    FactAnswer,
-    answer_choices,
-    answer_facets,
-    answer_form,
-    answer_limit,
-    answer_suggestions,
-    conditions,
-    corrected_findings,
-    facets_json,
-    fact_label,
-    merged_facts,
-    question_fallback,
-)
+from analysis_service.questions import question_fallback
+from analysis_service.report_conditions import conditions, corrected_findings
 from analysis_service.selection import SelectionError, resolve_selection
 from analysis_service.sources import ANSWERS_LABEL
 from analysis_service.system_model import SystemModel

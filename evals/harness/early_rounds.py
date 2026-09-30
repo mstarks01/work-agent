@@ -7,7 +7,7 @@ submitter answers in all, and how many the answers add or remove. No model
 runs: each round is built by
 :func:`~analysis_service.answer_round.question_set`, admitted by
 :meth:`~analysis_service.answer_round.QuestionSet.admit` and written by
-:func:`~analysis_service.questions.answered_model`, as the service does.
+:func:`~analysis_service.fact_writes.answered_model`, as the service does.
 
 **The checkpoint is an archived report's extracted model**, with no catalog,
 because no archived run pairs an extracted model with its catalog.
@@ -44,7 +44,7 @@ from analysis_service.answer_round import QuestionSet, passes_floor, question_se
 from analysis_service.assertions import UNKNOWN
 from analysis_service.claims import FrameworkName, UnknownKey
 from analysis_service.early_questions import EarlyQuestion, early_questions
-from analysis_service.questions import FactAnswer, answered_keys, merged_facts
+from analysis_service.fact_answers import FactAnswer, answered_keys, merged_facts
 from analysis_service.report import Report
 from analysis_service.system_model import SystemModel
 
