@@ -426,7 +426,9 @@
       label.title = q.reasons.join(" ");
       const about = context(q);
       if (q.form === "facets") {
-        group.grid = group.grid || facetTable(group.box, q, true);
+        // "Same for all" sets a column of two or more rows; one row needs none.
+        const rows = data.facts.filter((f) => f.group === q.group && f.form === "facets");
+        group.grid = group.grid || facetTable(group.box, q, rows.length >= 2);
         const before = earlier.get(JSON.stringify(q.key));
         const who = document.createElement("span");
         who.append(label);

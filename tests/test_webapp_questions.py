@@ -1440,6 +1440,25 @@ await ids.continue.listeners.click(); await settle();
         FactAnswer.model_validate(fact)
 
 
+@pytest.mark.parametrize(("rows", "shared"), [(1, False), (2, True)])
+def test_a_facet_table_sets_a_column_only_over_two_rows(rows, shared):
+    """A table of one row showed a "Same for all" row that set only that row."""
+    elements = [valid_model().data_stores[0], valid_model().data_flows[0]]
+    facts = [facet_fact(element) for element in elements[:rows]]
+    steps = f"""
+await ids.analyze.listeners.submit({{ preventDefault() {{}} }}); await settle();
+streams[0].listeners.questions({{ data: JSON.stringify({{ run: "r1", questions: [],
+  facts: {json.dumps(facts)} }}) }});
+const [table] = ids.questions.querySelectorAll("table");
+calls.push({{ labels: table.children.map(row => row.children[0].textContent) }});
+"""
+    seen = _run_form_script(steps)["calls"]
+    (labels,) = [c["labels"] for c in seen if "labels" in c]
+
+    assert ("Same for all" in labels) is shared
+    assert len(labels) == 1 + rows + shared
+
+
 @pytest.mark.parametrize("value", ["yes", "no", "not applicable", "unknown"])
 def test_every_facet_answer_the_page_offers_is_one_the_service_takes(value):
     """The page's FACET_CHOICES and the service's FACET_ANSWERS are two readers."""
@@ -1450,7 +1469,7 @@ await ids.analyze.listeners.submit({{ preventDefault() {{}} }}); await settle();
 streams[0].listeners.questions({{ data: JSON.stringify({{ run: "r1", questions: [],
   facts: {json.dumps(facts)} }}) }});
 const [table] = ids.questions.querySelectorAll("table");
-const select = table.children[2].children[1].children[0];
+const select = table.children[1].children[1].children[0];
 calls.push({{ offered: select.children.map(o => o.value) }});
 select.value = {json.dumps(value)};
 await ids.continue.listeners.click(); await settle();
@@ -1681,7 +1700,7 @@ streams[0].listeners.questions({{ data: JSON.stringify({{ run: "r1", questions: 
   facts: [{json.dumps(row)}], remaining: {{ field: 1 }},
   answered: [], answered_links: [], revision: 0 }}) }});
 const selects = ids.questions.querySelectorAll("select");
-selects[2].value = "yes";
+selects[0].value = "yes";
 globalThis.fetch = async (url, init) => {{
   calls.push({{ url, body: JSON.parse(init.body) }});
   return {{ ok: false, json: async () => ({{ message: "stop here" }}) }};
