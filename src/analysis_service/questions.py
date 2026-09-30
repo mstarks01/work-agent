@@ -266,6 +266,51 @@ def fact_line(fact: FactAnswer) -> str:
     return f'Asked "{subject}", the answer is "{fact.value}".'
 
 
+#: Why an open fact a conditional finding waits on is still open: an answer
+#: said "I don't know", the pause showed it and got no answer, an answer was
+#: given and the analysis still found the finding open, or nobody was asked.
+FactStatus = Literal["unknown", "skipped", "answered", "open"]
+
+
+def conditions(
+    analyses: Sequence[FrameworkAnalysis],
+    model: SystemModel,
+    answered: Sequence[FactAnswer],
+    shown: Sequence[UnknownKey],
+) -> dict[str, list[tuple[UnknownKey, str, FactStatus]]]:
+    """Each conditional finding's open facts, as ``framework/claim``: key, label and status.
+
+    **The one reader of "why is this finding still conditional"**, which a
+    report shows beside it. ``answered`` is what the run read and ``shown``
+    what its pause showed. An answer that does not settle its fact
+    (:attr:`FactAnswer.settles`) is ``unknown``: the finding is neither
+    confirmed nor cleared, and nothing reads the fact as absent.
+    """
+    names = element_names(model)
+    said = {answer.key: answer for answer in answered}
+    showed = set(shown)
+
+    def status(key: UnknownKey) -> FactStatus:
+        answer = said.get(key)
+        if answer is None:
+            return "skipped" if key in showed else "open"
+        return "answered" if answer.settles else "unknown"
+
+    found: dict[str, list[tuple[UnknownKey, str, FactStatus]]] = {}
+    for block in analyses:
+        for claim in block.all_claims():
+            if claim.verdict.status != "needs-info":
+                continue
+            refs = {
+                ref.key: ref
+                for ref in [*claim.unknown_grounds(), *claim.verdict.related_unknowns]
+            }
+            found[f"{block.framework}/{claim.id}"] = [
+                (key, label_of(ref, names), status(key)) for key, ref in refs.items()
+            ]
+    return found
+
+
 def corrected_findings(
     analyses: Sequence[FrameworkAnalysis],
     earlier: Sequence[FactAnswer],
