@@ -285,9 +285,10 @@ def fact_line(fact: FactAnswer) -> str:
 
 
 #: Why an open fact a conditional finding waits on is still open: an answer
-#: said "I don't know", the pause showed it and got no answer, an answer was
-#: given and the analysis still found the finding open, or nobody was asked.
-FactStatus = Literal["unknown", "skipped", "answered", "open"]
+#: said "I don't know", an answer gave some facets and left the rest open, the
+#: pause showed it and got no answer, an answer was given and the analysis
+#: still found the finding open, or nobody was asked.
+FactStatus = Literal["unknown", "partial", "skipped", "answered", "open"]
 
 
 def conditions(
@@ -301,7 +302,8 @@ def conditions(
     **The one reader of "why is this finding still conditional"**, which a
     report shows beside it. ``answered`` is what the run read and ``shown``
     what its pause showed. An answer that does not settle its fact
-    (:attr:`FactAnswer.settles`) is ``unknown``: the finding is neither
+    (:attr:`FactAnswer.settles`) is ``unknown`` where it says "I don't know",
+    and ``partial`` where it answers some facets: the finding is neither
     confirmed nor cleared, and nothing reads the fact as absent.
     """
     names = element_names(model)
@@ -312,7 +314,9 @@ def conditions(
         answer = said.get(key)
         if answer is None:
             return "skipped" if key in showed else "open"
-        return "answered" if answer.settles else "unknown"
+        if answer.settles:
+            return "answered"
+        return "partial" if answer.known else "unknown"
 
     found: dict[str, list[tuple[UnknownKey, str, FactStatus]]] = {}
     for block in analyses:

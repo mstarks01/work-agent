@@ -52,9 +52,18 @@
   // Why an open fact is still open, as the owner reads it.
   const WHY_OPEN = {
     unknown: "nobody knew: an answer said \"I don't know\"",
+    partial: "you answered part of it, and the parts left open keep it conditional",
     skipped: "skipped before the analysis",
     answered: "you answered it, and the analysis still did not find it settled",
     open: "not asked yet",
+  };
+  // The same reasons, as the "What remains open" summary counts them.
+  const OPEN_SUMMARY = {
+    unknown: (n) => `${n} wait on a fact nobody knew`,
+    partial: (n) => `${n} on a fact you answered in part`,
+    skipped: (n) => `${n} on a fact skipped before the analysis`,
+    answered: (n) => `${n} on a fact you answered that the analysis did not find settled`,
+    open: (n) => `${n} on a fact nobody was asked`,
   };
   const $ = (id) => document.getElementById(id);
   const el = (tag, cls, text) => {
@@ -860,16 +869,13 @@
   // confirmed nor cleared, and the counts say why each is still open.
   const conditional = Object.values(CONDITIONS);
   if (conditional.length) {
-    const tally = { unknown: 0, skipped: 0, answered: 0, open: 0 };
+    const tally = Object.fromEntries(Object.keys(WHY_OPEN).map(status => [status, 0]));
     conditional.forEach(waits => {
       new Set(waits.map(w => w.status)).forEach(status => { tally[status] += 1; });
     });
-    const parts = [
-      tally.unknown && `${tally.unknown} wait on a fact nobody knew`,
-      tally.skipped && `${tally.skipped} on a fact skipped before the analysis`,
-      tally.answered && `${tally.answered} on a fact you answered that the analysis did not find settled`,
-      tally.open && `${tally.open} on a fact nobody was asked`,
-    ].filter(Boolean);
+    const parts = Object.entries(OPEN_SUMMARY)
+      .filter(([status]) => tally[status])
+      .map(([status, line]) => line(tally[status]));
     $("analyses").append(el("div", "meta",
       `What remains open: ${conditional.length} finding(s) are conditional. Each is ` +
       "neither confirmed nor cleared until the facts it waits on are confirmed. " +

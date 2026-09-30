@@ -24,7 +24,12 @@ from analysis_service.jobs import Checkpoint, PipelineAwaiting, PipelineComplete
 from analysis_service.question_kinds import QUESTION_KINDS
 from analysis_service.questions import FACET_ANSWERS, FactAnswer
 from tests import test_open_facts, test_questions, test_webapp
-from tests.factories import asking_threat, sample_analysis, valid_model
+from tests.factories import (
+    asking_threat,
+    sample_analysis,
+    sample_report,
+    valid_model,
+)
 from tests.test_resume import parent_catalog
 from tests.test_webapp import (
     CARRIED,
@@ -35,7 +40,7 @@ from tests.test_webapp import (
     WEBAPP_LIMITS,
     posted,
 )
-from webapp.main import Startup, create_app
+from webapp.main import Run, Startup, create_app
 
 #: The shipped tier config, as the webapp tests build it: one fixture, used here.
 tiers = test_webapp.tiers
@@ -259,6 +264,39 @@ class TestTheRounds:
             headers=SAME_ORIGIN,
         )
         assert saved.status_code == 400
+
+    def test_a_start_after_a_skipped_round_admits_what_the_route_admits(self, tiers):
+        """The route admitted a round-2 answer and the engine refused it (#1289).
+
+        The engine built its round again without the skipped list, so it asked
+        round 1 again and the run failed after the route returned 200.
+        """
+        client = client_for(tiers, PausingRunner(catalog=False), catalog=False)
+        paused = start(client, questions=True)
+        shown = event(client.get(f"/events/{paused}").text, "questions")
+        skipped = client.post(
+            f"/answer/{paused}",
+            json={
+                "links": [],
+                "facts": [],
+                "save": True,
+                "skip": [q["key"] for q in shown["facts"]],
+                "revision": 0,
+            },
+            headers=SAME_ORIGIN,
+        )
+        asked = next(q for q in skipped.json()["facts"] if q["form"] == "choice")
+        started = client.post(
+            f"/answer/{paused}",
+            json={
+                "links": [],
+                "facts": [{"key": asked["key"], "value": asked["choices"][0]["id"]}],
+                "revision": 1,
+            },
+            headers=SAME_ORIGIN,
+        )
+        assert started.status_code == 200, started.text
+        assert "event: done" in client.get(f"/events/{started.json()['run']}").text
 
     def test_a_refused_answer_names_its_question(self, tiers):
         """Every malformed answer got one message that named nothing (#1289)."""
@@ -993,6 +1031,17 @@ def test_answers_to_a_waiting_run_may_take_its_place():
     assert analyses.get(first.id) is None
     assert analyses.get(second.id) is second
     assert analyses.get(run.id) is run
+
+
+def test_a_run_waits_until_the_run_its_answers_started_has_a_report():
+    """A failed resumed run left its paused run open to eviction (#1289)."""
+    _, (paused, _) = _waiting_registry()
+    resumed = Run(id="resumed")
+    paused.resumed_by = resumed
+
+    assert paused.waiting
+    resumed.report = sample_report([])
+    assert not paused.waiting
 
 
 CONTROL = {

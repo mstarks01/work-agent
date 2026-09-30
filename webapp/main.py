@@ -245,13 +245,18 @@ class Run:
     #: How many rounds a paused run has saved. A page sends the revision it
     #: read, so a page left open on an earlier round cannot write over a later one.
     revision: int = 0
-    #: True once a submitter's answers started a run from this one.
-    answered: bool = False
+    #: The run a submitter's answers started from this one, if any.
+    resumed_by: Run | None = None
 
     @property
     def waiting(self) -> bool:
-        """True while the run waits for answers before its analysis."""
-        return self.checkpoint is not None and self.report is None and not self.answered
+        """True while the run waits for answers before its analysis.
+
+        A run whose resumed run has not reached a report still waits: that
+        run can fail, and this one is then the only place its answers resume.
+        """
+        resumed = self.resumed_by is not None and self.resumed_by.report is not None
+        return self.checkpoint is not None and self.report is None and not resumed
 
     def questions(self) -> QuestionSet:
         """Every question this run asks, from the engine and checkpoint it holds."""
@@ -761,7 +766,7 @@ def create_app(
                 {"message": "An analysis is already running. Wait for it to finish."},
                 status_code=409,
             )
-        parent.answered = True
+        parent.resumed_by = run
         run.engine, run.sources = parent.engine, parent.sources
         run.links, run.facts = admitted.links, admitted.facts
         run.final = parent.report is not None
@@ -776,6 +781,8 @@ def create_app(
             earlier_links=parent.links,
             earlier_facts=parent.facts,
             final=parent.final,
+            shown=parent.shown,
+            skipped=parent.skipped,
             system_name="Your system",
         )
         run.task = asyncio.create_task(_drive(analyses, run, start))

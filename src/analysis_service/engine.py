@@ -292,6 +292,8 @@ class Engine:
         earlier_links: Sequence[LinkAnswer] = (),
         earlier_facts: Sequence[FactAnswer] = (),
         final: bool,
+        shown: Sequence[UnknownKey] = (),
+        skipped: Sequence[UnknownKey] = (),
         system_name: str | None = None,
         caller: str = DEFAULT_CALLER,
         on_node: NodeCallback | None = None,
@@ -303,8 +305,10 @@ class Engine:
         ``sources``, ``earlier_links`` and ``earlier_facts`` are what that run
         was given; ``links`` and ``facts`` are the new answers, which go over
         the earlier ones. ``final`` is True where that run's report
-        was written by a follow-up, and so takes no answer. :meth:`questions` admits them, so an answer to a fact
-        the run did not ask is refused. The run starts at ``prepare``, so no
+        was written by a follow-up, and so takes no answer. ``shown`` and
+        ``skipped`` are a paused run's pause history, as :meth:`questions`
+        takes them. :meth:`questions` admits the answers, so an answer to a
+        fact the run did not ask is refused. The run starts at ``prepare``, so no
         extraction and no assertion pass runs again (#1252).
         """
         if links and not self._carries_catalog:
@@ -319,6 +323,8 @@ class Engine:
                 answered=earlier_facts,
                 answered_links=earlier_links,
                 final=final,
+                shown=shown,
+                skipped=skipped,
             ).admit(
                 sources=sources,
                 earlier_links=earlier_links,
