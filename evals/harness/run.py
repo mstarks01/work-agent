@@ -186,7 +186,12 @@ from evals.harness.stability import (
     load_runs,
 )
 from evals.harness.structural import report_issues
-from evals.harness.withheld import AnswerFile, load_answer_file, withheld_case
+from evals.harness.withheld import (
+    AnswerFile,
+    answers_within_rounds,
+    load_answer_file,
+    withheld_case,
+)
 from evals.reference_facts import load_facts, signed_proposal
 
 EVALS_ROOT = Path(__file__).resolve().parents[1]
@@ -1062,6 +1067,24 @@ def command_run(args: argparse.Namespace) -> int:
     except modes.EvalRunError as refusal:
         print(refusal, file=sys.stderr)
         return 1
+    if args.answer_rounds is not None:
+        if args.mode != "answered" or answers is None:
+            print("--answer-rounds narrows the answered mode only", file=sys.stderr)
+            return 1
+        # Each case keeps the signed answers its pause asks by then, once,
+        # before anything is spent.
+        answers = {
+            case.id: replace(
+                answers[case.id],
+                answers=answers_within_rounds(
+                    case,
+                    answers[case.id],
+                    args.answer_rounds,
+                    tuple(args.framework),
+                ),
+            )
+            for case in cases
+        }
     # Before anything is spent. Both answers are free and the sweep is not, so
     # a repository that cannot say what it is about to run stops here rather
     # than 90 minutes later holding an artifact that cannot name its prompts.
@@ -1163,6 +1186,13 @@ def command_run(args: argparse.Namespace) -> int:
         sweep=sweep,
         series=_series_record(by_series) if by_series else None,
     )
+    if args.answer_rounds is not None and answers is not None:
+        # What this arm answered, in fields a reader can compare arms by.
+        artifact["answer_rounds"] = args.answer_rounds
+        artifact["answered_keys"] = {
+            case_id: [list(answer.key) for answer in answer_file.answers]
+            for case_id, answer_file in answers.items()
+        }
     if args.out:
         Path(args.out).write_text(archive_bytes("artifact", artifact), "utf-8")
         print(f"artifact written to {args.out}")
@@ -2183,6 +2213,13 @@ def _run_arguments(parser: argparse.ArgumentParser) -> None:
         "--roster",
         default=str(roster.DEFAULT_ROSTER_PATH),
         help="the standing roster the scored series are split by",
+    )
+    parser.add_argument(
+        "--answer-rounds",
+        type=int,
+        metavar="N",
+        help="with --mode answered, answer only the signed facts the pause asks"
+        " in its first N rounds, as an owner who stops after N rounds would",
     )
     parser.add_argument(
         "--accept-cost",

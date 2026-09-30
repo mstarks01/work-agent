@@ -98,3 +98,34 @@ def test_no_description_still_restates_a_withheld_control(case, tmp_path):  # no
     for element in withheld.model.elements():
         assert "authenticated session" not in element.description
         assert "Terminates shopper sessions" not in element.description
+
+
+class TestAnswersWithinRounds:
+    """An owner who stops after N rounds answers only what those rounds ask (#1289)."""
+
+    def flows(self, answers):
+        return [answer.key[0].rsplit(">", 1)[-1] for answer in answers]
+
+    def test_the_first_round_asks_one_withheld_fact_and_the_second_the_rest(
+        self,
+        case,  # noqa: F811
+    ):
+        from evals.harness.withheld import answers_within_rounds
+
+        signed = load_answer_file(DRAFT)
+        first = answers_within_rounds(case, signed, 1, ("stride",))
+        second = answers_within_rounds(case, signed, 2, ("stride",))
+        assert self.flows(first) == ["submit-order"]
+        assert set(second) == set(signed.answers)
+
+    def test_answers_keep_the_file_s_own_order_and_values(self, case):  # noqa: F811
+        from evals.harness.withheld import answers_within_rounds
+
+        signed = load_answer_file(DRAFT)
+        every = answers_within_rounds(case, signed, 10, ("stride",))
+        assert every == signed.answers
+
+    def test_the_option_narrows_the_answered_mode_only(self, capsys):
+        argv = ["run", "--mode", "withheld", "--case", "01-payments-checkout"]
+        assert run.main([*argv, "--answer-rounds", "1"]) == 1
+        assert "narrows the answered mode only" in capsys.readouterr().err
