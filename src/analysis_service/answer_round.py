@@ -40,7 +40,7 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, replace
 from typing import Any
 
-from analysis_service.assertions import AssertionCatalog
+from analysis_service.assertions import UNKNOWN, AssertionCatalog
 from analysis_service.claims import FrameworkAnalysis, FrameworkName, UnknownKey
 from analysis_service.early_questions import EarlyQuestion, early_questions
 from analysis_service.links import (
@@ -58,6 +58,7 @@ from analysis_service.questions import (
     answered_keys,
     answered_model,
     fact_questions,
+    merged_facts,
 )
 from analysis_service.sources import Source
 from analysis_service.system_model import SystemModel
@@ -213,7 +214,10 @@ class QuestionSet:
         raises :class:`~analysis_service.links.NoCatalogError`. ``save`` admits
         a round a waiting job keeps, which must answer or skip something and
         starts nothing. ``skips`` names questions of this round the submitter
-        skips for now; only a saved round skips.
+        skips for now; only a saved round skips. A report's one follow-up is
+        refused where its answers add no information
+        (:func:`_adds_information`), so it is not spent on a run that reads
+        nothing new.
         """
         if save and not self.waiting:
             raise ValueError("only a job waiting on answers saves a round")
@@ -240,6 +244,14 @@ class QuestionSet:
             earlier_links=earlier_links,
             reopen=self.waiting,
         )
+        if not self.waiting and not _adds_information(
+            earlier_links, earlier_facts, links, facts
+        ):
+            raise ValueError(
+                "these answers add nothing the analysis can use: each one is"
+                ' "I don\'t know" or repeats an earlier answer. The follow-up'
+                " has not run, and it is still available"
+            )
         answered = {fact.key for fact in facts}
         return AdmittedRound(
             *resumed_sources(sources, earlier_links, links, earlier_facts, facts),
@@ -404,6 +416,40 @@ def _round(
             shown.append(question)
             budget -= cost
     return tuple(shown), remaining, withheld
+
+
+def _adds_information(
+    earlier_links: Sequence[LinkAnswer],
+    earlier_facts: Sequence[FactAnswer],
+    links: Sequence[LinkAnswer],
+    facts: Sequence[FactAnswer],
+) -> bool:
+    """True where the answers change what the analysis reads.
+
+    A link answer does where it places a principal anew or elsewhere. A fact
+    answer does where its known content changes: "I don't know" is none, and
+    of a facet answer only the facets answered otherwise count.
+    """
+    placed = {fold(link.principal): link.element for link in earlier_links}
+    if any(placed.get(fold(link.principal)) != link.element for link in links):
+        return True
+    before = {fact.key: fact for fact in earlier_facts}
+    after = {fact.key: fact for fact in merged_facts(earlier_facts, facts)}
+    return any(
+        _known_content(after[fact.key]) != _known_content(before.get(fact.key))
+        for fact in facts
+    )
+
+
+def _known_content(answer: FactAnswer | None) -> frozenset[tuple[str, str]]:
+    """What an answer states, without its "I don't know" parts."""
+    if answer is None:
+        return frozenset()
+    if answer.facets is not None:
+        return frozenset(
+            (facet, value) for facet, value in answer.facets.items() if value != UNKNOWN
+        )
+    return frozenset({("", answer.value)}) if answer.known else frozenset()
 
 
 def _open_decisions(question: EarlyQuestion, answer: FactAnswer | None) -> int:

@@ -348,6 +348,10 @@ and an "I don't know" answer counts. A question with facets is asked again
 only for the facets that no round answered. You can still send a new answer
 to a fact that an earlier round answered, to change it. Each fact question
 carries `asked_before`: `true` where the pause showed it and got no answer.
+A follow-up must add information: a new or moved link, or an answer whose
+known content changes. Where every answer is `unknown` or repeats an earlier
+answer, it is refused with `400`, no job starts, and the follow-up is still
+available.
 
 | Status | Cause |
 | --- | --- |

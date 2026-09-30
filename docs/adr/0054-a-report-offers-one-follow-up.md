@@ -27,6 +27,12 @@ came from a report's answers, and `QuestionSet.final` reads it.
 A lineage therefore runs the analysis at most twice: once when it starts and
 once for the follow-up. The rounds at the pause run no model.
 
+**The follow-up must add information.** A submission whose every answer is
+"I don't know", or repeats an earlier answer, is refused, and the follow-up is
+still available. Only a new or moved link, or an answer whose known content
+changes, counts. Without this, one uninformed submission spent the only rerun
+on a run that read nothing new (#1289).
+
 **The follow-up is optional and says so.** The report shows it as a closed
 section: how many questions, how many conditional findings wait on them, and
 that answering runs the analysis once more. Each question says why it is
