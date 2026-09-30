@@ -157,12 +157,14 @@ from analysis_service.questions import (
     answer_form,
     answer_limit,
     answer_suggestions,
+    conditions,
     corrected_findings,
     facets_json,
     merged_facts,
     question_fallback,
 )
 from analysis_service.selection import SelectionError, resolve_selection
+from analysis_service.sources import ANSWERS_LABEL
 from analysis_service.system_model import SystemModel
 from analysis_service.vendors import (
     CREDENTIAL_MODE_NOTES,
@@ -504,7 +506,29 @@ def render_report(
         corrections=script_json(
             _corrections_payload(report, answered, corrections) if final else {}
         ),
+        provenance=script_json(_provenance_payload(report, answered, shown)),
     )
+
+
+def _provenance_payload(
+    report: Report, answered: Sequence[FactAnswer], shown: Sequence[UnknownKey]
+) -> dict[str, object]:
+    """What the page needs to tell the owner's answers from the sources, and to
+    say why each conditional finding is still open (#1289, PR 4)."""
+    return {
+        "answers_label": ANSWERS_LABEL,
+        "answered_attributes": [
+            list(answer.key[:2])
+            for answer in answered
+            if answer.kind == "attribute" and answer.known
+        ],
+        "conditions": {
+            finding: [{"label": label, "status": status} for _, label, status in rows]
+            for finding, rows in conditions(
+                report.analyses, report.system_model, answered, shown
+            ).items()
+        },
+    }
 
 
 def _corrections_payload(

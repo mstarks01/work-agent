@@ -42,6 +42,20 @@
   // findings they reach, built server-side (ADR 0054). Empty otherwise.
   const CORRECTIONS = JSON.parse(document.getElementById("corrections").textContent);
   const CORRECTED = new Set(CORRECTIONS.findings || []);
+  // Where each finding's facts came from, built server-side: the label of the
+  // owner's answers Source, the attributes the owner answered, and why each
+  // conditional finding's facts are still open.
+  const PROVENANCE = JSON.parse(document.getElementById("provenance").textContent);
+  const ANSWERED_ATTRIBUTES = new Set(
+    (PROVENANCE.answered_attributes || []).map(([element, attribute]) => `${element}>${attribute}`));
+  const CONDITIONS = PROVENANCE.conditions || {};
+  // Why an open fact is still open, as the owner reads it.
+  const WHY_OPEN = {
+    unknown: "nobody knew: an answer said \"I don't know\"",
+    skipped: "skipped before the analysis",
+    answered: "you answered it, and the analysis still did not find it settled",
+    open: "not asked yet",
+  };
   const $ = (id) => document.getElementById(id);
   const el = (tag, cls, text) => {
     const n = document.createElement(tag);
@@ -358,8 +372,12 @@
         row.append(more);
       }
       const cite = el("div", "cite" + (unverified ? " unverified" : ""));
+      // An owner's answer is an assertion the service did not check, and it
+      // says so rather than reading like the description.
+      const own = ground.source_label === PROVENANCE.answers_label;
       cite.append(unverified ? `\u26a0 not found in ${ground.source_label}`
-                             : `\u2014 ${ground.source_label}`);
+        : own ? "\u2014 your answer; the service did not check it"
+        : `\u2014 ${ground.source_label}`);
       row.append(cite);
       const repaired = marks.repaired.get(`${claimId}#${index}`);
       if (repaired) {
@@ -376,6 +394,9 @@
     }
     if (ground.kind === "unknown-attribute" || ground.kind === "absent-attribute") {
       body.append(code(ground.element_id), " \u2192 ", code(ground.attribute));
+      if (ANSWERED_ATTRIBUTES.has(`${ground.element_id}>${ground.attribute}`)) {
+        body.append(el("span", "cite", " (your answer; the service did not check it)"));
+      }
     } else {
       body.append(code(ground.flow_id));
     }
@@ -493,11 +514,25 @@
     // says who justified what.
     if (t.verdict.status === "needs-info" && t.verdict.related_unknowns.length) {
       const u = el("div","unknown");
-      u.append(el("b", null, "Needs info."), " ", prose(t.verdict.reason), " Unknown: ");
-      t.verdict.related_unknowns.forEach((r, i) => {
-        if (i) u.append(", ");
-        u.append(code(r.element_id), " \u2192 ", code(r.attribute));
-      });
+      u.append(el("b", null, "Needs info."), " ", prose(t.verdict.reason));
+      const waits = CONDITIONS[`${t.framework}/${t.id}`] || [];
+      if (waits.length) {
+        // Each fact by what it asks, and why it is still open. Until each is
+        // confirmed, the finding is neither confirmed nor cleared.
+        const list = el("ul");
+        waits.forEach(w => list.append(el("li", null, `${w.label} \u2014 ${WHY_OPEN[w.status] || w.status}`)));
+        u.append(" It waits on:", list, el("div", null,
+          "Until these are confirmed, this finding is neither confirmed nor cleared. " +
+          (FINAL
+            ? "To settle it, confirm them with the people who run the component, then correct an answer below or submit the description again."
+            : "To settle it, confirm them with the people who run the component, and answer them in the follow-up below.")));
+      } else {
+        u.append(" Unknown: ");
+        t.verdict.related_unknowns.forEach((r, i) => {
+          if (i) u.append(", ");
+          u.append(code(r.element_id), " \u2192 ", code(r.attribute));
+        });
+      }
       card.append(u);
     }
     if (t.verdict.status === "rejected") {
@@ -821,6 +856,25 @@
 
   // In the job's own selection order, which the envelope has already checked
   // against `job.frameworks`.
+  // What stays open, before any finding: a conditional finding is neither
+  // confirmed nor cleared, and the counts say why each is still open.
+  const conditional = Object.values(CONDITIONS);
+  if (conditional.length) {
+    const tally = { unknown: 0, skipped: 0, answered: 0, open: 0 };
+    conditional.forEach(waits => {
+      new Set(waits.map(w => w.status)).forEach(status => { tally[status] += 1; });
+    });
+    const parts = [
+      tally.unknown && `${tally.unknown} wait on a fact nobody knew`,
+      tally.skipped && `${tally.skipped} on a fact skipped before the analysis`,
+      tally.answered && `${tally.answered} on a fact you answered that the analysis did not find settled`,
+      tally.open && `${tally.open} on a fact nobody was asked`,
+    ].filter(Boolean);
+    $("analyses").append(el("div", "meta",
+      `What remains open: ${conditional.length} finding(s) are conditional. Each is ` +
+      "neither confirmed nor cleared until the facts it waits on are confirmed. " +
+      `Of them, ${parts.join("; ")}.`));
+  }
   R.analyses.forEach(renderBlock);
 
   // What the report asks: which element each principal is (link questions),
