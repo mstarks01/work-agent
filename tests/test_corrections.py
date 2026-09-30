@@ -88,6 +88,7 @@ class TestTheRoute:
         response = correct(client, job, FactAnswer(key=other, value="none"))
         assert response.status_code == 400
         assert "only an answer the report read" in response.json()["detail"]
+        assert "('" not in response.json()["detail"], "a label, never a raw key"
 
     def test_a_correction_that_changes_nothing_is_refused(self):
         client, store = make_client()

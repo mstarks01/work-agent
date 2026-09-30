@@ -249,6 +249,24 @@ class FactAnswer(BaseModel):
         )
 
 
+def fact_label(key: UnknownKey, model: SystemModel) -> str:
+    """What a person reads for one fact: the label its question shows.
+
+    A refusal names a fact by this rather than by its six-part key, which
+    means nothing on a page.
+    """
+    element_id, attribute, assertion, subject, question, capability = key
+    ref = UnknownRef.model_construct(
+        element_id=element_id,
+        attribute=attribute,
+        assertion=assertion,
+        subject=subject,
+        question=question,
+        capability=capability,
+    )
+    return label_of(ref, element_names(model))
+
+
 def fact_line(fact: FactAnswer) -> str:
     """The answer as its line of the answers Source, which its span quotes."""
     element_id, attribute, assertion, subject, question, capability = fact.key
@@ -997,7 +1015,7 @@ def check_fact_answers(
         if len(fact_line(answer)) > MAX_QUOTE_CHARS:
             raise ValueError(
                 f"an answer's line may hold {MAX_QUOTE_CHARS} characters; shorten"
-                f" the answer to {answer.key!r}"
+                f' the answer to "{fact_label(answer.key, model)}"'
             )
         if not answer.known:
             if answer.key in settled_before and not reopen:

@@ -268,7 +268,8 @@
     if (parts.length) {
       const estimate = document.createElement("p");
       estimate.className = "hint";
-      const choices = data.facts.reduce((sum, q) => sum + q.decisions, 0);
+      // Each link question is one choice too, though no round limit counts it.
+      const choices = data.facts.reduce((sum, q) => sum + q.decisions, 0) + data.questions.length;
       estimate.textContent = `There are ${parts.join(" and ")} that can change the`
         + ` analysis. This round asks ${choices} choice(s).`;
       questions.append(estimate);

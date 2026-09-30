@@ -869,3 +869,51 @@ class TestSkippingAPartAnswer:
         full = _facets(dict.fromkeys(("rate", "size", "concurrency", "quota"), "no"))
         with pytest.raises(ValueError, match="answered or skipped, not both"):
             admit(asked, facts=[full], save=True, skips=[CAPACITY])
+
+
+class TestARefusalNamesItsFactByLabel:
+    """Refusals printed a six-part key, which means nothing on a page (#1289)."""
+
+    def assert_readable(self, excinfo, label):
+        message = str(excinfo.value)
+        assert f'"{label}"' in message
+        assert "('" not in message, message
+
+    def test_a_line_too_long(self):
+        from analysis_service.questions import fact_label
+
+        key = (FLOW, "data_description", "", "", "", "")
+        with pytest.raises(ValueError, match="line may hold") as excinfo:
+            check_fact_answers(
+                [sized(key, MAX_QUOTE_CHARS + 1)], open_description(), None
+            )
+        self.assert_readable(excinfo, fact_label(key, open_description()))
+
+    def test_a_skip_of_a_question_not_shown_and_of_an_answered_one(self):
+        from analysis_service.questions import fact_label
+
+        asked = _asked_after([])
+        shown = asked.early[0].key
+        unshown = CAPACITY[:4] + ("x", "")
+        with pytest.raises(ValueError, match="only a question this round") as excinfo:
+            admit(asked, save=True, skips=[unshown])
+        self.assert_readable(excinfo, fact_label(unshown, asked.model))
+        with pytest.raises(ValueError, match="not both") as excinfo:
+            admit(
+                asked,
+                facts=[FactAnswer(key=shown, value="unknown")],
+                save=True,
+                skips=[shown],
+            )
+        self.assert_readable(excinfo, fact_label(shown, asked.model))
+
+    def test_an_unasked_fact(self):
+        from analysis_service.questions import fact_label
+
+        key = (FLOW, "data_description", "", "", "", "")
+        model = open_description()
+        with pytest.raises(ValueError, match="asked no question") as excinfo:
+            check_answers(
+                [], [FactAnswer(key=key, value="orders")], model, None, frozenset()
+            )
+        self.assert_readable(excinfo, fact_label(key, model))

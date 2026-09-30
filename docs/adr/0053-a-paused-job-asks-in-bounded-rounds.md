@@ -22,7 +22,11 @@ questions and up to 10 choices of questions about the model's elements (field
 questions). A question with facets costs one choice a facet it leaves open,
 and any other question costs one. A round of 10 questions asked 17 to 24
 choices on the 13 Baseline models, so the unit is the choice, not the
-question (#1289). A question wider than the round is still asked alone. A submitter saves a round, which writes the answers onto the job
+question (#1289). A question wider than the round is still asked alone.
+Link questions are outside the round limit, and each round shows every one
+still open. On the six archived reports with a catalog, a pause shows 1 to 3,
+each one choice that places 1 to 4 stated facts, so they need no place under
+the limit; the page counts them in the choices it says a round asks. A submitter saves a round, which writes the answers onto the job
 and runs no model. The next round is built from the model with every saved
 answer in it, so an answer hides the parts of a capability it rules out, and
 a named mechanism lowers the questions that rested on its lead. "Start the

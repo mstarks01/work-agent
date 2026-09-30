@@ -58,6 +58,7 @@ from analysis_service.questions import (
     answered_keys,
     answered_model,
     check_fact_answers,
+    fact_label,
     fact_questions,
     merged_facts,
     refuse_repeated_facts,
@@ -298,7 +299,8 @@ class QuestionSet:
         for fact in facts:
             if fact.key not in current:
                 raise ValueError(
-                    f"only an answer the report read can be corrected: {fact.key!r}"
+                    "only an answer the report read can be corrected:"
+                    f' "{fact_label(fact.key, self.model)}"'
                 )
         check_fact_answers(
             facts, self.model, self.catalog, list(current.values()), reopen=True
@@ -327,11 +329,13 @@ class QuestionSet:
         for key in skips:
             if key not in shown:
                 raise ValueError(
-                    f"only a question this round shows is skipped: {key!r}"
+                    "only a question this round shows is skipped:"
+                    f' "{fact_label(key, self.model)}"'
                 )
             if key in complete:
                 raise ValueError(
-                    f"a question is answered or skipped, not both: {key!r}"
+                    "a question is answered or skipped, not both:"
+                    f' "{fact_label(key, self.model)}"'
                 )
 
 
