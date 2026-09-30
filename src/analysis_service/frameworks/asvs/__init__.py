@@ -38,11 +38,11 @@ from analysis_service.frameworks import (
 )
 from analysis_service.frameworks.asvs.applicability import applicability_for
 from analysis_service.frameworks.asvs.catalog import (
-    ASVS_LEVELS,
     ASVS_VERSION,
     CHAPTER_NUMBERS,
     LANES,
     is_published_requirement,
+    requirement_band,
     requirement_level,
 )
 from analysis_service.frameworks.asvs.record import (
@@ -179,10 +179,11 @@ def _rank(claim: Claim) -> Band:
     ASVS grades no harm, and 5.0 defines a level as a requirement's priority.
     A claim naming no published requirement ranks last.
     """
-    level = requirement_level(requirement_of(claim.id))
-    if level is None:
-        return Band(0, "")
-    return Band(len(ASVS_LEVELS) + 1 - level, f"level {level}")
+    requirement = requirement_of(claim.id)
+    level = requirement_level(requirement)
+    return Band(
+        requirement_band(requirement), "" if level is None else f"level {level}"
+    )
 
 
 ASVS = FrameworkPackage(

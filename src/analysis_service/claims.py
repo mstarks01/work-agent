@@ -44,6 +44,7 @@ from pydantic import (
 from pydantic.json_schema import SkipJsonSchema
 
 from analysis_service.actions import ActionVerb
+from analysis_service.capabilities import CapabilityNeed
 from analysis_service.grounding import MovedKind, meaning_moved
 from analysis_service.question_kinds import QUESTION_KINDS
 from analysis_service.system_model import (
@@ -982,14 +983,15 @@ class Claim(BaseModel):
     @classmethod
     def open_capabilities(
         cls, model: SystemModel, options: Mapping[str, Any]
-    ) -> dict[str, int]:
+    ) -> dict[str, CapabilityNeed]:
         """Each unknown **Capability** whose answer this framework needs, and how much.
 
         A framework whose units apply by a rule over capabilities counts, for
         each capability the model leaves unknown, how many of its units that
-        answer could settle. The early questions ask those capabilities, the
-        largest count first. The neutral answer needs none, which is what a
-        framework with no applicability rule inherits.
+        answer could settle, and the band of the most important of them. The
+        early questions ask those capabilities, the highest band first. The
+        neutral answer needs none, which is what a framework with no
+        applicability rule inherits.
         """
         del model, options
         return {}

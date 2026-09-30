@@ -34,7 +34,7 @@ maintainer reads it.
 
 from __future__ import annotations
 
-from collections.abc import Iterable, Iterator, Mapping, Sequence
+from collections.abc import Callable, Iterator, Mapping, Sequence
 from dataclasses import dataclass
 from types import MappingProxyType
 from typing import Literal, TypeAlias
@@ -45,6 +45,7 @@ __all__ = [
     "Applicability",
     "Capability",
     "CapabilityFact",
+    "CapabilityNeed",
     "Decision",
     "Expression",
     "Presence",
@@ -52,7 +53,7 @@ __all__ = [
     "expression_issues",
     "expression_keys",
     "lineage",
-    "open_capability_counts",
+    "open_capability_needs",
     "resolve",
 ]
 
@@ -466,20 +467,39 @@ def resolve(known: Mapping[str, CapabilityFact]) -> Mapping[str, CapabilityFact]
     return MappingProxyType(resolved)
 
 
-def open_capability_counts(decisions: Iterable[Decision]) -> dict[str, int]:
-    """How many unknown decisions each capability, or a descendant of it, would settle.
+@dataclass(frozen=True)
+class CapabilityNeed:
+    """What one unknown capability's answer could settle for a framework.
 
-    A decision counts once for a capability, however many of its missing keys
-    sit under it.
+    ``units`` counts the unknown decisions it, or a descendant of it, would
+    settle. ``band`` is the order of the most important of them, as the
+    framework ranks its units, the higher first.
     """
-    counts: dict[str, int] = {}
-    for decision in decisions:
+
+    units: int
+    band: int
+
+
+def open_capability_needs(
+    decisions: Mapping[str, Decision], band: Callable[[str], int]
+) -> dict[str, CapabilityNeed]:
+    """How many unknown decisions each capability, or a descendant of it, would
+    settle, and the band of the most important one.
+
+    ``decisions`` maps each unit to its decision, and ``band`` gives a unit's
+    band. A decision counts once for a capability, however many of its
+    missing keys sit under it.
+    """
+    units: dict[str, int] = {}
+    bands: dict[str, int] = {}
+    for unit, decision in decisions.items():
         credited = {
             key for missing in decision.missing for key in (missing, *lineage(missing))
         }
         for key in credited:
-            counts[key] = counts.get(key, 0) + 1
-    return counts
+            units[key] = units.get(key, 0) + 1
+            bands[key] = max(bands.get(key, band(unit)), band(unit))
+    return {key: CapabilityNeed(units=units[key], band=bands[key]) for key in units}
 
 
 def _union(decisions: Sequence[Decision], field: str) -> tuple:

@@ -37,7 +37,7 @@ analysis" is available in every round.
 | Kind | Floor | Limit | Why |
 | --- | --- | --- | --- |
 | Field | 1 | 30 | The score is a ranking heuristic, the prior's citation rate times one plus the candidates, and 1 is where the ranking cuts. No measurement says how many findings an answer changes, so the floor is not a count of findings. The top 30 hold 99% of a STRIDE list's ranking score at the floor (E20), which is not a share of the report's value. |
-| Capability | 2 | 30 | A capability's score counts the units it could settle, not findings, so it takes its own floor. Under 2, it settles one unit. At ASVS level 2 the floor leaves 28 of 51. |
+| Capability | 2 | 30 | A capability's score counts the units it could settle, not findings, so it takes its own floor. Under 2, it settles one unit. At ASVS level 2 the floor left 28 of 51, and dropped about 6 a job that settle a level 1 requirement while it kept 13 that settle only level 2; a question in the highest band now passes the floor where bands differ (ADR 0055), so 34 pass and the limit asks 30. |
 
 Two limits, not one: capability questions come first, so one shared limit
 would give a job that selects both frameworks no field question.

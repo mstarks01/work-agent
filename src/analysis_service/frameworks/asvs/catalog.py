@@ -214,6 +214,17 @@ def requirement_level(requirement_id: str) -> AsvsLevel | None:
     return _LEVEL_BY_ID.get(requirement_id)
 
 
+def requirement_band(requirement_id: str) -> int:
+    """A requirement's band order: level 1, the first layer of defence, highest.
+
+    ASVS grades no harm, and 5.0 defines a level as a requirement's priority.
+    An ID the catalog lacks ranks last, at 0. The one reader of how ASVS ranks
+    a requirement, for a claim and for a capability question alike.
+    """
+    level = requirement_level(requirement_id)
+    return 0 if level is None else len(ASVS_LEVELS) + 1 - level
+
+
 def requirement_text(requirement_id: str) -> str:
     """The standard's own words for one requirement, or ``""`` for an ID it lacks.
 

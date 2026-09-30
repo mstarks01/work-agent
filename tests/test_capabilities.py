@@ -160,3 +160,20 @@ def test_expression_keys_lists_each_key_once():
     expression = {"all": ["oauth", {"any": ["oauth", "cors"]}]}
     assert expression_keys(expression) == ("oauth", "cors")
     assert expression_keys(ALWAYS) == ()
+
+
+def test_a_need_counts_each_unit_once_and_keeps_its_highest_band():
+    """The band a capability question is ranked by (#1289)."""
+    from analysis_service.capabilities import Decision, lineage, open_capability_needs
+
+    child = next(key for key in CAPABILITIES if next(lineage(key), None))
+    parent = next(lineage(child))
+    decisions = {
+        "low": Decision(state="unknown", missing=(child,)),
+        "high": Decision(state="unknown", missing=(parent,)),
+    }
+    needs = open_capability_needs(decisions, {"low": 1, "high": 3}.__getitem__)
+    assert needs[child].units == 1
+    assert needs[child].band == 1
+    assert needs[parent].units == 2, "a parent settles its child's unit too"
+    assert needs[parent].band == 3

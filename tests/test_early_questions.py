@@ -11,7 +11,7 @@ from collections import Counter
 
 import pytest
 
-from analysis_service.answer_round import EARLY_RULES, ROUND_DECISIONS
+from analysis_service.answer_round import ROUND_DECISIONS, passes_floor
 from analysis_service.candidates import generate_candidates
 from analysis_service.claims import UnknownRef
 from analysis_service.early_questions import (
@@ -206,8 +206,7 @@ class TestTheRoute:
         eligible = [
             question
             for question in listed
-            if question.score >= EARLY_RULES["field"].floor
-            and question.kind != "capability"
+            if passes_floor(question, listed) and question.kind != "capability"
         ]
         expected, budget = [], ROUND_DECISIONS
         for question in eligible:
@@ -289,3 +288,47 @@ class TestTheYesNoKinds:
     def test_a_faceted_kind_has_no_choices_of_its_own(self):
         key = UnknownRef(element_id=STORE, question="audit-evidence").key
         assert answer_choices(key, valid_model(), None) == ()
+
+
+class TestCapabilityBands:
+    """An ASVS job above level 1 dropped capability questions that settle a
+    level 1 requirement, and kept ones that settle only level 2 (#1289)."""
+
+    def question(self, score, band, kind="capability"):
+        from types import SimpleNamespace
+
+        return SimpleNamespace(kind=kind, score=score, band=band)
+
+    def test_the_top_band_passes_the_floor_where_bands_differ(self):
+        top, low = self.question(1.0, 3), self.question(1.0, 2)
+        listed = [top, low, self.question(5.0, 2)]
+        assert passes_floor(top, listed)
+        assert not passes_floor(low, listed)
+
+    def test_one_band_leaves_the_floor_alone(self):
+        one = self.question(1.0, 3)
+        assert not passes_floor(one, [one, self.question(5.0, 3)])
+
+    def test_a_field_question_is_held_to_its_floor(self):
+        field = self.question(0.5, 0, kind="attribute")
+        assert not passes_floor(field, [field, self.question(2.0, 0, kind="attribute")])
+
+    def test_a_level_2_job_asks_level_1_capabilities_first(self):
+        asked = early_questions(valid_model(), {"asvs": {"level": 2}}, None)
+        capabilities = [q for q in asked if q.kind == "capability"]
+        roots = [q for q in capabilities if q.parent is None]
+        assert {q.band for q in capabilities} == {2, 3}, "a control: two bands"
+        assert [q.band for q in roots] == sorted((q.band for q in roots), reverse=True)
+
+    def test_a_level_1_job_has_one_band(self):
+        asked = early_questions(valid_model(), {"asvs": {"level": 1}}, None)
+        assert {q.band for q in asked if q.kind == "capability"} == {3}
+
+    @pytest.mark.parametrize("level", [1, 2, 3])
+    def test_every_parent_is_asked_before_its_children(self, level):
+        asked = early_questions(valid_model(), {"asvs": {"level": level}}, None)
+        order = [q.key for q in asked if q.kind == "capability"]
+        for question in asked:
+            if question.parent is not None:
+                assert order.index(question.parent) < order.index(question.key)
+        assert any(q.parent for q in asked), "a control: some question has a parent"
