@@ -2000,3 +2000,46 @@ def test_answers_that_break_the_input_limits_are_refused_at_once(tiers, save):
 
     assert sent.status_code == 400, sent.text
     assert "bytes" in sent.json()["message"]
+
+
+def test_the_page_and_settles_agree_on_every_facet_answer():
+    """The page counts coverage in its own code, a second reader of
+    ``FactAnswer.settles``, so the two are asked the same answers here."""
+    import itertools
+
+    store = valid_model().data_stores[0]
+    fact = facet_fact(store, "audit-evidence")
+    question = {
+        **fact,
+        "basis": "evidence",
+        "cited_by": 1,
+        "covered_so_far": 1,
+        "findings": ["stride/R-01"],
+    }
+    payloads = {
+        "report": {"system_model": valid_model().model_dump(mode="json")},
+        "link_questions": [],
+        "fact_questions": [question],
+    }
+    choices = ["", *FACET_ANSWERS, "unknown"]
+    combos = list(itertools.product(choices, repeat=len(fact["facets"])))
+    steps = f"""
+const tally = () => box.all("div").map(d => d.textContent).filter(t => t.startsWith("Your"))[0];
+const selects = box.all("select");
+for (const combo of {json.dumps(combos)}) {{
+  combo.forEach((value, i) => {{ selects[i].value = value; selects[i].listeners.change(); }});
+  calls.push({{ covered: tally().startsWith("Your answers cover every question for 1") }});
+}}
+"""
+    seen = _run_answer_block(payloads, steps)["calls"]
+
+    for combo, page in zip(combos, seen, strict=True):
+        given = {
+            facet["id"]: value
+            for facet, value in zip(fact["facets"], combo, strict=True)
+            if value
+        }
+        settles = bool(given) and (
+            FactAnswer.model_validate({"key": fact["key"], "facets": given}).settles
+        )
+        assert page["covered"] is settles, combo
