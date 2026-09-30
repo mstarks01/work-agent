@@ -1559,10 +1559,33 @@ def _text_row(key, label):
         "suggestions": [],
         "facets": [],
         "max_length": 500,
+        "decisions": 1,
         "group": "g",
         "group_heading": "G",
         "reasons": [],
     }
+
+
+def test_the_round_size_counts_its_link_questions():
+    """The line said how many choices a round asks, and left out its link
+    questions, 1 to 3 a pause on the archived reports with a catalog (#1289)."""
+    row = _text_row(["", "", "", "who?", "", ""], "who?")
+    link = {
+        "principal": "shopper accounts",
+        "rows": 2,
+        "options": [{"id": "entity:shopper", "name": "Shopper"}],
+    }
+    steps = f"""
+await ids.analyze.listeners.submit({{ preventDefault() {{}} }}); await settle();
+streams[0].listeners.questions({{ data: JSON.stringify({{ run: "r1",
+  questions: [{json.dumps(link)}], facts: [{json.dumps(row)}],
+  remaining: {{ field: 1 }}, answered: [], answered_links: [], revision: 0 }}) }});
+const walk = (n, out = []) => {{ for (const c of n.children || [])
+  if (typeof c === "object") {{ out.push(c); walk(c, out); }} return out; }};
+calls.push(walk(ids.questions).map(n => n.textContent).find(t => t.includes("This round asks")));
+"""
+    said = _run_form_script(steps)["calls"][-1]
+    assert "This round asks 2 choice(s)." in said
 
 
 def test_skip_the_rest_skips_only_the_blank_questions():

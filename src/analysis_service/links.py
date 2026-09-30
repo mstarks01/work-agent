@@ -50,6 +50,7 @@ from analysis_service.questions import (
     ANSWERS_LABEL,
     FactAnswer,
     check_fact_answers,
+    fact_label,
     fact_line,
     fact_rows,
     merged_facts,
@@ -357,7 +358,9 @@ def check_answers(
     answered_before = {fact.key for fact in earlier}
     for fact in facts:
         if fact.key not in asked and fact.key not in answered_before:
-            raise ValueError(f"this job asked no question {fact.key!r}")
+            raise ValueError(
+                f'this job asked no question "{fact_label(fact.key, model)}"'
+            )
     if links and catalog is not None:
         _, issues = apply_answers(catalog, model, links)
         if issues:

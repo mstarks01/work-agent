@@ -133,7 +133,7 @@ from analysis_service import (
     Source,
 )
 from analysis_service.answer_round import QuestionSet, question_set
-from analysis_service.claims import UnknownKey, UnknownRef
+from analysis_service.claims import UnknownKey
 from analysis_service.deployment import Deployment
 from analysis_service.early_questions import EarlyQuestion
 from analysis_service.frameworks import package_for
@@ -145,8 +145,6 @@ from analysis_service.links import (
 )
 from analysis_service.model_tiers import ModelTierConfig
 from analysis_service.open_facts import (
-    element_names,
-    label_of,
     open_facts_by_framework,
 )
 from analysis_service.questions import (
@@ -160,6 +158,7 @@ from analysis_service.questions import (
     conditions,
     corrected_findings,
     facets_json,
+    fact_label,
     merged_facts,
     question_fallback,
 )
@@ -542,23 +541,13 @@ def _corrections_payload(
     """
     model = report.system_model
     catalog = report.assertions.catalog if report.assertions else None
-    names = element_names(model)
     corrected = {fact.key for fact in corrections}
     rows = []
     for answer in merged_facts(answered, corrections):
-        element_id, attribute, assertion, subject, question, capability = answer.key
-        ref = UnknownRef.model_construct(
-            element_id=element_id,
-            attribute=attribute,
-            assertion=assertion,
-            subject=subject,
-            question=question,
-            capability=capability,
-        )
         rows.append(
             {
                 "key": list(answer.key),
-                "label": label_of(ref, names),
+                "label": fact_label(answer.key, model),
                 "form": answer_form(answer.key, model, catalog),
                 "choices": list(answer_choices(answer.key, model, catalog)),
                 "facets": facets_json(answer_facets(answer.key)),
