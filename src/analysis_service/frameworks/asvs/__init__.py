@@ -29,22 +29,27 @@ from __future__ import annotations
 
 from types import MappingProxyType
 
+from analysis_service.claims import Claim
 from analysis_service.frameworks import (
+    Band,
     FrameworkPackage,
     IdRule,
     KnowledgeTables,
 )
 from analysis_service.frameworks.asvs.applicability import applicability_for
 from analysis_service.frameworks.asvs.catalog import (
+    ASVS_LEVELS,
     ASVS_VERSION,
     CHAPTER_NUMBERS,
     LANES,
     is_published_requirement,
+    requirement_level,
 )
 from analysis_service.frameworks.asvs.record import (
     ASVS_ID_FORMAT,
     AsvsOptions,
     DraftRequirementRuling,
+    requirement_of,
 )
 from analysis_service.frameworks.asvs.rules import (
     PREDICATE_READERS,
@@ -168,6 +173,18 @@ CASES: dict[str, tuple[str, ...]] = {
 }
 
 
+def _rank(claim: Claim) -> Band:
+    """A requirement's level: level 1, the first layer of defence, first.
+
+    ASVS grades no harm, and 5.0 defines a level as a requirement's priority.
+    A claim naming no published requirement ranks last.
+    """
+    level = requirement_level(requirement_of(claim.id))
+    if level is None:
+        return Band(0, "")
+    return Band(len(ASVS_LEVELS) + 1 - level, f"level {level}")
+
+
 ASVS = FrameworkPackage(
     name="asvs",
     version=ASVS_VERSION,
@@ -194,4 +211,5 @@ ASVS = FrameworkPackage(
         notes=MappingProxyType(NOTES), cases=MappingProxyType(CASES)
     ),
     predicate_readers=PREDICATE_READERS,
+    rank=_rank,
 )

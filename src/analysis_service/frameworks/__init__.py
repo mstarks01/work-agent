@@ -32,7 +32,7 @@ from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from types import MappingProxyType
-from typing import Literal, get_args
+from typing import Literal, NamedTuple, get_args
 
 from pydantic import BaseModel
 
@@ -285,11 +285,22 @@ class IdRule:
         return True if self.known is None else self.known(lane, key)
 
 
+class Band(NamedTuple):
+    """How important one claim is, as its package ranks it.
+
+    ``order`` ranks the bands, the higher first; ``label`` is what a page
+    shows, and empty for a package that grades nothing.
+    """
+
+    order: int
+    label: str
+
+
 @dataclass(frozen=True)
 class FrameworkPackage:
     """One security framework as an object the service can run.
 
-    Ten members, plus text under one root by convention.
+    Eleven members, plus text under one root by convention.
 
     ``name``
         The closed :data:`~analysis_service.claims.FrameworkName`. A package
@@ -335,6 +346,12 @@ class FrameworkPackage:
         gate refuses a table that omits a predicate or names a rule this
         package does not declare, so a predicate added to the registry fails
         every package until each one answers for it.
+    ``rank``
+        How important one of this package's claims is, as a :class:`Band`.
+        A report's follow-up asks first for the facts that the highest band
+        of conditional findings waits on. How important a claim is, is
+        judgement about a framework's own method, so a package declares it: a
+        package that grades nothing returns one band for every claim.
     """
 
     name: FrameworkName
@@ -347,6 +364,7 @@ class FrameworkPackage:
     precondition: Precondition
     knowledge: KnowledgeTables
     predicate_readers: Mapping[str, PredicateReader]
+    rank: Callable[[Claim], Band]
 
     def rules_for(self, lane: str) -> tuple[Rule, ...]:
         """This package's rules in one lane, in declaration order."""

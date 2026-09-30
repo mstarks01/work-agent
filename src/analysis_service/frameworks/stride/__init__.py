@@ -1,6 +1,6 @@
 """The STRIDE framework package: this repo's original analysis, as a package.
 
-Ten members and a text root at ``frameworks/stride/``. Everything here is
+Eleven members and a text root at ``frameworks/stride/``. Everything here is
 *profile* — the tailoring this service applies — and nothing declares a catalog:
 STRIDE is a method rather than a published requirement set, so there is no
 external artifact to carry or to check a declaration against.
@@ -9,10 +9,13 @@ external artifact to carry or to check a declaration against.
 from __future__ import annotations
 
 from types import MappingProxyType
+from typing import cast, get_args
 
 from pydantic import BaseModel, ConfigDict
 
+from analysis_service.claims import Claim, SeverityLevel, derive_severity_level
 from analysis_service.frameworks import (
+    Band,
     FrameworkPackage,
     IdRule,
     KnowledgeTables,
@@ -161,6 +164,13 @@ CASES: dict[str, tuple[str, ...]] = {
 }
 
 
+def _rank(claim: Claim) -> Band:
+    """A threat's severity band: a critical threat first."""
+    severity = cast(DraftThreat, claim).severity
+    level = derive_severity_level(severity.likelihood, severity.impact)
+    return Band(get_args(SeverityLevel).index(level), level)
+
+
 STRIDE = FrameworkPackage(
     name="stride",
     version=STRIDE_VERSION,
@@ -183,4 +193,5 @@ STRIDE = FrameworkPackage(
         notes=MappingProxyType(NOTES), cases=MappingProxyType(CASES)
     ),
     predicate_readers=PREDICATE_READERS,
+    rank=_rank,
 )

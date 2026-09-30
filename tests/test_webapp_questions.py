@@ -710,13 +710,15 @@ def test_the_report_names_the_findings_a_question_settles():
             ],
         },
         "link_questions": [],
-        "fact_questions": [_subject_question("who signs builds?", ["stride/T-01"])],
+        "fact_questions": [
+            _subject_question("who signs builds?", ["stride/T-01"]) | {"band": "high"}
+        ],
     }
     steps = """
 calls.push(box.all("div").map(d => d.textContent).filter(t => t.startsWith("Waiting")));
 """
     (waiting,) = _run_answer_block(payloads, steps)["calls"]
-    assert waiting == ["Waiting on it: Build tampering"]
+    assert waiting == ["Waiting on it: Build tampering. The most important is high."]
 
 
 def test_a_question_no_finding_waits_on_is_set_apart():
