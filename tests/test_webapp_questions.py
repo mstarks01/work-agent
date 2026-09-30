@@ -586,6 +586,7 @@ class Node {
   constructor(tag) { this.tag = tag; this.children = []; this.dataset = {};
     this.value = ""; this.listeners = {}; this._text = ""; }
   append(...kids) { for (const k of kids) this.children.push(k); }
+  replaceChildren(...kids) { this.children = [...kids]; }
   set textContent(t) { this._text = t; }
   get textContent() { return this._text; }
   addEventListener(name, fn) { this.listeners[name] = fn; }
@@ -615,7 +616,12 @@ ANSWER_BLOCK_START = "  if (LINK_QUESTIONS.length || FACT_QUESTIONS.length) {"
 ANSWER_BLOCK_END = "    box.append(actions, note);\n  }\n"
 
 
-def _run_answer_block(payloads: dict, steps: str) -> dict:
+def _run_answer_block(
+    payloads: dict,
+    steps: str,
+    start_marker: str = ANSWER_BLOCK_START,
+    end_marker: str = ANSWER_BLOCK_END,
+) -> dict:
     from tests.test_webapp import FIRST_VIEWER_CONSTANT, viewer_javascript
 
     node = shutil.which("node")
@@ -623,8 +629,8 @@ def _run_answer_block(payloads: dict, steps: str) -> dict:
         pytest.skip("no node on PATH to run the report page's script")
     javascript = viewer_javascript()
     helpers = javascript.split(FIRST_VIEWER_CONSTANT)[0]
-    start = javascript.index(ANSWER_BLOCK_START)
-    end = javascript.index(ANSWER_BLOCK_END, start) + len(ANSWER_BLOCK_END)
+    start = javascript.index(start_marker)
+    end = javascript.index(end_marker, start) + len(end_marker)
     program = (
         _VIEWER_ANSWER_HARNESS.replace("PAYLOADS", json.dumps(payloads))
         + helpers
@@ -1688,3 +1694,82 @@ calls.push(box.all("p").map(p => p.children.filter(c => typeof c === "string")
     assert "(you skipped this before the analysis)" in lines[0]
     assert "(new from the analysis)" in lines[1]
     assert "skipped" not in lines[2] and "new from" not in lines[2]
+
+
+CORRECTIONS_BLOCK_START = "  if (FINAL && (CORRECTIONS.answers || []).length) {"
+CORRECTIONS_BLOCK_END = '    $("links").append(box);\n  }\n'
+
+
+class TestCorrections:
+    """A final report takes corrections and runs nothing (#1289, ADR 0054)."""
+
+    def runs(self, tiers):
+        """A client, a finished run, and the final run its follow-up wrote."""
+        client = client_for(tiers, PausingRunner(catalog=False), catalog=False)
+        finished = start(client, questions=False)
+        client.get(f"/events/{finished}")
+        final = client.post(
+            f"/answer/{finished}",
+            json={"links": [], "facts": [dict(FACT)]},
+            headers=SAME_ORIGIN,
+        ).json()["run"]
+        client.get(f"/events/{final}")
+        return client, finished, final
+
+    def correct(self, client, run, value, headers=SAME_ORIGIN):
+        body = {"facts": [{"key": list(FACT["key"]), "value": value}]}
+        return client.post(f"/correct/{run}", json=body, headers=headers)
+
+    def test_a_final_report_keeps_a_correction_and_the_page_carries_it(self, tiers):
+        client, _, final = self.runs(tiers)
+        assert self.correct(client, final, "unknown").status_code == 200
+        page = client.get(f"/report/{final}").text
+        match = re.search(r'id="corrections"[^>]*>(.*?)</script>', page, re.DOTALL)
+        payload = json.loads(match.group(1))
+        (row,) = payload["answers"]
+        assert row["key"] == list(FACT["key"])
+        assert row["answer"]["value"] == "unknown"
+        assert row["corrected"] is True
+        assert row["form"] == "control"
+
+    def test_a_report_that_is_not_final_refuses_it(self, tiers):
+        client, finished, _ = self.runs(tiers)
+        response = self.correct(client, finished, "none")
+        assert response.status_code == 400
+        assert "only a final report" in response.json()["message"]
+
+    def test_it_requires_the_app_s_own_page(self, tiers):
+        client, _, final = self.runs(tiers)
+        assert self.correct(client, final, "none", headers={}).status_code == 403
+
+    def test_the_page_sends_a_changed_answer(self):
+        row = {
+            "key": list(FACT["key"]),
+            "label": "login: encryption in transit",
+            "form": "control",
+            "choices": [],
+            "facets": [],
+            "suggestions": [],
+            "max_length": 200,
+            "answer": dict(FACT) | {"key": list(FACT["key"])},
+            "corrected": False,
+        }
+        payloads = {
+            "report": {"system_model": valid_model().model_dump(mode="json")},
+            "final": True,
+            "corrections": {"answers": [row], "findings": []},
+        }
+        steps = """
+await box.all("button")[0].listeners.click();
+const [state] = box.all("select");
+state.value = "unknown"; state.listeners.change();
+await box.all("button")[1].listeners.click();
+"""
+        seen = _run_answer_block(
+            payloads, steps, CORRECTIONS_BLOCK_START, CORRECTIONS_BLOCK_END
+        )
+        (sent,) = seen["calls"]
+        assert sent["url"] == "/correct/r1"
+        assert sent["body"] == {
+            "facts": [{"key": list(FACT["key"]), "value": "unknown"}]
+        }

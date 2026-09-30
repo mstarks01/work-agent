@@ -24,6 +24,18 @@ it runs the analysis once more, and the report that run writes is final: it
 asks nothing and admits no answer. `Resumption.follow_up` records that a job
 came from a report's answers, and `QuestionSet.final` reads it.
 
+**A final report takes corrections, and runs nothing.** "Final" means the
+planned workflow ended, not that every answer was right. The owner of a final
+report can change an answer its run read, or take it back to "I don't know".
+The correction is kept beside the report, apart from the answers the run read
+(`JobRecord.corrections`, `Run.corrections`), and the report marks each
+finding that rests on a corrected fact: one that quotes the fact's line of the
+answers Source, grounds on the same element's attribute, or waits on the fact
+(`questions.corrected_findings`). The analysis does not run again. A report
+that is not final still has its follow-up, which takes a changed answer, so
+only a final report takes corrections (#1289). A rerun after a final report,
+as a separate action with its cost shown and accepted, is not built.
+
 A lineage therefore runs the analysis at most twice: once when it starts and
 once for the follow-up. The rounds at the pause run no model.
 
@@ -57,8 +69,13 @@ sampling.
 ## Consequences
 
 A final report still lists its open facts under its conditional findings, so
-nothing a reader needs is hidden. A submitter who wants a second follow-up
-submits the description again.
+nothing a reader needs is hidden. A submitter who wants the analysis to read a
+correction submits the description again.
+
+`/v1` reads whether a report is final from the job's resumption, which the
+job envelope leaves out for its weight, so the finished job's question routes
+read it by name (`JobStore.resumption`). Until they did, `/v1` read every
+report as not final and admitted a second follow-up.
 
 E22 is one case, five runs an arm, and three answers. The equal-effort paid
 run on #1289 would measure a second follow-up directly.

@@ -266,6 +266,55 @@ def fact_line(fact: FactAnswer) -> str:
     return f'Asked "{subject}", the answer is "{fact.value}".'
 
 
+def corrected_findings(
+    analyses: Sequence[FrameworkAnalysis],
+    earlier: Sequence[FactAnswer],
+    corrections: Sequence[FactAnswer],
+) -> tuple[str, ...]:
+    """Every finding, as ``framework/claim``, that rests on a fact a correction changed.
+
+    **The one reader of "which findings does a correction reach"** (ADR 0054).
+    ``earlier`` is the answers the report's run read. A finding rests on a
+    corrected fact where it quotes the fact's line of the answers Source,
+    grounds on the same element's attribute, or names the fact as one it waits
+    on.
+    """
+    before = {fact.key: fact for fact in earlier}
+    lines = {
+        fact.key: " ".join(fact_line(before[fact.key]).split())
+        for fact in corrections
+        if fact.key in before
+    }
+    keys = {fact.key for fact in corrections}
+    attributes = {key[:2] for key in keys if fact_kind(key) == "attribute"}
+
+    def rests_on(claim: Any) -> bool:
+        cited = {
+            ref.key
+            for ref in [*claim.unknown_grounds(), *claim.verdict.related_unknowns]
+        }
+        if cited & keys:
+            return True
+        for ground in claim.grounds:
+            if (ground.element_id, ground.attribute) in attributes:
+                return True
+            quoted = " ".join(ground.text.split())
+            if (
+                ground.source_label == ANSWERS_LABEL
+                and quoted
+                and any(quoted in line for line in lines.values())
+            ):
+                return True
+        return False
+
+    return tuple(
+        f"{block.framework}/{claim.id}"
+        for block in analyses
+        for claim in block.all_claims()
+        if rests_on(claim)
+    )
+
+
 def refuse_repeated_facts(facts: Sequence[FactAnswer]) -> None:
     """Refuse two answers to one open fact in one submission.
 

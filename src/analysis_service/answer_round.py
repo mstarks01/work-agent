@@ -57,8 +57,10 @@ from analysis_service.questions import (
     FactQuestion,
     answered_keys,
     answered_model,
+    check_fact_answers,
     fact_questions,
     merged_facts,
+    refuse_repeated_facts,
 )
 from analysis_service.sources import Source
 from analysis_service.system_model import SystemModel
@@ -266,6 +268,43 @@ class QuestionSet:
                 )
             ),
         )
+
+    def correct(
+        self,
+        *,
+        earlier_facts: Sequence[FactAnswer],
+        corrections: Sequence[FactAnswer],
+        facts: Sequence[FactAnswer],
+    ) -> list[FactAnswer]:
+        """Every correction a final report carries once ``facts`` land, or a ``ValueError``.
+
+        A final report takes corrections, never answers (ADR 0054): a change
+        to a fact its run's answers covered, "I don't know" included. No model
+        runs; the corrections are kept beside the report, which says which
+        findings rest on them. ``earlier_facts`` is what the run read and
+        ``corrections`` what was corrected before.
+        """
+        if not self.final:
+            raise ValueError(
+                "only a final report takes corrections; answer its follow-up"
+                " to change an answer"
+            )
+        if not facts:
+            raise ValueError("a correction changes at least one answer")
+        refuse_repeated_facts(facts)
+        current = {f.key: f for f in merged_facts(earlier_facts, corrections)}
+        for fact in facts:
+            if fact.key not in current:
+                raise ValueError(
+                    f"only an answer the report read can be corrected: {fact.key!r}"
+                )
+        check_fact_answers(
+            facts, self.model, self.catalog, list(current.values()), reopen=True
+        )
+        after = {f.key: f for f in merged_facts(list(current.values()), facts)}
+        if all(after[f.key].value == current[f.key].value for f in facts):
+            raise ValueError("these corrections change no answer")
+        return merged_facts(corrections, facts)
 
     def _check_skips(
         self, skips: Sequence[UnknownKey], facts: Sequence[FactAnswer], save: bool

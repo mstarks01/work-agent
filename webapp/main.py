@@ -133,7 +133,7 @@ from analysis_service import (
     Source,
 )
 from analysis_service.answer_round import QuestionSet, question_set
-from analysis_service.claims import UnknownKey
+from analysis_service.claims import UnknownKey, UnknownRef
 from analysis_service.deployment import Deployment
 from analysis_service.early_questions import EarlyQuestion
 from analysis_service.frameworks import package_for
@@ -144,10 +144,22 @@ from analysis_service.links import (
     LinkQuestion,
 )
 from analysis_service.model_tiers import ModelTierConfig
-from analysis_service.open_facts import open_facts_by_framework
+from analysis_service.open_facts import (
+    element_names,
+    label_of,
+    open_facts_by_framework,
+)
 from analysis_service.questions import (
     MAX_FACT_ANSWERS,
     FactAnswer,
+    answer_choices,
+    answer_facets,
+    answer_form,
+    answer_limit,
+    answer_suggestions,
+    corrected_findings,
+    facets_json,
+    merged_facts,
     question_fallback,
 )
 from analysis_service.selection import SelectionError, resolve_selection
@@ -225,6 +237,8 @@ class Run:
     final: bool = False
     #: Every early question the pause showed.
     shown: list[UnknownKey] = field(default_factory=list)
+    #: A final report's corrections, kept beside it; no model reads them.
+    corrections: list[FactAnswer] = field(default_factory=list)
     #: Every early question the submitter skipped for now.
     skipped: list[UnknownKey] = field(default_factory=list)
     #: How many rounds a paused run has saved. A page sends the revision it
@@ -439,12 +453,14 @@ def render_report(
     answered_links: Sequence[LinkAnswer],
     final: bool,
     shown: Sequence[UnknownKey],
+    corrections: Sequence[FactAnswer] = (),
 ) -> RenderedPage:
     """``report_view.html``, carrying this run's report.
 
     ``answered``, ``answered_links``, ``final`` and ``shown`` are the run's
     answers, whether a follow-up wrote its report, and what the pause showed,
     which decide what the page still asks and how it labels each question.
+    ``corrections`` is what a final report's owner corrected since.
 
     The template is a self-contained renderer for the report schema — no build
     step, no framework, its own inline CSS and JS. This fills its one payload
@@ -485,7 +501,53 @@ def render_report(
         question_fallback=script_json(question_fallback(report.analyses).to_json()),
         link_questions=script_json(asked["link_questions"]),
         final=script_json(asked["final"]),
+        corrections=script_json(
+            _corrections_payload(report, answered, corrections) if final else {}
+        ),
     )
+
+
+def _corrections_payload(
+    report: Report, answered: Sequence[FactAnswer], corrections: Sequence[FactAnswer]
+) -> dict[str, object]:
+    """A final report's answers as it is corrected in, and what corrections reach.
+
+    Each answer carries its label, its current value with every correction
+    in, and the form, choices and limit it is changed in, read by the same
+    helpers that build a question.
+    """
+    model = report.system_model
+    catalog = report.assertions.catalog if report.assertions else None
+    names = element_names(model)
+    corrected = {fact.key for fact in corrections}
+    rows = []
+    for answer in merged_facts(answered, corrections):
+        element_id, attribute, assertion, subject, question, capability = answer.key
+        ref = UnknownRef.model_construct(
+            element_id=element_id,
+            attribute=attribute,
+            assertion=assertion,
+            subject=subject,
+            question=question,
+            capability=capability,
+        )
+        rows.append(
+            {
+                "key": list(answer.key),
+                "label": label_of(ref, names),
+                "form": answer_form(answer.key, model, catalog),
+                "choices": list(answer_choices(answer.key, model, catalog)),
+                "facets": facets_json(answer_facets(answer.key)),
+                "suggestions": list(answer_suggestions(answer.key)),
+                "max_length": answer_limit(answer.key, model),
+                "answer": answer.model_dump(mode="json"),
+                "corrected": answer.key in corrected,
+            }
+        )
+    return {
+        "answers": rows,
+        "findings": list(corrected_findings(report.analyses, answered, corrections)),
+    }
 
 
 def create_app(
@@ -729,8 +791,45 @@ def create_app(
                 answered_links=run.links,
                 final=run.final,
                 shown=run.shown,
+                corrections=run.corrections,
             )
         )
+
+    @app.post("/correct/{run_id}")
+    async def correct(run_id: str, request: Request) -> Response:
+        """Correct a final report's answers, and run nothing (ADR 0054)."""
+        if not is_same_origin(request):
+            logger.warning("refused a POST /correct that was not same-origin")
+            return JSONResponse(
+                {"message": "This request did not come from the app's own page."},
+                status_code=403,
+            )
+        run = analyses.get(run_id)
+        if run is None or run.report is None or run.engine is None:
+            return JSONResponse(
+                {"message": "That report no longer exists."}, status_code=404
+            )
+        questions = run.questions()
+        try:
+            body = await request.json()
+            raw = body["facts"]
+            if not isinstance(raw, list) or len(raw) > MAX_FACT_ANSWERS:
+                raise TypeError
+            facts = [_fact_answer(fact, questions) for fact in raw]
+        except RefusedAnswer as exc:
+            return JSONResponse({"message": str(exc)}, status_code=400)
+        except (ValidationError, ValueError, KeyError, TypeError):
+            return JSONResponse(
+                {"message": "Expected a JSON body with a 'facts' list of corrections."},
+                status_code=400,
+            )
+        try:
+            run.corrections = questions.correct(
+                earlier_facts=run.facts, corrections=run.corrections, facts=facts
+            )
+        except ValueError as exc:
+            return JSONResponse({"message": str(exc)}, status_code=400)
+        return JSONResponse({"run": run.id})
 
     return app
 
