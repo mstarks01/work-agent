@@ -1976,3 +1976,27 @@ def test_the_app_and_the_store_free_a_parent_alike(state, status):
 
     assert resumed.status == status
     assert paused.resumed is store._resumed("paused")
+
+
+@pytest.mark.parametrize("save", [True, False], ids=["save", "start"])
+def test_answers_that_break_the_input_limits_are_refused_at_once(tiers, save):
+    """The route took answers over the limits, and the run then failed."""
+    client = client_for(tiers, PausingRunner(catalog=False), catalog=False)
+    head = "A web app talks to a database. "
+    text = head + "x" * (100 * 1024 - len(head) - 10)
+    started = client.post(
+        "/analyze", json=posted(text) | {"questions": True}, headers=SAME_ORIGIN
+    )
+    paused = started.json()["run"]
+    shown = event(client.get(f"/events/{paused}").text, "questions")
+    asked = next(q for q in shown["facts"] if q["form"] == "choice")
+    fact = {"key": asked["key"], "value": asked["choices"][0]["id"]}
+
+    sent = client.post(
+        f"/answer/{paused}",
+        json={"links": [], "facts": [fact], "save": save, "revision": 0},
+        headers=SAME_ORIGIN,
+    )
+
+    assert sent.status_code == 400, sent.text
+    assert "bytes" in sent.json()["message"]

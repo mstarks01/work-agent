@@ -789,6 +789,11 @@ def create_app(
             # The answer rules' own refusals name the submitter's choices, so
             # they are safe to show.
             return JSONResponse({"message": str(exc)}, status_code=400)
+        breach = parent.engine.breach(admitted.sources)
+        if breach is not None:
+            # Checked for a save too: a saved round that no start could run
+            # would hold the run until the submitter shortens an answer.
+            return JSONResponse({"message": breach.message}, status_code=400)
         if save:
             # A saved round runs no model: the answers go onto the paused run,
             # and the next round is read off the model with them in. Where

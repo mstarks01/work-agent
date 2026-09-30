@@ -1015,3 +1015,27 @@ def test_both_routes_refuse_one_set_of_odd_fields(odd, tiers):
     page = app.post(f"/answer/{paused}", json=body | {"facts": []}, headers=SAME_ORIGIN)
 
     assert (api.status_code, page.status_code) == (422, 400)
+
+
+@pytest.mark.parametrize("save", [True, False], ids=["save", "start"])
+def test_answers_that_break_the_input_limits_are_refused_at_once(save):
+    """A save over the limits landed, and every later start then failed."""
+    from analysis_service.sources import SourceLimits, total_bytes
+
+    client, store = catalog_client()
+    waited = waiting(store)
+    record = asyncio.run(store.get(waited))
+    client.app.state.limits = SourceLimits(
+        max_total_bytes=total_bytes(record.sources) + 10, max_sources=10
+    )
+    body = client.get(f"/v1/jobs/{waited}/questions", headers=auth()).json()
+    facts = [_known_answer(body["early_questions"][0])]
+
+    sent = client.post(
+        f"/v1/jobs/{waited}/answers",
+        json={"facts": facts, "save": save, "revision": 0},
+        headers=auth(),
+    )
+
+    assert sent.status_code == 413, sent.text
+    assert asyncio.run(store.get(waited)).facts == []

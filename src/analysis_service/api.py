@@ -1040,6 +1040,13 @@ def create_app(
             raise HTTPException(status_code=409, detail=str(exc)) from exc
         except ValueError as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
+        # Checked for a save too: a saved round that no start could run would
+        # hold the job until the submitter shortens an answer.
+        breach = request.app.state.limits.breach(admitted.sources)
+        if breach is not None:
+            raise HTTPException(
+                status_code=_STATUS_BY_RUNG[breach.rung], detail=breach.message
+            )
         if answers.save:
             store: JobStore = request.app.state.store
             if not await store.save_round(
@@ -1058,11 +1065,6 @@ def create_app(
                 )
             # A saved round never starts the analysis: a continue does.
             return JSONResponse({"job_id": parent.id, "saved": True})
-        breach = request.app.state.limits.breach(admitted.sources)
-        if breach is not None:
-            raise HTTPException(
-                status_code=_STATUS_BY_RUNG[breach.rung], detail=breach.message
-            )
         record = JobRecord.create(
             owner_subject=subject,
             sources=admitted.sources,
