@@ -48,6 +48,14 @@ jobs:
       - name: Install dependencies
         run: uv sync --locked
 
+      # The browser tests' dependency group, and headless Chromium with the
+      # system libraries it needs. REQUIRE_BROWSER on the test step makes a
+      # missing browser fail the suite rather than skip its tests.
+      - name: Install the browser
+        run: |
+          uv sync --locked --group browser
+          uv run --group browser playwright install --with-deps chromium
+
       # Ruff's rule selection is its default set, held stable by the exact pin
       # in the uv.lock installed above — see the note in pyproject.toml.
       - name: Lint
@@ -78,7 +86,7 @@ jobs:
       - name: Dependency audit
         run: |
           set -euo pipefail
-          uv export --frozen --format requirements-txt --no-emit-project \
+          uv export --frozen --group browser --format requirements-txt --no-emit-project \
             | uv run pip-audit --disable-pip --requirement /dev/stdin
 
       # Lints the workflow files themselves, including this one.
@@ -110,7 +118,9 @@ jobs:
         run: uv run python evals/verify_corpus.py
 
       - name: Test suite
-        run: uv run pytest -q
+        env:
+          REQUIRE_BROWSER: "1"
+        run: uv run --group browser pytest -q
 
       # The vendor conformance matrix, rendered into the job summary.
       #

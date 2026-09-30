@@ -218,9 +218,11 @@
   const showQuestions = (data) => {
     const left = data.questions.length || data.facts.length;
     revision = data.revision;
-    const saved = (data.answered || []).length || (data.answered_links || []).length;
-    // A pause with nothing to ask and nothing answered starts the analysis,
-    // with no page between. After a save, only the start button starts it.
+    const saved = (data.answered || []).length || (data.answered_links || []).length
+      || (data.skipped || []).length;
+    // A pause with nothing to ask and nothing answered or skipped starts the
+    // analysis, with no page between. After a save, only the start button
+    // starts it: a round of skips is a save too.
     if (!left && !saved) {
       pausedRun = data.run;
       startAnalysis([], []);

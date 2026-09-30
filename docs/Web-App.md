@@ -31,6 +31,32 @@ default. Dependency groups never enter the built distribution, so if you embed
 the engine you inherit none of this — your dependency surface stays `fastapi`,
 `google-adk`, `litellm`, `pydantic` and `pyjwt[crypto]`.
 
+## Browser tests
+
+`tests/test_browser.py` serves the app and drives its pages in headless
+Chromium. It needs the `browser` dependency group, which `uv sync` does not
+install by default, and a Chromium build:
+
+```bash
+uv sync --group browser
+uv run playwright install --with-deps chromium
+uv run --group browser pytest tests/test_browser.py
+```
+
+Without them the browser tests skip. CI sets `REQUIRE_BROWSER=1`, so there a
+missing browser fails the suite instead.
+
+`--with-deps` installs Chromium's system libraries and needs root. On a server
+where you have none, download the libraries it reports missing and point
+Chromium at them:
+
+```bash
+ldd ~/.cache/ms-playwright/chromium_headless_shell-*/chrome-headless-shell-linux64/chrome-headless-shell | grep "not found"
+apt-get download <each package>        # no root needed
+dpkg -x <package>.deb ~/.local/lib/chromium-deps
+LD_LIBRARY_PATH=~/.local/lib/chromium-deps/usr/lib/x86_64-linux-gnu uv run --group browser pytest tests/test_browser.py
+```
+
 ## What you select
 
 **The frameworks to run**, one checkbox per framework this install carries. The
