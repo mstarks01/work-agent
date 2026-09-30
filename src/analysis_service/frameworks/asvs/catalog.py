@@ -31,6 +31,7 @@ from pathlib import Path
 from types import MappingProxyType
 from typing import Literal, get_args
 
+from analysis_service.bands import Band, band_of
 from analysis_service.frameworks import FrameworkPackageError
 
 __all__ = [
@@ -214,15 +215,23 @@ def requirement_level(requirement_id: str) -> AsvsLevel | None:
     return _LEVEL_BY_ID.get(requirement_id)
 
 
-def requirement_band(requirement_id: str) -> int:
-    """A requirement's band order: level 1, the first layer of defence, highest.
+#: ASVS's bands, the highest first: level 1, the first layer of defence, down
+#: to level 3, then a claim that names no published requirement.
+REQUIREMENT_BANDS: tuple[str, ...] = (
+    *(f"level {level}" for level in sorted(ASVS_LEVELS)),
+    "",
+)
+
+
+def requirement_band(requirement_id: str) -> Band:
+    """A requirement's band: level 1, the first layer of defence, highest.
 
     ASVS grades no harm, and 5.0 defines a level as a requirement's priority.
-    An ID the catalog lacks ranks last, at 0. The one reader of how ASVS ranks
-    a requirement, for a claim and for a capability question alike.
+    An ID the catalog lacks ranks last. The one reader of how ASVS ranks a
+    requirement, for a claim and for a capability question alike.
     """
     level = requirement_level(requirement_id)
-    return 0 if level is None else len(ASVS_LEVELS) + 1 - level
+    return band_of(REQUIREMENT_BANDS, "" if level is None else f"level {level}")
 
 
 def requirement_text(requirement_id: str) -> str:

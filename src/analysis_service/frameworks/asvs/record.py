@@ -268,7 +268,9 @@ class DraftRequirementRuling(Claim):
         """
         level = AsvsOptions.model_validate(options).level
         decisions = applicability_for(level, model.capability_facts())
-        return open_capability_needs(decisions, requirement_band)
+        return open_capability_needs(
+            decisions, lambda unit: requirement_band(unit).order
+        )
 
     @classmethod
     def units_for(cls, options: Mapping[str, Any], lane: str) -> tuple[str, ...]:

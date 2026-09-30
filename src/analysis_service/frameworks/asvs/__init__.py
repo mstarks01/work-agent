@@ -1,6 +1,6 @@
 """The ASVS framework package: a published standard, as a package.
 
-It has ten members and a text root at ``frameworks/asvs/``, exactly as STRIDE
+It has twelve members and a text root at ``frameworks/asvs/``, exactly as STRIDE
 does. What differs is what stands behind them. STRIDE is a method, so its
 ``version`` names this repository's ruleset and it carries no catalog. ASVS is a
 published standard, so ``version`` names the standard's own release, and the 345
@@ -29,9 +29,9 @@ from __future__ import annotations
 
 from types import MappingProxyType
 
+from analysis_service.bands import Band
 from analysis_service.claims import Claim
 from analysis_service.frameworks import (
-    Band,
     FrameworkPackage,
     IdRule,
     KnowledgeTables,
@@ -41,9 +41,9 @@ from analysis_service.frameworks.asvs.catalog import (
     ASVS_VERSION,
     CHAPTER_NUMBERS,
     LANES,
+    REQUIREMENT_BANDS,
     is_published_requirement,
     requirement_band,
-    requirement_level,
 )
 from analysis_service.frameworks.asvs.record import (
     ASVS_ID_FORMAT,
@@ -179,11 +179,7 @@ def _rank(claim: Claim) -> Band:
     ASVS grades no harm, and 5.0 defines a level as a requirement's priority.
     A claim naming no published requirement ranks last.
     """
-    requirement = requirement_of(claim.id)
-    level = requirement_level(requirement)
-    return Band(
-        requirement_band(requirement), "" if level is None else f"level {level}"
-    )
+    return requirement_band(requirement_of(claim.id))
 
 
 ASVS = FrameworkPackage(
@@ -212,5 +208,6 @@ ASVS = FrameworkPackage(
         notes=MappingProxyType(NOTES), cases=MappingProxyType(CASES)
     ),
     predicate_readers=PREDICATE_READERS,
+    bands=REQUIREMENT_BANDS,
     rank=_rank,
 )
