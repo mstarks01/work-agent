@@ -40,8 +40,8 @@ from analysis_service.budgets import BudgetPolicy, measured_tokens, spent_tokens
 from analysis_service.certification import CertifyResult
 from analysis_service.claims import FrameworkAnalysis, UnknownKey
 from analysis_service.execution import GraphFailed
+from analysis_service.fact_answers import MAX_FACT_ANSWERS, FactAnswer
 from analysis_service.links import MAX_LINK_ANSWERS, LinkAnswer
-from analysis_service.questions import MAX_FACT_ANSWERS, FactAnswer
 from analysis_service.report import (
     FrameworkSelection,
     InputRef,

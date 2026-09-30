@@ -20,9 +20,9 @@ from fastapi.testclient import TestClient
 from analysis_service import Engine, StubPipelineRunner
 from analysis_service.assertions import AssertionRecord
 from analysis_service.claims import UnknownRef
+from analysis_service.fact_answers import FACET_ANSWERS, FactAnswer
 from analysis_service.jobs import Checkpoint, PipelineAwaiting, PipelineCompleted
 from analysis_service.question_kinds import QUESTION_KINDS
-from analysis_service.questions import FACET_ANSWERS, FactAnswer
 from tests import test_open_facts, test_questions, test_webapp
 from tests.factories import (
     asking_threat,

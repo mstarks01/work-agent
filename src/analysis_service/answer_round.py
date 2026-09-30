@@ -43,6 +43,14 @@ from typing import Any
 from analysis_service.assertions import UNKNOWN, AssertionCatalog
 from analysis_service.claims import FrameworkAnalysis, FrameworkName, UnknownKey
 from analysis_service.early_questions import EarlyQuestion, early_questions
+from analysis_service.fact_answers import (
+    FactAnswer,
+    answered_keys,
+    fact_label,
+    merged_facts,
+    refuse_repeated_facts,
+)
+from analysis_service.fact_writes import answered_model, check_fact_answers
 from analysis_service.links import (
     LinkAnswer,
     LinkQuestion,
@@ -52,17 +60,7 @@ from analysis_service.links import (
     link_questions,
     resumed_sources,
 )
-from analysis_service.questions import (
-    FactAnswer,
-    FactQuestion,
-    answered_keys,
-    answered_model,
-    check_fact_answers,
-    fact_label,
-    fact_questions,
-    merged_facts,
-    refuse_repeated_facts,
-)
+from analysis_service.questions import FactQuestion, fact_questions
 from analysis_service.sources import Source
 from analysis_service.system_model import SystemModel
 

@@ -5,8 +5,9 @@ from __future__ import annotations
 import asyncio
 
 from analysis_service.claims import Ground, UnknownRef
+from analysis_service.fact_answers import FactAnswer, fact_line
 from analysis_service.jobs import Checkpoint, JobRecord, Resumption
-from analysis_service.questions import FactAnswer, corrected_findings, fact_line
+from analysis_service.report_conditions import corrected_findings
 from analysis_service.sources import ANSWERS_LABEL, Source
 from tests.factories import (
     DESCRIPTION_TEXT,

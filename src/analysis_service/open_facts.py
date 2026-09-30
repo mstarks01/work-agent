@@ -26,10 +26,12 @@ from collections import defaultdict
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 
+from analysis_service.analysis import control_state
+from analysis_service.assertions import AssertionCatalog, apply_projection
 from analysis_service.capabilities import CAPABILITIES
 from analysis_service.claims import FrameworkAnalysis, UnknownKey, UnknownRef
 from analysis_service.question_kinds import QUESTION_KINDS
-from analysis_service.system_model import SystemModel
+from analysis_service.system_model import ZONE_ATTRIBUTE, SystemModel
 
 NEEDS_INFO = "needs-info"
 
@@ -160,3 +162,34 @@ def open_facts_by_framework(
         block.framework: [fact.to_json() for fact in open_facts(block, model)]
         for block in analyses
     }
+
+
+def open_attribute(model: SystemModel, element_id: str, attribute: str) -> bool:
+    """True where this attribute is a fact the model leaves open.
+
+    **The one reader of "may this attribute be asked, and answered".** Open is
+    unverified by :func:`~analysis_service.analysis.control_state`, the
+    reading the evidence catalog uses, or a zone the service inferred. The
+    early list, the report list and the answer check all ask it.
+    """
+    element = model.get(element_id)
+    value = getattr(element, attribute, None)
+    unverified = isinstance(value, str) and control_state(value) == "unverified"
+    assumed = (
+        attribute == ZONE_ATTRIBUTE and element_id in model.assumed_zone_elements()
+    )
+    return element is not None and (unverified or assumed)
+
+
+def prepared_model(model: SystemModel, catalog: AssertionCatalog | None) -> SystemModel:
+    """The model with the catalog's projection applied, as the lanes read it.
+
+    **The model every question reader asks :func:`open_attribute` of.** A
+    paused job's checkpoint holds the model before ``prepare`` projects the
+    catalog, so a fact the catalog states can still read ``unknown`` there.
+    Asked of that model, the early list would offer the fact and the check
+    would admit an answer that then supersedes what the sources stated. A
+    report's model is projected already, and projecting it again changes
+    nothing.
+    """
+    return model if catalog is None else apply_projection(model, catalog)[0]

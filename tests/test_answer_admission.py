@@ -15,8 +15,11 @@ from types import SimpleNamespace
 import pytest
 from pydantic import ValidationError
 
+from analysis_service.answer_forms import answer_choices, answer_limit
 from analysis_service.answer_round import question_set
 from analysis_service.assertions import MAX_QUOTE_CHARS, AssertionCatalog
+from analysis_service.fact_answers import FactAnswer, answered_keys, fact_line
+from analysis_service.fact_writes import check_fact_answers
 from analysis_service.links import (
     LinkAnswer,
     NoCatalogError,
@@ -24,16 +27,8 @@ from analysis_service.links import (
     check_answers,
     merged_facts,
 )
+from analysis_service.open_facts import open_attribute
 from analysis_service.question_kinds import QUESTION_KINDS
-from analysis_service.questions import (
-    FactAnswer,
-    answer_choices,
-    answer_limit,
-    answered_keys,
-    check_fact_answers,
-    fact_line,
-    open_attribute,
-)
 from analysis_service.system_model import attribute_names
 from tests import test_webapp
 from tests.factories import valid_model
@@ -893,7 +888,7 @@ class TestARefusalNamesItsFactByLabel:
         assert "('" not in message, message
 
     def test_a_line_too_long(self):
-        from analysis_service.questions import fact_label
+        from analysis_service.fact_answers import fact_label
 
         key = (FLOW, "data_description", "", "", "", "")
         with pytest.raises(ValueError, match="line may hold") as excinfo:
@@ -903,7 +898,7 @@ class TestARefusalNamesItsFactByLabel:
         self.assert_readable(excinfo, fact_label(key, open_description()))
 
     def test_a_skip_of_a_question_not_shown_and_of_an_answered_one(self):
-        from analysis_service.questions import fact_label
+        from analysis_service.fact_answers import fact_label
 
         asked = _asked_after([])
         shown = asked.early[0].key
@@ -921,7 +916,7 @@ class TestARefusalNamesItsFactByLabel:
         self.assert_readable(excinfo, fact_label(shown, asked.model))
 
     def test_an_unasked_fact(self):
-        from analysis_service.questions import fact_label
+        from analysis_service.fact_answers import fact_label
 
         key = (FLOW, "data_description", "", "", "", "")
         model = open_description()

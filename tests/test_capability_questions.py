@@ -8,16 +8,11 @@ from analysis_service.answer_round import question_set
 from analysis_service.capabilities import CAPABILITIES
 from analysis_service.claims import UnknownRef
 from analysis_service.early_questions import capability_questions
+from analysis_service.fact_answers import FactAnswer, fact_line
+from analysis_service.fact_writes import answered_model, check_fact_answers
 from analysis_service.frameworks.asvs.record import DraftRequirementRuling
 from analysis_service.links import with_link_answers
-from analysis_service.questions import (
-    ANSWERS_LABEL,
-    FactAnswer,
-    answered_model,
-    check_fact_answers,
-    fact_line,
-)
-from analysis_service.sources import Source
+from analysis_service.sources import ANSWERS_LABEL, Source
 from analysis_service.system_model import CapabilityStatement, SystemModel
 from analysis_service.validation import validate
 from tests.factories import DESCRIPTION_TEXT, valid_model

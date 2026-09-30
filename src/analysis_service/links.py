@@ -46,17 +46,15 @@ from analysis_service.assertions import (
     settled,
 )
 from analysis_service.claims import UnknownKey
-from analysis_service.questions import (
-    ANSWERS_LABEL,
+from analysis_service.fact_answers import (
     FactAnswer,
-    check_fact_answers,
     fact_label,
     fact_line,
-    fact_rows,
     merged_facts,
     refuse_repeated_facts,
 )
-from analysis_service.sources import Source, plain_name, text_digest
+from analysis_service.fact_writes import check_fact_answers, fact_rows
+from analysis_service.sources import ANSWERS_LABEL, Source, plain_name, text_digest
 from analysis_service.system_model import PLAIN_ID_RE, SystemModel
 
 __all__ = [
@@ -296,7 +294,7 @@ def apply_answers(
     """The catalog with every answer written in: links, then answered open rows.
 
     A fact answer about an attribute is written onto the model instead, by
-    :func:`~analysis_service.questions.answered_model`, and one about a subject
+    :func:`~analysis_service.fact_writes.answered_model`, and one about a subject
     has no row; both still quote their lines of the answers Source.
     """
     text, link_spans, fact_spans = _composed(links, facts)
@@ -344,7 +342,8 @@ def check_answers(
     answers of the earlier rounds, which a later round may answer again. A
     link to any other principal is refused, so a submission cannot replace a
     ``represented-by`` row the sources stated. ``reopen`` lets an ``unknown``
-    answer take back an earlier one (:func:`check_fact_answers`).
+    answer take back an earlier one
+    (:func:`~analysis_service.fact_writes.check_fact_answers`).
     """
     if links and catalog is None:
         raise NoCatalogError(

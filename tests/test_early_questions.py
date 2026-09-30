@@ -11,6 +11,7 @@ from collections import Counter
 
 import pytest
 
+from analysis_service.answer_forms import YES_NO, answer_choices
 from analysis_service.answer_round import ROUND_DECISIONS, passes_floor
 from analysis_service.candidates import generate_candidates
 from analysis_service.claims import UnknownRef
@@ -20,15 +21,11 @@ from analysis_service.early_questions import (
     early_questions,
     element_type,
 )
+from analysis_service.fact_answers import FactAnswer
+from analysis_service.fact_writes import check_fact_answers
 from analysis_service.frameworks import PACKAGES
 from analysis_service.open_facts import group_of
 from analysis_service.question_kinds import QUESTION_KINDS
-from analysis_service.questions import (
-    YES_NO,
-    FactAnswer,
-    answer_choices,
-    check_fact_answers,
-)
 from analysis_service.system_model import (
     UNKNOWN,
     ZONE_ATTRIBUTE,

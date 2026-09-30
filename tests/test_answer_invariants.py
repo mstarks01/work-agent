@@ -33,9 +33,10 @@ from analysis_service.assertions import (
 )
 from analysis_service.early_questions import early_questions
 from analysis_service.evidence import prepared_view
+from analysis_service.fact_answers import FactAnswer
 from analysis_service.jobs import Checkpoint
 from analysis_service.links import check_answers
-from analysis_service.questions import FactAnswer, open_attribute
+from analysis_service.open_facts import open_attribute
 from analysis_service.sources import Source
 from tests.factories import DESCRIPTION_TEXT, valid_model
 from tests.test_early_questions import prior_of

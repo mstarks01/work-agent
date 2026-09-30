@@ -45,6 +45,7 @@ from typing import Self
 from analysis_service.answer_round import QuestionSet, question_set
 from analysis_service.claims import FrameworkName, UnknownKey
 from analysis_service.deployment import Deployment
+from analysis_service.fact_answers import FactAnswer
 from analysis_service.frameworks import PACKAGES
 from analysis_service.graph import Entry
 from analysis_service.jobs import (
@@ -60,7 +61,6 @@ from analysis_service.links import (
     with_link_answers,
 )
 from analysis_service.pipeline import entry_of
-from analysis_service.questions import FactAnswer
 from analysis_service.report import FrameworkSelection, Report
 from analysis_service.selection import SelectionError, resolve_selection
 from analysis_service.sources import Source, SourceLimits, clean_system_name

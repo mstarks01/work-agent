@@ -20,7 +20,7 @@ open, so every later round asked it again.
 
 **A later round does not ask a fact that an earlier round answered.** An
 "I don't know" answer counts. A question with facets is asked again only while
-a facet has no answer. `questions.answered_keys` is the one rule, and the early
+a facet has no answer. `fact_answers.answered_keys` is the one rule, and the early
 list and the report list both read it. A submitter can still send a new answer
 to an answered fact, to change it.
 

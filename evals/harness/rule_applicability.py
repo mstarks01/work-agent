@@ -39,8 +39,9 @@ from typing import Any
 from analysis_service.capabilities import CAPABILITIES
 from analysis_service.claims import FrameworkName, UnknownRef
 from analysis_service.early_questions import capability_questions
+from analysis_service.fact_answers import FactAnswer
+from analysis_service.fact_writes import answered_model
 from analysis_service.frameworks import PACKAGES
-from analysis_service.questions import FactAnswer, answered_model
 from analysis_service.system_model import CapabilityStatement, SystemModel
 
 __all__ = [
