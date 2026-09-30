@@ -39,7 +39,9 @@ that answering runs the analysis once more. Each question says why it is
 there. "You skipped this before the analysis" marks a question the pause
 showed and got no answer to, from `JobRecord.shown_early`. "New from the
 analysis" marks one that the findings' evidence raised. The reviewer's own
-questions are headed apart, because they can change from run to run.
+questions are headed apart, because they can change from run to run. A
+question no conditional finding waits on comes last, in a closed section of
+its own, because its answer cannot move a finding of this report (#1289).
 
 **The form and the pause page state the whole plan**: facts, free and in
 rounds; the analysis; and one optional follow-up.

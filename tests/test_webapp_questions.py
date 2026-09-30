@@ -640,6 +640,57 @@ def _run_answer_block(payloads: dict, steps: str) -> dict:
     return json.loads(done.stdout.strip().splitlines()[-1])
 
 
+def _subject_question(name, findings):
+    return {
+        "key": ["", "", "", name, "", ""],
+        "kind": "subject",
+        "basis": "evidence",
+        "label": name,
+        "cited_by": len(findings),
+        "covered_so_far": 0,
+        "choices": [],
+        "form": "text",
+        "suggestions": [],
+        "facets": [],
+        "max_length": 500,
+        "findings": findings,
+        "asked_before": False,
+    }
+
+
+def test_a_question_no_finding_waits_on_is_set_apart():
+    """A follow-up listed questions that no conditional finding waits on among
+    the ones that settle findings (#1289, item 8)."""
+    payloads = {
+        "report": {"system_model": valid_model().model_dump(mode="json")},
+        "link_questions": [],
+        "fact_questions": [
+            _subject_question("who rotates keys?", []),
+            _subject_question("who signs builds?", ["stride/T-01"]),
+        ],
+    }
+    steps = """
+const direct = (node, tag) => node.children.filter(c => typeof c === "object" && c.tag === tag);
+calls.push(box.all("details").map(d => ({
+  summary: direct(d, "summary")[0].textContent,
+  labels: direct(d, "p").flatMap(p => p.all("b").map(b => b.textContent)),
+})));
+const inputs = box.all("input").filter(i => i.type === "text");
+inputs.forEach(i => { i.value = "the release team"; });
+await box.all("button")[0].listeners.click();
+"""
+    sections, sent = _run_answer_block(payloads, steps)["calls"]
+    (followup,) = [s for s in sections if s["summary"].startswith("Optional follow-up")]
+    (apart,) = [s for s in sections if s["summary"].startswith("Questions no")]
+    assert followup["labels"] == ["who signs builds?"]
+    assert apart["summary"] == "Questions no conditional finding waits on (1)"
+    assert apart["labels"] == ["who rotates keys?"]
+    assert {fact["key"][3] for fact in sent["body"]["facts"]} == {
+        "who rotates keys?",
+        "who signs builds?",
+    }
+
+
 def test_the_report_page_sends_both_kinds_of_answer_and_follows_the_run():
     model = valid_model().model_dump(mode="json")
     payloads = {

@@ -776,10 +776,22 @@
           `The reviewer asked ${FALLBACK.typed} open fact(s) from the fixed list of ` +
           `questions and ${FALLBACK.free_text} in its own words.`));
       }
+      // A question no conditional finding waits on cannot move this report:
+      // it follows the others, in a closed section of its own.
+      const material = FACT_QUESTIONS.filter(q => q.findings.length);
+      const aside = FACT_QUESTIONS.filter(q => !q.findings.length);
+      const ordered = [...material, ...aside];
       // The first few in full; the rest one click away rather than a wall.
       const SHOWN = 10;
       const more = el("details", "openfact");
-      more.append(el("summary", null, `More questions (${FACT_QUESTIONS.length - SHOWN})`));
+      more.append(el("summary", null, `More questions (${material.length - SHOWN})`));
+      const unwaited = el("details", "openfact");
+      unwaited.append(el("summary", null,
+        `Questions no conditional finding waits on (${aside.length})`));
+      unwaited.append(el("div", "meta",
+        "Only a confirmed finding, a rejected draft, or a finding that waits on a " +
+        "fact answered \"I don't know\" cites these facts. An answer cannot move a " +
+        "conditional finding in this report; the next analysis reads it."));
       // The facts only the critic named come after the ones the findings' own
       // evidence rests on, and they can change when the analysis runs again,
       // so they are headed apart.
@@ -787,7 +799,7 @@
       // A finding is covered once every question that names it has an answer,
       // in any order, so the count follows the answers given, not the rank.
       const waitsOn = new Map();
-      FACT_QUESTIONS.forEach((q, index) => q.findings.forEach(finding => {
+      ordered.forEach((q, index) => q.findings.forEach(finding => {
         if (!waitsOn.has(finding)) waitsOn.set(finding, []);
         waitsOn.get(finding).push(index);
       }));
@@ -799,8 +811,8 @@
           `Your answers cover every question for ${covered} of the ${waitsOn.size} findings ` +
           "that wait on one. The analysis decides again whether they are settled.";
       }
-      FACT_QUESTIONS.forEach((q, index) => {
-        const into = index < SHOWN ? box : more;
+      ordered.forEach((q, index) => {
+        const into = !q.findings.length ? unwaited : index < SHOWN ? box : more;
         if (q.basis === "critic" && !criticHeaded) {
           criticHeaded = true;
           into.append(el("h3", null,
@@ -901,7 +913,8 @@
           known: () => Boolean(read()) && read() !== DONT_KNOW,
         });
       });
-      if (FACT_QUESTIONS.length > SHOWN) box.append(more);
+      if (material.length > SHOWN) box.append(more);
+      if (aside.length) box.append(unwaited);
       box.append(tally);
       recount();
     }

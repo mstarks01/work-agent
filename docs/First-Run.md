@@ -352,7 +352,9 @@ The app can ask you questions before the analysis, and after the report.
   again, and it reads your answers.
 - **After the report: one optional follow-up.** The report may offer a
   closed **Optional follow-up** section. It says how many questions it asks
-  and how many conditional findings wait on them. You do not need it: the
+  and how many conditional findings wait on them. Questions that no
+  conditional finding waits on sit apart, in a closed section at the end:
+  an answer to one cannot change this report. You do not need it: the
   report is complete without it. Open it, answer what you can, and click
   **Run the follow-up with these answers**. The analysis runs once more, and
   the app shows its progress and then its report. That report is final: it
