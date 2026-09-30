@@ -382,13 +382,16 @@
         return select;
       });
       grid.table.append(row);
-      return () => {
+      const read = () => {
         const given = {};
         for (const select of selects) {
           if (select.value) given[select.dataset.facet] = select.value;
         }
         return Object.keys(given).length ? { key: q.key, facets: given } : null;
       };
+      // Whether a facet is still blank, which "Skip the rest" sets aside.
+      read.open = () => selects.some((select) => !select.value);
+      return read;
     };
     // Why a question is asked, and the words of the description its element
     // was read from, so the owner sees what the service read.
@@ -425,7 +428,7 @@
         if (about) who.append(about);
         const read = facetRow(group.grid, q, who, before && before.facets);
         answers.push(read);
-        roundRows.push({ key: q.key, read });
+        roundRows.push({ key: q.key, read, open: read.open });
         return;
       }
       const row = document.createElement("p");
@@ -615,7 +618,11 @@
   // `skipAll` also skips every question of this round left blank.
   const saveRound = async (skipAll) => {
     const { links, facts } = roundAnswers();
-    const skip = skipAll ? roundRows.filter((row) => !row.read()).map((row) => row.key) : [];
+    // A blank row is skipped, and so is a row with facets answered in part:
+    // its facets given are kept, and the rest are set aside for now.
+    const skip = skipAll
+      ? roundRows.filter((row) => !row.read() || (row.open && row.open())).map((row) => row.key)
+      : [];
     const saved = await fetch("/answer/" + pausedRun, {
       method: "POST",
       headers: { "Content-Type": "application/json" },

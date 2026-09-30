@@ -841,3 +841,31 @@ class TestAFollowUpMustAddSomething:
             headers=auth(),
         )
         assert known.status_code == 201, known.text
+
+
+class TestSkippingAPartAnswer:
+    """A question answered in part could not be skipped, and came back first
+    in every round (#1289)."""
+
+    def capacity(self, asked):
+        question = next((q for q in asked.early if q.key == CAPACITY), None)
+        if question is None:
+            pytest.skip("the test model asks no capacity question early")
+        return question
+
+    def test_a_part_answer_and_a_skip_of_the_rest_land_together(self):
+        asked = _asked_after([])
+        self.capacity(asked)
+        part = _facets({"rate": "yes"})
+        admitted = admit(asked, facts=[part], save=True, skips=[CAPACITY])
+        assert admitted.facts == [part]
+        assert admitted.skipped == (CAPACITY,)
+        after = _asked_after(admitted.facts, skipped=admitted.skipped)
+        assert CAPACITY not in {q.key for q in after.early}
+
+    def test_a_full_answer_is_still_not_skipped(self):
+        asked = _asked_after([])
+        self.capacity(asked)
+        full = _facets(dict.fromkeys(("rate", "size", "concurrency", "quota"), "no"))
+        with pytest.raises(ValueError, match="answered or skipped, not both"):
+            admit(asked, facts=[full], save=True, skips=[CAPACITY])

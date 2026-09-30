@@ -33,6 +33,7 @@ import argparse
 import json
 import statistics
 import sys
+from collections import Counter
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import asdict, dataclass
 from pathlib import Path
@@ -43,14 +44,15 @@ from analysis_service.answer_round import EARLY_RULES, QuestionSet, question_set
 from analysis_service.assertions import UNKNOWN
 from analysis_service.claims import FrameworkName, UnknownKey
 from analysis_service.early_questions import EarlyQuestion, early_questions
-from analysis_service.questions import FactAnswer, merged_facts
+from analysis_service.questions import FactAnswer, answered_keys, merged_facts
 from analysis_service.report import Report
 from analysis_service.system_model import SystemModel
 
 #: A replay that has not ended by this round is reported as not ending.
 MAX_ROUNDS = 50
 
-Answerer = Callable[[EarlyQuestion, SystemModel], FactAnswer]
+#: An answerer's answer to one question, or ``None`` to skip it for now.
+Answerer = Callable[[EarlyQuestion, SystemModel], FactAnswer | None]
 
 
 def _dont_know(question: EarlyQuestion) -> FactAnswer:
@@ -99,12 +101,38 @@ def _every_control(stated: bool) -> Answerer:
     return answer
 
 
+def _skip(question: EarlyQuestion, blessed: SystemModel) -> None:
+    """An owner who cannot answer: every question is skipped for now."""
+    del question, blessed
+
+
+def _in_part(rest: str | None) -> Answerer:
+    """An owner who knows one part of a question with parts: the first facet
+    is "yes", and the rest are ``rest`` or left out where ``rest`` is None."""
+
+    def answer(question: EarlyQuestion, blessed: SystemModel) -> FactAnswer:
+        if question.kind == "capability":
+            return FactAnswer(key=question.key, value="yes")
+        if not question.facets:
+            return _blessed(question, blessed)
+        first, *others = question.facets
+        facets = {first.id: "yes"}
+        if rest is not None:
+            facets |= {facet.id: rest for facet in others}
+        return FactAnswer.model_validate({"key": question.key, "facets": facets})
+
+    return answer
+
+
 #: The answerers, keyed by name.
 ANSWERERS: Mapping[str, Answerer] = {
     "capability-yes": _capabilities("yes"),
     "capability-no": _capabilities("no"),
     "controls-none": _every_control(stated=False),
     "controls-stated": _every_control(stated=True),
+    "skip-all": _skip,
+    "facets-partial": _in_part(None),
+    "facets-mixed-unknown": _in_part(UNKNOWN),
 }
 
 
@@ -131,6 +159,11 @@ class Replay:
     added: int
     removed: int
     ended: bool
+    #: Questions skipped for now, how many times a question already shown was
+    #: shown again, and why the rounds stopped (``QuestionSet.stop``).
+    skipped: int
+    repeats: int
+    stop: str
 
 
 def _eligible(listed: Sequence[EarlyQuestion]) -> set[UnknownKey]:
@@ -178,6 +211,8 @@ def replay(
     seen: set[UnknownKey] = set()
     asked_keys: set[UnknownKey] = set()
     per_round: list[int] = []
+    showings: Counter[UnknownKey] = Counter()
+    skipped: tuple[UnknownKey, ...] = ()
     rounds = 0
     for rounds in range(MAX_ROUNDS):
         asked = question_set(
@@ -190,13 +225,36 @@ def replay(
             answered_links=[],
             final=False,
             shown=[],
+            skipped=skipped,
         )
         if asked.done:
             break
         seen |= {question.key for question in asked.early}
+        showings.update(question.key for question in asked.early)
         per_round.append(sum(question.decisions for question in asked.early))
-        given = [answerer(question, blessed) for question in asked.early]
-        answered = merged_facts(answered, _admitted(asked, answered, given))
+        replies = {
+            question.key: answerer(question, blessed) for question in asked.early
+        }
+        given = [reply for reply in replies.values() if reply is not None]
+        # "Skip the rest" sets aside a blank question, and one with facets
+        # the owner answered only in part.
+        complete = answered_keys(merged_facts(answered, given))
+        skips = [
+            key
+            for key, reply in replies.items()
+            if reply is None or (reply.facets is not None and key not in complete)
+        ]
+        kept = _admitted(asked, answered, given)
+        skipped = asked.admit(
+            sources=[],
+            earlier_links=[],
+            earlier_facts=answered,
+            links=[],
+            facts=kept,
+            save=True,
+            skips=skips,
+        ).skipped
+        answered = merged_facts(answered, kept)
         asked_keys |= {question.key for question in asked.early}
     else:
         rounds = MAX_ROUNDS
@@ -213,13 +271,27 @@ def replay(
         added=len(seen - first),
         removed=len(first - asked_keys),
         ended=rounds < MAX_ROUNDS,
+        skipped=len(skipped),
+        repeats=sum(count - 1 for count in showings.values()),
+        stop=str(asked.stop),
     )
 
 
 def replays(root: Path, corpus: Path) -> list[Replay]:
-    """Every archived report under ``root`` whose case has a blessed model."""
+    """Every archived report under ``root`` whose case has a blessed model.
+
+    Each model is also replayed once with every framework the archive holds,
+    each with the options an archived job chose for it, so a job whose
+    frameworks share the rounds is measured too.
+    """
     found: list[Replay] = []
-    for path in sorted(root.rglob("*.report.json")):
+    paths = sorted(root.rglob("*.report.json"))
+    every: dict[FrameworkName, Mapping[str, Any]] = {}
+    for path in paths:
+        job = Report.model_validate_json(path.read_text(encoding="utf-8")).job
+        for selection in job.frameworks:
+            every.setdefault(selection.name, selection.options)
+    for path in paths:
         case = path.name.removesuffix(".report.json")
         blessed_path = corpus / case / "model.json"
         if not blessed_path.is_file():
@@ -235,6 +307,10 @@ def replays(root: Path, corpus: Path) -> list[Replay]:
             replay(case, report.system_model, blessed, frameworks, name)
             for name in ANSWERERS
         )
+        if len(every) > 1 and set(frameworks) != set(every):
+            found.append(
+                replay(case, report.system_model, blessed, every, "capability-yes")
+            )
     return found
 
 
@@ -246,6 +322,8 @@ FIGURES: Mapping[str, Callable[[Replay], int]] = {
     "rounds": lambda row: row.rounds,
     "decisions": lambda row: row.decisions,
     "widest": lambda row: row.widest,
+    "skipped": lambda row: row.skipped,
+    "repeats": lambda row: row.repeats,
     "added": lambda row: row.added,
     "removed": lambda row: row.removed,
 }
@@ -270,6 +348,7 @@ def summary(found: list[Replay]) -> dict[str, dict[str, object]]:
             sum(1 for value in drift if value <= 2) / len(rows), 3
         )
         figures["not_ended"] = sum(1 for row in rows if not row.ended)
+        figures["stops"] = dict(Counter(row.stop for row in rows))
         table[group] = figures
     return table
 

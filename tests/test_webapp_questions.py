@@ -1583,6 +1583,35 @@ await ids.skip.listeners.click(); await settle();
     }
 
 
+def test_skip_the_rest_sets_aside_a_question_answered_in_part():
+    """A question with facets answered in part came back first in every round,
+    and "Skip the rest" left it alone (#1289)."""
+    key = ["process:web-app", "", "", "", "capacity-limits", ""]
+    facets = [{"id": f, "question": f"{f}?"} for f in ("rate", "size")]
+    row = _text_row(key, "Web App") | {
+        "kind": "question",
+        "form": "facets",
+        "facets": facets,
+        "decisions": 2,
+    }
+    steps = f"""
+await ids.analyze.listeners.submit({{ preventDefault() {{}} }}); await settle();
+streams[0].listeners.questions({{ data: JSON.stringify({{ run: "r1", questions: [],
+  facts: [{json.dumps(row)}], remaining: {{ field: 1 }},
+  answered: [], answered_links: [], revision: 0 }}) }});
+const selects = ids.questions.querySelectorAll("select");
+selects[2].value = "yes";
+globalThis.fetch = async (url, init) => {{
+  calls.push({{ url, body: JSON.parse(init.body) }});
+  return {{ ok: false, json: async () => ({{ message: "stop here" }}) }};
+}};
+await ids.skip.listeners.click(); await settle();
+"""
+    (_, sent) = _run_form_script(steps)["calls"]
+    assert sent["body"]["facts"] == [{"key": key, "facets": {"rate": "yes"}}]
+    assert sent["body"]["skip"] == [key]
+
+
 def test_a_skipped_question_can_be_answered_from_its_list():
     kept, skipped = (["", "", "", name, "", ""] for name in ("who?", "when?"))
     steps = f"""

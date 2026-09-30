@@ -51,7 +51,10 @@ round shows a skipped question, and a skip takes no place under a limit, so
 a submitter who cannot answer reaches the next useful questions. The skipped
 questions stay listed, and an answer to one is still admitted. A question the
 submitter leaves blank without a skip comes back, as before: only an explicit
-skip sets a question aside (#1289).
+skip sets a question aside (#1289). A question with facets answered in part
+may be skipped with that answer: the facets given are kept, and the rest are
+set aside. Without this, such a question came back first in every round and
+had no way out; an offline replay asked one fifty rounds over (E26).
 
 **A waiting job counts its saved rounds.** Every answer to a waiting job names
 the round revision it was read against, and a save checks it and writes the
