@@ -256,7 +256,8 @@
     if (!left) {
       const ready = document.createElement("p");
       ready.className = "hint";
-      ready.textContent = (data.withheld
+      // The service's own stop reason decides the sentence (QuestionSet.stop).
+      ready.textContent = (data.stop === "budget-exhausted"
         ? `The question limit is reached, so ${data.withheld} more question(s) will not be asked. `
         : "No question is left. ")
         + "You can still change an answer below. Nothing runs until you choose Start the analysis.";
