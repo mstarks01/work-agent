@@ -178,3 +178,15 @@ def test_an_owner_s_answer_is_marked_as_unchecked():
     text = run_report_page(html)["analyses"]
     assert "your answer; the service did not check it" in text
     assert f"— {ANSWERS_LABEL}" not in text
+
+
+def test_every_reason_a_fact_is_open_has_a_line_on_the_page():
+    """The page's WHY_OPEN table and FactStatus are one set in two places."""
+    from typing import get_args
+
+    from analysis_service.questions import FactStatus
+    from tests.test_webapp import viewer_javascript
+
+    table = re.search(r"const WHY_OPEN = \{(.*?)\};", viewer_javascript(), re.DOTALL)
+    keys = set(re.findall(r"^\s*(\w+):", table.group(1), re.MULTILINE))
+    assert keys == set(get_args(FactStatus))
