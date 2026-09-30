@@ -365,7 +365,10 @@ The app can ask you questions before the analysis, and after the report.
   **Run the follow-up with these answers**. The analysis runs once more, and
   the app shows its progress and then its report. That report is final: it
   asks no more questions, and it lists the facts still open under its
-  conditional findings. Where your install builds an assertion catalog, the
+  conditional findings. If an answer was wrong or a guess, open **Correct an
+  answer**, change it or choose "I don't know", and click **Save the
+  corrections**. The report marks each finding that rests on a corrected
+  answer. The analysis does not run again. Where your install builds an assertion catalog, the
   follow-up also lists the group questions under **Which element is each of
   these?**.
 

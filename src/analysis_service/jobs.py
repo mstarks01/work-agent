@@ -191,6 +191,11 @@ class JobRecord(BaseModel):
     shown_early: list[UnknownKey] = Field(
         default_factory=list, max_length=MAX_FACT_ANSWERS
     )
+    # A final report's corrections: answers its owner changed after the run,
+    # kept beside the answers the run read. No model reads them (ADR 0054).
+    corrections: list[FactAnswer] = Field(
+        default_factory=list, max_length=MAX_FACT_ANSWERS
+    )
     # How many rounds a waiting job has saved. A save or a continue names the
     # revision it read, so a page left open on an earlier round cannot write
     # over a later one.
@@ -451,6 +456,8 @@ class JobStore(Protocol):
 
     async def checkpoint(self, job_id: str, subject: str) -> Checkpoint | None: ...
 
+    async def resumption(self, job_id: str, subject: str) -> Resumption | None: ...
+
     async def events_after(
         self, job_id: str, seen: int
     ) -> tuple[JobStatus, list[JobEvent]] | None: ...
@@ -466,6 +473,10 @@ class JobStore(Protocol):
         shown: Sequence[UnknownKey],
         skipped: Sequence[UnknownKey],
         revision: int,
+    ) -> bool: ...
+
+    async def save_corrections(
+        self, job_id: str, subject: str, corrections: Sequence[FactAnswer]
     ) -> bool: ...
 
 
@@ -630,6 +641,20 @@ class InMemoryJobStore:
             return None
         return record.checkpoint.model_copy(deep=True)
 
+    async def resumption(self, job_id: str, subject: str) -> Resumption | None:
+        """The owned job's resumption, as a copy, or ``None``.
+
+        The envelope leaves it out for its weight, and a finished job's
+        questions need it: whether the job came from a report's answers is
+        whether its report is final (ADR 0054).
+        """
+        record = self._records.get(job_id)
+        if record is None or record.owner_subject != subject:
+            return None
+        if record.resumption is None:
+            return None
+        return record.resumption.model_copy(deep=True)
+
     async def events_after(
         self, job_id: str, seen: int
     ) -> tuple[JobStatus, list[JobEvent]] | None:
@@ -684,6 +709,24 @@ class InMemoryJobStore:
         record.facts = list(facts)
         record.shown_early = list(shown)
         record.skipped_early = list(skipped)
+        record.updated_at = datetime.now(UTC)
+        return True
+
+    async def save_corrections(
+        self, job_id: str, subject: str, corrections: Sequence[FactAnswer]
+    ) -> bool:
+        """Keep a final report's corrections. False where the job is not the
+        subject's or its report is not final, and nothing is written."""
+        record = self._records.get(job_id)
+        if (
+            record is None
+            or record.owner_subject != subject
+            or record.status != "completed"
+            or record.resumption is None
+            or not record.resumption.follow_up
+        ):
+            return False
+        record.corrections = list(corrections)
         record.updated_at = datetime.now(UTC)
         return True
 

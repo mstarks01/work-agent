@@ -80,6 +80,7 @@ from analysis_service.pipeline import entry_of
 from analysis_service.questions import (
     MAX_FACT_ANSWERS,
     FactAnswer,
+    corrected_findings,
     question_fallback,
 )
 from analysis_service.report import FrameworkSelection
@@ -356,6 +357,15 @@ class AnswersSubmission(BaseModel):
     revision: int | None = Field(default=None, ge=0)
 
 
+class CorrectionsSubmission(BaseModel):
+    """Corrections to a final report's answers (ADR 0054): changed values, or
+    "I don't know" in place of an answer that was a guess."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    facts: list[FactAnswer] = Field(min_length=1, max_length=MAX_FACT_ANSWERS)
+
+
 class NodeCompletion(BaseModel):
     """One finished pipeline node, as shown in the poll response."""
 
@@ -497,6 +507,9 @@ async def _answerable(
     if report is None:
         logger.error("completed job %s has no report attached", record.id)
         raise HTTPException(status_code=500, detail="an internal error occurred")
+    # The envelope leaves the resumption out, and it says whether the report
+    # is final: a report its follow-up wrote asks nothing (ADR 0054).
+    record.resumption = await store.resumption(job_id, subject)
     return record, report.system_model, report.assertions, list(report.analyses)
 
 
@@ -695,6 +708,10 @@ def _questions_payload(
     return questions.to_json() | {
         "fallback": question_fallback(analyses).to_json(),
         "revision": record.round_revision,
+        "corrections": [fact.model_dump(mode="json") for fact in record.corrections],
+        "corrected_findings": list(
+            corrected_findings(analyses, record.facts, record.corrections)
+        ),
     }
 
 
@@ -1062,6 +1079,47 @@ def create_app(
     ) -> JSONResponse:
         served = await _servable_report(request, job_id, subject)
         return served if isinstance(served, JSONResponse) else JSONResponse(served)
+
+    @app.post("/v1/jobs/{job_id}/corrections")
+    async def correct_job(
+        job_id: str,
+        body: CorrectionsSubmission,
+        request: Request,
+        subject: str = Depends(require_subject),
+    ) -> JSONResponse:
+        """Correct a final report's answers, and run nothing (ADR 0054).
+
+        The corrections are kept beside the report; the report is not
+        rewritten. ``400`` where the job's report is not final, a correction
+        names no answer the report read, or changes none.
+        """
+        answerable = await _answerable(request, job_id, subject)
+        if isinstance(answerable, JSONResponse):
+            return answerable
+        parent, _, _, analyses = answerable
+        questions = await anyio.to_thread.run_sync(_question_set, *answerable)
+        try:
+            corrections = questions.correct(
+                earlier_facts=parent.facts,
+                corrections=parent.corrections,
+                facts=body.facts,
+            )
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        store: JobStore = request.app.state.store
+        if not await store.save_corrections(parent.id, subject, corrections):
+            raise HTTPException(
+                status_code=409, detail="the job's report is no longer final"
+            )
+        return JSONResponse(
+            {
+                "job_id": parent.id,
+                "corrections": [fact.model_dump(mode="json") for fact in corrections],
+                "corrected_findings": list(
+                    corrected_findings(analyses, parent.facts, corrections)
+                ),
+            }
+        )
 
     @app.get("/v1/jobs/{job_id}/questions")
     async def get_questions(

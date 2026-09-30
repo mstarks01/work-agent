@@ -38,6 +38,10 @@
   const FALLBACK = JSON.parse(document.getElementById("question_fallback").textContent);
   // True for a report the follow-up wrote: it asks nothing more (ADR 0054).
   const FINAL = JSON.parse(document.getElementById("final").textContent);
+  // A final report's answers, the corrections kept beside it, and the
+  // findings they reach, built server-side (ADR 0054). Empty otherwise.
+  const CORRECTIONS = JSON.parse(document.getElementById("corrections").textContent);
+  const CORRECTED = new Set(CORRECTIONS.findings || []);
   const $ = (id) => document.getElementById(id);
   const el = (tag, cls, text) => {
     const n = document.createElement(tag);
@@ -46,6 +50,111 @@
     return n;
   };
   const code = (text) => el("code", null, text);
+  // One answer's editor, as the follow-up and a correction both show it.
+  // `nodes` follow the label; `read` is the answer as the service takes it,
+  // or null; `known` is whether it says more than "I don't know". `prefill`
+  // is an answer to start from, `changed` runs on every edit, and `names`
+  // maps an element ID to its name for a choice.
+  let suggestLists = 0;
+  const editorFor = (q, prefill, changed, names) => {
+    const option = (label, value) => Object.assign(el("option", null, label), { value });
+    if (q.form === "facets") {
+      // One list per facet; a facet left blank is not sent.
+      const list = el("ul");
+      const selects = q.facets.map(facet => {
+        const select = el("select");
+        select.append(option("(leave unanswered)", ""));
+        FACET_CHOICES.forEach(([label, value]) => select.append(option(label, value)));
+        select.dataset.key = JSON.stringify(q.key);
+        select.dataset.facet = facet.id;
+        select.value = (prefill && prefill.facets && prefill.facets[facet.id]) || "";
+        select.addEventListener("change", changed);
+        const item = el("li", null, `${facet.question} `);
+        item.append(select);
+        list.append(item);
+        return select;
+      });
+      const given = () => Object.fromEntries(
+        selects.filter(s => s.value).map(s => [s.dataset.facet, s.value]));
+      return {
+        nodes: [list],
+        read: () => Object.keys(given()).length ? { key: q.key, facets: given() } : null,
+        // The critic names the kind, not a facet, so a finding waiting on it
+        // is covered only once every facet says more than "I don't know".
+        known: () => selects.every(s => s.value && s.value !== DONT_KNOW),
+      };
+    }
+    const value = (prefill && prefill.value) || "";
+    let input;
+    // "unknown" is the answer that says you do not know: the fact stays
+    // open, and it covers no finding.
+    let nodes;
+    // `read` is the answer the row sends, or "" for none.
+    let read = () => input.value.trim();
+    if (q.choices.length) {
+      input = el("select");
+      input.append(option("(leave unanswered)", ""));
+      q.choices.forEach(choice => input.append(option(names[choice] ? `${names[choice]} (${choice})` : choice, choice)));
+      input.append(option("I don't know", DONT_KNOW));
+      input.value = value;
+      input.addEventListener("change", changed);
+      nodes = [input];
+    } else if (q.form === "control") {
+      // A control: say there is none, say you do not know, or name the
+      // mechanism. The suggestions are a start; the text is the answer.
+      input = el("input");
+      input.type = "text";
+      input.maxLength = q.max_length;
+      input.placeholder = "type it, or pick a common one";
+      const list = el("datalist");
+      list.id = `suggest-${suggestLists++}`;
+      q.suggestions.forEach(s => list.append(option(s, s)));
+      input.setAttribute("list", list.id);
+      const state = el("select");
+      state.append(option("(leave unanswered)", ""), option("There is none", "none"),
+        option("I don't know", DONT_KNOW), option("A mechanism, in my own words:", "mechanism"));
+      // The state is the answer: blank sends nothing, and the text is read
+      // only under "mechanism". Typing a mechanism chooses it.
+      const fixed = value === "none" || value === DONT_KNOW;
+      state.value = fixed || !value ? value : "mechanism";
+      input.value = fixed ? "" : value;
+      input.disabled = fixed;
+      state.addEventListener("change", () => {
+        input.disabled = state.value === "none" || state.value === DONT_KNOW;
+        changed();
+      });
+      input.addEventListener("input", () => {
+        if (input.value.trim()) state.value = "mechanism";
+        changed();
+      });
+      read = () => (state.value === "mechanism" ? input.value.trim() : state.value);
+      nodes = [state, " ", input, list];
+    } else {
+      input = el("input");
+      input.type = "text";
+      input.maxLength = q.max_length;
+      input.placeholder = "(leave unanswered)";
+      const box = el("input");
+      box.type = "checkbox";
+      input.value = value;
+      box.checked = input.disabled = value === DONT_KNOW;
+      box.addEventListener("change", () => {
+        input.value = box.checked ? DONT_KNOW : "";
+        input.disabled = box.checked;
+        changed();
+      });
+      input.addEventListener("input", changed);
+      const dontKnow = el("label");
+      dontKnow.append(box, " I don't know");
+      nodes = [input, " ", dontKnow];
+    }
+    input.dataset.key = JSON.stringify(q.key);
+    return {
+      nodes,
+      read: () => read() ? { key: q.key, value: read() } : null,
+      known: () => Boolean(read()) && read() !== DONT_KNOW,
+    };
+  };
   // A model writes an identifier the way the prompt hands it over: in
   // backticks. Each of those spans becomes a `code` element here, so a
   // description names `process:web-api` in the same face the element table
@@ -297,6 +406,13 @@
     const head = el("div","card-head");
     head.append(proseEl("h3", null, t.title), el("span","tid", t.id));
     card.append(head);
+    // A final report's owner changed an answer this finding rests on, after
+    // the analysis ran; the analysis did not run again (ADR 0054).
+    if (CORRECTED.has(`${t.framework}/${t.id}`)) {
+      card.append(el("div", "unknown",
+        "Corrected after this report: an answer this finding rests on was " +
+        "changed after the analysis ran. The analysis did not run again."));
+    }
     // The lane, where the framework stamps one. Each package names the field
     // itself — STRIDE's is its category, ASVS's is its chapter — so this reads
     // the ones it knows and a framework it does not know renders without a lane
@@ -833,99 +949,13 @@
             "Raised by the reviewer \u2014 these can change when the analysis runs again"));
         }
         const row = el("p");
-        if (q.form === "facets") {
-          // One list per facet; a facet left blank is not sent.
-          const list = el("ul");
-          const selects = q.facets.map(facet => {
-            const select = el("select");
-            select.append(option("(leave unanswered)", ""));
-            FACET_CHOICES.forEach(([label, value]) => select.append(option(label, value)));
-            select.dataset.key = JSON.stringify(q.key);
-            select.dataset.facet = facet.id;
-            select.addEventListener("change", recount);
-            const item = el("li", null, `${facet.question} `);
-            item.append(select);
-            list.append(item);
-            return select;
-          });
-          const given = () => Object.fromEntries(
-            selects.filter(s => s.value).map(s => [s.dataset.facet, s.value]));
-          factAnswers.push({
-            read: () => Object.keys(given()).length ? { key: q.key, facets: given() } : null,
-            // The critic names the kind, not a facet, so a finding waiting on
-            // it is covered only once every facet says more than "I don't know".
-            known: () => selects.every(s => s.value && s.value !== DONT_KNOW),
-          });
-          row.append(el("b", null, q.label), why(q),
-            ` \u2014 ${q.cited_by} finding(s) wait on it; answering down to here covers ${q.covered_so_far}`,
-            waitingOn(q), list);
-          into.append(row);
-          return;
-        }
-        let input;
-        // "unknown" is the answer that says you do not know: the fact stays
-        // open, and it covers no finding. `beside` is what follows the label.
-        let beside;
-        // `read` is the answer the row sends, or "" for none.
-        let read = () => input.value.trim();
-        if (q.choices.length) {
-          input = el("select");
-          input.append(option("(leave unanswered)", ""));
-          q.choices.forEach(choice => input.append(option(names[choice] ? `${names[choice]} (${choice})` : choice, choice)));
-          input.append(option("I don't know", DONT_KNOW));
-          beside = [input];
-        } else if (q.form === "control") {
-          // A control: say there is none, say you do not know, or name the
-          // mechanism. The suggestions are a start; the text is the answer.
-          input = el("input");
-          input.type = "text";
-          input.maxLength = q.max_length;
-          input.placeholder = "type it, or pick a common one";
-          const list = el("datalist");
-          list.id = `suggest-${index}`;
-          q.suggestions.forEach(s => list.append(option(s, s)));
-          input.setAttribute("list", list.id);
-          const state = el("select");
-          state.append(option("(leave unanswered)", ""), option("There is none", "none"),
-            option("I don't know", DONT_KNOW), option("A mechanism, in my own words:", "mechanism"));
-          // The state is the answer: blank sends nothing, and the text is
-          // read only under "mechanism". Typing a mechanism chooses it.
-          state.addEventListener("change", () => {
-            input.disabled = state.value === "none" || state.value === DONT_KNOW;
-            recount();
-          });
-          input.addEventListener("input", () => {
-            if (input.value.trim()) state.value = "mechanism";
-            recount();
-          });
-          read = () => (state.value === "mechanism" ? input.value.trim() : state.value);
-          beside = [state, " ", input, list];
-        } else {
-          input = el("input");
-          input.type = "text";
-          input.maxLength = q.max_length;
-          input.placeholder = "(leave unanswered)";
-          const box = el("input");
-          box.type = "checkbox";
-          box.addEventListener("change", () => {
-            input.value = box.checked ? DONT_KNOW : "";
-            input.disabled = box.checked;
-            recount();
-          });
-          const dontKnow = el("label");
-          dontKnow.append(box, " I don't know");
-          beside = [input, " ", dontKnow];
-        }
-        input.dataset.key = JSON.stringify(q.key);
-        if (q.form !== "control") input.addEventListener(q.choices.length ? "change" : "input", recount);
-        row.append(el("b", null, q.label), why(q),
-          ` \u2014 ${q.cited_by} finding(s) wait on it; answering down to here covers ${q.covered_so_far} `,
-          ...beside, waitingOn(q));
+        const editor = editorFor(q, null, recount, names);
+        factAnswers.push({ read: editor.read, known: editor.known });
+        const lead = [el("b", null, q.label), why(q),
+          ` \u2014 ${q.cited_by} finding(s) wait on it; answering down to here covers ${q.covered_so_far}`];
+        if (q.form === "facets") row.append(...lead, waitingOn(q), ...editor.nodes);
+        else row.append(...lead, " ", ...editor.nodes, waitingOn(q));
         into.append(row);
-        factAnswers.push({
-          read: () => read() ? { key: q.key, value: read() } : null,
-          known: () => Boolean(read()) && read() !== DONT_KNOW,
-        });
       });
       if (material.length > SHOWN) box.append(more);
       if (aside.length) box.append(unwaited);
@@ -960,6 +990,62 @@
     const actions = el("p");
     actions.append(again);
     box.append(actions, note);
+  }
+
+  // A final report's answers can be corrected (ADR 0054): a changed value, or
+  // "I don't know" where an answer was a guess. A correction is kept beside
+  // the report and marks the findings that rest on it; nothing runs again.
+  if (FINAL && (CORRECTIONS.answers || []).length) {
+    const names = {};
+    [...R.system_model.external_entities, ...R.system_model.processes,
+     ...R.system_model.data_stores].forEach(e => { names[e.id] = e.name; });
+    const said = a => a.facets
+      ? Object.entries(a.facets).map(([facet, value]) => `${facet}: ${value}`).join("; ")
+      : (a.value === DONT_KNOW ? "I don't know" : a.value);
+    const box = el("details", "followup");
+    box.append(el("summary", null, `Correct an answer (${CORRECTIONS.answers.length})`),
+      el("div", "meta",
+        "If an answer was wrong or a guess, change it, or choose \"I don't know\". " +
+        "The correction is kept beside this report and marks the findings that rest " +
+        "on it. The analysis does not run again."));
+    const edits = [];
+    CORRECTIONS.answers.forEach(a => {
+      const row = el("p");
+      const shown = el("span", null,
+        ` \u2014 ${said(a.answer)}` + (a.corrected ? " (corrected after this report)" : ""));
+      const change = el("button", null, "Change");
+      change.type = "button";
+      change.addEventListener("click", () => {
+        change.hidden = true;
+        const editor = editorFor(a, a.answer, () => {}, names);
+        shown.replaceChildren(" \u2014 ", ...editor.nodes);
+        edits.push(editor.read);
+      });
+      row.append(el("b", null, a.label), shown, " ", change);
+      box.append(row);
+    });
+    const save = el("button", null, "Save the corrections");
+    const note = el("div", "meta");
+    save.addEventListener("click", async () => {
+      const facts = edits.map(read => read()).filter(Boolean);
+      // The run id is this page's own path: /report/{run}.
+      const run = location.pathname.split("/").pop();
+      const saved = await fetch("/correct/" + encodeURIComponent(run), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ facts }),
+      });
+      const body = await saved.json();
+      if (!saved.ok) {
+        note.textContent = body.message;
+        return;
+      }
+      location.href = location.pathname;
+    });
+    const actions = el("p");
+    actions.append(save);
+    box.append(actions, note);
+    $("links").append(box);
   }
 
   // system model table. Each entry returns the cell's children rather than a
