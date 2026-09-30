@@ -352,9 +352,11 @@ class AnswersSubmission(BaseModel):
 
     links: list[LinkAnswer] = Field(default_factory=list, max_length=MAX_LINK_ANSWERS)
     facts: list[FactAnswer] = Field(default_factory=list, max_length=MAX_FACT_ANSWERS)
-    save: bool = False
+    # Strict, as the first-run app reads them: ``true`` is no revision, and
+    # ``"yes"`` is no save.
+    save: bool = Field(default=False, strict=True)
     skip: list[UnknownKey] = Field(default_factory=list, max_length=MAX_FACT_ANSWERS)
-    revision: int | None = Field(default=None, ge=0)
+    revision: int | None = Field(default=None, ge=0, strict=True)
 
 
 class CorrectionsSubmission(BaseModel):
@@ -445,9 +447,8 @@ async def _admit_and_start(
             admission.global_tokens,
             budget.global_max_tokens_per_window,
         )
-        raise HTTPException(
-            status_code=429, detail=_REFUSALS[admission.outcome](admission, ceiling)
-        )
+        status, message = _REFUSALS[admission.outcome]
+        raise HTTPException(status_code=status, detail=message(admission, ceiling))
     if admission.outcome != "admitted":
         # A duplicate id, or an outcome the table above does not answer, is
         # this service's defect and not something the caller can act on or
@@ -747,24 +748,45 @@ def _sse_frame(event) -> str:
 #
 # A table because the machinery grew one entry per bound, which is what
 # ``AGENTS.md`` says to key — and because a missing key raises here rather than
-# falling through to a message about the wrong bound.
-_REFUSALS: dict[str, Callable[[Admission, int], str]] = {
-    "at_ceiling": lambda admission, ceiling: (
-        f"this token already has {admission.active} jobs in flight; the limit"
-        f" is {ceiling}. Wait for one to reach a terminal state."
+# falling through to a message about the wrong bound. Each entry carries its
+# status: a bound that clears with time is a 429, and a job that already has
+# its resumed job is a 409.
+_REFUSALS: dict[str, tuple[int, Callable[[Admission, int], str]]] = {
+    "at_ceiling": (
+        429,
+        lambda admission, ceiling: (
+            f"this token already has {admission.active} jobs in flight; the"
+            f" limit is {ceiling}. Wait for one to reach a terminal state."
+        ),
     ),
-    "over_rate": lambda admission, ceiling: (
-        "this token has started too many jobs in the current window."
-        " Wait for the window to roll past your earlier jobs."
+    "over_rate": (
+        429,
+        lambda admission, ceiling: (
+            "this token has started too many jobs in the current window."
+            " Wait for the window to roll past your earlier jobs."
+        ),
     ),
-    "over_subject_budget": lambda admission, ceiling: (
-        "this token has committed too many tokens in the current window."
-        " Wait for the window to roll past your earlier jobs, or submit less"
-        " text."
+    "over_subject_budget": (
+        429,
+        lambda admission, ceiling: (
+            "this token has committed too many tokens in the current window."
+            " Wait for the window to roll past your earlier jobs, or submit"
+            " less text."
+        ),
     ),
-    "over_global_budget": lambda admission, ceiling: (
-        "this deployment is at its consumption limit for the current window."
-        " Retry later; nothing you can do clears this one."
+    "over_global_budget": (
+        429,
+        lambda admission, ceiling: (
+            "this deployment is at its consumption limit for the current"
+            " window. Retry later; nothing you can do clears this one."
+        ),
+    ),
+    "resumed_already": (
+        409,
+        lambda admission, ceiling: (
+            "this job's answers already started a job, whose ID the first"
+            " answer returned; answer again only if that job fails"
+        ),
     ),
 }
 

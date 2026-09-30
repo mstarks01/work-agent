@@ -76,6 +76,11 @@ _LEGAL_TRANSITIONS: dict[JobStatus, frozenset[JobStatus]] = {
     "awaiting-answers": frozenset(),
 }
 
+# The statuses of a resumed job that read none of its answers into a report.
+# Its parent takes answers again: a job takes one resumed job at a time, and
+# only one of these ends that job's claim.
+UNSPENT_STATUSES: frozenset[JobStatus] = frozenset({"failed", "rejected"})
+
 # Stored on a failed job in place of any internal detail.
 GENERIC_FAILURE_MESSAGE = "internal error while running the analysis pipeline"
 
@@ -387,6 +392,7 @@ AdmissionOutcome = Literal[
     "over_subject_budget",
     "over_global_budget",
     "duplicate",
+    "resumed_already",
 ]
 
 
@@ -519,6 +525,8 @@ class InMemoryJobStore:
         """
         if record.id in self._records:
             return Admission(outcome="duplicate", active=0)
+        if record.resumption is not None and self._resumed(record.resumption.parent_id):
+            return Admission(outcome="resumed_already", active=0)
 
         subject = record.owner_subject
         since = budget.window_start()
@@ -565,6 +573,21 @@ class InMemoryJobStore:
             active=active,
             subject_tokens=subject_tokens,
             global_tokens=global_tokens,
+        )
+
+    def _resumed(self, parent_id: str) -> bool:
+        """True where a resumed job of ``parent_id`` is in flight or spent.
+
+        A job takes one resumed job: a report's follow-up runs the analysis
+        once (ADR 0054), and a paused job's answers start one analysis. A
+        resumed job that failed or was rejected read nothing into a report,
+        so its parent takes answers again.
+        """
+        return any(
+            held.resumption is not None
+            and held.resumption.parent_id == parent_id
+            and held.status not in UNSPENT_STATUSES
+            for held in self._records.values()
         )
 
     async def get(self, job_id: str) -> JobRecord | None:
@@ -693,8 +716,9 @@ class InMemoryJobStore:
         revision the save read: the check and the next revision are one step,
         so of two saves that read one revision only the first lands. Only these
         change, so the checkpoint an envelope read leaves
-        behind is kept. False where the job is not the subject's or no longer
-        waits, and nothing is written.
+        behind is kept. False where the job is not the subject's, no longer
+        waits, or its answers already started a resumed job that nothing
+        reads a later save into, and nothing is written.
         """
         record = self._records.get(job_id)
         if (
@@ -702,6 +726,7 @@ class InMemoryJobStore:
             or record.owner_subject != subject
             or record.status != "awaiting-answers"
             or record.round_revision != revision
+            or self._resumed(job_id)
         ):
             return False
         record.round_revision += 1
