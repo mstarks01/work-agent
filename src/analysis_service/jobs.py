@@ -81,6 +81,16 @@ _LEGAL_TRANSITIONS: dict[JobStatus, frozenset[JobStatus]] = {
 # only one of these ends that job's claim.
 UNSPENT_STATUSES: frozenset[JobStatus] = frozenset({"failed", "rejected"})
 
+
+def holds_its_parent(status: JobStatus) -> bool:
+    """True where a resumed job in ``status`` keeps its parent from taking answers.
+
+    **The one reader of "does a resumed job spend its parent's answers".** The
+    job store and the first-run app both ask it.
+    """
+    return status not in UNSPENT_STATUSES
+
+
 # Stored on a failed job in place of any internal detail.
 GENERIC_FAILURE_MESSAGE = "internal error while running the analysis pipeline"
 
@@ -586,7 +596,7 @@ class InMemoryJobStore:
         return any(
             held.resumption is not None
             and held.resumption.parent_id == parent_id
-            and held.status not in UNSPENT_STATUSES
+            and holds_its_parent(held.status)
             for held in self._records.values()
         )
 

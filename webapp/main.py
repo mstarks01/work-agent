@@ -137,7 +137,13 @@ from analysis_service.claims import UnknownKey
 from analysis_service.deployment import Deployment
 from analysis_service.early_questions import EarlyQuestion
 from analysis_service.frameworks import package_for
-from analysis_service.jobs import Checkpoint, PipelineAwaiting, PipelineOutcome
+from analysis_service.jobs import (
+    Checkpoint,
+    JobStatus,
+    PipelineAwaiting,
+    PipelineOutcome,
+    holds_its_parent,
+)
 from analysis_service.links import (
     MAX_LINK_ANSWERS,
     LinkAnswer,
@@ -267,9 +273,22 @@ class Run:
         takes answers again.
         """
         run = self.resumed_by
-        if run is None:
-            return False
-        return run.report is not None or run.task is None or not run.task.done()
+        return run is not None and holds_its_parent(run.status)
+
+    @property
+    def status(self) -> JobStatus:
+        """The run's state as a ``/v1`` job's status reads it.
+
+        A run with a report is ``completed``, one still going is ``running``,
+        and one that stopped at its checkpoint is ``awaiting-answers``. A run
+        that ended with neither read nothing into a report, whether it failed
+        or was rejected, and reads as ``failed``.
+        """
+        if self.report is not None:
+            return "completed"
+        if self.task is None or not self.task.done():
+            return "running"
+        return "awaiting-answers" if self.checkpoint is not None else "failed"
 
     def questions(self) -> QuestionSet:
         """Every question this run asks, from the engine and checkpoint it holds."""
