@@ -216,7 +216,8 @@
   // kind of question or attribute, and every earlier answer below them.
   // Every label and option is untrusted and lands as text.
   const showQuestions = (data) => {
-    const left = data.questions.length || data.facts.length;
+    // The service says whether the pause asks anything more (QuestionSet.stop).
+    const left = data.stop == null;
     revision = data.revision;
     const saved = (data.answered || []).length || (data.answered_links || []).length
       || (data.skipped || []).length;
