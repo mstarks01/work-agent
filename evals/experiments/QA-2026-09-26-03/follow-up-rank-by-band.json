@@ -1,0 +1,52 @@
+{
+  "figures": {
+    "reports": 52,
+    "before": {
+      "3": {
+        "high": 149,
+        "medium": 123,
+        "all": 310,
+        "low": 14,
+        "critical": 24
+      },
+      "6": {
+        "high": 223,
+        "medium": 210,
+        "all": 481,
+        "low": 20,
+        "critical": 28
+      },
+      "10": {
+        "high": 280,
+        "medium": 264,
+        "all": 613,
+        "low": 40,
+        "critical": 29
+      }
+    },
+    "after": {
+      "3": {
+        "high": 174,
+        "medium": 84,
+        "all": 295,
+        "low": 9,
+        "critical": 28
+      },
+      "6": {
+        "high": 248,
+        "medium": 182,
+        "all": 473,
+        "low": 15,
+        "critical": 28
+      },
+      "10": {
+        "high": 292,
+        "medium": 261,
+        "all": 613,
+        "low": 31,
+        "critical": 29
+      }
+    }
+  },
+  "script": "\"\"\"E25: rank the follow-up by band; findings covered at each depth, before and after.\"\"\"\nimport json\nfrom collections import Counter\nfrom dataclasses import replace\nfrom pathlib import Path\n\nfrom unittest import mock\n\nfrom analysis_service import questions as module\nfrom analysis_service.frameworks import PACKAGES, Band\nfrom analysis_service.questions import fact_questions\nfrom analysis_service.report import Report\n\nPATHS = sorted(Path(\"evals/baselines\").glob(\"*/*.reports/*.report.json\"))\nDEPTHS = (3, 6, 10)\n\n\ndef covered(report, flat):\n    flat_packages = {\n        name: replace(package, rank=lambda claim: Band(0, \"\"))\n        for name, package in PACKAGES.items()\n    }\n    catalog = report.assertions.catalog if report.assertions else None\n    with mock.patch.object(module, \"PACKAGES\", flat_packages if flat else PACKAGES):\n        questions = fact_questions(report.analyses, report.system_model, catalog)\n    bands = {\n        f\"{b.framework}/{c.id}\": PACKAGES[b.framework].rank(c).label\n        for b in report.analyses for c in b.all_claims()\n    }\n    waits: dict[str, set] = {}\n    for index, question in enumerate(questions):\n        for finding in question.findings:\n            waits.setdefault(finding, set()).add(index)\n    out = {}\n    for depth in DEPTHS:\n        out[depth] = Counter(\n            bands[f] for f, asked in waits.items() if max(asked) < depth\n        )\n        out[depth][\"all\"] = sum(1 for asked in waits.values() if max(asked) < depth)\n    return out\n\n\ntable = {\"before\": {d: Counter() for d in DEPTHS}, \"after\": {d: Counter() for d in DEPTHS}}\nfor path in PATHS:\n    report = Report.model_validate_json(path.read_text())\n    for arm, flat in ((\"before\", True), (\"after\", False)):\n        for depth, counts in covered(report, flat).items():\n            table[arm][depth].update(counts)\nprint(json.dumps({\"reports\": len(PATHS), **{a: {d: dict(c) for d, c in t.items()} for a, t in table.items()}}, indent=1))\n"
+}
