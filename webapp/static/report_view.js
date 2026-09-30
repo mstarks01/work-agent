@@ -752,7 +752,8 @@
       const named = q.findings.slice(0, 3).map(f => titles[f] || f);
       const rest = q.findings.length - named.length;
       return el("div", "meta",
-        `Waiting on it: ${named.join("; ")}` + (rest ? `; and ${rest} more` : ""));
+        `Waiting on it: ${named.join("; ")}` + (rest ? `; and ${rest} more` : "") +
+        (q.band ? `. The most important is ${q.band}.` : ""));
     };
 
     if (LINK_QUESTIONS.length) {

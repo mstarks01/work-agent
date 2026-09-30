@@ -86,6 +86,7 @@ from analysis_service.assertions import (
 )
 from analysis_service.capabilities import CAPABILITIES, lineage
 from analysis_service.claims import FrameworkAnalysis, UnknownKey, UnknownRef
+from analysis_service.frameworks import PACKAGES, Band
 from analysis_service.open_facts import element_names, label_of
 from analysis_service.question_kinds import QUESTION_KINDS, Facet
 from analysis_service.sources import ANSWERS_LABEL, plain_name
@@ -384,6 +385,10 @@ class FactQuestion:
     facets: tuple[Facet, ...]
     #: The longest answer it admits (:func:`answer_limit`).
     max_length: int
+    #: The label of the highest :class:`~analysis_service.frameworks.Band`
+    #: among the findings that wait on it, or empty where none does or its
+    #: package grades nothing.
+    band: str
     #: Every finding that waits on it, as ``framework/claim``. A finding is
     #: covered once every question that names it has an answer, whichever
     #: questions those are.
@@ -406,6 +411,7 @@ class FactQuestion:
             "suggestions": list(self.suggestions),
             "facets": facets_json(self.facets),
             "max_length": self.max_length,
+            "band": self.band,
             "findings": list(self.findings),
         }
 
@@ -597,29 +603,50 @@ def _answered_row(catalog: AssertionCatalog, identity: str) -> Assertion | None:
     return None
 
 
-def _greedy(open_facts: Mapping[Finding, set[UnknownKey]]) -> list[UnknownKey]:
-    """The facts in the order that completes the most findings, asked one by one.
+#: The band of a question no finding waits on: below every package's.
+_UNRANKED = Band(-1, "")
 
-    Where one question completes findings, the next is the one that completes
-    the most. Where none does, the next are the facts of the finding with the
+
+def _greedy(
+    open_facts: Mapping[Finding, set[UnknownKey]], band: Mapping[Finding, int]
+) -> list[UnknownKey]:
+    """The facts in the order that completes the most important findings first.
+
+    ``band`` is each finding's :class:`~analysis_service.frameworks.Band`
+    order. Where one question completes findings, the next is the one that
+    completes the most in the highest band, then in the next band down, and so
+    on: one critical finding before three low ones, with no weights. Where
+    none does, the next are the facts of the highest-band finding with the
     fewest left, the most cited first. A tie goes to more citations, then to
     the lower key, so one input always gives one order. Measured against
-    asking the most cited fact first, it covers more findings at every
-    depth (``QA-2026-09-26-03-E17``).
+    asking the most cited fact first, completing the most findings covers more
+    at every depth (``QA-2026-09-26-03-E17``).
     """
     left = {finding: set(keys) for finding, keys in open_facts.items() if keys}
     order: list[UnknownKey] = []
     while left:
         cites = Counter(key for keys in left.values() for key in keys)
-        completes = Counter(
-            next(iter(keys)) for keys in left.values() if len(keys) == 1
-        )
+        bands = sorted({band[finding] for finding in left}, reverse=True)
+        completes: dict[UnknownKey, Counter[int]] = {}
+        for finding, keys in left.items():
+            if len(keys) == 1:
+                completes.setdefault(next(iter(keys)), Counter())[band[finding]] += 1
         if completes:
             chosen = [
-                min(completes, key=lambda key: (-completes[key], -cites[key], key))
+                min(
+                    completes,
+                    key=lambda key: (
+                        tuple(-completes[key][level] for level in bands),
+                        -cites[key],
+                        key,
+                    ),
+                )
             ]
         else:
-            nearest = min(left.values(), key=lambda keys: (len(keys), sorted(keys)))
+            nearest = min(
+                left.items(),
+                key=lambda item: (-band[item[0]], len(item[1]), sorted(item[1])),
+            )[1]
             chosen = sorted(nearest, key=lambda key: (-cites[key], key))
         order.extend(chosen)
         asked = set(chosen)
@@ -668,9 +695,12 @@ def fact_questions(
     prepared = prepared_model(model, catalog)
     done = answered_keys(earlier)
     unknown = {answer.key for answer in earlier if not answer.settles} & done
+    bands: dict[Finding, Band] = {}
     for block in analyses:
+        rank = PACKAGES[block.framework].rank
         for claim in block.all_claims():
             finding = (block.framework, claim.id)
+            bands[finding] = rank(claim)
             cites = [*claim.unknown_grounds(), *claim.verdict.related_unknowns]
             stuck = bool(unknown & {ref.key for ref in cites})
             if claim.verdict.status == "needs-info" and not stuck:
@@ -692,9 +722,13 @@ def fact_questions(
                 cited += verdict
             for ref in cited:
                 refs.setdefault(ref.key, ref)
-    first = _greedy(evidence)
+    # Every draft ranks by its band, whatever its verdict, so the evidence
+    # section still does not depend on the critic: a band is the lane's
+    # rating or the catalog's, and a ruling sets neither.
+    order = {finding: band.order for finding, band in bands.items()}
+    first = _greedy(evidence, order)
     asked_first = set(first)
-    later = _greedy({f: keys - asked_first for f, keys in named.items()})
+    later = _greedy({f: keys - asked_first for f, keys in named.items()}, order)
     waiting = {
         finding: evidence.get(finding, set()) | named.get(finding, set())
         for finding in evidence.keys() | named.keys()
@@ -741,6 +775,11 @@ def fact_questions(
                             if key in facts
                         )
                     ),
+                    band=max(
+                        (bands[f] for f, facts in waiting.items() if key in facts),
+                        key=lambda band: band.order,
+                        default=_UNRANKED,
+                    ).label,
                 )
             )
     return tuple(asked)

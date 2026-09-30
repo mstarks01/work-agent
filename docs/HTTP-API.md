@@ -217,7 +217,10 @@ service loses it, with its extraction; submit it again.
 Most findings are conditional: they rest on facts the sources never state,
 such as how a flow is protected. `fact_questions` lists every such fact the
 report's findings cite. The first question is the one that completes the most
-findings, so that each has every fact it waits on answered:
+of the most important findings: one critical finding before three low ones
+([ADR 0055](adr/0055-a-follow-up-asks-first-what-the-most-important-findings-wait-on.md)).
+`band` names the most important finding that waits on the question, such as
+`critical` for STRIDE or `level 1` for ASVS:
 
 ```json
 {"key": ["flow:entity:customer>process:web-app>login", "encryption_in_transit", "", "", ""],
@@ -225,7 +228,7 @@ findings, so that each has every fact it waits on answered:
  "label": "Customer → Web App: encryption in transit",
  "cited_by": 4, "covered_so_far": 3, "choices": [],
  "form": "control", "suggestions": ["HTTPS", "TLS 1.3", "TLS 1.2"],
- "max_length": 200,
+ "max_length": 200, "band": "high",
  "findings": ["stride/I-01", "stride/I-02", "stride/T-03", "stride/T-04"]}
 ```
 

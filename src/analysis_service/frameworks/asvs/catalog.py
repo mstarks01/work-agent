@@ -204,6 +204,16 @@ _TEXT_BY_ID: Mapping[str, str] = MappingProxyType(
 )
 
 
+_LEVEL_BY_ID: Mapping[str, AsvsLevel] = MappingProxyType(
+    {req.id: req.level for req in REQUIREMENTS}
+)
+
+
+def requirement_level(requirement_id: str) -> AsvsLevel | None:
+    """The level one requirement belongs to, or ``None`` for an ID it lacks."""
+    return _LEVEL_BY_ID.get(requirement_id)
+
+
 def requirement_text(requirement_id: str) -> str:
     """The standard's own words for one requirement, or ``""`` for an ID it lacks.
 
