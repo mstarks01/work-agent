@@ -320,6 +320,16 @@ def _asked_after(answered, *, waiting=True, final=False, shown=(), skipped=()):
 CAPACITY = ("process:web-app", "", "", "", "capacity-limits", "")
 
 
+def _known_answer(question: dict) -> dict:
+    """An answer that states something, in the form the question takes."""
+    if question["form"] == "facets":
+        return {"key": question["key"], "facets": {question["facets"][0]["id"]: "yes"}}
+    if question["choices"]:
+        return {"key": question["key"], "value": question["choices"][0]}
+    value = "none" if question["form"] == "control" else "the admins"
+    return {"key": question["key"], "value": value}
+
+
 class TestTheRoundsEnd:
     """A later round asked "I don't know" facts again, and the rounds after a
     report had no end."""
@@ -378,7 +388,7 @@ class TestTheRoundsEnd:
         finished = TestTheRoutes().completed(store)
         body = client.get(f"/v1/jobs/{finished}/questions", headers=auth()).json()
         assert body["final"] is False
-        facts = [{"key": body["fact_questions"][0]["key"], "value": "unknown"}]
+        facts = [_known_answer(body["fact_questions"][0])]
         response = client.post(
             f"/v1/jobs/{finished}/answers", json={"facts": facts}, headers=auth()
         )
@@ -746,3 +756,88 @@ class TestTakingAnAnswerBack:
                 links=[],
                 facts=[FactAnswer(key=question.key, value="unknown")],
             )
+
+
+def _facets(facets: dict[str, str]) -> FactAnswer:
+    return FactAnswer.model_validate({"key": CAPACITY, "facets": facets})
+
+
+class TestAFollowUpMustAddSomething:
+    """An all-"I don't know" follow-up spent the report's only rerun (#1289)."""
+
+    FACT = (FLOW, "data_description", "", "", "", "")
+    LINK = LinkAnswer(principal="customer", element="entity:customer")
+
+    @pytest.mark.parametrize(
+        ("earlier", "sent", "adds"),
+        [
+            ([], [FactAnswer(key=FACT, value="unknown")], False),
+            (
+                [FactAnswer(key=FACT, value="orders")],
+                [FactAnswer(key=FACT, value="orders")],
+                False,
+            ),
+            (
+                [FactAnswer(key=FACT, value="orders")],
+                [FactAnswer(key=FACT, value="refunds")],
+                True,
+            ),
+            (
+                [],
+                [
+                    FactAnswer(key=FACT, value="unknown"),
+                    _facets({"rate": "no"}),
+                ],
+                True,
+            ),
+            (
+                [_facets({"rate": "yes"})],
+                [_facets({"size": "unknown"})],
+                False,
+            ),
+            (
+                [_facets({"rate": "yes"})],
+                [_facets({"size": "no"})],
+                True,
+            ),
+        ],
+        ids=[
+            "unknown",
+            "repeat",
+            "changed",
+            "one-known",
+            "facet-unknown",
+            "facet-known",
+        ],
+    )
+    def test_only_known_content_that_changes_is_information(self, earlier, sent, adds):
+        from analysis_service.answer_round import _adds_information
+
+        assert _adds_information([], earlier, [], sent) is adds
+
+    @pytest.mark.parametrize(("earlier", "adds"), [([], True), ([LINK], False)])
+    def test_a_link_is_information_where_it_places_anew(self, earlier, adds):
+        from analysis_service.answer_round import _adds_information
+
+        assert _adds_information(earlier, [], [self.LINK], []) is adds
+
+    def test_the_route_refuses_it_and_keeps_the_follow_up(self):
+        from tests.test_questions import TestTheRoutes
+
+        client, store = catalog_client()
+        finished = TestTheRoutes().completed(store)
+        body = client.get(f"/v1/jobs/{finished}/questions", headers=auth()).json()
+        question = body["fact_questions"][0]
+        unknown = client.post(
+            f"/v1/jobs/{finished}/answers",
+            json={"facts": [{"key": question["key"], "value": "unknown"}]},
+            headers=auth(),
+        )
+        assert unknown.status_code == 400
+        assert "still available" in unknown.json()["detail"]
+        known = client.post(
+            f"/v1/jobs/{finished}/answers",
+            json={"facts": [_known_answer(question)]},
+            headers=auth(),
+        )
+        assert known.status_code == 201, known.text
