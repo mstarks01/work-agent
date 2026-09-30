@@ -146,8 +146,10 @@
   let suggestLists = 0;
   const inputFor = (q, prefill) => {
     let input;
-    // `read` is the answer the row sends, or "" for none.
+    // `read` is the answer the row sends, or "" for none; `set` writes an
+    // answer into the row, as "Same for all" and an earlier answer do.
     let read = () => input.value.trim();
+    let set;
     // `beside` is what follows the label.
     let beside;
     if (q.choices.length) {
@@ -157,7 +159,7 @@
         input.append(optionOf(option.name ? `${option.name} (${option.id})` : option.id, option.id));
       }
       input.append(optionOf("I don't know", DONT_KNOW));
-      input.value = prefill || "";
+      set = (value) => { input.value = value; };
       beside = [input];
     } else if (q.form === "control") {
       // A control: say there is none, say you do not know, or name the
@@ -178,12 +180,12 @@
       const fix = () => { input.disabled = state.value === "none" || state.value === DONT_KNOW; };
       state.addEventListener("change", fix);
       input.addEventListener("input", () => { if (input.value.trim()) state.value = "mechanism"; });
-      if (prefill) {
-        const fixed = prefill === "none" || prefill === DONT_KNOW;
-        state.value = fixed ? prefill : "mechanism";
-        input.value = fixed ? "" : prefill;
+      set = (value) => {
+        const fixed = value === "none" || value === DONT_KNOW;
+        state.value = fixed || !value ? value : "mechanism";
+        input.value = fixed ? "" : value;
         fix();
-      }
+      };
       read = () => (state.value === "mechanism" ? input.value.trim() : state.value);
       beside = [state, " ", input, list];
     } else {
@@ -199,14 +201,15 @@
       });
       const dontKnow = document.createElement("label");
       dontKnow.append(box, " I don't know");
-      if (prefill) {
-        input.value = prefill;
-        box.checked = input.disabled = prefill === DONT_KNOW;
-      }
+      set = (value) => {
+        input.value = value;
+        box.checked = input.disabled = value === DONT_KNOW;
+      };
       beside = [input, " ", dontKnow];
     }
+    set(prefill || "");
     input.dataset.key = JSON.stringify(q.key);
-    return { input, beside, read };
+    return { input, beside, read, set };
   };
 
   // A paused run's round: the link questions, then the open facts grouped by
@@ -311,10 +314,22 @@
         const box = document.createElement("details");
         box.open = groups.size < OPEN_GROUPS;
         const title = document.createElement("summary");
-        box.append(title);
-        groups.set(q.group, { box, title, heading: q.group_heading, count: 0 });
+        // "Same for all" goes here, above the rows, where a group takes one.
+        const top = document.createElement("div");
+        box.append(title, top);
+        groups.set(q.group, { box, title, top, heading: q.group_heading, count: 0, rows: [] });
       }
     }
+    // A group takes "Same for all" where two or more rows ask one attribute
+    // or kind about different elements in one form. A capability asks about
+    // the whole application, so it never shares.
+    const shareable = new Set([...groups.keys()].filter((name) => {
+      const rows = data.facts.filter((q) => q.group === name && q.form !== "facets");
+      const [first] = rows;
+      return rows.length >= 2 && rows.every((q) => q.key[0]
+        && q.key[1] === first.key[1] && q.key[4] === first.key[4] && q.form === first.form
+        && JSON.stringify(q.choices) === JSON.stringify(first.choices));
+    }));
     // A question with facets is a table: a column per facet, a row per
     // element, and a first row that sets the whole column.
     const facetTable = (into, q, withAll) => {
@@ -414,8 +429,17 @@
         return;
       }
       const row = document.createElement("p");
-      const { input, beside, read } = inputFor(q, "");
+      const { input, beside, read, set } = inputFor(q, "");
       inputs.set(input.dataset.key, input);
+      if (shareable.has(q.group)) {
+        // Ticked rows take the shared answer; an unticked row is an exception.
+        const tick = document.createElement("input");
+        tick.type = "checkbox";
+        tick.checked = true;
+        tick.title = "Take the answer under \"Same for all\"";
+        row.append(tick, " ");
+        group.rows.push({ tick, set });
+      }
       // A part of another capability is asked only once its parent is "yes".
       // A hidden row sends no answer, so a "no" to the parent is never
       // contradicted by an answer to its part.
@@ -435,7 +459,25 @@
       if (about) row.append(about);
       group.box.append(row);
     });
-    for (const group of groups.values()) {
+    for (const [name, group] of groups) {
+      if (group.rows.length) {
+        const shared = inputFor(data.facts.find((q) => q.group === name), "");
+        const apply = document.createElement("button");
+        apply.type = "button";
+        apply.textContent = "Apply to the ticked rows";
+        apply.addEventListener("click", () => {
+          for (const row of group.rows) if (row.tick.checked) row.set(shared.read());
+        });
+        const line = document.createElement("p");
+        const title = document.createElement("b");
+        title.textContent = "Same for all";
+        line.append(title, " ", ...shared.beside, " ", apply);
+        const hint = document.createElement("div");
+        hint.className = "hint";
+        hint.textContent = "Untick a row the answer does not fit. Each row is sent as its"
+          + " own answer, and you can still change it.";
+        group.top.append(line, hint);
+      }
       group.title.textContent = `${group.heading} (${group.count})`;
       questions.append(group.box);
     }
