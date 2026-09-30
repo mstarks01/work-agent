@@ -302,9 +302,9 @@ Start with these parts of the result:
   means a requirement applies and the input does not show it satisfied; it is
   not a failed compliance test. A `needs-info` finding is conditional: it is
   neither confirmed nor cleared. Its card lists each fact it waits on and why
-  that fact is still open: nobody knew, you skipped it before the analysis,
-  you answered it and the analysis still did not find it settled, or nobody
-  was asked. **What remains open**, above the findings, counts them. An "I
+  that fact is still open: nobody knew, you answered only part of it, you
+  skipped it before the analysis, you answered it and the analysis still did
+  not find it settled, or nobody was asked. **What remains open**, above the findings, counts them. An "I
   don't know" never reads as a missing control.
 - **Marks:** look for repaired quotes, dropped claims, unresolved evidence, or
   unresolved references. These show where one proposal was degraded or removed

@@ -52,6 +52,7 @@ from analysis_service.questions import (
     answer_suggestions,
     answered_model,
     check_fact_answers,
+    conditions,
     fact_kind,
     fact_questions,
     open_attribute,
@@ -1082,3 +1083,36 @@ def test_a_report_question_the_pause_showed_is_marked_asked_before(report):
     marks = {question.key: question.asked_before for question in asked.facts}
     assert marks[first] is True
     assert not any(marks[key] for key in marks if key != first)
+
+
+@pytest.mark.parametrize(
+    ("answer", "status"),
+    [
+        ({"facets": {"rate": "yes"}}, "partial"),
+        ({"facets": {"rate": "yes", "size": "unknown"}}, "partial"),
+        ({"value": "unknown"}, "unknown"),
+        (
+            {
+                "facets": {
+                    "rate": "yes",
+                    "size": "no",
+                    "concurrency": "no",
+                    "quota": "no",
+                }
+            },
+            "answered",
+        ),
+    ],
+    ids=["facets-left-out", "a-facet-unknown", "dont-know", "every-facet"],
+)
+def test_a_fact_answered_in_part_is_not_read_as_dont_know(answer, status):
+    """A facet answer given in part read as "nobody knew" on the report (#1289)."""
+    from tests.factories import asking_threat, sample_analysis, valid_model
+
+    model = valid_model()
+    asked = UnknownRef(element_id=model.processes[0].id, question="capacity-limits")
+    given = FactAnswer.model_validate({"key": asked.key, **answer})
+
+    found = conditions([sample_analysis([asking_threat(asked)])], model, [given], [])
+
+    assert [row[2] for rows in found.values() for row in rows] == [status]
