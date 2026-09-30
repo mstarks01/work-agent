@@ -1,0 +1,412 @@
+{
+  "before": {
+    "L1 jobs": {
+      "listed": 21,
+      "eligible": 10,
+      "round 1 settling level 1": 10
+    },
+    "L2 jobs": {
+      "listed": 51,
+      "eligible": 28,
+      "dropped settling level 1": 6,
+      "kept settling only level 2+": 13,
+      "round 1 settling level 1": 5
+    }
+  },
+  "after": "L1 {'listed': 21.0, 'eligible': 10.0, 'asked (limit 30)': 10.0, 'round 1 settling level 1': 10.0, 'round 1': 10.0} jobs 14\nL2 {'listed': 51, 'eligible': 34, 'asked (limit 30)': 30, 'round 1 settling level 1': 10, 'round 1': 10} jobs 17\n",
+  "replay_summary_asvs": {
+    "asvs / capability-no": {
+      "models": 31,
+      "listed": {
+        "median": 56,
+        "max": 79
+      },
+      "above_floor": {
+        "median": 38,
+        "max": 46
+      },
+      "asked": {
+        "median": 28,
+        "max": 38
+      },
+      "rounds": {
+        "median": 3,
+        "max": 3
+      },
+      "decisions": {
+        "median": 28,
+        "max": 38
+      },
+      "widest": {
+        "median": 17,
+        "max": 20
+      },
+      "skipped": {
+        "median": 0,
+        "max": 0
+      },
+      "repeats": {
+        "median": 0,
+        "max": 0
+      },
+      "added": {
+        "median": 0,
+        "max": 5
+      },
+      "removed": {
+        "median": 10,
+        "max": 10
+      },
+      "asked_within_2_of_start": 0.323,
+      "not_ended": 0,
+      "stops": {
+        "nothing-left": 31
+      }
+    },
+    "asvs / capability-yes": {
+      "models": 31,
+      "listed": {
+        "median": 56,
+        "max": 79
+      },
+      "above_floor": {
+        "median": 38,
+        "max": 46
+      },
+      "asked": {
+        "median": 34,
+        "max": 44
+      },
+      "rounds": {
+        "median": 3,
+        "max": 3
+      },
+      "decisions": {
+        "median": 34,
+        "max": 44
+      },
+      "widest": {
+        "median": 17,
+        "max": 20
+      },
+      "skipped": {
+        "median": 0,
+        "max": 0
+      },
+      "repeats": {
+        "median": 0,
+        "max": 0
+      },
+      "added": {
+        "median": 0,
+        "max": 5
+      },
+      "removed": {
+        "median": 4,
+        "max": 4
+      },
+      "asked_within_2_of_start": 0.387,
+      "not_ended": 0,
+      "stops": {
+        "budget-exhausted": 17,
+        "nothing-left": 14
+      }
+    },
+    "asvs / controls-none": {
+      "models": 31,
+      "listed": {
+        "median": 56,
+        "max": 79
+      },
+      "above_floor": {
+        "median": 38,
+        "max": 46
+      },
+      "asked": {
+        "median": 34,
+        "max": 44
+      },
+      "rounds": {
+        "median": 3,
+        "max": 3
+      },
+      "decisions": {
+        "median": 34,
+        "max": 44
+      },
+      "widest": {
+        "median": 17,
+        "max": 20
+      },
+      "skipped": {
+        "median": 0,
+        "max": 0
+      },
+      "repeats": {
+        "median": 0,
+        "max": 0
+      },
+      "added": {
+        "median": 0,
+        "max": 5
+      },
+      "removed": {
+        "median": 4,
+        "max": 4
+      },
+      "asked_within_2_of_start": 0.387,
+      "not_ended": 0,
+      "stops": {
+        "budget-exhausted": 17,
+        "nothing-left": 14
+      }
+    },
+    "asvs / controls-stated": {
+      "models": 31,
+      "listed": {
+        "median": 56,
+        "max": 79
+      },
+      "above_floor": {
+        "median": 38,
+        "max": 46
+      },
+      "asked": {
+        "median": 34,
+        "max": 44
+      },
+      "rounds": {
+        "median": 3,
+        "max": 3
+      },
+      "decisions": {
+        "median": 34,
+        "max": 44
+      },
+      "widest": {
+        "median": 17,
+        "max": 20
+      },
+      "skipped": {
+        "median": 0,
+        "max": 0
+      },
+      "repeats": {
+        "median": 0,
+        "max": 0
+      },
+      "added": {
+        "median": 0,
+        "max": 5
+      },
+      "removed": {
+        "median": 4,
+        "max": 4
+      },
+      "asked_within_2_of_start": 0.387,
+      "not_ended": 0,
+      "stops": {
+        "budget-exhausted": 17,
+        "nothing-left": 14
+      }
+    },
+    "asvs / facets-mixed-unknown": {
+      "models": 31,
+      "listed": {
+        "median": 56,
+        "max": 79
+      },
+      "above_floor": {
+        "median": 38,
+        "max": 46
+      },
+      "asked": {
+        "median": 34,
+        "max": 44
+      },
+      "rounds": {
+        "median": 3,
+        "max": 3
+      },
+      "decisions": {
+        "median": 34,
+        "max": 44
+      },
+      "widest": {
+        "median": 17,
+        "max": 20
+      },
+      "skipped": {
+        "median": 0,
+        "max": 0
+      },
+      "repeats": {
+        "median": 0,
+        "max": 0
+      },
+      "added": {
+        "median": 0,
+        "max": 5
+      },
+      "removed": {
+        "median": 4,
+        "max": 4
+      },
+      "asked_within_2_of_start": 0.387,
+      "not_ended": 0,
+      "stops": {
+        "budget-exhausted": 17,
+        "nothing-left": 14
+      }
+    },
+    "asvs / facets-partial": {
+      "models": 31,
+      "listed": {
+        "median": 56,
+        "max": 79
+      },
+      "above_floor": {
+        "median": 38,
+        "max": 46
+      },
+      "asked": {
+        "median": 34,
+        "max": 44
+      },
+      "rounds": {
+        "median": 3,
+        "max": 3
+      },
+      "decisions": {
+        "median": 34,
+        "max": 44
+      },
+      "widest": {
+        "median": 17,
+        "max": 20
+      },
+      "skipped": {
+        "median": 0,
+        "max": 0
+      },
+      "repeats": {
+        "median": 0,
+        "max": 0
+      },
+      "added": {
+        "median": 0,
+        "max": 5
+      },
+      "removed": {
+        "median": 4,
+        "max": 4
+      },
+      "asked_within_2_of_start": 0.387,
+      "not_ended": 0,
+      "stops": {
+        "budget-exhausted": 17,
+        "nothing-left": 14
+      }
+    },
+    "asvs / skip-all": {
+      "models": 31,
+      "listed": {
+        "median": 56,
+        "max": 79
+      },
+      "above_floor": {
+        "median": 38,
+        "max": 46
+      },
+      "asked": {
+        "median": 38,
+        "max": 46
+      },
+      "rounds": {
+        "median": 4,
+        "max": 4
+      },
+      "decisions": {
+        "median": 38,
+        "max": 46
+      },
+      "widest": {
+        "median": 17,
+        "max": 20
+      },
+      "skipped": {
+        "median": 38,
+        "max": 46
+      },
+      "repeats": {
+        "median": 0,
+        "max": 0
+      },
+      "added": {
+        "median": 0,
+        "max": 0
+      },
+      "removed": {
+        "median": 0,
+        "max": 0
+      },
+      "asked_within_2_of_start": 1.0,
+      "not_ended": 0,
+      "stops": {
+        "nothing-left": 31
+      }
+    },
+    "stride,asvs / capability-yes": {
+      "models": 249,
+      "listed": {
+        "median": 143,
+        "max": 184
+      },
+      "above_floor": {
+        "median": 67,
+        "max": 81
+      },
+      "asked": {
+        "median": 60,
+        "max": 60
+      },
+      "rounds": {
+        "median": 6,
+        "max": 7
+      },
+      "decisions": {
+        "median": 83,
+        "max": 94
+      },
+      "widest": {
+        "median": 20,
+        "max": 20
+      },
+      "skipped": {
+        "median": 0,
+        "max": 0
+      },
+      "repeats": {
+        "median": 0,
+        "max": 0
+      },
+      "added": {
+        "median": 0,
+        "max": 0
+      },
+      "removed": {
+        "median": 7,
+        "max": 21
+      },
+      "asked_within_2_of_start": 0.0,
+      "not_ended": 0,
+      "stops": {
+        "budget-exhausted": 249
+      }
+    }
+  },
+  "scripts": {
+    "before": "\"\"\"ASVS capability questions: which the floor drops, and where level 1 ranks.\"\"\"\nimport statistics\nfrom collections import Counter\nfrom pathlib import Path\n\nfrom analysis_service.answer_round import EARLY_RULES, ROUND_DECISIONS\nfrom analysis_service.capabilities import lineage\nfrom analysis_service.early_questions import capability_questions\nfrom analysis_service.frameworks.asvs.applicability import applicability_for\nfrom analysis_service.frameworks.asvs.catalog import requirement_level\nfrom analysis_service.report import Report\n\nfloor = EARLY_RULES[\"capability\"].floor\nstats = Counter()\nfirst_round_l1, listed_l1 = [], []\nfor path in sorted(Path(\"evals\").rglob(\"*.report.json\")):\n    report = Report.model_validate_json(path.read_text())\n    options = {s.name: s.options for s in report.job.frameworks}\n    if \"asvs\" not in options:\n        continue\n    level = options[\"asvs\"][\"level\"]\n    decisions = applicability_for(level, report.system_model.capability_facts())\n    levels: dict[str, set[int]] = {}\n    for requirement, decision in decisions.items():\n        for missing in decision.missing:\n            for key in (missing, *lineage(missing)):\n                levels.setdefault(key, set()).add(requirement_level(requirement))\n    asked = capability_questions(report.system_model, {\"asvs\": options[\"asvs\"]})\n    stats[\"reports\"] += 1\n    stats[f\"level {level} jobs\"] += 1\n    kept = [q for q in asked if q.score >= floor]\n    dropped = [q for q in asked if q.score < floor]\n    tag = f\"L{level} jobs\"\n    stats[f\"{tag}: listed\"] += len(asked)\n    stats[f\"{tag}: kept\"] += len(kept)\n    stats[f\"{tag}: dropped\"] += len(dropped)\n    stats[f\"{tag}: dropped settling a level-1 requirement\"] += sum(1 for q in dropped if 1 in levels.get(q.key[5], set()))\n    stats[f\"{tag}: kept settling a level-1 requirement\"] += sum(1 for q in kept if 1 in levels.get(q.key[5], set()))\n    stats[f\"{tag}: kept settling only level 2+\"] += sum(1 for q in kept if levels.get(q.key[5]) and 1 not in levels[q.key[5]])\n    # Where the level-1 questions sit in today's order, in choices.\n    budget, first = ROUND_DECISIONS, set()\n    for q in kept:\n        if budget <= 0:\n            break\n        first.add(q.key)\n        budget -= q.decisions\n    l1 = [q for q in kept if 1 in levels.get(q.key[5], set())]\n    first_round_l1.append(sum(1 for q in l1 if q.key in first))\n    listed_l1.append(len(l1))\nfor key, value in stats.items():\n    print(f\"{key}: {value}\")\nprint(\"level-1 questions kept, a job (median):\", statistics.median(listed_l1),\n      \"| of them in round 1 (median):\", statistics.median(first_round_l1))\n",
+    "after": "\"\"\"After #1289's capability bands: what a level 1 and a level 2 ASVS job ask.\"\"\"\nimport statistics\nfrom collections import defaultdict\nfrom pathlib import Path\n\nfrom analysis_service.answer_round import question_set\nfrom analysis_service.early_questions import capability_questions\nfrom analysis_service.report import Report\n\nper = defaultdict(lambda: defaultdict(list))\nfor path in sorted(Path(\"evals\").rglob(\"*.report.json\")):\n    report = Report.model_validate_json(path.read_text())\n    options = {s.name: s.options for s in report.job.frameworks}\n    if \"asvs\" not in options:\n        continue\n    asvs = {\"asvs\": options[\"asvs\"]}\n    level = options[\"asvs\"][\"level\"]\n    listed = capability_questions(report.system_model, asvs)\n    qs = question_set(report.system_model, None, asvs, [], waiting=True, answered=[],\n                      answered_links=[], final=False, shown=[])\n    first = [q for q in qs.early if q.kind == \"capability\"]\n    row = per[f\"L{level}\"]\n    row[\"listed\"].append(len(listed))\n    row[\"eligible\"].append(qs.remaining[\"capability\"] + qs.withheld)\n    row[\"asked (limit 30)\"].append(qs.remaining[\"capability\"])\n    row[\"round 1 settling level 1\"].append(sum(1 for q in first if q.band == 3))\n    row[\"round 1\"].append(len(first))\nfor level, row in sorted(per.items()):\n    print(level, {k: statistics.median(v) for k, v in row.items()}, \"jobs\", len(row[\"listed\"]))\n"
+  }
+}
