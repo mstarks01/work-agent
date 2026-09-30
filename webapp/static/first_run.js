@@ -120,6 +120,8 @@
   // The answer that says the submitter does not know. The service writes
   // nothing for it, so the fact stays open.
   const DONT_KNOW = "unknown";
+  // How much of an element's source words a row shows; the rest is its title.
+  const EXCERPT = 200;
   // The answers a facet takes, as the service lists them in FACET_ANSWERS.
   const FACET_CHOICES = [
     ["yes", "yes"], ["no", "no"], ["not applicable", "not applicable"],
@@ -373,6 +375,22 @@
         return Object.keys(given).length ? { key: q.key, facets: given } : null;
       };
     };
+    // Why a question is asked, and the words of the description its element
+    // was read from, so the owner sees what the service read.
+    const context = (q) => {
+      const parts = [];
+      if (q.reasons.length) parts.push(`Why: ${q.reasons[0]}`);
+      if (q.excerpt) {
+        const cut = q.excerpt.length > EXCERPT ? `${q.excerpt.slice(0, EXCERPT)}\u2026` : q.excerpt;
+        parts.push(`Your description: \u201c${cut}\u201d`);
+      }
+      if (!parts.length) return null;
+      const hint = document.createElement("div");
+      hint.className = "hint";
+      hint.textContent = parts.join(" \u00b7 ");
+      hint.title = q.excerpt;
+      return hint;
+    };
     // Each answer's input by its key, so a capability that is part of another
     // can follow its parent's answer.
     const inputs = new Map();
@@ -383,10 +401,14 @@
       label.textContent = q.element;
       // Why the fact matters: the questions of the rules that fire on it.
       label.title = q.reasons.join(" ");
+      const about = context(q);
       if (q.form === "facets") {
         group.grid = group.grid || facetTable(group.box, q, true);
         const before = earlier.get(JSON.stringify(q.key));
-        const read = facetRow(group.grid, q, label, before && before.facets);
+        const who = document.createElement("span");
+        who.append(label);
+        if (about) who.append(about);
+        const read = facetRow(group.grid, q, who, before && before.facets);
         answers.push(read);
         roundRows.push({ key: q.key, read });
         return;
@@ -410,6 +432,7 @@
       answers.push(answer);
       roundRows.push({ key: q.key, read: answer });
       row.append(label, " ", ...beside);
+      if (about) row.append(about);
       group.box.append(row);
     });
     for (const group of groups.values()) {

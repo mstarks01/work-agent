@@ -741,6 +741,19 @@
     const why = q => q.asked_before
       ? " (you skipped this before the analysis)"
       : q.basis === "evidence" ? " (new from the analysis)" : "";
+    // The findings that wait on a question, by title, so the owner sees what
+    // an answer can settle.
+    const titles = {};
+    (R.analyses || []).forEach(b => b.claims.forEach(c => {
+      titles[`${b.framework}/${c.id}`] = c.title;
+    }));
+    const waitingOn = q => {
+      if (!q.findings.length) return "";
+      const named = q.findings.slice(0, 3).map(f => titles[f] || f);
+      const rest = q.findings.length - named.length;
+      return el("div", "meta",
+        `Waiting on it: ${named.join("; ")}` + (rest ? `; and ${rest} more` : ""));
+    };
 
     if (LINK_QUESTIONS.length) {
       box.append(el("h2", null, "Which element is each of these?"));
@@ -844,7 +857,7 @@
           });
           row.append(el("b", null, q.label), why(q),
             ` \u2014 ${q.cited_by} finding(s) wait on it; answering down to here covers ${q.covered_so_far}`,
-            list);
+            waitingOn(q), list);
           into.append(row);
           return;
         }
@@ -906,7 +919,7 @@
         if (q.form !== "control") input.addEventListener(q.choices.length ? "change" : "input", recount);
         row.append(el("b", null, q.label), why(q),
           ` \u2014 ${q.cited_by} finding(s) wait on it; answering down to here covers ${q.covered_so_far} `,
-          ...beside);
+          ...beside, waitingOn(q));
         into.append(row);
         factAnswers.push({
           read: () => read() ? { key: q.key, value: read() } : null,

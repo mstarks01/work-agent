@@ -658,6 +658,67 @@ def _subject_question(name, findings):
     }
 
 
+def test_an_early_row_carries_its_element_s_source_words(tiers):
+    """The owner could not see what the service read about an element (#1289, B2)."""
+    client = client_for(tiers, PausingRunner(catalog=False), catalog=False)
+    paused = start(client, questions=True)
+    shown = event(client.get(f"/events/{paused}").text, "questions")
+    model = valid_model()
+    for row in shown["facts"]:
+        element = model.get(row["key"][0])
+        assert row["excerpt"] == ("" if element is None else element.source_excerpt)
+    assert any(row["excerpt"] for row in shown["facts"]), "a control: some are read"
+
+
+def test_the_form_page_says_why_and_quotes_the_description():
+    """Each early row shows its first reason and its element's words (#1289, B1)."""
+    long = "x" * 250
+    rows = [
+        _text_row(["", "", "", "who?", "", ""], "who?")
+        | {"reasons": ["Can an attacker reach it?", "second"], "excerpt": long}
+    ]
+    steps = f"""
+await ids.analyze.listeners.submit({{ preventDefault() {{}} }}); await settle();
+streams[0].listeners.questions({{ data: JSON.stringify({{ run: "r1", questions: [],
+  facts: {json.dumps(rows)}, remaining: {{ field: 1 }},
+  answered: [], answered_links: [], revision: 0 }}) }});
+const walk = (n, out = []) => {{ for (const c of n.children || [])
+  if (typeof c === "object") {{ if (c.className === "hint") out.push(c); walk(c, out); }}
+  return out; }};
+calls.push(walk(ids.questions).map(h => ({{ text: h.textContent, title: h.title }})));
+"""
+    hints = _run_form_script(steps)["calls"][-1]
+    (row,) = [h for h in hints if h["text"].startswith("Why:")]
+    assert row["text"] == (
+        "Why: Can an attacker reach it? \u00b7 Your description: \u201c"
+        + "x" * 200
+        + "\u2026\u201d"
+    )
+    assert row["title"] == long
+
+
+def test_the_report_names_the_findings_a_question_settles():
+    """The report showed a count, never which findings wait (#1289, B1)."""
+    payloads = {
+        "report": {
+            "system_model": valid_model().model_dump(mode="json"),
+            "analyses": [
+                {
+                    "framework": "stride",
+                    "claims": [{"id": "T-01", "title": "Build tampering"}],
+                }
+            ],
+        },
+        "link_questions": [],
+        "fact_questions": [_subject_question("who signs builds?", ["stride/T-01"])],
+    }
+    steps = """
+calls.push(box.all("div").map(d => d.textContent).filter(t => t.startsWith("Waiting")));
+"""
+    (waiting,) = _run_answer_block(payloads, steps)["calls"]
+    assert waiting == ["Waiting on it: Build tampering"]
+
+
 def test_a_question_no_finding_waits_on_is_set_apart():
     """A follow-up listed questions that no conditional finding waits on among
     the ones that settle findings (#1289, item 8)."""

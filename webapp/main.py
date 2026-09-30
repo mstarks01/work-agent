@@ -151,6 +151,7 @@ from analysis_service.questions import (
     question_fallback,
 )
 from analysis_service.selection import SelectionError, resolve_selection
+from analysis_service.system_model import SystemModel
 from analysis_service.vendors import (
     CREDENTIAL_MODE_NOTES,
     VendorName,
@@ -908,12 +909,17 @@ def _link_row(question: LinkQuestion, names: Mapping[str, str]) -> dict[str, obj
     }
 
 
-def _early_row(question: EarlyQuestion, names: Mapping[str, str]) -> dict[str, object]:
+def _early_row(question: EarlyQuestion, model: SystemModel) -> dict[str, object]:
+    """The question as the form page shows it: each choice's element name, and
+    the words of the description the question's element was read from."""
+    element = model.get(question.key[0])
     return {
         **question.to_json(),
         "choices": [
-            {"id": choice, "name": names.get(choice, "")} for choice in question.choices
+            {"id": choice, "name": getattr(model.get(choice), "name", "")}
+            for choice in question.choices
         ],
+        "excerpt": "" if element is None else element.source_excerpt,
     }
 
 
@@ -977,8 +983,7 @@ def early_rows(questions: QuestionSet) -> list[dict[str, object]]:
 
     Every string is untrusted and lands on the page as text.
     """
-    names = _element_names(questions)
-    return [_early_row(question, names) for question in questions.early]
+    return [_early_row(question, questions.model) for question in questions.early]
 
 
 def paused_payload(run: Run, questions: QuestionSet) -> dict[str, object]:
@@ -996,9 +1001,12 @@ def paused_payload(run: Run, questions: QuestionSet) -> dict[str, object]:
         "remaining": dict(questions.remaining),
         "stop": questions.stop,
         "withheld": questions.withheld,
-        "skipped": [_early_row(question, names) for question in questions.skipped],
+        "skipped": [
+            _early_row(question, questions.model) for question in questions.skipped
+        ],
         "answered": [
-            _early_row(question, names) | {"answer": answer.model_dump(mode="json")}
+            _early_row(question, questions.model)
+            | {"answer": answer.model_dump(mode="json")}
             for question, answer in questions.answered_early
         ],
         "answered_links": [
