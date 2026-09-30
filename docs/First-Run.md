@@ -335,7 +335,10 @@ The app can ask you questions before the analysis, and after the report.
 
   The questions come in rounds of up to ten choices about the application and
   ten about parts of your system, the most useful first. A question with
-  parts counts one choice a part. Under each question, a line says why it is
+  parts counts one choice a part. Where one question asks about several
+  parts of your system, a **Same for all** row takes one answer, and **Apply
+  to the ticked rows** copies it into each row still ticked. Untick a row the
+  answer does not fit. Under each question, a line says why it is
   asked and quotes the words of your description that the part was read
   from. A line at the top says
   about how many are left; your answers can change that number. Click **Save

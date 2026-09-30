@@ -1203,6 +1203,73 @@ calls.push({ analysing: !ids.status.hidden, text: ids["status-text"].textContent
     assert "threat analysis with your answers" in analysing["text"]
 
 
+def _control_row(flow, form="control"):
+    return {
+        "key": [flow.id, "encryption_in_transit", "", "", "", ""],
+        "kind": "attribute",
+        "label": f"{flow.name}: encryption in transit",
+        "reasons": [],
+        "choices": [],
+        "form": form,
+        "suggestions": ["TLS 1.3"],
+        "facets": [],
+        "max_length": 200,
+        "decisions": 1,
+        "excerpt": "",
+        "group": "encryption_in_transit",
+        "group_heading": "Encryption in transit?",
+        "element": flow.name,
+    }
+
+
+_SHARED_STEPS = """
+await ids.analyze.listeners.submit({ preventDefault() {} }); await settle();
+streams[0].listeners.questions({ data: JSON.stringify({ run: "r1", questions: [],
+  facts: FACTS, remaining: {}, answered: [], answered_links: [], revision: 0 }) });
+const [group] = ids.questions.querySelectorAll("details");
+const child = (r, tag) => r.children.find(c => typeof c === "object" && c.tag === tag);
+const walk = (n, out = []) => { for (const c of n.children || [])
+  if (typeof c === "object") { out.push(c); walk(c, out); } return out; };
+const shared = walk(group).filter(n => n.tag === "b" && n.textContent === "Same for all");
+calls.push({ shared: shared.length });
+"""
+
+
+def test_same_for_all_fills_only_the_ticked_rows():
+    """One answer for several parts, with exceptions (#1289, design note C)."""
+    first, second = valid_model().data_flows[:2]
+    facts = [_control_row(first), _control_row(second)]
+    steps = (
+        _SHARED_STEPS.replace("FACTS", json.dumps(facts))
+        + """
+const [top, ...rows] = group.children.filter(c => c.tag === "div" || c.tag === "p");
+const line = child(top, "p");
+const state = child(line, "select");
+state.value = "none"; state.listeners.change();
+const ticks = group.children.filter(c => c.tag === "p").map(r => child(r, "input"));
+ticks[1].checked = false;
+await child(line, "button").listeners.click();
+await ids.continue.listeners.click(); await settle();
+"""
+    )
+    seen = _run_form_script(steps)["calls"]
+    assert seen[1] == {"shared": 1}
+    (sent,) = [c for c in seen if c.get("url") == "/answer/r1"]
+    assert sent["body"]["facts"] == [{"key": facts[0]["key"], "value": "none"}]
+
+
+@pytest.mark.parametrize("case", ["one-row", "two-forms"])
+def test_same_for_all_is_offered_only_where_rows_share_a_question(case):
+    first, second = valid_model().data_flows[:2]
+    facts = (
+        [_control_row(first)]
+        if case == "one-row"
+        else [_control_row(first), _control_row(second, form="text")]
+    )
+    steps = _SHARED_STEPS.replace("FACTS", json.dumps(facts))
+    assert _run_form_script(steps)["calls"][1] == {"shared": 0}
+
+
 def test_the_form_script_asks_each_group_once_with_a_row_per_element():
     """Two elements under one kind make one group with two rows (#1289)."""
     store, flow = valid_model().data_stores[0], valid_model().data_flows[0]
@@ -1231,12 +1298,13 @@ await ids.analyze.listeners.submit({{ preventDefault() {{}} }}); await settle();
 streams[0].listeners.questions({{ data: JSON.stringify({{ run: "r1", questions: [],
   facts: {json.dumps(facts)} }}) }});
 const groups = ids.questions.querySelectorAll("details");
+const rowsOf = g => g.children.filter(r => r.tag === "p");
+const child = (r, tag) => r.children.find(c => typeof c === "object" && c.tag === tag);
 calls.push({{ groups: groups.map(g => ({{
   title: g.children[0].textContent,
-  rows: g.children.slice(1).map(r => r.children[0].textContent),
+  rows: rowsOf(g).map(r => child(r, "b").textContent),
   open: g.open }})) }});
-const [first] = ids.questions.querySelectorAll("select");
-first.value = "no";
+child(rowsOf(groups[0])[0], "select").value = "no";
 await ids.continue.listeners.click(); await settle();
 """
     seen = _run_form_script(steps)["calls"]

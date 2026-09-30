@@ -99,3 +99,10 @@ answer writes the other.** A flow's authentication and the `oauth`,
 mechanical link: a capability is about the whole application, an attribute is
 about one element, and a free-text mechanism is not a capability code can
 read. The analysis sees both answers in the answers Source.
+
+**One answer reaches several elements only where the owner ticks them.**
+Where a round asks one attribute or question kind about two or more elements
+in one form, the page offers a "Same for all" row that copies its answer into
+each ticked row. An unticked row is an exception, and every row is still sent
+as its own answer, so no answer reaches an element the owner did not choose
+(#1289).
