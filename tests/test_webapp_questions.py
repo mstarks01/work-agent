@@ -1528,7 +1528,7 @@ def test_a_pause_with_nothing_to_ask_starts_the_analysis_at_once():
     steps = """
 await ids.analyze.listeners.submit({ preventDefault() {} }); await settle();
 streams[0].listeners.questions({ data: JSON.stringify({ run: "r1", questions: [],
-  facts: [], remaining: {}, answered: [], answered_links: [] }) });
+  facts: [], remaining: {}, stop: "nothing-left", answered: [], answered_links: [] }) });
 await settle();
 """
     seen = _run_form_script(steps)
