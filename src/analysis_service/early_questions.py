@@ -174,6 +174,11 @@ class EarlyQuestion:
     #: capability, how many units it could settle. The list is in this order,
     #: capabilities first.
     score: float = 0.0
+    #: For a capability, the band of the most important unit it could settle,
+    #: as its framework ranks units (level 1 highest for ASVS); 0 for every
+    #: other question. :func:`~analysis_service.answer_round.passes_floor`
+    #: reads it.
+    band: int = 0
     #: The key of the question this one depends on: a capability's parent,
     #: whose "no" makes this one moot. ``None`` for every other question.
     parent: UnknownKey | None = None
@@ -280,21 +285,26 @@ def capability_questions(
     an answer settles, so the need is proven before any run. Each question
     states how many units it could settle, summed over the frameworks.
 
-    **A parent comes first, and its children follow it.** Roots are ordered by
-    their count, and each root is followed by its descendants in the same
-    order. A child names its parent, so a page can hide it until the parent is
-    answered "yes", and the answer check refuses a "yes" under a "no".
+    **The most important first, and a parent before its children.** Each
+    question is ordered by the band of the most important unit it could
+    settle, then by its count, as the report's follow-up is (ADR 0055). A
+    parent's band and count are never below its child's, because it settles
+    every unit the child does, and a tie goes to the shallower question, so
+    every parent comes before its children without ordering by tree. A child
+    names its parent, so a page can hide it until the parent is answered
+    "yes", and the answer check refuses a "yes" under a "no".
     """
     counts: Counter[str] = Counter()
+    bands: dict[str, int] = {}
     for name, options in frameworks.items():
-        counts.update(PACKAGES[name].record.open_capabilities(model, options))
+        for key, need in (
+            PACKAGES[name].record.open_capabilities(model, options).items()
+        ):
+            counts[key] += need.units
+            bands[key] = max(bands.get(key, need.band), need.band)
 
     def asked_parent(key: str) -> str:
         return next((parent for parent in lineage(key) if parent in counts), "")
-
-    def root(key: str) -> str:
-        parent = asked_parent(key)
-        return root(parent) if parent else key
 
     def depth(key: str) -> int:
         parent = asked_parent(key)
@@ -302,7 +312,7 @@ def capability_questions(
 
     order = sorted(
         counts,
-        key=lambda key: (-counts[root(key)], root(key), depth(key), -counts[key], key),
+        key=lambda key: (-bands[key], -counts[key], depth(key), key),
     )
     questions = []
     for key in order:
@@ -326,6 +336,7 @@ def capability_questions(
                 group_heading=heading,
                 element=CAPABILITIES[key].question,
                 score=float(counts[key]),
+                band=bands[key],
                 parent=UnknownRef(capability=parent).key if parent else None,
             )
         )

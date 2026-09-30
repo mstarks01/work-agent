@@ -12,7 +12,7 @@ from collections.abc import Callable, Mapping
 
 import pytest
 
-from analysis_service.answer_round import EARLY_RULES
+from analysis_service.answer_round import passes_floor
 from analysis_service.assertions import REGISTRY, AssertionCatalog, settled
 from analysis_service.early_questions import early_questions
 from analysis_service.question_kinds import QUESTION_KINDS
@@ -89,11 +89,11 @@ def _stated_choices(report: Report) -> int:
     catalog = report.assertions.catalog if report.assertions else None
     model = prepared_model(report.system_model, catalog)
     frameworks = {s.name: s.options for s in report.job.frameworks}
-    floor = EARLY_RULES["field"].floor
+    listed = early_questions(report.system_model, frameworks, catalog)
     return sum(
         1
-        for question in early_questions(report.system_model, frameworks, catalog)
-        if question.score >= floor
+        for question in listed
+        if passes_floor(question, listed)
         for (kind, _), stated in STATED_FACETS.items()
         if question.key[4] == kind and stated(model, catalog, question.key[0])
     )

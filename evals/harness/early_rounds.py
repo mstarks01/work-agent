@@ -40,7 +40,7 @@ from pathlib import Path
 from typing import Any
 
 from analysis_service.analysis import control_state
-from analysis_service.answer_round import EARLY_RULES, QuestionSet, question_set
+from analysis_service.answer_round import QuestionSet, passes_floor, question_set
 from analysis_service.assertions import UNKNOWN
 from analysis_service.claims import FrameworkName, UnknownKey
 from analysis_service.early_questions import EarlyQuestion, early_questions
@@ -167,13 +167,8 @@ class Replay:
 
 
 def _eligible(listed: Sequence[EarlyQuestion]) -> set[UnknownKey]:
-    """The questions at or above their kind's floor, before any answer."""
-    return {
-        question.key
-        for question in listed
-        if question.score
-        >= EARLY_RULES["capability" if question.kind == "capability" else "field"].floor
-    }
+    """The questions that pass the floor, before any answer."""
+    return {question.key for question in listed if passes_floor(question, listed)}
 
 
 def _admitted(asked: QuestionSet, answered: list[FactAnswer], given: list[FactAnswer]):

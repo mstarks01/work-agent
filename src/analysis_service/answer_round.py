@@ -72,6 +72,7 @@ __all__ = [
     "AdmittedRound",
     "EarlyRule",
     "QuestionSet",
+    "passes_floor",
     "question_set",
 ]
 
@@ -108,6 +109,23 @@ EARLY_RULES: Mapping[str, EarlyRule] = {
 
 def _early_kind(question: EarlyQuestion) -> str:
     return "capability" if question.kind == "capability" else "field"
+
+
+def passes_floor(question: EarlyQuestion, listed: Sequence[EarlyQuestion]) -> bool:
+    """Whether a round may show this question: at or above its kind's floor.
+
+    **The one reader of the floor.** A question in the highest band of its
+    kind also passes, where the kind's questions span more than one band: in
+    an ASVS job above level 1, a capability question that settles one level 1
+    requirement is asked, where one that settles only level 2 requirements
+    needs the floor (#1289). Where every question shares one band, as in a
+    level 1 job, the band tells them nothing and the floor alone decides.
+    """
+    kind = _early_kind(question)
+    if question.score >= EARLY_RULES[kind].floor:
+        return True
+    bands = {other.band for other in listed if _early_kind(other) == kind}
+    return len(bands) > 1 and question.band == max(bands)
 
 
 @dataclass(frozen=True)
@@ -451,7 +469,7 @@ def _round(
             question
             for question in listed
             if _early_kind(question) == kind
-            and question.score >= rule.floor
+            and passes_floor(question, listed)
             and question.key not in done
         ]
         started = [question for question in eligible if question.key in held]

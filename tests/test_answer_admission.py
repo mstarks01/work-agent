@@ -402,10 +402,19 @@ class TestTheBoundedRounds:
 
     def test_a_round_asks_at_most_its_choices_of_each_kind_above_the_floor(self):
         """A round of 10 questions asked 17-24 choices (#1289, item 2)."""
-        from analysis_service.answer_round import EARLY_RULES, ROUND_DECISIONS
+        from analysis_service.answer_round import (
+            EARLY_RULES,
+            ROUND_DECISIONS,
+            passes_floor,
+        )
+        from analysis_service.early_questions import early_questions
 
         asked = _asked_after([])
-        for kind, rule in EARLY_RULES.items():
+        checkpoint = held()
+        listed = early_questions(
+            asked.model, {"stride": {}}, checkpoint.assertions.catalog
+        )
+        for kind in EARLY_RULES:
             shown = [
                 q
                 for q in asked.early
@@ -414,7 +423,7 @@ class TestTheBoundedRounds:
             assert sum(q.decisions for q in shown) <= max(
                 ROUND_DECISIONS, shown[0].decisions if shown else 0
             )
-            assert all(q.score >= rule.floor for q in shown)
+            assert all(passes_floor(q, listed) for q in shown)
         assert asked.early, "a control: the waiting job asks something"
 
     def test_a_question_wider_than_the_round_is_still_asked(self):

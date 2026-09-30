@@ -41,8 +41,9 @@ from pydantic.json_schema import SkipJsonSchema
 from analysis_service.capabilities import (
     CAPABILITIES,
     CapabilityFact,
+    CapabilityNeed,
     Decision,
-    open_capability_counts,
+    open_capability_needs,
 )
 from analysis_service.claims import (
     ApplicabilityEntry,
@@ -68,6 +69,7 @@ from analysis_service.frameworks.asvs.catalog import (
     CHAPTER_NUMBERS,
     LANES,
     AsvsLevel,
+    requirement_band,
     requirement_id,
     requirement_text,
     requirements_for,
@@ -256,8 +258,9 @@ class DraftRequirementRuling(Claim):
     @classmethod
     def open_capabilities(
         cls, model: SystemModel, options: Mapping[str, Any]
-    ) -> dict[str, int]:
-        """How many requirements at the job's level each unknown capability could settle.
+    ) -> dict[str, CapabilityNeed]:
+        """How many requirements at the job's level each unknown capability could
+        settle, and the band of the most important: level 1 highest.
 
         A requirement is counted once for each capability its decision misses,
         and once for each ancestor of one: an absent parent settles every
@@ -265,7 +268,7 @@ class DraftRequirementRuling(Claim):
         """
         level = AsvsOptions.model_validate(options).level
         decisions = applicability_for(level, model.capability_facts())
-        return open_capability_counts(decisions.values())
+        return open_capability_needs(decisions, requirement_band)
 
     @classmethod
     def units_for(cls, options: Mapping[str, Any], lane: str) -> tuple[str, ...]:

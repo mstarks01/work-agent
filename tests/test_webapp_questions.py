@@ -190,8 +190,11 @@ class TestTheRounds:
             assert not before & {tuple(q["key"]) for q in shown["facts"]}
         else:
             pytest.fail("the rounds never ended")
-        assert shown["stop"] == "nothing-left"
-        assert shown["withheld"] == 0
+        # The stop says why truthfully: the limits held questions back
+        # exactly where it says so.
+        assert shown["stop"] == (
+            "budget-exhausted" if shown["withheld"] else "nothing-left"
+        )
 
         started = client.post(
             f"/answer/{paused}",

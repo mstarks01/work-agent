@@ -38,8 +38,18 @@ the catalog's, and a critic ruling sets neither.
 **Each question names the highest band that waits on it**, as `band`, read
 from the conditional findings it can settle.
 
-**The early questions at the pause keep their ranking.** No finding exists
-before the analysis, so there is nothing to rank by.
+**At the pause, a field question keeps its ranking**, because no finding
+exists before the analysis to rank by. **A capability question is ranked by
+band too**, because it names the units it could settle before any run: the
+package's `open_capabilities` hook returns, for each unknown capability, its
+count and the band of the most important unit (`CapabilityNeed`), and ASVS
+reads a requirement's band with `requirement_band`, the reader `rank` uses.
+The questions are ordered by band, then count, and a parent's band and count
+are never below its child's, so a parent still comes first. A capability
+question in the highest band also passes the floor where the job's questions
+span more than one band (`answer_round.passes_floor`): in an ASVS job at
+level 2, one that settles a single level 1 requirement is asked. In a level 1
+job every question shares one band, and the floor alone decides.
 
 ## Consequences
 
