@@ -12,7 +12,7 @@ import json
 import re
 import shutil
 import subprocess
-from types import MappingProxyType
+from types import MappingProxyType, SimpleNamespace
 
 import pytest
 from fastapi.testclient import TestClient
@@ -1939,3 +1939,40 @@ def test_a_save_after_the_start_is_refused(tiers):
     )
 
     assert saved.status_code == 409
+
+
+@pytest.mark.parametrize(
+    ("state", "status"),
+    [
+        ({"task": SimpleNamespace(done=lambda: False)}, "running"),
+        ({"task": SimpleNamespace(done=lambda: True)}, "failed"),
+        ({"task": SimpleNamespace(done=lambda: True), "report": "report"}, "completed"),
+    ],
+    ids=["running", "ended-without-a-report", "completed"],
+)
+def test_the_app_and_the_store_free_a_parent_alike(state, status):
+    """The first-run app and the job store each held "a failed resumed run
+    frees its parent", each tested against its own expectation (#1289)."""
+    import asyncio
+
+    from analysis_service.jobs import InMemoryJobStore, JobRecord, Resumption
+    from analysis_service.sources import Source
+    from tests.factories import SEEDING_BUDGET, sample_selection
+
+    if state.get("report"):
+        state = state | {"report": sample_report([])}
+    resumed = Run(id="resumed", **state)
+    paused = Run(id="paused", checkpoint=HELD, resumed_by=resumed)
+
+    store = InMemoryJobStore()
+    held = JobRecord.create(
+        owner_subject="idp|user-1",
+        sources=[Source.description("A web app talks to a database.")],
+        frameworks=sample_selection(),
+        resumption=Resumption(follow_up=False, parent_id="paused", checkpoint=HELD),
+    )
+    asyncio.run(store.reserve(held, ceiling=10, budget=SEEDING_BUDGET))
+    asyncio.run(store.save(held.model_copy(update={"status": resumed.status})))
+
+    assert resumed.status == status
+    assert paused.resumed is store._resumed("paused")
