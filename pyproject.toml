@@ -93,6 +93,14 @@ dev = [
 web = [
     "uvicorn>=0.30",
 ]
+# Browser tests of the first-run app's pages (#1289): the web group's server,
+# and headless Chromium driven through Playwright. A group of its own, so a
+# plain `uv sync` does not download a browser; CI installs it for its test
+# job and requires it there.
+browser = [
+    { include-group = "web" },
+    "playwright>=1.55",
+]
 
 [tool.uv]
 # Both groups on by default, so `uv sync` (route step 1) leaves route step 3 a
@@ -141,7 +149,6 @@ target-version = "py311"
 # run `ruff format --check . --exclude '*.md'`. Under `exclude` these
 # files would be checked in exactly the two places that matter.
 extend-exclude = ["docs/research"]
-
 [tool.mypy]
 # Every Python file in the repository, not just the shipped package. The eval
 # harness and the corpus lints are where a `Literal` vocabulary is most often
@@ -173,6 +180,14 @@ python_version = "3.11"
 # none: it reads as a known-unfixable spot long after the checker or the
 # dependency it worked around has moved on.
 warn_unused_ignores = true
+
+
+# The browser tests import Playwright, which only the optional `browser`
+# group installs. Without it those tests skip, and the type check must not
+# fail on their import; CI installs the group, so there it checks the calls.
+[[tool.mypy.overrides]]
+module = ["playwright", "playwright.*"]
+ignore_missing_imports = true
 
 [tool.ruff.format]
 # Hand-labelled data table: one tuple per row is the editing and grep unit, and

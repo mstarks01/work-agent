@@ -86,7 +86,9 @@ def runner():
     return PausingRunner()
 
 
-def client_for(tiers, runner, catalog=True):
+def app_for(tiers, runner, catalog=True):
+    """The first-run app over ``runner``, as the browser tests serve it too."""
+
     def engine_for(selection):
         return Engine(
             runner,
@@ -99,7 +101,11 @@ def client_for(tiers, runner, catalog=True):
     startup = Startup(
         engine_for=engine_for, frameworks=CARRIED, tiers=tiers, error=None
     )
-    return TestClient(create_app(startup), base_url=LOOPBACK)
+    return create_app(startup)
+
+
+def client_for(tiers, runner, catalog=True):
+    return TestClient(app_for(tiers, runner, catalog), base_url=LOOPBACK)
 
 
 def start(client, questions: bool) -> str:
