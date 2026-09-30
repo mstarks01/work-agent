@@ -31,17 +31,24 @@ from __future__ import annotations
 
 import json
 import re
+from collections.abc import Mapping
 from dataclasses import dataclass, replace
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
+from analysis_service.claims import FrameworkName
 from analysis_service.questions import FactAnswer, check_fact_answers
 from analysis_service.sources import Source
 from analysis_service.system_model import SystemModel
 from evals.harness.modes import EvalRunError
 from evals.harness.reference import GoldenCase
 
-__all__ = ["AnswerFile", "load_answer_file", "withheld_case"]
+__all__ = [
+    "AnswerFile",
+    "answers_within_rounds",
+    "load_answer_file",
+    "withheld_case",
+]
 
 
 @dataclass(frozen=True)
@@ -123,6 +130,76 @@ def _withheld_model(
             raise EvalRunError(f"the model holds no field {field!r} on {element_id!r}")
         element[field] = value
     return SystemModel.model_validate(raw)
+
+
+def answers_within_rounds(
+    case: GoldenCase,
+    answer_file: AnswerFile,
+    rounds: int,
+    only: tuple[FrameworkName, ...] = (),
+) -> tuple[FactAnswer, ...]:
+    """The signed answers whose questions the pause asks in its first ``rounds`` rounds.
+
+    The pause is replayed over the withheld case with the service's own
+    question set. Each round answers a withheld fact it shows with its signed
+    answer, and every other question it shows with "I don't know", as an
+    owner who knows only those facts would, so the next round is the one the
+    service would show. Only the signed answers are returned, so an arm run
+    with them differs from ``answered`` in nothing but the facts the rounds
+    had not yet asked (#1289). ``only`` narrows the frameworks as the sweep
+    does (:func:`~evals.harness.modes.select_frameworks`), so the pause asks
+    for the frameworks the run builds.
+    """
+    from analysis_service.answer_round import question_set
+    from analysis_service.assertions import UNKNOWN
+    from analysis_service.questions import merged_facts
+    from evals.harness.modes import case_framework_options, select_frameworks
+
+    signed = {answer.key: answer for answer in answer_file.answers}
+    model = withheld_case(case, answer_file).model
+    selected = select_frameworks(case, only)
+    frameworks = cast(
+        "Mapping[FrameworkName, Mapping[str, Any]]",
+        {
+            name: options
+            for name, options in case_framework_options(case).items()
+            if name in selected
+        },
+    )
+    given: list[FactAnswer] = []
+    for _ in range(rounds):
+        asked = question_set(
+            model,
+            None,
+            frameworks,
+            [],
+            waiting=True,
+            answered=given,
+            answered_links=[],
+            final=False,
+            shown=[],
+        )
+        if asked.done:
+            break
+        given = merged_facts(
+            given,
+            [
+                signed.get(question.key)
+                or FactAnswer.model_validate(
+                    {
+                        "key": question.key,
+                        "facets": dict.fromkeys(
+                            (facet.id for facet in question.facets), UNKNOWN
+                        ),
+                    }
+                    if question.facets
+                    else {"key": question.key, "value": UNKNOWN}
+                )
+                for question in asked.early
+            ],
+        )
+    reached = {answer.key for answer in given}
+    return tuple(answer for answer in answer_file.answers if answer.key in reached)
 
 
 def withheld_case(case: GoldenCase, answer_file: AnswerFile) -> GoldenCase:
