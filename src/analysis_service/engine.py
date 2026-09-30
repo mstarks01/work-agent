@@ -63,7 +63,12 @@ from analysis_service.links import (
 from analysis_service.pipeline import entry_of
 from analysis_service.report import FrameworkSelection, Report
 from analysis_service.selection import SelectionError, resolve_selection
-from analysis_service.sources import Source, SourceLimits, clean_system_name
+from analysis_service.sources import (
+    LimitBreach,
+    Source,
+    SourceLimits,
+    clean_system_name,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -248,6 +253,14 @@ class Engine:
         )
         return await self._run(job, on_node)
 
+    def breach(self, sources: Sequence[Source]) -> LimitBreach | None:
+        """The first input bound ``sources`` breaks, or ``None`` if they fit.
+
+        A surface that keeps answers before it resumes asks this at each save,
+        so a round that no start could run is refused when it is saved.
+        """
+        return self._limits.breach(sources)
+
     def questions(
         self,
         checkpoint: Checkpoint,
@@ -334,7 +347,7 @@ class Engine:
             )
         except ValueError as exc:
             raise EngineInputError(str(exc)) from exc
-        breach = self._limits.breach(admitted.sources)
+        breach = self.breach(admitted.sources)
         if breach is not None:
             raise EngineInputError(breach.message)
         job = JobRecord.create(
@@ -431,7 +444,7 @@ class Engine:
             with_link_answers(sources, ())
         except ValueError as exc:
             raise EngineInputError(str(exc)) from exc
-        breach = self._limits.breach(sources)
+        breach = self.breach(sources)
         if breach is not None:
             raise EngineInputError(breach.message)
         return JobRecord.create(
