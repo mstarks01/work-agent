@@ -1,9 +1,24 @@
 {
   "asvs": {
-    "runs": [],
-    "revision": null,
-    "cases": 0,
-    "rates": {}
+    "runs": [
+      "evals/runs/20260906T234806Z-asvs-two-question-t1/analysis-asvs.json"
+    ],
+    "revision": "1938981680e27d7697859143605899292bedbe70",
+    "cases": 11,
+    "rates": {
+      "DataFlow": {
+        "authentication": 0.3836,
+        "encryption_in_transit": 0.2877,
+        "protocol": 0.0959
+      },
+      "DataStore": {
+        "technology": 0.1429
+      },
+      "Process": {
+        "exposure": 0.037,
+        "technology": 0.5556
+      }
+    }
   },
   "stride": {
     "runs": [

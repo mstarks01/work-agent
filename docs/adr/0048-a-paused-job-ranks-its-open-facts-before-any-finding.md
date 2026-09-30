@@ -72,5 +72,8 @@ there is none. The eval's heads mode scores a catalog, so it refuses such a
 deployment before it runs.
 
 The STRIDE row counts E11's two terra replays of Baseline 6bff717. The ASVS
-row counts no run, so an ASVS job asks nothing early until a row is counted
-from ASVS runs.
+row counts the archived sweep `20260906T234806Z-asvs-two-question-t1` (11
+cases, #1284). That sweep is older than the question kinds, so the row holds
+attribute rates only: an ASVS job asks its capability questions and the open
+attributes the rates name, and no question kind until a critic replay with
+today's prompt counts kind rates.

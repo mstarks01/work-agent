@@ -121,9 +121,23 @@ class TestWhatIsAsked:
         ]
 
     def test_a_framework_whose_row_counted_no_run_asks_only_capabilities(self):
-        asked = early_questions(valid_model(), {"asvs": {"level": 1}}, None)
+        from dataclasses import replace
+
+        empty = replace(QUESTION_PRIOR["asvs"], runs=(), cases=0, rates={})
+        prior = {**QUESTION_PRIOR, "asvs": empty}
+        asked = early_questions(valid_model(), {"asvs": {"level": 1}}, None, prior)
         assert asked
         assert {question.kind for question in asked} == {"capability"}
+
+    def test_the_asvs_row_asks_attributes_and_no_question_kind(self):
+        """Counted from an ASVS sweep older than the question kinds (#1284)."""
+        model = valid_model()
+        for flow in model.data_flows:
+            flow.authentication = "unknown"
+        asked = early_questions(model, {"asvs": {"level": 1}}, None)
+        assert QUESTION_PRIOR["asvs"].runs
+        assert "attribute" in {question.kind for question in asked}
+        assert "question" not in {question.kind for question in asked}
 
 
 class TestTheOrder:
