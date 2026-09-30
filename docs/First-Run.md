@@ -335,7 +335,9 @@ The app can ask you questions before the analysis, and after the report.
 
   The questions come in rounds of up to ten choices about the application and
   ten about parts of your system, the most useful first. A question with
-  parts counts one choice a part. A line at the top says
+  parts counts one choice a part. Under each question, a line says why it is
+  asked and quotes the words of your description that the part was read
+  from. A line at the top says
   about how many are left; your answers can change that number. Click **Save
   and show more** for the next round. The app keeps your answers and runs no
   model. A question you leave blank comes back in the next round. **Skip the
@@ -352,7 +354,8 @@ The app can ask you questions before the analysis, and after the report.
   again, and it reads your answers.
 - **After the report: one optional follow-up.** The report may offer a
   closed **Optional follow-up** section. It says how many questions it asks
-  and how many conditional findings wait on them. Questions that no
+  and how many conditional findings wait on them, and each question names the
+  findings that wait on it. Questions that no
   conditional finding waits on sit apart, in a closed section at the end:
   an answer to one cannot change this report. You do not need it: the
   report is complete without it. Open it, answer what you can, and click
