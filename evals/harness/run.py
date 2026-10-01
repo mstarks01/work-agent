@@ -75,6 +75,7 @@ from evals.harness import (
     consent,
     critic_replay,
     descendants,
+    early_policies,
     early_rounds,
     envelope,
     extraction_losses,
@@ -2729,6 +2730,12 @@ COMMANDS: dict[str, Command] = {
         " count how the list moves (offline, no credentials)",
         run=early_rounds.command_early_rounds,
         arguments=early_rounds.arguments,
+    ),
+    "early-policies": Command(
+        help="compare orders of early questions for a job that selects more"
+        " than one framework, on archived reports (offline, no credentials)",
+        run=early_policies.command_early_policies,
+        arguments=early_policies.arguments,
     ),
     "question-prior": Command(
         help="count one framework's early-question prior from a sweep's"
