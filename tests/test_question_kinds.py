@@ -19,7 +19,7 @@ from analysis_service.fact_answers import FactAnswer
 from analysis_service.fact_writes import check_fact_answers
 from analysis_service.links import with_link_answers
 from analysis_service.open_facts import element_names, label_of
-from analysis_service.prompts import compose_critic_prompt
+from analysis_service.prompts import compose_critic_prompt, compose_recritic_prompt
 from analysis_service.question_kinds import QUESTION_KINDS
 from analysis_service.questions import question_fallback
 from analysis_service.sources import Source
@@ -180,8 +180,9 @@ def rulings_of(*refs: UnknownRef):
     ]
 
 
-def test_the_critic_prompt_lists_every_kind_with_what_it_covers():
-    prompt = compose_critic_prompt(test_critic_review_replay.PROMPT_LOADER)
+@pytest.mark.parametrize("compose", [compose_critic_prompt, compose_recritic_prompt])
+def test_a_review_prompt_lists_every_kind_with_what_it_covers(compose):
+    prompt = compose(test_critic_review_replay.PROMPT_LOADER)
     for name, kind in QUESTION_KINDS.items():
         assert f"- `{name}`: {kind.covers}" in prompt
 
