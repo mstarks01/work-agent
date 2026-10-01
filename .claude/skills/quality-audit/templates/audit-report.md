@@ -29,8 +29,19 @@ attempts `<n>`. Resumed from `<audit id or none>`.
 Label every evidence cell with its kind: **historical**, **issue-reported**,
 **directly reproduced**, or **newly measured**. They are not interchangeable.
 
-Give every row its rung: suspected → reproduced → local fix verified →
-downstream gain measured → held-out gain confirmed.
+Give every row its state, from `references/experiment-protocol.md`: defect
+reproduced, local fix verified, affected deterministic consumers verified,
+behaviour on archived inputs measured, live downstream gain unmeasured or
+measured, held-out gain unmeasured or confirmed.
+
+## Evidence
+
+One row per claim or decision. The last column is `no`, or `yes` with the
+reason no free check can answer the question.
+
+| Claim / decision | Evidence and provenance | What passed or failed | What remains unknown | Fresh paid inference necessary? |
+|---|---|---|---|---|
+| | | | | |
 
 ## Answers
 
@@ -48,6 +59,10 @@ part of the result.
 **What remains untested or blocked?**
 
 **What was spent, and what remains?**
+
+**What needs fresh model output, and which decision does it change?** — for
+each item, the eight answers from "Before you propose paid work" in
+`references/experiment-protocol.md`, or "nothing".
 
 **What should the next audit do first?**
 

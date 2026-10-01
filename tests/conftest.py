@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import pytest
 
+from analysis_service.offline import OFFLINE_ENV
 from tests.factories import TEST_CREDENTIAL_ENV, TEST_TIER_ENV
 
 
@@ -26,6 +27,23 @@ def _selected_tiers(monkeypatch: pytest.MonkeyPatch) -> None:
     """
     for var, value in (TEST_TIER_ENV | TEST_CREDENTIAL_ENV).items():
         monkeypatch.setenv(var, value)
+
+
+@pytest.fixture(autouse=True)
+def _offline(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Refuse every live provider call, so a test that reaches one fails.
+
+    A test that drives the real translator down to a transport it supplies
+    asks for :func:`supplied_transport`, which turns the refusal off for that
+    test alone.
+    """
+    monkeypatch.setenv(OFFLINE_ENV, "1")
+
+
+@pytest.fixture
+def supplied_transport(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Admit calls through the real translator to a transport the test supplies."""
+    monkeypatch.delenv(OFFLINE_ENV)
 
 
 @pytest.fixture(scope="session")

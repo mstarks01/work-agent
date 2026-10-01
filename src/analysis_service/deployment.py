@@ -68,6 +68,7 @@ from analysis_service.certification import (
 )
 from analysis_service.claims import FrameworkName
 from analysis_service.compact import COMPACT_FORMAT, FULL_FORMAT, ExtractionFormat
+from analysis_service.config_files import env_flag
 from analysis_service.errors import ConfigError
 from analysis_service.framework_config import load_frameworks
 from analysis_service.frameworks import validate_packages
@@ -187,7 +188,7 @@ def _strategy(env: Mapping[str, str]) -> ExtractionStrategy:
         (FACTS_SPLIT_EXTRACTION_VAR, FACTS_SPLIT),
         (FACTS_FIRST_EXTRACTION_VAR, FACTS_FIRST),
     ):
-        if _flag(env, var):
+        if env_flag(env, var):
             return strategy
     return GRAPH_FIRST
 
@@ -332,13 +333,13 @@ class Deployment:
             manifest=load_manifest(paths.blessed_fingerprints),
             frameworks=frameworks,
             paths=paths,
-            require_certified=_flag(env, REQUIRE_CERTIFIED_VAR),
+            require_certified=env_flag(env, REQUIRE_CERTIFIED_VAR),
             extraction_format=(
-                COMPACT_FORMAT if _flag(env, COMPACT_EXTRACTION_VAR) else FULL_FORMAT
+                COMPACT_FORMAT if env_flag(env, COMPACT_EXTRACTION_VAR) else FULL_FORMAT
             ),
             extraction_strategy=_strategy(env),
-            assertions=_flag(env, ASSERTIONS_VAR),
-            source_review=_flag(env, SOURCE_REVIEW_VAR),
+            assertions=env_flag(env, ASSERTIONS_VAR),
+            source_review=env_flag(env, SOURCE_REVIEW_VAR),
             env=MappingProxyType(dict(env)),
         )
 
@@ -516,8 +517,3 @@ class Deployment:
                 self.pipeline(selection, entry=entry), certification=self.gate
             )
         return self._runners[key]
-
-
-def _flag(env: Mapping[str, str], var: str) -> bool:
-    """A boolean env flag, on only for an explicit affirmative."""
-    return env.get(var, "").strip().lower() in ("1", "true", "yes", "on")

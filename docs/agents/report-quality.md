@@ -30,11 +30,19 @@ captured lane request again, and `--append` adds a user part after the captured
 input. `run.py critic-replay` does the same for a critic call. The pattern A
 branch (see open work) adds `--fresh-leads`, which rebuilds a lane's leads with
 today's rules through the function the prepare node calls. A replay costs one
-model call, about $0.03 to $0.06 on the strong tier.
+model call, about $0.03 to $0.06 on the strong tier, and `ANALYSIS_OFFLINE`
+refuses it.
 
 **The ledger.** `evals/experiments/` holds one JSONL file per audit. Read it
 before a new experiment: `python -m evals.harness.run experiments --signature
 "<the failure>"`. A refuted row is an answer that saves a paid run.
+
+**What finishes a piece of work.** A fix to the pipeline is finished by
+offline evidence: a reproduction, a regression test through the production
+function, and its affected consumers. Its effect on these figures stays
+unmeasured until a run that a decision needs, and the report says so. A paid
+item in the open work below is an option with a price, not a step that every
+fix owes. See "Offline completion and paid runs" in `AGENTS.md`.
 
 ## Current figures
 

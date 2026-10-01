@@ -112,8 +112,8 @@ Examples of each:
 
 File it as a GitHub issue on `mstarks01/work-agent` — see
 `docs/agents/issue-tracker.md` — and label it per
-`docs/agents/triage-labels.md`. Apply `needs-sweep` when its next step is a
-paid run.
+`docs/agents/triage-labels.md`. Apply `needs-sweep` only when its next
+necessary step needs fresh paid model output.
 
 ## Authorised extension
 

@@ -39,6 +39,7 @@ import sys
 from typing import Any
 
 from analysis_service.errors import ConfigError
+from analysis_service.offline import refuse_live_inference
 from analysis_service.vendors import Vendor
 
 
@@ -326,6 +327,7 @@ def completion(**kwargs: Any) -> Any:
     own failure semantics, and ``num_retries`` rides the kwargs like any other
     provider parameter.
     """
+    refuse_live_inference(str(kwargs.get("model")))
     return _litellm.completion(**kwargs)
 
 

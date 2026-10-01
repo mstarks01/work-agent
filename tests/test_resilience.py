@@ -253,7 +253,9 @@ def test_a_sub_second_timeout_survives_the_conversion():
     assert config(timeout_ms=500).request_timeout_seconds() == 0.5
 
 
-def test_the_timeout_reaching_litellm_is_the_one_the_file_states(monkeypatch):
+def test_the_timeout_reaching_litellm_is_the_one_the_file_states(
+    monkeypatch, supplied_transport
+):
     """The two readers, tested against each other rather than each against itself.
 
     This is the assertion the defect got past. ``timeout_ms`` was asserted

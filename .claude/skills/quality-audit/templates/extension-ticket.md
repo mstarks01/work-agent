@@ -47,8 +47,8 @@ half-built tree helps nobody.
 
 ## Cost
 
-Implementation effort, and any inference cost. Apply `needs-sweep` when the
-next step after this lands is a paid run.
+Implementation effort, and any inference cost. Apply `needs-sweep` only when the
+next necessary step after this lands needs fresh paid model output.
 
 ## Risk and rollback
 

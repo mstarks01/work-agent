@@ -52,6 +52,9 @@ from tests.factories import (
     translator_of,
 )
 
+#: Every test here drives the real translator to a transport it supplies.
+pytestmark = pytest.mark.usefixtures("supplied_transport")
+
 CONFIG = PROJECT_ROOT / "config"
 
 #: A key-shaped string that is visibly not a key. Nothing here authenticates:
