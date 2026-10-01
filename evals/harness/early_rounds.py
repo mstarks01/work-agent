@@ -60,7 +60,8 @@ MAX_ROUNDS = 50
 Answerer = Callable[[EarlyQuestion, SystemModel], FactAnswer | None]
 
 
-def _dont_know(question: EarlyQuestion) -> FactAnswer:
+def dont_know(question: EarlyQuestion) -> FactAnswer:
+    """ "I don't know" to every part of ``question``, which writes nothing."""
     if question.facets:
         facets = {facet.id: UNKNOWN for facet in question.facets}
         return FactAnswer.model_validate({"key": question.key, "facets": facets})
@@ -76,7 +77,7 @@ def _blessed(question: EarlyQuestion, blessed: SystemModel) -> FactAnswer:
     fits = not question.choices or value in question.choices
     if question.kind == "attribute" and isinstance(value, str) and stated and fits:
         return FactAnswer(key=question.key, value=value)
-    return _dont_know(question)
+    return dont_know(question)
 
 
 def _capabilities(said: str) -> Answerer:
@@ -94,13 +95,13 @@ def _every_control(stated: bool) -> Answerer:
         if question.kind == "capability":
             return FactAnswer(key=question.key, value="yes")
         if question.kind != "attribute":
-            return _dont_know(question)
+            return dont_know(question)
         if question.choices:
             value = question.choices[0 if stated else -1]
         elif question.form == "control":
             value = question.suggestions[0] if stated else "none"
         else:
-            return _dont_know(question)
+            return dont_know(question)
         return FactAnswer(key=question.key, value=value)
 
     return answer
@@ -191,7 +192,7 @@ def _admitted(asked: QuestionSet, answered: list[FactAnswer], given: list[FactAn
             )
         except ValueError:
             question = next(q for q in asked.early if q.key == answer.key)
-            answer = _dont_know(question)
+            answer = dont_know(question)
         kept.append(answer)
     return kept
 
