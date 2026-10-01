@@ -39,6 +39,7 @@ from tests.factories import (
     STRONG_MODEL,
     ScriptedLlm,
     claims_json,
+    emitted,
     repo_package_loaders,
     repo_tiers,
     sample_ruling,
@@ -75,7 +76,7 @@ class MarkerExtractLlm(BaseLlm):
         model.assumptions[0].basis = f"carried:{marker}"
         yield LlmResponse(
             content=types.Content(
-                role="model", parts=[types.Part(text=model.model_dump_json())]
+                role="model", parts=[types.Part(text=emitted(model))]
             ),
             model_version=served_build(self.model),
         )

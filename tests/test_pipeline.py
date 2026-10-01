@@ -53,6 +53,7 @@ from tests.factories import (
     SCRIPTED_FRAMEWORKS,
     ScriptedLlm,
     claims_json,
+    emitted,
     repo_tiers,
     sample_fingerprint,
     sample_proposal,
@@ -130,7 +131,7 @@ def block(report):
 def happy_replies() -> dict[str, str]:
     """Extraction succeeds; spoofing drafts one threat; the critic confirms it."""
     return {
-        "extract": valid_model().model_dump_json(),
+        "extract": emitted(valid_model()),
         graph.analyze_node_name("stride", "spoofing"): proposal_json(
             "S-01", "spoofing"
         ),
@@ -234,7 +235,7 @@ def test_a_draft_resting_on_an_unknown_still_reaches_the_critic():
     cannot answer it — so the draft goes to the critic like any other.
     """
     replies = {
-        "extract": valid_model().model_dump_json(),
+        "extract": emitted(valid_model()),
         graph.analyze_node_name("stride", "spoofing"): proposal_json(
             "S-01",
             "spoofing",
@@ -266,7 +267,7 @@ def test_a_draft_resting_on_an_unknown_still_reaches_the_critic():
 
 
 def test_lanes_that_draft_nothing_call_no_critic():
-    replies = {"extract": valid_model().model_dump_json()}
+    replies = {"extract": emitted(valid_model())}
     pipeline, models = build(replies)
     outcome, visited = run(pipeline, job())
 
@@ -397,7 +398,7 @@ def test_one_name_on_two_types_is_marked_and_does_not_fail_the_run():
     """
     model = valid_model()
     model.data_stores[0].name = "Web App"
-    replies = happy_replies() | {"extract": model.model_dump_json()}
+    replies = happy_replies() | {"extract": emitted(model)}
     pipeline, _ = build(replies)
 
     outcome, _ = run(pipeline, job())
@@ -607,10 +608,10 @@ def test_the_critic_sees_each_category_agents_drafts_once():
 
 
 def test_an_invalid_extraction_is_repaired_once_and_then_analyzed():
-    broken = valid_model().model_dump(mode="json")
+    broken = json.loads(emitted(valid_model()))
     broken["data_flows"][0]["destination"] = "process:does-not-exist"
     replies = happy_replies() | {"extract": json.dumps(broken)}
-    replies["repair"] = valid_model().model_dump_json()
+    replies["repair"] = emitted(valid_model())
 
     pipeline, models = build(replies)
     outcome, visited = run(pipeline, job())
@@ -629,9 +630,9 @@ def test_an_invalid_extraction_is_repaired_once_and_then_analyzed():
 
 def test_a_repair_that_edits_an_uncited_element_is_undone_on_the_report():
     """#675 D01, end to end: the report carries the previous element and says so."""
-    broken = valid_model().model_dump(mode="json")
+    broken = json.loads(emitted(valid_model()))
     broken["data_flows"][0]["destination"] = "process:does-not-exist"
-    repaired = valid_model().model_dump(mode="json")
+    repaired = json.loads(emitted(valid_model()))
     repaired["processes"][0]["technology"] = "rewritten while I was here"
     replies = happy_replies() | {
         "extract": json.dumps(broken),
@@ -652,7 +653,7 @@ def test_a_repair_that_edits_an_uncited_element_is_undone_on_the_report():
 
 
 def test_a_model_that_fails_twice_is_rejected_with_its_issues():
-    broken = valid_model().model_dump(mode="json")
+    broken = json.loads(emitted(valid_model()))
     broken["data_flows"][0]["destination"] = "process:does-not-exist"
     replies = happy_replies() | {
         "extract": json.dumps(broken),
@@ -1010,7 +1011,7 @@ def test_one_framework_finishing_first_does_not_fail_the_other(first, held, wind
     held_nodes = graph.FrameworkNodes(held)
     held_critic = held_nodes.node(graph.CRITIC_ROLE)
     held_recritic = held_nodes.node(graph.RECRITIC_ROLE)
-    replies = {"extract": valid_model().model_dump_json()}
+    replies = {"extract": emitted(valid_model())}
     for name in (first, held):
         fixture = SCRIPTED_FRAMEWORKS[name]
         replies[graph.analyze_node_name(name, fixture.lane)] = fixture.proposal

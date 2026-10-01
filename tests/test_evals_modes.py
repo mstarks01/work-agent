@@ -71,6 +71,7 @@ from tests.factories import (
     DEFAULT_FRAMEWORKS,
     EVAL_MODEL,
     ScriptedLlm,
+    emitted,
     valid_model,
 )
 
@@ -299,7 +300,7 @@ def _reply_for(case, graph_node: str) -> str:
     if graph_node == "assert":
         return scripted_assertions(case)
     if graph_node == "extract":
-        return json.dumps(case.model.model_dump(mode="json"))
+        return emitted(case.model)
     if graph_node == "critic_stride":
         return json.dumps(
             {
@@ -930,7 +931,7 @@ class TestAnEndToEndRunKeepsItsFirstPass:
     """#961 finding 14: the report holds the model after repair, and nothing else held the emissions."""
 
     def broken(self, case):
-        raw = case.model.model_dump(mode="json")
+        raw = json.loads(emitted(case.model))
         raw["data_flows"][0]["destination"] = "process:does-not-exist"
         return raw
 
@@ -940,7 +941,7 @@ class TestAnEndToEndRunKeepsItsFirstPass:
         run = asyncio.run(modes.run_end_to_end(case, pipeline))
 
         assert run.extraction is not None
-        assert run.extraction.raw == case.model.model_dump(mode="json")
+        assert run.extraction.raw == json.loads(emitted(case.model))
         assert run.extraction.repair is None
         assert run.extraction.issues == ()
 
@@ -949,7 +950,7 @@ class TestAnEndToEndRunKeepsItsFirstPass:
         pipeline = build(case, ENTRY_EXTRACT, models)
         broken = self.broken(case)
         models["extract"].reply = json.dumps(broken)
-        repaired = case.model.model_dump(mode="json")
+        repaired = json.loads(emitted(case.model))
         models["repair"].reply = json.dumps(repaired)
 
         run = asyncio.run(modes.run_end_to_end(case, pipeline))
@@ -1392,7 +1393,7 @@ class TestTheInitiatorReadingOfAnExtraction:
 
         case = load_case(CORPUS / "07-cicd-store-deploy")
         return SystemModel.model_validate(
-            case.model.model_dump(mode="json") | {"data_flows": flows}
+            json.loads(emitted(case.model)) | {"data_flows": flows}
         )
 
     def test_an_element_that_only_ever_sends_is_an_initiator(self):
@@ -1835,7 +1836,7 @@ def _extraction_of(case, model) -> modes.ExtractionResult:
     """Drive ``run_extraction`` over a scripted extraction of ``model``."""
     models: dict[str, ScriptedLlm] = {}
     pipeline = build(case, ENTRY_EXTRACT_ONLY, models)
-    models["extract"].reply = json.dumps(model.model_dump(mode="json"))
+    models["extract"].reply = emitted(model)
     return asyncio.run(modes.run_extraction(case, pipeline))
 
 
@@ -2496,7 +2497,7 @@ class TestAStateAgreementIsJoinedToItsBasis:
 
     def _nonsense_model(self, case):
         """The case's own model with every stated scored value replaced."""
-        raw = case.model.model_dump(mode="json")
+        raw = json.loads(emitted(case.model))
         replaced = 0
         for group in (
             "external_entities",

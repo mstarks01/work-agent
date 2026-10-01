@@ -94,6 +94,7 @@ from analysis_service.system_model import (
     Assumption,
     DataFlow,
     DataStore,
+    EmittedSystemModel,
     ExternalEntity,
     Process,
     SystemModel,
@@ -411,6 +412,11 @@ def three_hop_model(source_label: str = DEFAULT_DESCRIPTION_LABEL) -> SystemMode
             "data_flows": [*model.data_flows, read],
         }
     )
+
+
+def emitted(model: SystemModel) -> str:
+    """``model`` as the extraction and repair nodes emit it: no capabilities."""
+    return model.model_dump_json(include=set(EmittedSystemModel.model_fields))
 
 
 def valid_model(source_label: str = DEFAULT_DESCRIPTION_LABEL) -> SystemModel:

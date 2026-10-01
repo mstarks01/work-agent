@@ -48,6 +48,7 @@ from tests.factories import (
     UpstreamNamingLlm,
     carrying,
     claims_json,
+    emitted,
     package_answering,
     repo_tiers,
     sample_fingerprint,
@@ -76,7 +77,7 @@ DESCRIPTION = DESCRIPTION_TEXT
 def happy_replies() -> dict[str, str]:
     """Extraction succeeds; spoofing drafts one threat; the critic confirms it."""
     return {
-        "extract": valid_model().model_dump_json(),
+        "extract": emitted(valid_model()),
         # A category agent proposes — the critic's two rulings are not its to make.
         graph.analyze_node_name("stride", "spoofing"): claims_json(
             sample_proposal("S-01", "spoofing")
@@ -535,7 +536,7 @@ class TestSourceRendering:
             evidence_refs=[],
         )
         replies = happy_replies() | {
-            "extract": valid_model("Doc").model_dump_json(),
+            "extract": emitted(valid_model("Doc")),
             graph.analyze_node_name("stride", "spoofing"): claims_json(proposal),
         }
         pipeline, models = scripted_pipeline(replies)

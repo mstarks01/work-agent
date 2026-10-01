@@ -12,10 +12,9 @@ list — never as silent guesses.
 Boundary crossings are derived, never extracted: a Data Flow crosses a trust
 boundary iff its endpoints' zones differ.
 
-The top-level ``capabilities`` list holds what the sources state about the whole
+The top-level ``capabilities`` list holds what the answers state about the whole
 application, such as whether it uses OAuth, each with the quote that states it.
-A capability the sources do not mention has no entry, and a reader takes it as
-unknown.
+A capability no answer states has no entry, and a reader takes it as unknown.
 """
 
 from __future__ import annotations
@@ -738,8 +737,14 @@ class BoundaryCrossing(BaseModel):
     assumed_endpoints: list[str] = Field(default_factory=list)
 
 
-class SystemModel(BaseModel):
-    """The canonical structured representation of the system under analysis."""
+class EmittedSystemModel(BaseModel):
+    """The System Model as the extraction and repair nodes emit it.
+
+    Every field but ``capabilities``, because only an answer states a
+    capability. Asking extraction for them costs element identity, up to
+    3.5 sd in the #1291 measurement, so the schema a model fills leaves the
+    list out, and a model that writes it anyway is refused.
+    """
 
     model_config = ConfigDict(extra="forbid")
 
@@ -749,6 +754,11 @@ class SystemModel(BaseModel):
     data_flows: list[DataFlow] = Field(default_factory=list)
     trust_boundaries: list[TrustBoundary] = Field(default_factory=list)
     assumptions: list[Assumption] = Field(default_factory=list)
+
+
+class SystemModel(EmittedSystemModel):
+    """The canonical structured representation of the system under analysis."""
+
     capabilities: list[CapabilityStatement] = Field(default_factory=list)
 
     def elements(self) -> list[Element]:

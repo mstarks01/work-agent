@@ -46,15 +46,22 @@ rule applies because users sign in with a password. A rule that asks for a
 second factor applies because the application authenticates, and not because
 a second factor exists.
 
-**The System Model carries the capabilities a source states.** Its
+**The System Model carries the capabilities an answer states.** Its
 `capabilities` list holds one entry for each statement: the capability,
 `present` or `absent`, and the `source_excerpt` and `source_label` that say so.
-The validity gate checks the quote as it checks an element's. Extraction writes
-`absent` only where a source says so, and writes no entry for a capability the
-text does not mention. Two statements that disagree leave the capability
-`unknown`. The list is on the model, and not in the assertion catalog, because
-the assertion pass is off by default and a default job must still read its
-capabilities.
+The validity gate checks the quote as it checks an element's. Two statements
+that disagree leave the capability `unknown`. The list is on the model, and not
+in the assertion catalog, because the assertion pass is off by default and a
+default job must still read its capabilities.
+
+**Extraction states no capability.** The extraction and repair nodes fill
+`EmittedSystemModel`, which has no `capabilities` field, and `extract.md` asks
+for none. Asking extraction for capabilities cost element identity: against
+no rule, five extraction sweeps each side measured aligned recall 3.5 sd lower
+and endpoint recall 1.6 sd lower, while the attribute figures did not move. In
+75 extractions the sources stated only three distinct correct absences, so the
+answers were already where nearly every capability came from (#1291, comment of
+2026-09-29).
 
 **A stated absence rules a requirement out before its lane runs.** ASVS's
 `ruled_out` hook evaluates each requirement of the lane's chapter. A
@@ -99,10 +106,10 @@ even where a description rarely states it.
 
 ## Consequences
 
-A job rules a requirement out only when a source states the absence of its
-subject. Descriptions rarely state one, so most conditional requirements stay
-`unknown` until an early question asks for the capability. A job with questions
-off keeps them `unknown`, and its lanes rule on them.
+A job rules a requirement out only when an answer states the absence of its
+subject. So every conditional requirement stays `unknown` until an early
+question asks for the capability, even where a source states the absence. A
+job with questions off keeps them `unknown`, and its lanes rule on them.
 
 The page asks every part in the same round as its parent, because a resumed
 job does not pause again. So a "yes" to OAuth asks the role questions at once,
@@ -114,5 +121,3 @@ until the maintainer reads it.
 The presence tests in `frameworks/asvs/rules.py` stay as leads for a lane. They
 decide no applicability.
 
-The facts-first extraction route writes no capability, so its jobs leave every
-capability `unknown`.

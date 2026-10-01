@@ -2,10 +2,14 @@
 
 from __future__ import annotations
 
+import pytest
+from pydantic import ValidationError
+
 from analysis_service.capabilities import CAPABILITIES
 from analysis_service.compact import expand
 from analysis_service.system_model import (
     CapabilityStatement,
+    EmittedSystemModel,
     SystemModel,
     normalize_element_ids,
 )
@@ -97,9 +101,11 @@ def test_normalization_snaps_a_statements_label_to_the_jobs_spelling():
     assert model.capabilities[0].source_label == "Kickoff call"
 
 
-def test_the_compact_transport_carries_the_statements_unchanged():
+def test_no_extraction_transport_admits_a_capability_statement():
+    """Only an answer states a capability, so a model that writes one is refused."""
     statement = _stated("oauth", "absent", "Ana").model_dump()
-    expanded, issues = expand({"capabilities": [statement]})
-    assert issues == []
-    assert expanded is not None
-    assert expanded["capabilities"] == [statement]
+
+    _, issues = expand({"capabilities": [statement]})
+    assert [issue.code for issue in issues] == ["schema"]
+    with pytest.raises(ValidationError, match="capabilities"):
+        EmittedSystemModel.model_validate({"capabilities": [statement]})

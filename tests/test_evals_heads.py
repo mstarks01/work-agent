@@ -35,7 +35,7 @@ from analysis_service.system_model import (
 )
 from evals.harness import modes
 from evals.harness.artifact import REPO_ROOT
-from tests.factories import EVAL_MODEL, ScriptedLlm
+from tests.factories import EVAL_MODEL, ScriptedLlm, emitted
 from tests.test_deployment import VERTEX_ENV
 from tests.test_evals_modes import scripted_assertions
 from tests.test_facts_route import FRAMEWORKS
@@ -122,7 +122,7 @@ def head_pipeline(
         "extract": (
             scripted_bundle(corpus_case.model)
             if strategy == FACTS_FIRST
-            else json.dumps(corpus_case.model.model_dump(mode="json"))
+            else emitted(corpus_case.model)
         ),
         "assert": scripted_assertions(corpus_case),
     }
