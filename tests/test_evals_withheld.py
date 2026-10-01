@@ -106,17 +106,19 @@ class TestAnswersWithinRounds:
     def flows(self, answers):
         return [answer.key[0].rsplit(">", 1)[-1] for answer in answers]
 
-    def test_the_first_round_asks_one_withheld_fact_and_the_second_the_rest(
+    def test_the_first_round_asks_every_withheld_fact(
         self,
         case,  # noqa: F811
     ):
+        """Ranked by score alone, round 1 asked one of the three and round 2
+        the rest (QA-2026-09-26-03-E27); ranked per choice, round 1 asks all
+        three (QA-2026-09-26-03-E33)."""
         from evals.harness.withheld import answers_within_rounds
 
         signed = load_answer_file(DRAFT)
         first = answers_within_rounds(case, signed, 1, ("stride",))
-        second = answers_within_rounds(case, signed, 2, ("stride",))
-        assert self.flows(first) == ["submit-order"]
-        assert set(second) == set(signed.answers)
+        assert set(first) == set(signed.answers)
+        assert "submit-order" in self.flows(first)
 
     def test_answers_keep_the_file_s_own_order_and_values(self, case):  # noqa: F811
         from evals.harness.withheld import answers_within_rounds
