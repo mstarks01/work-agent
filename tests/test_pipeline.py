@@ -28,6 +28,7 @@ from analysis_service.assertions import (
 )
 from analysis_service.claims import ProposedVerdict, UnknownRef
 from analysis_service.frameworks import PACKAGES, FrameworkName
+from analysis_service.frameworks.asvs.catalog import requirements_for
 from analysis_service.frameworks.stride.record import STRIDE_CATEGORIES
 from analysis_service.identity import IDENTITY_VERSION, build_identity
 from analysis_service.jobs import (
@@ -1045,3 +1046,34 @@ def test_one_framework_finishing_first_does_not_fail_the_other(first, held, wind
         assert [claim.id for claim in blocks[name].claims] == expected
     assert visited.count(graph.ASSEMBLE_NODE) == 2
     assert visited.index(graph.ASSEMBLE_NODE) < visited.index(held_node)
+
+
+def test_a_lane_with_no_unit_left_calls_no_model():
+    """A closed lane with nothing to rule on emits an empty batch for free.
+
+    At ASVS level 1, two chapters carry no requirement. Their lane agents once
+    ran anyway, with a scope line that listed no unit, and could only file a
+    claim on a requirement above the level.
+    """
+    fixture = SCRIPTED_FRAMEWORKS["asvs"]
+    level = fixture.options["level"]
+    nodes = graph.FrameworkNodes("asvs")
+    idle = {
+        lane.node_name for lane in nodes.lanes if not requirements_for(level, lane.lane)
+    }
+    assert idle
+    replies = {
+        "extract": emitted(valid_model()),
+        graph.analyze_node_name("asvs", fixture.lane): fixture.proposal,
+        nodes.node(graph.CRITIC_ROLE): fixture.ruling,
+    }
+    pipeline, models = build(replies, frameworks=("asvs",))
+
+    outcome = asyncio.run(AdkPipelineRunner(pipeline).run(pair_job(("asvs",)), None))
+
+    assert isinstance(outcome, PipelineCompleted)
+    assert [claim.id for claim in outcome.report.analyses[0].claims] == [
+        fixture.claim_id
+    ]
+    for lane in nodes.lanes:
+        assert bool(models[lane.node_name].seen) == (lane.node_name not in idle)

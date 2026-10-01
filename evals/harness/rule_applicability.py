@@ -138,7 +138,7 @@ def _selected(fixture: Fixture) -> set[str]:
     return {
         unit
         for lane in package.lanes
-        for unit in package.record.units_for(fixture.options, lane)
+        for unit in package.record.units_for(fixture.options, lane) or ()
     }
 
 

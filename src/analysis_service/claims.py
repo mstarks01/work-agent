@@ -915,17 +915,19 @@ class Claim(BaseModel):
         return list(proposals), {}
 
     @classmethod
-    def units_for(cls, options: Mapping[str, Any], lane: str) -> tuple[str, ...]:
-        """The units of ``lane`` a job with these options rules on, or ``()``.
+    def units_for(cls, options: Mapping[str, Any], lane: str) -> tuple[str, ...] | None:
+        """The units of ``lane`` a job with these options rules on, or ``None``.
 
         A package whose options select which units apply — a level picking a
         requirement set — names them here, and the lane agent's scope line
         lists them so the agent rules on those and on no other (#659). The
-        neutral answer is empty: a framework whose claims are an open set has
-        no list of units to hand an agent, and renders nothing.
+        neutral answer is ``None``: a framework whose claims are an open set has
+        no list of units to hand an agent, and renders nothing. An empty tuple
+        is a different fact: the set is closed and this lane has nothing in it,
+        so its agent is never called.
         """
         del options, lane
-        return ()
+        return None
 
     @classmethod
     def ruled_out(

@@ -122,6 +122,7 @@ import anyio.to_thread
 from google.adk.agents import LlmAgent
 from google.adk.events.event import Event
 from google.adk.models.base_llm import BaseLlm
+from google.adk.models.llm_response import LlmResponse
 from google.adk.workflow import START, FunctionNode, JoinNode, Workflow
 from google.genai import types
 from pydantic import BaseModel, ValidationError
@@ -140,6 +141,7 @@ from analysis_service.claims import (
     FrameworkAnalysis,
     FrameworkName,
     LaneCoverage,
+    ProposalBatch,
     Refusal,
     Ruling,
     SharedElementName,
@@ -899,6 +901,10 @@ FRAMEWORK_STRUCTURED_ARTIFACTS: tuple[str, ...] = (
     # Written by ``prepare``, read by the fan-in, which refuses a draft that
     # rules such a unit out; empty for a package with no applicability rule.
     "ruled_in",
+    # The lanes whose closed unit set has nothing left once the package's rules
+    # rule units out. Written by ``prepare``, read by each lane agent's model
+    # callback, which answers an empty batch instead of calling the model.
+    "idle_lanes",
     "marks",
     "precondition",
     "retrieved",
@@ -1751,6 +1757,7 @@ def prepare_analysis(
         retrieved: list[str] = []
         ruled_out: dict[str, str] = {}
         ruled_in: dict[str, str] = {}
+        idle_lanes: list[str] = []
         for position, lane in enumerate(nodes.lanes):
             candidate_set = candidates[lane.lane]
             # The package's own rules may rule a lane's units out of this model
@@ -1763,6 +1770,9 @@ def prepare_analysis(
             ruled_in.update(
                 package.record.ruled_in(model, options.get(name) or {}, lane.lane)
             )
+            units = package.record.units_for(options.get(name) or {}, lane.lane)
+            if units is not None and set(units) <= set(lane_ruled_out):
+                idle_lanes.append(lane.lane)
             # Retrieval is by *fired* rule, so a lane that triggered nothing gets
             # nothing: the material follows the leads rather than the lane.
             notes = notes_by_lane[position]
@@ -1778,9 +1788,7 @@ def prepare_analysis(
                         model,
                         candidate_set,
                         options.get(name) or {},
-                        units=package.record.units_for(
-                            options.get(name) or {}, lane.lane
-                        ),
+                        units=units or (),
                         ruled_out=tuple(lane_ruled_out),
                     ),
                     "reference_notes": compose_notes(loader, notes),
@@ -1798,6 +1806,7 @@ def prepare_analysis(
         # firing order across independent lanes is not a fact about anything.
         state.put(nodes.key("ruled_out"), ruled_out)
         state.put(nodes.key("ruled_in"), ruled_in)
+        state.put(nodes.key("idle_lanes"), idle_lanes)
         state.put(
             nodes.key("retrieved"),
             {
@@ -2691,6 +2700,7 @@ def _llm_node(
     resolve_model: ModelResolver,
     resolve_sampling: SamplingResolver,
     closing: str | None = None,
+    idle: tuple[str, str] | None = None,
 ) -> LlmAgent:
     """One LLM node: its model, its full instruction, its emitted schema.
 
@@ -2706,7 +2716,14 @@ def _llm_node(
 
     ``closing`` is text the node reads last, as one more part of its user turn
     (:func:`append_to_user_turn`).
+
+    ``idle`` is a lane agent's state key and lane name for
+    :func:`answer_when_idle`, which runs first so an idle lane sends nothing.
     """
+    callbacks: list[Callable[..., Any]] = [
+        *([answer_when_idle(*idle, output_schema)] if idle else []),
+        *([append_to_user_turn(closing)] if closing else []),
+    ]
     return LlmAgent(
         name=name,
         model=resolve_model(tier_node),
@@ -2715,8 +2732,29 @@ def _llm_node(
         output_key=output_key,
         include_contents="none",
         generate_content_config=_generate_content_config(resolve_sampling(tier_node)),
-        before_model_callback=append_to_user_turn(closing) if closing else None,
+        before_model_callback=callbacks or None,
     )
+
+
+def answer_when_idle(
+    key: str, lane: str, output_schema: type[ProposalBatch]
+) -> Callable[..., LlmResponse | None]:
+    """A callback that answers an empty batch for a lane ``prepare`` marked idle.
+
+    The lane's closed unit set has nothing left in it, so a model call could
+    only file a claim on a unit the job did not ask for. The lane still finishes
+    with an emission, which the join waits for and the fan-in reads.
+    """
+    empty = output_schema(claims=[]).model_dump_json(include={"claims"})
+
+    def callback(callback_context: Any, llm_request: Any) -> LlmResponse | None:
+        if lane not in (callback_context.state.get(key) or ()):
+            return None
+        return LlmResponse(
+            content=types.Content(role="model", parts=[types.Part(text=empty)])
+        )
+
+    return callback
 
 
 def append_to_user_turn(text: str) -> Callable[..., None]:
@@ -3298,6 +3336,7 @@ def _framework_subgraph(
                 resolve_model=resolve_model,
                 resolve_sampling=resolve_sampling,
                 closing=lane_closing(package_loader, package.name),
+                idle=(nodes.key("idle_lanes"), lane.lane),
             )
             for lane in nodes.lanes
         ),
