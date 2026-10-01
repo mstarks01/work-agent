@@ -81,6 +81,7 @@ from evals.harness import (
     extraction_losses,
     falsify,
     flow_ids,
+    follow_up_policies,
     guard_cost,
     instruction,
     instruction_delta,
@@ -2736,6 +2737,12 @@ COMMANDS: dict[str, Command] = {
         " than one framework, on archived reports (offline, no credentials)",
         run=early_policies.command_early_policies,
         arguments=early_policies.arguments,
+    ),
+    "follow-up-policies": Command(
+        help="compare orders of a report's follow-up questions at a matched"
+        " number of choices, on archived reports (offline, no credentials)",
+        run=follow_up_policies.command_follow_up_policies,
+        arguments=follow_up_policies.arguments,
     ),
     "question-prior": Command(
         help="count one framework's early-question prior from a sweep's"
