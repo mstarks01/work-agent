@@ -79,6 +79,7 @@ __all__ = [
     "QuestionSet",
     "SkipKey",
     "by_turn",
+    "next_round",
     "passes_floor",
     "question_set",
 ]
@@ -496,7 +497,7 @@ def question_set(
         catalog = apply_answers(catalog, view, answered_links, answered)[0]
     listed = early_questions(view, frameworks, catalog)
     aside: frozenset[SkipKey] = frozenset(skipped)
-    this_round, remaining, withheld = _round(listed, aside | done, held)
+    this_round, remaining, withheld = next_round(listed, aside | done, held)
     linked = {fold(link.principal): link for link in answered_links}
     open_links = link_questions(catalog, view)
     return QuestionSet(
@@ -529,7 +530,7 @@ def question_set(
     )
 
 
-def _round(
+def next_round(
     listed: Sequence[EarlyQuestion],
     done: frozenset[SkipKey],
     held: Mapping[UnknownKey, FactAnswer],

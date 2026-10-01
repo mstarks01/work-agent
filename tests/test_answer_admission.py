@@ -421,7 +421,7 @@ class TestTheBoundedRounds:
         assert asked.early, "a control: the waiting job asks something"
 
     def test_a_question_counts_as_one_whatever_its_facets(self):
-        from analysis_service.answer_round import _round
+        from analysis_service.answer_round import next_round
 
         wide = SimpleNamespace(
             key=CAPACITY,
@@ -431,7 +431,7 @@ class TestTheBoundedRounds:
             parent=None,
             frameworks=("stride",),
         )
-        shown, _, _ = _round([wide], frozenset(), {})
+        shown, _, _ = next_round([wide], frozenset(), {})
         assert shown == (wide,)
 
     def test_a_saved_answer_leaves_the_round_and_is_listed_with_its_answer(self):
@@ -442,7 +442,7 @@ class TestTheBoundedRounds:
         assert [(q.key, a) for q, a in after.answered_early] == [(first.key, answer)]
 
     def test_each_kind_stops_at_its_limit(self):
-        from analysis_service.answer_round import _round
+        from analysis_service.answer_round import next_round
 
         listed = _asked_after([]).early
         held = {
@@ -451,7 +451,7 @@ class TestTheBoundedRounds:
             )
             for n in range(30)
         }
-        shown, remaining, withheld = _round(listed, frozenset(held), held)
+        shown, remaining, withheld = next_round(listed, frozenset(held), held)
         assert not [q for q in shown if q.kind != "capability"]
         assert remaining["field"] == 0
         assert withheld == len([q for q in listed if q.kind != "capability"])
@@ -459,7 +459,7 @@ class TestTheBoundedRounds:
     def test_a_question_answered_in_part_comes_back_outside_the_limit(self):
         """Thirty partial answers hid every question and started the analysis
         as if nothing were left (#1289, B3)."""
-        from analysis_service.answer_round import EARLY_RULES, _round
+        from analysis_service.answer_round import EARLY_RULES, next_round
 
         facets = QUESTION_KINDS["capacity-limits"].facets
 
@@ -479,7 +479,9 @@ class TestTheBoundedRounds:
         held = {
             q.key: FactAnswer(key=q.key, facets={"rate": "yes"}) for q in listed[:30]
         }
-        shown, remaining, withheld = _round(listed, answered_keys(held.values()), held)
+        shown, remaining, withheld = next_round(
+            listed, answered_keys(held.values()), held
+        )
         per_round = EARLY_RULES["field"].per_round
         assert [q.key for q in shown] == [q.key for q in listed[:per_round]]
         assert remaining["field"] == 30
