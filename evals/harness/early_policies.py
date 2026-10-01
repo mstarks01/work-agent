@@ -1,10 +1,10 @@
 """Compare orders of early questions when a job selects more than one framework.
 
 The pause asks early questions before any finding exists (ADR 0053). Where a
-job selects two frameworks, the shipped order sums each framework's score and
-asks a fixed number of capability and field questions a round. The #1289
-review of 2026-10-01 asked whether another order serves each selected
-framework better at the same owner effort. This command answers that offline,
+job selects two frameworks, the shipped rounds ask a fixed number of
+capability and field questions a round, with the frameworks taking turns. The
+#1289 review of 2026-10-01 asked which order serves each selected framework
+best at the same owner effort. This command answers that offline,
 for an owner who answers from the top and stops after a number of choices.
 
 **What an order is worth is read off archived reports.** No archived report
@@ -58,7 +58,7 @@ def _rounds(model: SystemModel, frameworks: Selection) -> list[list[EarlyQuestio
 
     The owner answers "I don't know" to every question, which writes nothing,
     so the model and the ranking stay as they started and only the round
-    moves on. A round shows its capability questions before its field ones.
+    moves on.
     """
     shown: list[list[EarlyQuestion]] = []
     answered: list[FactAnswer] = []
@@ -81,34 +81,10 @@ def _rounds(model: SystemModel, frameworks: Selection) -> list[list[EarlyQuestio
     return shown
 
 
-def _summed_rounds(model: SystemModel, frameworks: Selection) -> list[EarlyQuestion]:
-    """The shipped order: the rounds in turn, each in the order the page shows."""
+def _shipped_rounds(model: SystemModel, frameworks: Selection) -> list[EarlyQuestion]:
+    """The shipped order: the rounds in turn, each in the order the page shows,
+    which takes the frameworks in turn (:func:`~analysis_service.answer_round.by_turn`)."""
     return [question for shown in _rounds(model, frameworks) for question in shown]
-
-
-def _round_merge(model: SystemModel, frameworks: Selection) -> list[EarlyQuestion]:
-    """The shipped rounds, with the frameworks taken in turn inside each round.
-
-    A round asks the same questions as the shipped one. Inside it, the next
-    question is the first one left that serves the framework charged the
-    fewest choices so far (the first by name on a tie), and each framework it
-    serves is charged its choices. The charge runs on from round to round. A
-    part still follows its parent, which comes first in its own framework's
-    turn.
-    """
-    charged = dict.fromkeys(sorted(frameworks), 0)
-    order: list[EarlyQuestion] = []
-    for shown in _rounds(model, frameworks):
-        left = list(shown)
-        while left:
-            served = {name for question in left for name in question.frameworks}
-            name = min(served, key=lambda each: (charged[each], each))
-            question = next(q for q in left if name in q.frameworks)
-            left.remove(question)
-            order.append(question)
-            for holder in question.frameworks:
-                charged[holder] += question.decisions
-    return order
 
 
 def _own_lists(
@@ -164,8 +140,7 @@ def _merge(
 
 #: Every order compared, by name.
 POLICIES: Mapping[str, Callable[[SystemModel, Selection], list[EarlyQuestion]]] = {
-    "summed-rounds": _summed_rounds,
-    "round-merge": _round_merge,
+    "shipped-rounds": _shipped_rounds,
     "framework-merge": lambda model, chosen: _merge(model, chosen, grouped=False),
     "grouped-merge": lambda model, chosen: _merge(model, chosen, grouped=True),
 }

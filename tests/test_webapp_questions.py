@@ -249,7 +249,7 @@ class TestTheRounds:
         )
         assert saved.status_code == 200, saved.text
         after = saved.json()
-        assert [q["key"] for q in after["skipped"]] == keys
+        assert sorted(q["key"] for q in after["skipped"]) == sorted(keys)
         assert not {tuple(k) for k in keys} & {tuple(q["key"]) for q in after["facts"]}
         assert after["answered"] == []
 
@@ -1343,8 +1343,9 @@ def test_same_for_all_is_offered_only_where_rows_share_a_question(case):
     assert _run_form_script(steps)["calls"][1] == {"shared": 0}
 
 
-def test_the_form_script_asks_each_group_once_with_a_row_per_element():
-    """Two elements under one kind make one group with two rows (#1289)."""
+def test_the_form_script_boxes_each_run_of_one_group_with_a_row_per_element():
+    """Questions of one kind that come together share a box, a row each; the
+    same kind later in the round opens a new box, so the list order holds."""
     store, flow = valid_model().data_stores[0], valid_model().data_flows[0]
 
     def fact(element, name, choices):
@@ -1363,8 +1364,10 @@ def test_the_form_script_asks_each_group_once_with_a_row_per_element():
 
     facts = [
         fact(store, "stored-copy-integrity", ["yes", "no"]),
-        fact(flow, "audit-evidence", []),
         fact(flow, "stored-copy-integrity", ["yes", "no"]),
+        fact(flow, "audit-evidence", []),
+        fact(store, "audit-evidence", []),
+        fact(store, "stored-copy-integrity", ["yes", "no"]),
     ]
     steps = f"""
 await ids.analyze.listeners.submit({{ preventDefault() {{}} }}); await settle();
@@ -1390,8 +1393,13 @@ await ids.continue.listeners.click(); await settle();
             "open": True,
         },
         {
-            "title": "audit-evidence heading? (1 question(s), 1 choice(s))",
-            "rows": [flow.name],
+            "title": "audit-evidence heading? (2 question(s), 2 choice(s))",
+            "rows": [flow.name, store.name],
+            "open": True,
+        },
+        {
+            "title": "stored-copy-integrity heading? (1 question(s), 1 choice(s))",
+            "rows": [store.name],
             "open": True,
         },
     ]

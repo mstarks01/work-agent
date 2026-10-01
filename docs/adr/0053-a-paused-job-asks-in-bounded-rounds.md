@@ -52,8 +52,26 @@ analysis" is available in every round.
 | Field | 1 | 30 | The score is a ranking heuristic, the prior's citation rate times one plus the candidates, and 1 is where the ranking cuts. No measurement says how many findings an answer changes, so the floor is not a count of findings. The top 30 hold 99% of a STRIDE list's ranking score at the floor (E20), which is not a share of the report's value. |
 | Capability | 2 | 30 | A capability's score counts the units it could settle, not findings, so it takes its own floor. Under 2, it settles one unit. At ASVS level 2 the floor left 28 of 51, and dropped about 6 a job that settle a level 1 requirement while it kept 13 that settle only level 2; a question in the highest band now passes the floor where bands differ (ADR 0055), so 34 pass and the limit asks 30. |
 
-Two limits, not one: capability questions come first, so one shared limit
-would give a job that selects both frameworks no field question.
+Two limits, not one: the two kinds' scores are on different scales, so one
+shared limit would let the higher-scored kind take every place.
+
+**The selected frameworks take turns** (`answer_round.by_turn`). Where a job
+selects more than one framework, each kind's places in a round go to the
+frameworks in turn: the next place goes to the first question that serves
+the framework charged the fewest choices so far, and every framework a
+question serves is charged its choices. The round is then shown in the same
+order, and the page starts a new box each time the question group changes,
+so a heading can come back within a round. Summing the frameworks' scores
+put ten capability questions first, and the page showed them in one box: an
+owner who stopped after ten choices completed no STRIDE finding with ASVS
+selected, where STRIDE alone completed 517 (E29). Turns need no calibration
+between frameworks, because each framework's scores order only its own
+questions, so a package added later takes its turn with no edit. Measured
+on the same archive with both selected, at 10 choices STRIDE completes 1,036
+findings and ASVS 125, where the summed order completed 0 and 0; the cost is
+ASVS units settled early, 1,209 against 2,186 at 10 choices; from 30
+choices on the two orders settle within 2% of each other (E32). With one framework selected, nothing
+changes (maintainer's decision of 2026-10-01).
 
 **A limit bounds the questions not yet answered at all.** Every saved answer
 counts toward its kind's limit. A question with facets that a round answered

@@ -16,7 +16,9 @@ may continue with no answers, and a finished one has nothing to continue.
 questions of each kind, its ``per_round``, so every round asks as many
 questions as the one before it, and only the last asks fewer. A question is
 shown only at or above its kind's floor, and one pause asks each kind at most
-its limit in all: :data:`EARLY_RULES` is the table. A question answered in
+its limit in all: :data:`EARLY_RULES` is the table. Where a job selects
+more than one framework, the frameworks take turns, both for the places in a
+round and for the order it is shown in (:func:`by_turn`). A question answered in
 part comes back first, outside the limit, and where the limits hold questions
 back the job says so (:attr:`QuestionSet.stop`). A submitter saves a round's answers, which writes
 them onto the job and runs no model, and the next round is read off the model
@@ -35,6 +37,7 @@ answer the facts a reviewer names differently on each run
 
 from __future__ import annotations
 
+from collections import Counter
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, replace
 from typing import Annotated, Any
@@ -75,6 +78,7 @@ __all__ = [
     "EarlyRule",
     "QuestionSet",
     "SkipKey",
+    "by_turn",
     "passes_floor",
     "question_set",
 ]
@@ -539,7 +543,9 @@ def _round(
 
     A round takes the first ``per_round`` questions of each kind, so the
     number of questions a round opens with never grows from one round to the
-    next (:func:`_take`).
+    next (:func:`_take`). Each kind's questions are taken with the selected
+    frameworks in turn, so each framework's best questions reach the round,
+    and the round is shown in that order too (:func:`by_turn`).
     """
     shown: list[EarlyQuestion] = []
     remaining = {}
@@ -558,8 +564,40 @@ def _round(
         fresh = [question for question in eligible if question.key not in held]
         remaining[kind] = len(started) + min(len(fresh), left)
         withheld += max(len(fresh) - left, 0)
-        shown += _take([*started, *fresh[:left]], rule.per_round)
-    return tuple(shown), remaining, withheld
+        shown += _take([*started, *by_turn(fresh)[:left]], rule.per_round)
+    return tuple(by_turn(shown)), remaining, withheld
+
+
+def by_turn(questions: Sequence[EarlyQuestion]) -> list[EarlyQuestion]:
+    """The questions with the selected frameworks taken in turn.
+
+    **The one reader of whose turn it is.** The next question is the first
+    one left that serves the framework charged the fewest choices so far, the
+    first by name on a tie, and every framework it serves is charged its
+    choices (:attr:`~analysis_service.early_questions.EarlyQuestion.frameworks`).
+    So a question two frameworks share costs each of them, and asks once.
+    Within one framework the list's order holds, so a parent still comes
+    before its parts: a part serves no framework its parent does not.
+
+    Summing the frameworks' scores put every capability question first, and
+    an owner who stopped after ten choices completed no STRIDE finding with
+    ASVS selected, where STRIDE alone completed 517 (``QA-2026-09-26-03-E29``).
+    With one framework selected the order does not change.
+    """
+    charged: Counter[str] = Counter()
+    left = list(questions)
+    order: list[EarlyQuestion] = []
+    while left:
+        served = {name for question in left for name in question.frameworks}
+        if not served:
+            return order + left
+        name = min(served, key=lambda each: (charged[each], each))
+        question = next(question for question in left if name in question.frameworks)
+        left.remove(question)
+        order.append(question)
+        for holder in question.frameworks:
+            charged[holder] += question.decisions
+    return order
 
 
 def _take(candidates: Sequence[EarlyQuestion], per_round: int) -> list[EarlyQuestion]:
