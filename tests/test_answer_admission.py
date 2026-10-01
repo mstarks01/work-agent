@@ -19,6 +19,7 @@ from pydantic import ValidationError
 from analysis_service.answer_forms import answer_choices, answer_limit
 from analysis_service.answer_round import question_set
 from analysis_service.assertions import MAX_QUOTE_CHARS, AssertionCatalog
+from analysis_service.early_questions import early_questions
 from analysis_service.fact_answers import FactAnswer, answered_keys, fact_line
 from analysis_service.fact_writes import check_fact_answers
 from analysis_service.links import (
@@ -423,7 +424,12 @@ class TestTheBoundedRounds:
         from analysis_service.answer_round import _round
 
         wide = SimpleNamespace(
-            key=CAPACITY, kind="question", score=5.0, decisions=11, parent=None
+            key=CAPACITY,
+            kind="question",
+            score=5.0,
+            decisions=11,
+            parent=None,
+            frameworks=("stride",),
         )
         shown, _, _ = _round([wide], frozenset(), {})
         assert shown == (wide,)
@@ -466,6 +472,7 @@ class TestTheBoundedRounds:
                 facets=facets,
                 decisions=4,
                 parent=None,
+                frameworks=("stride",),
             )
 
         listed = [capacity_of(n) for n in range(31)]
@@ -1191,3 +1198,78 @@ class TestAJobItsAnswersResumed:
 
         assert body["resumed_by"] is None
         assert body["early_questions"]
+
+
+BOTH = {"stride": {}, "asvs": {"level": 2}}
+
+
+class TestTheFrameworksTakeTurns:
+    """With ASVS selected, a round showed ten capability questions before any
+    STRIDE question, so an owner who stopped after ten choices completed no
+    STRIDE finding (#1289, QA-2026-09-26-03-E29)."""
+
+    def round_of(self, frameworks):
+        return question_set(
+            valid_model(),
+            None,
+            frameworks,
+            [],
+            waiting=True,
+            answered=[],
+            answered_links=[],
+            final=False,
+            shown=[],
+        ).early
+
+    def test_the_first_choices_serve_every_selected_framework(self):
+        shown = self.round_of(BOTH)
+        first, spent = [], 0
+        for question in shown:
+            if spent >= 10:
+                break
+            first.append(question)
+            spent += question.decisions
+        assert {name for q in first for name in q.frameworks} == set(BOTH)
+
+    def test_a_part_still_follows_its_parent(self):
+        keys = [q.key for q in self.round_of(BOTH)]
+        for at, question in enumerate(self.round_of(BOTH)):
+            if question.parent in keys:
+                assert keys.index(question.parent) < at
+
+    def test_the_selection_order_changes_nothing(self):
+        backward = dict(reversed(BOTH.items()))
+        assert self.round_of(BOTH) == self.round_of(backward)
+
+    def test_one_framework_keeps_the_list_s_order(self):
+        from analysis_service.answer_round import by_turn
+
+        shown = self.round_of({"stride": {}})
+        assert list(shown) == by_turn(shown)
+        listed = [
+            q.key
+            for q in early_questions(valid_model(), {"stride": {}}, None)
+            if q.key in {s.key for s in shown}
+        ]
+        assert [q.key for q in shown] == listed
+
+    def test_a_shared_question_is_charged_to_each_framework_it_serves(self):
+        from analysis_service.answer_round import by_turn
+
+        def question(key, *frameworks):
+            return SimpleNamespace(
+                key=(key,), frameworks=frameworks, decisions=1, parent=None
+            )
+
+        shared = question("shared", "asvs", "stride")
+        asvs, stride = question("a", "asvs"), question("s", "stride")
+        assert [q.key for q in by_turn([shared, asvs, stride])] == [
+            ("shared",),
+            ("a",),
+            ("s",),
+        ]
+        assert [q.key for q in by_turn([asvs, stride, shared])] == [
+            ("a",),
+            ("s",),
+            ("shared",),
+        ]

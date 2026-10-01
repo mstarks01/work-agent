@@ -212,8 +212,9 @@
     return { input, beside, read, set };
   };
 
-  // A paused run's round: the link questions, then the open facts grouped by
-  // kind of question or attribute, and every earlier answer below them.
+  // A paused run's round: the link questions, then the open facts in the order
+  // the service lists them, a box for each run of one kind or attribute, and
+  // every earlier answer below them.
   // Every label and option is untrusted and lands as text.
   const showQuestions = (data) => {
     // The service says whether the pause asks anything more (QuestionSet.stop).
@@ -312,38 +313,45 @@
       // A skipped link places nothing: it is not "None of these".
       roundRows.push({ key: q.key, read: () => select.value });
     }
-    // The open facts, asked once per kind of question or attribute with a row
-    // per element. A group comes where its most useful question comes in the
-    // list, so a later row of a group can come before a better question of
-    // the next group. Each group's title says how many choices it asks. The
-    // first groups are open, and the rest are one click away.
-    const OPEN_GROUPS = 5;
+    // The open facts, in the order the service lists them: the frameworks
+    // the job selected take turns (answer_round.by_turn). Questions of one kind
+    // or attribute that come together share a box, with a row per element, so
+    // a heading can come back later in the round. Each box's title says how
+    // many choices it asks.
     if (data.facts.length) {
       heading("Facts your description does not state",
-        "Each question is asked once, with a row for each part of your system it"
-        + " applies to. A group comes first where its most useful question is"
-        + " more likely to matter. Leave any row blank that you cannot answer.");
+        "The questions take turns between the analyses you selected, so the"
+        + " first ones help each of them. Questions of one kind that come"
+        + " together share a box, with a row for each part of your system, so a"
+        + " heading can come back. Leave any row blank that you cannot answer.");
     }
+    // Each question's box: a new one each time the group changes.
+    const runOf = new Map();
+    let run = -1;
+    data.facts.forEach((q, at) => {
+      if (at === 0 || q.group !== data.facts[at - 1].group) run += 1;
+      runOf.set(q, run);
+    });
     // An earlier answer by its key: a question with facets comes back while a
     // facet has no answer, and its answered facets are filled in.
     const earlier = new Map((data.answered || []).map((a) => [JSON.stringify(a.key), a.answer]));
     const groups = new Map();
     for (const q of data.facts) {
-      if (!groups.has(q.group)) {
+      if (!groups.has(runOf.get(q))) {
         const box = document.createElement("details");
-        box.open = groups.size < OPEN_GROUPS;
+        box.open = true;
         const title = document.createElement("summary");
         // "Same for all" goes here, above the rows, where a group takes one.
         const top = document.createElement("div");
         box.append(title, top);
-        groups.set(q.group, { box, title, top, heading: q.group_heading, count: 0, rows: [] });
+        groups.set(runOf.get(q), { box, title, top, heading: q.group_heading, count: 0, rows: [] });
       }
     }
     // A group takes "Same for all" where two or more rows ask one attribute
     // or kind about different elements in one form. A capability asks about
     // the whole application, so it never shares.
     const shareable = new Set([...groups.keys()].filter((name) => {
-      const rows = data.facts.filter((q) => q.group === name && q.form !== "facets");
+      const rows = data.facts.filter((q) => runOf.get(q) === name && q.form !== "facets");
       const [first] = rows;
       return rows.length >= 2 && rows.every((q) => q.key[0]
         && q.key[1] === first.key[1] && q.key[4] === first.key[4] && q.form === first.form
@@ -446,7 +454,7 @@
     const rows = new Map();
     const followers = new Map();
     data.facts.forEach((q) => {
-      const group = groups.get(q.group);
+      const group = groups.get(runOf.get(q));
       group.count += 1;
       group.choices = (group.choices || 0) + (q.decisions || 1);
       const label = document.createElement("b");
@@ -456,7 +464,7 @@
       const about = context(q);
       if (q.form === "facets") {
         // "Same for all" sets a column of two or more rows; one row needs none.
-        const rows = data.facts.filter((f) => f.group === q.group && f.form === "facets");
+        const rows = data.facts.filter((f) => runOf.get(f) === runOf.get(q) && f.form === "facets");
         group.grid = group.grid || facetTable(group.box, q, rows.length >= 2);
         const before = earlier.get(JSON.stringify(q.key));
         const who = document.createElement("span");
@@ -471,7 +479,7 @@
       const row = document.createElement("p");
       const { input, beside, read, set } = inputFor(q, "");
       inputs.set(input.dataset.key, input);
-      if (shareable.has(q.group)) {
+      if (shareable.has(runOf.get(q))) {
         // Ticked rows take the shared answer; an unticked row is an exception.
         const tick = document.createElement("input");
         tick.type = "checkbox";
@@ -516,7 +524,7 @@
     tally();
     for (const [name, group] of groups) {
       if (group.rows.length) {
-        const shared = inputFor(data.facts.find((q) => q.group === name), "");
+        const shared = inputFor(data.facts.find((q) => runOf.get(q) === name), "");
         const apply = document.createElement("button");
         apply.type = "button";
         apply.textContent = "Apply to the ticked rows";

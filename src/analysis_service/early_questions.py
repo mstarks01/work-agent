@@ -182,7 +182,8 @@ class EarlyQuestion:
     #: raise on the element, summed over the frameworks: a ranking heuristic,
     #: not a measured count of the findings an answer changes. For a
     #: capability, how many units it could settle. The list is in this order,
-    #: capabilities first.
+    #: capabilities first; a round reorders its own questions with the
+    #: frameworks in turn (:func:`~analysis_service.answer_round.by_turn`).
     score: float = 0.0
     #: For a capability, the band of the most important unit it could settle,
     #: as its framework ranks units (level 1 highest for ASVS); 0 for every
