@@ -623,6 +623,50 @@ class TestSkipForNow:
         with pytest.raises(ValueError, match=refusal):
             admit(asked, facts=facts, save=save, skips=[key])
 
+    def test_a_link_only_round_is_saved_as_a_skip_and_places_nothing(self):
+        """The "Skip the rest" button sent an empty save for a link round (#1289, A2)."""
+        asked = _asked_after([])
+        (link,) = asked.links
+        admitted = admit(asked, save=True, skips=[link.key])
+        assert (admitted.links, admitted.facts) == ([], [])
+        after = _asked_after([], skipped=admitted.skipped)
+        assert after.links == ()
+        assert after.skipped_links == (link,)
+        assert after.to_json()["skipped_links"][0]["key"] == link.key
+
+    def test_a_skipped_link_can_still_be_answered_and_leaves_the_list(self):
+        (link,) = _asked_after([]).links
+        after = _asked_after([], skipped=[link.key])
+        answer = LinkAnswer(principal=link.principal, element="none")
+        admitted = admit(after, links=[answer], save=True)
+        assert admitted.skipped == ()
+        assert admitted.links == [answer]
+
+    def test_a_link_is_answered_or_skipped_not_both(self):
+        asked = _asked_after([])
+        (link,) = asked.links
+        answer = LinkAnswer(principal=link.principal, element="none")
+        with pytest.raises(ValueError, match="answered or skipped, not both"):
+            admit(asked, links=[answer], save=True, skips=[link.key])
+
+    def test_the_route_keeps_a_link_skip_on_the_job(self):
+        from analysis_service.sources import SourceLimits
+
+        client, store = catalog_client()
+        client.app.state.limits = SourceLimits(max_total_bytes=100_000, max_sources=3)
+        job = waiting(store)
+        body = client.get(f"/v1/jobs/{job}/questions", headers=auth()).json()
+        key = body["link_questions"][0]["key"]
+        response = client.post(
+            f"/v1/jobs/{job}/answers",
+            json={"save": True, "skip": [key], "revision": 0},
+            headers=auth(),
+        )
+        assert response.status_code == 200, response.text
+        after = client.get(f"/v1/jobs/{job}/questions", headers=auth()).json()
+        assert after["link_questions"] == []
+        assert [q["key"] for q in after["skipped_links"]] == [key]
+
     def test_the_route_keeps_a_skip_on_the_job(self):
         from analysis_service.sources import SourceLimits
 

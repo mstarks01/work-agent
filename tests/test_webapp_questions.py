@@ -253,7 +253,9 @@ class TestTheRounds:
         assert not {tuple(k) for k in keys} & {tuple(q["key"]) for q in after["facts"]}
         assert after["answered"] == []
 
-    @pytest.mark.parametrize("skip", ["x", [["a", "b"]], [[1, 2, 3, 4, 5, 6]]])
+    @pytest.mark.parametrize(
+        "skip", ["x", [["a", "b"]], [[1, 2, 3, 4, 5, 6]], [""], ["x" * 201], [7]]
+    )
     def test_a_malformed_skip_is_refused(self, tiers, skip):
         client = client_for(tiers, PausingRunner(catalog=False), catalog=False)
         paused = start(client, questions=True)
@@ -1763,6 +1765,105 @@ await ids.save.listeners.click(); await settle();
     assert listed == {"listed": True}
     assert sent["body"]["facts"] == [{"key": skipped, "value": "nightly"}]
     assert sent["body"]["skip"] == []
+
+
+_LINK = {
+    "key": "shopper account",
+    "principal": "shopper accounts",
+    "rows": 2,
+    "options": [{"id": "entity:shopper", "name": "Shopper"}],
+}
+
+
+def _skip_the_rest(links, facts) -> dict:
+    """The body "Skip the rest" sends for a round of these, every row blank."""
+    steps = f"""
+await ids.analyze.listeners.submit({{ preventDefault() {{}} }}); await settle();
+streams[0].listeners.questions({{ data: JSON.stringify({{ run: "r1",
+  questions: {json.dumps(links)}, facts: {json.dumps(facts)},
+  remaining: {{ field: 1 }}, answered: [], answered_links: [], revision: 0 }}) }});
+globalThis.fetch = async (url, init) => {{
+  calls.push({{ url, body: JSON.parse(init.body) }});
+  return {{ ok: false, json: async () => ({{ message: "stop here" }}) }};
+}};
+await ids.skip.listeners.click(); await settle();
+"""
+    (_, sent) = _run_form_script(steps)["calls"]
+    return sent["body"]
+
+
+def test_skip_the_rest_skips_a_link_only_round():
+    """The page sent an empty save, which the service refuses (#1289, A2)."""
+    body = _skip_the_rest([_LINK], [])
+    assert body["links"] == []
+    assert body["skip"] == [_LINK["key"]]
+
+
+def test_skip_the_rest_skips_the_blank_links_and_facts_together():
+    key = ["", "", "", "who?", "", ""]
+    body = _skip_the_rest([_LINK], [_text_row(key, "who?")])
+    assert body["skip"] == [_LINK["key"], key]
+
+
+def test_a_skipped_link_can_be_answered_from_its_list():
+    steps = f"""
+await ids.analyze.listeners.submit({{ preventDefault() {{}} }}); await settle();
+streams[0].listeners.questions({{ data: JSON.stringify({{ run: "r1", questions: [],
+  facts: [], remaining: {{}}, skipped: [], skipped_links: [{json.dumps(_LINK)}],
+  answered: [], answered_links: [], revision: 1 }}) }});
+const [open] = ids.skipped.querySelectorAll("button");
+open.listeners.click();
+ids.skipped.querySelectorAll("select")[0].value = "entity:shopper";
+globalThis.fetch = async (url, init) => {{
+  calls.push({{ url, body: JSON.parse(init.body) }});
+  return {{ ok: false, json: async () => ({{ message: "stop here" }}) }};
+}};
+await ids.save.listeners.click(); await settle();
+"""
+    (_, sent) = _run_form_script(steps)["calls"]
+    assert sent["body"]["links"] == [
+        {"principal": "shopper accounts", "element": "entity:shopper"}
+    ]
+
+
+def test_a_question_answered_in_part_and_skipped_has_one_editor():
+    """It was listed under "Your answers" and "Skipped for now", and the two
+    editors sent two answers to one key, which the service refuses (#1289, A3).
+    """
+    key = ["store:db", "", "", "", "capacity-limits", ""]
+    facets = [{"id": f, "question": f"{f}?"} for f in ("rate", "size")]
+    question = _text_row(key, "DB") | {
+        "kind": "question",
+        "form": "facets",
+        "facets": facets,
+        "decisions": 2,
+    }
+    answered = question | {
+        "answer": {"key": key, "value": None, "facets": {"rate": "yes"}}
+    }
+    steps = f"""
+await ids.analyze.listeners.submit({{ preventDefault() {{}} }}); await settle();
+streams[0].listeners.questions({{ data: JSON.stringify({{ run: "r1", questions: [],
+  facts: [], remaining: {{}}, skipped: [{json.dumps(question)}],
+  answered: [{json.dumps(answered)}], answered_links: [], revision: 1 }}) }});
+calls.push({{ earlier: ids.earlier.querySelectorAll("button").length }});
+const [open] = ids.skipped.querySelectorAll("button");
+open.listeners.click();
+const [rate, size] = ids.skipped.querySelectorAll("select");
+calls.push({{ kept: rate.value }});
+size.value = "no";
+globalThis.fetch = async (url, init) => {{
+  calls.push({{ url, body: JSON.parse(init.body) }});
+  return {{ ok: false, json: async () => ({{ message: "stop here" }}) }};
+}};
+await ids.save.listeners.click(); await settle();
+"""
+    _, earlier, kept, sent = _run_form_script(steps)["calls"]
+    assert earlier == {"earlier": 0}
+    assert kept == {"kept": "yes"}
+    assert sent["body"]["facts"] == [
+        {"key": key, "facets": {"rate": "yes", "size": "no"}}
+    ]
 
 
 def test_an_earlier_answer_can_be_changed():

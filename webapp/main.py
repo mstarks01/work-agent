@@ -108,7 +108,7 @@ from collections.abc import AsyncIterator, Awaitable, Callable, Mapping, Sequenc
 from dataclasses import dataclass, field
 from functools import partial
 from pathlib import Path
-from typing import get_args
+from typing import Annotated, get_args
 
 from fastapi import FastAPI, Request
 from fastapi.responses import (
@@ -118,7 +118,7 @@ from fastapi.responses import (
     Response,
     StreamingResponse,
 )
-from pydantic import ValidationError
+from pydantic import Field, TypeAdapter, ValidationError
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from analysis_service import (
@@ -139,7 +139,13 @@ from analysis_service.answer_forms import (
     answer_suggestions,
     facets_json,
 )
-from analysis_service.answer_round import AlreadyResumed, QuestionSet, question_set
+from analysis_service.answer_round import (
+    MAX_SKIPS,
+    AlreadyResumed,
+    QuestionSet,
+    SkipKey,
+    question_set,
+)
 from analysis_service.claims import UnknownKey
 from analysis_service.deployment import Deployment
 from analysis_service.early_questions import EarlyQuestion
@@ -247,8 +253,8 @@ class Run:
     shown: list[UnknownKey] = field(default_factory=list)
     #: A final report's corrections, kept beside it; no model reads them.
     corrections: list[FactAnswer] = field(default_factory=list)
-    #: Every early question the submitter skipped for now.
-    skipped: list[UnknownKey] = field(default_factory=list)
+    #: Every early question and link question the submitter skipped for now.
+    skipped: list[SkipKey] = field(default_factory=list)
     #: How many rounds a paused run has saved. A page sends the revision it
     #: read, so a page left open on an earlier round cannot write over a later one.
     revision: int = 0
@@ -1100,20 +1106,17 @@ def _early_row(question: EarlyQuestion, model: SystemModel) -> dict[str, object]
     }
 
 
-def _skips(raw: object) -> list[UnknownKey]:
-    """The keys a save skips: a list of six-part keys, or a ``TypeError``."""
-    if not isinstance(raw, list) or len(raw) > MAX_FACT_ANSWERS:
-        raise TypeError
-    keys = []
-    for key in raw:
-        if not (
-            isinstance(key, list)
-            and len(key) == 6
-            and all(isinstance(part, str) for part in key)
-        ):
-            raise TypeError
-        keys.append(tuple(key))
-    return keys
+_SKIPS: TypeAdapter[list[SkipKey]] = TypeAdapter(
+    Annotated[list[SkipKey], Field(max_length=MAX_SKIPS)]
+)
+
+
+def _skips(raw: object) -> list[SkipKey]:
+    """The keys a save skips (:data:`SkipKey`), or a ``TypeError``."""
+    try:
+        return _SKIPS.validate_python(raw)
+    except ValidationError as exc:
+        raise TypeError from exc
 
 
 class RefusedAnswer(Exception):
@@ -1182,6 +1185,9 @@ def paused_payload(run: Run, questions: QuestionSet) -> dict[str, object]:
             _early_row(question, questions.model)
             | {"answer": answer.model_dump(mode="json")}
             for question, answer in questions.answered_early
+        ],
+        "skipped_links": [
+            _link_row(question, names) for question in questions.skipped_links
         ],
         "answered_links": [
             _link_row(question, names) | {"answer": answer.model_dump(mode="json")}

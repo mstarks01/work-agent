@@ -37,12 +37,15 @@ from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, replace
-from typing import Any
+from typing import Annotated, Any
+
+from pydantic import StringConstraints
 
 from analysis_service.assertions import UNKNOWN, AssertionCatalog
 from analysis_service.claims import FrameworkAnalysis, FrameworkName, UnknownKey
 from analysis_service.early_questions import EarlyQuestion, early_questions
 from analysis_service.fact_answers import (
+    MAX_FACT_ANSWERS,
     FactAnswer,
     answered_keys,
     fact_label,
@@ -51,6 +54,7 @@ from analysis_service.fact_answers import (
 )
 from analysis_service.fact_writes import answered_model, check_fact_answers
 from analysis_service.links import (
+    MAX_LINK_ANSWERS,
     LinkAnswer,
     LinkQuestion,
     apply_answers,
@@ -65,10 +69,12 @@ from analysis_service.system_model import SystemModel
 
 __all__ = [
     "EARLY_RULES",
+    "MAX_SKIPS",
     "AdmittedRound",
     "AlreadyResumed",
     "EarlyRule",
     "QuestionSet",
+    "SkipKey",
     "passes_floor",
     "question_set",
 ]
@@ -103,6 +109,15 @@ EARLY_RULES: Mapping[str, EarlyRule] = {
     "capability": EarlyRule(floor=2.0, limit=30, per_round=10),
     "field": EarlyRule(floor=1.0, limit=30, per_round=5),
 }
+
+
+#: What a saved round skips for now: an early question's fact key, or a link
+#: question's key, the :func:`~analysis_service.links.fold` of its principal.
+#: A skip of a link places nothing and never means "none of these".
+SkipKey = UnknownKey | Annotated[str, StringConstraints(min_length=1, max_length=200)]
+
+#: The most skips one save names: every fact and link answer it could carry.
+MAX_SKIPS = MAX_FACT_ANSWERS + MAX_LINK_ANSWERS
 
 
 def _early_kind(question: EarlyQuestion) -> str:
@@ -140,9 +155,9 @@ class AdmittedRound:
     #: Every early question the pause showed, this round's included, which
     #: the report reads to say a follow-up question was skipped before.
     shown: tuple[UnknownKey, ...]
-    #: Every early question the submitter skipped for now and has not
-    #: answered since.
-    skipped: tuple[UnknownKey, ...]
+    #: Every early question and link question the submitter skipped for now
+    #: and has not answered since.
+    skipped: tuple[SkipKey, ...]
 
 
 @dataclass(frozen=True)
@@ -175,6 +190,9 @@ class QuestionSet:
     #: A skip is not an answer: the fact stays open, no round shows it again,
     #: and an answer to it is still admitted.
     skipped: tuple[EarlyQuestion, ...]
+    #: For a waiting job, each link question the submitter skipped for now,
+    #: kept apart from :attr:`links` as :attr:`skipped` is from :attr:`early`.
+    skipped_links: tuple[LinkQuestion, ...]
     #: The job this one's answers started, which holds it: it asks nothing
     #: and admits no answer while that job is in flight or has its report.
     resumed_by: str | None = None
@@ -207,6 +225,7 @@ class QuestionSet:
             "early_withheld": self.withheld,
             "early_stop": self.stop,
             "skipped_early": [question.to_json() for question in self.skipped],
+            "skipped_links": [question.to_json() for question in self.skipped_links],
             "answered_early": [
                 question.to_json() | {"answer": answer.model_dump(mode="json")}
                 for question, answer in self.answered_early
@@ -231,7 +250,7 @@ class QuestionSet:
         links: Sequence[LinkAnswer],
         facts: Sequence[FactAnswer],
         save: bool = False,
-        skips: Sequence[UnknownKey] = (),
+        skips: Sequence[SkipKey] = (),
     ) -> AdmittedRound:
         """The resumed job this round's answers start, or a ``ValueError``.
 
@@ -255,9 +274,9 @@ class QuestionSet:
             raise ValueError("only a job waiting on answers saves a round")
         if save and not (links or facts or skips):
             raise ValueError("a saved round answers or skips at least one question")
-        complete = answered_keys(merged_facts(earlier_facts, facts)) & {
-            fact.key for fact in facts
-        }
+        complete: frozenset[SkipKey] = answered_keys(
+            merged_facts(earlier_facts, facts)
+        ) & {fact.key for fact in facts} | {fold(link.principal) for link in links}
         self._check_skips(skips, complete, save)
         if self.final:
             raise ValueError(
@@ -275,7 +294,9 @@ class QuestionSet:
             self.catalog,
             self.asked,
             earlier_facts,
-            asked_links=[question.key for question in self.links],
+            asked_links=[
+                question.key for question in (*self.links, *self.skipped_links)
+            ],
             earlier_links=earlier_links,
             reopen=self.waiting,
         )
@@ -295,7 +316,11 @@ class QuestionSet:
             skipped=tuple(
                 dict.fromkeys(
                     key
-                    for key in [*(question.key for question in self.skipped), *skips]
+                    for key in [
+                        *(question.key for question in self.skipped),
+                        *(question.key for question in self.skipped_links),
+                        *skips,
+                    ]
                     if key not in complete
                 )
             ),
@@ -340,7 +365,7 @@ class QuestionSet:
         return merged_facts(corrections, facts)
 
     def _check_skips(
-        self, skips: Sequence[UnknownKey], complete: frozenset[UnknownKey], save: bool
+        self, skips: Sequence[SkipKey], complete: frozenset[SkipKey], save: bool
     ) -> None:
         """Refuse a skip outside a saved round, of a question it does not show,
         or of a question the same submission answers in full.
@@ -354,17 +379,22 @@ class QuestionSet:
             return
         if not save:
             raise ValueError("only a saved round skips questions")
-        shown = {question.key for question in self.early}
+        shown: dict[SkipKey, str] = {
+            question.key: question.principal for question in self.links
+        }
+        shown |= {
+            question.key: fact_label(question.key, self.model)
+            for question in self.early
+        }
         for key in skips:
             if key not in shown:
+                named = key if isinstance(key, str) else fact_label(key, self.model)
                 raise ValueError(
-                    "only a question this round shows is skipped:"
-                    f' "{fact_label(key, self.model)}"'
+                    f'only a question this round shows is skipped: "{named}"'
                 )
             if key in complete:
                 raise ValueError(
-                    "a question is answered or skipped, not both:"
-                    f' "{fact_label(key, self.model)}"'
+                    f'a question is answered or skipped, not both: "{shown[key]}"'
                 )
 
 
@@ -379,7 +409,7 @@ def question_set(
     answered_links: Sequence[LinkAnswer],
     final: bool,
     shown: Sequence[UnknownKey],
-    skipped: Sequence[UnknownKey] = (),
+    skipped: Sequence[SkipKey] = (),
     resumed_by: str | None = None,
 ) -> QuestionSet:
     """The questions a job asks: a waiting job's round, or its report's list.
@@ -390,7 +420,7 @@ def question_set(
     ``answered_links`` are the answers of the earlier rounds, which are not
     asked again. ``final`` marks a report the follow-up wrote, and ``shown``
     is every early question the pause showed. ``skipped`` is every early
-    question a waiting job's submitter skipped for now. A waiting
+    question and link question a waiting job's submitter skipped for now. A waiting
     job's ``model`` and ``catalog`` are its checkpoint's, and the saved answers
     are written in here, as the resumed run writes them. ``resumed_by`` is the
     job this one's answers started and that holds it, which a store reads
@@ -412,6 +442,7 @@ def question_set(
             answered_links=(),
             withheld=0,
             skipped=(),
+            skipped_links=(),
             resumed_by=resumed_by,
         )
     if final:
@@ -429,6 +460,7 @@ def question_set(
             answered_links=(),
             withheld=0,
             skipped=(),
+            skipped_links=(),
         )
     if not waiting:
         showed = frozenset(shown)
@@ -449,6 +481,7 @@ def question_set(
             answered_links=(),
             withheld=0,
             skipped=(),
+            skipped_links=(),
         )
     done = answered_keys(answered)
     held = {answer.key: answer for answer in answered}
@@ -458,16 +491,17 @@ def question_set(
     if catalog is not None:
         catalog = apply_answers(catalog, view, answered_links, answered)[0]
     listed = early_questions(view, frameworks, catalog)
-    aside = frozenset(skipped)
-    this_round, remaining, withheld = _round(listed, done | aside, held)
+    aside: frozenset[SkipKey] = frozenset(skipped)
+    this_round, remaining, withheld = _round(listed, aside | done, held)
     linked = {fold(link.principal): link for link in answered_links}
+    open_links = link_questions(catalog, view)
     return QuestionSet(
         model=view,
         catalog=catalog,
         waiting=True,
         early=this_round,
         facts=(),
-        links=link_questions(catalog, view),
+        links=tuple(question for question in open_links if question.key not in aside),
         final=False,
         shown=tuple(shown),
         remaining=remaining,
@@ -485,12 +519,15 @@ def question_set(
             for question in listed
             if question.key in aside and question.key not in done
         ),
+        skipped_links=tuple(
+            question for question in open_links if question.key in aside
+        ),
     )
 
 
 def _round(
     listed: Sequence[EarlyQuestion],
-    done: frozenset[UnknownKey],
+    done: frozenset[SkipKey],
     held: Mapping[UnknownKey, FactAnswer],
 ) -> tuple[tuple[EarlyQuestion, ...], dict[str, int], int]:
     """This round's questions, how many each kind has left, and how many the limits hold back.

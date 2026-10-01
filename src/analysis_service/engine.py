@@ -42,7 +42,7 @@ from collections.abc import Callable, Mapping, Sequence
 from functools import partial
 from typing import Self
 
-from analysis_service.answer_round import QuestionSet, question_set
+from analysis_service.answer_round import QuestionSet, SkipKey, question_set
 from analysis_service.claims import FrameworkName, UnknownKey
 from analysis_service.deployment import Deployment
 from analysis_service.fact_answers import FactAnswer
@@ -270,7 +270,7 @@ class Engine:
         answered_links: Sequence[LinkAnswer],
         final: bool,
         shown: Sequence[UnknownKey] = (),
-        skipped: Sequence[UnknownKey] = (),
+        skipped: Sequence[SkipKey] = (),
         resumed_by: str | None = None,
     ) -> QuestionSet:
         """Every question a run asks: a paused run's early list, or its report's.
@@ -309,7 +309,7 @@ class Engine:
         earlier_facts: Sequence[FactAnswer] = (),
         final: bool,
         shown: Sequence[UnknownKey] = (),
-        skipped: Sequence[UnknownKey] = (),
+        skipped: Sequence[SkipKey] = (),
         system_name: str | None = None,
         caller: str = DEFAULT_CALLER,
         on_node: NodeCallback | None = None,

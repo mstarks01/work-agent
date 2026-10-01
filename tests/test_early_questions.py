@@ -16,6 +16,7 @@ from analysis_service.answer_round import EARLY_RULES, passes_floor
 from analysis_service.candidates import generate_candidates
 from analysis_service.claims import UnknownRef
 from analysis_service.early_questions import (
+    PRIOR_REASON,
     QUESTION_PRIOR,
     PriorRow,
     early_questions,
@@ -154,16 +155,49 @@ class TestTheOrder:
         expected = sorted(flows, key=lambda element: -named[element])
         assert [key[0] for key in asked] == expected
 
-    def test_a_question_says_which_rules_make_it_matter(self):
+    def test_a_question_says_which_rules_read_its_fact(self):
+        (question,) = early_questions(
+            valid_model(),
+            {"stride": {}},
+            None,
+            prior_of({"DataStore": {"encryption_at_rest": 1.0}}),
+        )
+        rules = {
+            rule.question
+            for rule in PACKAGES["stride"].rules
+            if rule.rule_id == "information-disclosure-store-at-rest-unverified"
+        }
+        assert set(question.reasons) == rules
+
+    def test_a_fact_no_rule_reads_gives_the_prior_as_its_reason(self):
+        """A rule that only names the element says nothing about this fact."""
         (question,) = early_questions(
             valid_model(),
             {"stride": {}},
             None,
             prior_of({"DataStore": {"audit-evidence": 1.0}}),
         )
-        rules = {rule.question for rule in PACKAGES["stride"].rules}
-        assert question.reasons
-        assert set(question.reasons) <= rules
+        assert question.reasons == (PRIOR_REASON,)
+
+
+def test_the_framework_order_changes_no_question():
+    """The #1289 reproduction: the reasons once followed the selection order."""
+    model = valid_model()
+    forward = early_questions(model, {"stride": {}, "asvs": {"level": 2}}, None)
+    backward = early_questions(model, {"asvs": {"level": 2}, "stride": {}}, None)
+    assert forward == backward
+    at_rest = next(q for q in forward if q.key[1] == "encryption_at_rest")
+    stride = {rule.question for rule in PACKAGES["stride"].rules}
+    assert set(at_rest.reasons) <= stride
+    assert at_rest.frameworks == ("stride",)
+
+
+def test_a_question_names_every_framework_it_serves():
+    model = valid_model()
+    questions = early_questions(model, {"stride": {}, "asvs": {"level": 2}}, None)
+    shared = [q for q in questions if q.frameworks == ("asvs", "stride")]
+    assert shared
+    assert all(q.frameworks for q in questions)
 
 
 def test_every_early_question_takes_an_answer_the_answer_rules_accept():
