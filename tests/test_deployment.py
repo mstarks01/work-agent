@@ -41,7 +41,7 @@ from analysis_service.model_gate import (
 )
 from analysis_service.model_tiers import SUPPORTED_VERSION as TIERS_SUPPORTED_VERSION
 from analysis_service.model_tiers import ModelConfigError
-from analysis_service.system_model import SystemModel
+from analysis_service.system_model import EmittedSystemModel
 from analysis_service.vendors import ProviderAuthError, vendor_for
 from tests.factories import DEFAULT_FRAMEWORKS, PROJECT_ROOT, translator_of
 
@@ -300,7 +300,7 @@ def test_the_full_route_is_what_an_install_that_sets_nothing_runs():
 
     assert deployment.extraction_format == FULL_FORMAT
     assert pipeline.extraction_format == FULL_FORMAT
-    assert nodes[graph.EXTRACT_NODE].output_schema is SystemModel
+    assert nodes[graph.EXTRACT_NODE].output_schema is EmittedSystemModel
 
 
 def test_the_flag_selects_the_compact_schema_and_the_prompt_that_describes_it():
@@ -314,13 +314,13 @@ def test_the_flag_selects_the_compact_schema_and_the_prompt_that_describes_it():
     assert "compact-v4" in nodes[graph.EXTRACT_NODE].instruction
 
 
-def test_the_repair_node_writes_a_full_model_on_either_route():
-    """The repair schema is unchanged, so its one pass is never a conversion."""
+def test_the_repair_node_writes_the_full_route_s_model_on_either_route():
+    """The repair schema is the full route's, so its one pass is never a conversion."""
     env = VERTEX_ENV | {COMPACT_EXTRACTION_VAR: "true"}
     pipeline = Deployment.from_env(env=env).pipeline(DEFAULT_FRAMEWORKS)
     nodes = {node.name: node for node in pipeline.workflow.graph.nodes}
 
-    assert nodes[graph.REPAIR_NODE].output_schema is SystemModel
+    assert nodes[graph.REPAIR_NODE].output_schema is EmittedSystemModel
     assert "compact-v4" not in nodes[graph.REPAIR_NODE].instruction
 
 

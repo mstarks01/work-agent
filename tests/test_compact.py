@@ -50,8 +50,8 @@ from analysis_service.system_model import (
     ELEMENT_GROUPS,
     UNKNOWN,
     Element,
+    EmittedSystemModel,
     Process,
-    SystemModel,
     _Element,
     normalize_element_ids,
 )
@@ -568,9 +568,11 @@ class TestTheTablesAnswerTheirRegistries:
 
         assert set(diverging) == {"data_flows.operations"}
 
-    def test_the_root_lists_are_the_full_model_s_own(self):
+    def test_the_root_lists_are_the_full_route_s_own(self):
         """One vocabulary for both routes, so expansion is a row-by-row copy."""
-        assert set(CompactSystemModel.model_fields) == set(SystemModel.model_fields)
+        assert set(CompactSystemModel.model_fields) == set(
+            EmittedSystemModel.model_fields
+        )
 
     def test_the_reference_fields_are_every_reference_an_element_carries(self):
         """The resolver walks a table, and the table answers the schema.

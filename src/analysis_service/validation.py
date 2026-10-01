@@ -776,9 +776,7 @@ def restore_unimplicated(
     repointing one arrives as the cited flow deleted and a new flow added,
     and both halves are permitted. ``assumptions`` are the repair's own:
     the prompt tells it to add one for every value it inferred, and the gate
-    checks each against the model. ``capabilities`` are the repair's own too:
-    a statement the repair drops leaves its capability unknown, which removes
-    no requirement from the analysis.
+    checks each against the model.
     """
     named = set(implicated)
     result: dict[str, Any] = dict(repaired)

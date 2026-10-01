@@ -768,7 +768,7 @@ def _root_capped_object_arrays(cls: type[BaseModel]) -> list[str]:
 #: until the enumerator reaches it too.
 NODE_OUTPUT_SCHEMAS: dict[str, str] = {
     "output_schema": "the `_llm_node` parameter every node below it passes through",
-    "SystemModel": "named directly: SystemModel, by `repair`",
+    "EmittedSystemModel": "named directly: EmittedSystemModel, by `repair`",
     "EXTRACTION_SCHEMAS[extraction_format]": (
         "every extraction transport's schema, read from EXTRACTION_SCHEMAS"
     ),

@@ -53,6 +53,7 @@ from evals.harness.modes import (
 )
 from evals.harness.reference import load_case
 from evals.harness.run import _run_mode
+from tests.factories import emitted
 from tests.test_evals_run_grounds import CASE_DIR, DEAD, TEST_TIER_ENV, sweep
 
 
@@ -157,7 +158,7 @@ class TestAnExtractionSweepKeepsItsModels:
 
     def result(self, case):
         """One extraction, as ``run_extraction`` returns it, with no provider."""
-        raw = case.model.model_dump(mode="json")
+        raw = json.loads(emitted(case.model))
         model, issues = parse_and_validate(
             raw,
             normalize_ids=True,
@@ -211,12 +212,12 @@ class TestAnExtractionSweepKeepsItsModels:
             (reports_dir(out) / f"{case.id}.extraction.json").read_text("utf-8")
         )
 
-        assert written["raw"] == case.model.model_dump(mode="json")
+        assert written["raw"] == json.loads(emitted(case.model))
 
     def test_a_model_the_gate_refused_is_kept_with_its_issues(self, case, tmp_path):
         """A refused extraction is the one most worth reading back."""
         out = tmp_path / "artifact.json"
-        raw = case.model.model_dump(mode="json")
+        raw = json.loads(emitted(case.model))
         for element in raw["processes"]:
             element["source_excerpt"] = ""
             element["source_label"] = ""
@@ -254,9 +255,9 @@ class TestAnExtractionSweepKeepsItsModels:
     ):
         """#961 finding 14: the report's model is the one after the overlay."""
         out = tmp_path / "artifact.json"
-        broken = case.model.model_dump(mode="json")
+        broken = json.loads(emitted(case.model))
         broken["data_flows"][0]["destination"] = "process:does-not-exist"
-        repaired = case.model.model_dump(mode="json")
+        repaired = json.loads(emitted(case.model))
         result = ExtractionResult(
             case_id=case.id, extracted=None, issues=(), raw=broken, repair=repaired
         )
@@ -277,7 +278,7 @@ class TestAnExtractionSweepKeepsItsModels:
 
         models = {}
         pipeline = build(case, ENTRY_EXTRACT, models)
-        broken = case.model.model_dump(mode="json")
+        broken = json.loads(emitted(case.model))
         broken["data_flows"][0]["destination"] = "process:does-not-exist"
         models["extract"].reply = json.dumps(broken)
         models["repair"].reply = json.dumps(broken)

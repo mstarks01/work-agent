@@ -233,7 +233,11 @@ from analysis_service.skills import (
     compose_lane_skills,
 )
 from analysis_service.sources import fenced
-from analysis_service.system_model import BoundaryCrossing, SystemModel
+from analysis_service.system_model import (
+    BoundaryCrossing,
+    EmittedSystemModel,
+    SystemModel,
+)
 from analysis_service.validation import (
     ValidationIssue,
     parse_and_validate,
@@ -2739,7 +2743,7 @@ def append_to_user_turn(text: str) -> Callable[..., None]:
 #: ``prompts.compose_extract_prompt``, and ``tests/test_compact.py`` holds this
 #: one against :data:`~analysis_service.compact.EXTRACTION_FORMATS`.
 EXTRACTION_SCHEMAS: dict[str, type[BaseModel]] = {
-    FULL_FORMAT: SystemModel,
+    FULL_FORMAT: EmittedSystemModel,
     COMPACT_FORMAT: CompactSystemModel,
 }
 
@@ -3598,7 +3602,7 @@ def build_pipeline(
             name=REPAIR_NODE,
             tier_node="repair",
             instruction=compose_repair_prompt(prompt_loader),
-            output_schema=SystemModel,
+            output_schema=EmittedSystemModel,
             output_key=STATE_EXTRACTED_MODEL,
             resolve_model=resolve_model,
             resolve_sampling=resolve_sampling,

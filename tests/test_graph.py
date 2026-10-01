@@ -68,7 +68,7 @@ from analysis_service.sampling import load_sampling
 from analysis_service.sources import DEFAULT_DESCRIPTION_LABEL, Source
 from analysis_service.system_model import (
     UNKNOWN,
-    SystemModel,
+    EmittedSystemModel,
     normalize_element_ids,
 )
 from analysis_service.validation import ValidationIssue
@@ -915,8 +915,8 @@ def test_llm_nodes_see_no_history(pipeline):
 
 def test_llm_nodes_emit_their_schema(pipeline):
     by_name = nodes_by_name(pipeline)
-    assert by_name[graph.EXTRACT_NODE].output_schema is SystemModel
-    assert by_name[graph.REPAIR_NODE].output_schema is SystemModel
+    assert by_name[graph.EXTRACT_NODE].output_schema is EmittedSystemModel
+    assert by_name[graph.REPAIR_NODE].output_schema is EmittedSystemModel
     assert by_name[CRITIC_NODE].output_schema is ThreatRulings
     for name in ANALYZE_NODES:
         assert by_name[name].output_schema is ThreatProposals

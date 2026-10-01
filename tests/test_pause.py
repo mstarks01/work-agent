@@ -33,6 +33,7 @@ from analysis_service.report import NodeRun
 from analysis_service.sources import Source
 from tests.factories import (
     DESCRIPTION_TEXT,
+    emitted,
     sample_selection,
     scripted_pipeline,
     valid_model,
@@ -69,7 +70,7 @@ class TestThePausedRun:
     def test_the_run_stops_after_the_catalog_and_holds_it(self):
         pipeline, _ = scripted_pipeline(
             {
-                "extract": valid_model().model_dump_json(),
+                "extract": emitted(valid_model()),
                 graph.ASSERT_NODE: json.dumps({"assertions": []}),
             },
             entry=graph.ENTRY_HEAD_ONLY,
@@ -93,7 +94,7 @@ class TestThePausedRun:
     def test_a_head_with_no_catalog_pass_stops_after_the_gate(self):
         """A deployment that builds no catalog still pauses, for early questions."""
         pipeline, _ = scripted_pipeline(
-            {"extract": valid_model().model_dump_json()},
+            {"extract": emitted(valid_model())},
             entry=graph.ENTRY_HEAD_ONLY,
         )
         record = asking_job()
@@ -369,7 +370,7 @@ class TestThePausePathIsCertified:
     def paused(self, gate):
         pipeline, _ = scripted_pipeline(
             {
-                "extract": valid_model().model_dump_json(),
+                "extract": emitted(valid_model()),
                 graph.ASSERT_NODE: json.dumps({"assertions": []}),
             },
             entry=graph.ENTRY_HEAD_ONLY,
