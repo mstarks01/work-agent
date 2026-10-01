@@ -36,10 +36,10 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from analysis_service.answer_round import passes_floor, question_set
+from analysis_service.answer_round import next_round, passes_floor, question_set
 from analysis_service.claims import FrameworkName, UnknownKey
 from analysis_service.early_questions import EarlyQuestion, early_questions
-from analysis_service.fact_answers import FactAnswer
+from analysis_service.fact_answers import FactAnswer, answered_keys
 from analysis_service.frameworks import PACKAGES
 from analysis_service.questions import fact_questions
 from analysis_service.report import Report
@@ -85,6 +85,42 @@ def _shipped_rounds(model: SystemModel, frameworks: Selection) -> list[EarlyQues
     """The shipped order: the rounds in turn, each in the order the page shows,
     which takes the frameworks in turn (:func:`~analysis_service.answer_round.by_turn`)."""
     return [question for shown in _rounds(model, frameworks) for question in shown]
+
+
+def _rounds_from(listed: Sequence[EarlyQuestion]) -> list[EarlyQuestion]:
+    """The rounds the pause would build from this list, in turn.
+
+    :func:`~analysis_service.answer_round.next_round` builds each round, as
+    :func:`~analysis_service.answer_round.question_set` does, and the owner
+    answers "I don't know" to each question, so the list does not move. Given
+    the shipped list it is the shipped order.
+    """
+    shown: list[EarlyQuestion] = []
+    answered: list[FactAnswer] = []
+    for _ in range(MAX_ROUNDS):
+        held = {answer.key: answer for answer in answered}
+        this_round, _, _ = next_round(listed, answered_keys(answered), held)
+        if not this_round:
+            break
+        shown.extend(this_round)
+        answered.extend(dont_know(question) for question in this_round)
+    return shown
+
+
+def _per_choice(model: SystemModel, frameworks: Selection) -> list[EarlyQuestion]:
+    """The shipped rounds, with each field question ranked by its score per choice.
+
+    A facet table of four choices then needs four times the score of a
+    one-choice question to come before it. Capability questions keep their
+    order, because each is one choice and a parent comes before its parts.
+    """
+    listed = early_questions(model, frameworks, None)
+    capabilities = [q for q in listed if q.kind == "capability"]
+    fields = sorted(
+        (q for q in listed if q.kind != "capability"),
+        key=lambda q: -q.score / q.decisions,
+    )
+    return _rounds_from([*capabilities, *fields])
 
 
 def _own_lists(
@@ -141,6 +177,7 @@ def _merge(
 #: Every order compared, by name.
 POLICIES: Mapping[str, Callable[[SystemModel, Selection], list[EarlyQuestion]]] = {
     "shipped-rounds": _shipped_rounds,
+    "per-choice-rounds": _per_choice,
     "framework-merge": lambda model, chosen: _merge(model, chosen, grouped=False),
     "grouped-merge": lambda model, chosen: _merge(model, chosen, grouped=True),
 }
