@@ -41,8 +41,9 @@ is not re-raised as a new one. See `docs/agents/code-review.md`.
 
 The five canonical roles, each label string equal to its name: `needs-triage`, `needs-info`,
 `ready-for-agent`, `ready-for-human`, `wontfix`. The `wayfinder:*` and GitHub stock labels are
-orthogonal to these. So is `needs-sweep`: apply it whenever an issue's next step is a paid model
-run, and keep the triage label beside it. See `docs/agents/triage-labels.md`.
+orthogonal to these. So is `needs-sweep`: apply it only when the next necessary step needs fresh
+paid model output, and keep the triage label beside it. Offline work left on the issue does not
+earn the label. See `docs/agents/triage-labels.md`.
 
 ### Framework parity
 
@@ -122,16 +123,65 @@ user's explicit permission every time.
 **Report quality** work starts from `docs/agents/report-quality.md`: the
 current figures, the mechanisms, the open work and the evidence index.
 
-### Price a fix before a run
+### Offline completion and paid runs
 
-A sweep costs money and sees nothing under the run-to-run spread. Before any
-paid run, read the archived misses and state the fix's ceiling in must-finds:
-`losses` charges each STRIDE miss to one of the causes in its own `CAUSES`
-table, and `attribution` charges each ASVS miss to a stage. A fix whose
-ceiling sits inside the spread gets no run; batch it. A scorer change is priced
-offline on the frontier with `run.py price-verbs`, and the run confirms rather
-than discovers. Spend on the narrowest instrument that can see the change: one
-case, then five runs of it, then the corpus. See `evals/TUNING.md` step 3.
+**Offline evidence can finish engineering work.** A paid run is not the
+automatic last step of a fix, a prompt edit, a schema change or an audit. The
+detailed procedure is `.claude/skills/quality-audit/references/experiment-protocol.md`.
+
+1. **The paid-inference budget is $0.** "Validate", "finish", "audit", "ensure
+   quality", a prompt or schema edit, and the `needs-sweep` label do not
+   authorise spend. Only an explicit amount from the user does.
+2. **State the claim before you choose the test.** Each claim is one of four
+   kinds: implementation correctness, behaviour on archived outputs, fresh
+   model behaviour, or end-to-end quality and generalisation.
+3. **Use the cheapest evidence that is sufficient for the claim.** Regression
+   tests through production functions, graph runs on scripted or recorded
+   responses, archive replay and invariants can complete a correctness claim.
+   They are not only a step before a live run.
+4. **Reproduce the defect, then verify the fix.** Show the defect on the code
+   before the fix and the correct result after it. Exercise the affected
+   readers and the relevant negative cases. Take the expected value from the
+   product contract or from evidence a person reviewed, never from the
+   implementation.
+5. **Read the existing evidence first.** Read the experiment ledger and the
+   archived artifacts. A different `HEAD` alone does not make evidence stale:
+   name the dependency that changed. Record the limits of each reuse. A replay
+   of old outputs is not a new sample and does not measure a new prompt.
+6. **Spend only for a decision.** A paid experiment answers one open question
+   that needs fresh model output, and names the decision each result changes.
+   "More confidence" or "confirmation" alone does not justify a run.
+7. **Finish the separable offline work first.** Report correctness and
+   empirical uncertainty apart. Do not ask again for a deferred experiment
+   unless the decision, the evidence or the budget changed, and name that
+   change.
+8. **Do not weaken a gate.** If an acceptance criterion needs live evidence,
+   it stays unmet. Split implementation completion from empirical acceptance.
+   Do not close the whole issue or claim that quality improved.
+9. **Do not escalate by habit.** Ordinary engineering validation needs no
+   corpus sweep and no fixed count of five runs. For real empirical work,
+   choose the cases, the repeats, the metric and the stopping rule from the
+   decision.
+10. **Keep the references intact.** Do not edit a human ruling, show a holdout
+    answer to tuning, use your own labels as independent truth, or call an
+    intermediate figure report quality.
+
+The completion statement for a fix is: "The fix is verified by the listed
+offline evidence; its live quality effect remains unmeasured."
+
+**Price a must-find fix before a run.** Where the hypothesis is that a fix
+recovers must-finds, read the archived misses and state the ceiling:
+`losses` charges each STRIDE miss to a cause in its `CAUSES` table, and
+`attribution` charges each ASVS miss to a stage. A ceiling inside the spread
+gets no run; batch it. A scorer change is priced offline with `run.py
+price-verbs`. A must-find ceiling is not the gate for any other claim:
+applicability, false certainty, question effort and provider compatibility
+each need their own outcome. See `evals/TUNING.md` step 3.
+
+**`ANALYSIS_OFFLINE` refuses a live provider call before it leaves the
+process.** The test suite sets it for every test. Set it for any offline
+validation. It is a guard against an accident, not consent, and it does not
+replace the spend gate in `evals/harness/consent.py`.
 
 ### One rule, one reader
 

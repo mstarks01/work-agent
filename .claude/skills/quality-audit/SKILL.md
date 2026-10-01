@@ -14,8 +14,9 @@ repeat it.
 
 The default audit is **offline and free**. Every instrument named here reads an
 archive this repository already paid for. A paid run needs the user's explicit
-permission, every time, and the ceiling of the fix has to clear the run-to-run
-band before you ask.
+permission, every time, and it has to answer a question that needs fresh
+model output. Offline evidence finishes most of the work: a correctness claim
+is complete without a run, and its live effect is reported as unmeasured.
 
 ## What this is not
 
@@ -99,13 +100,22 @@ the phase table with `uv run python -m evals.harness.run phases` rather than
 restating it. Record the **earliest** observed failure and every other
 contributing one. `unknown` is a legitimate attribution.
 
-**7. Price each fix before you propose a run.** `evals/TUNING.md` step 3 is the
-procedure, and it is not optional. State the ceiling in must-finds, read off
-the archived misses in the fix's own class. A ceiling inside the run-to-run
-band gets no run; batch it.
+**7. State each claim and price each fix.** Name the kind of each claim —
+implementation correctness, behaviour on archived outputs, fresh model
+behaviour, or end-to-end quality — as `references/experiment-protocol.md`
+sets out. For a must-find recovery hypothesis, `evals/TUNING.md` step 3 is the
+procedure: state the ceiling in must-finds, read off the archived misses in
+the fix's own class. A ceiling inside the run-to-run band gets no run; batch
+it. Any other outcome — applicability, false certainty, question effort,
+provider compatibility — is measured on its own terms, not in must-finds.
 
-**8. Execute the lowest-cost discriminating test** the authorisation allows.
-`references/experiment-protocol.md` holds the ladder. Offline first, always.
+**8. Execute the lowest-cost test that is sufficient for the claim.**
+`references/experiment-protocol.md` holds the ladder. Stop at the rung the
+claim needs: a correctness claim is finished by a reproduction, a regression
+test through the production function and the affected consumers. Set
+`ANALYSIS_OFFLINE=1` for every offline step, so a call that would reach a
+provider fails instead. Propose paid work only with the eight answers that
+file lists under "Before you propose paid work".
 
 When important misses stay unexplained after step 4, and the evidence cannot
 tell a lost fact from a lost argument or a dropped finding, read
@@ -120,13 +130,17 @@ takes that branch.
 uv run python -m evals.harness.run experiments --record /tmp/<experiment-id>.json
 ```
 
-**10. Report.** Use `templates/audit-report.md`. Lead with the ranked table and
-a one-screen summary.
+**10. Report.** Use `templates/audit-report.md`. Lead with the ranked table, the
+evidence table and a one-screen summary. Report correctness and empirical
+uncertainty apart: "the fix is verified by the listed offline evidence; its
+live quality effect remains unmeasured" is a complete result for a fix.
 
 ## Stopping rules
 
 Stop and report when any of these is true:
 
+- every claim has reached the rung it needs — a correctness claim needs no
+  run;
 - the budget or the attempt limit is reached;
 - no proposal has a ceiling that clears the band;
 - the next question needs a capability that does not exist — write the
@@ -138,8 +152,11 @@ An audit that stops with a good extension ticket is a successful audit.
 ## Money
 
 **Never call a paid model without the user's explicit permission in this
-conversation.** The default budget is zero. "One run" means one case, not a
-sweep; a corpus sweep is a separate ask with its own number.
+conversation.** The default budget is zero. "Validate", "finish", "ensure
+quality", a prompt edit and the `needs-sweep` label are not permission. "One
+run" means one case, not a sweep; a corpus sweep is a separate ask with its own
+number. A deferred experiment is not asked for again unless something material
+changed, and you name it.
 
 The spend control that matters is in code, not here: `run` states its estimate
 and holds the operator to what they typed (`evals/harness/consent.py`). This
@@ -160,6 +177,9 @@ Before any paid sweep, run one case first and read its provenance.
   figure in the holdout split, and only to confirm a fix measured elsewhere.
 - Never claim a report improved from an intermediate metric. The ladder in
   `references/experiment-protocol.md` says what each rung licenses.
+- Never credit a scripted or replayed response as new evidence about a model.
+- Never close an unmet empirical criterion with offline evidence. Split it
+  onto its own issue and keep it unmet.
 - Measure a shipped rule by calling the shipped function. A script that
   copies the rule measures the copy: E13 ranked early questions with its own
   loop, and E16 measured `early_questions` itself.

@@ -1,5 +1,20 @@
 # Experiment protocol
 
+## State the claim first
+
+Each claim is one of four kinds, and the kind decides the evidence that can
+finish it:
+
+| Claim | Evidence that can finish it | Needs fresh paid output? |
+| --- | --- | --- |
+| implementation correctness | a reproduction, a regression test through the production function, and the affected deterministic consumers | no |
+| behaviour on archived outputs | `score`, `replay`, `assembly`, `descendants` and the other free instruments over the archive | no |
+| fresh model behaviour | new calls on the deployment model | yes |
+| end-to-end quality or generalisation | a designed run on the shipped route, and the holdout split for generalisation | yes |
+
+A scripted, recorded or replayed response is never new evidence about a model.
+It proves what the code does with that response.
+
 ## Before an experiment exists
 
 State all seven, in the audit report, before running anything:
@@ -7,8 +22,10 @@ State all seven, in the audit report, before running anything:
 1. the observed failure, and the artifact a reader can open to see it;
 2. the suspected mechanism, and the competing explanations;
 3. the likely fix, and which phases it touches;
-4. which important outcomes it affects, and the **ceiling** on what it can
-   recover, as a number read off the archived misses in its class;
+4. which outcome the hypothesis is about, and what the fix can recover on it.
+   For a must-find recovery hypothesis that is the **ceiling**, read off the
+   archived misses in its class. Applicability, false certainty, question
+   effort and provider compatibility each have their own outcome;
 5. what would disprove the hypothesis;
 6. the smallest experiment that discriminates between the explanations;
 7. the expected cost and the acceptance criterion.
@@ -18,27 +35,72 @@ without one.
 
 ## The ladder
 
-Climb one rung at a time. Each rung licenses a narrower claim than the next,
-and a report that states a higher claim than its rung has reached is wrong.
+**Stop at the rung the claim needs.** The ladder is not a path to its top. A
+correctness claim is finished at rung 3; a claim about live report quality
+starts to need rung 4. Each rung licenses a narrower claim than the next, and
+a report that states a higher claim than its rung has reached is wrong.
 
-| Rung | What it is | What it licenses you to say |
-| --- | --- | --- |
-| 1 | offline analysis and deterministic replay | the defect is reproduced |
-| 2 | single-stage calls on archived inputs | the local behaviour changed |
-| 3 | the changed stage plus its affected downstream consumers | the change survives its consumers |
-| 4 | a small representative end-to-end suite | a downstream gain was measured |
-| 5 | held-out confirmation | the gain holds on material the fix never saw |
+| Rung | What it is | What it licenses you to say | Paid? |
+| --- | --- | --- | --- |
+| 1 | offline analysis and deterministic replay of the unfixed code | the defect is reproduced | no |
+| 2 | the same input through the fixed production function | the local fix is verified | no |
+| 3 | the changed stage plus its affected deterministic consumers, on scripted or archived input | the affected consumers are verified | no |
+| 3a | the free instruments over archived outputs under the fixed code | the behaviour on archived inputs is measured | no |
+| 4 | a designed run on the shipped route | a downstream gain was measured | yes |
+| 5 | held-out confirmation | the gain holds on material the fix never saw | yes |
 
-A unit test is rung 1. It proves local behaviour and says nothing about how
-often a model hits the path or whether the report improved.
+A reproduction is not a verification. Rung 1 shows that the defect exists;
+rung 2 shows that the fix removes it. Report both, and never collapse "fix
+verified" into "defect reproduced".
 
 A condition that feeds signed material to generation (`corrected-extraction`,
 `direct-facts` in `references/three-conditions.md`) never reaches rung 4 or 5.
 Its figures locate a loss, and only the shipped route can measure a gain.
 
-Report each recommendation's position explicitly:
-**suspected → reproduced → local fix verified → downstream gain measured →
-held-out gain confirmed.**
+Report each recommendation's state with these words, one per claim:
+
+- defect reproduced;
+- local fix verified;
+- affected deterministic consumers verified;
+- behaviour on archived inputs measured;
+- live downstream gain unmeasured, or measured;
+- held-out gain unmeasured, or confirmed.
+
+A fix can be complete at "affected deterministic consumers verified" while
+its live gain stays unmeasured. Say both. Where an acceptance criterion needs
+the live gain, that criterion stays unmet, and you split it onto its own
+issue rather than close the whole issue.
+
+## The evidence table
+
+Every audit and every finished fix reports this table, one row per claim or
+decision:
+
+| Claim / decision | Evidence and provenance | What passed or failed | What remains unknown | Fresh paid inference necessary? |
+|---|---|---|---|---|
+
+The last column is `no`, or `yes` with the reason that no free check can
+answer the question.
+
+## Before you propose paid work
+
+Write all eight down. A proposal that leaves one out is not ready:
+
+1. the exact open question, and the decision each possible result changes;
+2. the offline checks you completed, and their results;
+3. the ledger and archive search, and whether a compatible result exists.
+   Name the dependency that changed before you call a result stale; a
+   different `HEAD` alone does not;
+4. why no free check can answer the question;
+5. the smallest affected stage, and the case set with its reason;
+6. the metric, the denominator, the baseline, the decision thresholds, and
+   the sampling and stopping plan;
+7. the maximum spend, and what a retry costs;
+8. what you do if the result is null, adverse or inconclusive.
+
+"More confidence" and "confirmation" are not questions. A deferred experiment
+is not proposed again unless the decision, the evidence or the budget changed;
+name the change.
 
 ## Money
 
@@ -49,16 +111,27 @@ in this conversation.
   next.
 - **"One run" means one case.** A corpus sweep is a separate ask with its own
   number.
-- **Price before you ask.** A fix whose ceiling sits inside the run-to-run band
-  gets no run. Batch it with the next fixes until the batch clears the band.
+- **Price before you ask.** A must-find fix whose ceiling sits inside the
+  run-to-run band gets no run. Batch it with the next fixes until the batch
+  clears the band. A batch amortises the cost of a confirmation, but it cannot
+  say which change caused what.
+- **Choose the repeats from the design.** There is no fixed count. Five runs
+  of one case measure that case's spread; a correctness claim needs none.
 - **Pre-flight.** One case first; read its provenance before the sweep.
 - **This file enforces nothing.** The estimate gate and the spend hold are in
-  `evals/harness/consent.py`, and they are the only enforcement that exists.
-  `--accept-cost unknown` removes the hold entirely — never pass it to raise a
-  budget.
+  `evals/harness/consent.py`, and they are the only spend enforcement that
+  exists. `--accept-cost unknown` removes the hold entirely — never pass it to
+  raise a budget.
+- **Set `ANALYSIS_OFFLINE` for offline work.** It refuses a live provider call
+  before it leaves the process, on every node, every retry and every
+  single-node replay. It guards against an accident and is not consent.
+- **Classify a command by what it does.** `score` and `replay` re-read an
+  archive. `lane-replay` and `critic-replay` send a request again and cost a
+  call, whatever their names say.
 - **A cache hit is not free.** Meter paid requests.
 - **Do not substitute a cheaper model in a confirmation run.** That is a
-  changed condition, and the comparison stops being a comparison.
+  changed condition, and the comparison stops being a comparison. A cheaper
+  model cannot stand in for the deployment model in a claim of equal quality.
 
 There is no dollar ceiling in the code, by decision: a contributor may spend
 any amount. The control is informed consent, so your job is to state the

@@ -14,6 +14,31 @@ sentence with the commands filled in.
 > system's text — and every scoring run calls live models. Embedding the engine
 > instead? You want [docs/First-Run.md](../docs/First-Run.md).
 
+## When this guide applies
+
+**Use this workflow when the objective is to change or measure stochastic
+behaviour** — a sampling value, a prompt whose effect on the model is the
+question, a model choice. Offline correctness work does not inherit its
+sweeps. A fix to a rule, a reader, a schema or a graph edge is finished by a
+reproduction, a regression test through the production function and the
+affected consumers, all offline; its live effect is then reported as
+unmeasured, not bought by default. The policy is "Offline completion and paid
+runs" in [`AGENTS.md`](../AGENTS.md).
+
+- **The repeat counts below are this workflow's design**, for a lever change
+  read against the corpus spread. They are not a rule for every run. A
+  targeted question chooses its own cases, repeats and stopping rule.
+- **A batch amortises the cost of a confirmation.** It cannot say which change
+  in the batch caused which move.
+- **A cheaper model cannot stand in for the deployment model** in a claim of
+  equal quality. It answers questions about the machinery only; see "Choosing
+  a model to sweep with" below.
+- **Classify a command by what it does, not by its name.** `score`, `replay`,
+  `stability` and the other re-reads of an archive are offline. `run`,
+  `lane-replay` and `critic-replay` send requests and are paid. Set
+  `ANALYSIS_OFFLINE=1` for offline work, and a paid path fails before it
+  reaches a provider.
+
 ## Before you start
 
 - **Credentials for your configured vendors.** Producing a sweep calls live
@@ -188,7 +213,9 @@ runs on an unchanged config, 2026-08-23, gave failed-case counts of **2, 2, 5,
 5, 10** — a five-fold spread from chance alone. Three findings reported off
 single runs that week had to be withdrawn once that was known.
 
-Run the full suite five times on the current config:
+For a lever change read against the corpus, run the full suite five times on
+the current config. A narrower question reads its band off the runs already on
+disk instead — see "Do not buy the band" below:
 
 ```sh
 for i in 1 2 3 4 5; do
@@ -512,8 +539,8 @@ merge is a pair the corpus says are two findings, and the corpus is the standard
 gets no run of its own. Batch it with the next fixes until the batch clears the
 band, because a Baseline is per commit and every merge makes the next run an
 estimate rather than a recorded number. Spend on the narrowest instrument that
-can see the change: one case first, five runs of that case next, and the corpus
-only for a batch.
+can see the change: one case first, more runs of that case only where the
+question needs its spread, and the corpus only for a batch.
 
 **Run cases at once where waiting is the cost.** A sweep runs one case at a
 time by default. `--cases-in-flight N` runs N together, bounded by the
@@ -670,7 +697,8 @@ time — but it also shifts every baseline, so re-run Step 2 after changing it.
 
 ## Step 5 — Re-run and compare
 
-Re-run the suite five times with your change and compare to the baseline band:
+Re-run with your change, as many times as the baseline design used, and
+compare to the baseline band:
 
 - **Per-case must-find recall** — did any single case regress below its baseline
   spread? One case collapsing vetoes the change even if the average rises.

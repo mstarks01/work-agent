@@ -64,6 +64,7 @@ from google.genai import types
 from pydantic import BaseModel
 
 from analysis_service.charges import CHARGE_METADATA_KEY, UPSTREAM_METADATA_KEY
+from analysis_service.offline import refuse_live_inference
 from analysis_service.retry import (
     ProviderFailure,
     RetryPolicy,
@@ -293,6 +294,9 @@ class InProcessExecutor:
         return self._adapter
 
     async def generate(self, request: GenerationRequest) -> Sequence[GenerationResult]:
+        # Outside the ``try``, so the refusal is never classified as a provider
+        # failure and the retry loop above never asks again.
+        refuse_live_inference(request.route)
         try:
             responses = [
                 response

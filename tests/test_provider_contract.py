@@ -78,6 +78,9 @@ from analysis_service.system_model import SystemModel
 from analysis_service.vendors import VendorName, vendor_for
 from tests.factories import PROJECT_ROOT, inject_transport, tiers_for
 
+#: Every test here drives the real translator to a transport it supplies.
+pytestmark = pytest.mark.usefixtures("supplied_transport")
+
 CONFIG = PROJECT_ROOT / "config"
 
 #: Key-shaped strings that are visibly not keys. Nothing here authenticates: the

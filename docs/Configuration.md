@@ -1158,6 +1158,13 @@ credentials are missing, startup stops with an error, so a misconfigured
 deployment never reaches its first request. Offline tests and the in-memory
 [stub runner](Integration-Guide.md) need none of this.
 
+**`ANALYSIS_OFFLINE`** refuses every live provider call. With it on (`1`,
+`true`, `yes` or `on`), a call that would reach a provider raises an error
+that names the route, before any request leaves the process. This covers
+every graph node, every retry and the single-node replays. A scripted or
+recorded response is not affected. The test suite turns it on for every test.
+It guards against an accidental paid call; it is not a spend control.
+
 ## Input limits
 
 Bounds enforced before or during analysis:

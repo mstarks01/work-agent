@@ -60,9 +60,15 @@ costs one critic call and compares every draft's verdict with the archived one. 
 what the lane was shown. The material is the run's and the prompt files are
 this checkout's, and the command prints both commits.
 
+Both replays send a live request, so `ANALYSIS_OFFLINE` refuses them. Their
+names say "replay"; their cost says paid. `replay` and `score` above re-read an
+archive and are free.
+
 Narrow it as far as the question allows: `--case` for one case, `--framework`
-to narrow to one package. One case first, then five runs of that case, then the
-corpus — and only for a batch of fixes whose combined ceiling clears the band.
+to narrow to one package. The cases and the repeats come from the design of the
+question in `references/experiment-protocol.md`, not from a fixed count. A
+corpus sweep is for a batch of must-find fixes whose combined ceiling clears
+the band, or for a question only the whole corpus can answer.
 
 ## What has no instrument today
 

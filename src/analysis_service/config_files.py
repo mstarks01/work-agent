@@ -1,4 +1,4 @@
-"""One reader for the TOML files a deployment is configured from.
+"""One reader each for the TOML files and the boolean flags a deployment reads.
 
 Four loaders refuse the same two failures the same way: a file that cannot
 be read, and a file that is not TOML. Each one names its own error class, so
@@ -11,6 +11,7 @@ keep their own read.
 from __future__ import annotations
 
 import tomllib
+from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
 
@@ -23,3 +24,8 @@ def read_toml(path: Path | str, error: type[Exception]) -> dict[str, Any]:
         raise error(f"{path}: invalid TOML: {exc}") from exc
     except OSError as exc:
         raise error(f"{path}: cannot be read: {exc}") from exc
+
+
+def env_flag(env: Mapping[str, str], var: str) -> bool:
+    """A boolean env flag, on only for an explicit affirmative."""
+    return env.get(var, "").strip().lower() in ("1", "true", "yes", "on")
