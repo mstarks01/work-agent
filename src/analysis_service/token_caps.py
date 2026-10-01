@@ -206,7 +206,12 @@ TOKEN_CAPS: dict[str, int] = {
     f"package/{OUTPUT_DOC}": 1400,
     f"package/{SEVERITY_RUBRIC_DOC}": 900,
     "package/lane_skill": 3600,
-    "package/lane_exemplars": 1600,
+    # Raised from 1600 for the fourth spoofing exemplar (#1295). The lane had
+    # one ``impersonate`` draft, and it presented a held credential, which
+    # ``output.md`` files as ``use-credential``. That draft now carries
+    # ``use-credential``, and the new one poses as a caller without a
+    # credential, so the lane demonstrates both verbs.
+    "package/lane_exemplars": 2000,
     # One instruction a lane reads last, in its user turn rather than its
     # instruction, so COMPOSED_ANALYZE_CAP does not count it (ADR 0030).
     "package/lane_closing": 120,

@@ -600,9 +600,8 @@ FIGURES: tuple[Figure, ...] = (
             (
                 "evals/harness/exemplar_verbs.py",
                 (
-                    "``use-credential`` accounts for {first} of them,"
-                    " ``disable`` for {second}, and\n  ``plant`` and ``replay``"
-                    " for {third} each."
+                    "``disable`` accounts for {first} of them, and ``plant``"
+                    " and ``replay`` for {second}\n  each."
                 ),
                 1,
             ),
