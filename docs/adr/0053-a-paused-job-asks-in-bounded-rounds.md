@@ -71,7 +71,10 @@ submitter leaves blank without a skip comes back, as before: only an explicit
 skip sets a question aside (#1289). A question with facets answered in part
 may be skipped with that answer: the facets given are kept, and the rest are
 set aside. Without this, such a question came back first in every round and
-had no way out; an offline replay asked one fifty rounds over (E26).
+had no way out; an offline replay asked one fifty rounds over (E26). A link
+question is skipped the same way, by its key: the skip places the principal
+nowhere and is not "None of these", and the link question stays listed beside
+the skipped facts. A round of link questions alone can then be skipped too.
 
 **A waiting job counts its saved rounds.** Every answer to a waiting job names
 the round revision it was read against, and a save checks it and writes the

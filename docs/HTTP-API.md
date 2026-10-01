@@ -41,7 +41,7 @@ logged, never returned.
 | `GET` | `/v1/jobs/{id}/report` | The full [report](Report-Schema.md) once completed; `409` before, and `409` if the report is withheld (below). |
 | `POST` | `/v1/jobs/{id}/corrections` | Correct a final report's answers, as `{"facts": [...]}`: a changed value, or `unknown`. `200` with `{"job_id", "corrections", "corrected_findings"}`. No job starts, and the report is not rewritten. `400` where the report is not final, a correction names no answer the report read, or changes none. |
 | `POST` | `/v1/jobs/{id}/answers` | Answer the questions of a completed job or a job in `awaiting-answers`. Starts a **new** job that resumes from this one's model and catalog; `201` with its `job_id`. With `"save": true`, a waiting job keeps the round and answers `200` with its own `job_id`; a save never starts a job. |
-| `GET` | `/v1/jobs/{id}/questions` | What the job asks you, as `{"job_id", "link_questions", "fact_questions", "early_questions", "fallback", "final", "early_remaining", "early_withheld", "early_stop", "skipped_early", "answered_early", "answered_links", "revision", "resumed_by"}`: a finished report's questions, or a waiting job's link and early questions. `resumed_by` names the job this job's answers started while that job is in flight or has its report; the job then asks nothing until that job fails. Derived from the report when you ask, under the report's own rules: `409` before completion and `409` when the report is withheld. |
+| `GET` | `/v1/jobs/{id}/questions` | What the job asks you, as `{"job_id", "link_questions", "fact_questions", "early_questions", "fallback", "final", "early_remaining", "early_withheld", "early_stop", "skipped_early", "skipped_links", "answered_early", "answered_links", "revision", "resumed_by"}`: a finished report's questions, or a waiting job's link and early questions. `resumed_by` names the job this job's answers started while that job is in flight or has its report; the job then asks nothing until that job fails. Derived from the report when you ask, under the report's own rules: `409` before completion and `409` when the report is withheld. |
 | `GET` | `/healthz` | Unauthenticated liveness probe. |
 
 Errors are RFC 9457 `application/problem+json`.
@@ -194,8 +194,10 @@ with `{"job_id", "saved": true}`. Ask for the questions again for the next
 round. A saved round may also send `"skip"`, a list of keys of this round's
 questions that you set aside for now. A skip is not an answer: the fact stays
 open, no later round shows it, and it takes no place under the limit.
-`skipped_early` lists every skipped question, and an answer to one is still
-taken. A question with facets may be skipped beside a part answer to it: the
+A link question is skipped by its `key`, a string; the skip places the
+principal nowhere and is not `"none"`. `skipped_early` lists every skipped
+early question and `skipped_links` every skipped link question, and an answer
+to one is still taken. A question with facets may be skipped beside a part answer to it: the
 facets sent are kept, and the rest are set aside. A skip beside a complete
 answer is refused. A saved round must answer or skip at least one question.
 

@@ -40,7 +40,12 @@ from pathlib import Path
 from typing import Any
 
 from analysis_service.analysis import control_state
-from analysis_service.answer_round import QuestionSet, passes_floor, question_set
+from analysis_service.answer_round import (
+    QuestionSet,
+    SkipKey,
+    passes_floor,
+    question_set,
+)
 from analysis_service.assertions import UNKNOWN
 from analysis_service.claims import FrameworkName, UnknownKey
 from analysis_service.early_questions import EarlyQuestion, early_questions
@@ -207,7 +212,7 @@ def replay(
     asked_keys: set[UnknownKey] = set()
     per_round: list[int] = []
     showings: Counter[UnknownKey] = Counter()
-    skipped: tuple[UnknownKey, ...] = ()
+    skipped: tuple[SkipKey, ...] = ()
     rounds = 0
     for rounds in range(MAX_ROUNDS):
         asked = question_set(

@@ -220,7 +220,7 @@
     const left = data.stop == null;
     revision = data.revision;
     const saved = (data.answered || []).length || (data.answered_links || []).length
-      || (data.skipped || []).length;
+      || (data.skipped || []).length || (data.skipped_links || []).length;
     // A pause with nothing to ask and nothing answered or skipped starts the
     // analysis, with no page between. After a save, only the start button
     // starts it: a round of skips is a save too.
@@ -300,9 +300,12 @@
       const label = document.createElement("label");
       const name = document.createElement("b");
       name.textContent = q.principal;
-      label.append(name, ` — places ${q.rows} stated fact(s) `, linkSelect(q, ""));
+      const select = linkSelect(q, "");
+      label.append(name, ` — places ${q.rows} stated fact(s) `, select);
       row.append(label);
       questions.append(row);
+      // A skipped link places nothing: it is not "None of these".
+      roundRows.push({ key: q.key, read: () => select.value });
     }
     // The open facts, asked once per kind of question or attribute with a row
     // per element. A group ranks by its best question, so the order of the
@@ -496,10 +499,13 @@
       questions.append(group.box);
     }
     // Every earlier answer, each with a button that opens it again. An
-    // answer opened and changed is sent with this round's answers.
+    // answer opened and changed is sent with this round's answers. A question
+    // answered in part and then skipped has its one editor under "Skipped for
+    // now", so it is never sent twice.
     const answeredLinks = data.answered_links || [];
-    const answeredFacts = (data.answered || []).filter(
-      (a) => !data.facts.some((q) => JSON.stringify(q.key) === JSON.stringify(a.key)));
+    const skipped = data.skipped || [];
+    const elsewhere = new Set([...data.facts, ...skipped].map((q) => JSON.stringify(q.key)));
+    const answeredFacts = (data.answered || []).filter((a) => !elsewhere.has(JSON.stringify(a.key)));
     earlierBox.hidden = !(answeredLinks.length || answeredFacts.length);
     const title = document.createElement("summary");
     title.textContent = `Your answers (${answeredLinks.length + answeredFacts.length})`;
@@ -553,17 +559,36 @@
       earlierBox.append(row);
     }
     // Every question skipped for now. A skip is not an answer: no round shows
-    // it again, and "Answer it" opens it here.
-    const skipped = data.skipped || [];
-    skippedBox.hidden = !skipped.length;
+    // it again, and "Answer it" opens it here, with any part answered before.
+    const skippedLinks = data.skipped_links || [];
+    skippedBox.hidden = !(skipped.length || skippedLinks.length);
     const skippedTitle = document.createElement("summary");
-    skippedTitle.textContent = `Skipped for now (${skipped.length})`;
+    skippedTitle.textContent = `Skipped for now (${skipped.length + skippedLinks.length})`;
     skippedBox.append(skippedTitle);
+    for (const q of skippedLinks) {
+      const row = document.createElement("p");
+      const name = document.createElement("b");
+      name.textContent = q.principal;
+      row.append(name);
+      const open = document.createElement("button");
+      open.type = "button";
+      open.textContent = "Answer it";
+      open.addEventListener("click", () => {
+        open.hidden = true;
+        row.append(" \u2014 ", linkSelect(q, ""));
+      });
+      row.append(" ", open);
+      skippedBox.append(row);
+    }
     for (const q of skipped) {
       const row = document.createElement("p");
       const label = document.createElement("b");
       label.textContent = q.label;
       row.append(label);
+      const before = earlier.get(JSON.stringify(q.key));
+      const kept = document.createElement("span");
+      if (before) kept.textContent = ` \u2014 ${said(before)}`;
+      row.append(kept);
       const open = document.createElement("button");
       open.type = "button";
       open.textContent = "Answer it";
@@ -572,7 +597,8 @@
         if (q.form === "facets") {
           const name = document.createElement("b");
           name.textContent = q.element;
-          answers.push(facetRow(facetTable(row, q, false), q, name, null));
+          kept.hidden = true;
+          answers.push(facetRow(facetTable(row, q, false), q, name, before && before.facets));
           return;
         }
         const { beside, read } = inputFor(q, "");
@@ -587,7 +613,7 @@
 
   // The round's answers, as the service takes them.
   const roundAnswers = () => ({
-    links: [...questions.querySelectorAll("select"), ...earlierBox.querySelectorAll("select")]
+    links: [questions, earlierBox, skippedBox].flatMap((box) => [...box.querySelectorAll("select")])
       .filter((select) => select.dataset.principal && select.value)
       .map((select) => ({ principal: select.dataset.principal, element: select.value })),
     facts: answers.map((read) => read()).filter(Boolean),

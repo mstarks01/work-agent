@@ -78,6 +78,7 @@ from analysis_service.question_kinds import QUESTION_KINDS, Facet
 from analysis_service.system_model import Element, SystemModel
 
 __all__ = [
+    "PRIOR_REASON",
     "QUESTION_PRIOR",
     "QUESTION_PRIOR_PATH",
     "EarlyQuestion",
@@ -89,6 +90,10 @@ __all__ = [
 ]
 
 QUESTION_PRIOR_PATH = Path(__file__).with_name("question_prior.json")
+
+#: The reason a field question gives where no rule reads its fact: the prior,
+#: which is why it is asked at all.
+PRIOR_REASON = "Findings in earlier analyses often depend on this fact."
 
 
 @dataclass(frozen=True)
@@ -151,9 +156,12 @@ class EarlyQuestion:
     #: What a reader sees: an element's name and the attribute, or the kind's
     #: question about the element.
     label: str
-    #: The questions of the rules that fire on the element, which say why the
-    #: fact matters before any finding exists.
+    #: Why the fact matters before any finding exists: the questions of the
+    #: rules that read this fact on this element, or :data:`PRIOR_REASON`
+    #: where no rule reads it. Never a rule that only names the element.
     reasons: tuple[str, ...]
+    #: The selected frameworks an answer serves, by name, in name order.
+    frameworks: tuple[FrameworkName, ...]
     #: The answers it takes, or empty where the answer is free text.
     choices: tuple[str, ...]
     #: How a page takes the answer; see :data:`~analysis_service.answer_forms.AnswerForm`.
@@ -196,6 +204,7 @@ class EarlyQuestion:
             "kind": self.kind,
             "label": self.label,
             "reasons": list(self.reasons),
+            "frameworks": list(self.frameworks),
             "choices": list(self.choices),
             "form": self.form,
             "suggestions": list(self.suggestions),
@@ -233,8 +242,9 @@ def early_questions(
     """
     model = prepared_model(model, catalog)
     score: dict[UnknownKey, float] = {}
-    reasons: dict[str, list[str]] = {}
-    for name in frameworks:
+    helps: dict[UnknownKey, list[FrameworkName]] = {}
+    reasons: dict[tuple[str, str], list[str]] = {}
+    for name in sorted(frameworks):
         package = PACKAGES[name]
         asks = {rule.rule_id: rule.question for rule in package.rules}
         named: Counter[str] = Counter()
@@ -244,15 +254,17 @@ def early_questions(
             for candidate in found.candidates:
                 named.update(set(candidate.element_ids))
                 for element_id in candidate.element_ids:
-                    said = reasons.setdefault(element_id, [])
-                    if asks[candidate.rule_id] not in said:
-                        said.append(asks[candidate.rule_id])
+                    for field in candidate.facts:
+                        said = reasons.setdefault((element_id, field), [])
+                        if asks[candidate.rule_id] not in said:
+                            said.append(asks[candidate.rule_id])
         for element in model.elements():
             rates = prior[name].rates.get(element_type(element), {})
             for field, rate in rates.items():
                 key = _open_key(model, element, field)
                 if key is not None:
                     score[key] = score.get(key, 0.0) + rate * (1 + named[element.id])
+                    helps.setdefault(key, []).append(name)
     names = element_names(model)
     asked = []
     for key in sorted(score, key=lambda key: (-score[key], key)):
@@ -263,7 +275,8 @@ def early_questions(
                 key=key,
                 kind=fact_kind(key),
                 label=label_of(ref, names),
-                reasons=tuple(reasons.get(key[0], ())),
+                reasons=tuple(reasons.get((key[0], key[1]), ()) or (PRIOR_REASON,)),
+                frameworks=tuple(helps[key]),
                 choices=answer_choices(key, model, catalog),
                 form=answer_form(key, model, catalog),
                 suggestions=answer_suggestions(key),
@@ -298,12 +311,14 @@ def capability_questions(
     """
     counts: Counter[str] = Counter()
     bands: dict[str, int] = {}
-    for name, options in frameworks.items():
+    helps: dict[str, list[FrameworkName]] = {}
+    for name in sorted(frameworks):
         for key, need in (
-            PACKAGES[name].record.open_capabilities(model, options).items()
+            PACKAGES[name].record.open_capabilities(model, frameworks[name]).items()
         ):
             counts[key] += need.units
             bands[key] = max(bands.get(key, need.band), need.band)
+            helps.setdefault(key, []).append(name)
 
     def asked_parent(key: str) -> str:
         return next((parent for parent in lineage(key) if parent in counts), "")
@@ -337,6 +352,7 @@ def capability_questions(
                 group=group,
                 group_heading=heading,
                 element=CAPABILITIES[key].question,
+                frameworks=tuple(helps[key]),
                 score=float(counts[key]),
                 band=bands[key],
                 parent=UnknownRef(capability=parent).key if parent else None,

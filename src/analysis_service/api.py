@@ -44,7 +44,13 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.types import Receive, Scope, Send
 
 from analysis_service import budgets
-from analysis_service.answer_round import AlreadyResumed, QuestionSet, question_set
+from analysis_service.answer_round import (
+    MAX_SKIPS,
+    AlreadyResumed,
+    QuestionSet,
+    SkipKey,
+    question_set,
+)
 from analysis_service.assertions import AssertionRecord
 from analysis_service.auth import (
     AuthenticationError,
@@ -52,7 +58,7 @@ from analysis_service.auth import (
     build_verifier,
 )
 from analysis_service.budgets import BudgetPolicy
-from analysis_service.claims import FrameworkAnalysis, FrameworkName, UnknownKey
+from analysis_service.claims import FrameworkAnalysis, FrameworkName
 from analysis_service.deployment import Deployment
 from analysis_service.errors import ConfigError
 from analysis_service.fact_answers import MAX_FACT_ANSWERS, FactAnswer
@@ -340,7 +346,8 @@ class AnswersSubmission(BaseModel):
     only for a job waiting on answers, where it means "continue without
     answers"; against a finished report it answers nothing. ``save`` keeps a
     waiting job's round without starting the analysis (ADR 0053), and
-    ``skip`` names questions of that round the submitter skips for now.
+    ``skip`` names questions of that round the submitter skips for now: a
+    fact by its key, a link question by its ``key`` (:data:`SkipKey`).
     ``revision`` is the waiting job's round revision the answers were read
     against, which a waiting job requires.
     """
@@ -352,7 +359,7 @@ class AnswersSubmission(BaseModel):
     # Strict, as the first-run app reads them: ``true`` is no revision, and
     # ``"yes"`` is no save.
     save: bool = Field(default=False, strict=True)
-    skip: list[UnknownKey] = Field(default_factory=list, max_length=MAX_FACT_ANSWERS)
+    skip: list[SkipKey] = Field(default_factory=list, max_length=MAX_SKIPS)
     revision: int | None = Field(default=None, ge=0, strict=True)
 
 

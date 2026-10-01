@@ -35,6 +35,7 @@ from uuid import uuid4
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
+from analysis_service.answer_round import MAX_SKIPS, SkipKey
 from analysis_service.assertions import AssertionRecord
 from analysis_service.budgets import BudgetPolicy, measured_tokens, spent_tokens
 from analysis_service.certification import CertifyResult
@@ -215,11 +216,9 @@ class JobRecord(BaseModel):
     # revision it read, so a page left open on an earlier round cannot write
     # over a later one.
     round_revision: int = 0
-    # Every early question a waiting job's submitter skipped for now and has
-    # not answered since. No round shows it again.
-    skipped_early: list[UnknownKey] = Field(
-        default_factory=list, max_length=MAX_FACT_ANSWERS
-    )
+    # Every early question and link question a waiting job's submitter
+    # skipped for now and has not answered since. No round shows it again.
+    skipped_early: list[SkipKey] = Field(default_factory=list, max_length=MAX_SKIPS)
     # Set on a job resumed from a finished one: its run starts at ``prepare``
     # from these, and runs no extraction and no assertion pass.
     resumption: Resumption | None = None
@@ -489,7 +488,7 @@ class JobStore(Protocol):
         links: Sequence[LinkAnswer],
         facts: Sequence[FactAnswer],
         shown: Sequence[UnknownKey],
-        skipped: Sequence[UnknownKey],
+        skipped: Sequence[SkipKey],
         revision: int,
     ) -> bool: ...
 
@@ -738,7 +737,7 @@ class InMemoryJobStore:
         links: Sequence[LinkAnswer],
         facts: Sequence[FactAnswer],
         shown: Sequence[UnknownKey],
-        skipped: Sequence[UnknownKey],
+        skipped: Sequence[SkipKey],
         revision: int,
     ) -> bool:
         """Keep a saved round's answers on a job that still waits for them.
