@@ -58,8 +58,7 @@ The exemplar is the cascade. `store:accounts-db` is a shared dependency: its con
   "affected_element_ids": [
     "store:accounts-db",
     "process:ledger-service",
-    "flow:process:ledger-service>store:accounts-db>read-write-balances",
-    "store:audit-log"
+    "flow:process:ledger-service>store:accounts-db>read-write-balances"
   ],
   "verb": "flood",
   "evidence_refs": [],
@@ -99,8 +98,7 @@ Written against exemplar system B. The trigger is an `unknown` on an element rat
   "affected_element_ids": [
     "process:stream-processor",
     "process:mqtt-broker",
-    "flow:process:mqtt-broker>process:stream-processor>consume-topic",
-    "store:telemetry-store"
+    "flow:process:mqtt-broker>process:stream-processor>consume-topic"
   ],
   "verb": "flood",
   "evidence_refs": [

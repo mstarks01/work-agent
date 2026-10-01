@@ -83,18 +83,18 @@ def test_a_sibling_is_a_demonstrated_verb_of_the_same_family(corpus):
 
 
 def test_the_undemonstrated_count_is_what_the_sweep_measured(swept):
-    """58 of 242, 26 of them must-find. See this module's docstring when it
+    """46 of 242, 18 of them must-find. See this module's docstring when it
     moves."""
-    assert len(swept) == 58
-    assert sum(1 for entry in swept if entry.must_find) == 26
+    assert len(swept) == 46
+    assert sum(1 for entry in swept if entry.must_find) == 18
 
 
 def test_the_two_populations_still_split_where_they_did(swept):
-    """44 near misses and 14 with no neighbour. The split is the finding: a near
+    """32 near misses and 14 with no neighbour. The split is the finding: a near
     miss wants a draft demonstrating the member, and the rest want a draft
     demonstrating the family at all."""
     near = [entry for entry in swept if entry.siblings]
-    assert len(near) == 44
+    assert len(near) == 32
     assert len(swept) - len(near) == 14
 
 

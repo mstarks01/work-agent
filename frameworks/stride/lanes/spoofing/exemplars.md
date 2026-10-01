@@ -1,6 +1,6 @@
 # Spoofing Exemplars
 
-Three drafts against the exemplar system, showing the shape and the reasoning. Follow the reasoning, not the wording.
+Four drafts against the exemplar system, showing the shape and the reasoning. Follow the reasoning, not the wording.
 
 ## Canonical: password-only customer identity
 
@@ -16,8 +16,7 @@ Note the phrasing. "The login flow lacks MFA" is a control observation and would
   "affected_element_ids": [
     "entity:customer",
     "process:web-api",
-    "flow:entity:customer>process:web-api>submit-payment",
-    "store:accounts-db"
+    "flow:entity:customer>process:web-api>submit-payment"
   ],
   "verb": "guess-credential",
   "evidence_refs": [
@@ -49,7 +48,7 @@ Note the phrasing. "The login flow lacks MFA" is a control observation and would
 
 ## Second-order, in system B: one certificate speaks for every fleet
 
-Written against exemplar system B, to show the same reasoning on an event-driven system. A shared credential is not one identity weakly held — it is every identity held by whoever extracts it once. The reach is what makes the draft: the credential's blast radius is the whole tenant population, not the device it came from.
+Written against exemplar system B, to show the same reasoning on an event-driven system. A shared credential is not one identity weakly held — it is every identity held by whoever extracts it once. The reach is what makes the draft: the credential's blast radius is the whole tenant population, not the device it came from. The reach goes in the description; the IDs stay with the broker the certificate is presented to. The attacker presents a credential it holds, so the verb is `use-credential`: `impersonate` is posing as a party without its credential.
 
 ```json
 {
@@ -59,11 +58,9 @@ Written against exemplar system B, to show the same reasoning on an event-driven
   "affected_element_ids": [
     "entity:sensor-gateway",
     "process:mqtt-broker",
-    "flow:entity:sensor-gateway>process:mqtt-broker>publish-telemetry",
-    "process:stream-processor",
-    "store:telemetry-store"
+    "flow:entity:sensor-gateway>process:mqtt-broker>publish-telemetry"
   ],
-  "verb": "impersonate",
+  "verb": "use-credential",
   "evidence_refs": [
     "crossing:flow:entity:sensor-gateway>process:mqtt-broker>publish-telemetry"
   ],
@@ -120,6 +117,42 @@ Written against exemplar system B, to show the same reasoning on an event-driven
     {
       "summary": "Record and then enforce webhook authentication",
       "detail": "Establish what verifies this callback; if nothing does, require per-consumer HMAC signatures with timestamp and nonce, and reject stale or replayed deliveries."
+    }
+  ]
+}
+```
+
+## Trust by network position: a caller the ledger never verifies
+
+`flow:process:web-api>process:ledger-service>post-transfer` carries `authentication: none`, and it crosses from `boundary:dmz` into `boundary:core`. The ledger accepts a transfer instruction because of where it comes from. An attacker who reaches the ledger holds no credential to present, so the verb is `impersonate`: posing as a party without its credential. Both facts are catalogued, so this draft quotes nothing.
+
+Lane contrast: altering an instruction the web API sent is tampering, and reaching transfer authority the attacker's position does not carry is elevation of privilege. Being accepted *as* the web API is yours.
+
+```json
+{
+  "sequence": 4,
+  "title": "A dmz foothold can send transfers to the ledger as the web API",
+  "description": "`process:ledger-service` accepts transfer instructions over `flow:process:web-api>process:ledger-service>post-transfer`, which crosses from `boundary:dmz` into `boundary:core` with `authentication: none`. Nothing in the request says who sent it, so the ledger treats any caller that reaches it as `process:web-api`. An attacker with a foothold in `boundary:dmz` (a compromised neighbour, or a request forged from inside the web tier) sends instructions in the web API's place, and the ledger acts on them as genuine. Second-order: the ledger executes them with its own authority over `store:accounts-db`, so the impersonation moves money between accounts the attacker chooses.",
+  "affected_element_ids": [
+    "process:web-api",
+    "flow:process:web-api>process:ledger-service>post-transfer",
+    "process:ledger-service"
+  ],
+  "verb": "impersonate",
+  "evidence_refs": [
+    "crossing:flow:process:web-api>process:ledger-service>post-transfer",
+    "absent:flow:process:web-api>process:ledger-service>post-transfer:authentication"
+  ],
+  "quotes": [],
+  "severity": {
+    "likelihood": "medium",
+    "impact": "high",
+    "justification": "Likelihood is medium: no credential is needed, but the attacker must first hold a position in `boundary:dmz`. Impact is high: the ledger moves `financial` state in `store:accounts-db`, classified confidential, on the impostor's instructions."
+  },
+  "mitigations": [
+    {
+      "summary": "Authenticate the web API to the ledger",
+      "detail": "Require mutual TLS or a workload identity on `flow:process:web-api>process:ledger-service>post-transfer`, and have `process:ledger-service` refuse a caller it cannot verify, wherever the call comes from."
     }
   ]
 }

@@ -19,8 +19,7 @@ Two shapes, one test: what does the fix protect? This draft is `alter-in-transit
   "description": "`flow:process:web-api>process:ledger-service>post-transfer` moves gRPC transfer instructions from `boundary:dmz` into `boundary:core` with `encryption_in_transit: none`. An attacker positioned on that path — a compromised sidecar, a node in the dmz, or anything that can redirect traffic — rewrites the amount, the destination account, or the customer ID in a message the ledger has no way to distinguish from the original, since the flow also carries `authentication: none`. Second-order: `process:ledger-service` commits the altered instruction to `store:accounts-db`, so the modification becomes an authoritative balance, and `flow:process:ledger-service>store:audit-log>append-transfer-record` records the forged version as fact.",
   "affected_element_ids": [
     "flow:process:web-api>process:ledger-service>post-transfer",
-    "process:ledger-service",
-    "store:accounts-db"
+    "process:ledger-service"
   ],
   "verb": "alter-in-transit",
   "evidence_refs": [

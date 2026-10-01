@@ -10,7 +10,7 @@ Nothing, on any fact taken alone. Each is ordinary and each has a plausible reas
 
 ## Ruling
 
-Accepted: a chain from the exposed worker to attacker-controlled job definitions.
+Accepted as a conditional finding: a chain from the exposed worker to attacker-controlled job definitions, open on the one hop the model does not state.
 
 ## Why
 
@@ -20,6 +20,8 @@ This is the kind of finding deterministic rules cannot surface. A rule fires on 
 
 Write the chain explicitly: the entry point, what is inherited at each hop, and the terminal capability. A chain asserted without its steps reads as speculation, and the critic will treat it as one.
 
+One hop here is not a fact in the model. The model says the processor takes work from the queue and writes the configuration store. It does not say that what a message carries reaches what the processor writes. Name that hop as the open fact the chain rests on, so the finding is conditional on it.
+
 ## What decided it
 
-The flows themselves, plus the crossing on the worker's inbound edge. Every step is a fact in the model; the sequence is the analysis.
+The flows themselves, plus the crossing on the worker's inbound edge. Each step but one is a fact in the model, and the one that is not is named as open; the sequence is the analysis.
