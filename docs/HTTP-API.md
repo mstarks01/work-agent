@@ -181,7 +181,9 @@ reads your answers, so the findings rest on them.
 
 **A waiting job asks in rounds.** `early_questions` holds one round: up to 10
 capability questions and up to 5 questions about the model's elements, so no
-round asks more questions than the one before it. Each question's `decisions`
+round opens with more questions than the one before it. A capability question
+whose `parent` the round also asks takes no place: show it once the parent is
+answered "yes". Each question's `decisions`
 counts its choices: one a facet, else one.
 A field question needs a `score` of at least 1, and a capability question at
 least 2. One pause asks at most 30 of each kind in all. `early_remaining`

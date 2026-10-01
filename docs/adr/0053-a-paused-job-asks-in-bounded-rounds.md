@@ -28,7 +28,14 @@ corpus models with STRIDE it rose in 14, from 4 questions to 6 and back, and
 no question depended on another (maintainer's decision of 2026-10-01). Five
 field questions ask a median of 10 choices a round over those models, and at
 most 15. A capability question is one yes or no, so 10 of them are 10
-choices.
+choices. **A part takes no place in its parent's round.** A capability
+question whose parent the round also asks is hidden until the parent is
+answered "yes", so it joins the round beside its parent, outside the count,
+and a round opens with as many questions as it counts. Where a part took a
+place, an ASVS level 2 round 1 opened with 8 questions and round 2 with 10.
+A part can still make a later round larger than an earlier one that was not
+full, where a "yes" brings parts in: that is a dependency the submitter's own
+answer created.
 Link questions are outside the round limit, and each round shows every one
 still open. On the six archived reports with a catalog, a pause shows 1 to 3,
 each one choice that places 1 to 4 stated facts, so they need no place under
