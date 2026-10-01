@@ -44,7 +44,7 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.types import Receive, Scope, Send
 
 from analysis_service import budgets
-from analysis_service.answer_round import QuestionSet, question_set
+from analysis_service.answer_round import AlreadyResumed, QuestionSet, question_set
 from analysis_service.assertions import AssertionRecord
 from analysis_service.auth import (
     AuthenticationError,
@@ -472,7 +472,13 @@ async def _admit_and_start(
 async def _answerable(
     request: Request, job_id: str, subject: str
 ) -> (
-    tuple[JobRecord, SystemModel, AssertionRecord | None, list[FrameworkAnalysis]]
+    tuple[
+        JobRecord,
+        SystemModel,
+        AssertionRecord | None,
+        list[FrameworkAnalysis],
+        str | None,
+    ]
     | JSONResponse
 ):
     """The model, catalog and findings this caller may ask or answer about.
@@ -483,7 +489,9 @@ async def _answerable(
 
     Each heavy field is read by name, once. The envelope carries neither, so a
     status read never pays for them, and the report is copied as an object
-    rather than serialized and validated again.
+    rather than serialized and validated again. The last value is the job
+    this one's answers started and that holds it
+    (:meth:`~analysis_service.jobs.JobStore.resumed_by`).
     """
     store: JobStore = request.app.state.store
     record = await _owned_job(request, job_id, subject)
@@ -497,7 +505,8 @@ async def _answerable(
         if held is None:
             logger.error("waiting job %s holds no checkpoint", record.id)
             raise HTTPException(status_code=500, detail="an internal error occurred")
-        return record, held.system_model, held.assertions, []
+        resumed_by = await store.resumed_by(job_id, subject)
+        return record, held.system_model, held.assertions, [], resumed_by
     refused = _unservable(request, record)
     if refused is not None:
         return refused
@@ -508,7 +517,14 @@ async def _answerable(
     # The envelope leaves the resumption out, and it says whether the report
     # is final: a report its follow-up wrote asks nothing (ADR 0054).
     record.resumption = await store.resumption(job_id, subject)
-    return record, report.system_model, report.assertions, list(report.analyses)
+    resumed_by = await store.resumed_by(job_id, subject)
+    return (
+        record,
+        report.system_model,
+        report.assertions,
+        list(report.analyses),
+        resumed_by,
+    )
 
 
 def _unservable(request: Request, record: JobRecord) -> JSONResponse | None:
@@ -664,6 +680,7 @@ def _question_set(
     model: SystemModel,
     assertions: AssertionRecord | None,
     analyses: list[FrameworkAnalysis],
+    resumed_by: str | None,
 ) -> QuestionSet:
     """Every question a job asks, from what :func:`_answerable` read."""
     return question_set(
@@ -677,6 +694,7 @@ def _question_set(
         final=record.resumption is not None and record.resumption.follow_up,
         shown=record.shown_early,
         skipped=record.skipped_early,
+        resumed_by=resumed_by,
     )
 
 
@@ -700,9 +718,10 @@ def _questions_payload(
     model: SystemModel,
     assertions: AssertionRecord | None,
     analyses: list[FrameworkAnalysis],
+    resumed_by: str | None,
 ) -> dict[str, Any]:
     """Every question a job asks, as the questions route serves them."""
-    questions = _question_set(record, model, assertions, analyses)
+    questions = _question_set(record, model, assertions, analyses, resumed_by)
     return questions.to_json() | {
         "fallback": question_fallback(analyses).to_json(),
         "revision": record.round_revision,
@@ -1020,7 +1039,7 @@ def create_app(
         answerable = await _answerable(request, job_id, subject)
         if isinstance(answerable, JSONResponse):
             return answerable
-        parent, model, assertions, _ = answerable
+        parent, model, assertions, _, _ = answerable
         if parent.status == "awaiting-answers":
             _check_revision(answers.revision, parent.round_revision)
         # Derived from the report, as the questions route derives its lists, so
@@ -1036,7 +1055,7 @@ def create_app(
                 save=answers.save,
                 skips=answers.skip,
             )
-        except NoCatalogError as exc:
+        except (NoCatalogError, AlreadyResumed) as exc:
             raise HTTPException(status_code=409, detail=str(exc)) from exc
         except ValueError as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
@@ -1117,7 +1136,7 @@ def create_app(
         answerable = await _answerable(request, job_id, subject)
         if isinstance(answerable, JSONResponse):
             return answerable
-        parent, _, _, analyses = answerable
+        parent, _, _, analyses, _ = answerable
         questions = await anyio.to_thread.run_sync(_question_set, *answerable)
         try:
             corrections = questions.correct(

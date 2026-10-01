@@ -139,7 +139,7 @@ from analysis_service.answer_forms import (
     answer_suggestions,
     facets_json,
 )
-from analysis_service.answer_round import QuestionSet, question_set
+from analysis_service.answer_round import AlreadyResumed, QuestionSet, question_set
 from analysis_service.claims import UnknownKey
 from analysis_service.deployment import Deployment
 from analysis_service.early_questions import EarlyQuestion
@@ -266,6 +266,11 @@ class Run:
         return self.checkpoint is not None and self.report is None and not resumed
 
     @property
+    def holding(self) -> Run | None:
+        """The run these answers started, where it holds this one, or ``None``."""
+        return self.resumed_by if self.resumed else None
+
+    @property
     def resumed(self) -> bool:
         """True where a run this one's answers started is running or has a report.
 
@@ -295,6 +300,7 @@ class Run:
         """Every question this run asks, from the engine and checkpoint it holds."""
         if self.engine is None or self.checkpoint is None:
             raise RuntimeError(f"run {self.id} has reached no checkpoint")
+        holding = self.holding
         return self.engine.questions(
             self.checkpoint,
             self.report,
@@ -303,6 +309,7 @@ class Run:
             final=self.final,
             shown=self.shown,
             skipped=self.skipped,
+            resumed_by=None if holding is None else holding.id,
         )
 
 
@@ -493,13 +500,15 @@ def render_report(
     final: bool,
     shown: Sequence[UnknownKey],
     corrections: Sequence[FactAnswer] = (),
+    resumed_by: str | None = None,
 ) -> RenderedPage:
     """``report_view.html``, carrying this run's report.
 
     ``answered``, ``answered_links``, ``final`` and ``shown`` are the run's
     answers, whether a follow-up wrote its report, and what the pause showed,
     which decide what the page still asks and how it labels each question.
-    ``corrections`` is what a final report's owner corrected since.
+    ``corrections`` is what a final report's owner corrected since, and
+    ``resumed_by`` the run its follow-up started, where one holds it.
 
     The template is a self-contained renderer for the report schema — no build
     step, no framework, its own inline CSS and JS. This fills its one payload
@@ -526,6 +535,7 @@ def render_report(
         answered_links=answered_links,
         final=final,
         shown=shown,
+        resumed_by=resumed_by,
     ).to_json()
     return render(
         VIEWER.read_text(encoding="utf-8"),
@@ -540,6 +550,7 @@ def render_report(
         question_fallback=script_json(question_fallback(report.analyses).to_json()),
         link_questions=script_json(asked["link_questions"]),
         final=script_json(asked["final"]),
+        resumed_by=script_json(asked["resumed_by"]),
         corrections=script_json(
             _corrections_payload(report, answered, corrections) if final else {}
         ),
@@ -767,14 +778,6 @@ def create_app(
                 },
                 status_code=409,
             )
-        if parent.resumed:
-            return JSONResponse(
-                {
-                    "message": "These answers already started an analysis. Open"
-                    " its report, or answer again only if it fails."
-                },
-                status_code=409,
-            )
         try:
             admitted = questions.admit(
                 sources=parent.sources,
@@ -784,6 +787,14 @@ def create_app(
                 facts=facts,
                 save=save,
                 skips=skips,
+            )
+        except AlreadyResumed:
+            return JSONResponse(
+                {
+                    "message": "These answers already started an analysis. Open"
+                    " its report, or answer again only if it fails."
+                },
+                status_code=409,
             )
         except ValueError as exc:
             # The answer rules' own refusals name the submitter's choices, so
@@ -858,6 +869,7 @@ def create_app(
                 final=run.final,
                 shown=run.shown,
                 corrections=run.corrections,
+                resumed_by=None if run.holding is None else run.holding.id,
             )
         )
 

@@ -66,6 +66,7 @@ from analysis_service.system_model import SystemModel
 __all__ = [
     "EARLY_RULES",
     "AdmittedRound",
+    "AlreadyResumed",
     "EarlyRule",
     "QuestionSet",
     "passes_floor",
@@ -125,6 +126,10 @@ def passes_floor(question: EarlyQuestion, listed: Sequence[EarlyQuestion]) -> bo
     return len(bands) > 1 and question.band == max(bands)
 
 
+class AlreadyResumed(ValueError):
+    """Answers to a job whose earlier answers started a job that holds it."""
+
+
 @dataclass(frozen=True)
 class AdmittedRound:
     """What a resumed job carries: its sources and every round's answers."""
@@ -170,6 +175,9 @@ class QuestionSet:
     #: A skip is not an answer: the fact stays open, no round shows it again,
     #: and an answer to it is still admitted.
     skipped: tuple[EarlyQuestion, ...]
+    #: The job this one's answers started, which holds it: it asks nothing
+    #: and admits no answer while that job is in flight or has its report.
+    resumed_by: str | None = None
 
     @property
     def stop(self) -> str | None:
@@ -194,6 +202,7 @@ class QuestionSet:
             "fact_questions": [question.to_json() for question in self.facts],
             "early_questions": [question.to_json() for question in self.early],
             "final": self.final,
+            "resumed_by": self.resumed_by,
             "early_remaining": dict(self.remaining),
             "early_withheld": self.withheld,
             "early_stop": self.stop,
@@ -237,6 +246,11 @@ class QuestionSet:
         (:func:`_adds_information`), so it is not spent on a run that reads
         nothing new.
         """
+        if self.resumed_by is not None:
+            raise AlreadyResumed(
+                f"this job's answers already started job {self.resumed_by};"
+                " read that job, and answer here again only if it fails"
+            )
         if save and not self.waiting:
             raise ValueError("only a job waiting on answers saves a round")
         if save and not (links or facts or skips):
@@ -366,6 +380,7 @@ def question_set(
     final: bool,
     shown: Sequence[UnknownKey],
     skipped: Sequence[UnknownKey] = (),
+    resumed_by: str | None = None,
 ) -> QuestionSet:
     """The questions a job asks: a waiting job's round, or its report's list.
 
@@ -377,8 +392,28 @@ def question_set(
     is every early question the pause showed. ``skipped`` is every early
     question a waiting job's submitter skipped for now. A waiting
     job's ``model`` and ``catalog`` are its checkpoint's, and the saved answers
-    are written in here, as the resumed run writes them.
+    are written in here, as the resumed run writes them. ``resumed_by`` is the
+    job this one's answers started and that holds it, which a store reads
+    (:meth:`~analysis_service.jobs.JobStore.resumed_by`); such a job asks
+    nothing.
     """
+    if resumed_by is not None:
+        return QuestionSet(
+            model=model,
+            catalog=catalog,
+            waiting=waiting,
+            early=(),
+            facts=(),
+            links=(),
+            final=final,
+            shown=tuple(shown),
+            remaining={},
+            answered_early=(),
+            answered_links=(),
+            withheld=0,
+            skipped=(),
+            resumed_by=resumed_by,
+        )
     if final:
         return QuestionSet(
             model=model,

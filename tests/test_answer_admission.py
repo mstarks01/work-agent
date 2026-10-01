@@ -936,7 +936,7 @@ class TestOneResumedJob:
         again = self.answer(client, finished, facts)
 
         assert again.status_code == 409
-        assert "already started a job" in again.json()["detail"]
+        assert "already started job" in again.json()["detail"]
 
     def test_a_waiting_job_starts_one_analysis(self):
         client, store = catalog_client()
@@ -962,14 +962,14 @@ def test_a_save_after_the_start_is_refused():
     """A save after the start landed on the paused job, and no job read it."""
     client, store = catalog_client()
     waited = waiting(store)
+    body = client.get(f"/v1/jobs/{waited}/questions", headers=auth()).json()
+    question = body["early_questions"][0]
     started = client.post(
         f"/v1/jobs/{waited}/answers",
         json={"links": [], "revision": 0},
         headers=auth(),
     )
     assert started.status_code == 201
-    body = client.get(f"/v1/jobs/{waited}/questions", headers=auth()).json()
-    question = body["early_questions"][0]
 
     saved = client.post(
         f"/v1/jobs/{waited}/answers",
@@ -1109,3 +1109,41 @@ def test_no_round_opens_with_more_questions_than_the_one_before(case, run):
     assert any(opened[True]) or any(opened[False]), "a control: it asks something"
     for counts in opened.values():
         assert counts == sorted(counts, reverse=True), counts
+
+
+class TestAJobItsAnswersResumed:
+    """The questions route offered a job's questions after its answers started
+    a job, and every answer to them was refused (#1369, checkpoint round over
+    reviewed/2026-09-30)."""
+
+    def test_its_questions_name_the_job_that_holds_it(self):
+        from tests.test_questions import TestTheRoutes
+
+        client, store = catalog_client()
+        finished = TestTheRoutes().completed(store)
+        body = client.get(f"/v1/jobs/{finished}/questions", headers=auth()).json()
+        facts = {"facts": [_known_answer(body["fact_questions"][0])]}
+        child = client.post(
+            f"/v1/jobs/{finished}/answers", json=facts, headers=auth()
+        ).json()["job_id"]
+
+        held = client.get(f"/v1/jobs/{finished}/questions", headers=auth()).json()
+
+        assert held["resumed_by"] == child
+        assert (held["fact_questions"], held["link_questions"]) == ([], [])
+
+    def test_a_failed_resumed_job_gives_its_questions_back(self):
+        client, store = catalog_client()
+        waited = waiting(store)
+        child = client.post(
+            f"/v1/jobs/{waited}/answers",
+            json={"links": [], "revision": 0},
+            headers=auth(),
+        ).json()["job_id"]
+        spent = asyncio.run(store.get(child))
+        asyncio.run(store.save(spent.model_copy(update={"status": "failed"})))
+
+        body = client.get(f"/v1/jobs/{waited}/questions", headers=auth()).json()
+
+        assert body["resumed_by"] is None
+        assert body["early_questions"]
