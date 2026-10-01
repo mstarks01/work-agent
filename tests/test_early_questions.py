@@ -358,3 +358,17 @@ class TestCapabilityBands:
             if question.parent is not None:
                 assert order.index(question.parent) < order.index(question.key)
         assert any(q.parent for q in asked), "a control: some question has a parent"
+
+
+def test_a_field_question_ranks_by_its_score_per_choice():
+    """Ranked by score alone, a STRIDE-only pause opened with facet tables, and
+    ten choices completed 517 findings on the archive; per choice, 1,488
+    (QA-2026-09-26-03-E33)."""
+    fields = [
+        q
+        for q in early_questions(valid_model(), {"stride": {}}, None)
+        if q.kind != "capability"
+    ]
+    per_choice = [q.score / q.decisions for q in fields]
+    assert per_choice == sorted(per_choice, reverse=True)
+    assert len({q.decisions for q in fields}) > 1, "the fixture mixes costs"

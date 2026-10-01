@@ -15,6 +15,13 @@ the report's own order settled, at six and at ten questions a case. The count
 cannot see the main reason to ask early: the lanes then write their findings
 with the answer in hand.
 
+**The list ranks a question by its score per choice.** A question answered in
+facets costs a choice a facet, so a table of four facets must score four
+times a one-choice question to come before it. Ranked by score alone, a
+STRIDE-only pause opened with tables, and an owner's first ten choices
+completed 517 of 2,744 conditional findings on the archive; ranked per
+choice, 1,488 (``QA-2026-09-26-03-E33``). The floor still reads the score.
+
 **Only what is open is asked.** An attribute or a zone is asked where
 :func:`~analysis_service.open_facts.open_attribute` says it is open, the rule
 the answer check reads too. A question kind has no field, so each kind the
@@ -177,12 +184,13 @@ class EarlyQuestion:
     group: str
     group_heading: str
     element: str
-    #: The value the list is ranked by. For a field, the prior's rate for the
+    #: The value the list is ranked from. For a field, the prior's rate for the
     #: field on the element's type times one plus the candidates the rules
     #: raise on the element, summed over the frameworks: a ranking heuristic,
     #: not a measured count of the findings an answer changes. For a
-    #: capability, how many units it could settle. The list is in this order,
-    #: capabilities first; a round reorders its own questions with the
+    #: capability, how many units it could settle. The list ranks a field
+    #: question by this value per choice (:attr:`decisions`), capabilities
+    #: first; a round reorders its own questions with the
     #: frameworks in turn (:func:`~analysis_service.answer_round.by_turn`).
     score: float = 0.0
     #: For a capability, the band of the most important unit it could settle,
@@ -268,7 +276,7 @@ def early_questions(
                     helps.setdefault(key, []).append(name)
     names = element_names(model)
     asked = []
-    for key in sorted(score, key=lambda key: (-score[key], key)):
+    for key, value in score.items():
         ref = UnknownRef(element_id=key[0], attribute=key[1], question=key[4])
         group, heading = group_of(ref)
         asked.append(
@@ -286,9 +294,12 @@ def early_questions(
                 group=group,
                 group_heading=heading,
                 element=names.get(key[0], key[0]),
-                score=score[key],
+                score=value,
             )
         )
+    asked.sort(
+        key=lambda question: (-question.score / question.decisions, question.key)
+    )
     return (*capability_questions(model, frameworks), *asked)
 
 

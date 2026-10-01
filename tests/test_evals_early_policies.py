@@ -7,7 +7,6 @@ from pathlib import Path
 import pytest
 
 from analysis_service.answer_round import question_set
-from analysis_service.early_questions import early_questions
 from analysis_service.report import Report
 from evals.harness import early_policies
 from evals.harness.early_policies import POLICIES, _prefix, needs_of, readings
@@ -86,22 +85,3 @@ def test_a_finding_completes_only_when_every_fact_it_waits_on_is_answered():
         assert whole[policy].completed == expected
     by_budget = [one.completed for one in found if one.policy == "shipped-rounds"]
     assert by_budget == sorted(by_budget)
-
-
-@pytest.mark.parametrize("frameworks", [{"stride": {}}, BOTH])
-def test_the_round_builder_given_the_shipped_list_gives_the_shipped_order(frameworks):
-    """The per-choice order differs from the shipped one only in its list."""
-    listed = early_questions(valid_model(), frameworks, None)
-    assert early_policies._rounds_from(listed) == POLICIES["shipped-rounds"](
-        valid_model(), frameworks
-    )
-
-
-def test_a_field_question_ranks_by_its_score_per_choice():
-    order = POLICIES["per-choice-rounds"](valid_model(), {"stride": {}})
-    first = next(q for q in order if q.kind != "capability")
-    best = max(
-        (q for q in order if q.kind != "capability"),
-        key=lambda q: q.score / q.decisions,
-    )
-    assert first.score / first.decisions == best.score / best.decisions

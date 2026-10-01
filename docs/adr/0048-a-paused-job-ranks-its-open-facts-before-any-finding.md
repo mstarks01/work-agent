@@ -38,6 +38,18 @@ summed over the job's frameworks. On 13 tuned cases, with the prior read
 from the other 12 cases, the first six questions a case settled 59% to 64% of
 what the report's own six settled, and the first ten 62% to 63%.
 
+**The list ranks a question by its score per choice** (amended 2026-10-01).
+A question answered in facets costs one choice a facet, so a table of four
+facets must score four times a one-choice question to come before it. Ranked
+by score alone, a STRIDE-only pause opened with facet tables: on 183 archived
+STRIDE reports of 11 cases, an owner's first ten choices completed 517 of
+2,744 conditional findings, 268 of them critical or high. Ranked per choice,
+1,488, and 773 critical or high; ASVS changed by at most one finding
+(``QA-2026-09-26-03-E33``). The prior came from runs of the same tuned cases,
+and the two holdout cases have too few reachable findings to confirm the
+gain. The floor still reads the score, so the same questions are eligible
+(maintainer's decision of 2026-10-01).
+
 **The prior is a table with its provenance.** `question_prior.json` holds one
 row per framework, and each row names the runs it counted, the commit and the
 number of tuned cases. `run.py question-prior` writes a row from a sweep's
