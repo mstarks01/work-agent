@@ -51,7 +51,7 @@ from analysis_service.links import (
 )
 from analysis_service.open_facts import open_attribute
 from analysis_service.pipeline import AdkPipelineRunner
-from analysis_service.questions import _greedy, fact_questions
+from analysis_service.questions import _by_band, fact_questions
 from analysis_service.report_conditions import conditions
 from analysis_service.sources import ANSWERS_LABEL, Source, text_digest
 from analysis_service.system_model import ZONE_ATTRIBUTE, Assumption
@@ -121,7 +121,7 @@ class TestTheRanking:
         }
         waiting.update({("stride", f"S-{i}"): {key("D")} for i in range(9)})
 
-        order = _greedy(waiting, dict.fromkeys(waiting, 0))
+        order = _by_band(waiting, dict.fromkeys(waiting, 0))
 
         assert order[0] == key("D")
         assert order[1:] == [key("A"), key("B"), key("C")]
@@ -133,7 +133,7 @@ class TestTheRanking:
         waiting.update({("stride", f"L-{i}"): {key("Y")} for i in range(3)})
         band = {finding: 0 for finding in waiting} | {("stride", "C-1"): 3}
 
-        assert _greedy(waiting, band) == [key("X"), key("Y")]
+        assert _by_band(waiting, band) == [key("X"), key("Y")]
 
     def test_with_nothing_to_complete_the_highest_band_s_facts_come_first(self):
         key = lambda name: ("", "", "", name, "", "")
@@ -144,7 +144,7 @@ class TestTheRanking:
         }
         band = {("stride", "low"): 0, ("stride", "high"): 2, ("stride", "also-high"): 2}
 
-        assert _greedy(waiting, band)[:1] == [key("B")]
+        assert _by_band(waiting, band)[:1] == [key("B")]
 
     def test_each_question_names_the_highest_band_that_waits_on_it(self, report):
         from analysis_service.frameworks import PACKAGES
@@ -179,8 +179,9 @@ def open_model():
     return model
 
 
-class TestTheCriticCannotReorderTheEvidence:
-    """The evidence section reads grounds only (``QA-2026-09-26-03-E7``)."""
+class TestTheWaitingFindingsDecideTheOrder:
+    """The findings that wait decide the order, and every question keeps its
+    basis (ADR 0056, ``QA-2026-09-26-03-E35``)."""
 
     def rewritten(self, report):
         """The same drafts under a critic that confirmed every one of them."""
@@ -199,25 +200,28 @@ class TestTheCriticCannotReorderTheEvidence:
             blocks.append(block.model_copy(update={"claims": claims}))
         return report.model_copy(update={"analyses": blocks})
 
-    def evidence(self, report):
-        return [q.key for q in ask(report) if q.basis == "evidence"]
-
-    def test_the_evidence_section_is_the_same_whatever_the_verdicts(self, report):
-        assert self.evidence(self.rewritten(report)) == self.evidence(report)
-
-    def test_the_evidence_section_comes_first(self, report):
-        bases = [q.basis for q in ask(report)]
-        assert bases == sorted(bases, key=lambda basis: basis != "evidence")
+    def test_the_facts_a_finding_waits_on_come_before_the_rest(self, report):
+        waits = [bool(q.findings) for q in ask(report)]
+        assert waits == sorted(waits, reverse=True)
 
     def test_a_free_text_fact_is_only_ever_the_critic_s(self, report):
         assert all(q.basis == "critic" for q in ask(report) if q.kind == "subject")
 
-    def test_a_confirmed_finding_ranks_the_questions_and_counts_nowhere(self, report):
+    def test_a_question_s_basis_does_not_depend_on_its_place(self, report):
+        grounded = {
+            ref.key
+            for block in report.analyses
+            for claim in block.all_claims()
+            for ref in claim.unknown_grounds()
+        }
+        for question in ask(report):
+            assert (question.basis == "evidence") == (question.key in grounded)
+
+    def test_a_confirmed_finding_still_asks_its_facts_and_counts_nowhere(self, report):
         """A confirmed finding waits on no answer (#1289 audit, point 4)."""
         confirmed = ask(self.rewritten(report))
-        assert [q.key for q in confirmed if q.basis == "evidence"] == self.evidence(
-            report
-        )
+        grounded = {q.key for q in ask(report) if q.basis == "evidence"}
+        assert grounded <= {q.key for q in confirmed}
         assert all(q.cited_by == q.covered_so_far == 0 for q in confirmed)
         assert not any(q.findings for q in confirmed)
 
@@ -1112,3 +1116,89 @@ def test_a_fact_answered_in_part_is_not_read_as_dont_know(answer, status):
     found = conditions([sample_analysis([asking_threat(asked)])], model, [given], [])
 
     assert [row[2] for rows in found.values() for row in rows] == [status]
+
+
+class TestTheMostImportantFindingsFirst:
+    """The #1289 review's cases for what "most important first" means (ADR 0056)."""
+
+    @staticmethod
+    def key(name: str) -> tuple[str, ...]:
+        return ("", "", "", name, "", "")
+
+    @staticmethod
+    def needs(evidence, *, named=None, waiting=None, bands):
+        from analysis_service.bands import Band
+        from analysis_service.questions import FollowUpNeeds
+
+        named = named or {}
+        return FollowUpNeeds(
+            evidence=evidence,
+            named=named,
+            waiting=waiting if waiting is not None else {**evidence, **named},
+            bands={f: Band(order=o, label=str(o)) for f, o in bands.items()},
+            refs={},
+        )
+
+    def order(self, needs):
+        from analysis_service.questions import follow_up_order
+
+        return [(basis, k[3]) for basis, k in follow_up_order(needs)]
+
+    def test_a_critical_pair_comes_before_a_low_singleton(self):
+        a, b, c = (self.key(n) for n in "ABC")
+        needs = self.needs(
+            {("stride", "crit"): {a, b}, ("stride", "low"): {c}},
+            bands={("stride", "crit"): 0, ("stride", "low"): -3},
+        )
+        assert [k for _, k in self.order(needs)] == ["A", "B", "C"]
+
+    def test_a_critic_only_critical_fact_comes_first_and_keeps_its_basis(self):
+        a, c = self.key("A"), self.key("C")
+        needs = self.needs(
+            {("stride", "low"): {c}},
+            named={("stride", "crit"): {a}},
+            bands={("stride", "crit"): 0, ("stride", "low"): -3},
+        )
+        assert self.order(needs) == [("critic", "A"), ("evidence", "C")]
+
+    def test_a_fact_two_frameworks_share_counts_each_finding_it_completes(self):
+        s, t = self.key("S"), self.key("T")
+        needs = self.needs(
+            {
+                ("stride", "T-1"): {s},
+                ("asvs", "V1.1"): {s},
+                ("stride", "T-2"): {t},
+            },
+            bands={("stride", "T-1"): 0, ("asvs", "V1.1"): 0, ("stride", "T-2"): 0},
+        )
+        assert [k for _, k in self.order(needs)] == ["S", "T"]
+
+    def test_three_level_1_requirements_come_before_one_critical_threat(self):
+        """Every package's highest band ranks equal (ADR 0055), and a finding
+        counts as one whatever its framework: a stated policy, not a measured
+        equivalence of a requirement and a threat."""
+        x, y = self.key("X"), self.key("Y")
+        evidence = {("asvs", f"V{i}"): {x} for i in range(3)}
+        evidence[("stride", "T-1")] = {y}
+        needs = self.needs(evidence, bands=dict.fromkeys(evidence, 0))
+        assert [k for _, k in self.order(needs)] == ["X", "Y"]
+
+    def test_a_finding_no_answer_can_complete_does_not_lead(self):
+        """A critical draft that waits on a fact answered "I don't know" is not
+        conditional, so its facts follow the waiting findings'."""
+        c, d = self.key("C"), self.key("D")
+        needs = self.needs(
+            {("stride", "stuck"): {d}, ("stride", "low"): {c}},
+            waiting={("stride", "low"): {c}},
+            bands={("stride", "stuck"): 0, ("stride", "low"): -3},
+        )
+        assert [k for _, k in self.order(needs)] == ["C", "D"]
+
+    def test_the_order_of_the_frameworks_changes_nothing(self):
+        a, b, c = (self.key(n) for n in "ABC")
+        forward = {("asvs", "V1"): {a, b}, ("stride", "T-1"): {c}}
+        bands = {("asvs", "V1"): 0, ("stride", "T-1"): 0}
+        backward = dict(reversed(forward.items()))
+        assert self.order(self.needs(forward, bands=bands)) == self.order(
+            self.needs(backward, bands=dict(reversed(bands.items())))
+        )

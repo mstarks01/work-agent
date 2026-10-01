@@ -38,34 +38,23 @@ PAIR = needs(
 )
 
 
-def test_the_shipped_order_asks_a_low_singleton_before_a_critical_pair():
-    """The review's counterexample, as shipped: C, then A and B."""
-    assert order("shipped", PAIR) == ["C", "A", "B"]
+def test_the_old_order_asked_a_low_singleton_before_a_critical_pair():
+    """The review's counterexample, as ADR 0055 shipped it: C, then A and B."""
+    assert order("completion-first", PAIR) == ["C", "A", "B"]
 
 
-@pytest.mark.parametrize("policy", ["band-first", "band-first-material"])
-def test_band_first_asks_the_critical_pair_first(policy):
-    assert order(policy, PAIR) == ["A", "B", "C"]
+def test_the_shipped_order_asks_the_critical_pair_first():
+    assert order("shipped", PAIR) == ["A", "B", "C"]
 
 
-def test_a_critic_only_critical_fact_waits_behind_evidence_unless_the_order_is_material():
+def test_a_critic_only_critical_fact_now_comes_first():
     critic_only = needs(
         {("stride", "low"): frozenset({C})},
         named={("stride", "crit"): frozenset({A})},
         bands={("stride", "crit"): CRITICAL, ("stride", "low"): LOW},
     )
-    assert order("band-first", critic_only) == ["C", "A"]
-    assert order("band-first-material", critic_only) == ["A", "C"]
-
-
-def test_a_material_order_keeps_each_question_s_basis():
-    critic_only = needs(
-        {("stride", "low"): frozenset({C})},
-        named={("stride", "crit"): frozenset({A})},
-        bands={("stride", "crit"): CRITICAL, ("stride", "low"): LOW},
-    )
-    labels = {k[3]: basis for basis, k in POLICIES["band-first-material"](critic_only)}
-    assert labels == {"A": "critic", "C": "evidence"}
+    assert order("completion-first", critic_only) == ["C", "A"]
+    assert order("shipped", critic_only) == ["A", "C"]
 
 
 @pytest.mark.parametrize("policy", list(POLICIES))

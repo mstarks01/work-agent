@@ -2046,6 +2046,7 @@ calls.push(box.all("p").map(p => p.children.filter(c => typeof c === "string")
     assert "(you skipped this before the analysis)" in lines[0]
     assert "(new from the analysis)" in lines[1]
     assert "skipped" not in lines[2] and "new from" not in lines[2]
+    assert "(raised by the reviewer;" in lines[2]
 
 
 CORRECTIONS_BLOCK_START = "  if (FINAL && (CORRECTIONS.answers || []).length) {"
