@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import asyncio
 from dataclasses import replace
+from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
@@ -399,13 +400,8 @@ class TestTheRoundsEnd:
 class TestTheBoundedRounds:
     """A waiting job asks in rounds (ADR 0053)."""
 
-    def test_a_round_asks_at_most_its_choices_of_each_kind_above_the_floor(self):
-        """A round of 10 questions asked 17-24 choices (#1289, item 2)."""
-        from analysis_service.answer_round import (
-            EARLY_RULES,
-            ROUND_DECISIONS,
-            passes_floor,
-        )
+    def test_a_round_asks_at_most_its_questions_of_each_kind_above_the_floor(self):
+        from analysis_service.answer_round import EARLY_RULES, passes_floor
         from analysis_service.early_questions import early_questions
 
         asked = _asked_after([])
@@ -419,29 +415,16 @@ class TestTheBoundedRounds:
                 for q in asked.early
                 if (q.kind == "capability") == (kind == "capability")
             ]
-            assert sum(q.decisions for q in shown) <= max(
-                ROUND_DECISIONS, shown[0].decisions if shown else 0
-            )
+            assert len(shown) <= EARLY_RULES[kind].per_round
             assert all(passes_floor(q, listed) for q in shown)
         assert asked.early, "a control: the waiting job asks something"
 
-    def test_a_question_wider_than_the_round_is_still_asked(self):
-        from analysis_service.answer_round import ROUND_DECISIONS, _round
+    def test_a_question_counts_as_one_whatever_its_facets(self):
+        from analysis_service.answer_round import _round
 
-        wide = SimpleNamespace(
-            key=CAPACITY, kind="question", score=5.0, decisions=ROUND_DECISIONS + 1
-        )
+        wide = SimpleNamespace(key=CAPACITY, kind="question", score=5.0, decisions=11)
         shown, _, _ = _round([wide], frozenset(), {})
         assert shown == (wide,)
-
-    def test_a_started_question_costs_only_its_open_facets(self):
-        from analysis_service.answer_round import _open_decisions
-
-        facets = QUESTION_KINDS["capacity-limits"].facets
-        question = SimpleNamespace(key=CAPACITY, facets=facets, decisions=len(facets))
-        answer = FactAnswer(key=CAPACITY, facets={facets[0].id: "yes"})
-        assert _open_decisions(question, answer) == len(facets) - 1
-        assert _open_decisions(question, None) == len(facets)
 
     def test_a_saved_answer_leaves_the_round_and_is_listed_with_its_answer(self):
         first = _asked_after([]).early[0]
@@ -468,7 +451,7 @@ class TestTheBoundedRounds:
     def test_a_question_answered_in_part_comes_back_outside_the_limit(self):
         """Thirty partial answers hid every question and started the analysis
         as if nothing were left (#1289, B3)."""
-        from analysis_service.answer_round import ROUND_DECISIONS, _round
+        from analysis_service.answer_round import EARLY_RULES, _round
 
         facets = QUESTION_KINDS["capacity-limits"].facets
 
@@ -483,8 +466,8 @@ class TestTheBoundedRounds:
             q.key: FactAnswer(key=q.key, facets={"rate": "yes"}) for q in listed[:30]
         }
         shown, remaining, withheld = _round(listed, answered_keys(held.values()), held)
-        # Each started question still asks its three open facets.
-        assert [q.key for q in shown] == [q.key for q in listed[: ROUND_DECISIONS // 3]]
+        per_round = EARLY_RULES["field"].per_round
+        assert [q.key for q in shown] == [q.key for q in listed[:per_round]]
         assert remaining["field"] == 30
         assert withheld == 1
 
@@ -1039,3 +1022,46 @@ def test_answers_that_break_the_input_limits_are_refused_at_once(save):
 
     assert sent.status_code == 413, sent.text
     assert asyncio.run(store.get(waited)).facts == []
+
+
+def _answer_in_full(question):
+    if question.facets:
+        return FactAnswer(
+            key=question.key, facets={facet.id: "yes" for facet in question.facets}
+        )
+    if question.choices:
+        return FactAnswer(key=question.key, value=question.choices[0])
+    return FactAnswer(key=question.key, value="none")
+
+
+@pytest.mark.parametrize(
+    "case", sorted(path.name for path in Path("evals/corpus").iterdir())
+)
+def test_no_round_asks_more_questions_than_the_one_before(case):
+    """A round bounded by choices asked 4 questions, then 6, then 5: a facet
+    table cost a choice per facet, and the rounds rose and fell with the mix
+    (2026-10-01). Nothing a STRIDE question depends on requires that."""
+    from analysis_service.system_model import SystemModel
+
+    path = Path("evals/corpus") / case / "model.json"
+    model = SystemModel.model_validate_json(path.read_text())
+    answered: list[FactAnswer] = []
+    counts = []
+    for _ in range(40):
+        asked = question_set(
+            model,
+            None,
+            {"stride": {}},
+            [],
+            waiting=True,
+            answered=answered,
+            answered_links=[],
+            final=False,
+            shown=[],
+        )
+        if not asked.early:
+            break
+        counts.append(len(asked.early))
+        answered = merged_facts(answered, [_answer_in_full(q) for q in asked.early])
+    assert counts, "a control: the model asks something"
+    assert counts == sorted(counts, reverse=True), counts

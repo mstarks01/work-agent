@@ -17,12 +17,18 @@ Any answer started the analysis, so a submitter had one chance to answer.
 
 ## Decision
 
-**A paused job asks in rounds.** A round asks up to 10 choices of capability
-questions and up to 10 choices of questions about the model's elements (field
-questions). A question with facets costs one choice a facet it leaves open,
-and any other question costs one. A round of 10 questions asked 17 to 24
-choices on the 13 Baseline models, so the unit is the choice, not the
-question (#1289). A question wider than the round is still asked alone.
+**A paused job asks in rounds of a fixed number of questions.** A round asks
+up to 10 capability questions and up to 5 questions about the model's
+elements (field questions), as `per_round` in `EARLY_RULES`. So no round asks
+more questions than the one before it, and only the last asks fewer: a
+submitter sees the work shrink, never grow. A round bounded by choices
+instead, where a question with facets costs one choice a facet, asks a number
+of questions that rises and falls with the mix of facet tables: on the 15
+corpus models with STRIDE it rose in 14, from 4 questions to 6 and back, and
+no question depended on another (maintainer's decision of 2026-10-01). Five
+field questions ask a median of 10 choices a round over those models, and at
+most 15. A capability question is one yes or no, so 10 of them are 10
+choices.
 Link questions are outside the round limit, and each round shows every one
 still open. On the six archived reports with a catalog, a pause shows 1 to 3,
 each one choice that places 1 to 4 stated facts, so they need no place under
@@ -88,10 +94,10 @@ In E21, with rounds of 10 questions, every replay ended in three rounds. A
 STRIDE job asks at most 30 questions, and the limit cuts at most 12. An ASVS
 job asks 26 yes/no questions.
 
-In E23 the round size in choices moved only how the work is split. A STRIDE
-pause answered in full asks a median of 58 choices at every budget, because
-the limit of 30 questions sets the total. At 10 choices a round it takes 7
-rounds (5 when every control is named), and an ASVS pause takes 3. A
+In E23 the round size moved only how the work is split. A STRIDE pause
+answered in full asks a median of 58 choices at every budget, because the
+limit of 30 questions sets the total. At 5 field questions a round it takes a
+median of 6 rounds on the corpus models, and an ASVS pause takes 3. A
 submitter can stop at any round, and skip, so a smaller page costs a person
 who answers everything more rounds, and nobody else anything.
 
