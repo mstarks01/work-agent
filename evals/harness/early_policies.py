@@ -53,14 +53,14 @@ Selection = Mapping[FrameworkName, Mapping[str, Any]]
 BUDGETS = (5, 10, 15, 20, 30, 45, 60)
 
 
-def _summed_rounds(model: SystemModel, frameworks: Selection) -> list[EarlyQuestion]:
-    """The shipped order: each round as the pause builds it, rounds in turn.
+def _rounds(model: SystemModel, frameworks: Selection) -> list[list[EarlyQuestion]]:
+    """Each round as the pause builds it, in turn.
 
     The owner answers "I don't know" to every question, which writes nothing,
     so the model and the ranking stay as they started and only the round
     moves on. A round shows its capability questions before its field ones.
     """
-    shown: list[EarlyQuestion] = []
+    shown: list[list[EarlyQuestion]] = []
     answered: list[FactAnswer] = []
     for _ in range(MAX_ROUNDS):
         asked = question_set(
@@ -76,9 +76,39 @@ def _summed_rounds(model: SystemModel, frameworks: Selection) -> list[EarlyQuest
         )
         if not asked.early:
             break
-        shown.extend(asked.early)
+        shown.append(list(asked.early))
         answered.extend(dont_know(question) for question in asked.early)
     return shown
+
+
+def _summed_rounds(model: SystemModel, frameworks: Selection) -> list[EarlyQuestion]:
+    """The shipped order: the rounds in turn, each in the order the page shows."""
+    return [question for shown in _rounds(model, frameworks) for question in shown]
+
+
+def _round_merge(model: SystemModel, frameworks: Selection) -> list[EarlyQuestion]:
+    """The shipped rounds, with the frameworks taken in turn inside each round.
+
+    A round asks the same questions as the shipped one. Inside it, the next
+    question is the first one left that serves the framework charged the
+    fewest choices so far (the first by name on a tie), and each framework it
+    serves is charged its choices. The charge runs on from round to round. A
+    part still follows its parent, which comes first in its own framework's
+    turn.
+    """
+    charged = dict.fromkeys(sorted(frameworks), 0)
+    order: list[EarlyQuestion] = []
+    for shown in _rounds(model, frameworks):
+        left = list(shown)
+        while left:
+            served = {name for question in left for name in question.frameworks}
+            name = min(served, key=lambda each: (charged[each], each))
+            question = next(q for q in left if name in q.frameworks)
+            left.remove(question)
+            order.append(question)
+            for holder in question.frameworks:
+                charged[holder] += question.decisions
+    return order
 
 
 def _own_lists(
@@ -135,6 +165,7 @@ def _merge(
 #: Every order compared, by name.
 POLICIES: Mapping[str, Callable[[SystemModel, Selection], list[EarlyQuestion]]] = {
     "summed-rounds": _summed_rounds,
+    "round-merge": _round_merge,
     "framework-merge": lambda model, chosen: _merge(model, chosen, grouped=False),
     "grouped-merge": lambda model, chosen: _merge(model, chosen, grouped=True),
 }

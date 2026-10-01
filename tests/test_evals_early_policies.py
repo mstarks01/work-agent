@@ -85,3 +85,25 @@ def test_a_finding_completes_only_when_every_fact_it_waits_on_is_answered():
         assert whole[policy].completed == expected
     by_budget = [one.completed for one in found if one.policy == "summed-rounds"]
     assert by_budget == sorted(by_budget)
+
+
+class TestTheRoundMerge:
+    def test_each_round_asks_the_shipped_round_s_questions(self):
+        order = POLICIES["round-merge"](valid_model(), BOTH)
+        start = 0
+        for shown in early_policies._rounds(valid_model(), BOTH):
+            taken = order[start : start + len(shown)]
+            assert {q.key for q in taken} == {q.key for q in shown}
+            start += len(shown)
+        assert start == len(order)
+
+    def test_a_part_follows_its_parent(self):
+        order = [q.key for q in POLICIES["round-merge"](valid_model(), BOTH)]
+        for at, question in enumerate(POLICIES["round-merge"](valid_model(), BOTH)):
+            if question.parent in order:
+                assert order.index(question.parent) < at
+
+    def test_the_first_choices_serve_every_framework(self):
+        order = POLICIES["round-merge"](valid_model(), BOTH)
+        served = {name for q in order[:4] for name in q.frameworks}
+        assert served == set(BOTH)
