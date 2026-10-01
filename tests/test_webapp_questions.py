@@ -1659,6 +1659,35 @@ calls.push(walk(ids.questions).map(n => n.textContent).find(t => t.includes("Thi
     assert "This round asks 2 choice(s)." in said
 
 
+def test_the_round_size_leaves_out_a_part_until_its_parent_is_yes():
+    """A part hidden until its parent's "yes" was counted in the round's
+    choices, so the line named a choice the page did not show (#1289)."""
+    parent_key = ["", "", "", "", "", "oauth"]
+    choices = [{"id": "yes", "name": ""}, {"id": "no", "name": ""}]
+    parent = _text_row(parent_key, "OAuth?") | {
+        "kind": "capability",
+        "form": "choice",
+        "choices": choices,
+    }
+    part = _text_row(["", "", "", "", "", "oauth-client"], "A client?") | {
+        "kind": "capability",
+        "form": "choice",
+        "choices": choices,
+        "parent": parent_key,
+    }
+    steps = f"""
+await ids.analyze.listeners.submit({{ preventDefault() {{}} }}); await settle();
+streams[0].listeners.questions({{ data: JSON.stringify({{ run: "r1",
+  questions: [], facts: [{json.dumps(parent)}, {json.dumps(part)}],
+  remaining: {{ capability: 2 }}, answered: [], answered_links: [], revision: 0 }}) }});
+const walk = (n, out = []) => {{ for (const c of n.children || [])
+  if (typeof c === "object") {{ out.push(c); walk(c, out); }} return out; }};
+calls.push(walk(ids.questions).map(n => n.textContent).find(t => t.includes("This round asks")));
+"""
+    said = _run_form_script(steps)["calls"][-1]
+    assert "This round asks 1 choice(s)." in said
+
+
 def test_skip_the_rest_skips_only_the_blank_questions():
     answered, blank = (["", "", "", name, "", ""] for name in ("who?", "when?"))
     rows = [_text_row(answered, "who?"), _text_row(blank, "when?")]

@@ -270,7 +270,11 @@
       const estimate = document.createElement("p");
       estimate.className = "hint";
       // Each link question is one choice too, though no round limit counts it.
-      const choices = data.facts.reduce((sum, q) => sum + q.decisions, 0) + data.questions.length;
+      // A part shows only after its parent's "yes", so the round does not
+      // count it until then.
+      const inRound = new Set(data.facts.map((q) => JSON.stringify(q.key)));
+      const opens = data.facts.filter((q) => !(q.parent && inRound.has(JSON.stringify(q.parent))));
+      const choices = opens.reduce((sum, q) => sum + q.decisions, 0) + data.questions.length;
       estimate.textContent = `There are ${parts.join(" and ")} that can change the`
         + ` analysis. This round asks ${choices} choice(s).`;
       questions.append(estimate);

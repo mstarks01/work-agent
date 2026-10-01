@@ -422,7 +422,9 @@ class TestTheBoundedRounds:
     def test_a_question_counts_as_one_whatever_its_facets(self):
         from analysis_service.answer_round import _round
 
-        wide = SimpleNamespace(key=CAPACITY, kind="question", score=5.0, decisions=11)
+        wide = SimpleNamespace(
+            key=CAPACITY, kind="question", score=5.0, decisions=11, parent=None
+        )
         shown, _, _ = _round([wide], frozenset(), {})
         assert shown == (wide,)
 
@@ -458,7 +460,12 @@ class TestTheBoundedRounds:
         def capacity_of(n):
             key = (f"process:p{n}", "", "", "", "capacity-limits", "")
             return SimpleNamespace(
-                key=key, kind="question", score=5.0, facets=facets, decisions=4
+                key=key,
+                kind="question",
+                score=5.0,
+                facets=facets,
+                decisions=4,
+                parent=None,
             )
 
         listed = [capacity_of(n) for n in range(31)]
@@ -1024,34 +1031,54 @@ def test_answers_that_break_the_input_limits_are_refused_at_once(save):
     assert asyncio.run(store.get(waited)).facts == []
 
 
-def _answer_in_full(question):
+#: The selections the round test runs over every corpus model, and the answer
+#: given to a yes-or-no question. STRIDE asks none, so one answer covers it;
+#: ASVS level 1 puts no part in its parent's round, so levels 2 and 3 do.
+_ROUND_RUNS = {
+    "stride": ({"stride": {}}, "yes"),
+    **{
+        f"asvs-{level}-{choice}": ({"asvs": {"level": level}}, choice)
+        for level in (2, 3)
+        for choice in ("yes", "no")
+    },
+}
+
+
+def _answer_as_a_person(question, choice):
+    """What a person answers on the page: every facet, or ``choice`` where it is
+    one of the question's choices, else the first choice, else a mechanism."""
     if question.facets:
         return FactAnswer(
             key=question.key, facets={facet.id: "yes" for facet in question.facets}
         )
     if question.choices:
-        return FactAnswer(key=question.key, value=question.choices[0])
+        value = choice if choice in question.choices else question.choices[0]
+        return FactAnswer(key=question.key, value=value)
     return FactAnswer(key=question.key, value="none")
 
 
+@pytest.mark.parametrize("run", sorted(_ROUND_RUNS))
 @pytest.mark.parametrize(
     "case", sorted(path.name for path in Path("evals/corpus").iterdir())
 )
-def test_no_round_asks_more_questions_than_the_one_before(case):
+def test_no_round_opens_with_more_questions_than_the_one_before(case, run):
     """A round bounded by choices asked 4 questions, then 6, then 5: a facet
-    table cost a choice per facet, and the rounds rose and fell with the mix
-    (2026-10-01). Nothing a STRIDE question depends on requires that."""
+    table cost a choice per facet (2026-10-01). And at ASVS level 2 a part
+    hidden until its parent's "yes" took a place, so round 1 opened with 8
+    questions and round 2 with 10. Nothing a question depends on requires
+    either, so the questions a round opens with, of each kind, never grow."""
     from analysis_service.system_model import SystemModel
 
     path = Path("evals/corpus") / case / "model.json"
     model = SystemModel.model_validate_json(path.read_text())
+    selection, choice = _ROUND_RUNS[run]
     answered: list[FactAnswer] = []
-    counts = []
+    opened: dict[bool, list[int]] = {True: [], False: []}
     for _ in range(40):
         asked = question_set(
             model,
             None,
-            {"stride": {}},
+            selection,
             [],
             waiting=True,
             answered=answered,
@@ -1061,7 +1088,24 @@ def test_no_round_asks_more_questions_than_the_one_before(case):
         )
         if not asked.early:
             break
-        counts.append(len(asked.early))
-        answered = merged_facts(answered, [_answer_in_full(q) for q in asked.early])
-    assert counts, "a control: the model asks something"
-    assert counts == sorted(counts, reverse=True), counts
+        keys = {q.key for q in asked.early}
+        for capability, counts in opened.items():
+            counts.append(
+                sum(
+                    1
+                    for q in asked.early
+                    if (q.kind == "capability") == capability and q.parent not in keys
+                )
+            )
+        given: dict = {}
+        for q in asked.early:
+            # The page shows a part only once its parent in the round is "yes".
+            if q.parent in keys and given.get(q.parent, None) is None:
+                continue
+            if q.parent in keys and given[q.parent].value != "yes":
+                continue
+            given[q.key] = _answer_as_a_person(q, choice)
+        answered = merged_facts(answered, list(given.values()))
+    assert any(opened[True]) or any(opened[False]), "a control: it asks something"
+    for counts in opened.values():
+        assert counts == sorted(counts, reverse=True), counts

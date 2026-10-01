@@ -466,7 +466,8 @@ def _round(
     limit, and the limit bounds only the questions not yet answered at all.
 
     A round takes the first ``per_round`` questions of each kind, so the
-    number of questions never grows from one round to the next.
+    number of questions a round opens with never grows from one round to the
+    next (:func:`_take`).
     """
     shown: list[EarlyQuestion] = []
     remaining = {}
@@ -485,8 +486,35 @@ def _round(
         fresh = [question for question in eligible if question.key not in held]
         remaining[kind] = len(started) + min(len(fresh), left)
         withheld += max(len(fresh) - left, 0)
-        shown += [*started, *fresh[:left]][: rule.per_round]
+        shown += _take([*started, *fresh[:left]], rule.per_round)
     return tuple(shown), remaining, withheld
+
+
+def _take(candidates: Sequence[EarlyQuestion], per_round: int) -> list[EarlyQuestion]:
+    """The first ``per_round`` questions, with each one's parts beside them.
+
+    **A part waits on its parent, so it takes no place in the round.** A
+    question whose parent the round also asks is hidden until the parent is
+    answered "yes" (``parent`` on :class:`EarlyQuestion`). It joins the round
+    beside its parent, outside the count, so a round opens with as many
+    questions as it counts. A part whose parent an earlier round answered is
+    an ordinary question and takes a place.
+    """
+    taken: list[EarlyQuestion] = []
+    keys: set[UnknownKey] = set()
+    counted = 0
+    # A parent comes before its parts in the list (capability_questions), so
+    # one pass in order reaches a part of a part too.
+    for question in candidates:
+        if question.parent in keys:
+            taken.append(question)
+        elif counted < per_round:
+            taken.append(question)
+            counted += 1
+        else:
+            continue
+        keys.add(question.key)
+    return taken
 
 
 def _adds_information(
