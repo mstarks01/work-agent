@@ -131,3 +131,38 @@ def test_an_owner_who_skips_every_round_reaches_a_report_that_says_what_is_open(
     report = page.inner_text("body")
     assert "What remains open" in report
     assert "neither confirmed nor cleared" in report
+
+
+def test_a_phone_sized_owner_answers_skips_corrects_and_starts(browser, served):
+    """The #1289 review asked for a small-screen walk through every step."""
+    context = browser.new_context(
+        base_url=served, viewport={"width": 375, "height": 667}
+    )
+    page = context.new_page()
+    errors: list[str] = []
+    page.on("pageerror", lambda error: errors.append(str(error)))
+    page.goto("/")
+    pause(page)
+    page.locator('#questions select:has(option[value="no"])').first.select_option("no")
+    page.click("#save")
+    page.wait_for_selector("#earlier", state="visible")
+    before = page.inner_text("#questions")
+    page.click("#skip")
+    page.wait_for_function(
+        "before => document.querySelector('#questions').innerText !== before",
+        arg=before,
+    )
+    page.click("#earlier summary")
+    page.locator("#earlier button", has_text="Change").first.click()
+    page.locator('#earlier select:has(option[value="yes"])').first.select_option("yes")
+    wide = page.evaluate(
+        "document.documentElement.scrollWidth - document.documentElement.clientWidth"
+    )
+    with page.expect_request("**/answer/*") as sent:
+        page.click("#continue")
+    facts = sent.value.post_data_json["facts"]
+    page.wait_for_url("**/report/**")
+    context.close()
+    assert errors == [], f"the page raised: {errors}"
+    assert any("yes" in str(fact) for fact in facts)
+    assert wide <= 0, f"the page scrolls sideways by {wide}px on a phone"

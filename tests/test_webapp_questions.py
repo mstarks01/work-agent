@@ -730,7 +730,11 @@ def test_the_form_page_says_why_and_quotes_the_description():
     long = "x" * 250
     rows = [
         _text_row(["", "", "", "who?", "", ""], "who?")
-        | {"reasons": ["Can an attacker reach it?", "second"], "excerpt": long}
+        | {
+            "reasons": ["Can an attacker reach it?", "second"],
+            "excerpt": long,
+            "frameworks": ["asvs", "stride"],
+        }
     ]
     steps = f"""
 await ids.analyze.listeners.submit({{ preventDefault() {{}} }}); await settle();
@@ -745,7 +749,8 @@ calls.push(walk(ids.questions).map(h => ({{ text: h.textContent, title: h.title 
     hints = _run_form_script(steps)["calls"][-1]
     (row,) = [h for h in hints if h["text"].startswith("Why:")]
     assert row["text"] == (
-        "Why: Can an attacker reach it? \u00b7 Your description: \u201c"
+        "Why: Can an attacker reach it? \u00b7 Used by the asvs and stride analyses"
+        " \u00b7 Your description of this part, for reference: \u201c"
         + "x" * 200
         + "\u2026\u201d"
     )
@@ -1380,11 +1385,15 @@ await ids.continue.listeners.click(); await settle();
 
     assert layout["groups"] == [
         {
-            "title": "stored-copy-integrity heading? (2)",
+            "title": "stored-copy-integrity heading? (2 question(s), 2 choice(s))",
             "rows": [store.name, flow.name],
             "open": True,
         },
-        {"title": "audit-evidence heading? (1)", "rows": [flow.name], "open": True},
+        {
+            "title": "audit-evidence heading? (1 question(s), 1 choice(s))",
+            "rows": [flow.name],
+            "open": True,
+        },
     ]
     (sent,) = [c for c in seen if c.get("url") == "/answer/r1"]
     assert sent["body"]["facts"] == [{"key": facts[0]["key"], "value": "no"}]
@@ -1684,9 +1693,85 @@ streams[0].listeners.questions({{ data: JSON.stringify({{ run: "r1",
   remaining: {{ capability: 2 }}, answered: [], answered_links: [], revision: 0 }}) }});
 const walk = (n, out = []) => {{ for (const c of n.children || [])
   if (typeof c === "object") {{ out.push(c); walk(c, out); }} return out; }};
+const said = () => walk(ids.questions).map(n => n.textContent)
+  .find(t => t.includes("This round asks"));
+calls.push(said());
+const [yes] = walk(ids.questions).filter(n => n.tag === "select");
+yes.value = "yes"; yes.listeners.change();
+calls.push(said());
+yes.value = "no"; yes.listeners.change();
+calls.push(said());
+"""
+    before, opened, closed = _run_form_script(steps)["calls"][-3:]
+    assert "This round asks 1 choice(s). Up to 1 more appear" in before
+    assert opened.endswith("This round asks 2 choice(s).")
+    assert closed == before
+
+
+def test_a_part_of_a_part_hides_with_its_parent():
+    """A part's own part stayed shown after the part above it hid."""
+    choices = [{"id": "yes", "name": ""}, {"id": "no", "name": ""}]
+    keys = [["", "", "", "", "", name] for name in ("a", "b", "c")]
+    rows = [
+        _text_row(key, f"{key[5]}?")
+        | {"kind": "capability", "form": "choice", "choices": choices}
+        | ({"parent": keys[at - 1]} if at else {})
+        for at, key in enumerate(keys)
+    ]
+    steps = f"""
+await ids.analyze.listeners.submit({{ preventDefault() {{}} }}); await settle();
+streams[0].listeners.questions({{ data: JSON.stringify({{ run: "r1",
+  questions: [], facts: {json.dumps(rows)},
+  remaining: {{ capability: 3 }}, answered: [], answered_links: [], revision: 0 }}) }});
+const walk = (n, out = []) => {{ for (const c of n.children || [])
+  if (typeof c === "object") {{ out.push(c); walk(c, out); }} return out; }};
+const [a, b] = walk(ids.questions).filter(n => n.tag === "select");
+const shown = () => walk(ids.questions).filter(n => n.tag === "p" && n.children
+  .some(c => typeof c === "object" && c.tag === "select")).map(p => !p.hidden);
+a.value = "yes"; a.listeners.change();
+b.value = "yes"; b.listeners.change();
+calls.push(shown());
+a.value = "no"; a.listeners.change();
+calls.push(shown());
+"""
+    opened, closed = _run_form_script(steps)["calls"][-2:]
+    assert opened == [True, True, True]
+    assert closed == [True, False, False]
+
+
+def test_a_capability_says_it_decides_what_an_analysis_covers():
+    row = _text_row(["", "", "", "", "", "oauth"], "OAuth?") | {
+        "kind": "capability",
+        "form": "choice",
+        "choices": [{"id": "yes", "name": ""}, {"id": "no", "name": ""}],
+        "reasons": ["An answer settles whether up to 3 units apply."],
+        "frameworks": ["asvs"],
+    }
+    steps = f"""
+await ids.analyze.listeners.submit({{ preventDefault() {{}} }}); await settle();
+streams[0].listeners.questions({{ data: JSON.stringify({{ run: "r1",
+  questions: [], facts: [{json.dumps(row)}],
+  remaining: {{ capability: 1 }}, answered: [], answered_links: [], revision: 0 }}) }});
+const walk = (n, out = []) => {{ for (const c of n.children || [])
+  if (typeof c === "object") {{ out.push(c); walk(c, out); }} return out; }};
+calls.push(walk(ids.questions).map(n => n.textContent).find(t => t.startsWith("Why:")));
+"""
+    said = _run_form_script(steps)["calls"][-1]
+    assert "Decides what the asvs analysis covers" in said
+
+
+def test_a_link_only_round_says_what_it_asks():
+    steps = f"""
+await ids.analyze.listeners.submit({{ preventDefault() {{}} }}); await settle();
+streams[0].listeners.questions({{ data: JSON.stringify({{ run: "r1",
+  questions: [{json.dumps(_LINK)}], facts: [], remaining: {{}},
+  answered: [], answered_links: [], revision: 0 }}) }});
+const walk = (n, out = []) => {{ for (const c of n.children || [])
+  if (typeof c === "object") {{ out.push(c); walk(c, out); }} return out; }};
 calls.push(walk(ids.questions).map(n => n.textContent).find(t => t.includes("This round asks")));
 """
     said = _run_form_script(steps)["calls"][-1]
+    assert "1 question(s) about which part of your system a name is" in said
     assert "This round asks 1 choice(s)." in said
 
 
