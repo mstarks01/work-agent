@@ -51,6 +51,7 @@ from analysis_service.frameworks import PACKAGES, schemas_for
 from analysis_service.graph import (
     CRITIC_ROLE,
     STATE_BOUNDARY_CROSSINGS,
+    STATE_INPUT_TEXT,
     STATE_SYSTEM_MODEL,
     FrameworkNodes,
     critic_instruction,
@@ -61,14 +62,15 @@ from analysis_service.graph import (
     rulings_of,
 )
 from analysis_service.markdown_loader import MarkdownLoader
-from analysis_service.report import Report
-from evals.harness.artifact import repo_commit
+from analysis_service.report import InputRef, Report
+from analysis_service.sources import render_sources
+from evals.harness.artifact import CORPUS_DIR, repo_commit
 from evals.harness.bundle import reports_dir
 from evals.harness.lane_replay import load_material
 from evals.harness.modes import EvalRunError
 from evals.harness.node_call import NodeCall, node_call
 from evals.harness.provenance import REPO_ROOT
-from evals.harness.reference import CorpusError, refuse_holdout
+from evals.harness.reference import CorpusError, load_case, refuse_holdout
 
 
 @dataclass(frozen=True)
@@ -82,12 +84,24 @@ class Archived:
     shared: dict[str, Any]
 
 
-def shared_keys(report: Report) -> dict[str, str]:
-    """The job-wide keys ``prepare`` rendered, from the model the report embeds."""
+def shared_keys(report: Report, case_id: str) -> dict[str, str]:
+    """The job-wide keys the critic read, from the report and the corpus case.
+
+    The report embeds the model but keeps only digests of the sources, so the
+    sources come from the corpus case and must match the report's digest.
+    """
     model = report.system_model
+    sources = load_case(CORPUS_DIR / case_id).sources
+    digest = InputRef.of(system_name=report.input.system_name, sources=sources)
+    if digest.source_sha256 != report.input.source_sha256:
+        raise EvalRunError(
+            f"{case_id}'s corpus sources are not the ones the report was run on,"
+            " so the critic's input text cannot be rebuilt"
+        )
     return {
         STATE_SYSTEM_MODEL: render_model(model.model_dump(mode="json")),
         STATE_BOUNDARY_CROSSINGS: render_crossings(model.boundary_crossings()),
+        STATE_INPUT_TEXT: render_sources(sources),
     }
 
 
@@ -100,7 +114,7 @@ def load(artifact: Path, case_id: str, framework: FrameworkName) -> Archived:
     if (directory / f"{case_id}.lanes.json").is_file():
         shared = load_material(artifact, case_id)["shared"]
     else:
-        shared = shared_keys(report)
+        shared = shared_keys(report, case_id)
     block = next((b for b in report.analyses if b.framework == framework), None)
     if block is None:
         raise EvalRunError(f"{case_id} carries no {framework} block")
@@ -140,6 +154,7 @@ async def compose(
     state = {
         STATE_SYSTEM_MODEL: archived.shared[STATE_SYSTEM_MODEL],
         STATE_BOUNDARY_CROSSINGS: archived.shared[STATE_BOUNDARY_CROSSINGS],
+        STATE_INPUT_TEXT: archived.shared[STATE_INPUT_TEXT],
         nodes.key("draft_view"): render_fenced(view),
     }
     # ADK reads only ``_invocation_context.session.state`` for a state name.

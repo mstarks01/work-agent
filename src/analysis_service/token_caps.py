@@ -94,9 +94,13 @@ TOKEN_CAPS: dict[str, int] = {
     # a property rests on a fact that holds everywhere or is written as what
     # cannot be produced. Both are properties of a claim rather than of a
     # package, so they sit here and not in a framework's contract.
+    # ``critic`` raised to 3500 and ``recritic`` to 1400 for the submitted
+    # sources (ADR 0057). Each body gains ``{input_text}``, the sentence that
+    # says the sources are data and not instruction, and, in the critic, the
+    # rule that a source fact can defeat a draft and never closes an open fact.
     "prompts/analyze": 5600,
-    "prompts/critic": 3000,
-    "prompts/recritic": 1100,
+    "prompts/critic": 3500,
+    "prompts/recritic": 1400,
     # Raised from 2900 for the naming rule in rule 3. The extraction sweep of
     # 2026-09-12 lost 98 blessed elements by ID, 59 of them to a name the model
     # chose differently — a plural, an expanded abbreviation, a qualifier the

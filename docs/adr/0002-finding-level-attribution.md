@@ -1,6 +1,9 @@
 # 2. A finding cites the words that justify it
 
 - **Status**: accepted
+- **Superseded in part by**: [ADR 0057](0057-the-critic-reads-the-submitted-sources.md),
+  which gives the critic the submitted sources. The eval judge half of
+  "Neither the critic nor the eval judge receives submitter text" stands.
 - **Date**: 2026-08-04
 - **Effort**: [#76 — tie every finding back to the input text that justifies it](https://github.com/mstarks01/work-agent/issues/76)
   (nine resolution comments), cutover planned in
@@ -90,6 +93,8 @@ explainable to a submitter ("this word is not in your document"); a threshold is
 not.
 
 ### Neither the critic nor the eval judge receives submitter text
+
+*The critic half is superseded by [ADR 0057](0057-the-critic-reads-the-submitted-sources.md).*
 
 *The critic should check the quotes* is the obvious-looking addition. Three
 things are against it.

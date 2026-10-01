@@ -22,7 +22,12 @@ from analysis_service.markdown_loader import MarkdownLoader
 from analysis_service.prompts import compose_critic_prompt
 from analysis_service.system_model import SystemModel
 from evals.critic_review import replay as R
-from evals.critic_review.loading import REPO_ROOT, corpus_model, load_fixtures
+from evals.critic_review.loading import (
+    REPO_ROOT,
+    corpus_model,
+    corpus_sources,
+    load_fixtures,
+)
 from evals.critic_review.model import CriticFixture
 from evals.harness.assembly import ruling_type
 
@@ -52,7 +57,14 @@ def model() -> SystemModel:
 
 
 def composed(fixtures, model) -> str:
-    return R.compose(fixtures, model, PACKAGE, PACKAGE_LOADER, PROMPT_LOADER)
+    return R.compose(
+        fixtures,
+        model,
+        corpus_sources("01-payments-checkout"),
+        PACKAGE,
+        PACKAGE_LOADER,
+        PROMPT_LOADER,
+    )
 
 
 def test_the_harness_fills_exactly_the_placeholders_the_prompt_declares():
@@ -169,7 +181,15 @@ def run(fixtures, model, payload: dict):
         return json.dumps(payload)
 
     return asyncio.run(
-        R.replay(fixtures, model, PACKAGE, PACKAGE_LOADER, PROMPT_LOADER, call)
+        R.replay(
+            fixtures,
+            model,
+            corpus_sources("01-payments-checkout"),
+            PACKAGE,
+            PACKAGE_LOADER,
+            PROMPT_LOADER,
+            call,
+        )
     )
 
 

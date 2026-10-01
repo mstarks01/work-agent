@@ -10,8 +10,10 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+from analysis_service.sources import Source
 from analysis_service.system_model import SystemModel
 from evals.critic_review.model import CriticFixture
+from evals.harness.reference import load_case
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 CASES = REPO_ROOT / "evals" / "critic_review" / "cases.json"
@@ -32,6 +34,11 @@ def corpus_model(case_id: str) -> SystemModel:
     """
     path = CORPUS / case_id / "model.json"
     return SystemModel.model_validate(json.loads(path.read_text(encoding="utf-8")))
+
+
+def corpus_sources(case_id: str) -> tuple[Source, ...]:
+    """The sources a fixture's case submits, as a job would carry them."""
+    return load_case(CORPUS / case_id).sources
 
 
 def source_text(case_id: str) -> str:

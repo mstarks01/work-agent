@@ -12,9 +12,9 @@ The store's technology is named outright, so the requirement about parameterized
 {
   "requirement": "2.4",
   "direction": "question",
-  "needs_evidence": "code",
+  "needs_evidence": "prose",
   "title": "Query construction against the accounts database is undescribed",
-  "description": "V1.2.4 asks that database queries are built with parameterization or an equivalent that separates the query from its data. The requirement applies here because `store:accounts-db` is a PostgreSQL instance and `flow:process:ledger-service>store:accounts-db>read-write-balances` speaks the PostgreSQL wire protocol, so `process:ledger-service` builds queries. The submitted notes describe the credential that account uses and the privileges it holds, and say nothing at all about how the SQL reaching that connection is assembled. So the requirement applies and the input does not settle it. What would settle it is one fact: whether the ledger service composes SQL by string concatenation or hands parameters to a driver.",
+  "description": "V1.2.4 asks that database queries are built with parameterization or an equivalent that separates the query from its data. The requirement applies here because `store:accounts-db` is a PostgreSQL instance and `flow:process:ledger-service>store:accounts-db>read-write-balances` speaks the PostgreSQL wire protocol, so `process:ledger-service` builds queries. The submitted notes describe the credential that account uses and the privileges it holds, and say nothing at all about how the SQL reaching that connection is assembled. So the requirement applies and the input does not settle it. One sentence would settle it: whether the ledger service composes SQL by string concatenation or hands parameters to a driver.",
   "affected_element_ids": [
     "process:ledger-service",
     "store:accounts-db",
