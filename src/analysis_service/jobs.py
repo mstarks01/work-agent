@@ -474,6 +474,8 @@ class JobStore(Protocol):
 
     async def resumption(self, job_id: str, subject: str) -> Resumption | None: ...
 
+    async def resumed_by(self, job_id: str, subject: str) -> str | None: ...
+
     async def events_after(
         self, job_id: str, seen: int
     ) -> tuple[JobStatus, list[JobEvent]] | None: ...
@@ -535,7 +537,10 @@ class InMemoryJobStore:
         """
         if record.id in self._records:
             return Admission(outcome="duplicate", active=0)
-        if record.resumption is not None and self._resumed(record.resumption.parent_id):
+        if (
+            record.resumption is not None
+            and self._resumed_by(record.resumption.parent_id) is not None
+        ):
             return Admission(outcome="resumed_already", active=0)
 
         subject = record.owner_subject
@@ -585,20 +590,37 @@ class InMemoryJobStore:
             global_tokens=global_tokens,
         )
 
-    def _resumed(self, parent_id: str) -> bool:
-        """True where a resumed job of ``parent_id`` is in flight or spent.
+    def _resumed_by(self, parent_id: str) -> str | None:
+        """The resumed job of ``parent_id`` that is in flight or spent, if any.
 
-        A job takes one resumed job: a report's follow-up runs the analysis
-        once (ADR 0054), and a paused job's answers start one analysis. A
-        resumed job that failed or was rejected read nothing into a report,
-        so its parent takes answers again.
+        **The one reader of "does this job still take answers".** A job takes
+        one resumed job: a report's follow-up runs the analysis once (ADR
+        0054), and a paused job's answers start one analysis. A resumed job
+        that failed or was rejected read nothing into a report, so its parent
+        takes answers again. Admission, a saved round and the questions route
+        all ask this.
         """
-        return any(
-            held.resumption is not None
-            and held.resumption.parent_id == parent_id
-            and holds_its_parent(held.status)
-            for held in self._records.values()
+        return next(
+            (
+                held.id
+                for held in self._records.values()
+                if held.resumption is not None
+                and held.resumption.parent_id == parent_id
+                and holds_its_parent(held.status)
+            ),
+            None,
         )
+
+    async def resumed_by(self, job_id: str, subject: str) -> str | None:
+        """The ID of the owned job's resumed job that holds it, or ``None``.
+
+        ``None`` too where the job is not the subject's, as every other read
+        answers a foreign job.
+        """
+        record = self._records.get(job_id)
+        if record is None or record.owner_subject != subject:
+            return None
+        return self._resumed_by(job_id)
 
     async def get(self, job_id: str) -> JobRecord | None:
         record = self._records.get(job_id)
@@ -736,7 +758,7 @@ class InMemoryJobStore:
             or record.owner_subject != subject
             or record.status != "awaiting-answers"
             or record.round_revision != revision
-            or self._resumed(job_id)
+            or self._resumed_by(job_id) is not None
         ):
             return False
         record.round_revision += 1

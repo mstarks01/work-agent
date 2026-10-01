@@ -2023,7 +2023,7 @@ def test_the_app_and_the_store_free_a_parent_alike(state, status):
     asyncio.run(store.save(held.model_copy(update={"status": resumed.status})))
 
     assert resumed.status == status
-    assert paused.resumed is store._resumed("paused")
+    assert paused.resumed is (store._resumed_by("paused") is not None)
 
 
 @pytest.mark.parametrize("save", [True, False], ids=["save", "start"])
@@ -2091,3 +2091,76 @@ for (const combo of {json.dumps(combos)}) {{
             FactAnswer.model_validate({"key": fact["key"], "facets": given}).settles
         )
         assert page["covered"] is settles, combo
+
+
+def test_a_report_whose_follow_up_started_asks_nothing_and_says_where_it_went(tiers):
+    """The first-run app still offered a report's follow-up after its answers
+    started one, and every answer to it was refused (#1369)."""
+    client = client_for(tiers, PausingRunner(catalog=False), catalog=False)
+    finished = start(client, questions=False)
+    client.get(f"/events/{finished}")
+    page = client.get(f"/report/{finished}").text
+    (question,) = json.loads(
+        re.search(r'id="fact_questions"[^>]*>(.*?)</script>', page).group(1)
+    )
+    answer = {"key": question["key"], "value": "TLS 1.3"}
+    child = client.post(
+        f"/answer/{finished}",
+        json={"links": [], "facts": [answer]},
+        headers=SAME_ORIGIN,
+    ).json()["run"]
+    client.get(f"/events/{child}")
+
+    page = client.get(f"/report/{finished}").text
+    slot = re.search(r'id="resumed_by"[^>]*>(.*?)</script>', page).group(1)
+    asked = re.search(r'id="fact_questions"[^>]*>(.*?)</script>', page).group(1)
+
+    assert json.loads(slot) == child
+    assert json.loads(asked) == []
+
+
+@pytest.mark.parametrize(
+    "case", sorted(path.name for path in (PROJECT_ROOT / "evals/corpus").iterdir())
+)
+def test_the_page_opens_a_round_with_the_questions_the_service_counts(case):
+    """The page hides a part until its parent's "yes", and the service counts
+    a round without such a part: two readers of one rule, so a real ASVS
+    level 2 round is given to both (#1378)."""
+    from analysis_service.answer_round import question_set
+    from analysis_service.system_model import SystemModel
+    from webapp.main import early_rows
+
+    path = PROJECT_ROOT / "evals/corpus" / case / "model.json"
+    model = SystemModel.model_validate_json(path.read_text())
+    asked = question_set(
+        model,
+        None,
+        {"asvs": {"level": 2}},
+        [],
+        waiting=True,
+        answered=[],
+        answered_links=[],
+        final=False,
+        shown=[],
+    )
+    keys = {q.key for q in asked.early}
+    counted = [
+        q for q in asked.early if q.kind == "capability" and q.parent not in keys
+    ]
+    capabilities = [list(q.key) for q in asked.early if q.kind == "capability"]
+    steps = f"""
+await ids.analyze.listeners.submit({{ preventDefault() {{}} }}); await settle();
+streams[0].listeners.questions({{ data: JSON.stringify({{ run: "r1", questions: [],
+  facts: {json.dumps(early_rows(asked))}, remaining: {{}}, answered: [],
+  answered_links: [], revision: 0 }}) }});
+const walk = (n, out = []) => {{ for (const c of n.children || [])
+  if (typeof c === "object") {{ out.push(c); walk(c, out); }} return out; }};
+const asked = new Set({json.dumps(capabilities)}.map(k => JSON.stringify(k)));
+const shown = walk(ids.questions).filter(n => n.tag === "p" && !n.hidden
+  && walk(n).some(k => k.dataset && asked.has(k.dataset.key)));
+calls.push({{ shown: shown.length }});
+"""
+    seen = _run_form_script(steps)["calls"]
+
+    assert seen[-1]["shown"] == len(counted)
+    assert len(counted) < len(capabilities), "a control: the round holds a part"

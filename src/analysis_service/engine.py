@@ -271,6 +271,7 @@ class Engine:
         final: bool,
         shown: Sequence[UnknownKey] = (),
         skipped: Sequence[UnknownKey] = (),
+        resumed_by: str | None = None,
     ) -> QuestionSet:
         """Every question a run asks: a paused run's early list, or its report's.
 
@@ -279,7 +280,8 @@ class Engine:
         a paused run's saved rounds included. ``final`` marks a report the
         follow-up wrote, which asks nothing, ``shown`` is every early
         question the pause showed, and ``skipped`` every one its submitter
-        skipped for now.
+        skipped for now. ``resumed_by`` names the run these answers started,
+        where it holds this one, which then asks nothing.
         """
         return question_set(
             checkpoint.system_model,
@@ -292,6 +294,7 @@ class Engine:
             final=final,
             shown=shown,
             skipped=skipped,
+            resumed_by=resumed_by,
         )
 
     async def resume(

@@ -38,6 +38,9 @@
   const FALLBACK = JSON.parse(document.getElementById("question_fallback").textContent);
   // True for a report the follow-up wrote: it asks nothing more (ADR 0054).
   const FINAL = JSON.parse(document.getElementById("final").textContent);
+  // The run this report's follow-up started, where one holds it: the report
+  // then asks nothing, and its follow-up's report is the next one to read.
+  const RESUMED_BY = JSON.parse(document.getElementById("resumed_by").textContent);
   // A final report's answers, the corrections kept beside it, and the
   // findings they reach, built server-side (ADR 0054). Empty otherwise.
   const CORRECTIONS = JSON.parse(document.getElementById("corrections").textContent);
@@ -892,6 +895,15 @@
     $("links").append(el("div", "meta",
       "This report is final. Its one follow-up has run, so it asks no more " +
       "questions. The facts still open are listed under the conditional findings."));
+  }
+  if (RESUMED_BY) {
+    const note = el("div", "meta",
+      "Your answers to this report started its follow-up, so this report asks " +
+      "no more questions. When the follow-up finishes, its report is ");
+    const link = el("a", null, "here");
+    link.href = `/report/${encodeURIComponent(RESUMED_BY)}`;
+    note.append(link, ".");
+    $("links").append(note);
   }
   if (LINK_QUESTIONS.length || FACT_QUESTIONS.length) {
     const names = {};
