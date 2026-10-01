@@ -256,6 +256,9 @@
     if (remaining.field) {
       parts.push(`about ${remaining.field} question(s) about parts of your system`);
     }
+    if (data.questions.length) {
+      parts.push(`${data.questions.length} question(s) about which part of your system a name is`);
+    }
     if (!left) {
       const ready = document.createElement("p");
       ready.className = "hint";
@@ -266,19 +269,21 @@
         + "You can still change an answer below. Nothing runs until you choose Start the analysis.";
       questions.append(ready);
     }
-    if (parts.length) {
-      const estimate = document.createElement("p");
-      estimate.className = "hint";
-      // Each link question is one choice too, though no round limit counts it.
-      // A part shows only after its parent's "yes", so the round does not
-      // count it until then.
-      const inRound = new Set(data.facts.map((q) => JSON.stringify(q.key)));
-      const opens = data.facts.filter((q) => !(q.parent && inRound.has(JSON.stringify(q.parent))));
-      const choices = opens.reduce((sum, q) => sum + q.decisions, 0) + data.questions.length;
+    // The round's choices as the page shows them: each link question is one,
+    // and a part counts only while it shows, after its parent's "yes". The
+    // line is told again each time a part shows or hides.
+    const counted = [];
+    const estimate = document.createElement("p");
+    estimate.className = "hint";
+    const choicesOf = (rows) => rows.reduce((sum, row) => sum + row.decisions, 0);
+    const tally = () => {
+      const shown = choicesOf(counted.filter((row) => !row.hidden())) + data.questions.length;
+      const later = choicesOf(counted.filter((row) => row.hidden()));
       estimate.textContent = `There are ${parts.join(" and ")} that can change the`
-        + ` analysis. This round asks ${choices} choice(s).`;
-      questions.append(estimate);
-    }
+        + ` analysis. This round asks ${shown} choice(s).`
+        + (later ? ` Up to ${later} more appear if you answer \u201cyes\u201d.` : "");
+    };
+    if (parts.length) questions.append(estimate);
     if (data.questions.length) {
       heading("Which element is each of these?",
         "Your description states facts about these people or systems, but not"
@@ -308,14 +313,16 @@
       roundRows.push({ key: q.key, read: () => select.value });
     }
     // The open facts, asked once per kind of question or attribute with a row
-    // per element. A group ranks by its best question, so the order of the
-    // list is kept. The first groups are open, and the rest are one click away.
+    // per element. A group comes where its most useful question comes in the
+    // list, so a later row of a group can come before a better question of
+    // the next group. Each group's title says how many choices it asks. The
+    // first groups are open, and the rest are one click away.
     const OPEN_GROUPS = 5;
     if (data.facts.length) {
       heading("Facts your description does not state",
         "Each question is asked once, with a row for each part of your system it"
-        + " applies to. The first ones are the most likely to matter. Leave any"
-        + " row blank that you cannot answer.");
+        + " applies to. A group comes first where its most useful question is"
+        + " more likely to matter. Leave any row blank that you cannot answer.");
     }
     // An earlier answer by its key: a question with facets comes back while a
     // facet has no answer, and its answered facets are filled in.
@@ -405,14 +412,25 @@
       read.open = () => selects.some((select) => !select.value);
       return read;
     };
-    // Why a question is asked, and the words of the description its element
-    // was read from, so the owner sees what the service read.
+    // Which analysis an answer serves: a capability decides what a framework
+    // covers, and every other fact is read by the analysis itself.
+    const serves = (q) => {
+      const names = q.frameworks || [];
+      if (!names.length) return null;
+      const which = `the ${names.join(" and ")} ${names.length > 1 ? "analyses" : "analysis"}`;
+      return q.kind === "capability" ? `Decides what ${which} covers` : `Used by ${which}`;
+    };
+    // Why a question is asked, which analysis it serves, and the words of the
+    // description its element was read from. The words are what the service
+    // read, not an answer to the question.
     const context = (q) => {
       const parts = [];
       if (q.reasons.length) parts.push(`Why: ${q.reasons[0]}`);
+      const use = serves(q);
+      if (use) parts.push(use);
       if (q.excerpt) {
         const cut = q.excerpt.length > EXCERPT ? `${q.excerpt.slice(0, EXCERPT)}\u2026` : q.excerpt;
-        parts.push(`Your description: \u201c${cut}\u201d`);
+        parts.push(`Your description of this part, for reference: \u201c${cut}\u201d`);
       }
       if (!parts.length) return null;
       const hint = document.createElement("div");
@@ -424,9 +442,13 @@
     // Each answer's input by its key, so a capability that is part of another
     // can follow its parent's answer.
     const inputs = new Map();
+    // Each choice row by its key, and the parts that follow each answer.
+    const rows = new Map();
+    const followers = new Map();
     data.facts.forEach((q) => {
       const group = groups.get(q.group);
       group.count += 1;
+      group.choices = (group.choices || 0) + (q.decisions || 1);
       const label = document.createElement("b");
       label.textContent = q.element;
       // Why the fact matters: the questions of the rules that fire on it.
@@ -443,6 +465,7 @@
         const read = facetRow(group.grid, q, who, before && before.facets);
         answers.push(read);
         roundRows.push({ key: q.key, read, open: read.open });
+        counted.push({ decisions: q.decisions || 1, hidden: () => false });
         return;
       }
       const row = document.createElement("p");
@@ -461,9 +484,23 @@
       // A hidden row sends no answer, so a "no" to the parent is never
       // contradicted by an answer to its part.
       const parent = q.parent ? inputs.get(JSON.stringify(q.parent)) : null;
+      counted.push({ decisions: q.decisions || 1, hidden: () => row.hidden });
+      rows.set(input.dataset.key, row);
       if (parent) {
-        const follow = () => { row.hidden = parent.value !== "yes"; };
-        parent.addEventListener("change", follow);
+        // A part of a hidden part hides too, whatever its parent's answer.
+        const above = rows.get(parent.dataset.key);
+        const follow = () => {
+          row.hidden = parent.value !== "yes" || above.hidden;
+          for (const next of followers.get(input.dataset.key) || []) next();
+          tally();
+        };
+        if (!followers.has(parent.dataset.key)) {
+          followers.set(parent.dataset.key, []);
+          parent.addEventListener("change", () => {
+            for (const next of followers.get(parent.dataset.key)) next();
+          });
+        }
+        followers.get(parent.dataset.key).push(follow);
         follow();
       }
       const answer = () => {
@@ -476,6 +513,7 @@
       if (about) row.append(about);
       group.box.append(row);
     });
+    tally();
     for (const [name, group] of groups) {
       if (group.rows.length) {
         const shared = inputFor(data.facts.find((q) => q.group === name), "");
@@ -495,7 +533,8 @@
           + " own answer, and you can still change it.";
         group.top.append(line, hint);
       }
-      group.title.textContent = `${group.heading} (${group.count})`;
+      group.title.textContent = `${group.heading} (${group.count} question(s),`
+        + ` ${group.choices} choice(s))`;
       questions.append(group.box);
     }
     // Every earlier answer, each with a button that opens it again. An
@@ -563,7 +602,8 @@
     const skippedLinks = data.skipped_links || [];
     skippedBox.hidden = !(skipped.length || skippedLinks.length);
     const skippedTitle = document.createElement("summary");
-    skippedTitle.textContent = `Skipped for now (${skipped.length + skippedLinks.length})`;
+    skippedTitle.textContent = `Skipped for now (${skipped.length + skippedLinks.length},`
+      + " optional)";
     skippedBox.append(skippedTitle);
     for (const q of skippedLinks) {
       const row = document.createElement("p");

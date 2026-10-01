@@ -1370,6 +1370,8 @@ _STYLE = """
   @keyframes spin { to { transform: rotate(360deg); } }
   @media (prefers-reduced-motion: reduce) { .spinner { animation: none; } }
   .hint { font-size: .85rem; opacity: .7; }
+  /* A facet table can be wider than a phone: it scrolls in its own box. */
+  table { display: block; max-width: 100%; overflow-x: auto; }
 """
 
 _FORM_PAGE = (
