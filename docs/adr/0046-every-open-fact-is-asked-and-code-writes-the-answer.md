@@ -9,7 +9,10 @@
 - **Evidence**: `QA-2026-09-26-03-E6` and `-E7` in `evals/experiments/`
 - **Amended by**: [ADR 0049](0049-an-answer-binds-to-an-open-fact-and-the-order-completes-findings.md),
   which orders questions by the findings each completes, leaves rejected drafts
-  out of the count, and refuses an answer to a stated attribute
+  out of the count, and refuses an answer to a stated attribute; and
+  [ADR 0056](0056-the-findings-that-wait-decide-the-follow-up-order.md), where
+  the findings that wait decide the order and the evidence section no longer
+  comes first
 
 ## Context
 

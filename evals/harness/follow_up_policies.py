@@ -32,13 +32,12 @@ from pathlib import Path
 
 from analysis_service.claims import UnknownKey
 from analysis_service.critic import complete_rulings
-from analysis_service.fact_answers import answer_facets
 from analysis_service.frameworks import SCHEMAS
 from analysis_service.questions import (
     Basis,
     Finding,
     FollowUpNeeds,
-    _greedy,
+    choices_of,
     follow_up_needs,
     follow_up_order,
 )
@@ -47,117 +46,69 @@ from analysis_service.report import Report
 #: The owner effort, in choices, at which each order is read.
 BUDGETS = (1, 2, 3, 5, 10, 15, 20)
 
-#: The largest bundle, in choices, a bounded policy asks for one finding.
-BUNDLE = 3
 
-
-def cost(key: UnknownKey) -> int:
-    """The choices one question takes: one a facet, else one."""
-    return len(answer_facets(key)) or 1
-
-
-def _step(
-    left: Mapping[Finding, AbstractSet[UnknownKey]],
-    band: Mapping[Finding, int],
-    bound: int | None,
-) -> list[UnknownKey]:
-    """The next facts: the highest band left decides.
-
-    Where a fact completes findings of the highest band, the next is the one
-    that completes the most of them, then the most in each band below. Where
-    none does, the facts of that band's finding with the fewest choices left,
-    the most cited first: a bundle. Where ``bound`` is set and that bundle
-    costs more choices, the step falls back to the fact that completes the
-    most findings in any band, highest band first, as the shipped order does.
-    """
-    cites = Counter(key for keys in left.values() for key in keys)
-    top = max(band[finding] for finding in left)
-    bands = sorted({band[finding] for finding in left}, reverse=True)
-    completes: dict[UnknownKey, Counter[int]] = {}
-    for finding, keys in left.items():
-        if len(keys) == 1:
-            completes.setdefault(next(iter(keys)), Counter())[band[finding]] += 1
-
-    def best(pool: Mapping[UnknownKey, Counter[int]]) -> UnknownKey:
-        return min(
-            pool,
-            key=lambda key: (
-                tuple(-pool[key][level] for level in bands),
-                -cites[key],
-                key,
-            ),
-        )
-
-    at_top = {key: done for key, done in completes.items() if done[top]}
-    if at_top:
-        return [best(at_top)]
-    nearest = min(
-        (keys for finding, keys in left.items() if band[finding] == top),
-        key=lambda keys: (sum(cost(key) for key in keys), len(keys), sorted(keys)),
-    )
-    if bound is not None and sum(cost(key) for key in nearest) > bound and completes:
-        return [best(completes)]
-    return sorted(nearest, key=lambda key: (-cites[key], key))
-
-
-def _band_first(
-    open_facts: Mapping[Finding, AbstractSet[UnknownKey]],
-    band: Mapping[Finding, int],
-    bound: int | None,
-) -> list[UnknownKey]:
-    left = {finding: set(keys) for finding, keys in open_facts.items() if keys}
-    order: list[UnknownKey] = []
-    while left:
-        chosen = _step(left, band, bound)
-        order.extend(chosen)
-        left = {
-            finding: keys - set(chosen)
-            for finding, keys in left.items()
-            if keys - set(chosen)
-        }
-    return order
-
-
-def _sections(
-    needs: FollowUpNeeds, bound: int | None
-) -> list[tuple[Basis, UnknownKey]]:
-    """The two sections the shipped order keeps, each ordered band first."""
+def _completion_first(needs: FollowUpNeeds) -> list[tuple[Basis, UnknownKey]]:
+    """The order ADR 0055 shipped: each draft's grounds first, then the facts
+    only the critic named, each section in the order that completes the most
+    findings, highest band first."""
     band = {finding: each.order for finding, each in needs.bands.items()}
-    first = _band_first(needs.evidence, band, bound)
+    first = _completing(needs.evidence, band)
     asked = set(first)
-    later = _band_first({f: k - asked for f, k in needs.named.items()}, band, bound)
+    later = _completing({f: keys - asked for f, keys in needs.named.items()}, band)
     return [*(("evidence", key) for key in first), *(("critic", key) for key in later)]
 
 
-def _material(needs: FollowUpNeeds) -> list[tuple[Basis, UnknownKey]]:
-    """One order over the conditional findings, critic facts included, each
-    question still labelled with its basis."""
-    band = {finding: each.order for finding, each in needs.bands.items()}
-    grounded = {key for keys in needs.evidence.values() for key in keys}
-    return [
-        ("evidence" if key in grounded else "critic", key)
-        for key in _band_first(needs.waiting, band, None)
-    ]
+def _completing(
+    open_facts: Mapping[Finding, AbstractSet[UnknownKey]], band: Mapping[Finding, int]
+) -> list[UnknownKey]:
+    """The facts in the order that completes the most important findings first.
 
-
-def _shipped_material(needs: FollowUpNeeds) -> list[tuple[Basis, UnknownKey]]:
-    """The shipped completion rule over the conditional findings only: the
-    control that says how much of a material order's gain is the band rule."""
-    band = {finding: each.order for finding, each in needs.bands.items()}
-    grounded = {key for keys in needs.evidence.values() for key in keys}
-    return [
-        ("evidence" if key in grounded else "critic", key)
-        for key in _greedy(needs.waiting, band)
-    ]
+    ``band`` is each finding's :class:`~analysis_service.frameworks.Band`
+    order. Where one question completes findings, the next is the one that
+    completes the most in the highest band, then in the next band down, and so
+    on: one critical finding before three low ones, with no weights. Where
+    none does, the next are the facts of the highest-band finding with the
+    fewest left, the most cited first. A tie goes to more citations, then to
+    the lower key, so one input always gives one order. Measured against
+    asking the most cited fact first, completing the most findings covers more
+    at every depth (``QA-2026-09-26-03-E17``).
+    """
+    left = {finding: set(keys) for finding, keys in open_facts.items() if keys}
+    order: list[UnknownKey] = []
+    while left:
+        cites = Counter(key for keys in left.values() for key in keys)
+        bands = sorted({band[finding] for finding in left}, reverse=True)
+        completes: dict[UnknownKey, Counter[int]] = {}
+        for finding, keys in left.items():
+            if len(keys) == 1:
+                completes.setdefault(next(iter(keys)), Counter())[band[finding]] += 1
+        if completes:
+            chosen = [
+                min(
+                    completes,
+                    key=lambda key: (
+                        tuple(-completes[key][level] for level in bands),
+                        -cites[key],
+                        key,
+                    ),
+                )
+            ]
+        else:
+            nearest = min(
+                left.items(),
+                key=lambda item: (-band[item[0]], len(item[1]), sorted(item[1])),
+            )[1]
+            chosen = sorted(nearest, key=lambda key: (-cites[key], key))
+        order.extend(chosen)
+        asked = set(chosen)
+        left = {finding: keys - asked for finding, keys in left.items() if keys - asked}
+    return order
 
 
 #: Every order compared, by name.
 POLICIES: Mapping[str, Callable[[FollowUpNeeds], list[tuple[Basis, UnknownKey]]]] = {
     "shipped": follow_up_order,
-    "band-first": lambda needs: _sections(needs, None),
-    "band-first-bounded": lambda needs: _sections(needs, BUNDLE),
-    "band-first-material": _material,
-    "shipped-material": _shipped_material,
+    "completion-first": _completion_first,
 }
 
 
@@ -199,9 +150,9 @@ def readings(path: str, report: Report, built: Report | None = None) -> list[Rea
             spent = 0
             answered: set[UnknownKey] = set()
             for key in order:
-                if budget is not None and spent + cost(key) > budget:
+                if budget is not None and spent + choices_of(key) > budget:
                     break
-                spent += cost(key)
+                spent += choices_of(key)
                 answered.add(key)
             done = [
                 labels[finding]

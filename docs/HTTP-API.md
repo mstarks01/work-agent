@@ -223,9 +223,12 @@ service loses it, with its extraction; submit it again.
 
 Most findings are conditional: they rest on facts the sources never state,
 such as how a flow is protected. `fact_questions` lists every such fact the
-report's findings cite. The first question is the one that completes the most
-of the most important findings: one critical finding before three low ones
-([ADR 0055](adr/0055-a-follow-up-asks-first-what-the-most-important-findings-wait-on.md)).
+report's findings cite. The facts the most important waiting findings need
+come first: a critical finding that waits on two facts before a low one that
+waits on one
+([ADR 0056](adr/0056-the-findings-that-wait-decide-the-follow-up-order.md)).
+`basis` says whether a draft's own grounds cite the fact (`evidence`) or only
+the reviewer named it (`critic`).
 `band` names the most important finding that waits on the question, such as
 `critical` for STRIDE or `level 1` for ASVS:
 

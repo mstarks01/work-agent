@@ -3,6 +3,7 @@
 - **Status**: accepted
 - **Date**: 2026-09-30
 - **Effort**: [#1289](https://github.com/mstarks01/work-agent/issues/1289)
+- **Amended by**: [ADR 0056](0056-the-findings-that-wait-decide-the-follow-up-order.md)
 - **Amends**: the order of [ADR 0049](0049-an-answer-binds-to-an-open-fact-and-the-order-completes-findings.md)
 - **Relates to**: [ADR 0054](0054-a-report-offers-one-follow-up.md)
 - **Evidence**: `QA-2026-09-26-03-E25` in `evals/experiments/`

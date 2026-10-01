@@ -924,11 +924,15 @@
     // One reader per fact question: `read` is its answer as the service takes
     // it, or null; `known` is whether that answer says more than "I don't know".
     const factAnswers = [];
-    // Why a question is here: skipped before the analysis, or new from it.
-    // The reviewer's own questions are headed apart below.
+    // Why a question is here: skipped before the analysis, new from it, or
+    // raised by the reviewer. The list puts the most important findings'
+    // questions first, so the reviewer's questions sit among the others and
+    // each one says so.
     const why = q => q.asked_before
       ? " (you skipped this before the analysis)"
-      : q.basis === "evidence" ? " (new from the analysis)" : "";
+      : q.basis === "evidence"
+        ? " (new from the analysis)"
+        : " (raised by the reviewer; it can change when the analysis runs again)";
     // The findings that wait on a question, by title, so the owner sees what
     // an answer can settle.
     const titles = {};
@@ -997,7 +1001,6 @@
       // The facts only the critic named come after the ones the findings' own
       // evidence rests on, and they can change when the analysis runs again,
       // so they are headed apart.
-      let criticHeaded = false;
       // A finding is covered once every question that names it has an answer,
       // in any order, so the count follows the answers given, not the rank.
       const waitsOn = new Map();
@@ -1015,11 +1018,6 @@
       }
       ordered.forEach((q, index) => {
         const into = !q.findings.length ? unwaited : index < SHOWN ? box : more;
-        if (q.basis === "critic" && !criticHeaded) {
-          criticHeaded = true;
-          into.append(el("h3", null,
-            "Raised by the reviewer \u2014 these can change when the analysis runs again"));
-        }
         const row = el("p");
         const editor = editorFor(q, null, recount, names);
         factAnswers.push({ read: editor.read, known: editor.known });

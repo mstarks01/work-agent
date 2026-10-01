@@ -3,19 +3,18 @@
 A ``needs-info`` verdict names the facts an answer would settle. This module
 turns a report's findings into its ranked list of questions (#1225).
 
-**Every open fact is asked, in the order that completes the most findings.**
-The facts a finding's own grounds cite come first, in an order the critic
-cannot change; the facts only the critic named follow
-(``QA-2026-09-26-03-E7``). With the STRIDE lane closing a conditional finding
-waits on several facts, and six questions settled about a quarter of them
-where asking every one settled all (``QA-2026-09-26-03-E6``). So no cap is
-chosen here. The next question is the one that completes the most findings, so
-that each has every fact it waits on answered (``QA-2026-09-26-03-E17``). Each
-question states how many findings are covered once it and every question
-before it is answered. That count is coverage, not a verdict: only the resumed
-run rules on a finding again. A rejected draft still ranks the questions, and
-is left out of every count. A submitter answers from the top as far as they
-choose.
+**Every open fact is asked, the most important findings' facts first**
+(ADR 0056). The findings that wait on an answer decide the order, the highest
+band first: a critical finding that waits on two facts comes before a low one
+that waits on one. Each question keeps its basis, ``evidence`` where a
+draft's own grounds cite it and ``critic`` where only the critic named it.
+With the STRIDE lane closing a conditional finding waits on several facts,
+and six questions settled about a quarter of them where asking every one
+settled all (``QA-2026-09-26-03-E6``). So no cap is chosen here. Each question
+states how many findings are covered once it and every question before it is
+answered. That count is coverage, not a verdict: only the resumed run rules
+on a finding again. The facts no waiting finding needs follow, in their own
+section of the page. A submitter answers from the top as far as they choose.
 """
 
 from __future__ import annotations
@@ -60,6 +59,7 @@ __all__ = [
     "Fallback",
     "Finding",
     "FollowUpNeeds",
+    "choices_of",
     "fact_questions",
     "follow_up_needs",
     "follow_up_order",
@@ -134,36 +134,43 @@ class FactQuestion:
         }
 
 
-def _greedy(
+def choices_of(key: UnknownKey) -> int:
+    """The choices one question takes: one a facet, else one."""
+    return len(answer_facets(key)) or 1
+
+
+def _by_band(
     open_facts: Mapping[Finding, AbstractSet[UnknownKey]], band: Mapping[Finding, int]
 ) -> list[UnknownKey]:
-    """The facts in the order that completes the most important findings first.
+    """The facts in the order that serves the most important findings first.
 
-    ``band`` is each finding's :class:`~analysis_service.frameworks.Band`
-    order. Where one question completes findings, the next is the one that
-    completes the most in the highest band, then in the next band down, and so
-    on: one critical finding before three low ones, with no weights. Where
-    none does, the next are the facts of the highest-band finding with the
-    fewest left, the most cited first. A tie goes to more citations, then to
-    the lower key, so one input always gives one order. Measured against
-    asking the most cited fact first, completing the most findings covers more
-    at every depth (``QA-2026-09-26-03-E17``).
+    ``band`` is each finding's :class:`~analysis_service.bands.Band` order.
+    The highest band left decides each step. Where a fact completes findings
+    of that band, the next is the one that completes the most of them, then
+    the most in each band below. Where none does, the next are the facts of
+    that band's finding with the fewest choices left, the most cited first,
+    asked together. A lower band never comes before a higher one that still
+    waits: a critical finding that waits on two facts comes before a low one
+    that waits on one. A tie goes to more citations, then to the lower key,
+    so one input always gives one order (``QA-2026-09-26-03-E35``).
     """
     left = {finding: set(keys) for finding, keys in open_facts.items() if keys}
     order: list[UnknownKey] = []
     while left:
         cites = Counter(key for keys in left.values() for key in keys)
+        top = max(band[finding] for finding in left)
         bands = sorted({band[finding] for finding in left}, reverse=True)
         completes: dict[UnknownKey, Counter[int]] = {}
         for finding, keys in left.items():
             if len(keys) == 1:
                 completes.setdefault(next(iter(keys)), Counter())[band[finding]] += 1
-        if completes:
+        at_top = {key: done for key, done in completes.items() if done[top]}
+        if at_top:
             chosen = [
                 min(
-                    completes,
+                    at_top,
                     key=lambda key: (
-                        tuple(-completes[key][level] for level in bands),
+                        tuple(-at_top[key][level] for level in bands),
                         -cites[key],
                         key,
                     ),
@@ -171,9 +178,13 @@ def _greedy(
             ]
         else:
             nearest = min(
-                left.items(),
-                key=lambda item: (-band[item[0]], len(item[1]), sorted(item[1])),
-            )[1]
+                (keys for finding, keys in left.items() if band[finding] == top),
+                key=lambda keys: (
+                    sum(choices_of(key) for key in keys),
+                    len(keys),
+                    sorted(keys),
+                ),
+            )
             chosen = sorted(nearest, key=lambda key: (-cites[key], key))
         order.extend(chosen)
         asked = set(chosen)
@@ -259,16 +270,37 @@ def follow_up_needs(
 def follow_up_order(needs: FollowUpNeeds) -> list[tuple[Basis, UnknownKey]]:
     """The order the follow-up asks its facts in, each with its basis.
 
-    The evidence section first, ranked over every draft's grounds; then the
-    facts only the critic named. Every draft ranks by its band, whatever its
-    verdict, so the evidence section does not depend on the critic: a band
-    is the lane's rating or the catalog's, and a ruling sets neither.
+    **The findings that wait decide the order** (ADR 0056). The facts the
+    conditional findings wait on come first, the most important findings'
+    first (:func:`_by_band`), the critic's facts among them. The facts of the
+    other drafts follow: a confirmed or rejected draft, and one that waits on
+    a fact answered "I don't know", which no answer here can complete. Each
+    fact is ``evidence`` where any draft's own grounds cite it, and
+    ``critic`` where only a verdict names it.
+
+    The order reads the critic's verdicts, so a critic sampled again moves
+    it. Built from one sample and scored on another, it still completed 29%
+    more critical and high findings at five choices than the evidence-first
+    order, and 42% more at ten (``QA-2026-09-26-03-E35``).
     """
-    order = {finding: band.order for finding, band in needs.bands.items()}
-    first = _greedy(needs.evidence, order)
+    band = {finding: each.order for finding, each in needs.bands.items()}
+    first = _by_band(needs.waiting, band)
     asked = set(first)
-    later = _greedy({f: keys - asked for f, keys in needs.named.items()}, order)
-    return [*(("evidence", key) for key in first), *(("critic", key) for key in later)]
+    rest = _by_band(
+        {
+            finding: (
+                needs.evidence.get(finding, frozenset())
+                | needs.named.get(finding, frozenset())
+            )
+            - asked
+            for finding in needs.bands.keys() - needs.waiting.keys()
+        },
+        band,
+    )
+    grounded = {key for keys in needs.evidence.values() for key in keys}
+    return [
+        ("evidence" if key in grounded else "critic", key) for key in (*first, *rest)
+    ]
 
 
 def fact_questions(
