@@ -1077,3 +1077,30 @@ def test_a_lane_with_no_unit_left_calls_no_model():
     ]
     for lane in nodes.lanes:
         assert bool(models[lane.node_name].seen) == (lane.node_name not in idle)
+
+
+@pytest.mark.parametrize("role", [graph.CRITIC_ROLE, graph.RECRITIC_ROLE])
+def test_both_review_passes_read_the_submitted_sources(role):
+    """A source can state what extraction left out, so each pass reads it whole.
+
+    The critic's model view carries no element excerpts, and before #1295 the
+    critic had no other way to see the text a draft argues against.
+    """
+    fixture = SCRIPTED_FRAMEWORKS["stride"]
+    nodes = graph.FrameworkNodes("stride")
+    replies = {
+        "extract": emitted(valid_model()),
+        graph.analyze_node_name("stride", fixture.lane): fixture.proposal,
+        # A first pass that rules on nothing sends the drafts to the re-ask.
+        nodes.node(graph.CRITIC_ROLE): (
+            EMPTY_CLAIMS if role == graph.RECRITIC_ROLE else fixture.ruling
+        ),
+        nodes.node(graph.RECRITIC_ROLE): fixture.ruling,
+    }
+    pipeline, models = build(replies, frameworks=("stride",))
+
+    outcome = asyncio.run(AdkPipelineRunner(pipeline).run(pair_job(("stride",)), None))
+
+    assert isinstance(outcome, PipelineCompleted)
+    (instruction,) = models[nodes.node(role)].seen
+    assert DESCRIPTION_TEXT in instruction

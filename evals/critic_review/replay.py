@@ -27,7 +27,7 @@ from __future__ import annotations
 
 import json
 import re
-from collections.abc import Awaitable, Callable, Iterable
+from collections.abc import Awaitable, Callable, Iterable, Sequence
 from dataclasses import dataclass
 from typing import Any, Protocol
 
@@ -41,6 +41,7 @@ from analysis_service.graph import merge_summary, render_fenced, rulings_of
 from analysis_service.markdown_loader import MarkdownLoader
 from analysis_service.prompts import compose_critic_prompt
 from analysis_service.skills import compose_critic_skills
+from analysis_service.sources import Source, render_sources
 from analysis_service.system_model import SystemModel
 from evals.critic_review.model import CriticFixture
 from evals.harness.alignment import singular
@@ -50,7 +51,12 @@ from evals.harness.alignment import singular
 #: placeholder reaches a model as a literal brace, and a critic reading
 #: ``{boundary_crossings}`` where the crossings should be rules on a model it
 #: cannot see and says nothing about why.
-PLACEHOLDERS: tuple[str, ...] = ("system_model", "boundary_crossings", "drafts")
+PLACEHOLDERS: tuple[str, ...] = (
+    "system_model",
+    "boundary_crossings",
+    "drafts",
+    "input_text",
+)
 
 #: An async callable taking one composed instruction and returning the model's
 #: raw text. Injected so the mechanical half runs scripted and free.
@@ -60,6 +66,7 @@ CriticCall = Callable[[str], Awaitable[str]]
 def compose(
     fixtures: list[CriticFixture],
     model: SystemModel,
+    sources: Sequence[Source],
     package: FrameworkPackage,
     package_loader: MarkdownLoader,
     prompt_loader: MarkdownLoader,
@@ -93,6 +100,7 @@ def compose(
             ]
         ),
         "drafts": render_fenced(critic_view(drafts, model)),
+        "input_text": render_sources(sources),
     }
     prompt = compose_critic_prompt(prompt_loader)
     for name, block in filled.items():
@@ -539,6 +547,7 @@ def _reading(ruling: Ruling | None) -> RecommendationReadingLike | None:
 async def replay(
     fixtures: list[CriticFixture],
     model: SystemModel,
+    sources: Sequence[Source],
     package: FrameworkPackage,
     package_loader: MarkdownLoader,
     prompt_loader: MarkdownLoader,
@@ -552,7 +561,9 @@ async def replay(
     a job, and the replay reports it rather than scoring around it.
     """
     drafts = [_draft_of(fixture, package) for fixture in fixtures]
-    raw = await call(compose(fixtures, model, package, package_loader, prompt_loader))
+    raw = await call(
+        compose(fixtures, model, sources, package, package_loader, prompt_loader)
+    )
     rulings = parse_rulings(raw, package)
     problems = review_issues(drafts, rulings, model)
     return score(fixtures, rulings, package), list(problems.messages)

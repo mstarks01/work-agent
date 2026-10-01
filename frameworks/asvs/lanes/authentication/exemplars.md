@@ -37,9 +37,9 @@ A password exists, so the password requirements apply. Their subject is a parame
 {
   "requirement": "2.1",
   "direction": "question",
-  "needs_evidence": "config",
+  "needs_evidence": "prose",
   "title": "No password length policy is stated for customer accounts",
-  "description": "V6.2.1 sets a floor on password length. It applies here because `flow:entity:customer>process:web-api>submit-payment` authenticates `entity:customer` with an email and a password, so this system runs password authentication. The notes describe the mechanism and carry no parameter of it: no minimum length, no maximum, and no statement about what the registration form accepts. The requirement applies and the input does not settle it. The password policy `process:web-api` enforces at registration would settle it.",
+  "description": "V6.2.1 sets a floor on password length. It applies here because `flow:entity:customer>process:web-api>submit-payment` authenticates `entity:customer` with an email and a password, so this system runs password authentication. The notes describe the mechanism and carry no parameter of it: no minimum length, no maximum, and no statement about what the registration form accepts. The requirement applies and the input does not settle it. A sentence stating the minimum length that `process:web-api` enforces at registration would settle it.",
   "affected_element_ids": [
     "entity:customer",
     "process:web-api"

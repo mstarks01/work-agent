@@ -29,7 +29,12 @@ from pathlib import Path
 from analysis_service.deployment import Deployment
 from analysis_service.frameworks import PACKAGES, FrameworkName, schemas_for
 from analysis_service.markdown_loader import MarkdownLoader
-from evals.critic_review.loading import REPO_ROOT, corpus_model, load_fixtures
+from evals.critic_review.loading import (
+    REPO_ROOT,
+    corpus_model,
+    corpus_sources,
+    load_fixtures,
+)
 from evals.critic_review.model import CriticFixture
 from evals.critic_review.replay import replay, user_turn
 from evals.harness.node_call import node_call
@@ -94,7 +99,8 @@ def main(argv: list[str] | None = None) -> int:
 
     framework = _one_framework(fixtures)
     package = PACKAGES[framework]
-    model = corpus_model(_one_case(fixtures))
+    case_id = _one_case(fixtures)
+    model = corpus_model(case_id)
     # The node's own route, sampling and output schema, through the one helper
     # every replay uses, and the user turn a real critic receives: its fan-in's
     # summary, built by the function the merge node returns it from.
@@ -110,6 +116,7 @@ def main(argv: list[str] | None = None) -> int:
         replay(
             fixtures,
             model,
+            corpus_sources(case_id),
             package,
             MarkdownLoader(REPO_ROOT / "frameworks" / framework),
             MarkdownLoader(REPO_ROOT / "prompts"),

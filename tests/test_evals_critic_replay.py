@@ -14,6 +14,7 @@ import pytest
 
 from analysis_service.markdown_loader import MarkdownLoader
 from evals.harness import critic_replay
+from evals.harness.modes import EvalRunError
 from evals.harness.provenance import REPO_ROOT
 from tests.test_evals_lane_replay import recorded  # noqa: F401  (fixture)
 from tests.test_evals_run_grounds import case  # noqa: F401  (fixture)
@@ -109,10 +110,21 @@ def test_the_job_wide_keys_render_from_the_report_as_prepare_captured(
     out, _ = recorded
     captured = critic_replay.load(out, case.id, "stride")
 
-    assert critic_replay.shared_keys(captured.report) == {
-        name: captured.shared[name]
-        for name in critic_replay.shared_keys(captured.report)
-    }
+    rendered = critic_replay.shared_keys(captured.report, case.id)
+
+    assert rendered == {name: captured.shared[name] for name in rendered}
+
+
+def test_corpus_sources_the_report_was_not_run_on_are_refused(
+    recorded,  # noqa: F811
+    case,  # noqa: F811
+):
+    out, _ = recorded
+    report = critic_replay.load(out, case.id, "stride").report
+    other = report.input.model_copy(update={"source_sha256": "0" * 64})
+
+    with pytest.raises(EvalRunError, match="not the ones the report was run on"):
+        critic_replay.shared_keys(report.model_copy(update={"input": other}), case.id)
 
 
 def test_a_sweep_with_no_lane_capture_rebuilds_the_same_request(recorded, case):  # noqa: F811

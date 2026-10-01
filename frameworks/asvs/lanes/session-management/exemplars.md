@@ -35,7 +35,7 @@ Generation is the requirement the input can least often settle, and assuming a f
 {
   "requirement": "2.3",
   "direction": "question",
-  "needs_evidence": "code",
+  "needs_evidence": "prose",
   "title": "The session token's generation is never described",
   "description": "V7.2.3 sets a floor on the entropy of a session token and asks how it is generated. It applies here for the same reason V7.4.1 does: a session cookie is issued to `entity:customer` after a password login. The notes name the cookie and describe neither its length, its alphabet, nor the generator behind it. The requirement applies and the input does not settle it, and the framework `process:web-api` runs on is not evidence about the token — a stated generator would be.",
   "affected_element_ids": [

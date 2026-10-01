@@ -10,7 +10,7 @@ Two drafts against exemplar system A. The first rests on an `unknown` attribute 
 {
   "requirement": "3.1",
   "direction": "question",
-  "needs_evidence": "config",
+  "needs_evidence": "prose",
   "title": "No cipher mode is stated for data at rest in the accounts database",
   "description": "V11.3.1 asks that no encryption uses an insecure block mode such as ECB or a weak padding scheme. It applies here because `store:accounts-db` is classified confidential and tagged `pii` and `financial`, so it holds data the standard expects to be encrypted. Its `encryption_at_rest` is never stated, so the input does not say whether encryption happens at all, let alone in which mode. The requirement applies and the input does not settle it — an `unknown` attribute is an unanswered question and not a missing control. Stating what protects `store:accounts-db` at rest would settle it.",
   "affected_element_ids": [
