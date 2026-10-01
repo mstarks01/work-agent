@@ -185,8 +185,12 @@ def compose_recritic_prompt(loader: MarkdownLoader) -> str:
     No exemplars, like the critic — it re-rules the drafts it was given
     against the mechanical problems in its previous output, and the checks it
     must satisfy run in :mod:`analysis_service.critic`.
+
+    The question kinds follow the body as they follow the critic's, because a
+    repaired ``related_unknowns`` entry may have to name one.
     """
-    return loader.load(RECRITIC_PROMPT_NAME).strip() + "\n"
+    parts = [loader.load(RECRITIC_PROMPT_NAME), render_question_kinds()]
+    return "\n\n".join(part.strip() for part in parts) + "\n"
 
 
 def compose_extract_prompt(
