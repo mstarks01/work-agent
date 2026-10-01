@@ -10,65 +10,31 @@ from __future__ import annotations
 
 import asyncio
 
-import httpx
 import pytest
-from google.adk.models.llm_request import LlmRequest
 from google.genai import types
 
 from analysis_service import model_gate
-from analysis_service.binding import build_tier_adapters
 from analysis_service.deployment import Deployment
 from analysis_service.frameworks import schemas_for
 from analysis_service.graph import CRITIC_ROLE, FrameworkNodes
 from analysis_service.offline import OFFLINE_ENV, LiveInferenceRefused
-from analysis_service.resilience import load_resilience
-from analysis_service.sampling import load_sampling
 from evals.harness.node_call import node_call
-from tests.factories import PROJECT_ROOT, inject_transport, tiers_for
-
-CONFIG = PROJECT_ROOT / "config"
-
-
-@pytest.fixture(autouse=True)
-def _no_real_sleeping(monkeypatch):
-    """A retry, where one happens, runs at full speed."""
-
-    async def instant(_seconds):
-        return None
-
-    monkeypatch.setattr(asyncio, "sleep", instant)
+from tests.test_provider_contract import (  # noqa: F401 - the fixture is autouse
+    declining,
+    no_real_sleeping,
+    raised_by,
+)
 
 
-def _drive_base_tier() -> tuple[list[httpx.Request], BaseException]:
+def _drive_base_tier() -> tuple[list, BaseException]:
     """One call through the shipped ``base`` adapter, and what it reached.
 
     Returns the requests the transport saw and the exception the call ended
     in. The transport refuses every request, so every call ends in one.
     """
-    seen: list[httpx.Request] = []
-
-    def refuse(request: httpx.Request) -> httpx.Response:
-        seen.append(request)
-        return httpx.Response(400, json={"error": {"message": "no", "type": "x"}})
-
-    adapter = build_tier_adapters(
-        tiers_for("openai"),
-        load_sampling(CONFIG / "sampling.toml", env={}),
-        load_resilience(CONFIG / "resilience.toml", env={}),
-        env={"ANALYSIS_OPENAI_API_KEY": "not-a-real-openai-key"},
-    )["base"]
-    inject_transport(adapter, "openai", refuse)
-    request = LlmRequest(
-        contents=[types.Content(role="user", parts=[types.Part(text="hi")])],
-        config=types.GenerateContentConfig(),
-    )
-
-    async def drive():
-        return [r async for r in adapter.generate_content_async(request, False)]
-
-    with pytest.raises(Exception) as raised:
-        asyncio.run(drive())
-    return seen, raised.value
+    provider = declining(400)
+    error = raised_by("openai", provider)
+    return provider.requests, error
 
 
 def test_without_offline_mode_the_call_reaches_the_transport(supplied_transport):
