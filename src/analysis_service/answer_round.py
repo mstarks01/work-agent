@@ -12,14 +12,13 @@ cannot differ.
 report's list.** Both ask the link questions its catalog raises. A waiting job
 may continue with no answers, and a finished one has nothing to continue.
 
-**A waiting job asks in rounds** (ADR 0053). A round shows capability
-questions and questions about the model's elements up to
-:data:`ROUND_DECISIONS` choices of each kind: a question with facets costs
-one choice a facet it still leaves open, any other question one. A question is shown only at or above its kind's floor, and
-one pause asks each kind at most its limit in all: :data:`EARLY_RULES` is the
-table. A question answered in part comes back first, outside the limit, and
-where the limits hold questions back the job says so
-(:attr:`QuestionSet.stop`). A submitter saves a round's answers, which writes
+**A waiting job asks in rounds** (ADR 0053). A round shows a fixed number of
+questions of each kind, its ``per_round``, so every round asks as many
+questions as the one before it, and only the last asks fewer. A question is
+shown only at or above its kind's floor, and one pause asks each kind at most
+its limit in all: :data:`EARLY_RULES` is the table. A question answered in
+part comes back first, outside the limit, and where the limits hold questions
+back the job says so (:attr:`QuestionSet.stop`). A submitter saves a round's answers, which writes
 them onto the job and runs no model, and the next round is read off the model
 with them in. So an
 answer can hide the parts of a capability it rules out, and a named mechanism
@@ -66,7 +65,6 @@ from analysis_service.system_model import SystemModel
 
 __all__ = [
     "EARLY_RULES",
-    "ROUND_DECISIONS",
     "AdmittedRound",
     "EarlyRule",
     "QuestionSet",
@@ -74,22 +72,20 @@ __all__ = [
     "question_set",
 ]
 
-#: How many choices of each kind one round at the pause asks of a person.
-ROUND_DECISIONS = 10
-
 
 @dataclass(frozen=True)
 class EarlyRule:
     """Which early questions of one kind a round may show.
 
-    ``floor`` is the score a question needs, and ``limit`` how many of the
-    kind one pause asks in all. The two kinds' scores are not on one scale: a
-    field question's is a ranking value read off the prior, and a capability
-    question's is units it could settle.
+    ``floor`` is the score a question needs, ``limit`` how many of the kind
+    one pause asks in all, and ``per_round`` how many one round asks. The two
+    kinds' scores are not on one scale: a field question's is a ranking value
+    read off the prior, and a capability question's is units it could settle.
     """
 
     floor: float
     limit: int
+    per_round: int
 
 
 #: The rule for each kind of early question: ``capability`` and ``field``,
@@ -98,10 +94,13 @@ class EarlyRule:
 #: an answer under it changes. The top 30 of a STRIDE list hold 99% of the
 #: ranking score at that floor, which is not a share of the report's value. A
 #: capability question under 2 settles one unit, and at ASVS level 2 that
-#: leaves 28 of 51.
+#: leaves 28 of 51. A capability question is one yes or no, so a round asks
+#: 10. A field question can be a table of facets, and 5 a round asks a median
+#: of 10 choices over the corpus's STRIDE models, and at most 15, in a median
+#: of 6 rounds (ADR 0053).
 EARLY_RULES: Mapping[str, EarlyRule] = {
-    "capability": EarlyRule(floor=2.0, limit=30),
-    "field": EarlyRule(floor=1.0, limit=30),
+    "capability": EarlyRule(floor=2.0, limit=30, per_round=10),
+    "field": EarlyRule(floor=1.0, limit=30, per_round=5),
 }
 
 
@@ -466,8 +465,8 @@ def _round(
     it already counts toward: each earlier answer counts toward its kind's
     limit, and the limit bounds only the questions not yet answered at all.
 
-    A round takes questions in order until the next would pass
-    :data:`ROUND_DECISIONS` for its kind, and always takes the first.
+    A round takes the first ``per_round`` questions of each kind, so the
+    number of questions never grows from one round to the next.
     """
     shown: list[EarlyQuestion] = []
     remaining = {}
@@ -486,13 +485,7 @@ def _round(
         fresh = [question for question in eligible if question.key not in held]
         remaining[kind] = len(started) + min(len(fresh), left)
         withheld += max(len(fresh) - left, 0)
-        budget = ROUND_DECISIONS
-        for question in [*started, *fresh[:left]]:
-            cost = _open_decisions(question, held.get(question.key))
-            if cost > budget and budget < ROUND_DECISIONS:
-                break
-            shown.append(question)
-            budget -= cost
+        shown += [*started, *fresh[:left]][: rule.per_round]
     return tuple(shown), remaining, withheld
 
 
@@ -528,10 +521,3 @@ def _known_content(answer: FactAnswer | None) -> frozenset[tuple[str, str]]:
             (facet, value) for facet, value in answer.facets.items() if value != UNKNOWN
         )
     return frozenset({("", answer.value)}) if answer.known else frozenset()
-
-
-def _open_decisions(question: EarlyQuestion, answer: FactAnswer | None) -> int:
-    """The choices a question still asks: its facets with no answer, else all."""
-    if answer is None or not answer.facets:
-        return question.decisions
-    return sum(1 for facet in question.facets if facet.id not in answer.facets)

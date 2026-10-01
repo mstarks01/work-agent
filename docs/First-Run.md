@@ -340,9 +340,9 @@ The app can ask you questions before the analysis, and after the report.
   accounts", so that facts about the group reach the model. Rows you leave
   blank stay open.
 
-  The questions come in rounds of up to ten choices about the application and
-  ten about parts of your system, the most useful first. A question with
-  parts counts one choice a part. Where one question asks about several
+  The questions come in rounds of up to ten questions about the application
+  and five about parts of your system, the most useful first. No round asks
+  more questions than the one before it. Where one question asks about several
   parts of your system, a **Same for all** row takes one answer, and **Apply
   to the ticked rows** copies it into each row still ticked. Untick a row the
   answer does not fit. Under each question, a line says why it is

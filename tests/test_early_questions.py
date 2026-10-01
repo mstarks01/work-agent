@@ -12,7 +12,7 @@ from collections import Counter
 import pytest
 
 from analysis_service.answer_forms import YES_NO, answer_choices
-from analysis_service.answer_round import ROUND_DECISIONS, passes_floor
+from analysis_service.answer_round import EARLY_RULES, passes_floor
 from analysis_service.candidates import generate_candidates
 from analysis_service.claims import UnknownRef
 from analysis_service.early_questions import (
@@ -205,12 +205,7 @@ class TestTheRoute:
             for question in listed
             if passes_floor(question, listed) and question.kind != "capability"
         ]
-        expected, budget = [], ROUND_DECISIONS
-        for question in eligible:
-            if question.decisions > budget and expected:
-                break
-            expected.append(question)
-            budget -= question.decisions
+        expected = eligible[: EARLY_RULES["field"].per_round]
         assert body["early_questions"] == [q.to_json() for q in expected]
         assert body["early_questions"]
 

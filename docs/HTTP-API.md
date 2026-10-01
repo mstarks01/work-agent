@@ -180,9 +180,9 @@ qualification after it, or a zone the service inferred. Answer them as `facts` o
 reads your answers, so the findings rest on them.
 
 **A waiting job asks in rounds.** `early_questions` holds one round: up to 10
-choices of capability questions and up to 10 choices of questions about the
-model's elements. Each question's `decisions` counts its choices: one a facet,
-else one. A question wider than the round is still asked alone.
+capability questions and up to 5 questions about the model's elements, so no
+round asks more questions than the one before it. Each question's `decisions`
+counts its choices: one a facet, else one.
 A field question needs a `score` of at least 1, and a capability question at
 least 2. One pause asks at most 30 of each kind in all. `early_remaining`
 estimates how many of each kind are left, this round included; answers can
