@@ -22,6 +22,7 @@ from __future__ import annotations
 
 from collections import Counter
 from collections.abc import Mapping, Sequence
+from collections.abc import Set as AbstractSet
 from dataclasses import dataclass
 from typing import Literal
 
@@ -54,9 +55,14 @@ from analysis_service.question_kinds import Facet
 from analysis_service.system_model import SystemModel
 
 __all__ = [
+    "Basis",
     "FactQuestion",
     "Fallback",
+    "Finding",
+    "FollowUpNeeds",
     "fact_questions",
+    "follow_up_needs",
+    "follow_up_order",
     "question_fallback",
 ]
 
@@ -129,7 +135,7 @@ class FactQuestion:
 
 
 def _greedy(
-    open_facts: Mapping[Finding, set[UnknownKey]], band: Mapping[Finding, int]
+    open_facts: Mapping[Finding, AbstractSet[UnknownKey]], band: Mapping[Finding, int]
 ) -> list[UnknownKey]:
     """The facts in the order that completes the most important findings first.
 
@@ -175,6 +181,96 @@ def _greedy(
     return order
 
 
+@dataclass(frozen=True)
+class FollowUpNeeds:
+    """What a report's findings wait on: read once, for the order and the counts."""
+
+    #: Each draft's open grounds, whatever its verdict.
+    evidence: Mapping[Finding, frozenset[UnknownKey]]
+    #: The open facts a ``needs-info`` verdict names.
+    named: Mapping[Finding, frozenset[UnknownKey]]
+    #: Each conditional finding's open facts: the findings an answer can cover.
+    waiting: Mapping[Finding, frozenset[UnknownKey]]
+    #: Each draft's band, as its package ranks it.
+    bands: Mapping[Finding, Band]
+    #: The reference each open fact was first cited by.
+    refs: Mapping[UnknownKey, UnknownRef]
+
+
+def follow_up_needs(
+    analyses: Sequence[FrameworkAnalysis],
+    model: SystemModel,
+    catalog: AssertionCatalog | None,
+    earlier: Sequence[FactAnswer] = (),
+) -> FollowUpNeeds:
+    """Every open fact each draft waits on, as :func:`fact_questions` reads them.
+
+    A fact ``earlier`` answers in full is not open. A finding that waits on a
+    fact ``earlier`` answers without settling it is not conditional, because
+    no answer in the list can cover it.
+    """
+    evidence: dict[Finding, frozenset[UnknownKey]] = {}
+    named: dict[Finding, frozenset[UnknownKey]] = {}
+    refs: dict[UnknownKey, UnknownRef] = {}
+    conditional: set[Finding] = set()
+    prepared = prepared_model(model, catalog)
+    done = answered_keys(earlier)
+    unknown = {answer.key for answer in earlier if not answer.settles} & done
+    bands: dict[Finding, Band] = {}
+    for block in analyses:
+        rank = PACKAGES[block.framework].rank
+        for claim in block.all_claims():
+            finding = (block.framework, claim.id)
+            bands[finding] = rank(claim)
+            cites = [*claim.unknown_grounds(), *claim.verdict.related_unknowns]
+            stuck = bool(unknown & {ref.key for ref in cites})
+            if claim.verdict.status == "needs-info" and not stuck:
+                conditional.add(finding)
+            grounds = [
+                ref
+                for ref in claim.unknown_grounds()
+                if _open(ref, prepared) and ref.key not in done
+            ]
+            evidence[finding] = frozenset(ref.key for ref in grounds)
+            cited = list(grounds)
+            if claim.verdict.status == "needs-info":
+                verdict = [
+                    ref
+                    for ref in claim.verdict.related_unknowns
+                    if _open(ref, prepared) and ref.key not in done
+                ]
+                named[finding] = frozenset(ref.key for ref in verdict)
+                cited += verdict
+            for ref in cited:
+                refs.setdefault(ref.key, ref)
+    waiting = {
+        finding: evidence.get(finding, frozenset()) | named.get(finding, frozenset())
+        for finding in conditional
+    }
+    return FollowUpNeeds(
+        evidence=evidence,
+        named=named,
+        waiting={finding: keys for finding, keys in waiting.items() if keys},
+        bands=bands,
+        refs=refs,
+    )
+
+
+def follow_up_order(needs: FollowUpNeeds) -> list[tuple[Basis, UnknownKey]]:
+    """The order the follow-up asks its facts in, each with its basis.
+
+    The evidence section first, ranked over every draft's grounds; then the
+    facts only the critic named. Every draft ranks by its band, whatever its
+    verdict, so the evidence section does not depend on the critic: a band
+    is the lane's rating or the catalog's, and a ruling sets neither.
+    """
+    order = {finding: band.order for finding, band in needs.bands.items()}
+    first = _greedy(needs.evidence, order)
+    asked = set(first)
+    later = _greedy({f: keys - asked for f, keys in needs.named.items()}, order)
+    return [*(("evidence", key) for key in first), *(("critic", key) for key in later)]
+
+
 def fact_questions(
     analyses: Sequence[FrameworkAnalysis],
     model: SystemModel,
@@ -211,100 +307,46 @@ def fact_questions(
     it, because :func:`~analysis_service.fact_writes.check_fact_answers`
     refuses an answer to it.
     """
-    evidence: dict[Finding, set[UnknownKey]] = {}
-    named: dict[Finding, set[UnknownKey]] = {}
-    refs: dict[UnknownKey, UnknownRef] = {}
-    conditional: set[Finding] = set()
-    prepared = prepared_model(model, catalog)
-    done = answered_keys(earlier)
-    unknown = {answer.key for answer in earlier if not answer.settles} & done
-    bands: dict[Finding, Band] = {}
-    for block in analyses:
-        rank = PACKAGES[block.framework].rank
-        for claim in block.all_claims():
-            finding = (block.framework, claim.id)
-            bands[finding] = rank(claim)
-            cites = [*claim.unknown_grounds(), *claim.verdict.related_unknowns]
-            stuck = bool(unknown & {ref.key for ref in cites})
-            if claim.verdict.status == "needs-info" and not stuck:
-                conditional.add(finding)
-            grounds = [
-                ref
-                for ref in claim.unknown_grounds()
-                if _open(ref, prepared) and ref.key not in done
-            ]
-            evidence[finding] = {ref.key for ref in grounds}
-            cited = list(grounds)
-            if claim.verdict.status == "needs-info":
-                verdict = [
-                    ref
-                    for ref in claim.verdict.related_unknowns
-                    if _open(ref, prepared) and ref.key not in done
-                ]
-                named[finding] = {ref.key for ref in verdict}
-                cited += verdict
-            for ref in cited:
-                refs.setdefault(ref.key, ref)
-    # Every draft ranks by its band, whatever its verdict, so the evidence
-    # section still does not depend on the critic: a band is the lane's
-    # rating or the catalog's, and a ruling sets neither.
-    order = {finding: band.order for finding, band in bands.items()}
-    first = _greedy(evidence, order)
-    asked_first = set(first)
-    later = _greedy({f: keys - asked_first for f, keys in named.items()}, order)
-    waiting = {
-        finding: evidence.get(finding, set()) | named.get(finding, set())
-        for finding in evidence.keys() | named.keys()
-    }
-    waiting = {
-        finding: keys
-        for finding, keys in waiting.items()
-        if keys and finding in conditional
-    }
+    needs = follow_up_needs(analyses, model, catalog, earlier)
+    waiting = needs.waiting
+    bands = needs.bands
     names = element_names(model)
     asked: list[FactQuestion] = []
     answered: set[UnknownKey] = set()
-    sections: tuple[tuple[Basis, list[UnknownKey]], ...] = (
-        ("evidence", first),
-        ("critic", later),
-    )
-    for basis, keys in sections:
-        for key in keys:
-            cited_by = sum(
-                1
-                for facts in waiting.values()
-                if key in facts and not facts <= answered
+    for basis, key in follow_up_order(needs):
+        cited_by = sum(
+            1 for facts in waiting.values() if key in facts and not facts <= answered
+        )
+        answered.add(key)
+        asked.append(
+            FactQuestion(
+                key=key,
+                kind=fact_kind(key),
+                basis=basis,
+                label=label_of(needs.refs[key], names),
+                cited_by=cited_by,
+                covered_so_far=sum(
+                    1 for facts in waiting.values() if facts <= answered
+                ),
+                choices=answer_choices(key, model, catalog),
+                form=answer_form(key, model, catalog),
+                suggestions=answer_suggestions(key),
+                facets=answer_facets(key),
+                max_length=answer_limit(key, model),
+                findings=tuple(
+                    sorted(
+                        f"{framework}/{claim}"
+                        for (framework, claim), facts in waiting.items()
+                        if key in facts
+                    )
+                ),
+                band=max(
+                    (bands[f] for f, facts in waiting.items() if key in facts),
+                    key=lambda band: band.order,
+                    default=UNRANKED,
+                ).label,
             )
-            answered.add(key)
-            asked.append(
-                FactQuestion(
-                    key=key,
-                    kind=fact_kind(key),
-                    basis=basis,
-                    label=label_of(refs[key], names),
-                    cited_by=cited_by,
-                    covered_so_far=sum(
-                        1 for facts in waiting.values() if facts <= answered
-                    ),
-                    choices=answer_choices(key, model, catalog),
-                    form=answer_form(key, model, catalog),
-                    suggestions=answer_suggestions(key),
-                    facets=answer_facets(key),
-                    max_length=answer_limit(key, model),
-                    findings=tuple(
-                        sorted(
-                            f"{framework}/{claim}"
-                            for (framework, claim), facts in waiting.items()
-                            if key in facts
-                        )
-                    ),
-                    band=max(
-                        (bands[f] for f, facts in waiting.items() if key in facts),
-                        key=lambda band: band.order,
-                        default=UNRANKED,
-                    ).label,
-                )
-            )
+        )
     return tuple(asked)
 
 
