@@ -579,13 +579,16 @@ class TestTheLadderIsVendorNeutral:
     that re-maps any of it fails here rather than on node one of a paid job.
     """
 
-    #: Upstream codes litellm passes through with the code intact on every
-    #: registered vendor, beside what the ladder must decide about each.
+    #: Upstream codes every registered vendor decides the same way, beside
+    #: that decision. litellm hands most back intact; it rewrites 409 to a 400
+    #: on some vendors and 422 to a 400 on all of them, and neither is retried.
     DECIDED: ClassVar[dict[int, bool]] = {
         400: False,
         401: False,
         404: False,
         408: True,
+        409: False,
+        422: False,
         429: True,
         500: True,
         502: True,
@@ -596,8 +599,8 @@ class TestTheLadderIsVendorNeutral:
 
     #: Upstream codes litellm does *not* agree on across vendors, recorded
     #: rather than quietly left out of ``DECIDED``, beside the statuses it
-    #: actually produces. It rewrites each of these to ``APIConnectionError``
-    #: with a 500 on the vendors whose providers it maps that way, so a rejected
+    #: actually produces. It rewrites a 403 to ``APIConnectionError`` with a
+    #: 500 on the vendors whose providers it maps that way, so a rejected
     #: permission is retried on those and refused on the rest.
     #:
     #: **That asymmetry is litellm's and predates this rule**, which cannot see
@@ -607,8 +610,6 @@ class TestTheLadderIsVendorNeutral:
     #: needs to know exactly how far it reaches.
     FLATTENED: ClassVar[dict[int, set[int]]] = {
         403: {403, 500},
-        409: {409, 500},
-        422: {400, 500},
     }
 
     @pytest.mark.parametrize("status,retried", sorted(DECIDED.items()))

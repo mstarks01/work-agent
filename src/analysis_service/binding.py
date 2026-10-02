@@ -435,14 +435,16 @@ def build_tier_adapters(
         tier_sampling = sampling.for_tier(tier)
         source = f"tiers.{tier}"
 
-        check_supported(
-            vendor, selection.model, tier_sampling.gate_params(), source=source
-        )
+        # The model-keyed rules first: where litellm also refuses the value,
+        # their message names the knob and the file, and litellm's does not.
         check_temperature(
             selection.model,
             tier_sampling.temperature,
             tier,
             "config/sampling.toml",
+        )
+        check_supported(
+            vendor, selection.model, tier_sampling.gate_params(), source=source
         )
         _check_output_ceiling(vendor, selection.model, tier_sampling, source)
         _check_native_structured_output(vendor, selection.model, tier_sampling, source)

@@ -376,7 +376,7 @@ class TestOutputCeiling:
         ("vendor", "model", "ceiling"),
         [
             ("openai", "gpt-4o", 16384),
-            ("anthropic", ANTHROPIC_CLAUDE, 64000),
+            ("anthropic", "claude-sonnet-5", 128000),
             ("vertex", GEMINI, 65535),
         ],
     )

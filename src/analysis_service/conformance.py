@@ -104,7 +104,7 @@ PROBED_PARAMS: dict[str, Any] = {
 # vendors is alphabetical, deliberately: any other order here is a ranking, and
 # the vendors are alphabetical everywhere a reader might infer one.
 REFERENCE_MODELS: dict[str, tuple[str, ...]] = {
-    "anthropic": ("claude-sonnet-4-6", "claude-opus-5"),
+    "anthropic": ("claude-sonnet-5", "claude-opus-5"),
     # Claude in its Bedrock spelling, and only Claude: Nova and Llama get
     # *emulated* structured output there, which
     # :func:`~analysis_service.binding._check_native_structured_output` refuses,
@@ -156,7 +156,8 @@ REFERENCE_MODELS: dict[str, tuple[str, ...]] = {
     # requests to GPT-5.6 Sol", and its model list carries ``gpt-5.6-sol``,
     # ``-terra``, ``-luna`` and ``-cyber`` with no bare entry among them (read
     # 2026-09-12). The pinned map agrees in the way it can: ``gpt-5.6`` and
-    # ``gpt-5.6-sol`` differ in no key, and the two profile identically. So does
+    # ``gpt-5.6-sol`` differ in no key but a ``supports_*`` flag, and the two
+    # profile identically. So does
     # ``gpt-4o-2024-08-06``, which a live call confirmed the alias resolves to
     # (see ``vendors._CATCH_ALL``).
     #

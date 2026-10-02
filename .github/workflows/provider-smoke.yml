@@ -260,7 +260,7 @@ jobs:
           # nothing beyond their key, so theirs is empty.
           - vendor: anthropic
             secret_name: ANALYSIS_ANTHROPIC_API_KEY
-            base_model: claude-sonnet-4-6
+            base_model: claude-sonnet-5
             strong_model: claude-opus-5
             addressing: ""
           - vendor: openai
