@@ -587,7 +587,7 @@ def _fingerprint_mismatches(report: Report, deployment: Deployment) -> list[str]
         recomputed = execution_fingerprint(
             requested_route=run.requested_model,
             served_route=run.model,
-            sampling=TierSampling.model_validate(recorded).model_dump(),
+            sampling=TierSampling.model_validate(recorded).identity_params(),
             instruction_sha256=run.instruction_sha256,
             build=report.execution.build,
         )

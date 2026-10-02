@@ -41,6 +41,7 @@ from analysis_service.model_gate import (
 )
 from analysis_service.model_tiers import SUPPORTED_VERSION as TIERS_SUPPORTED_VERSION
 from analysis_service.model_tiers import ModelConfigError
+from analysis_service.provider import OUTPUT_TOOL_NAME
 from analysis_service.system_model import EmittedSystemModel
 from analysis_service.vendors import ProviderAuthError, vendor_for
 from tests.factories import DEFAULT_FRAMEWORKS, PROJECT_ROOT, translator_of
@@ -632,6 +633,18 @@ max_output_tokens = 8192
 BASE_TEMPERATURE_VAR = "ANALYSIS_SAMPLING_BASE_TEMPERATURE"
 STATED_BASE = {BASE_TEMPERATURE_VAR: "1"}
 
+#: Every tier asks for native structured output and refuses the tool path.
+NATIVE_ONLY = NO_TEMPERATURE.replace(
+    "max_output_tokens = 8192\n",
+    'max_output_tokens = 8192\nstructured_output = "native"\n',
+)
+
+#: Every tier sends its schema as a forced tool call.
+TOOL_ONLY = NO_TEMPERATURE.replace(
+    "max_output_tokens = 8192\n",
+    'max_output_tokens = 8192\nstructured_output = "tool"\n',
+)
+
 EMULATED_ENV = VERTEX_ENV | {
     "ANALYSIS_MODEL_BASE_MODEL": EMULATED_MODEL,
     "ANALYSIS_MODEL_STRONG_MODEL": EMULATED_MODEL,
@@ -792,39 +805,101 @@ def test_the_emulated_fixture_still_emulates():
     )
 
 
-def test_a_model_without_native_schema_support_fails_the_build(tmp_path):
-    """The expensive failure shape: well-formed request, well-formed response.
-
-    Where a provider cannot constrain output to a schema directly, the library
-    emulates it with a synthesised tool, which asks the model to follow the
-    schema and does not make it. Nothing rejects the request, so without this
-    gate a response that breaks the schema kills the job at output validation. Temperature is unset here so the 4.7 rule
-    cannot fire first and mask which check is under test.
-    """
+def _sampling_file(tmp_path, text: str) -> str:
     path = tmp_path / "sampling.toml"
-    path.write_text(NO_TEMPERATURE, encoding="utf-8")
+    path.write_text(text, encoding="utf-8")
+    return str(path)
+
+
+def _extract_executor(pipeline):
+    nodes = {node.name: node for node in pipeline.workflow.graph.nodes}
+    return nodes[graph.EXTRACT_NODE].model
+
+
+def test_native_refuses_a_model_without_native_schema_support(tmp_path):
+    """A deployment that asked for the guarantee is told this pair cannot give it.
+
+    Temperature is unset so the 4.7 rule cannot fire first and mask which check
+    is under test.
+    """
+    env = EMULATED_ENV | {"ANALYSIS_SAMPLING": _sampling_file(tmp_path, NATIVE_ONLY)}
 
     with pytest.raises(ModelGateError) as excinfo:
-        Deployment.from_env(
-            env=EMULATED_ENV | {"ANALYSIS_SAMPLING": str(path)}
-        ).pipeline(DEFAULT_FRAMEWORKS)
+        Deployment.from_env(env=env).pipeline(DEFAULT_FRAMEWORKS)
 
     message = str(excinfo.value)
     assert "tiers.base" in message
-    assert "synthesised tool" in message and "schema" in message
+    assert 'structured_output = "native"' in message
 
 
-def test_the_schema_gate_catches_vertex_hosted_claude_too():
-    """Not an Anthropic-only problem, and the reason it is asked as a call.
+def test_auto_sends_an_emulated_pair_s_schema_as_a_tool_call(tmp_path):
+    """ADR 0058: the model builds, and the tier runs the forced tool path."""
+    env = EMULATED_ENV | {"ANALYSIS_SAMPLING": _sampling_file(tmp_path, NO_TEMPERATURE)}
+
+    pipeline = Deployment.from_env(env=env).pipeline(DEFAULT_FRAMEWORKS)
+
+    adapter = _extract_executor(pipeline)
+    kwargs = translator_of(adapter)._additional_args
+    assert kwargs["response_format"] is None
+    assert kwargs["tool_choice"]["function"]["name"] == OUTPUT_TOOL_NAME
+    assert adapter.executor._tool_path is True
+
+
+def test_vertex_hosted_claude_is_emulated_and_so_takes_the_tool_path(tmp_path):
+    """Why the path is asked as a call: the model alone does not decide it.
 
     Under the pinned library, Vertex-hosted Claude takes the emulated path for
-    *every* generation — including ones the direct vendor serves natively. A
-    rule keyed on the model would have called this configuration fine.
+    every generation, including ones the direct vendor serves natively.
     """
-    env = VERTEX_ENV | {"ANALYSIS_MODEL_BASE_MODEL": "claude-sonnet-4-6"}
+    env = VERTEX_ENV | {
+        "ANALYSIS_MODEL_BASE_MODEL": "claude-sonnet-4-6",
+        "ANALYSIS_SAMPLING": _sampling_file(tmp_path, NO_TEMPERATURE),
+    }
 
-    with pytest.raises(ModelGateError, match="synthesised tool"):
-        Deployment.from_env(env=env).pipeline(DEFAULT_FRAMEWORKS)
+    pipeline = Deployment.from_env(env=env).pipeline(DEFAULT_FRAMEWORKS)
+
+    assert _extract_executor(pipeline).executor._tool_path is True
+
+
+def test_tool_forces_the_tool_path_on_a_model_with_native_output(tmp_path):
+    """The case the map gets wrong: it marks a model native that a provider refuses."""
+    env = ANTHROPIC_ENV | {
+        "ANALYSIS_SAMPLING": _sampling_file(tmp_path, TOOL_ONLY),
+        "ANALYSIS_MODEL_BASE_MODEL": CLAUDE_NATIVE,
+        "ANALYSIS_MODEL_STRONG_MODEL": CLAUDE_NATIVE,
+    }
+
+    pipeline = Deployment.from_env(env=env).pipeline(DEFAULT_FRAMEWORKS)
+
+    adapter = _extract_executor(pipeline)
+    assert adapter.executor._tool_path is True
+    assert translator_of(adapter)._additional_args["response_format"] is None
+
+
+def test_a_tier_with_thinking_does_not_force_the_tool(tmp_path):
+    """Anthropic refuses a forced tool together with extended thinking."""
+    thinking = TOOL_ONLY.replace(
+        "max_output_tokens = 8192\n", 'max_output_tokens = 8192\nthinking = "low"\n'
+    )
+    env = ANTHROPIC_ENV | {
+        "ANALYSIS_SAMPLING": _sampling_file(tmp_path, thinking),
+        "ANALYSIS_MODEL_BASE_MODEL": CLAUDE_NATIVE,
+        "ANALYSIS_MODEL_STRONG_MODEL": CLAUDE_NATIVE,
+    }
+
+    pipeline = Deployment.from_env(env=env).pipeline(DEFAULT_FRAMEWORKS)
+
+    kwargs = translator_of(_extract_executor(pipeline))._additional_args
+    assert "tool_choice" not in kwargs
+    assert kwargs["response_format"] is None
+
+
+def test_auto_keeps_a_native_pair_on_the_native_path():
+    pipeline = Deployment.from_env(env=VERTEX_ENV).pipeline(DEFAULT_FRAMEWORKS)
+
+    adapter = _extract_executor(pipeline)
+    assert adapter.executor._tool_path is False
+    assert "tool_choice" not in translator_of(adapter)._additional_args
 
 
 def test_gemini_and_openai_are_untouched_by_the_schema_gate():
@@ -884,26 +959,26 @@ def test_a_constrained_tier_leaves_the_derived_schema_alone():
 
 
 def test_the_schema_gate_is_scoped_to_tiers_that_send_a_schema(tmp_path):
-    """The narrowing: a model rejected while constrained is fine unconstrained.
+    """The narrowing: a pair refused under ``native`` is fine unconstrained.
 
-    Vertex-hosted Claude takes the emulated path, so the gate stops it — but
-    only because a schema would be sent. Turn that off and there is no emulated
-    request to object to, so the same selection must build.
+    Vertex-hosted Claude takes the emulated path, so ``native`` stops it, but
+    only because a schema would be sent. Turn that off and there is no request
+    to object to, so the same selection must build.
     """
-    # Both legs run without temperature so the 4.7 floor cannot fire first and
-    # mask which gate is under test; the only difference is constrain_output.
-    constrained = tmp_path / "constrained.toml"
-    constrained.write_text(NO_TEMPERATURE, encoding="utf-8")
-    path = tmp_path / "sampling.toml"
-    path.write_text(UNCONSTRAINED_BASE, encoding="utf-8")
+    unconstrained = UNCONSTRAINED_BASE.replace(
+        "constrain_output = false\n",
+        'constrain_output = false\nstructured_output = "native"\n',
+    )
 
-    with pytest.raises(ModelGateError, match="synthesised tool"):
+    with pytest.raises(ModelGateError, match='structured_output = "native"'):
         Deployment.from_env(
-            env=EMULATED_ENV | {"ANALYSIS_SAMPLING": str(constrained)}
+            env=EMULATED_ENV
+            | {"ANALYSIS_SAMPLING": _sampling_file(tmp_path, NATIVE_ONLY)}
         ).pipeline(DEFAULT_FRAMEWORKS)
 
     pipeline = Deployment.from_env(
-        env=EMULATED_ENV | {"ANALYSIS_SAMPLING": str(path)}
+        env=EMULATED_ENV
+        | {"ANALYSIS_SAMPLING": _sampling_file(tmp_path, unconstrained)}
     ).pipeline(DEFAULT_FRAMEWORKS)
 
     assert pipeline.node_models[graph.EXTRACT_NODE] == f"vertex_ai/{EMULATED_MODEL}"

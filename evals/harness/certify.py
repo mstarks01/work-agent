@@ -108,7 +108,11 @@ _STR_PARAMS = frozenset({"thinking"})
 # constrained and unconstrained generation are different generation behaviour,
 # so a sweep measured one way does not certify a run made the other way. Skipped
 # here, compared there.
-_NOT_PROMOTABLE = frozenset({"constrain_output"})
+#
+# ``structured_output`` is outside promotion for the same reason: it records how
+# the provider serving this tier carries a schema, which is a property of the
+# deployment. An explicit ``native`` or ``tool`` enters the execution identity.
+_NOT_PROMOTABLE = frozenset({"constrain_output", "structured_output"})
 
 
 def promote(
@@ -164,7 +168,7 @@ def promote(
             execution_fingerprint(
                 requested_route=key.requested,
                 served_route=key.served,
-                sampling=sampling.for_tier(tier).model_dump(),
+                sampling=sampling.for_tier(tier).identity_params(),
                 instruction_sha256=key.instruction_sha256,
                 build=build,
             )
@@ -296,7 +300,7 @@ def _tier_promotion(
             execution_fingerprint(
                 requested_route=key.requested,
                 served_route=key.served,
-                sampling=tier_sampling.model_dump(),
+                sampling=tier_sampling.identity_params(),
                 instruction_sha256=key.instruction_sha256,
                 build=build,
             )

@@ -328,15 +328,15 @@ class TestTheMatrixItself:
         reference matrix, because every reference pair binds — a test that
         only saw those would agree with itself and see nothing.
         """
-        from analysis_service.binding import _check_native_structured_output
+        from analysis_service.binding import _structured_output_path
         from analysis_service.model_gate import ModelGateError
         from analysis_service.sampling import TierSampling
 
-        constrained = TierSampling(constrain_output=True)
+        constrained = TierSampling(constrain_output=True, structured_output="native")
 
         def build_refuses(vendor: str, model: str) -> bool:
             try:
-                _check_native_structured_output(
+                _structured_output_path(
                     vendor_for(vendor), model, constrained, source="cross-reader"
                 )
             except ModelGateError:

@@ -101,7 +101,9 @@ under the `config/sampling.toml` shipped at the time, that pair was refused at
 startup by two independent gates — Claude 4.7+ does not accept `temperature`,
 which that file then pinned, and the model would get *emulated* rather than
 native schema constraint. The sampling file no longer pins a temperature, so
-the first gate is now inert by default and the second still refuses the pair. The documented
+the first gate is now inert by default. ADR 0058 replaced the second gate with a
+preference: under `structured_output = "auto"` the pair builds and sends its
+schema as a forced tool call, and only `"native"` still refuses it. The documented
 first-run configuration for one of three vendors could not start the service.
 `.github/workflows/evals-live-api-key.yml` had the constraint right, in a comment,
 which is precisely the kind of knowledge a suite exists to hold instead.

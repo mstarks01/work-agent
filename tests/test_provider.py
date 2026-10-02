@@ -326,7 +326,9 @@ class TestTheAdapterOverTheSeam:
             model="x/y", executor=_Scripted(results=[]), retry_policy=policy()
         )
 
-        assert isinstance(InProcessExecutor(translator, dict), ProviderExecutor)
+        assert isinstance(
+            InProcessExecutor(translator, dict, tool_path=False), ProviderExecutor
+        )
 
     def test_the_executor_is_handed_the_projection_and_nothing_else(self):
         executor = _Scripted(results=[GenerationResult.of(LlmResponse())])

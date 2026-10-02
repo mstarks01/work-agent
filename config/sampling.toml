@@ -14,6 +14,14 @@
 # loader rejects an unknown key, and a deliberately-unset param is a *commented*
 # line, not a silent absence.
 #
+# `structured_output` (ADR 0058) decides how a tier's node schema reaches the
+# provider: `"native"` uses the provider's own structured-output field, `"tool"`
+# sends the schema as a forced tool call, and `"auto"` uses native output where
+# the pinned library sends it and the tool call elsewhere. Under `"auto"` the
+# path follows from the vendor, the model and the installed library, which the
+# fingerprint already hashes, so `"auto"` leaves every blessed number where it
+# is. `"native"` and `"tool"` enter the fingerprint.
+#
 # Version 4 adds `constrain_output` (see below). The field carries a default, so
 # a version-3 file would have loaded unchanged — the bump is deliberate anyway,
 # because the field enters the sampling fingerprint and so re-baselines every
@@ -96,7 +104,8 @@
 # sampling.py.
 #
 # Env overrides ANALYSIS_SAMPLING_{TIER}_{PARAM} retune the OFFERED params
-# (temperature, top_p, seed, thinking, max_output_tokens, constrain_output) at
+# (temperature, top_p, seed, thinking, max_output_tokens, constrain_output,
+# structured_output) at
 # deploy time,
 # validated exactly like the file value and captured by the run's fingerprint.
 # Reserved params (candidate_count) and the deliberately-absent set below cannot
@@ -164,6 +173,10 @@ candidate_count = 1      # reserved Self-MoA lever; loader rejects != 1
 constrain_output = true  # send this tier's node schema to the provider.
                          # Leave it true: setting it false is not currently a
                          # working configuration -- see the note above.
+structured_output = "auto" # native output where the library sends it,
+                           # a forced tool call elsewhere. "native" refuses a
+                           # model without it; "tool" covers a model the map
+                           # marks native and the provider refuses.
 # temperature       unset -> the model's own default. Set a value to state one;
 #                   a tier that does cannot then run Claude >= 4.7, which
 #                   rejects the param, and an OpenAI reasoning family accepts
@@ -184,6 +197,10 @@ candidate_count = 1      # reserved Self-MoA lever; loader rejects != 1
 constrain_output = true  # send this tier's node schema to the provider.
                          # Leave it true: setting it false is not currently a
                          # working configuration -- see the note above.
+structured_output = "auto" # native output where the library sends it,
+                           # a forced tool call elsewhere. "native" refuses a
+                           # model without it; "tool" covers a model the map
+                           # marks native and the provider refuses.
 # temperature       unset -> the model's own default. Set a value to state one;
 #                   a tier that does cannot then run Claude >= 4.7, which
 #                   rejects the param, and an OpenAI reasoning family accepts
@@ -213,6 +230,10 @@ candidate_count = 1      # reserved Self-MoA lever; loader rejects != 1
 constrain_output = true  # send this tier's node schema to the provider.
                          # Leave it true: setting it false is not currently a
                          # working configuration -- see the note above.
+structured_output = "auto" # native output where the library sends it,
+                           # a forced tool call elsewhere. "native" refuses a
+                           # model without it; "tool" covers a model the map
+                           # marks native and the provider refuses.
 # temperature       unset -> the model's own default. Set a value to state one;
 #                   a tier that does cannot then run Claude >= 4.7, which
 #                   rejects the param, and an OpenAI reasoning family accepts

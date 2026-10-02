@@ -279,12 +279,12 @@ class TestAModelThatRefusesTheParameterAtAll:
         answer was a plain refusal. Both readers answer from
         ``native_structured_output`` now.
         """
-        from analysis_service.binding import _check_native_structured_output
+        from analysis_service.binding import _structured_output_path
         from analysis_service.model_gate import ModelGateError
         from analysis_service.sampling import TierSampling
 
-        with pytest.raises(ModelGateError, match="cannot constrain"):
-            _check_native_structured_output(
+        with pytest.raises(ModelGateError, match="does not take the parameter"):
+            _structured_output_path(
                 vendor_for("bedrock"),
                 self.REFUSING,
                 TierSampling(constrain_output=True),
@@ -303,7 +303,7 @@ class TestAModelThatRefusesTheParameterAtAll:
 
         The matrix may print what the map says. The gate may not act on it.
         """
-        from analysis_service.binding import _check_native_structured_output
+        from analysis_service.binding import _structured_output_path
         from analysis_service.model_gate import (
             library_sends_no_native_schema,
             native_structured_output,
@@ -317,8 +317,9 @@ class TestAModelThatRefusesTheParameterAtAll:
             " asking its question — pick another map-says-no, not-emulated pair"
         )
         assert not library_sends_no_native_schema(vendor, model)
-        _check_native_structured_output(
-            vendor, model, TierSampling(constrain_output=True), source="tiers.strong"
+        native = TierSampling(constrain_output=True, structured_output="native")
+        assert _structured_output_path(vendor, model, native, "tiers.strong") == (
+            "native"
         )
 
     def test_the_matrix_renders_a_cell_rather_than_failing(self):

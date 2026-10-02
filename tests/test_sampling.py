@@ -336,6 +336,7 @@ class TestEnvOverrides:
             "thinking",
             "max_output_tokens",
             "constrain_output",
+            "structured_output",
         )
 
 

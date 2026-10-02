@@ -23,7 +23,8 @@ dependencies = [
     # routine dependency update.
     #
     # The version decides which path `response_format` takes on Anthropic, and
-    # binding.py's schema gate refuses the emulated path. 1.100.1 sends both
+    # under `structured_output = "auto"` that decides whether a tier runs native
+    # output or the forced tool call (ADR 0058). 1.100.1 sends both
     # `claude-sonnet-5` and `claude-opus-5` native on every route the reference
     # pairs name; 1.97.0 sent `claude-sonnet-5` emulated, and 1.103.2 sends
     # `global.anthropic.claude-sonnet-5` emulated. The gate asks for the mapped

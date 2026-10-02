@@ -76,7 +76,7 @@ from __future__ import annotations
 import os
 from collections.abc import Mapping
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Self
+from typing import TYPE_CHECKING, Any, Self
 
 from analysis_service.budgets import widest_llm_calls
 from analysis_service.charges import (
@@ -92,8 +92,8 @@ from analysis_service.model_gate import (
     ModelGateError,
     assert_kwarg_supported,
     check_supported,
-    library_sends_no_native_schema,
     output_ceiling,
+    schema_support,
 )
 from analysis_service.model_tiers import (
     TIER_NAMES,
@@ -105,7 +105,12 @@ from analysis_service.prompt_cache import (
     cache_marking_client_class,
     cache_write_reporting_llm_class,
 )
-from analysis_service.provider import ExecutedLlm, InProcessExecutor
+from analysis_service.provider import (
+    OUTPUT_TOOL_NAME,
+    ExecutedLlm,
+    InProcessExecutor,
+    SchemaPath,
+)
 from analysis_service.resilience import ResilienceConfig
 from analysis_service.sampling import (
     SamplingConfig,
@@ -309,61 +314,78 @@ def _check_output_ceiling(
     )
 
 
-def _check_native_structured_output(
+def _structured_output_path(
     vendor: Vendor, model: str, sampling: TierSampling, source: str
-) -> None:
-    """Fail closed when a tier's model would get *emulated* schema constraint.
+) -> SchemaPath | None:
+    """How this tier sends its node schema, or ``None`` where it sends none.
 
-    A tier whose model falls to LiteLLM's synthesised-tool path is not merely
-    taking a different route to the same place — the model is asked to follow
-    the schema and nothing makes it, so a response that breaks the schema fails
-    on the node's validation rather than on the request it made. That is the
-    most expensive shape a failure can take here: it survives the build,
-    survives the request, and dies at output validation mid-job when the one
-    schema re-ask fails too.
+    ADR 0058. ``native`` uses the provider's own structured-output field, which
+    constrains decoding. ``tool`` sends the schema as a forced tool call, which
+    asks the model to follow it; the schema re-ask in
+    :class:`~analysis_service.provider.ExecutedLlm` covers an answer that does
+    not. ``auto`` takes ``native`` where the pinned library sends it.
 
-    Scoped to tiers that actually send a schema. A tier running
-    ``constrain_output = false`` sends none, so how the provider *would* have
-    constrained one is not a fact about anything that happens — checking it
-    there would reject a configuration on the strength of a request it never
-    makes.
+    Two configurations still fail the build, at no cost:
 
-    Checked per tier at build time for the same reason as everything else in
-    this module — a misconfiguration should cost nothing.
+    * ``structured_output = "native"`` on a pair the library would emulate.
+      The deployment asked for the guarantee, and this pair cannot give it.
+    * a model that does not take ``response_format`` at all, on every setting.
+
+    Scoped to tiers that send a schema. Under ``constrain_output = false`` no
+    schema is sent, so how a provider would carry one is not a fact about any
+    request this tier makes.
 
     **It reads the probe and never the map.**
-    :func:`~analysis_service.model_gate.library_sends_no_native_schema` is what
-    the installed library will do with the request: emulate the constraint with
-    a synthesised tool, or refuse ``response_format`` outright. Both mean no
-    schema reaches the model, and both are the one shape a gate may act on.
-
-    Asking ``emulates_structured_output`` here left this reader one shape short
-    of the one #821 gave the matrix, so a deployment naming one of the 79 rows
-    that refuse the parameter got a library traceback where the answer was a
-    plain refusal.
-
-    **The map is deliberately not consulted**, which is what separates this
-    from :func:`~analysis_service.model_gate.native_structured_output`.
-    ``supports_response_schema`` is a claim in a data file, and #819 measured
-    one that was wrong. Reading it here would refuse four ``responses``-mode
-    OpenAI models a deployment could reasonably name, on the strength of an
-    entry that has been stale before. A report may print what the map says; a
-    gate may not stop a build on it.
+    :func:`~analysis_service.model_gate.schema_support` asks the installed
+    library what it would do with the request. ``supports_response_schema`` is
+    a claim in a data file, and #819 measured one that was wrong.
     """
     if not sampling.constrain_output:
-        return
-    if library_sends_no_native_schema(vendor, model):
+        return None
+    support = schema_support(vendor, model)
+    if support == "refused":
+        raise ModelGateError(
+            f"{source}: {vendor.name} {model!r} does not take the parameter that"
+            " carries a schema. Every LLM node binds an output schema. Choose a"
+            " model that supports structured output or tool calls."
+        )
+    if sampling.structured_output == "native" and support == "emulated":
         raise ModelGateError(
             f"{source}: {vendor.name} cannot constrain {model!r} to a schema"
-            " natively. Either the provider library would emulate it with a"
-            " synthesised tool, which asks the model to follow the schema"
-            " and does not make it, or the model does not take the parameter"
-            " that carries a schema at all. Every LLM node binds an output"
-            " schema, so a response that breaks it fails at output validation"
-            " mid-job rather than here."
-            " Choose a model whose provider supports schema-constrained output"
-            " directly."
+            ' natively, and this tier sets structured_output = "native". Set'
+            ' "auto" or "tool" to send the schema as a forced tool call,'
+            " or choose a model whose provider supports structured output."
         )
+    if sampling.structured_output == "tool" or support == "emulated":
+        return "tool"
+    return "native"
+
+
+#: A tool in the shape litellm takes, for the build-time check that this pair
+#: accepts tool calls at all.
+_PROBE_TOOL = {
+    "type": "function",
+    "function": {"name": OUTPUT_TOOL_NAME, "parameters": {"type": "object"}},
+}
+
+
+def _tool_path_kwargs(sampling: TierSampling) -> dict[str, Any]:
+    """The translator arguments a ``tool`` tier adds.
+
+    ``response_format=None`` keeps any structured-output field off the wire,
+    because ADK applies the translator's arguments over the one it derives. The
+    forced ``tool_choice`` rides the translator because ADK forwards no tool
+    choice from a request. It is left out where the tier sets ``thinking``:
+    Anthropic refuses a forced tool together with extended thinking, and the
+    pinned litellm leaves it out on the same condition.
+    """
+    kwargs: dict[str, Any] = {"response_format": None}
+    if sampling.thinking is None:
+        kwargs["tool_choice"] = {
+            "type": "function",
+            "function": {"name": OUTPUT_TOOL_NAME},
+        }
+    return kwargs
 
 
 def build_tier_adapters(
@@ -450,7 +472,15 @@ def build_tier_adapters(
             vendor, selection.model, tier_sampling.gate_params(), source=source
         )
         _check_output_ceiling(vendor, selection.model, tier_sampling, source)
-        _check_native_structured_output(vendor, selection.model, tier_sampling, source)
+        path = _structured_output_path(vendor, selection.model, tier_sampling, source)
+        if path == "tool":
+            # The tool path sends params the sampling gate above never saw.
+            check_supported(
+                vendor,
+                selection.model,
+                {"tools": [_PROBE_TOOL], **_tool_path_kwargs(tier_sampling)},
+                source=source,
+            )
         require_sdk(selection.vendor)
         charged = vendor.reports_charge or not vendor.routes_to_one_provider
         client_cls = capturing_client if charged else LiteLLMClient
@@ -474,6 +504,7 @@ def build_tier_adapters(
                 )
             },
             **tier_sampling.constructor_kwargs(),
+            **(_tool_path_kwargs(tier_sampling) if path == "tool" else {}),
             **vendor.credential_kwargs(env, tiers.credential_mode(selection.vendor)),
             # The upstream pin, where the deployment declared one. It rides the
             # request body under litellm's ``extra_body``, which the OpenRouter
@@ -508,7 +539,11 @@ def build_tier_adapters(
         # provider side of the seam. What crosses is one call's own request.
         adapters[tier] = ExecutedLlm(
             model=selection.route,
-            executor=InProcessExecutor(translator, SCHEMA_RULES[vendor.schema_rule]),
+            executor=InProcessExecutor(
+                translator,
+                SCHEMA_RULES[vendor.schema_rule],
+                tool_path=path == "tool",
+            ),
             retry_policy=policy,
         )
     return adapters
