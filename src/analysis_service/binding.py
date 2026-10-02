@@ -314,11 +314,11 @@ def _check_native_structured_output(
     """Fail closed when a tier's model would get *emulated* schema constraint.
 
     A tier whose model falls to LiteLLM's synthesised-tool path is not merely
-    taking a different route to the same place — it sends a ``$defs``-bearing
-    schema the provider will not resolve, and the node fails on the response it
-    validates rather than on the request it made. That is the most expensive
-    shape a failure can take here: it survives the build, survives the request,
-    and dies at output validation on node one.
+    taking a different route to the same place — the model is asked to follow
+    the schema and nothing makes it, so a response that breaks the schema fails
+    on the node's validation rather than on the request it made. That is the
+    most expensive shape a failure can take here: it survives the build,
+    survives the request, and dies at output validation mid-job.
 
     Scoped to tiers that actually send a schema. A tier running
     ``constrain_output = false`` sends none, so how the provider *would* have
@@ -354,10 +354,11 @@ def _check_native_structured_output(
         raise ModelGateError(
             f"{source}: {vendor.name} cannot constrain {model!r} to a schema"
             " natively. Either the provider library would emulate it with a"
-            " synthesised tool and send the graph's schema with its $defs"
-            " unresolved, or the model does not take the parameter that"
-            " carries a schema at all. Every LLM node binds an output schema,"
-            " so this fails at output validation mid-job rather than here."
+            " synthesised tool, which asks the model to follow the schema"
+            " and does not make it, or the model does not take the parameter"
+            " that carries a schema at all. Every LLM node binds an output"
+            " schema, so a response that breaks it fails at output validation"
+            " mid-job rather than here."
             " Choose a model whose provider supports schema-constrained output"
             " directly."
         )

@@ -208,12 +208,12 @@ def test_the_node_s_schema_reaches_the_provider(wire):
 
 
 def test_the_schema_travels_with_its_defs_unresolved(wire):
-    """A measurement rather than a preference, and the reason the gate exists.
+    """A nested model reaches the provider as ``$defs`` plus references to them.
 
-    A nested model arrives as ``$defs`` plus references to them. The provider
-    resolves it on the native path, which is why that path is the one the gate
-    admits — and why the emulated path, which forwards the same shape to a
-    provider that will not resolve it, is refused at build time.
+    This is the native path, which the gate admits. The emulated path sends the
+    same shape, so ``$defs`` is not what separates the two: the gate refuses the
+    emulated path because it asks the model to follow the schema and does not
+    make it.
     """
     _send(wire)
     schema = wire.body["response_format"]["json_schema"]["schema"]

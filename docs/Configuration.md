@@ -555,14 +555,13 @@ tier: **can this `(vendor, model)` be constrained to a schema *natively*?**
 Where a provider cannot, the library does not fail — it *emulates* the
 constraint by synthesising a single tool whose input schema is the response
 schema and forcing a call to it. The two paths are not equivalent. The native
-path resolves `$ref`/`$defs` before sending, because providers do not resolve
-external schema references; the emulated path forwards the schema as-is. A
-schema with nested types — which every Pydantic model here produces — therefore
-arrives unusable, and the model answers in a shape of its own invention.
+path constrains the model's output, so the response matches the schema. The
+emulated path only asks the model to follow the schema. The model usually does,
+but nothing makes it, and how often it does not is not measured here.
 
-That failure is the most expensive one available: the request is well-formed,
-the response is well-formed, and the job dies at the node's own output
-validation partway through. Neither of the other two checks can see it. So a
+A response that breaks the schema is the most expensive failure available: the
+request is well-formed, the response is well-formed JSON, and the job dies at
+the node's own output validation partway through. Neither of the other two checks can see it. So a
 tier whose model would take the emulated path is a startup error naming the
 tier.
 

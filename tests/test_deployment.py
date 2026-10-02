@@ -796,9 +796,9 @@ def test_a_model_without_native_schema_support_fails_the_build(tmp_path):
     """The expensive failure shape: well-formed request, well-formed response.
 
     Where a provider cannot constrain output to a schema directly, the library
-    emulates it with a synthesised tool and forwards the schema's `$defs`
-    unresolved. Nothing rejects the request, so without this gate the job dies
-    at output validation on node one. Temperature is unset here so the 4.7 rule
+    emulates it with a synthesised tool, which asks the model to follow the
+    schema and does not make it. Nothing rejects the request, so without this
+    gate a response that breaks the schema kills the job at output validation. Temperature is unset here so the 4.7 rule
     cannot fire first and mask which check is under test.
     """
     path = tmp_path / "sampling.toml"
@@ -811,7 +811,7 @@ def test_a_model_without_native_schema_support_fails_the_build(tmp_path):
 
     message = str(excinfo.value)
     assert "tiers.base" in message
-    assert "$defs" in message and "schema" in message
+    assert "synthesised tool" in message and "schema" in message
 
 
 def test_the_schema_gate_catches_vertex_hosted_claude_too():
@@ -823,7 +823,7 @@ def test_the_schema_gate_catches_vertex_hosted_claude_too():
     """
     env = VERTEX_ENV | {"ANALYSIS_MODEL_BASE_MODEL": "claude-sonnet-4-6"}
 
-    with pytest.raises(ModelGateError, match=r"\$defs"):
+    with pytest.raises(ModelGateError, match="synthesised tool"):
         Deployment.from_env(env=env).pipeline(DEFAULT_FRAMEWORKS)
 
 
@@ -897,7 +897,7 @@ def test_the_schema_gate_is_scoped_to_tiers_that_send_a_schema(tmp_path):
     path = tmp_path / "sampling.toml"
     path.write_text(UNCONSTRAINED_BASE, encoding="utf-8")
 
-    with pytest.raises(ModelGateError, match=r"\$defs"):
+    with pytest.raises(ModelGateError, match="synthesised tool"):
         Deployment.from_env(
             env=EMULATED_ENV | {"ANALYSIS_SAMPLING": str(constrained)}
         ).pipeline(DEFAULT_FRAMEWORKS)
