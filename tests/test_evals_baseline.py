@@ -54,8 +54,8 @@ def priced(monkeypatch):
 
     def fake(model: str) -> UnitPrices | None:
         rates = {
-            "gpt-base-001": UnitPrices("gpt-base-001", 1e-6, 4e-6, 1e-7),
-            "openai/gpt-5.6": UnitPrices("openai/gpt-5.6", 2e-6, 8e-6, 2e-7),
+            "gpt-base-001": UnitPrices("gpt-base-001", 1e-6, 4e-6, 1e-7, None),
+            "openai/gpt-5.6": UnitPrices("openai/gpt-5.6", 2e-6, 8e-6, 2e-7, None),
         }
         return rates.get(model)
 

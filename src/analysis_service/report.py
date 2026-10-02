@@ -383,6 +383,10 @@ class TokenUsage(BaseModel):
 
     prompt_tokens: int = Field(default=0, ge=0)
     cached_prompt_tokens: int = Field(default=0, ge=0)
+    #: Prompt tokens the provider wrote to its cache on this call, which a
+    #: GPT-5.6-family model bills above the input rate. ADK drops the count, so
+    #: :mod:`analysis_service.prompt_cache` carries it.
+    cache_write_tokens: int = Field(default=0, ge=0)
     completion_tokens: int = Field(default=0, ge=0)
     reasoning_tokens: int = Field(default=0, ge=0)
     total_tokens: int = Field(default=0, ge=0)

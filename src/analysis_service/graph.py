@@ -3185,9 +3185,15 @@ def _instruction(skills: str, prompt: str) -> str:
     The lanes of one job read one **System Model** and one set of sources
     between them, and ``analyze.md`` lays those out after ``{scope}``, which
     :data:`LANE_ARTIFACTS` makes per lane. So the material every lane shares
-    sits behind the first thing that separates them, and a provider that caches
-    on a common prefix reaches none of it. Reordering the block is a prompt
-    change and needs the measurement any prompt change needs.
+    sits behind the first thing that separates them.
+
+    **Moving the shared material first would cost more than it saves** (#1400).
+    The lanes of one job start together from one ``prepare`` route, so none
+    finds another's cache entry written. And the order here is what lets each
+    lane's own prefix, 4,576 to 6,520 tokens of skill and prompt, cache across
+    jobs (:mod:`analysis_service.prompt_cache`); with the job data first, that
+    prefix would shrink to the few tokens of ``analyze.md`` before its title
+    names the lane.
     """
     return f"{skills.strip()}\n\n{prompt.strip()}\n"
 

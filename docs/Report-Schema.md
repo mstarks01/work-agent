@@ -970,6 +970,7 @@ class NodeRun:
 class TokenUsage:
     prompt_tokens: int
     cached_prompt_tokens: int  # the part of prompt_tokens served from cache
+    cache_write_tokens: int  # the part of prompt_tokens written to cache, billed above input
     completion_tokens: int
     reasoning_tokens: int  # spent against max_output_tokens, absent from the output
     total_tokens: int

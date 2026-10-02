@@ -34,7 +34,11 @@ discount over-states rather than under-states.
 
 The cost rule is spelled once, so submit and CI compute the same number:
 uncached prompt tokens at the input rate, cached prompt tokens at the cache-read
-rate, and completion tokens at the output rate. Reasoning tokens are not added
+rate, prompt tokens written to the cache at the cache-write rate, and
+completion tokens at the output rate. A model whose map entry states no write
+rate bills a written token at the input rate, which under-states wherever that
+model charges a premium for writing; litellm's map states the rate for every
+model that charges one here. Reasoning tokens are not added
 on top. The vendor that bills them separately reports them inside
 ``completion_tokens``, and adding the separate field as well would double-count
 exactly there. Where a vendor reports them only outside, the recorded actual is
@@ -64,6 +68,9 @@ class UnitPrices:
     #: this module says it never writes — and it bills a 90%-cached call at a
     #: seventh of a plausible cost.
     cache_read_per_token: float | None
+    #: ``None`` where the map states no cache-write rate. OpenAI's GPT-5.6
+    #: family and later bill a written token at 1.25x the input rate.
+    cache_write_per_token: float | None = None
 
     @property
     def cached_rate(self) -> float:
@@ -81,12 +88,23 @@ class UnitPrices:
             return self.input_per_token
         return self.cache_read_per_token
 
+    @property
+    def write_rate(self) -> float:
+        """What a prompt token written to the cache costs: the stated rate, or the input rate."""
+        if self.cache_write_per_token is None:
+            return self.input_per_token
+        return self.cache_write_per_token
+
     def cost(self, usage: TokenUsage) -> float:
         """The one cost rule; see the module docstring for what it excludes."""
-        uncached = max(usage.prompt_tokens - usage.cached_prompt_tokens, 0)
+        uncached = max(
+            usage.prompt_tokens - usage.cached_prompt_tokens - usage.cache_write_tokens,
+            0,
+        )
         return (
             uncached * self.input_per_token
             + usage.cached_prompt_tokens * self.cached_rate
+            + usage.cache_write_tokens * self.write_rate
             + usage.completion_tokens * self.output_per_token
         )
 
@@ -96,6 +114,7 @@ class UnitPrices:
             "input_per_token": self.input_per_token,
             "output_per_token": self.output_per_token,
             "cache_read_per_token": self.cache_read_per_token,
+            "cache_write_per_token": self.cache_write_per_token,
         }
 
     @classmethod
@@ -108,6 +127,11 @@ class UnitPrices:
                 None
                 if raw.get("cache_read_per_token") is None
                 else float(raw["cache_read_per_token"])
+            ),
+            cache_write_per_token=(
+                None
+                if raw.get("cache_write_per_token") is None
+                else float(raw["cache_write_per_token"])
             ),
         )
 
@@ -265,5 +289,10 @@ def unit_prices(model: str) -> UnitPrices | None:
             None
             if (cached := entry.get("cache_read_input_token_cost")) is None
             else float(cached)
+        ),
+        cache_write_per_token=(
+            None
+            if (written := entry.get("cache_creation_input_token_cost")) is None
+            else float(written)
         ),
     )

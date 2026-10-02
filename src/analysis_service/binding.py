@@ -100,7 +100,10 @@ from analysis_service.model_tiers import (
     ReviewIndependence,
     TierName,
 )
-from analysis_service.prompt_cache import cache_marking_client_class
+from analysis_service.prompt_cache import (
+    cache_marking_client_class,
+    cache_write_reporting_llm_class,
+)
 from analysis_service.provider import ExecutedLlm, InProcessExecutor
 from analysis_service.resilience import ResilienceConfig
 from analysis_service.sampling import (
@@ -410,7 +413,7 @@ def build_tier_adapters(
     # retry loop sits above it in ``ExecutedLlm``, so every attempt it makes
     # passes through the charge layer and the attempt that answered is the one
     # whose figure is carried back.
-    translating = charge_reporting_llm_class(LiteLlm)
+    translating = cache_write_reporting_llm_class(charge_reporting_llm_class(LiteLlm))
     capturing_client = charge_capturing_client_class(LiteLLMClient)
     # The cache layer goes on top of whichever client a tier gets, and only
     # where the vendor row says the tier's model takes the breakpoint.

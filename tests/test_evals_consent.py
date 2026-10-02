@@ -293,8 +293,12 @@ class TestTheEstimate:
 
         def amount_at(base_out: float, strong_out: float) -> float:
             rates = {
-                "openai/gpt-base": UnitPrices("openai/gpt-base", 0.0, base_out, 0.0),
-                "openai/gpt-5.6": UnitPrices("openai/gpt-5.6", 0.0, strong_out, 0.0),
+                "openai/gpt-base": UnitPrices(
+                    "openai/gpt-base", 0.0, base_out, 0.0, None
+                ),
+                "openai/gpt-5.6": UnitPrices(
+                    "openai/gpt-5.6", 0.0, strong_out, 0.0, None
+                ),
             }
             monkeypatch.setattr(consent, "unit_prices", rates.get)
             got = consent.estimate(IDENTITY, ROUTES, tmp_path).amount_usd
@@ -426,7 +430,7 @@ class TestTheDriftDisclosure:
     history the day after; this is disclosed to the one person it bears on.
     """
 
-    RECORDED = (UnitPrices("openai/gpt-5.6", 1e-6, 4e-6, 1e-7),)
+    RECORDED = (UnitPrices("openai/gpt-5.6", 1e-6, 4e-6, 1e-7, None),)
 
     def test_a_moved_price_is_named_with_both_figures(self, tmp_path, priced):
         merged(

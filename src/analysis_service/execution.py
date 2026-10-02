@@ -52,6 +52,7 @@ from analysis_service.graph import (
     revise_rounds,
 )
 from analysis_service.identity import build_identity, execution_fingerprint
+from analysis_service.prompt_cache import CACHE_WRITE_METADATA_KEY
 from analysis_service.report import (
     InputRef,
     Job,
@@ -542,7 +543,11 @@ def _usage_of(event) -> TokenUsage | None:
     }
     if all(count is None for count in counts.values()):
         return None
-    return TokenUsage(**{field: count or 0 for field, count in counts.items()})
+    stamped = getattr(event, "custom_metadata", None) or {}
+    return TokenUsage(
+        **{field: count or 0 for field, count in counts.items()},
+        cache_write_tokens=stamped.get(CACHE_WRITE_METADATA_KEY) or 0,
+    )
 
 
 def _attempts_of(event) -> int:
