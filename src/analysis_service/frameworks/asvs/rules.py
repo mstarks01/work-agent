@@ -58,6 +58,8 @@ from analysis_service.analysis import (
     crossing_facts,
     is_unverified,
     matches_term,
+    model_text,
+    names_term,
     states_a_protocol,
 )
 from analysis_service.assertions import AssertionCatalog
@@ -102,16 +104,23 @@ def _hits(model: SystemModel, test: PresenceTest) -> Iterator[Match]:
     One match per element rather than one per term: a store named
     "PostgreSQL orders database" answers ``tech:database`` once, and the fact
     records which attribute and which term answered it.
+
+    A term the whole model's text does not name matches no single value, so
+    only the terms :func:`names_term` finds are tried value by value (#1316).
+    That holds while ``test.attributes`` is a subset of
+    :data:`TEXT_ATTRIBUTES`, which ``tests/test_asvs.py`` checks.
     """
+    text = model_text(model)
+    terms = [term for term in test.terms if names_term(text, term)]
+    if not terms:
+        return
     for element in model.elements():
         for attribute in test.attributes:
             value = getattr(element, attribute, "")
             if not isinstance(value, str):
                 continue
             lowered = value.lower()
-            term = next(
-                (term for term in test.terms if matches_term(term, lowered)), ""
-            )
+            term = next((term for term in terms if matches_term(term, lowered)), "")
             if not term:
                 continue
             yield (

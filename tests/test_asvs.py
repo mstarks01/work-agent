@@ -14,6 +14,7 @@ a maintainer would notice.
 from __future__ import annotations
 
 import json
+import random
 import re
 from collections import Counter
 from collections.abc import Sequence
@@ -23,6 +24,7 @@ from typing import Any, get_args
 import pytest
 from pydantic import ValidationError
 
+from analysis_service.analysis import TEXT_ATTRIBUTES, WHOLE_WORD, matches_term
 from analysis_service.claims import (
     Ground,
     QuoteCandidate,
@@ -1225,6 +1227,59 @@ class TestNothingIsRuledOutByVocabulary:
         assert not list(rules._hits(model, upload))
         model.processes[0].description += " Suppliers upload compliance documents."
         assert list(rules._hits(model, upload))
+
+
+class TestTheTermScreenKeepsEveryHit:
+    """``_hits`` tries a term value by value only where the whole text names it.
+
+    The screen reads :data:`TEXT_ATTRIBUTES`, so it is exact only while every
+    test reads a subset of them (#1316).
+    """
+
+    def test_every_presence_test_reads_text_the_screen_reads(self):
+        for test in rules.PRESENCE_TESTS:
+            assert set(test.attributes) <= set(TEXT_ATTRIBUTES), test.rule_id
+
+    def test_the_screened_hits_are_the_hits_of_every_term(self):
+        rng = random.Random(1316)
+        words = [
+            term.rstrip(WHOLE_WORD) for t in rules.PRESENCE_TESTS for term in t.terms
+        ]
+        words += ["x", "ws", "loginx", "_", "-", "\n"]
+        base = valid_model()
+        for _ in range(300):
+            model = base.model_copy(
+                update={
+                    "processes": [
+                        base.processes[0].model_copy(
+                            update={
+                                field: " ".join(rng.choices(words, k=rng.randint(0, 4)))
+                                for field in ("name", "description", "notes")
+                            }
+                        )
+                    ]
+                }
+            )
+            for test in rules.PRESENCE_TESTS:
+                every_term = []
+                for element in model.elements():
+                    for attribute in test.attributes:
+                        value = getattr(element, attribute, "")
+                        if not isinstance(value, str):
+                            continue
+                        term = next(
+                            (t for t in test.terms if matches_term(t, value.lower())),
+                            "",
+                        )
+                        if term:
+                            every_term.append((element.id, attribute, term))
+                            break
+
+                screened = [
+                    (ids[0], fact["attribute"], fact["term"])
+                    for ids, fact in rules._hits(model, test)
+                ]
+                assert screened == every_term, test.rule_id
 
 
 class TestARejectionThatDoesNotRuleLeavesItsRequirementListed:
