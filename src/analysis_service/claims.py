@@ -947,6 +947,20 @@ class Claim(BaseModel):
         return {}
 
     @classmethod
+    def idle(cls, model: SystemModel, options: Mapping[str, Any], lane: str) -> bool:
+        """Whether a job with these options leaves ``lane`` nothing to rule on.
+
+        A lane is idle where its units are a closed set and :meth:`ruled_out`
+        takes every one, including an empty set. Its agent is never called, so
+        its candidates lead nothing. ``prepare`` marks the lane by this, and
+        the early questions score no candidate of it.
+        """
+        units = cls.units_for(options, lane)
+        return units is not None and set(units) <= set(
+            cls.ruled_out(model, options, lane)
+        )
+
+    @classmethod
     def applicability(
         cls, model: SystemModel, options: Mapping[str, Any]
     ) -> list[ApplicabilityEntry]:

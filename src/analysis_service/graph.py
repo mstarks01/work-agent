@@ -1772,7 +1772,7 @@ def prepare_analysis(
                 package.record.ruled_in(model, options.get(name) or {}, lane.lane)
             )
             units = package.record.units_for(options.get(name) or {}, lane.lane)
-            if units is not None and set(units) <= set(lane_ruled_out):
+            if package.record.idle(model, options.get(name) or {}, lane.lane):
                 idle_lanes.append(lane.lane)
             # Retrieval is by *fired* rule, so a lane that triggered nothing gets
             # nothing: the material follows the leads rather than the lane.

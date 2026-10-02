@@ -33,7 +33,9 @@ zone where the service inferred it, and each question kind.
 **The rank is a prior times the candidates.** The prior says how often each
 framework's findings in earlier runs cite that attribute or kind, per element
 of that type. The candidates are the framework's rules that fire on the
-element. A question's score is the prior times one plus the candidates,
+element, in the lanes the job runs. A lane with nothing to rule on at the
+job's options, such as an ASVS chapter with no level 1 requirement, leads
+nothing. A question's score is the prior times one plus the candidates,
 summed over the job's frameworks. On 13 tuned cases, with the prior read
 from the other 12 cases, the first six questions a case settled 59% to 64% of
 what the report's own six settled, and the first ten 62% to 63%.
