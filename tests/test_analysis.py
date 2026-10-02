@@ -5,11 +5,16 @@ output, and no security claim invented on the way. A helper that reordered its
 result would change the prompt bytes two otherwise-identical jobs send.
 """
 
+import random
+import re
+
 import pytest
 
 from analysis_service import analysis
 from analysis_service.analysis import (
     CONTROL_ATTRIBUTES,
+    TEXT_ATTRIBUTES,
+    WHOLE_WORD,
     control_state,
     cross_boundary_flows,
     crossing_facts,
@@ -286,6 +291,68 @@ def test_a_term_fires_at_the_start_of_a_word_or_as_a_whole_word():
     assert not matches_term("java$", "a javascript front end")
     assert matches_term("java$", "a java service")
     assert not matches_term("log$", "the login flow")
+
+
+#: Characters on each side of a word boundary, the line break that joins a
+#: model's values, a non-ASCII letter, an upper-case one and the ``$`` marker.
+SHAPES = "ab_1 .-\néA$"
+
+
+def random_text(rng, longest):
+    return "".join(rng.choices(SHAPES[:-1], k=rng.randint(0, longest)))
+
+
+def test_the_matcher_states_a_leading_word_boundary():
+    """The word-start check sits behind the stem (#1316) and states one rule."""
+    from analysis_service.analysis import matches_term
+
+    rng = random.Random(1316)
+    for _ in range(20_000):
+        text = random_text(rng, 10)
+        term = "".join(rng.choices(SHAPES, k=rng.randint(0, 4)))
+        stem = re.escape(term.rstrip(WHOLE_WORD))
+        tail = r"(?!\w)" if term.endswith(WHOLE_WORD) else ""
+        leading = re.search(rf"(?<!\w){stem}{tail}", text) is not None
+
+        assert matches_term(term, text) == leading, (term, text)
+
+
+def test_the_joined_text_names_what_a_value_names():
+    """``names_term`` searches one joined text; asked value by value, it agrees.
+
+    The value-by-value search is the rule as it reads, and the joined text is
+    the fast form of it (#1316). They are tested against each other.
+    """
+    from analysis_service.analysis import matches_term, model_text, names_term
+
+    rng = random.Random(1316)
+    base = valid_model()
+    for _ in range(5_000):
+        model = base.model_copy(
+            update={
+                "processes": [
+                    base.processes[0].model_copy(
+                        update={
+                            "name": random_text(rng, 6),
+                            "description": random_text(rng, 6),
+                            "notes": random_text(rng, 6),
+                        }
+                    )
+                ]
+            }
+        )
+        term = "".join(rng.choices(SHAPES, k=rng.randint(0, 4))).lower()
+        by_value = any(
+            matches_term(term, value.lower())
+            for element in model.elements()
+            for attribute in TEXT_ATTRIBUTES
+            if isinstance(value := getattr(element, attribute, ""), str)
+        )
+
+        assert names_term(model_text(model), term) == by_value, (term, model)
+
+    for term in ("", WHOLE_WORD, "a"):
+        assert not names_term(model_text(SystemModel()), term)
 
 
 class TestTheAssetVocabularyNamesWhatAnElementHolds:

@@ -224,8 +224,8 @@ FUNCTION_WORDS: frozenset[str] = frozenset(
 #: either one alone can see it.
 #:
 #: Measured, on the tree that carries this constant: a search runs at about
-#: 70,000 characters per millisecond, so 20 million characters is about 285 ms
-#: of CPU. The worst of the 15 corpus cases spends 46,732, which is 427 times
+#: 930,000 characters per millisecond, so 20 million characters is about 21 ms
+#: of CPU (#1316). The worst of the 15 corpus cases spends 46,732, which is 427 times
 #: under the budget. A job that spends it names over a thousand different words
 #: across its controls and matches none of them, which is not a model this
 #: measures usefully.
@@ -485,8 +485,7 @@ class _Scan:
     once per element, and it searches the same token against the same source
     once per value that carries it — and a model's control vocabulary repeats
     heavily, because the systems it describes use the same few mechanisms. Both
-    are memoized here, which is what takes the 150-element worst case from 13.5
-    seconds of CPU to 71 milliseconds.
+    are memoized here.
 
     Memoizing is not a bound: distinct tokens can keep arriving, and the cost
     of each is the length of the source it is searched against — both set by
