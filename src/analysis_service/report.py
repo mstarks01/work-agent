@@ -166,6 +166,9 @@ from analysis_service.vendors import ServedTrust, vendor_for_route
 # 3.0 also carries ``nodes[].attempts``, the provider-call count the retry
 # driver stamps on each LLM node. Optional with a default of 1, and it rides
 # the unshipped major for the same reason.
+# 3.0 also carries ``nodes[].reasks``, the schema re-ask count (0 or 1) that
+# the adapter stamps (ADR 0058). Optional with a default of 0, for the same
+# reason.
 # 3.0 also carries ``unknown_claim_identities``, a seventh list of
 # service-owned marks: a claim naming an identifier its framework's own catalog
 # does not hold. It rides 3.0 for the same reason ``absent-attribute`` does —
@@ -472,6 +475,10 @@ class NodeRun(BaseModel):
     leave. A settlement charges them from it (see
     :func:`analysis_service.budgets.measured_tokens`).
 
+    ``reasks`` is 1 where the node's first answer failed its output schema and
+    the adapter asked once more with the validation errors. Both answering
+    calls are metered, so ``usage`` covers both and ``attempts`` counts both.
+
     ``served_trust`` says what this row's ``model`` is worth as evidence, and it
     is **here rather than once per report**. A deployment may select a
     different vendor per tier, so one report can hold rows whose served builds
@@ -491,6 +498,7 @@ class NodeRun(BaseModel):
     duration_ms: int = Field(ge=0)
     usage: TokenUsage | None = None
     attempts: int = Field(default=1, ge=1)
+    reasks: int = Field(default=0, ge=0, le=1)
     # ``allow_inf_nan`` off, because a stored figure is only as trustworthy as
     # whatever wrote it — the reasoning ``_stored_system_name`` states below.
     # ``analysis_service.charges.reported_charge_of`` refuses a non-finite

@@ -1242,7 +1242,7 @@ class Proposal(BaseModel):
     by prompt instruction, which makes a mis-shaped ground an expected
     stochastic outcome rather than a defect: an agent that picked the right
     fact and spelled it into the wrong branch killed the node, and with it all
-    six lanes, at a seam with no re-ask path.
+    six lanes.
 
     So the agent stops spelling it. ``evidence_refs`` holds IDs copied from the
     evidence catalog the service derived from the validated System Model,
@@ -1276,16 +1276,14 @@ class Proposal(BaseModel):
     # RATHER THAN OVERLOOKED. Unlike the rules this class exists to remove, they
     # *are* expressible in a JSON schema — but providers enforce ``maxLength``
     # and ``minItems`` no more reliably than ``pattern``, so an agent can still
-    # exceed one, and the raise lands at the node boundary where it costs the
-    # lane and its siblings.
+    # exceed one. The schema re-ask (ADR 0058) gives the lane one more answer
+    # with the error named. A second answer over the cap fails at the node
+    # boundary, where it costs the lane and its siblings.
     #
-    # Neither remedy that worked elsewhere applies. There is no "select rather
-    # than construct" form of an over-long description, so it cannot be made
-    # unrepresentable; and the analyst path has no re-ask to relocate the check
-    # to — ``repair`` is extraction-only and ``recritic`` critic-only — so it
-    # cannot be made recoverable either. What is left is to truncate, which
-    # infers what the agent meant and is refused on principle, or to size the
-    # caps so the ceiling is not one a model reaches.
+    # There is no "select rather than construct" form of an over-long
+    # description, so it cannot be made unrepresentable. Truncation infers what
+    # the agent meant and is refused on principle. So the caps are sized so the
+    # ceiling is not one a model reaches.
     #
     # Sized against measured output: the 18 exemplar descriptions run 524-811
     # characters, median 702, against 4000. Roughly 5x headroom, and the risk

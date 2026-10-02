@@ -662,12 +662,13 @@ class TestRetryingAdapter:
         # A failed attempt meters nothing, so the count on the answer is what
         # lets a settlement charge the prompts the failed attempts sent.
         assert drive(FakeExecutor(outcomes=["ok"]), policy())[0].custom_metadata == {
-            "attempts": 1
+            "attempts": 1,
+            "reasks": 0,
         }
         retried = drive(
             FakeExecutor(outcomes=[rate_limited(), rate_limited(), "ok"]), policy()
         )
-        assert retried[0].custom_metadata == {"attempts": 3}
+        assert retried[0].custom_metadata == {"attempts": 3, "reasks": 0}
 
     def test_success_credits_the_budget(self):
         pol = policy()

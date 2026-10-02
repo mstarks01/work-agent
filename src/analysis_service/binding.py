@@ -319,7 +319,8 @@ def _check_native_structured_output(
     the schema and nothing makes it, so a response that breaks the schema fails
     on the node's validation rather than on the request it made. That is the
     most expensive shape a failure can take here: it survives the build,
-    survives the request, and dies at output validation mid-job.
+    survives the request, and dies at output validation mid-job when the one
+    schema re-ask fails too.
 
     Scoped to tiers that actually send a schema. A tier running
     ``constrain_output = false`` sends none, so how the provider *would* have

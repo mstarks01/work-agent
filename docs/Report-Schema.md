@@ -962,6 +962,7 @@ class NodeRun:
     duration_ms: int
     usage: TokenUsage | None  # what the provider says the call cost; None if unmetered
     attempts: int  # provider calls this execution took; 1 unless the driver retried
+    reasks: int  # 1 where the first answer failed its schema and the node asked once more
     served_trust: (
         Literal["provider_reported", "requested_echo"] | None
     )  # what `model` is worth as evidence; None for code-only nodes
@@ -1048,10 +1049,15 @@ class TokenUsage:
   then hold rows with different answers. It is derived from `requested_model`,
   so a value you edit in a stored file is recomputed on read.
 - **`attempts`** is how many provider calls the node took, as the retry driver
-  counted them. `usage` meters only the call that answered; a failed attempt
-  reports nothing. The budget settlement charges each earlier attempt the
-  answering call's `prompt_tokens`, because that is the prompt every attempt
+  counted them. `usage` meters only the calls that answered; a failed attempt
+  reports nothing. The budget settlement charges each failed attempt the
+  answering calls' `prompt_tokens`, which is at least the prompt that attempt
   sent.
+- **`reasks`** is 1 where the node's first answer failed its output schema and
+  the service asked the same model once more, with the validation errors
+  (ADR 0058). Both answers are metered, so `usage` covers both calls and
+  `attempts` counts both. A second answer that fails the schema still fails
+  the node.
 
 > **`schema_version` 1.1** added `requested_model` and redefined `model` as the
 > served build rather than the configured string. A consumer keying on `model`
