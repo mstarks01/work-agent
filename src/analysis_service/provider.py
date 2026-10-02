@@ -65,6 +65,7 @@ from pydantic import BaseModel
 
 from analysis_service.charges import CHARGE_METADATA_KEY, UPSTREAM_METADATA_KEY
 from analysis_service.offline import refuse_live_inference
+from analysis_service.prompt_cache import CACHE_WRITE_METADATA_KEY
 from analysis_service.retry import (
     ProviderFailure,
     RetryPolicy,
@@ -173,8 +174,8 @@ class GenerationRequest:
 class GenerationResult:
     """What one provider call answered, as the facts this service reads.
 
-    Exactly the nine ``tests/test_provider_contract.py`` drives, minus the
-    attempt count — that one is the retry loop's own, written above this seam
+    The nine ``tests/test_provider_contract.py`` drives, plus the cache-write
+    count ``tests/test_prompt_cache.py`` drives, minus the attempt count — that one is the retry loop's own, written above this seam
     on the way back out, because an implementation cannot know how many times
     its caller asked.
     """
@@ -185,6 +186,7 @@ class GenerationResult:
     finish_reason: str | None
     reported_charge_usd: float | None
     served_upstream: str | None
+    cache_write_tokens: int | None
 
     @classmethod
     def of(cls, response: LlmResponse) -> Self:
@@ -203,12 +205,13 @@ class GenerationResult:
             finish_reason=_finish_reason_text(response.finish_reason),
             reported_charge_usd=stamped.get(CHARGE_METADATA_KEY),
             served_upstream=stamped.get(UPSTREAM_METADATA_KEY),
+            cache_write_tokens=stamped.get(CACHE_WRITE_METADATA_KEY),
         )
 
     def into_response(self) -> LlmResponse:
         """This result as the ADK response the graph's flow consumes.
 
-        The two metadata keys are written only where there is something to
+        The metadata keys are written only where there is something to
         write, so an event from a direct vendor carries neither key rather than
         carrying them as ``None`` — which is what every reader downstream
         already distinguishes.
@@ -216,6 +219,7 @@ class GenerationResult:
         stamped = {
             CHARGE_METADATA_KEY: self.reported_charge_usd,
             UPSTREAM_METADATA_KEY: self.served_upstream,
+            CACHE_WRITE_METADATA_KEY: self.cache_write_tokens,
         }
         present = {key: value for key, value in stamped.items() if value is not None}
         return LlmResponse(

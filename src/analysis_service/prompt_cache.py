@@ -22,6 +22,21 @@ Three parts, one per layer:
 
 Which vendor and model take the marker is the vendor row's
 :attr:`~analysis_service.vendors.Vendor.prompt_cache`, read once at build time.
+
+**A cache write is charged, and ADK drops its count.** GPT-5.6 and later bill
+a written token at 1.25x the input rate. ADK's translation keeps the cached
+read count and nothing about writes, so the marking client reads the write
+count off litellm's response, and :func:`cache_write_reporting_llm_class`
+stamps it on the response under :data:`CACHE_WRITE_METADATA_KEY`. Only that
+model family charges for a write, and every tier serving it has the marking
+client, so no other tier needs the read.
+
+**Two nodes cache nothing, by decision.** ``repair``'s whole template is 954
+tokens, below OpenAI's 1,024-token minimum. ``extract`` places the source text
+after 471 tokens; moving it to the end would cache about 3,990 tokens on the
+base tier, worth at most about $0.0006 a job at its listed prices, against an
+``extract.md`` edit that needs five runs a side to measure and two of which
+measured 3 sd worse.
 """
 
 from __future__ import annotations
@@ -37,8 +52,14 @@ BREAKPOINT_FIELD = "prompt_cache_breakpoint"
 OPTIONS_FIELD = "prompt_cache_options"
 EXPLICIT = {"mode": "explicit"}
 
+#: Where a call's cache-write count rides on the response that carries it.
+CACHE_WRITE_METADATA_KEY = "cache_write_tokens"
+
 #: The stable prefix of the instruction the current node is about to send.
 _stable_prefix: ContextVar[str | None] = ContextVar("stable_prefix", default=None)
+
+#: The cache-write count the current call's provider reported, until stamped.
+_written: ContextVar[int | None] = ContextVar("cache_written", default=None)
 
 
 def stable_prefix(template: str) -> str:
@@ -100,8 +121,50 @@ def cache_marking_client_class(client_cls: type) -> type:
                     **(kwargs.get("extra_body") or {}),
                     OPTIONS_FIELD: dict(EXPLICIT),
                 }
-            return await super().acompletion(
+            response = await super().acompletion(
                 model=model, messages=messages, tools=tools, **kwargs
             )
+            _written.set(cache_writes_of(response))
+            return response
 
     return CacheMarkingClient
+
+
+def cache_writes_of(response: Any) -> int | None:
+    """The cache-write count litellm parsed off a response, or ``None``.
+
+    litellm keeps it at ``usage.prompt_tokens_details.cache_write_tokens``
+    whichever vendor sent it; any link of that chain may be absent.
+    """
+    details = getattr(getattr(response, "usage", None), "prompt_tokens_details", None)
+    if isinstance(details, dict):
+        written = details.get(CACHE_WRITE_METADATA_KEY)
+    else:
+        written = getattr(details, CACHE_WRITE_METADATA_KEY, None)
+    return written if isinstance(written, int) else None
+
+
+def cache_write_reporting_llm_class(litellm_cls: type) -> type:
+    """A ``LiteLlm`` subclass that stamps a call's cache-write count.
+
+    Cleared before each call and after it is stamped, as
+    :func:`analysis_service.charges.charge_reporting_llm_class` clears the
+    charge, so one tier's count never lands on another tier's response.
+    """
+
+    class CacheWriteReportingLlm(litellm_cls):
+        """One tier's adapter, carrying a cache-write count to the record."""
+
+        async def generate_content_async(self, llm_request, stream: bool = False):
+            _written.set(None)
+            async for response in super().generate_content_async(llm_request, stream):
+                written = _written.get()
+                if written is not None:
+                    _written.set(None)
+                    response.custom_metadata = {
+                        **(response.custom_metadata or {}),
+                        CACHE_WRITE_METADATA_KEY: written,
+                    }
+                yield response
+
+    return CacheWriteReportingLlm

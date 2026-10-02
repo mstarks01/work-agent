@@ -17,9 +17,11 @@ from google.adk.models.llm_request import LlmRequest
 from google.genai import types
 
 from analysis_service.binding import build_tier_adapters
+from analysis_service.execution import _usage_of
 from analysis_service.model_tiers import TierName
 from analysis_service.prompt_cache import (
     BREAKPOINT_FIELD,
+    CACHE_WRITE_METADATA_KEY,
     EXPLICIT,
     OPTIONS_FIELD,
     cache_marking_client_class,
@@ -27,9 +29,11 @@ from analysis_service.prompt_cache import (
     remember_stable_prefix,
     stable_prefix,
 )
+from analysis_service.report import TokenUsage
 from analysis_service.resilience import load_resilience
 from analysis_service.sampling import load_sampling
 from analysis_service.vendors import VendorName
+from evals.harness.prices import UnitPrices, unit_prices
 from tests.factories import PROJECT_ROOT, inject_transport, tiers_for
 
 pytestmark = pytest.mark.usefixtures("supplied_transport")
@@ -37,6 +41,7 @@ pytestmark = pytest.mark.usefixtures("supplied_transport")
 CONFIG = PROJECT_ROOT / "config"
 PREFIX = "# Role\n\nYou rule on drafts.\n\n"
 REST = "The drafts:\n\n[]\n"
+WRITTEN = 30
 MARKED = [
     {"type": "text", "text": PREFIX, BREAKPOINT_FIELD: EXPLICIT},
     {"type": "text", "text": REST},
@@ -158,9 +163,13 @@ class _Wire:
                     }
                 ],
                 "usage": {
-                    "prompt_tokens": 1,
+                    "prompt_tokens": 100,
                     "completion_tokens": 1,
-                    "total_tokens": 2,
+                    "total_tokens": 101,
+                    "prompt_tokens_details": {
+                        "cached_tokens": 20,
+                        CACHE_WRITE_METADATA_KEY: WRITTEN,
+                    },
                 },
             },
         )
@@ -168,8 +177,8 @@ class _Wire:
 
 def _sent(
     vendor: VendorName, models: tuple[str, str], tier: TierName
-) -> dict[str, Any]:
-    """The body one call on ``tier`` puts on the wire, after its node's callback."""
+) -> tuple[dict[str, Any], Any]:
+    """The body one call on ``tier`` puts on the wire, and the response back."""
     wire = _Wire(models[0] if tier == "base" else models[1])
     sampling = load_sampling(CONFIG / "sampling.toml", env={})
     adapters = build_tier_adapters(
@@ -191,9 +200,9 @@ def _sent(
         )
         return [r async for r in adapter.generate_content_async(request, False)]
 
-    asyncio.run(drive())
+    (response,) = asyncio.run(drive())
     assert len(wire.requests) == 1
-    return json.loads(wire.requests[0].content)
+    return json.loads(wire.requests[0].content), response
 
 
 @pytest.mark.parametrize(
@@ -211,10 +220,12 @@ def _sent(
     ],
 )
 def test_a_model_that_takes_the_breakpoint_gets_it_on_the_wire(vendor, models, tier):
-    body = _sent(vendor, models, tier)
+    body, response = _sent(vendor, models, tier)
 
     assert body["messages"][0] == {"role": "system", "content": MARKED}
     assert body[OPTIONS_FIELD] == EXPLICIT
+    assert response.custom_metadata[CACHE_WRITE_METADATA_KEY] == WRITTEN
+    assert _usage_of(response).cache_write_tokens == WRITTEN
 
 
 @pytest.mark.parametrize(
@@ -234,7 +245,41 @@ def test_a_model_that_takes_the_breakpoint_gets_it_on_the_wire(vendor, models, t
 def test_a_model_that_does_not_take_it_sends_the_system_text_unchanged(
     vendor, models, tier
 ):
-    body = _sent(vendor, models, tier)
+    body, response = _sent(vendor, models, tier)
 
     assert body["messages"][0] == {"role": "system", "content": PREFIX + REST}
     assert OPTIONS_FIELD not in body
+    assert CACHE_WRITE_METADATA_KEY not in (response.custom_metadata or {})
+
+
+class TestTheCostOfAWrite:
+    """A written prompt token bills at the write rate, and not also as input."""
+
+    USAGE = TokenUsage(
+        prompt_tokens=1000, cached_prompt_tokens=200, cache_write_tokens=300
+    )
+
+    def test_each_kind_of_prompt_token_bills_at_its_own_rate(self):
+        rates = UnitPrices("m", 2e-6, 8e-6, 2e-7, 2.5e-6)
+
+        assert rates.cost(self.USAGE) == pytest.approx(
+            500 * 2e-6 + 200 * 2e-7 + 300 * 2.5e-6
+        )
+
+    def test_an_unstated_write_rate_bills_at_the_input_rate(self):
+        rates = UnitPrices("m", 2e-6, 8e-6, 2e-7, None)
+
+        assert rates.cost(self.USAGE) == pytest.approx(800 * 2e-6 + 200 * 2e-7)
+
+    def test_the_map_states_the_write_rate_for_the_gpt_5_6_family(self):
+        rates = unit_prices("gpt-5.6-terra")
+
+        assert rates is not None
+        assert rates.cache_write_per_token == pytest.approx(
+            1.25 * rates.input_per_token
+        )
+
+    def test_a_recorded_rate_survives_its_json(self):
+        rates = UnitPrices("m", 2e-6, 8e-6, 2e-7, 2.5e-6)
+
+        assert UnitPrices.from_json(rates.to_json()) == rates
