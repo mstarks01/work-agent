@@ -64,6 +64,7 @@ from analysis_service.execution import (
     _served_upstream_of,
     _usage_of,
 )
+from analysis_service.provider import REASKS_METADATA_KEY
 from analysis_service.report import TokenUsage
 from analysis_service.resilience import load_resilience
 from analysis_service.retry import (
@@ -76,12 +77,16 @@ from analysis_service.retry import (
 from analysis_service.sampling import load_sampling
 from analysis_service.system_model import SystemModel
 from analysis_service.vendors import VendorName, vendor_for
-from tests.factories import PROJECT_ROOT, inject_transport, tiers_for
+from tests.factories import PROJECT_ROOT, inject_transport, tiers_for, valid_model
 
 #: Every test here drives the real translator to a transport it supplies.
 pytestmark = pytest.mark.usefixtures("supplied_transport")
 
 CONFIG = PROJECT_ROOT / "config"
+
+#: An answer that passes the ``SystemModel`` schema these calls bind, so no
+#: test here takes a schema re-ask it did not ask for.
+VALID_ANSWER = valid_model().model_dump_json()
 
 #: Key-shaped strings that are visibly not keys. Nothing here authenticates: the
 #: transport answers before anything reads one.
@@ -137,7 +142,7 @@ def completion_body(vendor: VendorName, **over: Any) -> dict[str, Any]:
         "choices": [
             {
                 "index": 0,
-                "message": {"role": "assistant", "content": "hello"},
+                "message": {"role": "assistant", "content": VALID_ANSWER},
                 "finish_reason": "stop",
             }
         ],
@@ -471,6 +476,7 @@ class TestTheMetadataKeysAreTheOnesTheReadersUse:
 
         assert set(event.custom_metadata) == {
             ATTEMPTS_METADATA_KEY,
+            REASKS_METADATA_KEY,
             CHARGE_METADATA_KEY,
             UPSTREAM_METADATA_KEY,
         }

@@ -53,6 +53,7 @@ from analysis_service.graph import (
 )
 from analysis_service.identity import build_identity, execution_fingerprint
 from analysis_service.prompt_cache import CACHE_WRITE_METADATA_KEY
+from analysis_service.provider import REASKS_METADATA_KEY
 from analysis_service.report import (
     InputRef,
     Job,
@@ -138,6 +139,7 @@ class _NodeFinish:
     served_model: str | None
     usage: TokenUsage | None = None
     attempts: int = 1
+    reasks: int = 0
     reported_charge_usd: float | None = None
     served_upstream: str | None = None
 
@@ -378,6 +380,7 @@ class GraphExecutor:
                             served_model=getattr(event, "model_version", None),
                             usage=_usage_of(event),
                             attempts=_attempts_of(event),
+                            reasks=_reasks_of(event),
                             reported_charge_usd=_reported_charge_of(event),
                             served_upstream=_served_upstream_of(event),
                         )
@@ -453,6 +456,7 @@ class GraphExecutor:
                     duration_ms=max(round((finish.at - ready_at) * 1000), 0),
                     usage=finish.usage,
                     attempts=finish.attempts,
+                    reasks=finish.reasks,
                     reported_charge_usd=finish.reported_charge_usd,
                     served_upstream=finish.served_upstream,
                 )
@@ -557,6 +561,14 @@ def _attempts_of(event) -> int:
     and a model that did not pass through the retry driver made exactly one.
     """
     return (getattr(event, "custom_metadata", None) or {}).get(ATTEMPTS_METADATA_KEY, 1)
+
+
+def _reasks_of(event) -> int:
+    """How many schema re-asks this event's node took, as the adapter said.
+
+    Zero where the event carries no stamp: a deterministic node makes no call.
+    """
+    return (getattr(event, "custom_metadata", None) or {}).get(REASKS_METADATA_KEY, 0)
 
 
 def _reported_charge_of(event) -> float | None:

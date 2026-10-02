@@ -848,9 +848,10 @@ count would read whitespace-free text as a handful of tokens. The reservation
 is **replaced** by the measured usage the moment the job reaches a terminal
 state, so a job that reserved a lot and cost little frees the difference
 immediately. The measurement is each node's reported usage, plus its prompt
-tokens once more for every retried attempt: a failed attempt sends the prompt
-and reports nothing, so `nodes[].attempts` is what the settlement charges it
-from.
+tokens once more for every failed attempt: a failed attempt sends the prompt
+and reports nothing, so `nodes[].attempts` and `nodes[].reasks` are what the
+settlement charges it from. A schema re-ask is not a failed attempt, because
+its answer is metered.
 
 A job that nothing measured keeps its reservation. A completed job is settled
 from its report. A rejected job is settled from the nodes that ran before the

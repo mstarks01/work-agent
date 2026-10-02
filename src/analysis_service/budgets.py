@@ -188,12 +188,14 @@ def retried_prompt_tokens(node: NodeRun) -> int:
     consent price did not, so a sweep offered $9.75 against a $25.35 bill at the
     shipped `attempts = 3`. Each was tested against its own expectation.
 
-    Only the attempt that answered is metered, and every attempt before it sent
-    the same prompt. `analysis_service.retry` stamps the count for exactly this
-    (OWASP LLM10). This over-counts an attempt the provider refused before
+    Only the calls that answered are metered: one, or two where the node took a
+    schema re-ask. Every attempt that failed before them sent a prompt no larger
+    than theirs together. `analysis_service.retry` stamps the count for exactly
+    this (OWASP LLM10). This over-counts an attempt the provider refused before
     reading the prompt, which is the direction a settlement should err in.
     """
-    return 0 if node.usage is None else node.usage.prompt_tokens * (node.attempts - 1)
+    unmetered = node.attempts - 1 - node.reasks
+    return 0 if node.usage is None else node.usage.prompt_tokens * unmetered
 
 
 def measured_tokens(nodes: Iterable[NodeRun]) -> int:

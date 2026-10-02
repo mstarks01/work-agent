@@ -60,8 +60,9 @@ from typing import Any, Protocol, Self, runtime_checkable
 from google.adk.models.base_llm import BaseLlm
 from google.adk.models.llm_request import LlmRequest
 from google.adk.models.llm_response import LlmResponse
+from google.adk.utils._schema_utils import validate_schema
 from google.genai import types
-from pydantic import BaseModel
+from pydantic import BaseModel, ValidationError
 
 from analysis_service.charges import CHARGE_METADATA_KEY, UPSTREAM_METADATA_KEY
 from analysis_service.offline import refuse_live_inference
@@ -73,6 +74,18 @@ from analysis_service.retry import (
     reject_truncated,
     stamp_attempt,
 )
+
+#: The ``custom_metadata`` key under which a response carries how many schema
+#: re-asks its node took: 0 or 1.
+REASKS_METADATA_KEY = "reasks"
+
+#: What the model reads after an answer that does not match its node's schema.
+#: The validation errors follow it, one per line.
+REASK_INSTRUCTION = (
+    "Your previous answer does not match the required JSON schema. It failed"
+    " these checks:"
+)
+REASK_CLOSING = "Answer again with the complete corrected JSON, and nothing else."
 
 #: The decoding params that travel with each call, named as
 #: ``types.GenerateContentConfig`` names them. A closed list rather than a dump
@@ -132,6 +145,15 @@ class GenerationRequest:
             },
             response_mime_type=getattr(config, "response_mime_type", None),
         )
+
+    def reasked(self, answer: types.Content | None, errors: str) -> Self:
+        """This request again, with the answer that failed and why it failed."""
+        follow_up = types.Content(
+            role="user",
+            parts=[types.Part(text=f"{REASK_INSTRUCTION}\n{errors}\n{REASK_CLOSING}")],
+        )
+        earlier = (answer,) if answer is not None else ()
+        return replace(self, contents=(*self.contents, *earlier, follow_up))
 
     def into_llm_request(self) -> LlmRequest:
         """This request as the ADK object an in-process adapter expects.
@@ -206,6 +228,25 @@ class GenerationResult:
             reported_charge_usd=stamped.get(CHARGE_METADATA_KEY),
             served_upstream=stamped.get(UPSTREAM_METADATA_KEY),
             cache_write_tokens=stamped.get(CACHE_WRITE_METADATA_KEY),
+        )
+
+    def followed_by(self, later: Self) -> Self:
+        """``later``'s answer, metered as both calls together.
+
+        Both calls answered, so both are metered: token counts and cache writes
+        add. A charge adds only where both calls report one, because a sum with
+        one half missing is a figure for part of the node.
+        """
+        first, second = self.reported_charge_usd, later.reported_charge_usd
+        return replace(
+            later,
+            usage=_summed_usage(self.usage, later.usage),
+            reported_charge_usd=None
+            if first is None or second is None
+            else first + second,
+            cache_write_tokens=_summed(
+                self.cache_write_tokens, later.cache_write_tokens
+            ),
         )
 
     def into_response(self) -> LlmResponse:
@@ -363,14 +404,31 @@ class ExecutedLlm(BaseLlm):
                 " attempt and check no finish reason"
             )
         request = GenerationRequest.project(self.model, llm_request)
-        results, attempt = await self._attempt_with_retries(request)
+        results, attempt = await self._answered(request)
+        reasks = 0
+        errors = schema_errors(llm_request.config.response_schema, results)
+        if errors is not None:
+            answer = results[-1].content if results else None
+            later, later_attempt = await self._answered(request.reasked(answer, errors))
+            results = [results[-1].followed_by(later[-1]), *later[:-1]]
+            attempt += later_attempt
+            reasks = 1
         responses = [result.into_response() for result in results]
-        # Refused here rather than inside the loop, so that method keeps its one
-        # job — surviving transport failures — and a truncation is never
-        # mistaken for one of them.
-        reject_truncated(responses, self.model)
-        for response in stamp_attempt(responses, attempt):
+        for response in stamp_reasks(stamp_attempt(responses, attempt), reasks):
             yield response
+
+    async def _answered(
+        self, request: GenerationRequest
+    ) -> tuple[list[GenerationResult], int]:
+        """One answer to ``request``, with the attempts it took.
+
+        The truncation check runs here rather than inside the loop, so the loop
+        keeps its one job — surviving transport failures — and a truncation is
+        never mistaken for one of them.
+        """
+        results, attempt = await self._attempt_with_retries(request)
+        reject_truncated([result.into_response() for result in results], self.model)
+        return list(results), attempt
 
     async def _attempt_with_retries(
         self, request: GenerationRequest
@@ -401,6 +459,71 @@ class ExecutedLlm(BaseLlm):
                 self.retry_policy.budget.credit()
                 return results, attempt
         raise AssertionError(f"retry loop fell through: {last!r}")
+
+
+def schema_errors(schema: Any, results: Sequence[GenerationResult]) -> str | None:
+    """The validation errors ADK would raise for this answer, or ``None``.
+
+    ADK validates a node's output with ``validate_schema`` over the joined text
+    parts that are not thoughts, and skips an answer with no text. This asks the
+    same function the same question, so a re-ask fires exactly where ADK would
+    end the job. Each error names its location and its message, and never the
+    input value, so a re-ask does not repeat the answer back at length.
+    """
+    if schema is None or not results or results[-1].content is None:
+        return None
+    parts = results[-1].content.parts or ()
+    text = "".join(part.text for part in parts if part.text and not part.thought)
+    if not text.strip():
+        return None
+    try:
+        validate_schema(schema, text)
+    except ValidationError as exc:
+        return "\n".join(
+            f"- {'.'.join(str(step) for step in error['loc']) or '(root)'}:"
+            f" {error['msg']}"
+            for error in exc.errors(include_input=False, include_url=False)
+        )
+    return None
+
+
+def stamp_reasks(
+    responses: Sequence[LlmResponse], reasks: int
+) -> Sequence[LlmResponse]:
+    """``responses`` carrying how many schema re-asks their node took.
+
+    Stamped on every response, like the attempt count, so a response without
+    the stamp is one that never passed through :class:`ExecutedLlm`.
+    """
+    for response in responses:
+        response.custom_metadata = {
+            **(response.custom_metadata or {}),
+            REASKS_METADATA_KEY: reasks,
+        }
+    return responses
+
+
+def _summed(first: int | None, second: int | None) -> int | None:
+    """Two optional counts added, or ``None`` where neither was reported."""
+    if first is None and second is None:
+        return None
+    return (first or 0) + (second or 0)
+
+
+def _summed_usage(
+    first: types.GenerateContentResponseUsageMetadata | None,
+    second: types.GenerateContentResponseUsageMetadata | None,
+) -> types.GenerateContentResponseUsageMetadata | None:
+    """Two calls' usage as one record: every count adds, every other field is
+    the second call's."""
+    if first is None or second is None:
+        return second or first
+    counts = {
+        name: _summed(getattr(first, name), getattr(second, name))
+        for name in type(second).model_fields
+        if isinstance(getattr(first, name) or getattr(second, name), int)
+    }
+    return second.model_copy(update=counts)
 
 
 def _finish_reason_text(reason: Any) -> str | None:
