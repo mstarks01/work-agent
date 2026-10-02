@@ -78,7 +78,9 @@ from typing import Any, NamedTuple
 
 from analysis_service.analysis import (
     CONTROL_ATTRIBUTES,
+    ModelText,
     control_state,
+    model_text,
     names_term,
 )
 from analysis_service.assertions import (
@@ -424,10 +426,11 @@ def ground_issues(
     """
     catalog = evidence_catalog(model, assertions)
     by_id = {element.id: element for element in model.elements()}
+    text = model_text(model)
     issues = []
     for claim in claims:
         for ground in claim.grounds:
-            issue = _one_ground_issue(claim.id, ground, catalog, by_id, model)
+            issue = _one_ground_issue(claim.id, ground, catalog, by_id, text)
             if issue:
                 issues.append(issue)
     return issues
@@ -438,13 +441,13 @@ def _one_ground_issue(
     ground: Ground,
     catalog: EvidenceCatalog,
     by_id: Mapping[str, Element],
-    model: SystemModel,
+    text: ModelText,
 ) -> str:
     """Why one catalogued ground is not in this model's catalog, or ``""``."""
     if ground.kind == "quote":
         return ""
     if ground.kind == "absent-element":
-        if names_term(model, ground.term):
+        if names_term(text, ground.term):
             return (
                 f"claim {claim_id!r} grounds an absence on {ground.term!r},"
                 " which the system model names"
@@ -822,7 +825,7 @@ class Resolution(NamedTuple):
 
 
 def _grounds_of(
-    proposal: Proposal, catalog: Mapping[str, Ground], model: SystemModel
+    proposal: Proposal, catalog: Mapping[str, Ground], text: ModelText
 ) -> tuple[list[Ground], list[str]]:
     """One proposal's grounds, and every reference of its that named nothing.
 
@@ -871,7 +874,7 @@ def _grounds_of(
         # prefix below has already made the string non-blank.
         if not term:
             continue
-        if len(term) > GROUND_TERM_MAX_CHARS or names_term(model, term):
+        if len(term) > GROUND_TERM_MAX_CHARS or names_term(text, term):
             unresolved.append(absent_element_ref(raw)[:REFERENCE_MAX_CHARS])
         else:
             grounds.append(Ground(kind="absent-element", term=term))
@@ -957,10 +960,11 @@ def resolve_proposals(
     drafts: list[Claim] = []
     unresolved_evidence: list[UnresolvedEvidence] = []
     groundless: list[DroppedClaim] = []
+    text = model_text(model)
     for proposal in proposals:
         key = getattr(proposal, key_field)
         claim_id = package.compose_id(lane, key)
-        grounds, unresolved = _grounds_of(proposal, catalog, model)
+        grounds, unresolved = _grounds_of(proposal, catalog, text)
         # A per-reference mark names a claim the block carries, so a claim that
         # is dropped gets none: its groundless mark names the references instead.
         if not grounds:

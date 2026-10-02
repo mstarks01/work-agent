@@ -40,7 +40,7 @@ import re
 from collections.abc import Collection, Iterable, Iterator, Mapping
 from functools import cache
 from types import MappingProxyType
-from typing import Literal
+from typing import Literal, NamedTuple
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -58,6 +58,7 @@ __all__ = [
     "TEXT_ATTRIBUTES",
     "WHOLE_WORD",
     "ControlState",
+    "ModelText",
     "UnknownControl",
     "comparable_asset_tags",
     "control_state",
@@ -70,6 +71,7 @@ __all__ = [
     "is_unverified",
     "leading_word",
     "matches_term",
+    "model_text",
     "names_term",
     "outbound_flows",
     "reachable_from",
@@ -434,13 +436,42 @@ def matches_term(term: str, text: str) -> bool:
 
     ``text`` is matched as given, so a caller comparing against a submitter's
     prose lowercases it first — the terms this reads are written lowercase.
+
+    The word-start check looks back from the end of the stem, which states the
+    same rule as a leading ``(?<!\\w)``. The order is for speed: the engine
+    scans for a leading literal at C speed, and a leading lookbehind makes it
+    try every position. On a 17,000-character text a term costs 45
+    microseconds this way and 289 the other way (#1316).
     """
     stem = re.escape(term.rstrip(WHOLE_WORD))
     tail = r"(?!\w)" if term.endswith(WHOLE_WORD) else ""
-    return re.search(rf"(?<!\w){stem}{tail}", text) is not None
+    return re.search(rf"{stem}(?<!\w{stem}){tail}", text) is not None
 
 
-def names_term(model: SystemModel, term: str) -> bool:
+class ModelText(NamedTuple):
+    """A model's :data:`TEXT_ATTRIBUTES` values, lowercased once for many terms.
+
+    One fan-in asks one model about thousands of terms, because a lane may name
+    20 absent elements on each proposal. Reading every value again for each
+    term costs 11 seconds of CPU for one STRIDE lane at its bound (#1316).
+    """
+
+    values: tuple[str, ...]
+    joined: str
+
+
+def model_text(model: SystemModel) -> ModelText:
+    """The text :func:`names_term` searches, read from ``model`` once."""
+    values = tuple(
+        value.lower()
+        for element in model.elements()
+        for attribute in TEXT_ATTRIBUTES
+        if isinstance(value := getattr(element, attribute, ""), str)
+    )
+    return ModelText(values, "\n".join(values))
+
+
+def names_term(text: ModelText, term: str) -> bool:
     """Whether any element's free text names ``term``.
 
     The structural question behind "the model contains no such thing". It reads
@@ -449,10 +480,14 @@ def names_term(model: SystemModel, term: str) -> bool:
     what a submitter's prose offers. Answering ``False`` is not proof of
     absence from the *system*; it is proof of absence from the description,
     which is the only thing this service ever has.
+
+    The values are searched as one text joined by line breaks. A line break is
+    not a word character, so each value starts and ends a word in the joined
+    text exactly as it does alone.
     """
-    return any(
-        matches_term(term, value.lower())
-        for element in model.elements()
-        for attribute in TEXT_ATTRIBUTES
-        if isinstance(value := getattr(element, attribute, ""), str)
-    )
+    if "\n" in term or not text.values:
+        # The two shapes the joined text answers wrongly: a term holding a line
+        # break can match across two values, and an empty stem (``$``) matches
+        # an empty joined text where no value exists.
+        return any(matches_term(term, value) for value in text.values)
+    return matches_term(term, text.joined)

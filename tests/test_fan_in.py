@@ -13,6 +13,7 @@ from analysis_service.assertions import (
     assertion_id,
 )
 from analysis_service.claims import (
+    MAX_ABSENT_PER_PROPOSAL,
     MAX_CLAIMS_PER_BATCH,
     MENTION_MAX_CHARS,
     Ground,
@@ -21,8 +22,9 @@ from analysis_service.claims import (
 from analysis_service.fan_in import DraftJoinError, join_drafts, snap_drafts
 from analysis_service.frameworks import schemas_for
 from analysis_service.frameworks.stride import STRIDE
-from analysis_service.frameworks.stride.record import DraftThreat
+from analysis_service.frameworks.stride.record import MAX_SEQUENCE, DraftThreat
 from analysis_service.sources import DEFAULT_DESCRIPTION_LABEL
+from analysis_service.validation import MAX_ELEMENTS
 from tests.factories import (
     REPORTING_JOB,
     sample_draft,
@@ -1235,3 +1237,36 @@ class TestTheEmissionBound:
         assert len(batch.invalid) == half
         with pytest.raises(fan_in.DraftJoinError, match=f"emitted {half * 2}"):
             fan_in.fan_in({"spoofing": batch}, STRIDE, model)
+
+    def test_a_lane_of_absences_at_the_bound_is_a_short_body(self):
+        """#1316: every absent term is searched against every element's text.
+
+        One lane at its bound names 1,980 terms, and the fan-in searches each
+        twice. Read value by value, this lane costs 13 seconds of CPU on the
+        model below, and six lanes hold one worker thread for over a minute
+        that no deadline can stop.
+        """
+        model = valid_model()
+        template = model.processes[0]
+        model.processes += [
+            template.model_copy(
+                update={"id": f"process:worker-{index}", "name": f"Worker {index}"}
+            )
+            for index in range(MAX_ELEMENTS - len(model.elements()))
+        ]
+        proposals = [
+            sample_proposal(
+                f"S-{sequence:02d}",
+                absent_elements=[
+                    f"absent {sequence} {term}"
+                    for term in range(MAX_ABSENT_PER_PROPOSAL)
+                ],
+            )
+            for sequence in range(1, MAX_SEQUENCE + 1)
+        ]
+        started = time.thread_time()
+
+        merged = fan_in.fan_in(batches(spoofing=proposals), STRIDE, model, SOURCES)
+
+        assert time.thread_time() - started < 2
+        assert len(merged.drafts) == MAX_SEQUENCE
