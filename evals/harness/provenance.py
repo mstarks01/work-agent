@@ -353,7 +353,7 @@ class RunProvenance(BaseModel):
             recomputed = execution_fingerprint(
                 requested_route=execution.requested_model,
                 served_route=execution.served_model,
-                sampling=sampling.model_dump(),
+                sampling=sampling.identity_params(),
                 instruction_sha256=execution.instruction_sha256,
                 build=self.build,
             )

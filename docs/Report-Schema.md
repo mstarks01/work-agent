@@ -963,6 +963,7 @@ class NodeRun:
     usage: TokenUsage | None  # what the provider says the call cost; None if unmetered
     attempts: int  # provider calls this execution took; 1 unless the driver retried
     reasks: int  # 1 where the first answer failed its schema and the node asked once more
+    schema_path: Literal["native", "tool"] | None  # how the node's schema travelled
     served_trust: (
         Literal["provider_reported", "requested_echo"] | None
     )  # what `model` is worth as evidence; None for code-only nodes
@@ -1058,6 +1059,11 @@ class TokenUsage:
   (ADR 0058). Both answers are metered, so `usage` covers both calls and
   `attempts` counts both. A second answer that fails the schema still fails
   the node.
+- **`schema_path`** is how the node's schema reached the provider: `native`
+  through the provider's own structured-output field, or `tool` as a forced
+  tool call (ADR 0058). It is `None` for a node that sent no schema. Read it
+  beside `reasks`: the tool path relies on the re-ask, and the native path
+  rarely needs it.
 
 > **`schema_version` 1.1** added `requested_model` and redefined `model` as the
 > served build rather than the configured string. A consumer keying on `model`

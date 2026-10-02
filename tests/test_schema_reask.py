@@ -27,6 +27,7 @@ from analysis_service.report import NodeRun, TokenUsage
 from analysis_service.retry import ATTEMPTS_METADATA_KEY, RetryBudget, RetryPolicy
 from tests.factories import (
     STRONG_MODEL,
+    collected,
     scripted_pipeline,
     scripted_usage,
 )
@@ -61,6 +62,7 @@ class _Replies:
                 reported_charge_usd=self.charge,
                 served_upstream=None,
                 cache_write_tokens=None,
+                schema_path=None,
             )
         ]
 
@@ -77,11 +79,7 @@ def _ask(executor: _Replies, schema: type[BaseModel] | None = _Answer):
         config=types.GenerateContentConfig(response_schema=schema),
     )
 
-    return asyncio.run(_collected(adapter.generate_content_async(request, False)))
-
-
-async def _collected(responses):
-    return [response async for response in responses]
+    return asyncio.run(collected(adapter.generate_content_async(request, False)))
 
 
 def test_a_valid_answer_is_not_reasked():

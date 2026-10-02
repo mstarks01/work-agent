@@ -106,9 +106,9 @@ PROBED_PARAMS: dict[str, Any] = {
 REFERENCE_MODELS: dict[str, tuple[str, ...]] = {
     "anthropic": ("claude-sonnet-5", "claude-opus-5"),
     # Claude in its Bedrock spelling, and only Claude: Nova and Llama get
-    # *emulated* structured output there, which
-    # :func:`~analysis_service.binding._check_native_structured_output` refuses,
-    # so neither could bind a tier of this graph.
+    # *emulated* structured output there, so a tier on either runs the forced
+    # tool path of :func:`~analysis_service.binding._structured_output_path`,
+    # and this pair profiles the native path.
     #
     # **The ``global.`` inference profile, because the plain identifier does not
     # invoke.** AWS serves recent Claude generations through cross-Region
@@ -229,9 +229,8 @@ class ProviderProfile:
     the same question: ``response_format`` is an accepted parameter everywhere,
     and what varies is whether the provider honours it as a schema natively or
     LiteLLM emulates it with a synthesised tool — a difference the parameter
-    probe cannot see and one that fails a job at output validation rather than
-    at the request (see
-    :func:`~analysis_service.binding._check_native_structured_output`).
+    probe cannot see, and the one that decides a tier's path (see
+    :func:`~analysis_service.binding._structured_output_path`).
 
     ``known`` records whether the pinned map had an entry at all. It is not
     derivable from the cells: an unmapped model produces all-``UNKNOWN``, but so

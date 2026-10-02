@@ -449,6 +449,7 @@ loader rejects, never a silent fallback.
 | `max_output_tokens` | pinned `16384` base / `64000` strong | Must be pinned: silence means a *vendor-derived* cap. Sized against measured output — see below. |
 | `candidate_count` | pinned `1` | Reserved; the loader **rejects any value ≠ 1**. |
 | `constrain_output` | pinned `true` | Send this tier's node schema to the provider. Set `false` where the provider's schema compiler won't take it — see below. |
+| `structured_output` | pinned `auto` | How the schema travels: native output, or a forced tool call. See [How a tier sends its schema](#how-a-tier-sends-its-schema). |
 | `top_p`, `presence_penalty`, `frequency_penalty` | **unset** | No verified per-tier constant to pin. |
 | `seed` | **unset** | Buys consistency, not reproducibility — and Anthropic does not accept it at all. |
 | `thinking` | **unset** | Leaves the model's own preset. |
@@ -547,35 +548,53 @@ support table: when the pinned library's model data catches up, the first check
 starts catching the same case and this one becomes redundant rather than
 contradictory.
 
-### The startup schema check
+### How a tier sends its schema
 
-Every LLM node in the graph binds an output schema, so a third check runs per
-tier: **can this `(vendor, model)` be constrained to a schema *natively*?**
+Every LLM node in the graph binds an output schema. A schema can reach a
+provider in two ways (ADR 0058):
 
-Where a provider cannot, the library does not fail — it *emulates* the
-constraint by synthesising a single tool whose input schema is the response
-schema and forcing a call to it. The two paths are not equivalent. The native
-path constrains the model's output, so the response matches the schema. The
-emulated path only asks the model to follow the schema. The model usually does,
-but nothing makes it, and how often it does not is not measured here.
+- **Native structured output.** The schema goes in the provider's own field,
+  and the provider constrains the model's output, so the response matches the
+  schema.
+- **A forced tool call.** The schema becomes the parameters of one tool, named
+  `submit_answer`, and the request forces the model to call it. The model
+  usually follows the schema, but nothing makes it. The service reads the
+  call's arguments as the node's answer.
 
-A response that breaks the schema is the most expensive failure available: the
-request is well-formed, the response is well-formed JSON, and the job dies at
-the node's own output validation partway through. Neither of the other two checks can see it. So a
-tier whose model would take the emulated path is a startup error naming the
-tier.
+`structured_output` chooses between them, per tier:
 
-Like the supported-param check, this is asked as a **call**, not a table — the
-check inspects whether the library had to synthesise its internal
-response-format tool for this pair. That matters more than it sounds: under the
+| Value | What the tier does |
+| --- | --- |
+| `auto` (shipped) | Native output where the pinned library sends it for this `(vendor, model)`, and the forced tool call elsewhere. |
+| `native` | Native output only. A pair without it is a startup error that names the tier. |
+| `tool` | The forced tool call, even where native output exists. Use it for a model that the library marks native and the provider refuses, such as Claude 5 on Bedrock (the AWS model cards list structured outputs as unsupported there). |
+
+A model that does not take a schema parameter at all is a startup error on
+every setting.
+
+**The tool path relies on the schema re-ask.** An answer that fails its schema
+goes back to the same model once, with the validation errors. A second failure
+still fails the node. How often the tool path needs the re-ask, and whether
+report quality matches the native path, is not measured yet (#1413).
+
+**A tier that sets `thinking` does not force the tool.** Anthropic refuses a
+forced tool together with extended thinking, so the request offers the tool and
+the model chooses to call it. An answer in plain text goes to the same schema
+check and re-ask.
+
+The path is decided as a **call**, not a table: the check asks the installed
+library whether it would send the schema natively for this pair. Under the
 pinned library, the same Claude generation can be native on one vendor and
-emulated on another, so a rule keyed on the model alone would pass a
-configuration that does not work.
+emulated on another, so a rule keyed on the model alone would be wrong.
 
 "Is a schema honoured at all" is a **different and weaker question**, and
 litellm's own `supports_response_schema` answers yes for models on both paths.
-It cannot substitute for this check — and it answers `False` for a map entry
-that simply says nothing, so nothing in this service reads it directly.
+It answers `False` for a map entry that simply says nothing, so nothing in this
+service reads it directly.
+
+Under `auto`, the path follows from the vendor, the model and the installed
+library, which the fingerprint already hashes, so `auto` does not move a blessed
+identity. An explicit `native` or `tool` enters the fingerprint.
 
 **The check is scoped to tiers that send a schema.** A tier running
 `constrain_output = false` sends none, so how its provider *would* have
@@ -607,8 +626,11 @@ and the job dies.
 
 The field is kept because the *mechanism* is right — the schema genuinely stops
 going on the wire — but a tier that turns it off needs the graph to tolerate a
-fenced response first. Where a provider will not compile a schema, the working
-answer today is to make the schema smaller, not to stop sending it.
+fenced response first. Where a provider will not compile a schema, two answers
+remain: make the schema smaller, or set `structured_output = "tool"` on that
+tier. The tool path still sends the schema, as a tool's parameters, so the model
+still reads it, and the schema re-ask covers an answer that breaks it. Whether
+the provider accepts a large schema as tool parameters is not measured yet.
 
 Every LLM node carries a schema the adapter can convert, so this setting is the
 only thing deciding whether one is sent. (That was not always true: the six
@@ -1051,6 +1073,7 @@ validated **identically** to a file value. `{TIER}` is `BASE` or `STRONG`.
 | `ANALYSIS_SAMPLING_{TIER}_THINKING` | Overrides the tier's `thinking` (`low`/`medium`/`high`). |
 | `ANALYSIS_SAMPLING_{TIER}_MAX_OUTPUT_TOKENS` | Overrides the tier's `max_output_tokens`. |
 | `ANALYSIS_SAMPLING_{TIER}_CONSTRAIN_OUTPUT` | Overrides the tier's `constrain_output`. Only the literals `true` and `false` are accepted — anything else raises. |
+| `ANALYSIS_SAMPLING_{TIER}_STRUCTURED_OUTPUT` | Overrides the tier's `structured_output` (`auto`/`native`/`tool`). |
 
 Only these are overridable. A variable naming a reserved (`candidate_count`),
 removed (`top_k`) or forbidden param raises `not overridable`. Treat this as a

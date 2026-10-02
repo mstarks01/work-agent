@@ -37,7 +37,7 @@ from __future__ import annotations
 import os
 import sys
 from collections.abc import Callable, Mapping
-from typing import Any
+from typing import Any, Literal
 
 from analysis_service.errors import ConfigError
 from analysis_service.offline import refuse_live_inference
@@ -139,10 +139,24 @@ def library_sends_no_native_schema(vendor: Vendor, model: str) -> bool:
     consult the map: ``supports_response_schema`` is a claim in a data file, and
     #819 measured one that was wrong.
     """
+    return schema_support(vendor, model) != "native"
+
+
+#: How the pinned library would carry a response schema for one pair.
+SchemaSupport = Literal["native", "emulated", "refused"]
+
+
+def schema_support(vendor: Vendor, model: str) -> SchemaSupport:
+    """Whether the pinned library sends a schema natively, emulates it, or refuses it.
+
+    The one reader of the probe. ``emulated`` is LiteLLM's synthesised tool;
+    ``refused`` is a model that does not take ``response_format`` at all, which
+    the call reports by raising ``UnsupportedParamsError``.
+    """
     try:
-        return emulates_structured_output(vendor, model)
+        return "emulated" if emulates_structured_output(vendor, model) else "native"
     except _litellm.exceptions.UnsupportedParamsError:
-        return True
+        return "refused"
 
 
 def native_structured_output(vendor: Vendor, model: str) -> bool | None:
@@ -163,8 +177,8 @@ def native_structured_output(vendor: Vendor, model: str) -> bool | None:
     Emulation is checked first and is definitive. Where LiteLLM would satisfy
     the constraint with a synthesised tool, the schema does not reach the model
     natively whatever the map claims, and
-    :func:`~analysis_service.binding._check_native_structured_output` refuses
-    the tier on that same fact.
+    :func:`~analysis_service.binding._structured_output_path` sends that tier's
+    schema as a forced tool call on the same fact.
 
     The map's own key is read rather than LiteLLM's lookup, because the lookup
     is where the two answers were collapsed. An unmapped pair yields ``None``

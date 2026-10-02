@@ -30,7 +30,7 @@ from analysis_service.provider import InProcessExecutor
 from analysis_service.resilience import load_resilience
 from analysis_service.sampling import load_sampling
 from analysis_service.vendors import VENDOR_NAMES, VendorName, vendor_for
-from tests.factories import PROJECT_ROOT, tiers_for, translator_of
+from tests.factories import PROJECT_ROOT, collected, tiers_for, translator_of
 
 #: Every call here ends at a client the test supplies, never at a network.
 pytestmark = pytest.mark.usefixtures("supplied_transport")
@@ -52,35 +52,36 @@ FAKE_ENV = {
 }
 
 
-class _Capturing:
-    """A litellm client that records one call and answers it with empty JSON."""
+class Capturing:
+    """A litellm client that records one call and answers with ``message``."""
 
-    def __init__(self) -> None:
+    def __init__(self, message: dict[str, Any] | None = None) -> None:
         self.kwargs: dict[str, Any] = {}
+        self.message = message or {"role": "assistant", "content": "{}"}
 
     async def acompletion(self, **kwargs: Any) -> Any:
         self.kwargs = kwargs
         return _litellm.ModelResponse(
-            choices=[
-                {
-                    "index": 0,
-                    "message": {"role": "assistant", "content": "{}"},
-                    "finish_reason": "stop",
-                }
-            ],
+            choices=[{"index": 0, "message": self.message, "finish_reason": "stop"}],
             model=kwargs["model"],
             usage={"prompt_tokens": 1, "completion_tokens": 1, "total_tokens": 2},
         )
 
 
-def _response_format(vendor: VendorName, *, rewrite: bool = True) -> Any:
-    """The ``response_format`` the built adapter hands litellm for ``SCHEMA``.
+def drive_strong_tier(
+    vendor: VendorName,
+    client: Capturing,
+    *,
+    sampling_env: dict[str, str] | None = None,
+    rewrite: bool = True,
+) -> list[Any]:
+    """One ``SCHEMA`` call through the built strong-tier adapter, to ``client``.
 
     ``rewrite=False`` applies ``as_built`` in place of the vendor's rule.
     """
     adapters = build_tier_adapters(
         tiers_for(vendor),
-        load_sampling(CONFIG / "sampling.toml", env={}),
+        load_sampling(CONFIG / "sampling.toml", env=sampling_env or {}),
         load_resilience(CONFIG / "resilience.toml", env={}),
         env=FAKE_ENV,
     )
@@ -89,7 +90,6 @@ def _response_format(vendor: VendorName, *, rewrite: bool = True) -> Any:
         executor = adapter.executor
         assert isinstance(executor, InProcessExecutor)
         executor._rewrite_schema = dict
-    client = _Capturing()
     translator_of(adapter).llm_client = client
     request = LlmRequest(
         model=adapter.model,
@@ -97,11 +97,13 @@ def _response_format(vendor: VendorName, *, rewrite: bool = True) -> Any:
         config=types.GenerateContentConfig(response_schema=SCHEMA),
     )
 
-    async def drive() -> None:
-        async for _ in adapter.generate_content_async(request, False):
-            pass
+    return asyncio.run(collected(adapter.generate_content_async(request, False)))
 
-    asyncio.run(drive())
+
+def _response_format(vendor: VendorName, *, rewrite: bool = True) -> Any:
+    """The ``response_format`` the built adapter hands litellm for ``SCHEMA``."""
+    client = Capturing()
+    drive_strong_tier(vendor, client, rewrite=rewrite)
     return client.kwargs["response_format"]
 
 

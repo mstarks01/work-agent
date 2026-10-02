@@ -53,8 +53,9 @@ output where the pinned library sends it, and the forced tool call elsewhere.
 `native` keeps today's refusal for a deployment that wants the guarantee.
 `tool` covers a model that the price map marks native and the provider
 refuses. A model that refuses the schema parameter outright stays refused on
-every setting. The setting is a resolved sampling param, so it is part of the
-**Execution Identity**.
+every setting. An explicit `native` or `tool` is part of the **Execution
+Identity**. `auto` is not, because under it the path follows from the vendor,
+the model and the installed library, which the identity already hashes.
 
 **A provider refusal moves the tier, at run time.** Under `auto`, a 400 error
 that refuses the native schema field or the compiled schema sends the same
@@ -85,9 +86,9 @@ about the tool path says that its quality effect is unmeasured.
 error for an unsupported model. The first live call on each vendor confirms
 the shape, and the confirmed message is recorded beside the matcher.
 
-**A fingerprint now names the path.** Moving a tier between `native` and
-`tool` re-baselines its **Blessed** identities, because the path decides what
-the node could answer.
+**A fingerprint names an explicit path.** Setting a tier to `native` or `tool`
+re-baselines its **Blessed** identities, because the path decides what the node
+could answer. `auto` leaves them where they are.
 
 **The re-ask adds cost where it fires.** It is charged to the node, as
 `repair` is today.

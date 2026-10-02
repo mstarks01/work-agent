@@ -170,7 +170,7 @@ class BaselineIdentity:
             )
         sampling = json.dumps(
             {
-                tier: block.model_dump()
+                tier: block.identity_params()
                 for tier, block in artifact.provenance.sampling.items()
             },
             sort_keys=True,

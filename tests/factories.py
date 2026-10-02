@@ -266,7 +266,9 @@ def sample_fingerprint(
     return execution_fingerprint(
         requested_route=served if requested is None else requested,
         served_route=served,
-        sampling=sampling.model_dump() if hasattr(sampling, "model_dump") else sampling,
+        sampling=sampling.identity_params()
+        if hasattr(sampling, "identity_params")
+        else sampling,
         instruction_sha256=instructions,
         build=build_identity() if build is None else build,
     )
@@ -937,6 +939,11 @@ def scripted_usage() -> types.GenerateContentResponseUsageMetadata:
         thoughts_token_count=9000,
         total_token_count=10400,
     )
+
+
+async def collected(responses: AsyncGenerator[LlmResponse, None]) -> list[LlmResponse]:
+    """Every response an adapter yields, in order."""
+    return [response async for response in responses]
 
 
 class ScriptedLlm(BaseLlm):

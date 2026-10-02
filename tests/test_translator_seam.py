@@ -241,9 +241,10 @@ def test_every_adapter_kwarg_comes_from_a_closed_set():
     configuration — so this is still the one constructor a deployment's values
     reach LiteLLM through.
 
-    Seven sources, all of them code or deploy-time config: the route from the
+    Eight sources, all of them code or deploy-time config: the route from the
     vendor registry, one literal, the per-request timeout from
     `config/resilience.toml`, the tier's sampling constructor kwargs, the
+    tool-path kwargs its `structured_output` path adds (ADR 0058), the
     vendor's credential kwargs, the upstream pin the deployment declared for a
     gateway vendor, and the client, which is ADK's or the charge-capturing
     one, each with or without the prompt-cache layer, chosen by registry facts
@@ -256,6 +257,7 @@ def test_every_adapter_kwarg_comes_from_a_closed_set():
     body = call.group(1)
     assert "model=selection.route" in body
     assert "**tier_sampling.constructor_kwargs()" in body
+    assert '**(_tool_path_kwargs(tier_sampling) if path == "tool" else {})' in body
     assert "**vendor.credential_kwargs(env, tiers.credential_mode(" in body
     assert "**vendor.upstream_kwargs(tiers.upstreams_for(selection.vendor))" in body
     assert "_TIMEOUT_KWARG: resilience.request_timeout_seconds(" in body
@@ -267,7 +269,7 @@ def test_every_adapter_kwarg_comes_from_a_closed_set():
     assert "client_cls = capturing_client if charged else LiteLLMClient" in source
     assert "if vendor.caches_prompt_prefix(selection.model):" in source
     assert "client_cls = marking[client_cls]" in source
-    assert body.count("**") == 5, (
+    assert body.count("**") == 6, (
         "a new spread reaches the translator constructor. Every value crossing"
         " this seam has to come from the vendor registry or from deploy-time"
         " config, never from anything a request can influence."

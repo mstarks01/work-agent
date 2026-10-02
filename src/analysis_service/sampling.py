@@ -109,6 +109,12 @@ SUPPORTED_VERSION = 5
 # LiteLLM's business, not this file's.
 ReasoningEffort = Literal["low", "medium", "high"]
 
+#: How a tier's node schema reaches the provider (ADR 0058). ``native`` uses
+#: the provider's own structured-output field and refuses a model without it.
+#: ``tool`` sends the schema as a forced tool call. ``auto`` uses native output
+#: where the pinned library sends it, and the tool call elsewhere.
+StructuredOutput = Literal["auto", "native", "tool"]
+
 # Env override surface: only these params are overridable. A var naming any
 # other param — reserved (``candidate_count``) or forbidden — raises.
 _ENV_PREFIX = "ANALYSIS_SAMPLING_"
@@ -119,6 +125,7 @@ OFFERED_PARAMS: tuple[str, ...] = (
     "thinking",
     "max_output_tokens",
     "constrain_output",
+    "structured_output",
 )
 
 # The only two strings ``constrain_output`` accepts from the environment.
@@ -155,6 +162,7 @@ class _TierParams(BaseModel):
     frequency_penalty: float | None = None
     thinking: ReasoningEffort | None = None
     constrain_output: bool = True
+    structured_output: StructuredOutput = "auto"
 
 
 class _RawTier(_TierParams):
@@ -270,6 +278,21 @@ class TierSampling(_TierParams):
             frequency_penalty=self.frequency_penalty,
         )
 
+    def identity_params(self) -> dict[str, Any]:
+        """This tier's sampling as the **Execution Identity** hashes it.
+
+        Every field, except ``structured_output`` at ``auto``. Under ``auto``
+        the path follows from the vendor, the model and the installed library,
+        and the identity hashes all three already, so the setting adds nothing.
+        An explicit ``native`` or ``tool`` is a choice the deployment made, and
+        it is hashed. One reader for every site that computes a fingerprint, so
+        a live run, a verified archive and a promotion hash the same payload.
+        """
+        params = self.model_dump()
+        if params["structured_output"] == "auto":
+            del params["structured_output"]
+        return params
+
     def gate_params(self) -> dict[str, Any]:
         """Every set param, named as LiteLLM names it, for the build-time gate.
 
@@ -356,7 +379,8 @@ def _parse_env_value(var: str, param: str, value: str) -> float | int | bool | s
             expected = ", ".join(sorted(_BOOL_LITERALS))
             raise SamplingConfigError(f"{var}: {value!r} is not one of {expected}")
         return parsed
-    # thinking: left as the raw string for _RawTier's Literal to accept or reject.
+    # thinking and structured_output: left as the raw string for _RawTier's
+    # Literal to accept or reject.
     return value
 
 

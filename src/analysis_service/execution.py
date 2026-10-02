@@ -53,7 +53,11 @@ from analysis_service.graph import (
 )
 from analysis_service.identity import build_identity, execution_fingerprint
 from analysis_service.prompt_cache import CACHE_WRITE_METADATA_KEY
-from analysis_service.provider import REASKS_METADATA_KEY
+from analysis_service.provider import (
+    REASKS_METADATA_KEY,
+    SCHEMA_PATH_METADATA_KEY,
+    SchemaPath,
+)
 from analysis_service.report import (
     InputRef,
     Job,
@@ -140,6 +144,7 @@ class _NodeFinish:
     usage: TokenUsage | None = None
     attempts: int = 1
     reasks: int = 0
+    schema_path: SchemaPath | None = None
     reported_charge_usd: float | None = None
     served_upstream: str | None = None
 
@@ -381,6 +386,7 @@ class GraphExecutor:
                             usage=_usage_of(event),
                             attempts=_attempts_of(event),
                             reasks=_reasks_of(event),
+                            schema_path=_schema_path_of(event),
                             reported_charge_usd=_reported_charge_of(event),
                             served_upstream=_served_upstream_of(event),
                         )
@@ -457,6 +463,7 @@ class GraphExecutor:
                     usage=finish.usage,
                     attempts=finish.attempts,
                     reasks=finish.reasks,
+                    schema_path=finish.schema_path,
                     reported_charge_usd=finish.reported_charge_usd,
                     served_upstream=finish.served_upstream,
                 )
@@ -492,7 +499,7 @@ class GraphExecutor:
         return execution_fingerprint(
             requested_route=requested_route,
             served_route=served_route,
-            sampling=sampling.model_dump(),
+            sampling=sampling.identity_params(),
             instruction_sha256=self._pipeline.instruction_sha256,
             build=build_identity(),
         )
@@ -569,6 +576,15 @@ def _reasks_of(event) -> int:
     Zero where the event carries no stamp: a deterministic node makes no call.
     """
     return (getattr(event, "custom_metadata", None) or {}).get(REASKS_METADATA_KEY, 0)
+
+
+def _schema_path_of(event) -> SchemaPath | None:
+    """The path this event's node schema took, as the executor stamped it.
+
+    ``None`` where the event carries no stamp: a deterministic node, or a call
+    that sent no schema.
+    """
+    return (getattr(event, "custom_metadata", None) or {}).get(SCHEMA_PATH_METADATA_KEY)
 
 
 def _reported_charge_of(event) -> float | None:

@@ -53,9 +53,10 @@ the same nine facts off the other side.
 
 from __future__ import annotations
 
+import json
 from collections.abc import AsyncGenerator, Callable, Mapping, Sequence
 from dataclasses import dataclass, replace
-from typing import Any, Protocol, Self, runtime_checkable
+from typing import Any, Literal, Protocol, Self, runtime_checkable
 
 from google.adk.models.base_llm import BaseLlm
 from google.adk.models.llm_request import LlmRequest
@@ -81,11 +82,26 @@ REASKS_METADATA_KEY = "reasks"
 
 #: What the model reads after an answer that does not match its node's schema.
 #: The validation errors follow it, one per line.
+#: The two ways a node schema can travel (ADR 0058).
+SchemaPath = Literal["native", "tool"]
+
+#: The ``custom_metadata`` key under which a response carries the path its
+#: node schema took: ``native`` or ``tool`` (ADR 0058). Absent where the call
+#: sent no schema.
+SCHEMA_PATH_METADATA_KEY = "schema_path"
+
 REASK_INSTRUCTION = (
     "Your previous answer does not match the required JSON schema. It failed"
     " these checks:"
 )
 REASK_CLOSING = "Answer again with the complete corrected JSON, and nothing else."
+
+#: The tool a ``tool`` tier sends a node schema as, and forces the model to call
+#: (ADR 0058). The executor turns the call back into the JSON text a node reads.
+OUTPUT_TOOL_NAME = "submit_answer"
+OUTPUT_TOOL_DESCRIPTION = (
+    "Submit your answer. The arguments are the answer, and must match this schema."
+)
 
 #: The decoding params that travel with each call, named as
 #: ``types.GenerateContentConfig`` names them. A closed list rather than a dump
@@ -209,6 +225,9 @@ class GenerationResult:
     reported_charge_usd: float | None
     served_upstream: str | None
     cache_write_tokens: int | None
+    #: ``native`` or ``tool``, as the executor sent the schema; ``None`` where
+    #: the call sent no schema.
+    schema_path: SchemaPath | None
 
     @classmethod
     def of(cls, response: LlmResponse) -> Self:
@@ -228,6 +247,7 @@ class GenerationResult:
             reported_charge_usd=stamped.get(CHARGE_METADATA_KEY),
             served_upstream=stamped.get(UPSTREAM_METADATA_KEY),
             cache_write_tokens=stamped.get(CACHE_WRITE_METADATA_KEY),
+            schema_path=stamped.get(SCHEMA_PATH_METADATA_KEY),
         )
 
     def followed_by(self, later: Self) -> Self:
@@ -261,6 +281,7 @@ class GenerationResult:
             CHARGE_METADATA_KEY: self.reported_charge_usd,
             UPSTREAM_METADATA_KEY: self.served_upstream,
             CACHE_WRITE_METADATA_KEY: self.cache_write_tokens,
+            SCHEMA_PATH_METADATA_KEY: self.schema_path,
         }
         present = {key: value for key, value in stamped.items() if value is not None}
         return LlmResponse(
@@ -328,9 +349,12 @@ class InProcessExecutor:
         self,
         adapter: BaseLlm,
         rewrite_schema: Callable[[Mapping[str, Any]], Mapping[str, Any]],
+        *,
+        tool_path: bool,
     ) -> None:
         self._adapter = adapter
         self._rewrite_schema = rewrite_schema
+        self._tool_path = tool_path
 
     @property
     def translator(self) -> BaseLlm:
@@ -347,16 +371,27 @@ class InProcessExecutor:
         # Outside the ``try``, so the refusal is never classified as a provider
         # failure and the retry loop above never asks again.
         refuse_live_inference(request.route)
+        llm_request = self._for_vendor(request).into_llm_request()
+        path: SchemaPath | None = None
+        if request.output_schema is not None:
+            path = "tool" if self._tool_path else "native"
+        if self._tool_path:
+            llm_request = schema_as_tool(llm_request)
         try:
             responses = [
                 response
                 async for response in self._adapter.generate_content_async(
-                    self._for_vendor(request).into_llm_request(), False
+                    llm_request, False
                 )
             ]
         except Exception as exc:
             raise ProviderCallFailed(classify(exc)) from exc
-        return [GenerationResult.of(response) for response in responses]
+        if self._tool_path:
+            responses = [answer_from_tool_call(response) for response in responses]
+        return [
+            replace(GenerationResult.of(response), schema_path=path)
+            for response in responses
+        ]
 
     def _for_vendor(self, request: GenerationRequest) -> GenerationRequest:
         """The request with its output schema in the form this vendor takes.
@@ -459,6 +494,59 @@ class ExecutedLlm(BaseLlm):
                 self.retry_policy.budget.credit()
                 return results, attempt
         raise AssertionError(f"retry loop fell through: {last!r}")
+
+
+def schema_as_tool(llm_request: LlmRequest) -> LlmRequest:
+    """``llm_request`` with its output schema sent as :data:`OUTPUT_TOOL_NAME`.
+
+    The tool path of ADR 0058. The schema leaves ``response_schema`` and becomes
+    the tool's parameters, so no provider structured-output field is sent. The
+    tier's translator carries the ``tool_choice`` that forces the call, because
+    ADK forwards no tool choice from a request. A request with no schema passes
+    unchanged.
+    """
+    config = llm_request.config
+    if config is None or config.response_schema is None:
+        return llm_request
+    schema = config.response_schema
+    parameters = schema if isinstance(schema, Mapping) else _schema_json(schema)
+    tool = types.Tool(
+        function_declarations=[
+            types.FunctionDeclaration(
+                name=OUTPUT_TOOL_NAME,
+                description=OUTPUT_TOOL_DESCRIPTION,
+                parameters_json_schema=dict(parameters or {}),
+            )
+        ]
+    )
+    tooled = config.model_copy(
+        update={"response_schema": None, "response_mime_type": None, "tools": [tool]}
+    )
+    return llm_request.model_copy(update={"config": tooled})
+
+
+def answer_from_tool_call(response: LlmResponse) -> LlmResponse:
+    """``response`` with a call to :data:`OUTPUT_TOOL_NAME` turned into JSON text.
+
+    The node reads its answer as text, as it does on the native path, so the
+    call's arguments become one text part. Thought parts stay. Any other text
+    is dropped, because ADK joins every text part and a preamble would break
+    the JSON. A response that did not call the tool passes unchanged, and the
+    schema check above the seam decides what happens to its text.
+    """
+    parts = response.content.parts if response.content is not None else None
+    calls = [
+        part.function_call
+        for part in parts or ()
+        if part.function_call is not None
+        and part.function_call.name == OUTPUT_TOOL_NAME
+    ]
+    if not calls or response.content is None:
+        return response
+    kept = [part for part in parts or () if part.thought]
+    answer = types.Part(text=json.dumps(calls[0].args or {}))
+    content = response.content.model_copy(update={"parts": [*kept, answer]})
+    return response.model_copy(update={"content": content})
 
 
 def schema_errors(schema: Any, results: Sequence[GenerationResult]) -> str | None:
