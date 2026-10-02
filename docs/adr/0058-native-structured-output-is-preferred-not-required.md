@@ -84,9 +84,11 @@ on the last rung.
 1. **A shared schema re-ask.** A response that fails its schema goes back to
    the same model once, with the validation errors. It serves every node that
    binds a schema, on every rung.
-2. **One schema text on every rung.** A vendor-keyed table names the schema
-   keywords that each provider refuses. One function moves them into the field
-   description before litellm sees the schema. The pydantic validators still
+2. **One schema text on every rung.** A table keyed by vendor and model
+   family names where the schema keywords a model refuses are rewritten,
+   because a gateway such as OpenRouter serves Claude beside models that
+   take the keywords. One function moves them into the field description
+   before litellm sees the schema. The pydantic validators still
    apply every bound on arrival.
 3. **The path is a recorded fact.** Each node execution records the path it
    used, any switch, and its re-ask count. `run.py schema-paths` reads the

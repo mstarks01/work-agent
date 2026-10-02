@@ -25,7 +25,7 @@ from google.genai import types
 from analysis_service.binding import build_tier_adapters
 from analysis_service.conformance import REFERENCE_MODELS
 from analysis_service.frameworks import schemas_for
-from analysis_service.model_gate import _litellm
+from analysis_service.model_gate import _litellm, schema_support
 from analysis_service.provider import InProcessExecutor
 from analysis_service.resilience import load_resilience
 from analysis_service.sampling import load_sampling
@@ -43,6 +43,19 @@ SCHEMA = schemas_for("stride").proposals
 #: The keywords AWS documents as refused, and the one it limits.
 BEDROCK_REFUSED = {"minimum", "maximum", "multipleOf", "minLength", "maxLength"}
 BEDROCK_LIMITED_MIN_ITEMS = {0, 1}
+
+#: The keywords Claude's constrained decoding refuses with a 400 error
+#: (Anthropic's structured-outputs page, read 2026-10-02).
+CLAUDE_REFUSED = {"minimum", "maximum", "multipleOf", "minLength", "maxLength"}
+
+#: A Claude in each spelling of a vendor that serves Claude. ``openai`` and
+#: ``gemini`` serve one provider's own models, and neither is Claude.
+CLAUDE_ON: dict[VendorName, str] = {
+    "anthropic": "claude-sonnet-5",
+    "bedrock": "global.anthropic.claude-sonnet-4-6",
+    "openrouter": "anthropic/claude-sonnet-4.6",
+    "vertex": "claude-sonnet-4-6",
+}
 
 FAKE_ENV = {
     var: f"not-a-real-{var.lower()}"
@@ -74,13 +87,15 @@ def drive_strong_tier(
     *,
     sampling_env: dict[str, str] | None = None,
     rewrite: bool = True,
+    model: str | None = None,
 ) -> list[Any]:
     """One ``SCHEMA`` call through the built strong-tier adapter, to ``client``.
 
     ``rewrite=False`` applies ``as_built`` in place of the vendor's rule.
+    ``model`` replaces the vendor's reference pair on both tiers.
     """
     adapters = build_tier_adapters(
-        tiers_for(vendor),
+        tiers_for(vendor, models=None if model is None else (model, model)),
         load_sampling(CONFIG / "sampling.toml", env=sampling_env or {}),
         load_resilience(CONFIG / "resilience.toml", env={}),
         env=FAKE_ENV,
@@ -100,16 +115,20 @@ def drive_strong_tier(
     return asyncio.run(collected(adapter.generate_content_async(request, False)))
 
 
-def _response_format(vendor: VendorName, *, rewrite: bool = True) -> Any:
+def _response_format(
+    vendor: VendorName, *, rewrite: bool = True, model: str | None = None
+) -> Any:
     """The ``response_format`` the built adapter hands litellm for ``SCHEMA``."""
     client = Capturing()
-    drive_strong_tier(vendor, client, rewrite=rewrite)
+    drive_strong_tier(vendor, client, rewrite=rewrite, model=model)
     return client.kwargs["response_format"]
 
 
-def _mapped(vendor: VendorName, response_format: Any) -> dict[str, Any]:
+def _mapped(
+    vendor: VendorName, response_format: Any, model: str | None = None
+) -> dict[str, Any]:
     """What the pinned litellm maps ``response_format`` to for this vendor."""
-    model = REFERENCE_MODELS[vendor][1]
+    model = model or REFERENCE_MODELS[vendor][1]
     return _litellm.utils.get_optional_params(
         model=model,
         custom_llm_provider=vendor_for(vendor).litellm_provider,
@@ -118,8 +137,10 @@ def _mapped(vendor: VendorName, response_format: Any) -> dict[str, Any]:
 
 
 def _nodes(schema: Any) -> Iterator[Mapping[str, Any]]:
-    """Every mapping inside a JSON schema."""
-    if isinstance(schema, Mapping):
+    """Every mapping inside a JSON schema, a schema sent as JSON text included."""
+    if isinstance(schema, str) and schema.startswith("{"):
+        yield from _nodes(json.loads(schema))
+    elif isinstance(schema, Mapping):
         yield schema
         for value in schema.values():
             yield from _nodes(value)
@@ -186,4 +207,31 @@ def test_the_anthropic_wire_does_not_change():
 def test_every_vendor_names_a_rule_the_executor_can_apply(vendor):
     from analysis_service.model_gate import SCHEMA_RULES
 
-    assert vendor_for(vendor).schema_rule in SCHEMA_RULES
+    entries = vendor_for(vendor).schema_rules
+    assert {entry.rule for entry in entries} <= SCHEMA_RULES.keys()
+    assert entries[-1].family.pattern == "", "the last entry answers every model"
+
+
+@pytest.mark.parametrize(("vendor", "model"), sorted(CLAUDE_ON.items()))
+def test_a_claude_sent_a_native_schema_gets_no_bound_it_refuses(vendor, model):
+    """Claude refuses these bounds on every vendor that sends it a native schema.
+
+    A vendor that sends Claude no native schema reaches it through a tool,
+    which takes the bounds, so this asks only the native ones.
+    """
+    if schema_support(vendor_for(vendor), model) != "native":
+        pytest.skip(f"{vendor} sends {model} no native schema")
+
+    mapped = _mapped(vendor, _response_format(vendor, model=model), model)
+
+    assert {key for node in _nodes(mapped) for key in node} & CLAUDE_REFUSED == set()
+
+
+def test_openrouter_gpt_wire_does_not_change():
+    """The archive's OpenRouter models keep the schema they were measured on."""
+    model = "openai/gpt-5.6-terra"
+
+    sent = _response_format("openrouter", model=model)
+
+    assert sent == _response_format("openrouter", model=model, rewrite=False)
+    assert {key for node in _nodes(sent) for key in node} & CLAUDE_REFUSED
