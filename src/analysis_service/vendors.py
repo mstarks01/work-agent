@@ -74,6 +74,15 @@ VENDOR_NAMES: tuple[VendorName, ...] = (
 #: field faithfully and what it reads is the request (#806).
 ServedTrust = Literal["provider_reported", "requested_echo"]
 
+#: What a node's output schema becomes before it reaches this vendor.
+#:
+#: ``as_built`` sends the schema pydantic builds. ``bounds_described`` moves the
+#: length, range and count bounds that Claude's constrained decoding refuses
+#: into each field's ``description``, so the model still reads them and the
+#: provider does not refuse the request. The pydantic validators apply every
+#: bound when the response arrives, on both rules.
+SchemaRule = Literal["as_built", "bounds_described"]
+
 # The one reasoning knob, uniform across vendors: LiteLLM maps it to adaptive
 # ``thinking`` plus ``output_config.effort`` on Anthropic (identically via
 # Vertex), to ``thinkingConfig`` on Gemini, and passes it through on OpenAI
@@ -876,6 +885,14 @@ class Vendor:
     #: A vendor whose models cache another way answers ``None`` until that way
     #: has a sender of its own.
     prompt_cache: _PromptCacheRule | None
+    #: What a node's output schema becomes before it reaches this vendor. The
+    #: same rule applies on the native path and on the forced tool call, so the
+    #: model reads one schema text on both (ADR 0058).
+    #:
+    #: ``as_built`` says that no rewrite is known to be needed. It is not a
+    #: measurement on every row that carries it. Live sweeps on ``openai`` and
+    #: ``openrouter`` accepted the bounded schemas this graph builds.
+    schema_rule: SchemaRule
     #: What this vendor reports about the charge it made, keyed by the
     #: arrangement a deployment can run under.
     #:
@@ -1203,6 +1220,7 @@ VENDORS: dict[VendorName, Vendor] = {
         routes_to_one_provider=True,
         upstream_pin=None,
         prompt_cache=None,
+        schema_rule="as_built",
         # Vertex admits no raw-API-key path under any adapter
         # (``BerriAI/litellm#21036``), so ``vertex + api_key`` is
         # unrepresentable rather than validated against. Under ``IAM`` it
@@ -1237,6 +1255,9 @@ VENDORS: dict[VendorName, Vendor] = {
         routes_to_one_provider=True,
         upstream_pin=None,
         prompt_cache=None,
+        # The pinned litellm applies the same rewrite on this path itself, so
+        # the wire does not change. Applying it here keeps the rule ours.
+        schema_rule="bounds_described",
         credentials={CredentialMode.API_KEY: _api_key_source("anthropic")},
         form_rules=(_CLAUDE_RULE, _CATCH_ALL),
         sdk=None,
@@ -1252,6 +1273,7 @@ VENDORS: dict[VendorName, Vendor] = {
         routes_to_one_provider=True,
         upstream_pin=None,
         prompt_cache=_OPENAI_PROMPT_CACHE,
+        schema_rule="as_built",
         credentials={CredentialMode.API_KEY: _api_key_source("openai")},
         form_rules=(_CLAUDE_RULE, _CATCH_ALL),
         sdk=None,
@@ -1271,6 +1293,11 @@ VENDORS: dict[VendorName, Vendor] = {
         routes_to_one_provider=True,
         upstream_pin=None,
         prompt_cache=None,
+        # Claude's constrained decoding refuses length and range bounds, and
+        # litellm sends them unchanged on the Converse path. AWS documents a
+        # 400 for ``minimum``, ``maximum``, ``multipleOf``, ``minLength`` and
+        # ``maxLength`` (structured-outputs page, read 2026-10-02).
+        schema_rule="bounds_described",
         credentials={
             # Under ``API_KEY`` Bedrock passes a bearer token and a region.
             # litellm's ``_sign_request`` reads the bearer off the ``api_key``
@@ -1332,6 +1359,7 @@ VENDORS: dict[VendorName, Vendor] = {
         routes_to_one_provider=True,
         upstream_pin=None,
         prompt_cache=None,
+        schema_rule="as_built",
         # The Developer API takes a key and nothing else. It is a different
         # provider from ``vertex`` rather than a second mode on it:
         # ``get_llm_provider`` resolves ``gemini/`` and ``vertex_ai/`` to two
@@ -1420,6 +1448,7 @@ VENDORS: dict[VendorName, Vendor] = {
             field="provider", only="only", fallbacks="allow_fallbacks"
         ),
         prompt_cache=_OPENROUTER_PROMPT_CACHE,
+        schema_rule="as_built",
         # A bearer token and nothing else. litellm reads ``OPENROUTER_API_KEY``
         # and then ``OR_API_KEY`` out of the process environment whenever
         # ``api_key`` is absent; the registry declares neither, and the key is
