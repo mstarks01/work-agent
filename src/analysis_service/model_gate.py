@@ -115,7 +115,8 @@ def library_sends_no_native_schema(vendor: Vendor, model: str) -> bool:
     :func:`emulates_structured_output` spells them differently:
 
     * it returns ``True`` where LiteLLM would satisfy the constraint with a
-      synthesised tool, so an unresolved ``$defs`` schema reaches the model;
+      synthesised tool, so the model is asked to follow the schema and nothing
+      makes it;
     * it *raises* where LiteLLM will not map ``response_format`` at all — 79 of
       the pinned map's rows under a registered prefix, Bedrock's Cohere text
       models among them. A schema does not reach a model that refuses the
@@ -269,12 +270,18 @@ def emulates_structured_output(vendor: Vendor, model: str) -> bool:
     Some providers constrain output to a schema directly; where a model is not
     known to support that, LiteLLM falls back to synthesising a single tool
     whose input schema is the response schema and forcing a call to it. The two
-    are not equivalent, and the difference is silent at build time: the native
-    path resolves ``$ref``/``$defs`` before sending (Anthropic does not resolve
-    external references), while the emulated path forwards the schema as-is. A
-    ``$defs``-bearing schema — which every Pydantic model with a nested type
-    produces — therefore reaches the model unusable, and what comes back fails
-    the node's own output validation rather than the request.
+    are not equivalent, and the difference is silent at build time. The native
+    path constrains decoding, so the response matches the schema. The emulated
+    path only asks: the model usually follows the tool's input schema, and
+    nothing makes it. A response that does not match fails the node's own
+    output validation after the call is paid for.
+
+    ``$defs`` is not the difference. Under the pinned litellm, the direct
+    Anthropic path resolves ``$ref``/``$defs`` before it sends, but the Bedrock
+    native path sends them as-is, and Bedrock documents internal references as
+    supported. The emulated path sends them as-is too. How often a model
+    breaks the schema on the emulated path is not measured here; the gate
+    refuses it because no guarantee exists.
 
     Asked as a **call**, like :func:`check_supported`, and detected by its
     signature rather than by mirroring which models are on which path: the
