@@ -88,6 +88,7 @@ from analysis_service.charges import (
 # is what pins the model-cost map to the installed copy. See
 # :func:`analysis_service.model_gate._import_litellm_hermetically`.
 from analysis_service.model_gate import (
+    SCHEMA_RULES,
     ModelGateError,
     assert_kwarg_supported,
     check_supported,
@@ -506,7 +507,7 @@ def build_tier_adapters(
         # provider side of the seam. What crosses is one call's own request.
         adapters[tier] = ExecutedLlm(
             model=selection.route,
-            executor=InProcessExecutor(translator),
+            executor=InProcessExecutor(translator, SCHEMA_RULES[vendor.schema_rule]),
             retry_policy=policy,
         )
     return adapters

@@ -53,8 +53,8 @@ the same nine facts off the other side.
 
 from __future__ import annotations
 
-from collections.abc import AsyncGenerator, Mapping, Sequence
-from dataclasses import dataclass
+from collections.abc import AsyncGenerator, Callable, Mapping, Sequence
+from dataclasses import dataclass, replace
 from typing import Any, Protocol, Self, runtime_checkable
 
 from google.adk.models.base_llm import BaseLlm
@@ -283,8 +283,13 @@ class InProcessExecutor:
     deciding something that is not its to decide.
     """
 
-    def __init__(self, adapter: BaseLlm) -> None:
+    def __init__(
+        self,
+        adapter: BaseLlm,
+        rewrite_schema: Callable[[Mapping[str, Any]], Mapping[str, Any]],
+    ) -> None:
         self._adapter = adapter
+        self._rewrite_schema = rewrite_schema
 
     @property
     def translator(self) -> BaseLlm:
@@ -305,12 +310,25 @@ class InProcessExecutor:
             responses = [
                 response
                 async for response in self._adapter.generate_content_async(
-                    request.into_llm_request(), False
+                    self._for_vendor(request).into_llm_request(), False
                 )
             ]
         except Exception as exc:
             raise ProviderCallFailed(classify(exc)) from exc
         return [GenerationResult.of(response) for response in responses]
+
+    def _for_vendor(self, request: GenerationRequest) -> GenerationRequest:
+        """The request with its output schema in the form this vendor takes.
+
+        On the provider side, because what a provider refuses is a fact about
+        the provider: the projection above the seam stays the schema the node
+        built.
+        """
+        if request.output_schema is None:
+            return request
+        return replace(
+            request, output_schema=self._rewrite_schema(request.output_schema)
+        )
 
 
 class ExecutedLlm(BaseLlm):

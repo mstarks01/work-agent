@@ -177,6 +177,17 @@ DECLARED: dict[str, str] = {
 #: the reason. The framework module's ``Engine`` and ``analysis_pipeline`` are
 #: the same shape: a name that reads as a selection and is not one.
 OPEN_BY_DECISION: dict[str, str] = {
+    "AnthropicConfig": (
+        "A third party's class name, read from the pinned litellm. It holds the"
+        " schema rule for Claude's constrained decoding, which any vendor that"
+        " serves Claude can name through its `schema_rule`. The name is the"
+        " library's, so no neutral spelling exists here to prefer."
+    ),
+    "filter_anthropic_output_schema": (
+        "The same third party's function name, on the same class. The rule it"
+        " applies is a property of the model family, and the vendor table"
+        " decides which rows use it."
+    ),
     "openai_reasoning_model": (
         "Names the model **family**, not the vendor that serves it. OpenAI"
         " publishes the o-series and GPT-5-and-later, and their sampling"

@@ -36,11 +36,12 @@ from __future__ import annotations
 
 import os
 import sys
+from collections.abc import Callable, Mapping
 from typing import Any
 
 from analysis_service.errors import ConfigError
 from analysis_service.offline import refuse_live_inference
-from analysis_service.vendors import Vendor
+from analysis_service.vendors import SchemaRule, Vendor
 
 
 class ModelGateError(ConfigError):
@@ -236,6 +237,20 @@ def model_info(vendor: Vendor, model: str) -> dict[str, Any] | None:
         # ``tests/test_model_gate.py`` so a version that starts raising
         # something meaningful shows up as a test to tighten.
         return None
+
+
+#: Each :data:`~analysis_service.vendors.SchemaRule`, as the function that
+#: applies it.
+#:
+#: ``bounds_described`` is the pinned litellm's own rule for Claude's
+#: constrained decoding, which litellm applies on the direct Anthropic path. One
+#: function for every vendor that serves Claude keeps the bound text identical,
+#: and no second copy of its labels exists here. It is idempotent, so the direct
+#: path, where litellm applies it again, sends what it sent before.
+SCHEMA_RULES: dict[SchemaRule, Callable[[Mapping[str, Any]], dict[str, Any]]] = {
+    "as_built": dict,
+    "bounds_described": _litellm.AnthropicConfig.filter_anthropic_output_schema,
+}
 
 
 def output_ceiling(vendor: Vendor, model: str) -> int | None:
