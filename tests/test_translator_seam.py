@@ -245,9 +245,9 @@ def test_every_adapter_kwarg_comes_from_a_closed_set():
     vendor registry, one literal, the per-request timeout from
     `config/resilience.toml`, the tier's sampling constructor kwargs, the
     vendor's credential kwargs, the upstream pin the deployment declared for a
-    gateway vendor, and the client, which is one of two classes this package
-    defines, chosen by a registry fact and carrying the arrangement this
-    deployment declared. A further spread would be the thing to look at, which
+    gateway vendor, and the client, which is ADK's or the charge-capturing
+    one, each with or without the prompt-cache layer, chosen by registry facts
+    and carrying the arrangement this deployment declared. A further spread would be the thing to look at, which
     is why the count is asserted rather than the names alone.
     """
     source = (PACKAGE / "binding.py").read_text(encoding="utf-8")
@@ -260,8 +260,13 @@ def test_every_adapter_kwarg_comes_from_a_closed_set():
     assert "**vendor.upstream_kwargs(tiers.upstreams_for(selection.vendor))" in body
     assert "_TIMEOUT_KWARG: resilience.request_timeout_seconds(" in body
     assert "llm_client=(" in body
-    assert "capturing_client(vendor, tiers.charge_mode(" in body
-    assert "if vendor.reports_charge or not vendor.routes_to_one_provider" in body
+    assert "client_cls(vendor, tiers.charge_mode(selection.vendor))" in body
+    assert (
+        "charged = vendor.reports_charge or not vendor.routes_to_one_provider" in source
+    )
+    assert "client_cls = capturing_client if charged else LiteLLMClient" in source
+    assert "if vendor.caches_prompt_prefix(selection.model):" in source
+    assert "client_cls = marking[client_cls]" in source
     assert body.count("**") == 5, (
         "a new spread reaches the translator constructor. Every value crossing"
         " this seam has to come from the vendor registry or from deploy-time"

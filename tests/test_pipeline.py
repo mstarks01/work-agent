@@ -15,6 +15,7 @@ from collections.abc import AsyncGenerator, Sequence
 from itertools import permutations
 
 import pytest
+from google.adk.agents import LlmAgent
 from google.adk.models import LlmResponse
 
 from analysis_service import graph
@@ -39,6 +40,7 @@ from analysis_service.jobs import (
     StubPipelineRunner,
 )
 from analysis_service.pipeline import AdkPipelineRunner, PipelineError
+from analysis_service.prompt_cache import stable_prefix
 from analysis_service.report import (
     FrameworkSelection,
     InputRef,
@@ -1104,3 +1106,35 @@ def test_both_review_passes_read_the_submitted_sources(role):
     assert isinstance(outcome, PipelineCompleted)
     (instruction,) = models[nodes.node(role)].seen
     assert DESCRIPTION_TEXT in instruction
+
+
+def test_every_node_s_system_text_starts_with_its_stable_prefix():
+    """The prefix read off the template at build time leads what the node sends.
+
+    :mod:`analysis_service.prompt_cache` marks a prefix only where the system
+    text starts with it, so a node whose rendered text did not would lose its
+    cache silently.
+    """
+    replies = {"extract": emitted(valid_model())}
+    for name in PACKAGES:
+        fixture = SCRIPTED_FRAMEWORKS[name]
+        replies[graph.analyze_node_name(name, fixture.lane)] = fixture.proposal
+        replies[graph.FrameworkNodes(name).node(graph.CRITIC_ROLE)] = fixture.ruling
+    pipeline, models = build(replies, frameworks=tuple(PACKAGES))
+    templates = {
+        node.name: node.instruction
+        for node in pipeline.workflow.graph.nodes
+        if isinstance(node, LlmAgent)
+    }
+
+    outcome = asyncio.run(
+        AdkPipelineRunner(pipeline).run(pair_job(tuple(PACKAGES)), None)
+    )
+
+    assert isinstance(outcome, PipelineCompleted)
+    sent = {name: model.seen for name, model in models.items() if model.seen}
+    assert sent
+    for name, (system_text, *_) in sent.items():
+        prefix = stable_prefix(templates[name])
+        assert prefix, name
+        assert system_text.startswith(prefix), name
