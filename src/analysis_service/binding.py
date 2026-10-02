@@ -100,6 +100,7 @@ from analysis_service.model_tiers import (
     ModelTierConfig,
     ReviewIndependence,
     TierName,
+    TierSelection,
 )
 from analysis_service.prompt_cache import (
     cache_marking_client_class,
@@ -388,6 +389,75 @@ def _tool_path_kwargs(sampling: TierSampling) -> dict[str, Any]:
     return kwargs
 
 
+def _translator(
+    translating: Any,
+    path: SchemaPath | None,
+    *,
+    selection: TierSelection,
+    vendor: Vendor,
+    tier_sampling: TierSampling,
+    tiers: ModelTierConfig,
+    resilience: ResilienceConfig,
+    env: Mapping[str, str],
+    client_cls: Any,
+    charged: bool,
+) -> Any:
+    """One tier's translator, for the schema ``path`` it sends.
+
+    The one construction of a translator. An ``auto`` tier on the native path
+    builds two, one per path, so the runtime fallback of ADR 0058 has a
+    tool-path translator to move to.
+    """
+    return translating(
+        model=selection.route,
+        # Zero, and not because retry is off: it is one layer up, in
+        # ``analysis_service.retry``. This kwarg is what keeps the library's
+        # own layer — and the provider SDK's, which it sets from this same
+        # value — down to exactly one request per call, so ``attempts``
+        # means requests instead of half of a product with them.
+        **{_NUM_RETRIES_KWARG: 0},
+        # One request's bound, from ``config/resilience.toml``. On the
+        # adapter rather than on each node's ``generate_content_config``,
+        # because the value is one number for the whole deployment and this
+        # is the one seam where its unit is LiteLLM's own.
+        **{
+            _TIMEOUT_KWARG: resilience.request_timeout_seconds(
+                tiers.upstreams_for(selection.vendor)
+            )
+        },
+        **tier_sampling.constructor_kwargs(),
+        **(_tool_path_kwargs(tier_sampling) if path == "tool" else {}),
+        **vendor.credential_kwargs(env, tiers.credential_mode(selection.vendor)),
+        # The upstream pin, where the deployment declared one. It rides the
+        # request body under litellm's ``extra_body``, which the OpenRouter
+        # transformation merges into what it sends; a direct vendor and an
+        # unpinned gateway contribute nothing here.
+        **vendor.upstream_kwargs(tiers.upstreams_for(selection.vendor)),
+        # A client that reads what the provider said about money, on every
+        # tier whose vendor says anything. Every other tier gets ADK's own
+        # client and reports token counts alone, which is what the cost
+        # arithmetic has always run on. Named rather than spread, so the
+        # seam stays a closed set of kwargs.
+        #
+        # Installed wherever the vendor reports a charge rather than
+        # wherever the figure is recordable: the client is also what catches
+        # a declared arrangement the provider contradicts, and a deployment
+        # that declared the wrong one records nothing to be caught by.
+        #
+        # And wherever a route reaches more than one provider, because there
+        # the response may name which one answered — a fact only a gateway
+        # has, and the one an `openrouter` route's served build cannot give.
+        # Two registry properties rather than one, because they are two
+        # facts: a vendor could state a charge without naming an upstream,
+        # or the reverse, and an OR keeps both reaching the reader.
+        llm_client=(
+            client_cls(vendor, tiers.charge_mode(selection.vendor))
+            if charged
+            else client_cls()
+        ),
+    )
+
+
 def build_tier_adapters(
     tiers: ModelTierConfig,
     sampling: SamplingConfig,
@@ -486,54 +556,46 @@ def build_tier_adapters(
         client_cls = capturing_client if charged else LiteLLMClient
         if vendor.caches_prompt_prefix(selection.model):
             client_cls = marking[client_cls]
-        translator = translating(
-            model=selection.route,
-            # Zero, and not because retry is off: it is one layer up, in
-            # ``analysis_service.retry``. This kwarg is what keeps the library's
-            # own layer — and the provider SDK's, which it sets from this same
-            # value — down to exactly one request per call, so ``attempts``
-            # means requests instead of half of a product with them.
-            **{_NUM_RETRIES_KWARG: 0},
-            # One request's bound, from ``config/resilience.toml``. On the
-            # adapter rather than on each node's ``generate_content_config``,
-            # because the value is one number for the whole deployment and this
-            # is the one seam where its unit is LiteLLM's own.
-            **{
-                _TIMEOUT_KWARG: resilience.request_timeout_seconds(
-                    tiers.upstreams_for(selection.vendor)
-                )
-            },
-            **tier_sampling.constructor_kwargs(),
-            **(_tool_path_kwargs(tier_sampling) if path == "tool" else {}),
-            **vendor.credential_kwargs(env, tiers.credential_mode(selection.vendor)),
-            # The upstream pin, where the deployment declared one. It rides the
-            # request body under litellm's ``extra_body``, which the OpenRouter
-            # transformation merges into what it sends; a direct vendor and an
-            # unpinned gateway contribute nothing here.
-            **vendor.upstream_kwargs(tiers.upstreams_for(selection.vendor)),
-            # A client that reads what the provider said about money, on every
-            # tier whose vendor says anything. Every other tier gets ADK's own
-            # client and reports token counts alone, which is what the cost
-            # arithmetic has always run on. Named rather than spread, so the
-            # seam stays a closed set of kwargs.
-            #
-            # Installed wherever the vendor reports a charge rather than
-            # wherever the figure is recordable: the client is also what catches
-            # a declared arrangement the provider contradicts, and a deployment
-            # that declared the wrong one records nothing to be caught by.
-            #
-            # And wherever a route reaches more than one provider, because there
-            # the response may name which one answered — a fact only a gateway
-            # has, and the one an `openrouter` route's served build cannot give.
-            # Two registry properties rather than one, because they are two
-            # facts: a vendor could state a charge without naming an upstream,
-            # or the reverse, and an OR keeps both reaching the reader.
-            llm_client=(
-                client_cls(vendor, tiers.charge_mode(selection.vendor))
-                if charged
-                else client_cls()
-            ),
+
+        translator = _translator(
+            translating,
+            path,
+            selection=selection,
+            vendor=vendor,
+            tier_sampling=tier_sampling,
+            tiers=tiers,
+            resilience=resilience,
+            env=env,
+            client_cls=client_cls,
+            charged=charged,
         )
+        # An ``auto`` tier on the native path keeps a tool-path translator, so a
+        # provider that refuses the native schema at run time moves the tier
+        # rather than failing the job (ADR 0058).
+        fallback = None
+        if path == "native" and tier_sampling.structured_output == "auto":
+            try:
+                check_supported(
+                    vendor,
+                    selection.model,
+                    {"tools": [_PROBE_TOOL], **_tool_path_kwargs(tier_sampling)},
+                    source=source,
+                )
+            except ModelGateError:
+                pass  # this pair takes no tool calls, so no fallback exists
+            else:
+                fallback = _translator(
+                    translating,
+                    "tool",
+                    selection=selection,
+                    vendor=vendor,
+                    tier_sampling=tier_sampling,
+                    tiers=tiers,
+                    resilience=resilience,
+                    env=env,
+                    client_cls=client_cls,
+                    charged=charged,
+                )
         # The tier's configuration — the credential, the seed, the reasoning
         # effort, the request timeout — stays on the translator, which is the
         # provider side of the seam. What crosses is one call's own request.
@@ -543,6 +605,7 @@ def build_tier_adapters(
                 translator,
                 SCHEMA_RULES[vendor.schema_rule],
                 tool_path=path == "tool",
+                fallback=fallback,
             ),
             retry_policy=policy,
         )

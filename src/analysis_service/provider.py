@@ -71,6 +71,7 @@ from analysis_service.prompt_cache import CACHE_WRITE_METADATA_KEY
 from analysis_service.retry import (
     ProviderFailure,
     RetryPolicy,
+    SchemaRefusal,
     classify,
     reject_truncated,
     stamp_attempt,
@@ -84,6 +85,11 @@ REASKS_METADATA_KEY = "reasks"
 #: The validation errors follow it, one per line.
 #: The two ways a node schema can travel (ADR 0058).
 SchemaPath = Literal["native", "tool"]
+
+#: The ``custom_metadata`` key under which a response carries the
+#: :data:`~analysis_service.retry.SCHEMA_REFUSALS` rule that moved its tier to
+#: the tool path. Present only on the call that met the refusal.
+SCHEMA_FALLBACK_METADATA_KEY = "schema_fallback"
 
 #: The ``custom_metadata`` key under which a response carries the path its
 #: node schema took: ``native`` or ``tool`` (ADR 0058). Absent where the call
@@ -228,6 +234,8 @@ class GenerationResult:
     #: ``native`` or ``tool``, as the executor sent the schema; ``None`` where
     #: the call sent no schema.
     schema_path: SchemaPath | None
+    #: The refusal rule that moved this call to the tool path, or ``None``.
+    schema_fallback: SchemaRefusal | None = None
 
     @classmethod
     def of(cls, response: LlmResponse) -> Self:
@@ -248,6 +256,7 @@ class GenerationResult:
             served_upstream=stamped.get(UPSTREAM_METADATA_KEY),
             cache_write_tokens=stamped.get(CACHE_WRITE_METADATA_KEY),
             schema_path=stamped.get(SCHEMA_PATH_METADATA_KEY),
+            schema_fallback=stamped.get(SCHEMA_FALLBACK_METADATA_KEY),
         )
 
     def followed_by(self, later: Self) -> Self:
@@ -267,6 +276,7 @@ class GenerationResult:
             cache_write_tokens=_summed(
                 self.cache_write_tokens, later.cache_write_tokens
             ),
+            schema_fallback=self.schema_fallback or later.schema_fallback,
         )
 
     def into_response(self) -> LlmResponse:
@@ -282,6 +292,7 @@ class GenerationResult:
             UPSTREAM_METADATA_KEY: self.served_upstream,
             CACHE_WRITE_METADATA_KEY: self.cache_write_tokens,
             SCHEMA_PATH_METADATA_KEY: self.schema_path,
+            SCHEMA_FALLBACK_METADATA_KEY: self.schema_fallback,
         }
         present = {key: value for key, value in stamped.items() if value is not None}
         return LlmResponse(
@@ -351,10 +362,15 @@ class InProcessExecutor:
         rewrite_schema: Callable[[Mapping[str, Any]], Mapping[str, Any]],
         *,
         tool_path: bool,
+        fallback: BaseLlm | None,
     ) -> None:
         self._adapter = adapter
         self._rewrite_schema = rewrite_schema
         self._tool_path = tool_path
+        self._fallback = fallback
+        # Kept apart from ``_fallback``, which the move clears: a lane whose
+        # refusal arrives after another lane moved the tier still sends again.
+        self._falls_back = fallback is not None
 
     @property
     def translator(self) -> BaseLlm:
@@ -371,6 +387,28 @@ class InProcessExecutor:
         # Outside the ``try``, so the refusal is never classified as a provider
         # failure and the retry loop above never asks again.
         refuse_live_inference(request.route)
+        try:
+            return await self._generate(request)
+        except ProviderCallFailed as failed:
+            refusal = failed.failure.schema_refusal
+            if not self._falls_back or refusal is None:
+                raise
+            self._move_to_tool_path()
+            results = await self._generate(request)
+            return [replace(result, schema_fallback=refusal) for result in results]
+
+    def _move_to_tool_path(self) -> None:
+        """Send every later call on this tier as a forced tool call (ADR 0058).
+
+        The provider refused the native schema for this ``(vendor, model)``,
+        which is a property of the pair rather than of one request, so the tier
+        stays on the tool path for the life of the process.
+        """
+        if self._fallback is not None:
+            self._adapter, self._fallback = self._fallback, None
+            self._tool_path = True
+
+    async def _generate(self, request: GenerationRequest) -> Sequence[GenerationResult]:
         llm_request = self._for_vendor(request).into_llm_request()
         path: SchemaPath | None = None
         if request.output_schema is not None:

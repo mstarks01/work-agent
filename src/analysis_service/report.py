@@ -51,6 +51,7 @@ from analysis_service.claims import FrameworkAnalysis, FrameworkName, SharedElem
 from analysis_service.evidence import ground_issues
 from analysis_service.frameworks import block_type_for
 from analysis_service.provider import SchemaPath
+from analysis_service.retry import SchemaRefusal
 from analysis_service.sources import Source, clean_system_name
 from analysis_service.system_model import (
     BoundaryCrossing,
@@ -169,7 +170,8 @@ from analysis_service.vendors import ServedTrust, vendor_for_route
 # the unshipped major for the same reason.
 # 3.0 also carries ``nodes[].reasks``, the schema re-ask count (0 or 1) that
 # the adapter stamps (ADR 0058). Optional with a default of 0, for the same
-# reason. ``nodes[].schema_path`` rides with it: optional, default ``None``.
+# reason. ``nodes[].schema_path`` and ``nodes[].schema_fallback`` ride with
+# it: optional, default ``None``.
 # 3.0 also carries ``unknown_claim_identities``, a seventh list of
 # service-owned marks: a claim naming an identifier its framework's own catalog
 # does not hold. It rides 3.0 for the same reason ``absent-attribute`` does —
@@ -484,6 +486,12 @@ class NodeRun(BaseModel):
     provider's structured-output field, ``tool`` as a forced tool call
     (ADR 0058). ``None`` for a node that sent no schema.
 
+    ``schema_fallback`` names the rule in
+    :data:`~analysis_service.retry.SCHEMA_REFUSALS` that moved this node's tier
+    to the tool path, on the call where the provider refused the native schema.
+    It is the rule's name and never the provider's message, which can quote
+    the prompt back.
+
     ``served_trust`` says what this row's ``model`` is worth as evidence, and it
     is **here rather than once per report**. A deployment may select a
     different vendor per tier, so one report can hold rows whose served builds
@@ -505,6 +513,7 @@ class NodeRun(BaseModel):
     attempts: int = Field(default=1, ge=1)
     reasks: int = Field(default=0, ge=0, le=1)
     schema_path: SchemaPath | None = None
+    schema_fallback: SchemaRefusal | None = None
     # ``allow_inf_nan`` off, because a stored figure is only as trustworthy as
     # whatever wrote it — the reasoning ``_stored_system_name`` states below.
     # ``analysis_service.charges.reported_charge_of`` refuses a non-finite

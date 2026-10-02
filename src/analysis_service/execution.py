@@ -55,6 +55,7 @@ from analysis_service.identity import build_identity, execution_fingerprint
 from analysis_service.prompt_cache import CACHE_WRITE_METADATA_KEY
 from analysis_service.provider import (
     REASKS_METADATA_KEY,
+    SCHEMA_FALLBACK_METADATA_KEY,
     SCHEMA_PATH_METADATA_KEY,
     SchemaPath,
 )
@@ -65,7 +66,7 @@ from analysis_service.report import (
     Report,
     TokenUsage,
 )
-from analysis_service.retry import ATTEMPTS_METADATA_KEY
+from analysis_service.retry import ATTEMPTS_METADATA_KEY, SchemaRefusal
 from analysis_service.sources import Source, render_sources
 from analysis_service.vendors import join_served
 
@@ -145,6 +146,7 @@ class _NodeFinish:
     attempts: int = 1
     reasks: int = 0
     schema_path: SchemaPath | None = None
+    schema_fallback: SchemaRefusal | None = None
     reported_charge_usd: float | None = None
     served_upstream: str | None = None
 
@@ -387,6 +389,7 @@ class GraphExecutor:
                             attempts=_attempts_of(event),
                             reasks=_reasks_of(event),
                             schema_path=_schema_path_of(event),
+                            schema_fallback=_schema_fallback_of(event),
                             reported_charge_usd=_reported_charge_of(event),
                             served_upstream=_served_upstream_of(event),
                         )
@@ -464,6 +467,7 @@ class GraphExecutor:
                     attempts=finish.attempts,
                     reasks=finish.reasks,
                     schema_path=finish.schema_path,
+                    schema_fallback=finish.schema_fallback,
                     reported_charge_usd=finish.reported_charge_usd,
                     served_upstream=finish.served_upstream,
                 )
@@ -585,6 +589,13 @@ def _schema_path_of(event) -> SchemaPath | None:
     that sent no schema.
     """
     return (getattr(event, "custom_metadata", None) or {}).get(SCHEMA_PATH_METADATA_KEY)
+
+
+def _schema_fallback_of(event) -> SchemaRefusal | None:
+    """The refusal rule that moved this event's tier to the tool path, if any."""
+    return (getattr(event, "custom_metadata", None) or {}).get(
+        SCHEMA_FALLBACK_METADATA_KEY
+    )
 
 
 def _reported_charge_of(event) -> float | None:

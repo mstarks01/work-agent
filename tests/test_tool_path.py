@@ -35,7 +35,7 @@ TOOL_TIER = {"ANALYSIS_SAMPLING_STRONG_STRUCTURED_OUTPUT": "tool"}
 ANSWER: dict[str, Any] = {"claims": []}
 
 
-def _tool_call_message() -> dict[str, Any]:
+def tool_call_message() -> dict[str, Any]:
     return {
         "role": "assistant",
         "content": None,
@@ -63,7 +63,7 @@ def _bedrock_mapped(kwargs: dict[str, Any]) -> dict[str, Any]:
 
 
 def test_a_tool_tier_sends_the_schema_as_a_forced_tool():
-    client = Capturing(_tool_call_message())
+    client = Capturing(tool_call_message())
 
     drive_strong_tier("bedrock", client, sampling_env=TOOL_TIER)
 
@@ -76,7 +76,7 @@ def test_a_tool_tier_sends_the_schema_as_a_forced_tool():
 
 
 def test_bedrock_receives_a_tool_config_and_no_output_config():
-    client = Capturing(_tool_call_message())
+    client = Capturing(tool_call_message())
 
     drive_strong_tier("bedrock", client, sampling_env=TOOL_TIER)
 
@@ -88,7 +88,7 @@ def test_bedrock_receives_a_tool_config_and_no_output_config():
 
 def test_the_tool_s_parameters_carry_no_bound_bedrock_refuses():
     """The vendor's schema rule applies on the tool path too: one schema text."""
-    client = Capturing(_tool_call_message())
+    client = Capturing(tool_call_message())
 
     drive_strong_tier("bedrock", client, sampling_env=TOOL_TIER)
 
@@ -98,7 +98,7 @@ def test_the_tool_s_parameters_carry_no_bound_bedrock_refuses():
 
 
 def test_the_tool_call_reaches_the_node_as_json_text():
-    client = Capturing(_tool_call_message())
+    client = Capturing(tool_call_message())
 
     (response,) = drive_strong_tier("bedrock", client, sampling_env=TOOL_TIER)
 
@@ -146,7 +146,7 @@ def test_a_request_without_a_schema_gets_no_tool():
 
 def test_the_node_records_which_path_its_schema_took():
     tool = drive_strong_tier(
-        "bedrock", Capturing(_tool_call_message()), sampling_env=TOOL_TIER
+        "bedrock", Capturing(tool_call_message()), sampling_env=TOOL_TIER
     )
     native = drive_strong_tier("bedrock", Capturing())
 

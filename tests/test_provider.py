@@ -327,7 +327,8 @@ class TestTheAdapterOverTheSeam:
         )
 
         assert isinstance(
-            InProcessExecutor(translator, dict, tool_path=False), ProviderExecutor
+            InProcessExecutor(translator, dict, tool_path=False, fallback=None),
+            ProviderExecutor,
         )
 
     def test_the_executor_is_handed_the_projection_and_nothing_else(self):

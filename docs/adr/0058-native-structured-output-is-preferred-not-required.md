@@ -59,8 +59,9 @@ the model and the installed library, which the identity already hashes.
 
 **A provider refusal moves the tier, at run time.** Under `auto`, a 400 error
 that refuses the native schema field or the compiled schema sends the same
-request again on the tool path, and the tier stays there for the rest of the
-job. Any other 400 error stays a failure.
+request again on the tool path. The refusal is a property of the
+`(vendor, model)` pair, so the tier stays on the tool path for the life of the
+process. Any other 400 error stays a failure.
 
 **Three safeguards keep the tool path equal to native:**
 
