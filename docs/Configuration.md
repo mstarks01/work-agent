@@ -572,6 +572,18 @@ provider in two ways (ADR 0058):
 A model that does not take a schema parameter at all is a startup error on
 every setting.
 
+**Under `auto`, a refusal at run time moves the tier.** The price map can mark a
+model native when the provider does not support it. Under the pinned litellm,
+Claude 5 on Bedrock is one such case. When the provider answers the native
+request with a 400 error that refuses the schema, the service sends the same
+request again as a forced tool call. The tier then stays on the tool path for
+the life of the process. Two rules recognise the refusal: Anthropic's "the
+compiled grammar is too large", and a 400 that names a field which carries the
+schema, such as `outputConfig` or `response_format`. Bedrock does not document
+its message, so the first live refusal on each vendor confirms the rule. The
+node records the rule's name in `nodes[].schema_fallback`, and never the
+provider's message. `native` and `tool` have no fallback.
+
 **The tool path relies on the schema re-ask.** An answer that fails its schema
 goes back to the same model once, with the validation errors. A second failure
 still fails the node. How often the tool path needs the re-ask, and whether

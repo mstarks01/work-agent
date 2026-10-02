@@ -71,6 +71,7 @@ import random
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from enum import StrEnum
+from typing import Literal
 
 logger = logging.getLogger(__name__)
 
@@ -457,6 +458,32 @@ _KIND_FOR_STATUS: Mapping[int, FailureKind] = {
 }
 
 
+#: Why a provider refused a native structured-output request (ADR 0058).
+SchemaRefusal = Literal["grammar_too_large", "schema_field_refused"]
+
+#: The 400 messages that mean a provider refused the native schema, by rule.
+#: Matched in lower case. The record keeps the rule name and never the message,
+#: which can quote the prompt back (OWASP LLM02). The first live refusal on each
+#: vendor confirms a rule's shape, and its date is recorded beside the rule.
+SCHEMA_REFUSALS: Mapping[SchemaRefusal, tuple[str, ...]] = {
+    # Anthropic, against ``SystemModel``: recorded in ``config/sampling.toml``.
+    "grammar_too_large": ("compiled grammar is too large",),
+    # A 400 that names a field which carries the schema. AWS documents a 400
+    # for an unsupported schema keyword on Bedrock, and does not document the
+    # message (structured-outputs page, read 2026-10-02).
+    "schema_field_refused": (
+        "outputconfig",
+        "output_config",
+        "output_format",
+        "response_format",
+        "json_schema",
+        "structured output",
+    ),
+}
+
+_BAD_REQUEST_STATUS = 400
+
+
 @dataclass(frozen=True)
 class ProviderFailure:
     """One failed provider call, as the facts the callers actually ask for.
@@ -484,6 +511,8 @@ class ProviderFailure:
     retry_after_seconds: float | None
     detail: str
     cause: BaseException | None = None
+    #: The :data:`SCHEMA_REFUSALS` rule this failure matched, or ``None``.
+    schema_refusal: SchemaRefusal | None = None
 
 
 def classify(exc: BaseException) -> ProviderFailure:
@@ -501,7 +530,19 @@ def classify(exc: BaseException) -> ProviderFailure:
         retry_after_seconds=_retry_after_seconds(exc),
         detail=type(exc).__name__,
         cause=exc,
+        schema_refusal=_schema_refusal(exc),
     )
+
+
+def _schema_refusal(exc: BaseException) -> SchemaRefusal | None:
+    """The :data:`SCHEMA_REFUSALS` rule a 400 matches, or ``None``."""
+    if getattr(exc, "status_code", None) != _BAD_REQUEST_STATUS:
+        return None
+    message = str(exc).lower()
+    for rule, phrases in SCHEMA_REFUSALS.items():
+        if any(phrase in message for phrase in phrases):
+            return rule
+    return None
 
 
 def _kind_of(exc: BaseException, retryable: bool) -> FailureKind:

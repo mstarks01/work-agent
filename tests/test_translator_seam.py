@@ -252,12 +252,15 @@ def test_every_adapter_kwarg_comes_from_a_closed_set():
     is why the count is asserted rather than the names alone.
     """
     source = (PACKAGE / "binding.py").read_text(encoding="utf-8")
-    call = re.search(r"translator = translating\((.*?)\n        \)", source, re.DOTALL)
-    assert call is not None, "build_tier_adapters no longer builds adapters this way"
+    call = re.search(r"    return translating\((.*?)\n    \)", source, re.DOTALL)
+    assert call is not None, "_translator no longer builds translators this way"
     body = call.group(1)
     assert "model=selection.route" in body
     assert "**tier_sampling.constructor_kwargs()" in body
     assert '**(_tool_path_kwargs(tier_sampling) if path == "tool" else {})' in body
+    assert source.count("_translator(\n") == 3, (
+        "one definition and two calls: the tier's translator and its fallback"
+    )
     assert "**vendor.credential_kwargs(env, tiers.credential_mode(" in body
     assert "**vendor.upstream_kwargs(tiers.upstreams_for(selection.vendor))" in body
     assert "_TIMEOUT_KWARG: resilience.request_timeout_seconds(" in body
