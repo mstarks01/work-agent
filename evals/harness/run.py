@@ -100,6 +100,7 @@ from evals.harness import (
     replay,
     roster,
     rule_applicability,
+    schema_paths,
     score_arms,
     standings,
     submit,
@@ -2743,6 +2744,13 @@ COMMANDS: dict[str, Command] = {
         " number of choices, on archived reports (offline, no credentials)",
         run=follow_up_policies.command_follow_up_policies,
         arguments=follow_up_policies.arguments,
+    ),
+    "schema-paths": Command(
+        help="count how each node's schema reached the provider, its"
+        " fallbacks and its re-asks, on archived reports (offline, no"
+        " credentials)",
+        run=schema_paths.command_schema_paths,
+        arguments=schema_paths.arguments,
     ),
     "question-prior": Command(
         help="count one framework's early-question prior from a sweep's"

@@ -19,7 +19,7 @@ shown only at or above its kind's floor, and one pause asks each kind at most
 its limit in all: :data:`EARLY_RULES` is the table. Where a job selects
 more than one framework, the frameworks take turns, both for the places in a
 round and for the order it is shown in (:func:`by_turn`). A question answered in
-part comes back first, outside the limit, and where the limits hold questions
+part is taken before any new question, outside the limit, and where the limits hold questions
 back the job says so (:attr:`QuestionSet.stop`). A submitter saves a round's answers, which writes
 them onto the job and runs no model, and the next round is read off the model
 with them in. So an
@@ -538,7 +538,7 @@ def next_round(
     """This round's questions, how many each kind has left, and how many the limits hold back.
 
     A question an earlier round answered in full is not asked again. One it
-    answered in part comes first, and takes no place under the limit, which
+    answered in part is taken first, and takes no place under the limit, which
     it already counts toward: each earlier answer counts toward its kind's
     limit, and the limit bounds only the questions not yet answered at all.
 
@@ -546,7 +546,9 @@ def next_round(
     number of questions a round opens with never grows from one round to the
     next (:func:`_take`). Each kind's questions are taken with the selected
     frameworks in turn, so each framework's best questions reach the round,
-    and the round is shown in that order too (:func:`by_turn`).
+    and the whole round is shown in that order too (:func:`by_turn`). So a
+    question answered in part is shown where its framework's turn puts it,
+    which is not always first.
     """
     shown: list[EarlyQuestion] = []
     remaining = {}
