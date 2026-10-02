@@ -327,7 +327,7 @@ class TestTheAdapterOverTheSeam:
         )
 
         assert isinstance(
-            InProcessExecutor(translator, dict, tool_path=False, fallback=None),
+            InProcessExecutor([("native", translator)], dict),
             ProviderExecutor,
         )
 

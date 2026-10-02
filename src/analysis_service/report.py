@@ -483,12 +483,13 @@ class NodeRun(BaseModel):
     calls are metered, so ``usage`` covers both and ``attempts`` counts both.
 
     ``schema_path`` is how the node's schema travelled: ``native`` through the
-    provider's structured-output field, ``tool`` as a forced tool call
-    (ADR 0058). ``None`` for a node that sent no schema.
+    provider's structured-output field, ``tool`` as a tool's parameters, or
+    ``prompt`` stated in the request text (ADR 0058). ``None`` for a node that
+    sent no schema.
 
     ``schema_fallback`` names the rule in
     :data:`~analysis_service.retry.SCHEMA_REFUSALS` that moved this node's tier
-    to the tool path, on the call where the provider refused the native schema.
+    down its ladder, on the call where the provider refused the rung above.
     It is the rule's name and never the provider's message, which can quote
     the prompt back.
 

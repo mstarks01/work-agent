@@ -109,10 +109,10 @@ SUPPORTED_VERSION = 5
 # LiteLLM's business, not this file's.
 ReasoningEffort = Literal["low", "medium", "high"]
 
-#: How a tier's node schema reaches the provider (ADR 0058). ``native`` uses
-#: the provider's own structured-output field and refuses a model without it.
-#: ``tool`` sends the schema as a forced tool call. ``auto`` uses native output
-#: where the pinned library sends it, and the tool call elsewhere.
+#: Which rungs of the format ladder a tier allows (ADR 0058). ``auto`` allows
+#: every rung its pair supports, from the provider's own structured-output field
+#: down to the schema stated in the request. ``native`` allows the first rung
+#: alone and refuses a model without it. ``tool`` allows the two tool rungs.
 StructuredOutput = Literal["auto", "native", "tool"]
 
 # Env override surface: only these params are overridable. A var naming any

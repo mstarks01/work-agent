@@ -458,30 +458,60 @@ _KIND_FOR_STATUS: Mapping[int, FailureKind] = {
 }
 
 
-#: Why a provider refused a native structured-output request (ADR 0058).
-SchemaRefusal = Literal["grammar_too_large", "schema_field_refused"]
+#: Why a provider refused how a schema was sent (ADR 0058). Any of these moves
+#: the tier one rung down its ladder.
+SchemaRefusal = Literal[
+    "grammar_too_large",
+    "forced_tool_refused",
+    "tools_refused",
+    "no_endpoint",
+    "schema_field_refused",
+]
 
-#: The 400 messages that mean a provider refused the native schema, by rule.
-#: Matched in lower case. The record keeps the rule name and never the message,
-#: which can quote the prompt back (OWASP LLM02). The first live refusal on each
-#: vendor confirms a rule's shape, and its date is recorded beside the rule.
+#: The messages that mean a provider refused how a schema was sent, by rule,
+#: checked in this order. Matched in lower case. The record keeps the rule name
+#: and never the message, which can quote the prompt back (OWASP LLM02). None
+#: of these was confirmed by a live call unless its comment says so.
 SCHEMA_REFUSALS: Mapping[SchemaRefusal, tuple[str, ...]] = {
     # Anthropic, against ``SystemModel``: recorded in ``config/sampling.toml``.
     "grammar_too_large": ("compiled grammar is too large",),
-    # A 400 that names a field which carries the schema. AWS documents a 400
-    # for an unsupported schema keyword on Bedrock, and does not document the
-    # message (structured-outputs page, read 2026-10-02).
+    # Anthropic refuses a forced tool together with extended thinking, and a
+    # model with thinking always on cannot turn it off. Matches the field name
+    # on every vendor: ``tool_choice``, or Bedrock's ``toolChoice``.
+    "forced_tool_refused": ("forces tool use", "tool_choice", "toolchoice"),
+    # A model that takes no tools at all, in the words vendors use for it.
+    "tools_refused": (
+        "does not support tool",
+        "doesn't support tool",
+        "tool use is not supported",
+        "tools are not supported",
+        "function calling is not",
+        "toolconfig",
+    ),
+    # OpenRouter, where no upstream serves the parameters the request carries.
+    "no_endpoint": ("no endpoints found",),
+    # A 400 that names a field which carries the schema: OpenAI's and
+    # OpenRouter's ``response_format``, Anthropic's ``output_format``,
+    # Bedrock's ``outputConfig``, Gemini's ``response_schema``. AWS documents
+    # a 400 for an unsupported schema keyword on Bedrock, and does not document
+    # the message (structured-outputs page, read 2026-10-02).
     "schema_field_refused": (
         "outputconfig",
         "output_config",
         "output_format",
         "response_format",
+        "response_schema",
+        "responseschema",
+        "response_json_schema",
+        "responsejsonschema",
         "json_schema",
         "structured output",
     ),
 }
 
-_BAD_REQUEST_STATUS = 400
+#: The statuses a refusal arrives with: a bad request, and OpenRouter's 404
+#: when no upstream serves the request.
+_REFUSAL_STATUSES = frozenset({400, 404})
 
 
 @dataclass(frozen=True)
@@ -536,7 +566,7 @@ def classify(exc: BaseException) -> ProviderFailure:
 
 def _schema_refusal(exc: BaseException) -> SchemaRefusal | None:
     """The :data:`SCHEMA_REFUSALS` rule a 400 matches, or ``None``."""
-    if getattr(exc, "status_code", None) != _BAD_REQUEST_STATUS:
+    if getattr(exc, "status_code", None) not in _REFUSAL_STATUSES:
         return None
     message = str(exc).lower()
     for rule, phrases in SCHEMA_REFUSALS.items():

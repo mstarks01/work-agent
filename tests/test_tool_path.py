@@ -20,9 +20,12 @@ from analysis_service.conformance import REFERENCE_MODELS
 from analysis_service.model_gate import _litellm
 from analysis_service.provider import (
     OUTPUT_TOOL_NAME,
+    PROMPT_SCHEMA_INSTRUCTION,
     SCHEMA_PATH_METADATA_KEY,
     answer_from_tool_call,
+    answer_unfenced,
     schema_as_tool,
+    schema_in_prompt,
 )
 from analysis_service.vendors import vendor_for
 from tests.test_schema_rules import SCHEMA, Capturing, drive_strong_tier
@@ -152,3 +155,53 @@ def test_the_node_records_which_path_its_schema_took():
 
     assert tool[0].custom_metadata[SCHEMA_PATH_METADATA_KEY] == "tool"
     assert native[-1].custom_metadata[SCHEMA_PATH_METADATA_KEY] == "native"
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        '```json\n{"claims": []}\n```',
+        '```\n{"claims": []}\n```',
+        '  ```json\n{"claims": []}\n```  \n',
+    ],
+)
+def test_one_fence_around_the_whole_answer_is_removed(text):
+    (part,) = answer_unfenced(_response(types.Part(text=text))).content.parts
+
+    assert part.text == '{"claims": []}'
+
+
+@pytest.mark.parametrize(
+    "text",
+    ['{"claims": []}', 'Here it is:\n```json\n{"claims": []}\n```'],
+)
+def test_any_other_answer_passes_unchanged(text):
+    response = _response(types.Part(text=text))
+
+    assert answer_unfenced(response) is response
+
+
+def test_the_schema_joins_the_last_user_turn():
+    request = LlmRequest(
+        contents=[types.Content(role="user", parts=[types.Part(text="go")])],
+        config=types.GenerateContentConfig(response_schema={"type": "object"}),
+    )
+
+    prompted = schema_in_prompt(request)
+
+    (turn,) = prompted.contents
+    assert [part.text.split("\n")[0] for part in turn.parts] == [
+        "go",
+        PROMPT_SCHEMA_INSTRUCTION,
+    ]
+    assert prompted.config.response_schema is None
+
+
+def test_every_rung_has_a_path_and_translator_arguments():
+    """A rung added to the vocabulary must answer in both tables."""
+    from typing import get_args
+
+    from analysis_service.binding import _RUNG_KWARGS
+    from analysis_service.provider import PATH_OF_RUNG, Rung
+
+    assert set(PATH_OF_RUNG) == set(get_args(Rung)) == set(_RUNG_KWARGS)

@@ -54,6 +54,7 @@ the same nine facts off the other side.
 from __future__ import annotations
 
 import json
+import re
 from collections.abc import AsyncGenerator, Callable, Mapping, Sequence
 from dataclasses import dataclass, replace
 from typing import Any, Literal, Protocol, Self, runtime_checkable
@@ -83,17 +84,35 @@ REASKS_METADATA_KEY = "reasks"
 
 #: What the model reads after an answer that does not match its node's schema.
 #: The validation errors follow it, one per line.
-#: The two ways a node schema can travel (ADR 0058).
-SchemaPath = Literal["native", "tool"]
+#: How a node schema travelled (ADR 0058): in the provider's structured-output
+#: field, as a tool's parameters, or stated in the request text.
+SchemaPath = Literal["native", "tool", "prompt"]
+
+#: The rungs a tier's schema can travel on, best first (ADR 0058). Each rung
+#: names the path it records; ``unconstrained`` is a tier that sends no schema.
+Rung = Literal["native", "forced_tool", "offered_tool", "prompt", "unconstrained"]
+PATH_OF_RUNG: Mapping[Rung, SchemaPath | None] = {
+    "native": "native",
+    "forced_tool": "tool",
+    "offered_tool": "tool",
+    "prompt": "prompt",
+    "unconstrained": None,
+}
+
+#: What the model reads on the ``prompt`` rung, before the schema itself.
+PROMPT_SCHEMA_INSTRUCTION = (
+    "Answer with one JSON object that matches this JSON schema. Write the JSON"
+    " and nothing else."
+)
 
 #: The ``custom_metadata`` key under which a response carries the
-#: :data:`~analysis_service.retry.SCHEMA_REFUSALS` rule that moved its tier to
-#: the tool path. Present only on the call that met the refusal.
+#: :data:`~analysis_service.retry.SCHEMA_REFUSALS` rule that moved its tier down
+#: its ladder. Present only on the call that met the refusal.
 SCHEMA_FALLBACK_METADATA_KEY = "schema_fallback"
 
 #: The ``custom_metadata`` key under which a response carries the path its
-#: node schema took: ``native`` or ``tool`` (ADR 0058). Absent where the call
-#: sent no schema.
+#: node schema took: ``native``, ``tool`` or ``prompt`` (ADR 0058). Absent
+#: where the call sent no schema.
 SCHEMA_PATH_METADATA_KEY = "schema_path"
 
 REASK_INSTRUCTION = (
@@ -231,10 +250,10 @@ class GenerationResult:
     reported_charge_usd: float | None
     served_upstream: str | None
     cache_write_tokens: int | None
-    #: ``native`` or ``tool``, as the executor sent the schema; ``None`` where
+    #: ``native``, ``tool`` or ``prompt``, as the executor sent the schema; ``None`` where
     #: the call sent no schema.
     schema_path: SchemaPath | None
-    #: The refusal rule that moved this call to the tool path, or ``None``.
+    #: The refusal rule that moved this call down its tier's ladder, or ``None``.
     schema_fallback: SchemaRefusal | None = None
 
     @classmethod
@@ -358,74 +377,88 @@ class InProcessExecutor:
 
     def __init__(
         self,
-        adapter: BaseLlm,
+        ladder: Sequence[tuple[Rung, BaseLlm]],
         rewrite_schema: Callable[[Mapping[str, Any]], Mapping[str, Any]],
-        *,
-        tool_path: bool,
-        fallback: BaseLlm | None,
     ) -> None:
-        self._adapter = adapter
+        if not ladder:
+            raise ValueError("an executor needs at least one rung")
+        self._ladder = tuple(ladder)
+        self._step = 0
         self._rewrite_schema = rewrite_schema
-        self._tool_path = tool_path
-        self._fallback = fallback
-        # Kept apart from ``_fallback``, which the move clears: a lane whose
-        # refusal arrives after another lane moved the tier still sends again.
-        self._falls_back = fallback is not None
 
     @property
     def translator(self) -> BaseLlm:
-        """The configured adapter this runs calls through.
+        """The configured adapter this runs calls through, on the current rung.
 
         Exposed for the same reason ADK exposes ``LiteLlm.llm_client``: a test
         that wants to drive the real code down to a transport it controls needs
         a seam to reach, and the alternative is for ``src`` to learn that a test
         is running. Read-only, and nothing in the service reads it.
         """
-        return self._adapter
+        return self._ladder[self._step][1]
+
+    @property
+    def ladder(self) -> tuple[tuple[Rung, BaseLlm], ...]:
+        """Every rung this tier can send a schema on, best first."""
+        return self._ladder
+
+    @property
+    def rung(self) -> Rung:
+        """The rung the next call is sent on."""
+        return self._ladder[self._step][0]
 
     async def generate(self, request: GenerationRequest) -> Sequence[GenerationResult]:
         # Outside the ``try``, so the refusal is never classified as a provider
         # failure and the retry loop above never asks again.
         refuse_live_inference(request.route)
-        try:
-            return await self._generate(request)
-        except ProviderCallFailed as failed:
-            refusal = failed.failure.schema_refusal
-            if not self._falls_back or refusal is None:
-                raise
-            self._move_to_tool_path()
-            results = await self._generate(request)
+        step = self._step
+        refusal: SchemaRefusal | None = None
+        while True:
+            try:
+                results = await self._generate(request, step)
+            except ProviderCallFailed as failed:
+                refused = failed.failure.schema_refusal
+                last = step + 1 >= len(self._ladder)
+                if refused is None or request.output_schema is None or last:
+                    raise
+                refusal = refused
+                step = self._step = self._moved_below(step)
+                continue
+            if refusal is None:
+                return results
             return [replace(result, schema_fallback=refusal) for result in results]
 
-    def _move_to_tool_path(self) -> None:
-        """Send every later call on this tier as a forced tool call (ADR 0058).
+    def _moved_below(self, step: int) -> int:
+        """Move the tier one rung below ``step``, and never back up (ADR 0058).
 
-        The provider refused the native schema for this ``(vendor, model)``,
-        which is a property of the pair rather than of one request, so the tier
-        stays on the tool path for the life of the process.
+        The provider refused this rung for this ``(vendor, model)``, which is a
+        property of the pair rather than of one request, so the tier stays on
+        the lower rung for the life of the process. Lanes run together on one
+        tier, so another lane may have moved it already: the step only grows.
         """
-        if self._fallback is not None:
-            self._adapter, self._fallback = self._fallback, None
-            self._tool_path = True
+        return max(self._step, step + 1)
 
-    async def _generate(self, request: GenerationRequest) -> Sequence[GenerationResult]:
+    async def _generate(
+        self, request: GenerationRequest, step: int
+    ) -> Sequence[GenerationResult]:
+        rung, adapter = self._ladder[step]
         llm_request = self._for_vendor(request).into_llm_request()
-        path: SchemaPath | None = None
-        if request.output_schema is not None:
-            path = "tool" if self._tool_path else "native"
-        if self._tool_path:
+        path = PATH_OF_RUNG[rung] if request.output_schema is not None else None
+        if path == "tool":
             llm_request = schema_as_tool(llm_request)
+        elif path == "prompt":
+            llm_request = schema_in_prompt(llm_request)
         try:
             responses = [
                 response
-                async for response in self._adapter.generate_content_async(
-                    llm_request, False
-                )
+                async for response in adapter.generate_content_async(llm_request, False)
             ]
         except Exception as exc:
             raise ProviderCallFailed(classify(exc)) from exc
-        if self._tool_path:
+        if path == "tool":
             responses = [answer_from_tool_call(response) for response in responses]
+        elif path == "prompt":
+            responses = [answer_unfenced(response) for response in responses]
         return [
             replace(GenerationResult.of(response), schema_path=path)
             for response in responses
@@ -561,6 +594,61 @@ def schema_as_tool(llm_request: LlmRequest) -> LlmRequest:
         update={"response_schema": None, "response_mime_type": None, "tools": [tool]}
     )
     return llm_request.model_copy(update={"config": tooled})
+
+
+def schema_in_prompt(llm_request: LlmRequest) -> LlmRequest:
+    """``llm_request`` with its output schema stated in the request text.
+
+    The ``prompt`` rung of ADR 0058, for a pair that takes neither a schema
+    field nor a tool. The schema leaves ``response_schema`` and becomes one more
+    part of the last user turn, after :data:`PROMPT_SCHEMA_INSTRUCTION`. A
+    request with no schema passes unchanged.
+    """
+    config = llm_request.config
+    if config is None or config.response_schema is None:
+        return llm_request
+    schema = config.response_schema
+    parameters = schema if isinstance(schema, Mapping) else _schema_json(schema)
+    stated = types.Part(
+        text=f"{PROMPT_SCHEMA_INSTRUCTION}\n```json\n{json.dumps(parameters)}\n```"
+    )
+    contents = list(llm_request.contents or ())
+    if contents and contents[-1].role == "user":
+        last = contents[-1]
+        contents[-1] = last.model_copy(update={"parts": [*(last.parts or ()), stated]})
+    else:
+        contents.append(types.Content(role="user", parts=[stated]))
+    plain = config.model_copy(
+        update={"response_schema": None, "response_mime_type": None}
+    )
+    return llm_request.model_copy(update={"config": plain, "contents": contents})
+
+
+#: One JSON answer wrapped in a Markdown fence, which a model writes without a
+#: schema constraint and ADK cannot parse.
+_FENCED = re.compile(r"\A\s*```(?:json)?[ \t]*\r?\n(.*?)\r?\n[ \t]*```\s*\Z", re.DOTALL)
+
+
+def answer_unfenced(response: LlmResponse) -> LlmResponse:
+    """``response`` with one fence around its whole answer removed.
+
+    The ``prompt`` rung sends no schema constraint, and a model then often
+    fences its JSON, which ADK hands to validation as it is. Only a fence
+    around the whole answer is removed. Any other shape passes unchanged to
+    the schema check, which may re-ask.
+    """
+    if response.content is None:
+        return response
+    parts = response.content.parts or ()
+    text = "".join(part.text or "" for part in parts if not part.thought)
+    fenced = _FENCED.match(text)
+    if fenced is None:
+        return response
+    kept = [part for part in parts if part.thought]
+    content = response.content.model_copy(
+        update={"parts": [*kept, types.Part(text=fenced.group(1))]}
+    )
+    return response.model_copy(update={"content": content})
 
 
 def answer_from_tool_call(response: LlmResponse) -> LlmResponse:

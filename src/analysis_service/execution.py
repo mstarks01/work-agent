@@ -592,7 +592,7 @@ def _schema_path_of(event) -> SchemaPath | None:
 
 
 def _schema_fallback_of(event) -> SchemaRefusal | None:
-    """The refusal rule that moved this event's tier to the tool path, if any."""
+    """The refusal rule that moved this event's tier down its ladder, if any."""
     return (getattr(event, "custom_metadata", None) or {}).get(
         SCHEMA_FALLBACK_METADATA_KEY
     )

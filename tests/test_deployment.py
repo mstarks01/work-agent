@@ -44,7 +44,7 @@ from analysis_service.model_tiers import ModelConfigError
 from analysis_service.provider import OUTPUT_TOOL_NAME
 from analysis_service.system_model import EmittedSystemModel
 from analysis_service.vendors import ProviderAuthError, vendor_for
-from tests.factories import DEFAULT_FRAMEWORKS, PROJECT_ROOT, translator_of
+from tests.factories import DEFAULT_FRAMEWORKS, PROJECT_ROOT, rungs_of, translator_of
 
 # This install's one package's critic nodes. Named per framework now, because
 # two packages each bring their own critic and its bounded re-ask.
@@ -842,7 +842,7 @@ def test_auto_sends_an_emulated_pair_s_schema_as_a_tool_call(tmp_path):
     kwargs = translator_of(adapter)._additional_args
     assert kwargs["response_format"] is None
     assert kwargs["tool_choice"]["function"]["name"] == OUTPUT_TOOL_NAME
-    assert adapter.executor._tool_path is True
+    assert rungs_of(adapter) == ["forced_tool", "offered_tool", "prompt"]
 
 
 def test_vertex_hosted_claude_is_emulated_and_so_takes_the_tool_path(tmp_path):
@@ -858,7 +858,7 @@ def test_vertex_hosted_claude_is_emulated_and_so_takes_the_tool_path(tmp_path):
 
     pipeline = Deployment.from_env(env=env).pipeline(DEFAULT_FRAMEWORKS)
 
-    assert _extract_executor(pipeline).executor._tool_path is True
+    assert _extract_executor(pipeline).executor.rung == "forced_tool"
 
 
 def test_tool_forces_the_tool_path_on_a_model_with_native_output(tmp_path):
@@ -872,7 +872,7 @@ def test_tool_forces_the_tool_path_on_a_model_with_native_output(tmp_path):
     pipeline = Deployment.from_env(env=env).pipeline(DEFAULT_FRAMEWORKS)
 
     adapter = _extract_executor(pipeline)
-    assert adapter.executor._tool_path is True
+    assert rungs_of(adapter) == ["forced_tool", "offered_tool"]
     assert translator_of(adapter)._additional_args["response_format"] is None
 
 
@@ -898,7 +898,7 @@ def test_auto_keeps_a_native_pair_on_the_native_path():
     pipeline = Deployment.from_env(env=VERTEX_ENV).pipeline(DEFAULT_FRAMEWORKS)
 
     adapter = _extract_executor(pipeline)
-    assert adapter.executor._tool_path is False
+    assert rungs_of(adapter) == ["native", "forced_tool", "offered_tool", "prompt"]
     assert "tool_choice" not in translator_of(adapter)._additional_args
 
 

@@ -963,8 +963,8 @@ class NodeRun:
     usage: TokenUsage | None  # what the provider says the call cost; None if unmetered
     attempts: int  # provider calls this execution took; 1 unless the driver retried
     reasks: int  # 1 where the first answer failed its schema and the node asked once more
-    schema_path: Literal["native", "tool"] | None  # how the node's schema travelled
-    schema_fallback: Literal["grammar_too_large", "schema_field_refused"] | None
+    schema_path: Literal["native", "tool", "prompt"] | None  # how the schema travelled
+    schema_fallback: str | None  # a rule name from retry.SCHEMA_REFUSALS
     served_trust: (
         Literal["provider_reported", "requested_echo"] | None
     )  # what `model` is worth as evidence; None for code-only nodes
@@ -1061,13 +1061,12 @@ class TokenUsage:
   `attempts` counts both. A second answer that fails the schema still fails
   the node.
 - **`schema_path`** is how the node's schema reached the provider: `native`
-  through the provider's own structured-output field, or `tool` as a forced
-  tool call (ADR 0058). It is `None` for a node that sent no schema. Read it
+  through the provider's own structured-output field, `tool` as a tool's
+  parameters, or `prompt` stated in the request text (ADR 0058). It is `None` for a node that sent no schema. Read it
   beside `reasks`: the tool path relies on the re-ask, and the native path
   rarely needs it.
-- **`schema_fallback`** names the rule that moved the node's tier from the
-  native path to the tool path, on the call where the provider refused the
-  native schema. It holds the rule's name and never the provider's message,
+- **`schema_fallback`** names the rule that moved the node's tier down its
+  ladder of formats, on the call where the provider refused the format above. It holds the rule's name and never the provider's message,
   which can quote the prompt back.
 
 > **`schema_version` 1.1** added `requested_model` and redefined `model` as the
