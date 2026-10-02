@@ -132,6 +132,12 @@ DECLARED: dict[str, str] = {
         " carries that as `needs_candidate_pairs`. A package matching by catalog"
         " identifier contributes no pair, so there is nothing here to key."
     ),
+    "evals/experiments/QA-2026-09-26-03/early-prior-bands.py": (
+        "This code is that framework's. The experiment splits a prior by the"
+        " band a job's options select, which exists only for a package whose"
+        " options select a closed set of units by band. A package whose claim"
+        " set is open selects every band, so it has no arm to compare."
+    ),
     "evals/harness/bottleneck.py": (
         "Each fixture's ``Want`` cites the deterministic consumer that reads"
         " the attribute, by the rule's own name, and both packages are cited"
