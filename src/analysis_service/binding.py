@@ -110,7 +110,7 @@ from analysis_service.provider import (
     OUTPUT_TOOL_NAME,
     ExecutedLlm,
     InProcessExecutor,
-    SchemaPath,
+    Rung,
 )
 from analysis_service.resilience import ResilienceConfig
 from analysis_service.sampling import (
@@ -315,51 +315,83 @@ def _check_output_ceiling(
     )
 
 
-def _structured_output_path(
+def _ladder(
     vendor: Vendor, model: str, sampling: TierSampling, source: str
-) -> SchemaPath | None:
-    """How this tier sends its node schema, or ``None`` where it sends none.
+) -> tuple[Rung, ...]:
+    """The rungs this tier can send its node schema on, best first (ADR 0058).
 
-    ADR 0058. ``native`` uses the provider's own structured-output field, which
-    constrains decoding. ``tool`` sends the schema as a forced tool call, which
-    asks the model to follow it; the schema re-ask in
+    ``native`` uses the provider's own structured-output field, which
+    constrains decoding. ``forced_tool`` sends the schema as a tool's
+    parameters and forces the call. ``offered_tool`` offers the tool and lets
+    the model call it. ``prompt`` states the schema in the request text. Each
+    rung below ``native`` asks the model to follow the schema rather than
+    making it, and the schema re-ask in
     :class:`~analysis_service.provider.ExecutedLlm` covers an answer that does
-    not. ``auto`` takes ``native`` where the pinned library sends it.
+    not. A provider refusal at run time moves the tier one rung down.
 
-    Two configurations still fail the build, at no cost:
+    The setting decides which rungs are allowed:
 
-    * ``structured_output = "native"`` on a pair the library would emulate.
-      The deployment asked for the guarantee, and this pair cannot give it.
-    * a model that does not take ``response_format`` at all, on every setting.
+    * ``auto`` allows every rung the pair supports, and ends with ``prompt``,
+      which every model takes;
+    * ``native`` allows ``native`` alone, and a pair the library would not send
+      a native schema for is a startup error;
+    * ``tool`` allows the two tool rungs, and a pair that takes no tool call is
+      a startup error.
 
-    Scoped to tiers that send a schema. Under ``constrain_output = false`` no
-    schema is sent, so how a provider would carry one is not a fact about any
-    request this tier makes.
+    ``forced_tool`` is left out where the tier sets ``thinking``, because
+    Anthropic refuses a forced tool together with extended thinking.
+
+    Under ``constrain_output = false`` no schema is sent, and the ladder is the
+    one ``unconstrained`` rung.
 
     **It reads the probe and never the map.**
-    :func:`~analysis_service.model_gate.schema_support` asks the installed
-    library what it would do with the request. ``supports_response_schema`` is
+    :func:`~analysis_service.model_gate.schema_support` and
+    :func:`~analysis_service.model_gate.check_supported` ask the installed
+    library what it would do with each request. ``supports_response_schema`` is
     a claim in a data file, and #819 measured one that was wrong.
     """
     if not sampling.constrain_output:
-        return None
-    support = schema_support(vendor, model)
-    if support == "refused":
+        return ("unconstrained",)
+    setting = sampling.structured_output
+    native = schema_support(vendor, model) == "native"
+    if setting == "native":
+        if not native:
+            raise ModelGateError(
+                f"{source}: {vendor.name} cannot constrain {model!r} to a schema"
+                ' natively, and this tier sets structured_output = "native".'
+                ' Set "auto" or "tool" to send the schema another way, or'
+                " choose a model whose provider supports structured output."
+            )
+        return ("native",)
+    rungs: list[Rung] = []
+    if setting == "auto" and native:
+        rungs.append("native")
+    tool_rungs: tuple[Rung, ...] = ("offered_tool",)
+    if sampling.thinking is None:
+        tool_rungs = ("forced_tool", "offered_tool")
+    rungs.extend(
+        rung
+        for rung in tool_rungs
+        if _accepts(vendor, model, {"tools": [_PROBE_TOOL], **_RUNG_KWARGS[rung]})
+    )
+    if setting == "auto":
+        rungs.append("prompt")
+    if not rungs:
         raise ModelGateError(
-            f"{source}: {vendor.name} {model!r} does not take the parameter that"
-            " carries a schema. Every LLM node binds an output schema. Choose a"
-            " model that supports structured output or tool calls."
+            f"{source}: {vendor.name} {model!r} takes no tool call, and this tier"
+            ' sets structured_output = "tool". Set "auto" to state the'
+            " schema in the request instead."
         )
-    if sampling.structured_output == "native" and support == "emulated":
-        raise ModelGateError(
-            f"{source}: {vendor.name} cannot constrain {model!r} to a schema"
-            ' natively, and this tier sets structured_output = "native". Set'
-            ' "auto" or "tool" to send the schema as a forced tool call,'
-            " or choose a model whose provider supports structured output."
-        )
-    if sampling.structured_output == "tool" or support == "emulated":
-        return "tool"
-    return "native"
+    return tuple(rungs)
+
+
+def _accepts(vendor: Vendor, model: str, params: dict[str, Any]) -> bool:
+    """Whether the pinned library would send these params for this pair."""
+    try:
+        check_supported(vendor, model, params, source="ladder")
+    except ModelGateError:
+        return False
+    return True
 
 
 #: A tool in the shape litellm takes, for the build-time check that this pair
@@ -369,29 +401,25 @@ _PROBE_TOOL = {
     "function": {"name": OUTPUT_TOOL_NAME, "parameters": {"type": "object"}},
 }
 
-
-def _tool_path_kwargs(sampling: TierSampling) -> dict[str, Any]:
-    """The translator arguments a ``tool`` tier adds.
-
-    ``response_format=None`` keeps any structured-output field off the wire,
-    because ADK applies the translator's arguments over the one it derives. The
-    forced ``tool_choice`` rides the translator because ADK forwards no tool
-    choice from a request. It is left out where the tier sets ``thinking``:
-    Anthropic refuses a forced tool together with extended thinking, and the
-    pinned litellm leaves it out on the same condition.
-    """
-    kwargs: dict[str, Any] = {"response_format": None}
-    if sampling.thinking is None:
-        kwargs["tool_choice"] = {
-            "type": "function",
-            "function": {"name": OUTPUT_TOOL_NAME},
-        }
-    return kwargs
+#: The translator arguments each rung adds. ``response_format=None`` keeps any
+#: structured-output field off the wire, because ADK applies the translator's
+#: arguments over the one it derives. The forced ``tool_choice`` rides the
+#: translator because ADK forwards no tool choice from a request.
+_RUNG_KWARGS: Mapping[Rung, Mapping[str, Any]] = {
+    "native": {},
+    "forced_tool": {
+        "response_format": None,
+        "tool_choice": {"type": "function", "function": {"name": OUTPUT_TOOL_NAME}},
+    },
+    "offered_tool": {"response_format": None},
+    "prompt": {"response_format": None},
+    "unconstrained": {},
+}
 
 
 def _translator(
     translating: Any,
-    path: SchemaPath | None,
+    rung: Rung,
     *,
     selection: TierSelection,
     vendor: Vendor,
@@ -402,11 +430,10 @@ def _translator(
     client_cls: Any,
     charged: bool,
 ) -> Any:
-    """One tier's translator, for the schema ``path`` it sends.
+    """One tier's translator, for one rung of its ladder.
 
-    The one construction of a translator. An ``auto`` tier on the native path
-    builds two, one per path, so the runtime fallback of ADR 0058 has a
-    tool-path translator to move to.
+    The one construction of a translator. A tier builds one per rung, so a
+    provider refusal at run time has a translator to move to (ADR 0058).
     """
     return translating(
         model=selection.route,
@@ -426,7 +453,7 @@ def _translator(
             )
         },
         **tier_sampling.constructor_kwargs(),
-        **(_tool_path_kwargs(tier_sampling) if path == "tool" else {}),
+        **_RUNG_KWARGS[rung],
         **vendor.credential_kwargs(env, tiers.credential_mode(selection.vendor)),
         # The upstream pin, where the deployment declared one. It rides the
         # request body under litellm's ``extra_body``, which the OpenRouter
@@ -542,51 +569,19 @@ def build_tier_adapters(
             vendor, selection.model, tier_sampling.gate_params(), source=source
         )
         _check_output_ceiling(vendor, selection.model, tier_sampling, source)
-        path = _structured_output_path(vendor, selection.model, tier_sampling, source)
-        if path == "tool":
-            # The tool path sends params the sampling gate above never saw.
-            check_supported(
-                vendor,
-                selection.model,
-                {"tools": [_PROBE_TOOL], **_tool_path_kwargs(tier_sampling)},
-                source=source,
-            )
+        rungs = _ladder(vendor, selection.model, tier_sampling, source)
         require_sdk(selection.vendor)
         charged = vendor.reports_charge or not vendor.routes_to_one_provider
         client_cls = capturing_client if charged else LiteLLMClient
         if vendor.caches_prompt_prefix(selection.model):
             client_cls = marking[client_cls]
 
-        translator = _translator(
-            translating,
-            path,
-            selection=selection,
-            vendor=vendor,
-            tier_sampling=tier_sampling,
-            tiers=tiers,
-            resilience=resilience,
-            env=env,
-            client_cls=client_cls,
-            charged=charged,
-        )
-        # An ``auto`` tier on the native path keeps a tool-path translator, so a
-        # provider that refuses the native schema at run time moves the tier
-        # rather than failing the job (ADR 0058).
-        fallback = None
-        if path == "native" and tier_sampling.structured_output == "auto":
-            try:
-                check_supported(
-                    vendor,
-                    selection.model,
-                    {"tools": [_PROBE_TOOL], **_tool_path_kwargs(tier_sampling)},
-                    source=source,
-                )
-            except ModelGateError:
-                pass  # this pair takes no tool calls, so no fallback exists
-            else:
-                fallback = _translator(
+        ladder = [
+            (
+                rung,
+                _translator(
                     translating,
-                    "tool",
+                    rung,
                     selection=selection,
                     vendor=vendor,
                     tier_sampling=tier_sampling,
@@ -595,18 +590,16 @@ def build_tier_adapters(
                     env=env,
                     client_cls=client_cls,
                     charged=charged,
-                )
+                ),
+            )
+            for rung in rungs
+        ]
         # The tier's configuration — the credential, the seed, the reasoning
         # effort, the request timeout — stays on the translator, which is the
         # provider side of the seam. What crosses is one call's own request.
         adapters[tier] = ExecutedLlm(
             model=selection.route,
-            executor=InProcessExecutor(
-                translator,
-                SCHEMA_RULES[vendor.schema_rule],
-                tool_path=path == "tool",
-                fallback=fallback,
-            ),
+            executor=InProcessExecutor(ladder, SCHEMA_RULES[vendor.schema_rule]),
             retry_policy=policy,
         )
     return adapters

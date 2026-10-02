@@ -106,9 +106,9 @@ PROBED_PARAMS: dict[str, Any] = {
 REFERENCE_MODELS: dict[str, tuple[str, ...]] = {
     "anthropic": ("claude-sonnet-5", "claude-opus-5"),
     # Claude in its Bedrock spelling, and only Claude: Nova and Llama get
-    # *emulated* structured output there, so a tier on either runs the forced
-    # tool path of :func:`~analysis_service.binding._structured_output_path`,
-    # and this pair profiles the native path.
+    # *emulated* structured output there, so a tier on either starts below the
+    # native rung of :func:`~analysis_service.binding._ladder`, and this pair
+    # profiles the native rung.
     #
     # **The ``global.`` inference profile, because the plain identifier does not
     # invoke.** AWS serves recent Claude generations through cross-Region
@@ -230,7 +230,7 @@ class ProviderProfile:
     and what varies is whether the provider honours it as a schema natively or
     LiteLLM emulates it with a synthesised tool — a difference the parameter
     probe cannot see, and the one that decides a tier's path (see
-    :func:`~analysis_service.binding._structured_output_path`).
+    :func:`~analysis_service.binding._ladder`).
 
     ``known`` records whether the pinned map had an entry at all. It is not
     derivable from the cells: an unmapped model produces all-``UNKNOWN``, but so

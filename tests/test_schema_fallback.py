@@ -9,6 +9,7 @@ Claude 5 native while the AWS model card says Bedrock does not support it.
 from __future__ import annotations
 
 import asyncio
+import json
 from typing import Any
 
 import pytest
@@ -19,6 +20,7 @@ from analysis_service.binding import build_tier_adapters
 from analysis_service.model_gate import _litellm
 from analysis_service.provider import (
     OUTPUT_TOOL_NAME,
+    PROMPT_SCHEMA_INSTRUCTION,
     SCHEMA_FALLBACK_METADATA_KEY,
     SCHEMA_PATH_METADATA_KEY,
     InProcessExecutor,
@@ -26,7 +28,7 @@ from analysis_service.provider import (
 from analysis_service.resilience import load_resilience
 from analysis_service.retry import classify
 from analysis_service.sampling import load_sampling
-from tests.factories import collected, tiers_for, translator_of
+from tests.factories import collected, rungs_of, tiers_for
 from tests.test_schema_rules import CONFIG, FAKE_ENV, SCHEMA
 from tests.test_tool_path import tool_call_message
 
@@ -79,13 +81,12 @@ def _strong_adapter(sampling_env: dict[str, str] | None = None):
 
 
 def _wire(adapter, provider: _Provider) -> InProcessExecutor:
-    """Point both of the tier's translators at ``provider``."""
+    """Point every rung's translator at ``provider``."""
     executor = adapter.executor
     assert isinstance(executor, InProcessExecutor)
-    translator_of(adapter).llm_client = provider
-    fallback: Any = executor._fallback
-    if fallback is not None:
-        fallback.llm_client = provider
+    for _, translator in executor.ladder:
+        translator_any: Any = translator
+        translator_any.llm_client = provider
     return executor
 
 
@@ -131,18 +132,26 @@ class TestTheMatcher:
         assert failure.detail == "BadRequestError"
 
 
-def test_an_auto_tier_on_the_native_path_has_a_fallback():
-    assert _strong_adapter().executor._fallback is not None
+def test_an_auto_tier_has_every_rung_its_pair_supports():
+    assert rungs_of(_strong_adapter()) == [
+        "native",
+        "forced_tool",
+        "offered_tool",
+        "prompt",
+    ]
 
 
-@pytest.mark.parametrize("setting", ["native", "tool"])
-def test_an_explicit_setting_has_no_fallback(setting):
+@pytest.mark.parametrize(
+    ("setting", "rungs"),
+    [("native", ["native"]), ("tool", ["forced_tool", "offered_tool"])],
+)
+def test_an_explicit_setting_limits_the_ladder(setting, rungs):
     adapter = _strong_adapter({"ANALYSIS_SAMPLING_STRONG_STRUCTURED_OUTPUT": setting})
 
-    assert adapter.executor._fallback is None
+    assert rungs_of(adapter) == rungs
 
 
-def test_a_refused_native_schema_is_sent_again_as_atool_call_message():
+def test_a_refused_native_schema_is_sent_again_as_a_tool_call():
     adapter = _strong_adapter()
     provider = _Provider(_bad_request(BEDROCK_REFUSAL), tool_call_message())
     _wire(adapter, provider)
@@ -184,7 +193,7 @@ def test_another_400_still_fails_the_call():
         _ask(adapter)
 
     assert len(provider.calls) == 1
-    assert adapter.executor._tool_path is False
+    assert adapter.executor.rung == "native"
 
 
 def test_two_lanes_refused_at_once_both_fall_back():
@@ -205,3 +214,87 @@ def test_two_lanes_refused_at_once_both_fall_back():
     assert len(provider.calls) == 4
     assert first[0].custom_metadata[SCHEMA_PATH_METADATA_KEY] == "tool"
     assert second[0].custom_metadata[SCHEMA_PATH_METADATA_KEY] == "tool"
+
+
+def test_a_refused_forced_tool_is_offered_instead():
+    """A model with thinking always on refuses a forced tool."""
+    adapter = _strong_adapter()
+    forced_refusal = _bad_request(
+        "AnthropicError - Thinking may not be enabled when tool_choice forces tool use."
+    )
+    provider = _Provider(
+        _bad_request(BEDROCK_REFUSAL), forced_refusal, tool_call_message()
+    )
+    _wire(adapter, provider)
+
+    (response,) = _ask(adapter)
+
+    offered = provider.calls[2]
+    assert offered["tools"][0]["function"]["name"] == OUTPUT_TOOL_NAME
+    assert "tool_choice" not in offered
+    assert response.custom_metadata[SCHEMA_FALLBACK_METADATA_KEY] == (
+        "forced_tool_refused"
+    )
+    assert adapter.executor.rung == "offered_tool"
+
+
+def test_a_model_that_refuses_tools_gets_the_schema_in_its_prompt():
+    adapter = _strong_adapter()
+    fenced = "```json\n" + json.dumps({"claims": []}) + "\n```"
+    provider = _Provider(
+        _bad_request(BEDROCK_REFUSAL),
+        _bad_request("This model doesn't support tool use in streaming mode."),
+        _bad_request("This model doesn't support tool use."),
+        {"role": "assistant", "content": fenced},
+    )
+    _wire(adapter, provider)
+
+    (response,) = _ask(adapter)
+
+    prompted = provider.calls[3]
+    assert prompted["tools"] is None
+    assert prompted["response_format"] is None
+    assert PROMPT_SCHEMA_INSTRUCTION in json.dumps(prompted["messages"])
+    assert SCHEMA.model_validate_json(response.content.parts[0].text).claims == []
+    assert response.custom_metadata[SCHEMA_PATH_METADATA_KEY] == "prompt"
+    assert adapter.executor.rung == "prompt"
+
+
+def test_a_refusal_on_the_last_rung_fails_the_call():
+    adapter = _strong_adapter({"ANALYSIS_SAMPLING_STRONG_STRUCTURED_OUTPUT": "native"})
+    provider = _Provider(_bad_request(BEDROCK_REFUSAL))
+    _wire(adapter, provider)
+
+    with pytest.raises(_litellm.exceptions.BadRequestError):
+        _ask(adapter)
+
+
+@pytest.mark.parametrize(
+    ("status", "message", "rule"),
+    [
+        (
+            400,
+            'Invalid JSON payload. Unknown name "response_schema"',
+            "schema_field_refused",
+        ),
+        (400, "Invalid schema for response_format 'x'", "schema_field_refused"),
+        (400, "The model does not support the toolConfig field", "tools_refused"),
+        (
+            404,
+            "No endpoints found that can handle the requested parameters.",
+            "no_endpoint",
+        ),
+    ],
+)
+def test_every_vendor_s_refusal_matches(status, message, rule):
+    error = _bad_request(message)
+    error.status_code = status
+
+    assert classify(error).schema_refusal == rule
+
+
+def test_a_404_that_is_not_a_refusal_does_not_match():
+    error = _bad_request("model not found")
+    error.status_code = 404
+
+    assert classify(error).schema_refusal is None

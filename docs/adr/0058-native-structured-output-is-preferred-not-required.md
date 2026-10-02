@@ -43,32 +43,48 @@ every vendor, with no loss of report quality.
 
 ## Decision
 
-**Native structured output is preferred where it works, and the forced tool
-call is an accepted fallback.** The schema always reaches the model. Only the
-mechanism changes.
+**Native structured output is preferred where it works, and each tier falls
+back to a more traditional format where it does not.** The schema always
+reaches the model. Only the mechanism changes. Every vendor gets the same
+ladder, best first:
 
-**Each tier selects its path.** `structured_output` in `config/sampling.toml`
-takes `auto`, `native` or `tool`, and `auto` is the default. `auto` uses native
-output where the pinned library sends it, and the forced tool call elsewhere.
-`native` keeps today's refusal for a deployment that wants the guarantee.
-`tool` covers a model that the price map marks native and the provider
-refuses. A model that refuses the schema parameter outright stays refused on
-every setting. An explicit `native` or `tool` is part of the **Execution
-Identity**. `auto` is not, because under it the path follows from the vendor,
-the model and the installed library, which the identity already hashes.
+1. `native`: the provider's own structured-output field;
+2. `forced_tool`: the schema as a tool's parameters, with the call forced;
+3. `offered_tool`: the same tool, offered, so the model chooses to call it;
+4. `prompt`: the schema stated in the request text, and the answer read as
+   plain JSON. One fence around the whole answer is removed, because a model
+   without a constraint often writes one.
 
-**A provider refusal moves the tier, at run time.** Under `auto`, a 400 error
-that refuses the native schema field or the compiled schema sends the same
-request again on the tool path. The refusal is a property of the
-`(vendor, model)` pair, so the tier stays on the tool path for the life of the
-process. Any other 400 error stays a failure.
+At build time the probe removes each rung the pair does not support.
+`forced_tool` is also removed where the tier sets `thinking`, because
+Anthropic refuses a forced tool together with extended thinking. `prompt`
+takes every model, so under `auto` no pair is refused for how it carries a
+schema.
+
+**Each tier selects which rungs it allows.** `structured_output` in
+`config/sampling.toml` takes `auto`, `native` or `tool`, and `auto` is the
+default. `auto` allows every rung. `native` allows `native` alone and keeps the
+refusal for a deployment that wants the guarantee. `tool` allows the two tool
+rungs, for a model that the price map marks native and the provider refuses.
+An explicit `native` or `tool` is part of the **Execution Identity**. `auto` is
+not, because under it the ladder follows from the vendor, the model and the
+installed library, which the identity already hashes.
+
+**A provider refusal moves the tier down one rung, at run time.** A 400 error,
+or OpenRouter's 404 when no upstream serves the request, that matches a rule in
+`retry.SCHEMA_REFUSALS` sends the same request again on the next rung. The
+rules cover a refused schema field on every vendor's spelling, a grammar too
+large, a refused forced tool, and a model that takes no tools. The refusal is a
+property of the `(vendor, model)` pair, so the tier stays on the lower rung for
+the life of the process. Any other error stays a failure, and so does a refusal
+on the last rung.
 
 **Three safeguards keep the tool path equal to native:**
 
 1. **A shared schema re-ask.** A response that fails its schema goes back to
    the same model once, with the validation errors. It serves every node that
-   binds a schema, on both paths.
-2. **One schema text on both paths.** A vendor-keyed table names the schema
+   binds a schema, on every rung.
+2. **One schema text on every rung.** A vendor-keyed table names the schema
    keywords that each provider refuses. One function moves them into the field
    description before litellm sees the schema. The pydantic validators still
    apply every bound on arrival.
@@ -84,8 +100,16 @@ cases, decides whether `auto` stays the default. Until it runs, every statement
 about the tool path says that its quality effect is unmeasured.
 
 **The runtime matcher rests on documentation.** Bedrock does not document the
-error for an unsupported model. The first live call on each vendor confirms
-the shape, and the confirmed message is recorded beside the matcher.
+error for an unsupported model, and no rule was confirmed by a live call. A
+refusal that no rule matches fails the call as it did before, and is handled as
+a bug when it occurs.
+
+**The `prompt` rung is the weakest format.** It is the format that
+`constrain_output = false` measured as a dead run: the model fenced its JSON and
+left out required fields. The rung adds what that run lacked: the schema stated
+in the request, the fence removed, and the schema re-ask. Whether that is
+enough is not measured. The rung is used only where every better rung is
+refused.
 
 **A fingerprint names an explicit path.** Setting a tier to `native` or `tool`
 re-baselines its **Blessed** identities, because the path decides what the node

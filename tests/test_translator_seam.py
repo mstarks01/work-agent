@@ -244,7 +244,7 @@ def test_every_adapter_kwarg_comes_from_a_closed_set():
     Eight sources, all of them code or deploy-time config: the route from the
     vendor registry, one literal, the per-request timeout from
     `config/resilience.toml`, the tier's sampling constructor kwargs, the
-    tool-path kwargs its `structured_output` path adds (ADR 0058), the
+    kwargs each rung of its `structured_output` ladder adds (ADR 0058), the
     vendor's credential kwargs, the upstream pin the deployment declared for a
     gateway vendor, and the client, which is ADK's or the charge-capturing
     one, each with or without the prompt-cache layer, chosen by registry facts
@@ -257,9 +257,9 @@ def test_every_adapter_kwarg_comes_from_a_closed_set():
     body = call.group(1)
     assert "model=selection.route" in body
     assert "**tier_sampling.constructor_kwargs()" in body
-    assert '**(_tool_path_kwargs(tier_sampling) if path == "tool" else {})' in body
-    assert source.count("_translator(\n") == 3, (
-        "one definition and two calls: the tier's translator and its fallback"
+    assert "**_RUNG_KWARGS[rung]" in body
+    assert source.count("_translator(\n") == 2, (
+        "one definition and one call, once per rung of the tier's ladder"
     )
     assert "**vendor.credential_kwargs(env, tiers.credential_mode(" in body
     assert "**vendor.upstream_kwargs(tiers.upstreams_for(selection.vendor))" in body

@@ -270,26 +270,40 @@ class TestAModelThatRefusesTheParameterAtAll:
             " measured against"
         )
 
-    def test_the_build_gate_refuses_it_rather_than_raising(self):
+    def test_native_refuses_it_rather_than_raising(self):
         """The other reader of the same probe, held against the first.
 
-        #821 taught the matrix that the probe has a third answer and left this
-        reader asking the probe directly, so a deployment naming one of these
-        models got ``UnsupportedParamsError`` out of the library where the
-        answer was a plain refusal. Both readers answer from
-        ``native_structured_output`` now.
+        #821 taught the matrix that the probe has a third answer, and a
+        deployment naming one of these models once got ``UnsupportedParamsError``
+        out of the library where the answer was a plain refusal. Under
+        ``native`` the answer is still a refusal.
         """
-        from analysis_service.binding import _structured_output_path
+        from analysis_service.binding import _ladder
         from analysis_service.model_gate import ModelGateError
         from analysis_service.sampling import TierSampling
 
-        with pytest.raises(ModelGateError, match="does not take the parameter"):
-            _structured_output_path(
+        with pytest.raises(ModelGateError, match="cannot constrain"):
+            _ladder(
                 vendor_for("bedrock"),
                 self.REFUSING,
-                TierSampling(constrain_output=True),
+                TierSampling(constrain_output=True, structured_output="native"),
                 source="tiers.base",
             )
+
+    def test_auto_states_the_schema_in_the_request_instead(self):
+        """ADR 0058: the lowest rung takes every model, so ``auto`` builds."""
+        from analysis_service.binding import _ladder
+        from analysis_service.sampling import TierSampling
+
+        ladder = _ladder(
+            vendor_for("bedrock"),
+            self.REFUSING,
+            TierSampling(constrain_output=True),
+            source="tiers.base",
+        )
+
+        assert "native" not in ladder
+        assert ladder[-1] == "prompt"
 
     def test_a_map_that_says_no_does_not_stop_a_build_on_its_own(self):
         """The guard on the fix, not on the defect.
@@ -303,7 +317,7 @@ class TestAModelThatRefusesTheParameterAtAll:
 
         The matrix may print what the map says. The gate may not act on it.
         """
-        from analysis_service.binding import _structured_output_path
+        from analysis_service.binding import _ladder
         from analysis_service.model_gate import (
             library_sends_no_native_schema,
             native_structured_output,
@@ -318,9 +332,7 @@ class TestAModelThatRefusesTheParameterAtAll:
         )
         assert not library_sends_no_native_schema(vendor, model)
         native = TierSampling(constrain_output=True, structured_output="native")
-        assert _structured_output_path(vendor, model, native, "tiers.strong") == (
-            "native"
-        )
+        assert _ladder(vendor, model, native, "tiers.strong") == ("native",)
 
     def test_the_matrix_renders_a_cell_rather_than_failing(self):
         from analysis_service.conformance import Capability, profile

@@ -177,8 +177,8 @@ def native_structured_output(vendor: Vendor, model: str) -> bool | None:
     Emulation is checked first and is definitive. Where LiteLLM would satisfy
     the constraint with a synthesised tool, the schema does not reach the model
     natively whatever the map claims, and
-    :func:`~analysis_service.binding._structured_output_path` sends that tier's
-    schema as a forced tool call on the same fact.
+    :func:`~analysis_service.binding._ladder` leaves the native rung off that
+    tier's ladder on the same fact.
 
     The map's own key is read rather than LiteLLM's lookup, because the lookup
     is where the two answers were collapsed. An unmapped pair yields ``None``

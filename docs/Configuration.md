@@ -550,52 +550,53 @@ contradictory.
 
 ### How a tier sends its schema
 
-Every LLM node in the graph binds an output schema. A schema can reach a
-provider in two ways (ADR 0058):
+Every LLM node in the graph binds an output schema. Every vendor gets the same
+ladder of formats, best first (ADR 0058):
 
-- **Native structured output.** The schema goes in the provider's own field,
-  and the provider constrains the model's output, so the response matches the
-  schema.
-- **A forced tool call.** The schema becomes the parameters of one tool, named
-  `submit_answer`, and the request forces the model to call it. The model
-  usually follows the schema, but nothing makes it. The service reads the
-  call's arguments as the node's answer.
-
-`structured_output` chooses between them, per tier:
-
-| Value | What the tier does |
+| Rung | How the schema travels |
 | --- | --- |
-| `auto` (shipped) | Native output where the pinned library sends it for this `(vendor, model)`, and the forced tool call elsewhere. |
-| `native` | Native output only. A pair without it is a startup error that names the tier. |
-| `tool` | The forced tool call, even where native output exists. Use it for a model that the library marks native and the provider refuses, such as Claude 5 on Bedrock (the AWS model cards list structured outputs as unsupported there). |
+| `native` | In the provider's own structured-output field. The provider constrains the model's output, so the response matches the schema. |
+| `forced_tool` | As the parameters of one tool, `submit_answer`, and the request forces the call. The service reads the call's arguments as the node's answer. |
+| `offered_tool` | The same tool, offered without force, so the model chooses to call it. |
+| `prompt` | Stated in the request text, after an instruction to answer with JSON only. The service removes one fence around the whole answer. |
 
-A model that does not take a schema parameter at all is a startup error on
-every setting.
+Below `native`, the model usually follows the schema, but nothing makes it.
 
-**Under `auto`, a refusal at run time moves the tier.** The price map can mark a
-model native when the provider does not support it. Under the pinned litellm,
-Claude 5 on Bedrock is one such case. When the provider answers the native
-request with a 400 error that refuses the schema, the service sends the same
-request again as a forced tool call. The tier then stays on the tool path for
-the life of the process. Two rules recognise the refusal: Anthropic's "the
-compiled grammar is too large", and a 400 that names a field which carries the
-schema, such as `outputConfig` or `response_format`. Bedrock does not document
-its message, so the first live refusal on each vendor confirms the rule. The
-node records the rule's name in `nodes[].schema_fallback`, and never the
-provider's message. `native` and `tool` have no fallback.
+At startup, the service asks the installed library which rungs each
+`(vendor, model)` supports, and removes the others. `forced_tool` is also
+removed where the tier sets `thinking`, because Anthropic refuses a forced tool
+together with extended thinking. `prompt` takes every model.
 
-**The tool path relies on the schema re-ask.** An answer that fails its schema
-goes back to the same model once, with the validation errors. A second failure
-still fails the node. How often the tool path needs the re-ask, and whether
-report quality matches the native path, is not measured yet (#1413).
+`structured_output` chooses which rungs a tier allows:
 
-**A tier that sets `thinking` does not force the tool.** Anthropic refuses a
-forced tool together with extended thinking, so the request offers the tool and
-the model chooses to call it. An answer in plain text goes to the same schema
-check and re-ask.
+| Value | Rungs |
+| --- | --- |
+| `auto` (shipped) | Every rung the pair supports. No pair is refused for how it carries a schema. |
+| `native` | `native` alone. A pair without it is a startup error that names the tier. |
+| `tool` | `forced_tool` and `offered_tool`. Use it for a model that the library marks native and the provider refuses, such as Claude 5 on Bedrock (the AWS model cards list structured outputs as unsupported there). A pair that takes no tool call is a startup error. |
 
-The path is decided as a **call**, not a table: the check asks the installed
-library whether it would send the schema natively for this pair. Under the
+**A refusal at run time moves the tier down one rung.** When the provider
+refuses how the schema was sent, the service sends the same request again on
+the next rung. The tier then stays there for the life of the process, because
+the refusal is a property of the pair. The rules in `retry.SCHEMA_REFUSALS`
+recognise a refusal: a 400 that names a field which carries the schema
+(`response_format`, `output_format`, `outputConfig`, `response_schema`),
+Anthropic's "the compiled grammar is too large", a refused forced tool, a model
+that takes no tools, and OpenRouter's 404 "no endpoints found". No rule was
+confirmed by a live call. The node records the rule's name in
+`nodes[].schema_fallback`, and never the provider's message. Any other error,
+and a refusal on the last rung, still fails the call.
+
+**Every rung below `native` relies on the schema re-ask.** An answer that fails
+its schema goes back to the same model once, with the validation errors. A
+second failure still fails the node. How often the lower rungs need the
+re-ask, and whether report quality matches the native rung, is not measured yet
+(#1413). The `prompt` rung is the weakest: it is the format the
+`constrain_output = false` measurement below found fenced and incomplete, with
+the schema now stated, the fence removed and the re-ask added.
+
+The ladder is decided as a **call**, not a table: the check asks the installed
+library what it would send for this pair. Under the
 pinned library, the same Claude generation can be native on one vendor and
 emulated on another, so a rule keyed on the model alone would be wrong.
 
@@ -604,7 +605,7 @@ litellm's own `supports_response_schema` answers yes for models on both paths.
 It answers `False` for a map entry that simply says nothing, so nothing in this
 service reads it directly.
 
-Under `auto`, the path follows from the vendor, the model and the installed
+Under `auto`, the ladder follows from the vendor, the model and the installed
 library, which the fingerprint already hashes, so `auto` does not move a blessed
 identity. An explicit `native` or `tool` enters the fingerprint.
 
@@ -638,11 +639,11 @@ and the job dies.
 
 The field is kept because the *mechanism* is right — the schema genuinely stops
 going on the wire — but a tier that turns it off needs the graph to tolerate a
-fenced response first. Where a provider will not compile a schema, two answers
-remain: make the schema smaller, or set `structured_output = "tool"` on that
-tier. The tool path still sends the schema, as a tool's parameters, so the model
-still reads it, and the schema re-ask covers an answer that breaks it. Whether
-the provider accepts a large schema as tool parameters is not measured yet.
+fenced response first. Where a provider will not compile a schema, an `auto`
+tier moves down its ladder at run time: the lower rungs still send the schema,
+as a tool's parameters or in the request text, so the model still reads it.
+Whether a provider accepts a large schema as tool parameters is not measured
+yet. A smaller schema remains the other answer.
 
 Every LLM node carries a schema the adapter can convert, so this setting is the
 only thing deciding whether one is sent. (That was not always true: the six

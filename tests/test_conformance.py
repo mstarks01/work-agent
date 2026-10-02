@@ -328,7 +328,7 @@ class TestTheMatrixItself:
         reference matrix, because every reference pair binds — a test that
         only saw those would agree with itself and see nothing.
         """
-        from analysis_service.binding import _structured_output_path
+        from analysis_service.binding import _ladder
         from analysis_service.model_gate import ModelGateError
         from analysis_service.sampling import TierSampling
 
@@ -336,9 +336,7 @@ class TestTheMatrixItself:
 
         def build_refuses(vendor: str, model: str) -> bool:
             try:
-                _structured_output_path(
-                    vendor_for(vendor), model, constrained, source="cross-reader"
-                )
+                _ladder(vendor_for(vendor), model, constrained, source="cross-reader")
             except ModelGateError:
                 return True
             return False
