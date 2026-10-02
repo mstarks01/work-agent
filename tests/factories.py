@@ -188,6 +188,7 @@ def tiers_for(
     vendor: VendorName,
     mode: CredentialMode | None = None,
     charge_mode: ChargeMode | None = None,
+    models: tuple[str, str] | None = None,
 ) -> ModelTierConfig:
     """The shipped node -> tier map, with both tiers on one vendor's pair.
 
@@ -210,8 +211,11 @@ def tiers_for(
     charged is used under, and it defaults the same way. Both declarations are
     made from the registry rather than from a vendor's name, so a row that gains
     a second mode of either kind needs no edit here.
+
+    ``models`` replaces the reference pair, for a test about a model the
+    reference matrix does not list.
     """
-    base, strong = REFERENCE_MODELS[vendor]
+    base, strong = models or REFERENCE_MODELS[vendor]
     entry = vendor_for(vendor)
     env = {
         "ANALYSIS_MODEL_BASE_VENDOR": vendor,

@@ -203,6 +203,26 @@ class _UpstreamPin:
 
 
 @dataclass(frozen=True)
+class _PromptCacheRule:
+    """Which models on a vendor take OpenAI's explicit prompt-cache breakpoint.
+
+    ``family`` matches a model name and captures its major and minor version;
+    ``minimum`` is the first version that takes the breakpoint.
+    :meth:`Vendor.caches_prompt_prefix` is the one reader.
+    """
+
+    family: re.Pattern[str]
+    minimum: tuple[int, int]
+
+    def accepts(self, model: str) -> bool:
+        """Whether ``model`` is in the family, at or above the minimum."""
+        match = self.family.match(model)
+        if match is None:
+            return False
+        return (int(match.group(1)), int(match.group(2) or 0)) >= self.minimum
+
+
+@dataclass(frozen=True)
 class _CredentialVar:
     """One environment variable a ``(vendor, mode)`` pair reads.
 
@@ -609,6 +629,16 @@ _BEDROCK_CLAUDE_RULE = _FormRule(
 # The o-series is a separate case again: it ships no dated form at all.
 _CATCH_ALL = _FormRule(family=re.compile(""), pinned=None, hint="")
 
+# The GPT-5.6 family and later take the explicit cache breakpoint; earlier GPT
+# models and every other family do not. One rule per spelling of the model
+# name: bare on the direct row, under OpenRouter's ``openai/`` segment there.
+_OPENAI_PROMPT_CACHE = _PromptCacheRule(
+    family=re.compile(r"gpt-(\d+)(?:\.(\d+))?"), minimum=(5, 6)
+)
+_OPENROUTER_PROMPT_CACHE = _PromptCacheRule(
+    family=re.compile(r"openai/gpt-(\d+)(?:\.(\d+))?"), minimum=(5, 6)
+)
+
 # OpenRouter reads Claude under a third spelling: its own vendor segment, and a
 # **dot** where every other vendor writes a hyphen —
 # ``anthropic/claude-sonnet-4.6``. Both orders are pinned, because the pinned
@@ -831,6 +861,21 @@ class Vendor:
     #: gateways would spell the fields two ways, and a row that names none
     #: must say so rather than inherit a shape.
     upstream_pin: _UpstreamPin | None
+    #: Which models on this vendor take an explicit prompt-cache breakpoint, or
+    #: ``None`` where no model does.
+    #:
+    #: OpenAI's GPT-5.6 family and later reuse a prompt prefix only up to a
+    #: ``prompt_cache_breakpoint`` on a content block, with
+    #: ``prompt_cache_options`` at the request root (OpenAI's prompt caching
+    #: guide, read 2026-10-02). OpenRouter forwards both to those models (its
+    #: prompt caching page, read the same day). A live check on
+    #: ``openrouter/openai/gpt-5.6-terra`` measured the default mode writing
+    #: nearly every prompt at 1.25x and the marked prefix reading back at about
+    #: 0.1x (#1400). :mod:`analysis_service.prompt_cache` sends the fields.
+    #:
+    #: A vendor whose models cache another way answers ``None`` until that way
+    #: has a sender of its own.
+    prompt_cache: _PromptCacheRule | None
     #: What this vendor reports about the charge it made, keyed by the
     #: arrangement a deployment can run under.
     #:
@@ -942,6 +987,10 @@ class Vendor:
                 " so the deployment declares which one; ask the tier config"
             )
         return modes[0]
+
+    def caches_prompt_prefix(self, model: str) -> bool:
+        """Whether a call to ``model`` here takes the explicit cache breakpoint."""
+        return self.prompt_cache is not None and self.prompt_cache.accepts(model)
 
     def upstream_kwargs(self, upstreams: tuple[str, ...]) -> dict[str, object]:
         """The adapter kwarg that pins a request to ``upstreams``, or nothing.
@@ -1153,6 +1202,7 @@ VENDORS: dict[VendorName, Vendor] = {
         served_trust="requested_echo",
         routes_to_one_provider=True,
         upstream_pin=None,
+        prompt_cache=None,
         # Vertex admits no raw-API-key path under any adapter
         # (``BerriAI/litellm#21036``), so ``vertex + api_key`` is
         # unrepresentable rather than validated against. Under ``IAM`` it
@@ -1186,6 +1236,7 @@ VENDORS: dict[VendorName, Vendor] = {
         served_trust="provider_reported",
         routes_to_one_provider=True,
         upstream_pin=None,
+        prompt_cache=None,
         credentials={CredentialMode.API_KEY: _api_key_source("anthropic")},
         form_rules=(_CLAUDE_RULE, _CATCH_ALL),
         sdk=None,
@@ -1200,6 +1251,7 @@ VENDORS: dict[VendorName, Vendor] = {
         served_trust="provider_reported",
         routes_to_one_provider=True,
         upstream_pin=None,
+        prompt_cache=_OPENAI_PROMPT_CACHE,
         credentials={CredentialMode.API_KEY: _api_key_source("openai")},
         form_rules=(_CLAUDE_RULE, _CATCH_ALL),
         sdk=None,
@@ -1218,6 +1270,7 @@ VENDORS: dict[VendorName, Vendor] = {
         served_trust="requested_echo",
         routes_to_one_provider=True,
         upstream_pin=None,
+        prompt_cache=None,
         credentials={
             # Under ``API_KEY`` Bedrock passes a bearer token and a region.
             # litellm's ``_sign_request`` reads the bearer off the ``api_key``
@@ -1278,6 +1331,7 @@ VENDORS: dict[VendorName, Vendor] = {
         served_trust="requested_echo",
         routes_to_one_provider=True,
         upstream_pin=None,
+        prompt_cache=None,
         # The Developer API takes a key and nothing else. It is a different
         # provider from ``vertex`` rather than a second mode on it:
         # ``get_llm_provider`` resolves ``gemini/`` and ``vertex_ai/`` to two
@@ -1365,6 +1419,7 @@ VENDORS: dict[VendorName, Vendor] = {
         upstream_pin=_UpstreamPin(
             field="provider", only="only", fallbacks="allow_fallbacks"
         ),
+        prompt_cache=_OPENROUTER_PROMPT_CACHE,
         # A bearer token and nothing else. litellm reads ``OPENROUTER_API_KEY``
         # and then ``OR_API_KEY`` out of the process environment whenever
         # ``api_key`` is absent; the registry declares neither, and the key is

@@ -100,6 +100,7 @@ from analysis_service.model_tiers import (
     ReviewIndependence,
     TierName,
 )
+from analysis_service.prompt_cache import cache_marking_client_class
 from analysis_service.provider import ExecutedLlm, InProcessExecutor
 from analysis_service.resilience import ResilienceConfig
 from analysis_service.sampling import (
@@ -411,6 +412,12 @@ def build_tier_adapters(
     # whose figure is carried back.
     translating = charge_reporting_llm_class(LiteLlm)
     capturing_client = charge_capturing_client_class(LiteLLMClient)
+    # The cache layer goes on top of whichever client a tier gets, and only
+    # where the vendor row says the tier's model takes the breakpoint.
+    marking = {
+        client: cache_marking_client_class(client)
+        for client in (capturing_client, LiteLLMClient)
+    }
 
     adapters: dict[TierName, ExecutedLlm] = {}
     # Walked in the vocabulary's order rather than the map's, so the build order
@@ -437,6 +444,10 @@ def build_tier_adapters(
         _check_output_ceiling(vendor, selection.model, tier_sampling, source)
         _check_native_structured_output(vendor, selection.model, tier_sampling, source)
         require_sdk(selection.vendor)
+        charged = vendor.reports_charge or not vendor.routes_to_one_provider
+        client_cls = capturing_client if charged else LiteLLMClient
+        if vendor.caches_prompt_prefix(selection.model):
+            client_cls = marking[client_cls]
         translator = translating(
             model=selection.route,
             # Zero, and not because retry is off: it is one layer up, in
@@ -479,9 +490,9 @@ def build_tier_adapters(
             # facts: a vendor could state a charge without naming an upstream,
             # or the reverse, and an OR keeps both reaching the reader.
             llm_client=(
-                capturing_client(vendor, tiers.charge_mode(selection.vendor))
-                if vendor.reports_charge or not vendor.routes_to_one_provider
-                else LiteLLMClient()
+                client_cls(vendor, tiers.charge_mode(selection.vendor))
+                if charged
+                else client_cls()
             ),
         )
         # The tier's configuration — the credential, the seed, the reasoning

@@ -201,6 +201,7 @@ from analysis_service.links import LinkAnswer, apply_answers
 from analysis_service.markdown_loader import MarkdownLoader, estimate_tokens
 from analysis_service.model_tiers import ReviewIndependence, TierName
 from analysis_service.patch import PatchBatch, apply_patch
+from analysis_service.prompt_cache import remember_stable_prefix, stable_prefix
 from analysis_service.prompts import (
     compose_analyze_prompt,
     compose_assert_prompt,
@@ -2719,8 +2720,13 @@ def _llm_node(
 
     ``idle`` is a lane agent's state key and lane name for
     :func:`answer_when_idle`, which runs first so an idle lane sends nothing.
+
+    Every node records its instruction's stable prefix for the call that
+    follows, so a tier whose model caches a prefix can mark where it ends
+    (:mod:`analysis_service.prompt_cache`).
     """
     callbacks: list[Callable[..., Any]] = [
+        remember_stable_prefix(stable_prefix(instruction)),
         *([answer_when_idle(*idle, output_schema)] if idle else []),
         *([append_to_user_turn(closing)] if closing else []),
     ]
