@@ -82,8 +82,6 @@ from analysis_service.retry import (
 #: re-asks its node took: 0 or 1.
 REASKS_METADATA_KEY = "reasks"
 
-#: What the model reads after an answer that does not match its node's schema.
-#: The validation errors follow it, one per line.
 #: How a node schema travelled (ADR 0058): in the provider's structured-output
 #: field, as a tool's parameters, or stated in the request text.
 SchemaPath = Literal["native", "tool", "prompt"]
@@ -115,6 +113,8 @@ SCHEMA_FALLBACK_METADATA_KEY = "schema_fallback"
 #: where the call sent no schema.
 SCHEMA_PATH_METADATA_KEY = "schema_path"
 
+#: What the model reads after an answer that does not match its node's schema.
+#: The validation errors follow it, one per line.
 REASK_INSTRUCTION = (
     "Your previous answer does not match the required JSON schema. It failed"
     " these checks:"

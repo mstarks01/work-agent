@@ -89,8 +89,8 @@ on the last rung.
    description before litellm sees the schema. The pydantic validators still
    apply every bound on arrival.
 3. **The path is a recorded fact.** Each node execution records the path it
-   used, any switch, and its re-ask count, in fields that the eval harness
-   reads.
+   used, any switch, and its re-ask count. `run.py schema-paths` reads the
+   three fields off archived reports.
 
 ## Consequences
 

@@ -309,7 +309,7 @@ def fact_questions(
     catalog: AssertionCatalog | None,
     earlier: Sequence[FactAnswer] = (),
 ) -> tuple[FactQuestion, ...]:
-    """Every open fact a report's findings rest on, the most completing first.
+    """Every open fact a report's findings rest on, in :func:`follow_up_order`.
 
     ``earlier`` is the fact answers of the earlier rounds. A fact they answer
     in full (:func:`~analysis_service.fact_answers.answered_keys`) is not
@@ -318,15 +318,12 @@ def fact_questions(
     "I don't know" or a facet answered so, is not counted, because no answer
     in this list can cover it.
 
-    **Two sections, and the first does not depend on the critic.** The
-    evidence section ranks the open facts each finding's own grounds cite, for
-    every finding the lanes wrote, rejected ones included. A critic that is
-    sampled again rules differently about a third of the time, and a list read
-    from its verdicts shared 7 of 18 questions with the list from a second
-    sample; a list read from the grounds is the same for both, and settled 82%
-    as many findings as each sample's own list (``QA-2026-09-26-03-E7``). The
-    critic section follows, with the facts only the critic named: its
-    free-text subjects, mostly, which change from one sample to the next.
+    **The findings that wait decide the order** (ADR 0056). The facts the most
+    important conditional findings wait on come first, and the facts only the
+    critic named sit among them. Each question keeps its basis: ``evidence``
+    where a draft's own grounds cite the fact, ``critic`` where only a verdict
+    names it, so a page can say which facts can change when the critic is
+    sampled again.
 
     Each question counts the findings of every framework together, because one
     answer settles a fact for every framework that cites it. ``cited_by`` and
