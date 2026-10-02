@@ -7,7 +7,9 @@ job does hold (``QA-2026-09-26-03-E13``):
 
 * **the prior**: how often findings in earlier runs cite that attribute or
   kind, per element of that type, for each framework the job selected;
-* **the candidates**: how many of that framework's rules fire on the element.
+* **the candidates**: how many of that framework's rules fire on the element,
+  in the lanes the job runs. A lane the job's options leave idle
+  (:meth:`~analysis_service.claims.Claim.idle`) leads nothing.
 
 A question's score is the prior times one plus the candidates, summed over
 the job's frameworks. On 13 tuned cases that order settled about 60% of what
@@ -257,9 +259,11 @@ def early_questions(
         package = PACKAGES[name]
         asks = {rule.rule_id: rule.question for rule in package.rules}
         named: Counter[str] = Counter()
-        for found in generate_candidates(
+        for lane, found in generate_candidates(
             model, package.lanes, package.rules, catalog
-        ).values():
+        ).items():
+            if package.record.idle(model, frameworks[name], lane):
+                continue
             for candidate in found.candidates:
                 named.update(set(candidate.element_ids))
                 for element_id in candidate.element_ids:

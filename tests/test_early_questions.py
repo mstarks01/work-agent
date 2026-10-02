@@ -8,6 +8,7 @@ for a row per framework, and against the questions route for a paused job.
 from __future__ import annotations
 
 from collections import Counter
+from pathlib import Path
 
 import pytest
 
@@ -31,6 +32,7 @@ from analysis_service.system_model import (
     UNKNOWN,
     ZONE_ATTRIBUTE,
     Assumption,
+    SystemModel,
     all_attribute_names,
     attribute_names,
 )
@@ -190,6 +192,33 @@ def test_the_framework_order_changes_no_question():
     stride = {rule.question for rule in PACKAGES["stride"].rules}
     assert set(at_rest.reasons) <= stride
     assert at_rest.frameworks == ("stride",)
+
+
+CORPUS_MODELS = sorted(Path("evals/corpus").glob("*/model.json"))
+
+
+@pytest.mark.parametrize("level", [1, 2, 3])
+def test_an_idle_lane_leads_no_early_question(level):
+    """At level 1 the logging and WebRTC lanes hold no requirement, so their
+    agents are never called. The early list still scored their candidates and
+    gave a logging rule's question as the reason on 14 of 15 corpus models
+    (#1289, B3)."""
+    package = PACKAGES["asvs"]
+    options = {"level": level}
+    led = 0
+    for path in CORPUS_MODELS:
+        model = SystemModel.model_validate_json(path.read_text())
+        idle = {
+            lane for lane in package.lanes if package.record.idle(model, options, lane)
+        }
+        found = generate_candidates(model, package.lanes, package.rules, None)
+        led += sum(len(found[lane].candidates) for lane in idle)
+        idle_asks = {rule.question for rule in package.rules if rule.lane in idle}
+        asked = early_questions(model, {"asvs": options}, None)
+        assert not [q.key for q in asked if set(q.reasons) & idle_asks], path
+    # The reproduction needs an idle lane whose rules fire; above level 1 the
+    # corpus has none.
+    assert led if level == 1 else led == 0
 
 
 def test_a_question_names_every_framework_it_serves():
