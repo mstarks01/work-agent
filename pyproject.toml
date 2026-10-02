@@ -22,16 +22,14 @@ dependencies = [
     # re-run the probe in tests/test_model_gate.py rather than be taken as a
     # routine dependency update.
     #
-    # 1.97.0 over 1.93.0 for what it does with `response_format` on Anthropic.
-    # 1.93.0 chose the native path from a hardcoded set of model-name
-    # substrings, so every model released after that copy fell to the emulated
-    # path and was refused by binding.py's schema gate. 1.97.0 reads a model-map
-    # capability flag instead, which is why `claude-opus-5` is selectable at all.
-    # The flag is not a promise: its own lookup still answers "unknown" for
-    # `claude-sonnet-5` while the map says otherwise, so that model is refused —
-    # the gate asks for the mapped params rather than reading the flag, and so
-    # sees what the request would actually carry.
-    "litellm==1.97.0",
+    # The version decides which path `response_format` takes on Anthropic, and
+    # binding.py's schema gate refuses the emulated path. 1.100.1 sends both
+    # `claude-sonnet-5` and `claude-opus-5` native on every route the reference
+    # pairs name; 1.97.0 sent `claude-sonnet-5` emulated, and 1.103.2 sends
+    # `global.anthropic.claude-sonnet-5` emulated. The gate asks for the mapped
+    # params rather than reading the map's flag, and so sees what the request
+    # would actually carry.
+    "litellm==1.100.1",
     # Ed25519 for report attestations (ADR 0022). Already present transitively
     # through the two pins above; named here because the code imports it, and a
     # dependency you rely on but do not declare is one a transitive bump can
@@ -61,7 +59,9 @@ dependencies = [
 # A range and not an exact pin. The reason `google-adk` and `litellm` carry one
 # — this service reads their APIs directly — does not apply: litellm is the
 # caller here and this project reads none of boto3's API. The range is copied
-# from litellm 1.97.0's own `proxy` extra, so a litellm bump has to re-read it.
+# from litellm 1.100.1's own requirement, so a litellm bump has to re-read it.
+# litellm 1.100.1 also requires boto3 itself. The extra stays, because the
+# Bedrock route needs boto3 and a litellm bump can drop that requirement.
 #
 # `boto3` is deliberately absent from `BUILD_DISTRIBUTIONS`. It signs a request
 # and never changes what a node answers, and `build_identity()` fails closed on

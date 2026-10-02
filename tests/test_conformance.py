@@ -1059,14 +1059,21 @@ def catalogue_key(vendor: str, model: str, catalogue: Mapping[str, Any]) -> str 
     return route if route in catalogue else None
 
 
+def _without_flags(entry: Mapping[str, Any]) -> dict[str, Any]:
+    return {k: v for k, v in entry.items() if not k.startswith("supports_")}
+
+
 def builds_fronted_by(key: str, catalogue: Mapping[str, Any]) -> dict[str, str]:
     """Every identifier in ``catalogue`` that is a build of ``key``, and why.
 
     **Two shapes, because a provider spells an alias more than one way.** A
     date is the shape OpenAI used for ``gpt-4o``. An entry identical in every
-    key is the shape it used for ``gpt-5.6``, whose tail is a capability tier
-    rather than a date — the map cannot price an alias apart from the build it
-    resolves to, so it does not, and that equality is the signal.
+    key but its ``supports_*`` flags is the shape it used for ``gpt-5.6``, whose
+    tail is a capability tier rather than a date — the map cannot price an
+    alias apart from the build it resolves to, so it does not, and that
+    equality is the signal. The flags are left out because the map fills them
+    key by key: ``gpt-5.6-sol`` carries ``supports_computer_use`` and
+    ``gpt-5.6`` does not.
 
     The second shape does not fire on a sub-family, which is what a rule keyed
     on the tail's spelling could not promise: ``gemini-2.5-flash`` has nine
@@ -1085,8 +1092,8 @@ def builds_fronted_by(key: str, catalogue: Mapping[str, Any]) -> dict[str, str]:
             continue
         if _DATED_BUILD.match(other[len(key) + 1 :]):
             fronted[other] = "a dated build"
-        elif isinstance(value, dict) and value == entry:
-            fronted[other] = "an entry identical in every key"
+        elif isinstance(value, dict) and _without_flags(value) == _without_flags(entry):
+            fronted[other] = "an entry identical in every key but its flags"
     return dict(sorted(fronted.items()))
 
 
@@ -1157,7 +1164,7 @@ def test_the_alias_rule_finds_both_aliases_it_was_written_for():
         "gpt-4o-2024-11-20": "a dated build",
     }
     assert builds_fronted_by("gpt-5.6", litellm.model_cost) == {
-        "gpt-5.6-sol": "an entry identical in every key"
+        "gpt-5.6-sol": "an entry identical in every key but its flags"
     }
 
     # The sub-family is a different model, not a build of this one, and neither
