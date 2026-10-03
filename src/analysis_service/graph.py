@@ -2077,7 +2077,6 @@ def merge_drafts(
         render_fenced(
             critic_view(
                 merged.drafts,
-                model,
                 repaired=merged.marks.repaired_quotes,
                 unverified=merged.marks.unverified_grounds,
                 assertions=_held_assertions(state),

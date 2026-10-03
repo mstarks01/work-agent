@@ -98,6 +98,12 @@ VerdictStatus = Literal["confirmed", "needs-info", "rejected"]
 # it answers for a package nobody has written.
 RejectionStep = Literal["evidence", "reasoning", "lane", "duplicate"]
 
+# The steps a critic may fail a draft on. ``duplicate`` is not among them: the
+# critic rules every draft on its own, because every duplicate rejection on
+# record dropped a different finding (QA-2026-10-03-02-E3). It stays in
+# :data:`RejectionStep` because archived reports carry it and are re-scored.
+CriticStep = Literal["evidence", "reasoning", "lane"]
+
 # What a finding can cite in its own support. Spelled out rather than terse
 # (``unknown`` / ``derived``) because a bare ``unknown`` collides: it is already
 # a legal *attribute value* across the System Model, so ``kind="unknown"`` would
@@ -716,6 +722,8 @@ class ProposedVerdict(VerdictFields):
     facts, a verdict with no reason — is asked at the review seam, which can
     send it back.
     """
+
+    rejected_because: CriticStep | None = None
 
     @property
     def status(self) -> VerdictStatus:
@@ -1885,9 +1893,8 @@ UNNAMED_CLAIM = "(unnamed)"
 #: * ``duplicate-id`` — one ID carries more than one ruling;
 #: * ``confirmed-on-unknown`` — archived only: see
 #:   :data:`ARCHIVED_UNRECONCILED_KINDS`;
-#: * ``duplicate-on-unit`` — a draft naming a catalog unit was rejected as a
-#:   duplicate, which that framework decides by identifier before any critic
-#:   reads it;
+#: * ``duplicate-on-unit`` — archived only: see
+#:   :data:`ARCHIVED_UNRECONCILED_KINDS`;
 #: * ``dismissal-off-grounds`` — a ruling names a pair in
 #:   ``immaterial_unknowns`` that the draft's own grounds do not cite;
 #: * ``verdict-shape`` — a verdict's fields cannot make a coherent verdict;
@@ -1916,9 +1923,12 @@ UnreconciledKind = Literal[
 #: from the archive, so its marks must still load. ``confirmed-on-unknown`` is
 #: a draft citing an unknown that the critic ruled confirmed. The critic writes
 #: no status, and an unknown it does not dismiss makes the claim ``needs-info``
-#: (#1202), so no ruling can take this kind.
+#: (#1202), so no ruling can take this kind. ``duplicate-on-unit`` is a draft
+#: naming a catalog unit that the critic rejected as a duplicate. The critic
+#: has no duplicate step and :class:`ProposedVerdict` admits no ``duplicate``,
+#: so no ruling can take this kind either.
 ARCHIVED_UNRECONCILED_KINDS: frozenset[UnreconciledKind] = frozenset(
-    {"confirmed-on-unknown"}
+    {"confirmed-on-unknown", "duplicate-on-unit"}
 )
 
 

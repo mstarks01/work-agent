@@ -22,7 +22,7 @@ import pytest
 from analysis_service.analysis import unknown_controls
 from analysis_service.candidates import generate_candidates
 from analysis_service.coverage import build_coverage
-from analysis_service.critic import duplicate_groups
+from analysis_service.critic import finding_key
 from analysis_service.evidence import evidence_catalog
 from analysis_service.fan_in import join_drafts
 from analysis_service.frameworks import PACKAGES
@@ -31,7 +31,7 @@ from analysis_service.graph import render, render_fenced, unfence
 from analysis_service.grounding import normalize
 from analysis_service.report import Report
 from analysis_service.sources import DEFAULT_DESCRIPTION_LABEL
-from analysis_service.system_model import ELEMENT_GROUPS, SystemModel
+from analysis_service.system_model import ELEMENT_GROUPS, ModelIndex, SystemModel
 from analysis_service.validation import parse_and_validate
 from evals.harness.flow_ids import rewrite_text
 from tests.factories import sample_draft, valid_model
@@ -290,16 +290,16 @@ def test_lane_order_changes_nothing_the_join_produces():
 
 
 @pytest.mark.parametrize("seed", SEEDS[:5])
-def test_element_order_changes_no_coverage_row_or_duplicate_pair(seed):
+def test_element_order_changes_no_coverage_row_or_finding_key(seed):
     model = valid_model()
     data = model.model_dump(mode="json")
     reordered = SystemModel.model_validate(shuffled(data, seed))
     drafts = {"spoofing": [sample_draft("S-01"), sample_draft("S-02")]}
-    for m in (model, reordered):
-        assert duplicate_groups(drafts["spoofing"], m) == {
-            "S-01": ["S-02"],
-            "S-02": ["S-01"],
-        }
+    keys = [
+        [finding_key(d, ModelIndex.of(m).flow_endpoints) for d in drafts["spoofing"]]
+        for m in (model, reordered)
+    ]
+    assert keys[0] == keys[1]
     rows = lambda m: build_coverage(
         drafts, generate_candidates(m, STRIDE.lanes, STRIDE.rules), m, STRIDE
     )

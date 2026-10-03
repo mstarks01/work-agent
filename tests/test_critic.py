@@ -145,7 +145,7 @@ class TestAssembleThreats:
                 "S-02",
                 verdict=ProposedVerdict(
                     reason="duplicate of S-01",
-                    rejected_because="duplicate",
+                    rejected_because="lane",
                 ),
             ),
         ]
@@ -502,11 +502,15 @@ class TestRulingsMergeOntoDrafts:
         rulings = [
             sample_ruling(
                 "S-02",
-                verdict=ProposedVerdict(reason="dup", rejected_because="duplicate"),
+                verdict=ProposedVerdict(
+                    reason="filed in the wrong lane", rejected_because="lane"
+                ),
             ),
             sample_ruling(
                 "S-01",
-                verdict=ProposedVerdict(reason="dup", rejected_because="duplicate"),
+                verdict=ProposedVerdict(
+                    reason="filed in the wrong lane", rejected_because="lane"
+                ),
             ),
         ]
         _, rejected = assemble_claims(drafts, rulings, model, SCHEMAS)
@@ -731,7 +735,7 @@ class TestAnUnknownGroundMakesTheClaimConditional:
         """
         conditional, plain = self._draft(), sample_draft("S-02")
 
-        shown = critic.critic_view([conditional, plain], model)
+        shown = critic.critic_view([conditional, plain])
 
         assert [view["id"] for view in shown] == ["S-01", "S-02"]
 
@@ -905,67 +909,6 @@ class TestAnUnknownGroundMakesTheClaimConditional:
         assert not review_issues([sample_draft("S-01")], [sample_ruling("S-01")], model)
 
 
-class TestDuplicateGroups:
-    """#440: one action at one place is a comparison of two fields, made in code."""
-
-    @pytest.fixture
-    def model(self):
-        return valid_model()
-
-    def test_one_verb_at_one_place_is_marked_within_a_lane(self, model):
-        from analysis_service.critic import duplicate_groups
-
-        drafts = [
-            sample_draft("S-01", verb="forge", affected_element_ids=[CROSSING]),
-            sample_draft(
-                "S-02",
-                verb="forge",
-                affected_element_ids=["entity:customer", "process:web-app"],
-            ),
-            sample_draft("S-03", verb="replay", affected_element_ids=[CROSSING]),
-        ]
-
-        assert duplicate_groups(drafts, model) == {"S-01": ["S-02"], "S-02": ["S-01"]}
-
-    def test_one_verb_at_one_place_in_two_lanes_is_two_findings(self, model):
-        """The lane is part of a claim's identity, so the pair is never marked.
-
-        The corpus records one verb at one place in two lanes as two references,
-        the scorer keys by lane, and the critic prompt says two lanes are never
-        duplicates. #440 asked for the identity rule's comparison, which reads
-        the lane; the first cut left it out.
-        """
-        from analysis_service.critic import duplicate_groups
-
-        drafts = [
-            sample_draft("S-01", verb="forge", affected_element_ids=[CROSSING]),
-            sample_draft(
-                "T-01",
-                "tampering",
-                verb="forge",
-                affected_element_ids=["entity:customer", "process:web-app"],
-            ),
-        ]
-
-        assert duplicate_groups(drafts, model) == {}
-
-    def test_a_draft_with_no_verb_is_never_compared(self, model):
-        from analysis_service.critic import duplicate_groups
-        from analysis_service.frameworks.asvs.record import DraftRequirementRuling
-
-        ruling = DraftRequirementRuling.model_validate(
-            {
-                **sample_draft("S-01").model_dump(
-                    exclude={"category", "verb", "severity", "mitigations"}
-                ),
-                "id": "v5.0.0-6.2.1",
-                "chapter": "authentication",
-            }
-        )
-
-        assert duplicate_groups([ruling, ruling], model) == {}
-
-
 class TestAMisfiledVerbIsRejectedInCode:
     """#442: the lane a verb belongs to is a table, so the ruling is the table's."""
 
@@ -1081,17 +1024,6 @@ def test_the_critic_is_shown_the_recommendations_it_now_rules_on():
     assert view["mitigations"][0]["summary"] == draft.mitigations[0].summary
 
 
-def test_ruling_view_names_the_drafts_that_share_an_action():
-    """#440: the critic reads a marked pair rather than hunting for one."""
-    draft = sample_draft("S-01")
-
-    (view,) = critic._ruling_view([draft], {"S-01": ["T-01"]})
-    (bare,) = critic._ruling_view([draft])
-
-    assert view["same_action_as"] == ["T-01"]
-    assert "same_action_as" not in bare
-
-
 def test_ruling_view_says_when_a_verb_belongs_to_another_lane():
     """#442: the critic reads a settled lane error rather than judging it."""
     (view,) = critic._ruling_view([sample_draft("S-01", verb="flood")])
@@ -1156,26 +1088,29 @@ class TestOneReviewCall:
 
 
 class TestTheCriticView:
-    def test_the_pairs_are_computed_over_every_shown_draft(self):
-        """``only`` narrows what is rendered and nothing else.
-
-        A duplicate is a relation between two drafts, so narrowing the set
-        before pairing would leave a draft paired with nothing and read as
-        unique — which is exactly the judgement the critic is being spared.
-        """
+    def test_narrowing_renders_what_the_whole_view_holds(self):
+        """``only`` narrows what is rendered and nothing else."""
         drafts = [sample_draft("S-01"), sample_draft("S-02")]
-        model = valid_model()
 
-        (narrowed,) = critic.critic_view(drafts, model, only={"S-01"})
-        whole = critic.critic_view(drafts, model)
+        (narrowed,) = critic.critic_view(drafts, only={"S-01"})
+        whole = critic.critic_view(drafts)
 
-        assert narrowed["same_action_as"] == ["S-02"]
         assert narrowed == next(view for view in whole if view["id"] == "S-01")
+
+    def test_two_drafts_of_one_action_at_one_place_are_not_paired(self):
+        """The critic rules on each draft, and is told of no duplicate.
+
+        Every duplicate rejection on record dropped a different finding
+        (QA-2026-10-03-02-E3), so the view marks no pair.
+        """
+        views = critic.critic_view([sample_draft("S-01"), sample_draft("S-02")])
+
+        assert not any("same_action_as" in view for view in views)
 
     def test_narrowing_to_nothing_renders_nothing(self):
         drafts = [sample_draft("S-01")]
 
-        assert critic.critic_view(drafts, valid_model(), only=set()) == []
+        assert critic.critic_view(drafts, only=set()) == []
 
     def test_both_critic_passes_read_one_view(self):
         """The fan-in and the re-ask reach the same function.
@@ -1184,55 +1119,12 @@ class TestTheCriticView:
         would be a second opinion about what a claim is.
         """
         drafts = [sample_draft("S-01"), sample_draft("T-01", category="tampering")]
-        model = valid_model()
+        valid_model()
 
-        first_pass = critic.critic_view(drafts, model)
-        re_ask = critic.critic_view(drafts, model, only={"S-01", "T-01"})
+        first_pass = critic.critic_view(drafts)
+        re_ask = critic.critic_view(drafts, only={"S-01", "T-01"})
 
         assert first_pass == re_ask
-
-
-class TestADuplicateRejectionOfAUnitBearingDraftIsMalformed:
-    """#657: a package that names a unit decides duplication by its identifier."""
-
-    def _asvs_draft(self):
-        from analysis_service.frameworks.asvs.record import DraftRequirementRuling
-
-        return DraftRequirementRuling.model_validate(
-            {
-                **sample_draft("S-01").model_dump(
-                    exclude={"category", "verb", "severity", "mitigations"}
-                ),
-                "id": "v5.0.0-6.2.1",
-                "chapter": "authentication",
-            }
-        )
-
-    def test_it_is_re_asked_on_a_draft_that_names_a_unit(self):
-        from analysis_service.critic import review_issues
-
-        draft = self._asvs_draft()
-        rulings = [
-            sample_ruling(
-                draft.id,
-                verdict=ProposedVerdict(reason="dup", rejected_because="duplicate"),
-            )
-        ]
-        problems = review_issues([draft], rulings, valid_model())
-        assert any("decided by its identifier" in m for m in problems.messages)
-
-    def test_it_passes_on_a_draft_that_names_none(self):
-        from analysis_service.critic import review_issues
-
-        draft = sample_draft("S-01")
-        rulings = [
-            sample_ruling(
-                "S-01",
-                verdict=ProposedVerdict(reason="dup", rejected_because="duplicate"),
-            )
-        ]
-        problems = review_issues([draft], rulings, valid_model())
-        assert not any("decided by its identifier" in m for m in problems.messages)
 
 
 def test_ruling_view_carries_the_unit_text_a_package_supplies():
@@ -1280,7 +1172,6 @@ PRODUCERS = {
     "invented": ("_dropped_and_invented", "S-1"),
     "duplicate-id": ("_duplicate_id", "S-01"),
     "dismissal-off-grounds": ("_dismissal_off_grounds", "S-01"),
-    "duplicate-on-unit": ("_duplicate_on_unit", "v5.0.0-6.2.1"),
     "verdict-shape": ("_verdict_shape", "S-01"),
     "unresolved-unknown": ("_unresolved_unknown", "S-01"),
     "unbriefed-change": ("_unbriefed_change", "S-01"),
@@ -1347,14 +1238,6 @@ class TestEveryProblemCarriesItsClaimAndItsKind:
                     )
                 ],
             ),
-        )
-        return review_issues([draft], [ruling], valid_model()).problems
-
-    def _duplicate_on_unit(self):
-        draft = self._asvs_draft()
-        ruling = sample_ruling(
-            draft.id,
-            verdict=ProposedVerdict(reason="dup", rejected_because="duplicate"),
         )
         return review_issues([draft], [ruling], valid_model()).problems
 
@@ -1462,3 +1345,20 @@ class TestEveryProblemCarriesItsClaimAndItsKind:
 
         invented = [p for p in problems.problems if p.kind == "invented"]
         assert [p.claim_id for p in invented] == [UNNAMED_CLAIM]
+
+
+def test_the_critic_cannot_reject_a_draft_as_a_duplicate():
+    """Every archived duplicate rejection dropped a different finding
+    (QA-2026-10-03-02-E3), so the critic rules each draft on its own."""
+    from pydantic import ValidationError
+
+    from analysis_service.claims import Verdict
+
+    with pytest.raises(ValidationError, match="'evidence', 'reasoning' or 'lane'"):
+        ProposedVerdict(reason="same as S-02", rejected_because="duplicate")
+    archived = Verdict(
+        status="rejected", reason="same as S-02", rejected_because="duplicate"
+    )
+    assert archived.rejected_because == "duplicate", (
+        "an archived report must still load"
+    )

@@ -1604,7 +1604,7 @@ class TestADraftStatesItsDirection:
         )
         (draft,) = resolution.drafts
         assert draft.direction == "excluded"
-        (view,) = critic_view([draft], model)
+        (view,) = critic_view([draft])
         assert view["direction"] == "excluded"
 
     def test_a_claim_read_back_from_an_older_report_carries_no_direction(self):

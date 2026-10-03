@@ -196,7 +196,7 @@ an empty list where STRIDE narrows it.
 
 **An ASVS claim never reports a pass.** `confirmed` means the requirement applies
 and the input does not show it satisfied; `needs-info` means the input does not
-settle it; `rejected` with `rejected_because` of `evidence` means the requirement does not apply; a rejection for `reasoning`, `lane` or `duplicate` answers nothing about it, and the requirement stays listed in `scope` as `not-raised`. Verification needs
+settle it; `rejected` with `rejected_because` of `evidence` means the requirement does not apply; a rejection for `reasoning` or `lane` answers nothing about it, and the requirement stays listed in `scope` as `not-raised`. Verification needs
 source code, configuration and the people who built the system, and a job here
 carries prose. See
 [ADR 0013](adr/0013-asvs-rules-applicability-and-never-a-pass.md).
@@ -836,7 +836,7 @@ class UnreconciledRuling:
     message: str  # the sentence the re-ask was asked to fix it by
 ```
 
-The nine kinds. Each is a check the service distinguishes in code, except `confirmed-on-unknown`, which only archived reports carry:
+The nine kinds. Each is a check the service distinguishes in code, except `confirmed-on-unknown` and `duplicate-on-unit`, which only archived reports carry:
 
 | `kind` | What went wrong |
 | --- | --- |
@@ -845,7 +845,7 @@ The nine kinds. Each is a check the service distinguishes in code, except `confi
 | `duplicate-id` | One ID carries more than one ruling. |
 | `confirmed-on-unknown` | Archived reports only. A draft whose own grounds cite an unknown was ruled confirmed. Code decides the status and the critic writes none, so no review writes this kind. |
 | `dismissal-off-grounds` | A ruling names a fact in `immaterial_unknowns` that the draft's own grounds do not cite. |
-| `duplicate-on-unit` | A draft naming a catalog unit was rejected as a duplicate, which that framework decides by identifier first. |
+| `duplicate-on-unit` | Archived reports only. A draft naming a catalog unit was rejected as a duplicate. The critic has no duplicate step, so no review writes this kind. |
 | `verdict-shape` | A rejection also names open facts, or a rejection or needs-info states no reason. |
 | `unresolved-unknown` | A `needs-info` names an element or attribute the model does not hold, or names nothing at all. |
 | `unbriefed-change` | The re-ask changed a ruling no problem named; the first pass's ruling was kept. |
