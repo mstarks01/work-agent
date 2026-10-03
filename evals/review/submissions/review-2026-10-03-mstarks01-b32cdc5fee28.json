@@ -1,0 +1,117 @@
+{
+  "envelope": 1,
+  "submitted_by": "mstarks01",
+  "submitted_for": "mstarks01",
+  "generated": "2026-10-03",
+  "cases": {
+    "14-loyalty-oauth-platform": {
+      "own_list": [
+        "Prefix-matched redirect URIs can send authorization codes to an attacker-controlled location.",
+        "If the mobile flow lacks PKCE, an intercepted authorization code can be exchanged by another app.",
+        "A compromised or malicious partner can redeem points because every partner receives every scope.",
+        "A support-console token may be accepted by the rewards API because audience and client restrictions are not checked.",
+        "Anyone who obtains bearer tokens from the request logs can replay them to the rewards API.",
+        "A stolen mobile refresh token can sustain access indefinitely by repeatedly extending its expiry.",
+        "Closed accounts retain refresh tokens that may still mint access tokens unless account status is checked on refresh.",
+        "A disconnected partner retains access for the remaining lifetime of its already-issued one-hour access tokens.",
+        "A stolen authorization-server session can remain usable during thirty days of inactivity because no idle timeout is defined.",
+        "A stolen redeem-scoped token can cash out points without fresh member authentication or transaction approval.",
+        "Client-only ledger records cannot establish which member approved a disputed redemption.",
+        "MODEL: The rewards API is described as checking only signatures, but the source does not say expiration or all other JWT checks are absent."
+      ],
+      "marks": {
+        "v5:61cceebf2758c863": "agree",
+        "v5:2ac79592351ede3c": "agree",
+        "v5:b7936aa2ad5df852": "agree",
+        "v5:ef301c98d501ad28": "agree",
+        "v5:91288896211b18ef": "agree",
+        "v5:4908870eb3f8e4b5": "duplicate",
+        "v5:f2037e711b5ee336": "agree",
+        "v5:913381b82beb2cf5": "agree",
+        "v5:01b9475d0d737b71": "agree",
+        "v5:f5fd4c86f4360125": "agree",
+        "v5:28fd818aad05bcc2": "duplicate",
+        "v5:e927c434920f0ba7": "reject",
+        "v5:b0eb4d8f704c2bd8": "agree",
+        "v5:4d542352d6703d28": "agree",
+        "v5:ada4cf9f4038434d": "reject",
+        "v5:2388b1b66b69a7de": "reject",
+        "v5:69fa9772424c6aa4": "agree",
+        "v5:59c6a841e4f82093": "duplicate",
+        "v6:cbb87f71eb7280f6": "unsure",
+        "v6:0e908e8769e6cfff": "agree",
+        "v6:4c5d0756a3997536": "reject",
+        "v6:0ebd30b1aecfb594": "duplicate",
+        "v6:72ba23284ebcb308": "agree",
+        "v6:7a20c5f6a06c1fa3": "reject",
+        "v6:9d29d0f3a762a1f2": "agree",
+        "v6:3933086ffb180211": "agree",
+        "v6:c315308d5a94f7e6": "reject",
+        "v6:a0667756b811b60a": "reject",
+        "v6:8c35e5757d3994ef": "reject",
+        "v6:8e7e2d08781a670b": "agree",
+        "v6:e692237509fb41e9": "reject",
+        "v6:b20c43e86806d1d7": "agree"
+      },
+      "missing": [],
+      "notes": "Review basis: supplied source text and model, sent as CSV in conversation; own list written before the recorded sets were opened. n refers to the row number of the issued ballot, which numbered both cases together.\nMODEL: The rewards API model says it checks only signatures. The source says it checks signatures and omits client/audience checks; it does not say expiration or all other JWT checks are absent. Do not propagate rewards API validation behavior to the support console.\nRow 19 combines two attack mechanisms under one fingerprint. Preserve the supplied fingerprint for this ballot, then split the claim data and correct the identity rule. Detailed conditional rewrites and the mixed judgment are in its note.\nNo additional unmatched threat from my own list: its items 1-11 map respectively to ballot rows 1/22, 3/19, 6/30, 9, 18/26, 4/19, 16/31, 32, 15, 17, and 25. Coverage here includes rows requiring correction; it is not a statement that all claims are accepted.\nCorrection to my own-list items 6 and 9: unlimited sliding lifetime does not alone prove indefinite replay of a copied refresh token; effective sender binding or replay defenses may prevent it. No decided idle timeout is a policy/evidence gap, not proof the deployed server lacks one. Apply the rewrites in 19 and 15.\nRow review notes and proposed corrections:\nn=1 [asvs V10.4.1 (oauth-and-oidc); agree]: Prefix matching is explicit. This is the same redirect weakness expressed as an attack in row 22.\nn=2 [asvs V10.4.3 (oauth-and-oidc); agree]: Ten minutes is explicit and exceeds the one-minute L3 maximum in V10.4.3.\nn=3 [asvs V10.4.6 (oauth-and-oidc); agree]: Supported as an unresolved PKCE requirement, not proof PKCE is absent. Inspect server enforcement as well as the mobile request.\nn=4 [asvs V10.4.8 (oauth-and-oidc); agree]: The source explicitly gives sliding expiry without an absolute lifetime. Replay resistance is a separate question in row 5.\nn=5 [asvs V10.4.5 (oauth-and-oidc); agree]: Supported as missing evidence about refresh-token replay defenses. At L3, do not treat rotation alone as sufficient; verify sender constraint.\nn=6 [asvs V10.4.11 (oauth-and-oidc); duplicate]: Same as 30; keep 30 and retain V10.4.11 as a requirement mapping.\nn=7 [asvs V10.2.3 (oauth-and-oidc); agree]: The requested scopes are unspecified even though assigned scopes are excessive. This concerns externally operated partner clients; treat it as partner evidence to obtain, not a proven defect in platform-owned code. Authorization requests are not represented by the named token-request flow.\nn=8 [asvs V10.4.16 (oauth-and-oidc); agree]: Shared-secret authentication is explicit and does not meet the stated L3 public-key authentication requirement. Sending the secret in an HTTPS body is not itself evidence of leakage.\nn=9 [asvs V10.3.1 (oauth-and-oidc); agree]: The rewards API explicitly omits audience checking. A token intended for the support console may therefore be accepted by the rewards API; the reverse direction is not established.\nn=10 [asvs V10.3.5 (oauth-and-oidc); agree]: Plain bearer tokens are explicit. Missing sender constraint is a separate control gap from the specific log leak in row 26.\nn=11 [asvs V10.4.14 (oauth-and-oidc); duplicate]: Same as 10; keep 10 and retain V10.4.14 as the authorization-server side of the same sender-constraint finding.\nn=12 [asvs V9.2.3 (self-contained-tokens); reject]: The source states missing audience checks only for the rewards API. Rewrite as: rewards API audience validation is absent (covered by 9); support-console audience validation is unknown. Sharing a key or hostname does not prove the console accepts rewards tokens.\nn=13 [asvs V9.2.4 (self-contained-tokens); agree]: Supported as an evidence gap: audience inclusion in issued tokens is unspecified. Token issuance and recipient validation are different controls, so this is not a duplicate of 9.\nn=14 [asvs V9.1.3 (self-contained-tokens); agree]: Supported as an unresolved trust configuration for the downloaded verification key, not evidence that an attacker can replace it.\nn=15 [asvs V7.3.1 (session-management); reject]: No decided idle timeout does not prove the deployed server has none. Rewrite as: no idle-timeout policy is defined; establish the intended timeout and verify enforcement. Treat V7.3.1 enforcement as unresolved rather than a confirmed absence.\nn=16 [asvs V7.4.2 (session-management); reject]: Retained refresh-token records do not prove tokens remain usable after closure; the token endpoint may check account status. Rewrite as: closure leaves refresh tokens stored, and continued token issuance is possible if refresh does not reject closed accounts. Change the confirmed-gap disposition to an unresolved enforcement check.\nn=17 [asvs V7.5.3 (session-management); agree]: The source expressly says redemption requires only a valid redeem-scoped token, supporting the absence of further transaction authentication or approval.\nn=18 [asvs V16.2.5 (security-logging-and-error-handling); duplicate]: Same as 26; keep 26 and retain V16.2.5 as a requirement mapping.\nn=19 [stride spoofing; unsure]: IDENTITY DEFECT: Split into two findings. The no-absolute-expiry fact is supported (4), but indefinite use of a copied token also requires lack of effective sender binding, replay detection or revocation; those are unknown (5). Rewrite that claim conditionally. The intercepted-code claim is supported as a conditional threat if PKCE is absent (3). One mark cannot fairly express these different judgments. Do not count both claims as one independent finding or count their ASVS equivalents again.\nn=20 [stride spoofing; agree]: Supported conditional credential-compromise scenario: possession of the client secret permits client impersonation. It does not alone grant a member token; retain the need for a valid authorization grant and do not imply the request body leaks the secret.\nn=21 [stride spoofing; reject]: The source does not establish password-only login, guessable passwords, or ineffective guessing defenses. Rewrite as an unresolved check of MFA and anti-guessing controls; do not claim successful password guessing from silence.\nn=22 [stride information-disclosure; duplicate]: Same as 1; keep 1. Preserve the attack condition that an attacker must control an accepted prefix-matching URL; code theft alone does not establish redemption without the confidential client secret.\nn=23 [stride tampering; agree]: A supported conditional threat on the stated ledger-write path. Keep both prerequisites: attacker reachability to the ledger and missing effective authorization/authentication for writes; a cloud foothold alone does not establish either.\nn=24 [stride tampering; reject]: Answering or intercepting a download does not establish acceptance of an untrusted key. Rewrite as: if the key source or its authenticated delivery can be replaced without verification, attacker-signed tokens may be accepted. The unresolved key-trust check is already covered by 14.\nn=25 [stride repudiation; agree]: The ledger explicitly records the client, not the approving member. Keep the conclusion limited to what that ledger can establish about a particular redemption.\nn=26 [stride information-disclosure; agree]: Headers are logged and tokens are bearer credentials. Reading a still-valid logged token enables replay within that token's existing permissions and remaining lifetime.\nn=27 [stride information-disclosure; reject]: Unrecorded at-rest protection does not imply a stolen database copy is readable or contains reusable raw refresh tokens. Rewrite as: if a stolen copy is readable and refresh tokens are stored in reusable form, it exposes those tokens and password hashes. Verify storage representation and encryption; hashes are not plaintext passwords.\nn=28 [stride denial-of-service; reject]: This asserts successful exhaustion without evidence about capacity or defenses. Rewrite as an unresolved availability question about sign-in/token endpoint abuse controls. Also remove the claim that the API immediately serves nobody: existing access tokens last up to one hour.\nn=29 [stride elevation-of-privilege; reject]: The missing audience check belongs to the rewards API, not the support console. Neither shared signing keys nor a shared hostname proves console token acceptance or account-closing authorization. Rewrite the console attack conditionally on both missing audience separation and insufficient operation authorization; do not label it established.\nn=30 [stride elevation-of-privilege; agree]: Every partner receives every scope, including redemption, although some partners only need balance reads. Member consent to the scopes does not make that excess privilege necessary.\nn=31 [stride elevation-of-privilege; reject]: The source does not establish refresh acceptance for closed accounts or redemption after closure. Rewrite conditionally on the token endpoint and API failing to reject closed accounts; consolidate with the corrected row 16.\nn=32 [stride elevation-of-privilege; agree]: Explicit residual-access window after disconnect. Limit impact to the existing token's privileges and remaining lifetime, at most one hour; this is not indefinite access.",
+      "opened_digests": {
+        "source.md": "d414cc10c981749e783270475acdaa286ead5d32d22e334e4f6d1e23ae385a29",
+        "model.json": "a17b00f9ceb04039f2684393ce1cc35e117e960e62d98e6d30cea3c59a2a6f1a",
+        "claims/asvs.json": "b10a09436c79bd42d208c9656d65ecea9252530762b487d67355dd57816bf285",
+        "claims/stride.json": "d8e4f0b80d97f41452a348f0b2066a8b5f6b75c9f333cfee08e986dc5be39362"
+      }
+    },
+    "15-multitenant-invoicing": {
+      "own_list": [
+        "An unauthenticated visitor can enumerate sequential payment-page links to read other companies' invoices and bank details.",
+        "A user may open another company's invoice by number if the app fails to enforce ownership on that request.",
+        "A viewer may invoke hidden admin actions directly if the server does not enforce roles.",
+        "A crafted invoice update can change protected fields such as the paid flag or payout bank account.",
+        "Cross-company PDF requests may place another tenant's invoice under the requesting company if the renderer trusts an unchecked job company ID.",
+        "A user can flood the single-job PDF renderer with unlimited requests and delay every tenant's PDFs.",
+        "A support agent can make changes attributed only to the impersonated customer, concealing the responsible agent.",
+        "A stolen customer password is sufficient to take over an account, including an admin account, because there is no second factor.",
+        "An omitted company filter can expose other tenants' records because the shared database account has no row-level isolation.",
+        "Unspecified internal transport protection leaves interception or alteration of invoice data and render jobs unresolved.",
+        "Unspecified encryption at rest leaves protection of invoice and bank data in database or bucket copies unresolved."
+      ],
+      "marks": {
+        "v5:2bea1c31d4d23ec2": "agree",
+        "v5:e2e1021cd7b6f29e": "agree",
+        "v5:ff67c81298a3d42b": "agree",
+        "v5:75811dbfd5387f5a": "reject",
+        "v5:059c8aa68fd64e98": "agree",
+        "v5:05a7032788955808": "agree",
+        "v5:e588d26e10826ffd": "duplicate",
+        "v5:c09f385c06c0655a": "agree",
+        "v5:76d4b399d7425dac": "duplicate",
+        "v5:8aa3b6d92947b48e": "agree",
+        "v6:122f92599f936d59": "agree",
+        "v6:0793e188d7495316": "agree",
+        "v6:8ca6d86d0e7db662": "agree",
+        "v6:0b9690d4b3276e19": "agree",
+        "v6:efc6a0d803ef0bdc": "duplicate",
+        "v6:69c702dd7b31dc58": "duplicate",
+        "v6:7f1a9c9453feb869": "duplicate",
+        "v6:4a3bd648fcb1ed8d": "reject",
+        "v6:3576d2a54b2be87d": "agree",
+        "v6:3ddb5013b3479004": "agree",
+        "v6:7970aa29f424f948": "duplicate",
+        "v6:716dcfe3ff238a19": "reject"
+      },
+      "missing": [
+        "Own-list item 5: any ordinary user can request a PDF of any invoice through the billing app. If job creation and rendering fail to bind the requested invoice to the authenticated tenant, another tenant's invoice may be rendered into that user's tenant path. Row 46 instead assumes direct queue-write access; broad invoice isolation row 34 does not explicitly cover this asynchronous path.",
+        "Own-list item 10: internal transport protection for database, queue and bucket connections is unspecified. Verify authenticated, integrity-protected and confidential delivery; otherwise a suitably positioned attacker may intercept invoice data or alter render jobs. Do not assert those connections are plaintext.",
+        "Own-list item 11, uncovered bucket portion: protection at rest for invoice PDFs in the shared bucket is unspecified. A stolen readable bucket copy could expose multiple tenants. Verify encryption and key protection; row 50 addresses the database, and row 51 concerns a live service credential."
+      ],
+      "notes": "Review basis: supplied source text and model, sent as CSV in conversation; own list written before the recorded sets were opened. n refers to the row number of the issued ballot, which numbered both cases together.\nOwn-list coverage: items 1-4 map to 33/48, 34/49, 35/53 and 39/45; items 6-9 map to 40/52, 42/47, 41/43 and 34/49. Item 11's database portion is in 50 but needs a conditional rewrite. Missing rows record the remaining paths, not generic additions.\nAcross both cases, duplicate means the same underlying finding across frameworks; retain requirement mappings on the kept row. Agree on needs-* rows means an evidence gap is supported, not that the control is absent or noncompliance is proven. Conditional threats remain conditional. Only mark and note were changed in the ballot.\nRow review notes and proposed corrections:\nn=33 [asvs V8.2.2 (authorization); agree]: The unauthenticated page uses globally sequential invoice identifiers and exposes invoice, company name and bank details.\nn=34 [asvs V8.4.1 (authorization); agree]: Supported as an unresolved completeness check for tenant isolation, not total absence of tenant controls: the app explicitly adds company filters. Rewrite to say per-invoice ownership enforcement is unspecified. Missing database RLS alone is not a vulnerability.\nn=35 [asvs V8.3.1 (authorization); agree]: Supported as an unresolved server-side role check. Hidden buttons do not establish server enforcement, but do not prove its absence either.\nn=36 [asvs V8.2.3 (authorization); reject]: Saving all submitted fields supports mass assignment, but does not establish that no field is restricted for any user. Role enforcement is unknown. Rewrite around the unfiltered invoice update and consolidate with 45; retain V8.2.3 only where field permissions are established.\nn=37 [asvs V8.1.1 (authorization); agree]: Supported as an evidence request for the full authorization policy. Rewrite as: the supplied description does not define the complete function/data permissions for each role. It does state tenant membership and query filtering; do not claim all authorization documentation is absent.\nn=38 [asvs V8.1.2 (authorization); agree]: Supported as an evidence request for field-level permissions. Rewrite as: the supplied description does not define which invoice fields each role may read or change. This is not proof that no policy exists elsewhere.\nn=39 [asvs V15.3.3 (secure-coding-and-architecture); duplicate]: Same as 45; keep 45 and retain V15.3.3 as a requirement mapping.\nn=40 [asvs V15.1.3 (secure-coding-and-architecture); agree]: Supported as missing documentation of resource-abuse protection. Rewrite as: PDF jobs are asynchronous and processed serially, but the description supplies no per-user/tenant quotas or protection against excessive submissions. Keep documentation uncertainty distinct from the concrete load-abuse threat in 52.\nn=41 [asvs V6.3.3 (authentication); duplicate]: Same as 43; keep 43 and retain V6.3.3 as a requirement mapping.\nn=42 [asvs V16.2.1 (security-logging-and-error-handling); agree]: The source explicitly attributes impersonated actions only to the customer user. Preserve both the acting support agent and impersonated customer in the audit trail.\nn=43 [stride spoofing; agree]: Password compromise permits customer account takeover without a second factor. Do not infer absent rate limits or claim all passwords are guessable.\nn=44 [stride spoofing; agree]: Supported conditional compromise-impact scenario. The attacker must also satisfy or bypass the office-network restriction and one-time-code authentication; possession of an agent password alone is insufficient. This does not establish a defect in the legitimate impersonation feature itself.\nn=45 [stride tampering; agree]: The edit handler explicitly saves all supplied fields, including financial state and payout details. Keep the mass-assignment finding. Do not assert that viewers can reach the handler unless the unresolved role check also fails.\nn=46 [stride tampering; agree]: Supported conditional queue-integrity threat. Rewrite more precisely: an attacker able to enqueue an inconsistent company-ID/invoice-number pair may cause a PDF to be stored under the wrong tenant unless the renderer verifies their relationship. Queue write access is a prerequisite, not an established capability of ordinary users; subsequent PDF retrieval is also not demonstrated.\nn=47 [stride repudiation; duplicate]: Same as 42; keep 42. Remove the absolute claims that nothing can identify the agent or that the customer cannot dispute it; the source establishes the database attribution failure, not the absence of every other possible form of evidence.\nn=48 [stride information-disclosure; duplicate]: Same as 33; keep 33. The source explicitly names the company name, not customer names; use invoice contents, company name and bank details.\nn=49 [stride information-disclosure; duplicate]: Same as 34; keep 34 and incorporate this conditional invoice-number attack example. Do not count the ASVS evidence gap and its conditional STRIDE scenario twice.\nn=50 [stride information-disclosure; reject]: Unspecified encryption is not evidence that a stolen database copy is readable. Rewrite as: if an attacker obtains a readable database copy, every tenant's invoices and payout details are exposed; verify encryption and key protection. Keep the control status unresolved.\nn=51 [stride spoofing; agree]: Supported conditional credential-compromise impact: one service credential reads PDFs across companies. Credential theft is a prerequisite, not an established leak; do not infer write permission or public bucket access.\nn=52 [stride denial-of-service; agree]: Unlimited user requests and serial processing support a cross-tenant queue-backlog threat. Rewrite stops producing PDFs as delays or denies timely PDFs when malicious submissions exceed processing capacity; permanent total stoppage is not established.\nn=53 [stride elevation-of-privilege; duplicate]: Same as 35; keep 35 and incorporate this conditional direct-request attack example.\nn=54 [stride elevation-of-privilege; reject]: The source does not define legitimate support duties or prove that impersonation exceeds them. Authorized use of an intended feature is not by itself privilege escalation. Ask whether impersonation needs narrower scope or approval; retain the supported attribution problem in 42 and compromise impact in 44.",
+      "opened_digests": {
+        "source.md": "5f6c64fc0b7494033e74547c61f660750882de95b66dd8ca9370eef14e7c796f",
+        "model.json": "55a71c8adc0434496dc4e280dbfc108ff84f7bb72dc629515f65560480226bff",
+        "claims/asvs.json": "bd9e0e03c33124071dd75d2a684f07075a11526dd573612885150efbe82dd62d",
+        "claims/stride.json": "4ac30820b7fb579fd988b13a809aa70014b9f6d56767f6cb7578c9495acfb551"
+      }
+    }
+  }
+}
