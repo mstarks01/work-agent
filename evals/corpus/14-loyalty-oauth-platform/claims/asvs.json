@@ -138,13 +138,12 @@
     "chapter": "self-contained-tokens",
     "requirement": "V9.2.3",
     "affected_element_ids": [
-      "process:rewards-api",
       "process:support-console"
     ],
-    "claim": "Neither the rewards API nor the support console restricts the tokens it accepts to the ones meant for it.",
+    "claim": "Nothing states whether the support console restricts the tokens it accepts to the ones meant for it.",
     "tier": "expected",
-    "disposition": "gap-from-prose",
-    "notes": "Stated for the rewards API; the console shares the key and the source states no check there either."
+    "disposition": "needs-code",
+    "notes": "The source states the missing audience check only for the rewards API, which V10.3.1 holds. Sharing a key or a hostname does not show that the console accepts rewards tokens."
   },
   {
     "chapter": "self-contained-tokens",
@@ -177,10 +176,10 @@
       "process:authorization-server",
       "flow:entity:member>process:authorization-server>sign-in-and-consent"
     ],
-    "claim": "The authorization server's sign-in session has no idle timeout.",
+    "claim": "Nobody decided an idle timeout for the authorization server's sign-in session, so nothing states that one is enforced.",
     "tier": "must-find",
-    "disposition": "gap-from-prose",
-    "notes": "Stated outright: nobody decided one."
+    "disposition": "needs-config",
+    "notes": "No decided idle timeout does not show that the deployed server has none. Establish the intended timeout and verify its enforcement."
   },
   {
     "chapter": "session-management",
@@ -189,10 +188,10 @@
       "process:support-console",
       "store:identity-database"
     ],
-    "claim": "Closing a member's account leaves that member's refresh tokens usable.",
+    "claim": "Closing a member's account leaves that member's refresh tokens stored, and nothing states that the token endpoint refuses them for a closed account.",
     "tier": "must-find",
-    "disposition": "gap-from-prose",
-    "notes": "Stated outright: nothing happens to the grant store on closure."
+    "disposition": "needs-code",
+    "notes": "Stored refresh-token records do not show that the tokens stay usable after closure: the token endpoint may check the account status."
   },
   {
     "chapter": "session-management",

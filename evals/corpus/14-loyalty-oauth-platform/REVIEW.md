@@ -101,7 +101,7 @@ Not part of the question, but the records cite these names, so you need them.
 |---|---|---|---|---|
 | process:mobile-app | unknown | unknown | boundary:member-devices | mobile app; OAuth public client using the authorization code flow |
 | process:authorization-server | internet-facing | web | boundary:rewards-cloud | OAuth authorization server issuing signed JWT access tokens |
-| process:rewards-api | internet-facing | web | boundary:rewards-cloud | API that validates JWT signatures only |
+| process:rewards-api | internet-facing | web | boundary:rewards-cloud | API that validates JWT signatures and checks no client or audience |
 | process:support-console | internet-facing | web | boundary:rewards-cloud | web app |
 
 **Data stores**
@@ -254,10 +254,10 @@ The narrower question, per record: **does this requirement apply to this system,
 
 ### self-contained-tokens
 
-**A12.** `V9.2.3` — Neither the rewards API nor the support console restricts the tokens it accepts to the ones meant for it.
+**A12.** `V9.2.3` — Nothing states whether the support console restricts the tokens it accepts to the ones meant for it.
 
-- `process:rewards-api`, `process:support-console`
-- Stated for the rewards API; the console shares the key and the source states no check there either.
+- `process:support-console`
+- The source states the missing audience check only for the rewards API, which V10.3.1 holds. Sharing a key or a hostname does not show that the console accepts rewards tokens.
 
 > mark:
 
@@ -278,17 +278,17 @@ The narrower question, per record: **does this requirement apply to this system,
 
 ### session-management
 
-**A15.** `V7.3.1` — The authorization server's sign-in session has no idle timeout.
+**A15.** `V7.3.1` — Nobody decided an idle timeout for the authorization server's sign-in session, so nothing states that one is enforced.
 
 - `process:authorization-server`, `flow:entity:member>process:authorization-server>sign-in-and-consent`
-- Stated outright: nobody decided one.
+- No decided idle timeout does not show that the deployed server has none. Establish the intended timeout and verify its enforcement.
 
 > mark:
 
-**A16.** `V7.4.2` — Closing a member's account leaves that member's refresh tokens usable.
+**A16.** `V7.4.2` — Closing a member's account leaves that member's refresh tokens stored, and nothing states that the token endpoint refuses them for a closed account.
 
 - `process:support-console`, `store:identity-database`
-- Stated outright: nothing happens to the grant store on closure.
+- Stored refresh-token records do not show that the tokens stay usable after closure: the token endpoint may check the account status.
 
 > mark:
 
@@ -327,18 +327,18 @@ on either of them. That is the finding this sitting exists for.
 
 ### spoofing
 
-**1.** An attacker who copies a member's mobile refresh token from the phone keeps getting access tokens as that member indefinitely, because the token's expiry slides forward on every use.
+**1.** An attacker who copies a member's mobile refresh token can continue obtaining access tokens while sliding its expiry forward, if effective sender binding or replay defenses do not block the attacker and the token is not revoked.
 
 - `flow:process:mobile-app>process:authorization-server>token-requests`, `process:mobile-app`, `process:authorization-server`
 - severity: medium/high · verb: `use-credential`
-- Stated outright: the refresh token never expires and slides ninety days on each use. Nothing the source states bounds the window, and nothing detects a second holder.
+- The sliding expiry with no absolute lifetime is stated. Continued use of a copied token also needs the sender binding, replay detection and revocation to fail, and the source states none of them.
 
 > mark:
 
-**2.** A malicious app on the member's phone intercepts the mobile app's authorization code and redeems it as the mobile app, if the app sends no PKCE challenge.
+**2.** A malicious app that intercepts the mobile app's authorization code may impersonate that client at the token endpoint if the server accepts the code without requiring and validating PKCE.
 
 - `flow:process:mobile-app>process:authorization-server>token-requests`, `process:mobile-app`
-- severity: medium/high · verb: `use-credential`
+- severity: medium/high · verb: `impersonate`
 - Conditional on the unrecorded PKCE. A public client has no secret, so the code is the whole credential at the token endpoint.
 
 > mark:
@@ -351,11 +351,11 @@ on either of them. That is the finding this sitting exists for.
 
 > mark:
 
-**4.** An attacker guesses members' passwords on the authorization server's sign-in page and signs in as them.
+**4.** An attacker guesses members' passwords on the authorization server's sign-in page and signs in as them, if the sign-in has no second factor and no defence against guessing.
 
 - `flow:entity:member>process:authorization-server>sign-in-and-consent`, `process:authorization-server`
 - severity: medium/medium · verb: `guess-credential`
-- The sign-in is a password alone and the source states no lockout or rate limit. An expected finding, not a must-find: the silence is ordinary, not a stated gap.
+- Conditional: the source establishes neither a password-only sign-in nor missing defences against guessing.
 
 > mark:
 
@@ -381,11 +381,11 @@ on either of them. That is the finding this sitting exists for.
 
 > mark:
 
-**7.** An attacker who can answer the rewards API's start-up key download serves a public key of their own, and the API then accepts access tokens the attacker signs.
+**7.** An attacker who can replace the public key the rewards API downloads at start-up has the API accept access tokens the attacker signs, if the API does not verify the key's source or its delivery.
 
 - `process:rewards-api`, `process:authorization-server`
 - severity: low/high · verb: `forge`
-- The source states the key is downloaded at start-up and does not say from where or how it is checked. Low likelihood; the whole API's trust rests on that one fetch.
+- The source states the key is downloaded at start-up and does not say from where or how it is checked. Answering the download alone does not establish that the API accepts an untrusted key.
 
 > mark:
 
@@ -411,33 +411,33 @@ on either of them. That is the finding this sitting exists for.
 
 > mark:
 
-**10.** An attacker who obtains a copy of the identity database recovers members' refresh tokens and password hashes, since its protection at rest is not recorded.
+**10.** An attacker who obtains a readable copy of the identity database recovers members' password hashes, and their refresh tokens if those are stored in a reusable form.
 
 - `store:identity-database`, `flow:process:authorization-server>store:identity-database>read-and-write-accounts-and-grants`
 - severity: low/high · verb: `recover-credential`
-- Conditional on the unrecorded at-rest protection. It matters more here than on the other stores because the mobile refresh tokens never expire.
+- Conditional on the unrecorded protection at rest and on how refresh tokens are stored. Password hashes are not plaintext passwords.
 
 > mark:
 
 
 ### denial-of-service
 
-**11.** An attacker floods the authorization server's sign-in and token endpoints until members and partner apps can no longer get tokens.
+**11.** An attacker may prevent members and partner apps from obtaining new tokens by flooding the authorization server's sign-in and token endpoints, if accepted malicious traffic exhausts their capacity and abuse defenses do not prevent it.
 
 - `process:authorization-server`, `flow:entity:member>process:authorization-server>sign-in-and-consent`, `flow:process:mobile-app>process:authorization-server>token-requests`
 - severity: medium/medium · verb: `flood`
-- Every client depends on the one authorization server, and the source states no rate limit. The rewards API cannot serve anyone once tokens stop.
+- Every client depends on the one authorization server, and the source states no rate limit. Already-issued tokens remain usable for their remaining lifetime.
 
 > mark:
 
 
 ### elevation-of-privilege
 
-**12.** A partner app presents a member's access token to the support console, which accepts it because both services trust the same signing key and neither checks the audience, and it closes members' accounts.
+**12.** A partner app presents a member's access token to the support console and closes members' accounts, if the console does not restrict tokens to the ones meant for it and does not check that the caller may close accounts.
 
 - `process:support-console`, `entity:partner-app`, `process:authorization-server`
 - severity: medium/high · verb: `escalate`
-- The case's central finding, assembled from three stated facts: no audience check, one signing key for both services, and the console on the same public hostname. Whether the console also checks a role is not stated, which is what keeps the likelihood at medium.
+- One signing key serves both services and the console shares the public hostname. The missing audience check is stated for the rewards API only: the console's audience and role checks are unknown.
 
 > mark:
 
@@ -449,11 +449,11 @@ on either of them. That is the finding this sitting exists for.
 
 > mark:
 
-**14.** A member whose account support closed keeps redeeming points with a refresh token the closure never revoked.
+**14.** A member whose account support closed uses an unrevoked refresh token to obtain new access tokens and redeem points, if the token endpoint and rewards API do not reject the closed account.
 
 - `store:identity-database`, `store:identity-database`, `flow:process:mobile-app>process:rewards-api>call-rewards-api`
 - severity: medium/medium · verb: `abuse-grant`
-- Stated outright: closing an account marks it closed in the directory and leaves the grant store untouched. Whether the token endpoint reads the closed flag is not stated.
+- Closing an account marks it closed and leaves the grant store untouched. Whether the token endpoint or the rewards API reads the closed flag is not stated.
 
 > mark:
 
@@ -510,9 +510,9 @@ your missing list, your notes and a digest of each file you read:
       "notes": "<counts, and anything you would change>",
       "opened_digests": {
       "source.md": "d414cc10c981749e783270475acdaa286ead5d32d22e334e4f6d1e23ae385a29",
-      "model.json": "a17b00f9ceb04039f2684393ce1cc35e117e960e62d98e6d30cea3c59a2a6f1a",
-      "claims/asvs.json": "b10a09436c79bd42d208c9656d65ecea9252530762b487d67355dd57816bf285",
-      "claims/stride.json": "d8e4f0b80d97f41452a348f0b2066a8b5f6b75c9f333cfee08e986dc5be39362"
+      "model.json": "eb6210790530ebcb9aeac28c28b0d0eceb9676b38790d4f12656f72678c9074b",
+      "claims/asvs.json": "1383f84a4e5de056f8afa84f3b7bab01a03f2d4971846e4e1aaa0a0385e6ead8",
+      "claims/stride.json": "6523ae929850b63084d57b2a19231600fd4d1e847420cbb94fe97ae04e6953b9"
       }
     }
   }

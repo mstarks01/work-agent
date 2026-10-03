@@ -64,7 +64,10 @@ MATCHER_WIDER_THAN_FINGERPRINT = 2
 #: merged in the corpus.
 UNSEPARATED: dict[str, str] = {
     "14-loyalty-oauth-platform | spoofing | process:authorization-server, process:mobile-app": (
-        "A copied refresh token and an intercepted authorization code are two credentials of one public client, both presented at the token endpoint, so both are `use-credential` on one flow. The verb does not separate them; the credential does, and so does the control: an absolute expiry answers the first and PKCE the second. `verbs.UNSEPARATED` records the same pair for the matcher."
+        "A copied refresh token used again and an intercepted authorization code redeemed as the mobile client are `use-credential` and `impersonate` on one flow. Sender binding or revocation answers the first and PKCE the second. The verb separates them."
+    ),
+    "15-multitenant-invoicing | tampering | process:billing-app, process:pdf-renderer, store:render-queue": (
+        "Planting a job whose company ID does not match its invoice and changing a job on its way to the renderer are `plant` and `alter-in-transit`. Queue write authorization and a check that the company owns the invoice answer the first; integrity protection on the path answers the second. The verb separates them."
     ),
     "01-payments-checkout | tampering | process:order-service, process:storefront-api": (
         "Modifying an order in flight on the gRPC channel and submitting a fabricated one over it are `alter-in-transit` and `inject`. The first needs an on-path position and transport protection answers it; the second needs only reach, and authentication answers it. The verb separates them."
