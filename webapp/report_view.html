@@ -79,6 +79,7 @@
   .analysis { border-top: 1px solid var(--border); margin-top: 8px; }
   .meta { color: var(--ink-2); font-size: 0.85rem; }
   .meta code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+  .ref { text-decoration: underline dotted; cursor: help; }
 
   .toggle { border: 1px solid var(--border); background: var(--surface); color: var(--ink-2);
     border-radius: 8px; padding: 6px 12px; font: inherit; font-size: 0.8rem; cursor: pointer; }
@@ -163,6 +164,7 @@
   .field .lbl { color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; font-size: 0.68rem; }
   .refs code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.8rem;
     background: var(--surface-2); border: 1px solid var(--border); border-radius: 6px; padding: 1px 6px; margin-right: 6px; }
+  .refs .ref { margin-right: 10px; }
   ul.mits { margin: 6px 0 0; padding-left: 18px; font-size: 0.88rem; color: var(--ink-2); }
 
   /* grounds rail — why the finding was raised, under the analysis */
@@ -294,6 +296,9 @@
      Source, the attributes the owner answered, and why each conditional
      finding's facts are still open. -->
 <script type="application/json" id="provenance" nonce="__CSP_NONCE__"><!--provenance--></script>
+<!-- Each element's display name by ID, from
+     analysis_service.open_facts.element_names. Escaped the same way. -->
+<script type="application/json" id="names" nonce="__CSP_NONCE__"><!--names--></script>
 
 <script nonce="__CSP_NONCE__"><!--script--></script>
 </body>

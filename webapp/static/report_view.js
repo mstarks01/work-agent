@@ -49,6 +49,10 @@
   // owner's answers Source, the attributes the owner answered, and why each
   // conditional finding's facts are still open.
   const PROVENANCE = JSON.parse(document.getElementById("provenance").textContent);
+  // Each element's display name, and a flow's as its two endpoints, keyed by
+  // ID and built server-side by analysis_service.open_facts.element_names, the
+  // reader every question label uses.
+  const NAMES = JSON.parse(document.getElementById("names").textContent);
   const ANSWERED_ATTRIBUTES = new Set(
     (PROVENANCE.answered_attributes || []).map(([element, attribute]) => `${element}>${attribute}`));
   const CONDITIONS = PROVENANCE.conditions || {};
@@ -79,10 +83,9 @@
   // One answer's editor, as the follow-up and a correction both show it.
   // `nodes` follow the label; `read` is the answer as the service takes it,
   // or null; `known` is whether it says more than "I don't know". `prefill`
-  // is an answer to start from, `changed` runs on every edit, and `names`
-  // maps an element ID to its name for a choice.
+  // is an answer to start from, and `changed` runs on every edit.
   let suggestLists = 0;
-  const editorFor = (q, prefill, changed, names) => {
+  const editorFor = (q, prefill, changed) => {
     const option = (label, value) => Object.assign(el("option", null, label), { value });
     if (q.form === "facets") {
       // One list per facet; a facet left blank is not sent.
@@ -120,7 +123,7 @@
     if (q.choices.length) {
       input = el("select");
       input.append(option("(leave unanswered)", ""));
-      q.choices.forEach(choice => input.append(option(names[choice] ? `${names[choice]} (${choice})` : choice, choice)));
+      q.choices.forEach(choice => input.append(option(NAMES[choice] ? `${NAMES[choice]} (${choice})` : choice, choice)));
       input.append(option("I don't know", DONT_KNOW));
       input.value = value;
       input.addEventListener("change", changed);
@@ -182,9 +185,10 @@
     };
   };
   // A model writes an identifier the way the prompt hands it over: in
-  // backticks. Each of those spans becomes a `code` element here, so a
-  // description names `process:web-api` in the same face the element table
-  // below shows it in, rather than printing the delimiters as characters.
+  // backticks. A span that is an element's ID shows the element's name, and
+  // the ID stays on hover, so a description reads "Storefront API" rather than
+  // `process:storefront-api`. Every other span becomes a `code` element, in
+  // the face the element table below shows identifiers in.
   //
   // A pair of backticks around a non-empty span is the entire grammar. No
   // other Markdown is read, and an unpaired backtick stays a backtick: this
@@ -195,12 +199,16 @@
   // elements, appended. A quote never comes through here. Its text is the
   // submitter's own words, and a backtick among them is one of those words.
   const CODE_SPAN = /`([^`\n]+)`/g;
+  // An element's ID as its name, the ID on hover; any other ID as code.
+  const ref = (id) => Object.hasOwn(NAMES, id)
+    ? Object.assign(el("span", "ref", NAMES[id]), { title: id })
+    : code(id);
   const prose = (text) => {
     const line = String(text);
     const frag = document.createDocumentFragment();
     let end = 0;
     for (const span of line.matchAll(CODE_SPAN)) {
-      frag.append(line.slice(end, span.index), code(span[1]));
+      frag.append(line.slice(end, span.index), ref(span[1]));
       end = span.index + span[0].length;
     }
     frag.append(line.slice(end));
@@ -405,12 +413,12 @@
       return row;
     }
     if (ground.kind === "unknown-attribute" || ground.kind === "absent-attribute") {
-      body.append(code(ground.element_id), " \u2192 ", code(ground.attribute));
+      body.append(ref(ground.element_id), " \u2192 ", code(ground.attribute));
       if (ANSWERED_ATTRIBUTES.has(`${ground.element_id}>${ground.attribute}`)) {
         body.append(el("span", "cite", " (your answer; the service did not check it)"));
       }
     } else {
-      body.append(code(ground.flow_id));
+      body.append(ref(ground.flow_id));
     }
     row.append(body);
     return row;
@@ -511,7 +519,7 @@
 
     const refs = el("div","field refs");
     refs.append(lbl("Affected elements"), el("br"));
-    t.affected_element_ids.forEach(r => refs.append(code(r)));
+    t.affected_element_ids.forEach(r => refs.append(ref(r)));
     card.append(refs);
 
     // After the analysis, not before it: the card's job on first read is
@@ -542,7 +550,7 @@
         u.append(" Unknown: ");
         t.verdict.related_unknowns.forEach((r, i) => {
           if (i) u.append(", ");
-          u.append(code(r.element_id), " \u2192 ", code(r.attribute));
+          u.append(ref(r.element_id), " \u2192 ", code(r.attribute));
         });
       }
       card.append(u);
@@ -906,9 +914,6 @@
     $("links").append(note);
   }
   if (LINK_QUESTIONS.length || FACT_QUESTIONS.length) {
-    const names = {};
-    [...R.system_model.external_entities, ...R.system_model.processes,
-     ...R.system_model.data_stores].forEach(e => { names[e.id] = e.name; });
     // The follow-up is optional and starts closed: the report is complete
     // without it, and answering runs the analysis once more.
     const box = el("details", "followup");
@@ -958,7 +963,7 @@
         const select = el("select");
         select.dataset.principal = q.principal;
         select.append(option("(leave unanswered)", ""));
-        q.options.forEach(id => select.append(option(names[id] ? `${names[id]} (${id})` : id, id)));
+        q.options.forEach(id => select.append(option(NAMES[id] ? `${NAMES[id]} (${id})` : id, id)));
         select.append(option("None of these", "none"));
         row.append(el("b", null, q.principal),
           ` \u2014 an answer places ${q.rows} stated fact(s) `, select);
@@ -1019,7 +1024,7 @@
       ordered.forEach((q, index) => {
         const into = !q.findings.length ? unwaited : index < SHOWN ? box : more;
         const row = el("p");
-        const editor = editorFor(q, null, recount, names);
+        const editor = editorFor(q, null, recount);
         factAnswers.push({ read: editor.read, known: editor.known });
         const lead = [el("b", null, q.label), why(q),
           ` \u2014 ${q.cited_by} finding(s) wait on it; answering down to here covers ${q.covered_so_far}`];
@@ -1066,9 +1071,6 @@
   // "I don't know" where an answer was a guess. A correction is kept beside
   // the report and marks the findings that rest on it; nothing runs again.
   if (FINAL && (CORRECTIONS.answers || []).length) {
-    const names = {};
-    [...R.system_model.external_entities, ...R.system_model.processes,
-     ...R.system_model.data_stores].forEach(e => { names[e.id] = e.name; });
     const said = a => a.facets
       ? Object.entries(a.facets).map(([facet, value]) => `${facet}: ${value}`).join("; ")
       : (a.value === DONT_KNOW ? "I don't know" : a.value);
@@ -1087,7 +1089,7 @@
       change.type = "button";
       change.addEventListener("click", () => {
         change.hidden = true;
-        const editor = editorFor(a, a.answer, () => {}, names);
+        const editor = editorFor(a, a.answer, () => {});
         shown.replaceChildren(" \u2014 ", ...editor.nodes);
         edits.push(editor.read);
       });
@@ -1153,19 +1155,19 @@
   R.boundary_crossings.forEach(c => {
     const d = el("div","crossing");
     d.append(
-      "Boundary crossing: ", code(c.flow_id), " — ",
-      code(c.source_zone), " → ", code(c.destination_zone)
+      "Boundary crossing: ", ref(c.flow_id), " — ",
+      ref(c.source_zone), " → ", ref(c.destination_zone)
     );
     // A crossing one of whose zones the service inferred says so here. The
     // assumption itself is listed below with its basis; without this line a
     // reader has to join the two lists to find out that the crossing rests on
     // a placement nobody stated.
-    c.assumed_endpoints.forEach(id => d.append(" — assumed zone for ", code(id)));
+    c.assumed_endpoints.forEach(id => d.append(" — assumed zone for ", ref(id)));
     $("crossings").append(d);
   });
   R.system_model.assumptions.forEach(a => {
     const d = el("div","assume");
-    d.append(`Assumption: ${a.assumption} (`, code(a.element_id), `) — ${a.basis}`);
+    d.append(`Assumption: ${a.assumption} (`, ref(a.element_id), `) — ${a.basis}`);
     $("assumptions").append(d);
   });
 

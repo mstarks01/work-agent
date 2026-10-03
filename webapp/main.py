@@ -174,9 +174,7 @@ from analysis_service.links import (
     LinkQuestion,
 )
 from analysis_service.model_tiers import ModelTierConfig
-from analysis_service.open_facts import (
-    open_facts_by_framework,
-)
+from analysis_service.open_facts import element_names, open_facts_by_framework
 from analysis_service.questions import question_fallback
 from analysis_service.report_conditions import conditions, corrected_findings
 from analysis_service.selection import SelectionError, resolve_selection
@@ -552,6 +550,7 @@ def render_report(report: Report, state: AnswerState) -> RenderedPage:
             else {}
         ),
         provenance=script_json(_provenance_payload(report, state.facts, state.shown)),
+        names=script_json(element_names(report.system_model)),
     )
 
 
