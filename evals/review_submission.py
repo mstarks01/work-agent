@@ -157,9 +157,9 @@ def _live(reviews: list[MergedReview]) -> tuple[list[MergedReview], list[str]]:
     A reader who sits one case twice replaces their earlier sitting, and
     "later" is the ``generated`` date. Two sittings by one signature of one
     case on one date carry nothing that says which the reader wrote last, so
-    neither is live and both are named. A merged file is never removed, so
-    the reader's remedy is a sitting dated later, and a maintainer's is to
-    drop one of the two.
+    neither is live and both are named. A merged file is never removed:
+    :func:`verify_pull_request` refuses a pull request that deletes or edits
+    one. So the remedy is a sitting dated later.
     """
     grouped: dict[tuple[str, str], list[MergedReview]] = {}
     for review in reviews:
@@ -174,7 +174,8 @@ def _live(reviews: list[MergedReview]) -> tuple[list[MergedReview], list[str]]:
             continue
         ties.append(
             f"{case_id}: {' and '.join(tied)} are both {signature}'s sitting dated"
-            f" {newest}, and nothing says which is later; keep one"
+            f" {newest}, and nothing says which is later; sit again on a later"
+            " date"
         )
     return live, ties
 
