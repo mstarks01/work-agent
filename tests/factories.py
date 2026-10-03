@@ -36,6 +36,7 @@ from google.genai import types
 from pydantic import BaseModel, Field
 
 from analysis_service import frameworks as framework_registry
+from analysis_service.answer_round import AnswerState
 from analysis_service.binding import NodeBinding
 from analysis_service.budgets import BudgetPolicy
 from analysis_service.certification import MANIFEST_VERSION, BlessedManifest
@@ -46,11 +47,13 @@ from analysis_service.claims import (
     ProposedVerdict,
     Rating,
     Severity,
+    UnknownKey,
     UnknownRef,
     Verdict,
 )
 from analysis_service.compact import FULL_FORMAT, ExtractionFormat
 from analysis_service.conformance import REFERENCE_MODELS
+from analysis_service.fact_answers import FactAnswer
 from analysis_service.frameworks import PACKAGES, FrameworkName, FrameworkPackage
 from analysis_service.frameworks.asvs.record import (
     RequirementProposal,
@@ -71,6 +74,7 @@ from analysis_service.graph import (
     build_pipeline,
 )
 from analysis_service.identity import build_identity, execution_fingerprint
+from analysis_service.jobs import Checkpoint
 from analysis_service.markdown_loader import MarkdownLoader
 from analysis_service.model_tiers import (
     ModelTierConfig,
@@ -938,6 +942,34 @@ def scripted_usage() -> types.GenerateContentResponseUsageMetadata:
         candidates_token_count=300,
         thoughts_token_count=9000,
         total_token_count=10400,
+    )
+
+
+def report_state(
+    report: Report,
+    *,
+    answered: Sequence[FactAnswer] = (),
+    final: bool = False,
+    shown: Sequence[UnknownKey] = (),
+    corrections: Sequence[FactAnswer] = (),
+) -> AnswerState:
+    """The Answer State of a finished run whose report is ``report``."""
+    return AnswerState(
+        checkpoint=Checkpoint(
+            system_model=report.system_model, assertions=report.assertions
+        ),
+        frameworks={s.name: s.options for s in report.job.frameworks},
+        analyses=report.analyses,
+        waiting=False,
+        final=final,
+        sources=(),
+        links=(),
+        facts=answered,
+        shown=shown,
+        skipped=(),
+        corrections=corrections,
+        revision=0,
+        resumed_by=None,
     )
 
 
