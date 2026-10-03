@@ -55,6 +55,12 @@
   // analysis_service.open_facts.reference_labels, so the page parses no
   // reference.
   const NAMES = JSON.parse(document.getElementById("names").textContent);
+  // How each finding moved since the report a follow-up's answers came from,
+  // matched server-side by analysis_service.report_changes. Empty for any
+  // other report.
+  const CHANGES = JSON.parse(document.getElementById("changes").textContent).findings || [];
+  const CHANGED = new Map(CHANGES.filter(c => c.change !== "gone")
+    .map(c => [`${c.framework}/${c.claim_id}`, c]));
   const ANSWERED_ATTRIBUTES = new Set(
     (PROVENANCE.answered_attributes || []).map(([element, attribute]) => `${element}>${attribute}`));
   const CONDITIONS = PROVENANCE.conditions || {};
@@ -452,6 +458,12 @@
     card.append(head);
     // A final report's owner changed an answer this finding rests on, after
     // the analysis ran; the analysis did not run again (ADR 0054).
+    const moved = CHANGED.get(`${t.framework}/${t.id}`);
+    if (moved && moved.change === "new") {
+      card.append(el("div", "meta", "New since the earlier report."));
+    } else if (moved && moved.change === "changed") {
+      card.append(el("div", "meta", `Was ${VERDICT[moved.before][0]} in the earlier report.`));
+    }
     if (CORRECTED.has(`${t.framework}/${t.id}`)) {
       card.append(el("div", "unknown",
         "Corrected after this report: an answer this finding rests on was " +
@@ -888,6 +900,29 @@
     $("analyses").append(section);
   }
 
+  // What the answers did, before any finding: how the follow-up's findings
+  // moved since the report the answers came from. A finding the follow-up no
+  // longer raises has no card, so it is listed here by title.
+  if (CHANGES.length) {
+    const tally = new Map();
+    CHANGES.forEach(c => {
+      const line = c.change === "new" ? "new"
+        : c.change === "gone" ? "no longer raised"
+        : c.change === "unchanged" ? "unchanged"
+        : `${VERDICT[c.before][0]} \u2192 ${VERDICT[c.after][0]}`;
+      tally.set(line, (tally.get(line) || 0) + 1);
+    });
+    const box = el("div", "meta");
+    box.append(`Since the report your answers came from, ${CHANGES.length} finding(s): ` +
+      [...tally].map(([line, n]) => `${n} ${line}`).join("; ") + ".");
+    const gone = CHANGES.filter(c => c.change === "gone");
+    if (gone.length) {
+      const list = el("ul");
+      gone.forEach(c => list.append(proseEl("li", null, c.title)));
+      box.append(list);
+    }
+    $("analyses").append(box);
+  }
   // In the job's own selection order, which the envelope has already checked
   // against `job.frameworks`.
   // What stays open, before any finding: a conditional finding is neither
