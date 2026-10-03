@@ -49,9 +49,11 @@
   // owner's answers Source, the attributes the owner answered, and why each
   // conditional finding's facts are still open.
   const PROVENANCE = JSON.parse(document.getElementById("provenance").textContent);
-  // Each element's display name, and a flow's as its two endpoints, keyed by
-  // ID and built server-side by analysis_service.open_facts.element_names, the
-  // reader every question label uses.
+  // A display label for each element ID, a flow's as its two endpoints, and
+  // for each evidence reference a lane may cite, such as an unstated attribute
+  // or a boundary crossing. Built server-side by
+  // analysis_service.open_facts.reference_labels, so the page parses no
+  // reference.
   const NAMES = JSON.parse(document.getElementById("names").textContent);
   const ANSWERED_ATTRIBUTES = new Set(
     (PROVENANCE.answered_attributes || []).map(([element, attribute]) => `${element}>${attribute}`));
@@ -185,10 +187,11 @@
     };
   };
   // A model writes an identifier the way the prompt hands it over: in
-  // backticks. A span that is an element's ID shows the element's name, and
-  // the ID stays on hover, so a description reads "Storefront API" rather than
-  // `process:storefront-api`. Every other span becomes a `code` element, in
-  // the face the element table below shows identifiers in.
+  // backticks. A span that is an element's ID or an evidence reference shows
+  // its label, and the identifier stays on hover, so a description reads
+  // "Storefront API" rather than `process:storefront-api`. Every other span
+  // becomes a `code` element, in the face the element table below shows
+  // identifiers in.
   //
   // A pair of backticks around a non-empty span is the entire grammar. No
   // other Markdown is read, and an unpaired backtick stays a backtick: this
@@ -199,7 +202,7 @@
   // elements, appended. A quote never comes through here. Its text is the
   // submitter's own words, and a backtick among them is one of those words.
   const CODE_SPAN = /`([^`\n]+)`/g;
-  // An element's ID as its name, the ID on hover; any other ID as code.
+  // A labelled identifier as its label, the identifier on hover; any other as code.
   const ref = (id) => Object.hasOwn(NAMES, id)
     ? Object.assign(el("span", "ref", NAMES[id]), { title: id })
     : code(id);
