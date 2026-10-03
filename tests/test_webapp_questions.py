@@ -692,6 +692,10 @@ def _run_answer_block(
     node = shutil.which("node")
     if node is None:
         pytest.skip("no node on PATH to run the report page's script")
+    # Every report carries `analyses`; a stub that states only the model
+    # stands for one with no findings.
+    if isinstance(payloads.get("report"), dict):
+        payloads["report"] = {"analyses": [], **payloads["report"]}
     javascript = viewer_javascript()
     helpers = javascript.split(FIRST_VIEWER_CONSTANT)[0]
     start = javascript.index(start_marker)
@@ -887,15 +891,23 @@ await button.listeners.click();
 
 
 def tallies(
-    questions: list[dict], answer: list[dict], value: str | None = None
+    questions: list[dict],
+    answer: list[dict],
+    value: str | None = None,
+    *,
+    analyses: list[dict] | None = None,
+    starts: str = "Your",
 ) -> list[str]:
-    """The running line after answering the questions in ``answer``.
+    """The running lines starting ``starts`` after answering the questions in ``answer``.
 
     Each answer is ``value`` where one is given, and otherwise the first choice
-    or a line of text.
+    or a line of text. ``analyses`` stands in for the report's findings.
     """
     payloads = {
-        "report": {"system_model": valid_model().model_dump(mode="json")},
+        "report": {
+            "system_model": valid_model().model_dump(mode="json"),
+            "analyses": analyses or [],
+        },
         "link_questions": [],
         "fact_questions": questions,
     }
@@ -907,7 +919,8 @@ for (const q of {json.dumps(answer)}) {{
   input.value = {json.dumps(value)} ?? (q.choices.length ? q.choices[0] : "an answer");
   (input.listeners.input || input.listeners.change)();
 }}
-calls.push(...box.all("div").map(d => d.textContent).filter(t => t.startsWith("Your")));
+calls.push(...box.all("div").map(d => d.textContent)
+  .filter(t => t.startsWith({json.dumps(starts)})));
 """
     return _run_answer_block(payloads, steps)["calls"]
 
@@ -971,6 +984,41 @@ class TestTheRunningCount:
         ]
         line = "Your answers cover every question for 1 of the 2 findings that wait on one."
         assert tallies(questions, questions[1:]) == [f"{line} {DECIDED}"]
+
+
+def test_the_follow_up_states_its_scope_before_it_runs():
+    """#561: how far the answers reach, and what pressing the button runs."""
+    questions = [
+        {
+            "key": ["", "", "", name, "", ""],
+            "kind": "subject",
+            "basis": "critic",
+            "label": name,
+            "cited_by": 1,
+            "covered_so_far": 1,
+            "choices": [],
+            "findings": [finding],
+        }
+        for name, finding in (("a", "stride/S-01"), ("b", "stride/S-02"))
+    ]
+    analyses = [
+        {
+            "framework": "stride",
+            "claims": [
+                {"id": "S-01", "category": "spoofing"},
+                {"id": "S-02", "category": "tampering"},
+            ],
+        }
+    ]
+
+    assert tallies(questions, [], analyses=analyses, starts="No answer") == [
+        "No answer given yet."
+    ]
+    (line,) = tallies(questions, questions, analyses=analyses, starts="2 answer")
+    assert line.startswith("2 answer(s) reach 2 finding(s) in 2 lane(s).")
+    assert "runs the whole analysis once" in line
+    (line,) = tallies(questions, questions[:1], analyses=analyses, starts="1 answer")
+    assert line.startswith("1 answer(s) reach 1 finding(s) in 1 lane(s).")
 
 
 def test_the_report_page_says_how_many_facts_fell_back_to_free_text():
