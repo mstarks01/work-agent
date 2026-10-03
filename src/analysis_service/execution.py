@@ -52,12 +52,12 @@ from analysis_service.graph import (
     revise_rounds,
 )
 from analysis_service.identity import build_identity, execution_fingerprint
+from analysis_service.ladder import SchemaPath, SchemaRefusal
 from analysis_service.prompt_cache import CACHE_WRITE_METADATA_KEY
 from analysis_service.provider import (
     REASKS_METADATA_KEY,
     SCHEMA_FALLBACK_METADATA_KEY,
     SCHEMA_PATH_METADATA_KEY,
-    SchemaPath,
 )
 from analysis_service.report import (
     InputRef,
@@ -66,7 +66,7 @@ from analysis_service.report import (
     Report,
     TokenUsage,
 )
-from analysis_service.retry import ATTEMPTS_METADATA_KEY, SchemaRefusal
+from analysis_service.retry import ATTEMPTS_METADATA_KEY
 from analysis_service.sources import Source, render_sources
 from analysis_service.vendors import join_served
 

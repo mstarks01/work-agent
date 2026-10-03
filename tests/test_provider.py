@@ -23,6 +23,7 @@ from google.genai import types
 from pydantic import BaseModel
 
 from analysis_service.charges import CHARGE_METADATA_KEY, UPSTREAM_METADATA_KEY
+from analysis_service.ladder import Ladder
 from analysis_service.provider import (
     PER_CALL_SAMPLING,
     ExecutedLlm,
@@ -327,7 +328,7 @@ class TestTheAdapterOverTheSeam:
         )
 
         assert isinstance(
-            InProcessExecutor([("native", translator)], dict),
+            InProcessExecutor(Ladder(("native",)), {"native": translator}, dict),
             ProviderExecutor,
         )
 

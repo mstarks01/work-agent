@@ -580,7 +580,7 @@ refuses how the schema was sent, the service sends the same request again on
 the next rung. The tier then stays there for the life of the process, because
 most refusals are a property of the pair. Anthropic's "the compiled grammar is
 too large" is a property of one schema, so only that schema moves down, and
-the tier's other nodes keep their rung (`retry.REFUSAL_SCOPE`). The rules in `retry.SCHEMA_REFUSALS`
+the tier's other nodes keep their rung (`ladder.REFUSAL_SCOPE`). The rules in `ladder.SCHEMA_REFUSALS`
 recognise a refusal: a 400 that names a field which carries the schema
 (`response_format`, `output_format`, `outputConfig`, `response_schema`),
 Anthropic's "the compiled grammar is too large", a refused forced tool, a model

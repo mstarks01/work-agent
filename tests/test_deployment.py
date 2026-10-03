@@ -34,6 +34,7 @@ from analysis_service.deployment import (
 from analysis_service.errors import ConfigError
 from analysis_service.graph import FrameworkNodes
 from analysis_service.jobs import InMemoryJobStore
+from analysis_service.ladder import OUTPUT_TOOL_NAME
 from analysis_service.model_gate import (
     ModelGateError,
     emulates_structured_output,
@@ -41,7 +42,6 @@ from analysis_service.model_gate import (
 )
 from analysis_service.model_tiers import SUPPORTED_VERSION as TIERS_SUPPORTED_VERSION
 from analysis_service.model_tiers import ModelConfigError
-from analysis_service.provider import OUTPUT_TOOL_NAME
 from analysis_service.system_model import EmittedSystemModel
 from analysis_service.vendors import ProviderAuthError, vendor_for
 from tests.factories import DEFAULT_FRAMEWORKS, PROJECT_ROOT, rungs_of, translator_of
@@ -858,7 +858,7 @@ def test_vertex_hosted_claude_is_emulated_and_so_takes_the_tool_path(tmp_path):
 
     pipeline = Deployment.from_env(env=env).pipeline(DEFAULT_FRAMEWORKS)
 
-    assert _extract_executor(pipeline).executor.rung == "forced_tool"
+    assert _extract_executor(pipeline).executor.ladder.rung == "forced_tool"
 
 
 def test_tool_forces_the_tool_path_on_a_model_with_native_output(tmp_path):

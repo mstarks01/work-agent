@@ -17,9 +17,9 @@ from google.adk.models.llm_response import LlmResponse
 from google.genai import types
 
 from analysis_service.conformance import REFERENCE_MODELS
+from analysis_service.ladder import OUTPUT_TOOL_NAME
 from analysis_service.model_gate import _litellm
 from analysis_service.provider import (
-    OUTPUT_TOOL_NAME,
     PROMPT_SCHEMA_INSTRUCTION,
     SCHEMA_PATH_METADATA_KEY,
     answer_from_tool_call,
@@ -201,7 +201,6 @@ def test_every_rung_has_a_path_and_translator_arguments():
     """A rung added to the vocabulary must answer in both tables."""
     from typing import get_args
 
-    from analysis_service.binding import _RUNG_KWARGS
-    from analysis_service.provider import PATH_OF_RUNG, Rung
+    from analysis_service.ladder import PATH_OF_RUNG, RUNG_KWARGS, Rung
 
-    assert set(PATH_OF_RUNG) == set(get_args(Rung)) == set(_RUNG_KWARGS)
+    assert set(PATH_OF_RUNG) == set(get_args(Rung)) == set(RUNG_KWARGS)

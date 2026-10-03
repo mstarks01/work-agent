@@ -257,7 +257,7 @@ def test_every_adapter_kwarg_comes_from_a_closed_set():
     body = call.group(1)
     assert "model=selection.route" in body
     assert "**tier_sampling.constructor_kwargs()" in body
-    assert "**_RUNG_KWARGS[rung]" in body
+    assert "**RUNG_KWARGS[rung]" in body
     assert source.count("_translator(\n") == 2, (
         "one definition and one call, once per rung of the tier's ladder"
     )

@@ -943,7 +943,7 @@ def scripted_usage() -> types.GenerateContentResponseUsageMetadata:
 
 def rungs_of(adapter) -> list[str]:
     """The rungs of one built tier adapter's format ladder, best first."""
-    return [rung for rung, _ in adapter.executor.ladder]
+    return list(adapter.executor.ladder.rungs)
 
 
 async def collected(responses: AsyncGenerator[LlmResponse, None]) -> list[LlmResponse]:
