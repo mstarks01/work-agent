@@ -599,7 +599,9 @@ def build_tier_adapters(
         # provider side of the seam. What crosses is one call's own request.
         adapters[tier] = ExecutedLlm(
             model=selection.route,
-            executor=InProcessExecutor(ladder, SCHEMA_RULES[vendor.schema_rule]),
+            executor=InProcessExecutor(
+                ladder, SCHEMA_RULES[vendor.schema_rule(selection.model)]
+            ),
             retry_policy=policy,
         )
     return adapters

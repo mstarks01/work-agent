@@ -232,6 +232,18 @@ class _PromptCacheRule:
 
 
 @dataclass(frozen=True)
+class _SchemaRuleFor:
+    """Which :data:`SchemaRule` a family of models on a vendor takes.
+
+    ``family`` matches a model name. :meth:`Vendor.schema_rule` is the one
+    reader, and it takes the first entry whose family matches.
+    """
+
+    family: re.Pattern[str]
+    rule: SchemaRule
+
+
+@dataclass(frozen=True)
 class _CredentialVar:
     """One environment variable a ``(vendor, mode)`` pair reads.
 
@@ -692,6 +704,19 @@ _OPENROUTER_CLAUDE_RULE = _FormRule(
     ),
 )
 
+# Claude's constrained decoding refuses ``minimum``, ``maximum``,
+# ``multipleOf``, ``minLength`` and ``maxLength`` with a 400 error (Anthropic's
+# structured-outputs page, read 2026-10-02). The refusal belongs to the model
+# family, so a vendor that serves Claude beside other families keys the rule
+# by family. ``_CLAUDE_FAMILY`` reads every vendor's spelling of a Claude.
+_CLAUDE_BOUNDS = _SchemaRuleFor(family=_CLAUDE_FAMILY, rule="bounds_described")
+
+
+def _every_model(rule: SchemaRule) -> _SchemaRuleFor:
+    """The entry that answers for every model a row's earlier entries do not."""
+    return _SchemaRuleFor(family=re.compile(""), rule=rule)
+
+
 # The parse, composed from the same two atoms as the rules above and reading a
 # Claude wherever one starts a segment. ``(?:^|\.)`` is what earns that: it
 # requires the match to start the identifier or to follow a dot, so a ``claude-``
@@ -885,14 +910,16 @@ class Vendor:
     #: A vendor whose models cache another way answers ``None`` until that way
     #: has a sender of its own.
     prompt_cache: _PromptCacheRule | None
-    #: What a node's output schema becomes before it reaches this vendor. The
-    #: same rule applies on the native path and on the forced tool call, so the
-    #: model reads one schema text on both (ADR 0058).
+    #: What a node's output schema becomes before it reaches this vendor, by
+    #: model family, the first match winning. The last entry matches every
+    #: model. The same rule applies on every rung, so the model reads one
+    #: schema text on each (ADR 0058). :meth:`schema_rule` is the one reader.
     #:
     #: ``as_built`` says that no rewrite is known to be needed. It is not a
     #: measurement on every row that carries it. Live sweeps on ``openai`` and
-    #: ``openrouter`` accepted the bounded schemas this graph builds.
-    schema_rule: SchemaRule
+    #: on ``openrouter``'s GPT models accepted the bounded schemas this graph
+    #: builds. No sweep ran Claude on ``openrouter``.
+    schema_rules: tuple[_SchemaRuleFor, ...]
     #: What this vendor reports about the charge it made, keyed by the
     #: arrangement a deployment can run under.
     #:
@@ -1004,6 +1031,14 @@ class Vendor:
                 " so the deployment declares which one; ask the tier config"
             )
         return modes[0]
+
+    def schema_rule(self, model: str) -> SchemaRule:
+        """The :data:`SchemaRule` a node schema for ``model`` is sent under."""
+        return next(
+            entry.rule
+            for entry in self.schema_rules
+            if entry.family.match(model) is not None
+        )
 
     def caches_prompt_prefix(self, model: str) -> bool:
         """Whether a call to ``model`` here takes the explicit cache breakpoint."""
@@ -1220,7 +1255,7 @@ VENDORS: dict[VendorName, Vendor] = {
         routes_to_one_provider=True,
         upstream_pin=None,
         prompt_cache=None,
-        schema_rule="as_built",
+        schema_rules=(_every_model("as_built"),),
         # Vertex admits no raw-API-key path under any adapter
         # (``BerriAI/litellm#21036``), so ``vertex + api_key`` is
         # unrepresentable rather than validated against. Under ``IAM`` it
@@ -1257,7 +1292,7 @@ VENDORS: dict[VendorName, Vendor] = {
         prompt_cache=None,
         # The pinned litellm applies the same rewrite on this path itself, so
         # the wire does not change. Applying it here keeps the rule ours.
-        schema_rule="bounds_described",
+        schema_rules=(_every_model("bounds_described"),),
         credentials={CredentialMode.API_KEY: _api_key_source("anthropic")},
         form_rules=(_CLAUDE_RULE, _CATCH_ALL),
         sdk=None,
@@ -1273,7 +1308,7 @@ VENDORS: dict[VendorName, Vendor] = {
         routes_to_one_provider=True,
         upstream_pin=None,
         prompt_cache=_OPENAI_PROMPT_CACHE,
-        schema_rule="as_built",
+        schema_rules=(_every_model("as_built"),),
         credentials={CredentialMode.API_KEY: _api_key_source("openai")},
         form_rules=(_CLAUDE_RULE, _CATCH_ALL),
         sdk=None,
@@ -1297,7 +1332,7 @@ VENDORS: dict[VendorName, Vendor] = {
         # litellm sends them unchanged on the Converse path. AWS documents a
         # 400 for ``minimum``, ``maximum``, ``multipleOf``, ``minLength`` and
         # ``maxLength`` (structured-outputs page, read 2026-10-02).
-        schema_rule="bounds_described",
+        schema_rules=(_every_model("bounds_described"),),
         credentials={
             # Under ``API_KEY`` Bedrock passes a bearer token and a region.
             # litellm's ``_sign_request`` reads the bearer off the ``api_key``
@@ -1359,7 +1394,7 @@ VENDORS: dict[VendorName, Vendor] = {
         routes_to_one_provider=True,
         upstream_pin=None,
         prompt_cache=None,
-        schema_rule="as_built",
+        schema_rules=(_every_model("as_built"),),
         # The Developer API takes a key and nothing else. It is a different
         # provider from ``vertex`` rather than a second mode on it:
         # ``get_llm_provider`` resolves ``gemini/`` and ``vertex_ai/`` to two
@@ -1448,7 +1483,12 @@ VENDORS: dict[VendorName, Vendor] = {
             field="provider", only="only", fallbacks="allow_fallbacks"
         ),
         prompt_cache=_OPENROUTER_PROMPT_CACHE,
-        schema_rule="as_built",
+        # OpenRouter passes a ``json_schema`` response format through to
+        # Anthropic with its structured-outputs beta header, and documents no
+        # rewrite of the keywords Claude refuses (its structured-outputs and
+        # provider-routing pages, read 2026-10-02). The pinned litellm forwards
+        # every bound unchanged on this path.
+        schema_rules=(_CLAUDE_BOUNDS, _every_model("as_built")),
         # A bearer token and nothing else. litellm reads ``OPENROUTER_API_KEY``
         # and then ``OR_API_KEY`` out of the process environment whenever
         # ``api_key`` is absent; the registry declares neither, and the key is
