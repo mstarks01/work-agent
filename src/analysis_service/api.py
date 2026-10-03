@@ -432,7 +432,19 @@ async def _admit_and_start(
     # The runner is looked up before the reservation. A graph is built on
     # first use per selection, and a build that raised after the reservation
     # would leave a slot held that no task ever releases.
-    runner = request.app.state.runner_for(record.selection(), entry_of(record))
+    try:
+        runner = request.app.state.runner_for(record.selection(), entry_of(record))
+    except ConfigError as exc:
+        # The deployment's configuration, such as a missing provider
+        # credential, and not the caller's request. The message names
+        # environment variables, so it goes to the log, and the caller gets a
+        # fixed message (OWASP A10).
+        logger.error("cannot build a runner for job %s: %s", record.id, exc)
+        raise HTTPException(
+            status_code=503,
+            detail="this deployment cannot run an analysis now: its configuration"
+            " is incomplete",
+        ) from None
     budget = request.app.state.budget
     admission = await store.reserve(record, ceiling=ceiling, budget=budget)
     if admission.outcome in _REFUSALS:
