@@ -78,7 +78,12 @@ def run_report_page(html: str) -> dict[str, str]:
         "Object.entries(ids).map(([id, n]) => [id, n.textContent]))));"
     )
     done = subprocess.run(
-        [node, "-e", program], capture_output=True, text=True, timeout=30, check=False
+        [node, "-"],
+        input=program,
+        capture_output=True,
+        text=True,
+        timeout=30,
+        check=False,
     )
     assert done.returncode == 0, done.stderr
     return json.loads(done.stdout.strip().splitlines()[-1])
@@ -143,7 +148,7 @@ def test_a_conditional_finding_says_why_each_fact_is_still_open(
 def test_the_next_step_follows_whether_the_report_is_final():
     follow_up = run_report_page(page())["analyses"]
     final = run_report_page(page(final=True))["analyses"]
-    assert "answer them in the follow-up below" in follow_up
+    assert "answer the questions in the follow-up below" in follow_up
     assert "correct an answer below or submit the description again" in final
 
 
@@ -260,3 +265,56 @@ def test_a_description_names_an_evidence_reference_by_its_label():
     )
     assert unstated not in text
     assert crosses not in text
+
+
+def _split_by_provenance(html: str) -> tuple[str, str]:
+    """The analyses text outside the provenance toggle, and the text inside it."""
+    node = shutil.which("node")
+    if node is None:
+        pytest.skip("no node on PATH to run the report page")
+    payloads = dict(
+        re.findall(
+            r'<script type="application/json" id="([^"]+)"[^>]*>(.*?)</script>',
+            html,
+            re.DOTALL,
+        )
+    )
+    (script,) = re.findall(r"<script nonce=\"[^\"]*\">(.*?)</script>", html, re.DOTALL)
+    walk = r"""
+const text = (n) => typeof n === "object" ? n.textContent : String(n);
+const split = (n, out) => {
+  if (typeof n !== "object") { out.shown.push(String(n)); return; }
+  if (n.tag === "details" && n.className === "prov") { out.hidden.push(text(n)); return; }
+  n.children.forEach(k => split(k, out));
+};
+const out = { shown: [], hidden: [] };
+split(ids["analyses"], out);
+console.log(JSON.stringify({ shown: out.shown.join(""), hidden: out.hidden.join("") }));
+"""
+    program = _SHIM.replace("PAYLOADS", json.dumps(payloads)) + script + walk
+    done = subprocess.run(
+        [node, "-"],
+        input=program,
+        capture_output=True,
+        text=True,
+        timeout=30,
+        check=False,
+    )
+    assert done.returncode == 0, done.stderr
+    parts = json.loads(done.stdout.strip().splitlines()[-1])
+    return parts["shown"], parts["hidden"]
+
+
+def test_a_finding_shows_its_summary_and_hides_its_provenance():
+    """#561's default view: why it matters, what is missing, what it touches
+    and what to do next. The grounds and the critic's reason sit behind the
+    toggle, and nothing is dropped."""
+    shown, hidden = _split_by_provenance(page())
+
+    for part in ("Why it matters", "Missing information", "Affected", "Next step"):
+        assert part in shown, part
+    assert "The critic's reason" in hidden
+    assert "The sources do not state this." in hidden
+    assert "The sources do not state this." not in shown
+    assert "Quoted from the submission" in hidden
+    assert "Quoted from the submission" not in shown
