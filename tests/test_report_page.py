@@ -192,3 +192,29 @@ def test_every_reason_a_fact_is_open_has_a_line_on_the_page():
         )
         keys = set(re.findall(r"^\s*(\w+):", table.group(1), re.MULTILINE))
         assert keys == set(get_args(FactStatus)), name
+
+
+def test_a_description_names_an_element_by_its_name():
+    """A finding showed `flow:entity:customer>process:web-app>login` (#561).
+
+    An element ID in backticks reads as the element's name, and a flow as its
+    two endpoints. A span that names no element, such as an attribute, stays
+    as it was written.
+    """
+    from tests.factories import sample_threat
+
+    model = valid_model()
+    flow = next(f for f in model.data_flows if f.id.endswith(">login"))
+    by_id = {element.id: element.name for element in model.elements()}
+    described = sample_threat(
+        description=f"`{flow.source}` sends `{flow.id}` with `encryption_in_transit` unknown."
+    )
+    report = sample_report([described])
+    text = run_report_page(render_report(report, report_state(report)).html)["analyses"]
+
+    endpoints = f"{by_id[flow.source]} → {by_id[flow.destination]}"
+    assert (
+        f"{by_id[flow.source]} sends {endpoints} with encryption_in_transit unknown."
+        in text
+    )
+    assert flow.id not in text
