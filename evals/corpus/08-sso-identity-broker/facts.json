@@ -441,6 +441,36 @@
     }
   ],
   "disputed": [],
+  "unheld": [
+    {
+      "fact": "group membership and leavers reach the directory only through a nightly pull from the HR system",
+      "quotes": [
+        {
+          "source_label": "System description",
+          "quote": "The broker pulls the changes once a night, and that is also how\nleavers stop being colleagues."
+        }
+      ],
+      "claims": [
+        {
+          "framework": "stride",
+          "index": 16,
+          "claim_sha256": "baa174ef24ce92ba987f011d792bc60af7d94e8e13e41a0cafec8ac7bbcf0132"
+        },
+        {
+          "framework": "stride",
+          "index": 19,
+          "claim_sha256": "0e4477d2b48580f0088a66dc95194f674b5b81d03e2215dc7aa56e3dcba11bc3"
+        },
+        {
+          "framework": "asvs",
+          "index": 2,
+          "claim_sha256": "dfc0bd94cc567ee1c3b7f8c5bc4f0ceb45982529a30c78e7979221da6f0c2056"
+        }
+      ],
+      "rationale": "No predicate names how often a store is brought up to date from another system. credential-revocation holds that a token cannot be pulled back, and not the delay before a leaver loses access. Stride 16 rests on the pull alone; stride 19 and asvs 2 rest on it in part.",
+      "reviewed_by": null
+    }
+  ],
   "aliases": {
     "subjects": [],
     "qualifiers": []

@@ -555,6 +555,15 @@ to the reference's spelling before it compares the rows, and only where the
 alias is signed. A produced row on a subject nobody ruled an alias for reads
 `unreviewed`, never `found`.
 
+The file may also carry `unheld`: each fact the source states that no
+assertion predicate can hold. An entry carries the `fact` in words, the
+`quotes` that state it, the `claims` that rest on it, a `rationale` and
+`reviewed_by`. A claim is named by its `framework`, its `index` in that
+claims file and `claim_sha256`, the digest of its sentence. The digest stands
+in for the sentence, because the leakage lint refuses a claim sentence in
+this file. When a predicate that holds the fact is added, write the fact as a
+row and delete the entry.
+
 Read the source, then rule on each row: does the source state this, about
 this subject, at this scope, with this basis? Write your GitHub login into
 the row's `reviewed_by` where it does. Correct the row first where it does
@@ -568,7 +577,9 @@ assumption on `model.json` that says so, and write the row as `unknown`: the
 value is a placeholder, and the gate keeps the pair out of the denominator.
 
 `python evals/verify_corpus.py` resolves every row through the assertion
-gate and prints how many rows each file holds and how many are unsigned.
+gate and prints how many rows each file holds, how many are unsigned and how
+many facts are unheld. It also fails an unheld entry whose quote the source
+does not carry, or whose claim no longer matches its digest.
 `tests/test_reference_facts.py` holds the rows to the blessed model: every
 control the model states or states absent must be reached by a row that
 agrees with it, and every row that states a control must land on one the
