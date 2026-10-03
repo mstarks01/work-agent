@@ -164,6 +164,20 @@ class TestTheImportRefusesWhatWouldRecordWordsNobodyRead:
             applied(tree, env)
         assert not written(tree)
 
+    def test_a_second_sitting_on_the_same_date(self, tree):
+        """CI refuses a tie with a merged sitting, so the import must too.
+
+        The import once wrote the second file, and the pull request then could
+        not merge: two sittings of one case by one reader on one date have no
+        order, and a merged file cannot be removed.
+        """
+        applied(tree, envelope(tree))
+        second = envelope(tree, {CASE: answers(tree, notes="a confirming read")})
+
+        with pytest.raises(EnvelopeError, match="nothing says which is later"):
+            applied(tree, second)
+        assert len(written(tree)) == 1
+
     def test_a_file_that_moved_under_the_read(self, tree):
         """Days pass between the page and the import, and the text can move."""
         env = envelope(tree)

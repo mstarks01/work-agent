@@ -20,8 +20,9 @@ envelope (A08). A mark that names no recorded finding refuses its case rather
 than being dropped (A10). Nothing in the file decides anything: it supplies
 answers, and the rules that judge them are the same ones the app runs.
 
-Each case is held to :func:`~evals.harness.sitting.sitting_problems`, the
-reader that also checks a merged submission, and the import writes the one
+The envelope is held to :func:`~evals.review_submission.validate`, the check
+CI runs on the pull request, so the import refuses what CI refuses: a case's
+own problems and a tie with a merged sitting. The import writes the one
 submission file the app's press writes, under the same name. So an imported
 sitting and one held in the app are the same bytes, checked the same way.
 
@@ -45,7 +46,7 @@ from evals.harness.reference import (
     MAX_NAME,
     SUBMITTED_FOR_PATTERN,
 )
-from evals.harness.sitting import Mark, SittingError, Store
+from evals.harness.sitting import Mark, Store
 
 #: The envelope format, so a file written by an older page refuses loudly
 #: rather than being read under rules it was not built for. There is one
@@ -203,26 +204,6 @@ def _offered(corpus_dir: Path) -> set[str]:
     return {case.meta.id for case in sittings.load_corpus(corpus_dir)}
 
 
-def _refusals(
-    case_id: str,
-    answers: CaseAnswers,
-    prepared: sittings.Prepared,
-    case_dir: Path,
-) -> list[str]:
-    """Everything wrong with one case's answers, all of it at once.
-
-    Asked rather than re-derived. An offline reader and a reader at a keyboard
-    are held to one rule, so a change to it cannot refuse one and accept the
-    other.
-    """
-    return sittings.sitting_problems(
-        case_dir,
-        own_list=answers.own_list,
-        opened_digests=answers.opened_digests,
-        marks=answers.marks,
-    )
-
-
 #: Where a merged submission lives, relative to the repository root.
 SUBMISSIONS_DIR = Path("evals/review/submissions")
 
@@ -275,27 +256,20 @@ def apply(envelope: Envelope, root: Path, drafts: Path | None = None) -> list[st
             f"this envelope names cases the corpus does not hold: {unknown}"
         )
 
-    # Every case is offered: the check above raised on the difference.
-    ordered = sorted(envelope.cases)
-    prepared = {}
-    problems: list[str] = []
-    for case_id in ordered:
-        case_dir = store.case_dir(case_id)
-        try:
-            prepared[case_id] = sittings.prepare(case_dir)
-        except (SittingError, OSError) as exc:
-            problems.append(f"{case_id}: will not prepare — {exc}")
-            continue
-        problems += _refusals(
-            case_id, envelope.cases[case_id], prepared[case_id], case_dir
-        )
-    if problems:
+    # Every case is offered: the check above raised on the difference. The
+    # rest is the check CI runs on the pull request, asked rather than copied,
+    # so the import refuses what CI refuses: each case's own problems and a
+    # tie with a merged sitting. Imported here because review_submission
+    # imports this module.
+    from evals.review_submission import validate
+
+    if problems := validate(envelope, root):
         raise EnvelopeError("\n".join(problems))
 
     target = root / relative_path(envelope)
     target.parent.mkdir(parents=True, exist_ok=True)
     target.write_bytes(serialize(envelope))
-    return ordered
+    return sorted(envelope.cases)
 
 
 def command_import(args: argparse.Namespace) -> int:
