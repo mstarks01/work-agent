@@ -573,6 +573,30 @@ def endpoint_targets(
     return frozenset(targets)
 
 
+#: A finding's identity, as :func:`finding_key` spells it.
+FindingKey = tuple[object, ...]
+
+
+def finding_key(claim: Claim, flows: Mapping[str, tuple[str, str]]) -> FindingKey:
+    """Which finding a claim is, from its fields and never its prose.
+
+    A claim with a verb is one action at one place in one lane: its
+    framework, its lane, its verb and its endpoint-resolved targets. A claim
+    with no verb belongs to a package whose identity is a catalog identifier,
+    so it is its framework and the unit it rules on. Read by the critic's
+    duplicate pairs and by :mod:`analysis_service.report_changes`, which
+    matches one report's findings to an earlier report's.
+    """
+    if claim.verb is None:
+        return (claim.framework, type(claim).unit_of(claim))
+    return (
+        claim.framework,
+        lane_of(claim),
+        claim.verb,
+        endpoint_targets(claim.affected_element_ids, flows),
+    )
+
+
 def duplicate_groups(
     drafts: Sequence[Claim], system_model: SystemModel
 ) -> dict[str, list[str]]:
@@ -590,16 +614,11 @@ def duplicate_groups(
     identifier, and its duplicates are ID collisions the join already refuses.
     """
     flows = ModelIndex.of(system_model).flow_endpoints
-    by_key: dict[tuple[str | None, str, frozenset[str]], list[str]] = {}
+    by_key: dict[FindingKey, list[str]] = {}
     for draft in drafts:
         if draft.verb is None:
             continue
-        key = (
-            lane_of(draft),
-            draft.verb,
-            endpoint_targets(draft.affected_element_ids, flows),
-        )
-        by_key.setdefault(key, []).append(draft.id)
+        by_key.setdefault(finding_key(draft, flows), []).append(draft.id)
     return {
         draft_id: [other for other in ids if other != draft_id]
         for ids in by_key.values()

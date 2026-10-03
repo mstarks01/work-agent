@@ -318,3 +318,29 @@ def test_a_finding_shows_its_summary_and_hides_its_provenance():
     assert "The sources do not state this." not in shown
     assert "Quoted from the submission" in hidden
     assert "Quoted from the submission" not in shown
+
+
+def test_a_follow_up_says_how_each_finding_moved():
+    """A follow-up's reader saw its findings and nothing of what the answers did."""
+    from tests.factories import sample_threat
+
+    before = sample_report(
+        [asking_threat(ASKED), sample_threat("S-02", verb="impersonate", title="Lost")]
+    )
+    after = sample_report([sample_threat()])
+    html = render_report(after, report_state(after, final=True), before).html
+    text = run_report_page(html)["analyses"]
+
+    assert (
+        "Since the report your answers came from, 2 finding(s): 1 Needs info"
+        " → Confirmed; 1 no longer raised." in text
+    )
+    assert "Was Needs info in the earlier report." in text
+    assert "Lost" in text
+
+
+def test_a_first_report_says_nothing_about_changes():
+    text = run_report_page(page())["analyses"]
+
+    assert "Since the report your answers came from" not in text
+    assert "in the earlier report" not in text

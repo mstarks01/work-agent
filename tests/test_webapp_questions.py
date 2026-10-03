@@ -370,6 +370,22 @@ class TestTheWholeFlow:
         assert resumed.status_code == 200
         assert "event: done" in client.get(f"/events/{resumed.json()['run']}").text
 
+    def test_a_follow_up_s_page_compares_it_with_the_report_before(self, tiers, runner):
+        """The follow-up keeps the report its answers came from (#561)."""
+        client = client_for(tiers, runner)
+        finished = start(client, questions=False)
+        client.get(f"/events/{finished}")
+        resumed = answer(client, finished, LINK).json()["run"]
+        client.get(f"/events/{resumed}")
+
+        def changes(run_id):
+            page = client.get(f"/report/{run_id}").text
+            block = re.search(r'id="changes"[^>]*>(.*?)</script>', page, re.DOTALL)
+            return json.loads(block.group(1))
+
+        assert changes(finished) == {}
+        assert changes(resumed)["findings"], "the follow-up lists no finding"
+
 
 class TestTheAnswerEndpoint:
     def test_it_requires_the_app_s_own_page(self, tiers, runner):

@@ -176,6 +176,7 @@ from analysis_service.links import (
 from analysis_service.model_tiers import ModelTierConfig
 from analysis_service.open_facts import open_facts_by_framework, reference_labels
 from analysis_service.questions import question_fallback
+from analysis_service.report_changes import report_changes
 from analysis_service.report_conditions import conditions, corrected_findings
 from analysis_service.selection import SelectionError, resolve_selection
 from analysis_service.sources import ANSWERS_LABEL
@@ -262,6 +263,9 @@ class Run:
     revision: int = 0
     #: The run a submitter's answers started from this one, if any.
     resumed_by: Run | None = None
+    #: The report this run's answers came from, for a follow-up: what its own
+    #: report is compared with.
+    previous: Report | None = None
 
     @property
     def waiting(self) -> bool:
@@ -505,8 +509,13 @@ def unit_rows(report: Report) -> dict[str, list[dict[str, str]]]:
     return rows
 
 
-def render_report(report: Report, state: AnswerState) -> RenderedPage:
+def render_report(
+    report: Report, state: AnswerState, previous: Report | None = None
+) -> RenderedPage:
     """``report_view.html``, carrying this run's report.
+
+    ``previous`` is the report a follow-up's answers came from. The page then
+    shows how each finding moved since it.
 
     ``state`` is the run's :class:`~analysis_service.answer_round.AnswerState`:
     its answers, whether a follow-up wrote its report, what the pause showed,
@@ -550,6 +559,15 @@ def render_report(report: Report, state: AnswerState) -> RenderedPage:
             else {}
         ),
         provenance=script_json(_provenance_payload(report, state.facts, state.shown)),
+        changes=script_json(
+            {
+                "findings": [
+                    change.to_json() for change in report_changes(previous, report)
+                ]
+            }
+            if previous is not None
+            else {}
+        ),
         names=script_json(
             reference_labels(
                 report.system_model,
@@ -817,6 +835,7 @@ def create_app(
                 status_code=409,
             )
         parent.resumed_by = run
+        run.previous = parent.report
         run.engine, run.sources = parent.engine, parent.sources
         run.links, run.facts = outcome.links, outcome.facts
         run.final = outcome.follow_up
@@ -841,7 +860,7 @@ def create_app(
         run = analyses.get(run_id)
         if run is None or run.report is None:
             return PlainTextResponse("no such report", status_code=404)
-        return response(render_report(run.report, run.state()))
+        return response(render_report(run.report, run.state(), run.previous))
 
     @app.post("/correct/{run_id}")
     async def correct(run_id: str, request: Request) -> Response:
