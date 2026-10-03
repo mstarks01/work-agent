@@ -30,6 +30,7 @@ from analysis_service.analysis import control_state
 from analysis_service.assertions import AssertionCatalog, apply_projection
 from analysis_service.capabilities import CAPABILITIES
 from analysis_service.claims import FrameworkAnalysis, UnknownKey, UnknownRef
+from analysis_service.evidence import evidence_catalog
 from analysis_service.question_kinds import QUESTION_KINDS
 from analysis_service.system_model import ZONE_ATTRIBUTE, SystemModel
 
@@ -76,6 +77,35 @@ def element_names(model: SystemModel) -> Mapping[str, str]:
         destination = names.get(flow.destination, flow.destination)
         names[flow.id] = f"{source} → {destination}"
     return names
+
+
+#: How a reader sees each attribute state the evidence catalog offers.
+_GROUND_STATE = {"unknown-attribute": "unstated", "absent-attribute": "stated absent"}
+
+
+def reference_labels(
+    model: SystemModel, assertions: AssertionCatalog | None = None
+) -> Mapping[str, str]:
+    """A display label for each element ID and each evidence reference.
+
+    The references are the keys of
+    :func:`~analysis_service.evidence.evidence_catalog`, the one writer of
+    their spelling, so a page that looks a cited reference up here never
+    parses one. An attribute reads as ``element: attribute, state`` and a
+    crossing as ``flow crosses a trust boundary``. An assertion row has no
+    short label and keeps its reference.
+    """
+    names = element_names(model)
+    labels = dict(names)
+    for ref, ground in evidence_catalog(model, assertions).items():
+        if ground.kind in _GROUND_STATE:
+            where = names.get(ground.element_id, ground.element_id)
+            attribute = ground.attribute.replace("_", " ")
+            labels[ref] = f"{where}: {attribute}, {_GROUND_STATE[ground.kind]}"
+        elif ground.flow_id:
+            where = names.get(ground.flow_id, ground.flow_id)
+            labels[ref] = f"{where} crosses a trust boundary"
+    return labels
 
 
 def label_of(ref: UnknownRef, names: Mapping[str, str]) -> str:

@@ -218,3 +218,45 @@ def test_a_description_names_an_element_by_its_name():
         in text
     )
     assert flow.id not in text
+
+
+def test_a_description_names_an_evidence_reference_by_its_label():
+    """A lane cites `unknown:<flow>:<attribute>`, and 158 of 201 archived
+    reports showed such references raw (#561).
+
+    The reference reads as the element and the attribute in words, and a
+    crossing as the flow that crosses; the reference stays on hover.
+    """
+    from analysis_service.evidence import (
+        crossing_evidence_ref,
+        evidence_catalog,
+        unknown_evidence_ref,
+    )
+    from tests.factories import sample_threat
+
+    model = valid_model()
+    by_id = {element.id: element.name for element in model.elements()}
+    catalog = evidence_catalog(model)
+    flow = next(
+        f
+        for f in model.data_flows
+        if unknown_evidence_ref(f.id, "encryption_in_transit") in catalog
+    )
+    crossing = next(
+        f for f in model.data_flows if crossing_evidence_ref(f.id) in catalog
+    )
+    unstated = unknown_evidence_ref(flow.id, "encryption_in_transit")
+    crosses = crossing_evidence_ref(crossing.id)
+    described = sample_threat(description=f"It rests on `{unstated}` and `{crosses}`.")
+    report = sample_report([described])
+    text = run_report_page(render_report(report, report_state(report)).html)["analyses"]
+
+    def endpoints(f):
+        return f"{by_id[f.source]} → {by_id[f.destination]}"
+
+    assert (
+        f"It rests on {endpoints(flow)}: encryption in transit, unstated and"
+        f" {endpoints(crossing)} crosses a trust boundary." in text
+    )
+    assert unstated not in text
+    assert crosses not in text
