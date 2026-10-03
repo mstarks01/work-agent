@@ -70,7 +70,9 @@ from analysis_service.charges import CHARGE_METADATA_KEY, UPSTREAM_METADATA_KEY
 from analysis_service.offline import refuse_live_inference
 from analysis_service.prompt_cache import CACHE_WRITE_METADATA_KEY
 from analysis_service.retry import (
+    REFUSAL_SCOPE,
     ProviderFailure,
+    RefusalScope,
     RetryPolicy,
     SchemaRefusal,
     classify,
@@ -384,6 +386,10 @@ class InProcessExecutor:
             raise ValueError("an executor needs at least one rung")
         self._ladder = tuple(ladder)
         self._step = 0
+        #: The step for each schema a provider refused on its own, keyed by
+        #: :func:`_schema_key`. A call reads it with the tier's step, and the
+        #: larger of the two wins.
+        self._schema_steps: dict[str, int] = {}
         self._rewrite_schema = rewrite_schema
 
     @property
@@ -404,14 +410,15 @@ class InProcessExecutor:
 
     @property
     def rung(self) -> Rung:
-        """The rung the next call is sent on."""
+        """The rung the next call is sent on, where its schema was not refused alone."""
         return self._ladder[self._step][0]
 
     async def generate(self, request: GenerationRequest) -> Sequence[GenerationResult]:
         # Outside the ``try``, so the refusal is never classified as a provider
         # failure and the retry loop above never asks again.
         refuse_live_inference(request.route)
-        step = self._step
+        key = _schema_key(request.output_schema)
+        step = max(self._step, self._schema_steps.get(key, 0))
         refusal: SchemaRefusal | None = None
         while True:
             try:
@@ -422,21 +429,27 @@ class InProcessExecutor:
                 if refused is None or request.output_schema is None or last:
                     raise
                 refusal = refused
-                step = self._step = self._moved_below(step)
+                step = self._moved_below(step, key, REFUSAL_SCOPE[refused])
                 continue
             if refusal is None:
                 return results
             return [replace(result, schema_fallback=refusal) for result in results]
 
-    def _moved_below(self, step: int) -> int:
-        """Move the tier one rung below ``step``, and never back up (ADR 0058).
+    def _moved_below(self, step: int, key: str, scope: RefusalScope) -> int:
+        """Move one rung below ``step``, and never back up (ADR 0058).
 
-        The provider refused this rung for this ``(vendor, model)``, which is a
-        property of the pair rather than of one request, so the tier stays on
-        the lower rung for the life of the process. Lanes run together on one
-        tier, so another lane may have moved it already: the step only grows.
+        A ``pair`` refusal moves the whole tier, because the provider refuses
+        that rung for every request to this ``(vendor, model)``. A ``schema``
+        refusal moves only the schema ``key`` names, so the tier's other nodes
+        keep their rung. Either stays for the life of the process. Lanes run
+        together on one tier, so another lane may have moved it already: each
+        step only grows.
         """
-        return max(self._step, step + 1)
+        if scope == "pair":
+            self._step = max(self._step, step + 1)
+        else:
+            self._schema_steps[key] = max(self._schema_steps.get(key, 0), step + 1)
+        return max(self._step, self._schema_steps.get(key, 0))
 
     async def _generate(
         self, request: GenerationRequest, step: int
@@ -565,6 +578,11 @@ class ExecutedLlm(BaseLlm):
                 self.retry_policy.budget.credit()
                 return results, attempt
         raise AssertionError(f"retry loop fell through: {last!r}")
+
+
+def _schema_key(schema: Mapping[str, Any] | None) -> str:
+    """One node schema, as the key a refusal of it alone is kept under."""
+    return json.dumps(schema, sort_keys=True, default=str)
 
 
 def schema_as_tool(llm_request: LlmRequest) -> LlmRequest:

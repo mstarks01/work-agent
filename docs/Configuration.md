@@ -578,7 +578,9 @@ together with extended thinking. `prompt` takes every model.
 **A refusal at run time moves the tier down one rung.** When the provider
 refuses how the schema was sent, the service sends the same request again on
 the next rung. The tier then stays there for the life of the process, because
-the refusal is a property of the pair. The rules in `retry.SCHEMA_REFUSALS`
+most refusals are a property of the pair. Anthropic's "the compiled grammar is
+too large" is a property of one schema, so only that schema moves down, and
+the tier's other nodes keep their rung (`retry.REFUSAL_SCOPE`). The rules in `retry.SCHEMA_REFUSALS`
 recognise a refusal: a 400 that names a field which carries the schema
 (`response_format`, `output_format`, `outputConfig`, `response_schema`),
 Anthropic's "the compiled grammar is too large", a refused forced tool, a model

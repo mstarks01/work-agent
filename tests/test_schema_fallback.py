@@ -26,8 +26,9 @@ from analysis_service.provider import (
     InProcessExecutor,
 )
 from analysis_service.resilience import load_resilience
-from analysis_service.retry import classify
+from analysis_service.retry import REFUSAL_SCOPE, SCHEMA_REFUSALS, classify
 from analysis_service.sampling import load_sampling
+from analysis_service.system_model import SystemModel
 from tests.factories import collected, rungs_of, tiers_for
 from tests.test_schema_rules import CONFIG, FAKE_ENV, SCHEMA
 from tests.test_tool_path import tool_call_message
@@ -182,6 +183,51 @@ def test_the_tier_stays_on_the_tool_path():
     assert len(provider.calls) == 3
     assert provider.calls[2]["response_format"] is None
     assert SCHEMA_FALLBACK_METADATA_KEY not in later.custom_metadata
+
+
+GRAMMAR_REFUSAL = "AnthropicException - the compiled grammar is too large"
+
+
+def _request_for(adapter, schema) -> LlmRequest:
+    return LlmRequest(
+        model=adapter.model,
+        contents=[types.Content(role="user", parts=[types.Part(text="x")])],
+        config=types.GenerateContentConfig(response_schema=schema),
+    )
+
+
+def test_a_grammar_refusal_moves_only_the_schema_it_refused():
+    """``extract``'s schema is refused alone; another node on the tier stays native."""
+    adapter = _strong_adapter()
+    empty_model = tool_call_message()
+    empty_model["tool_calls"][0]["function"]["arguments"] = "{}"
+    provider = _Provider(
+        _bad_request(GRAMMAR_REFUSAL),
+        empty_model,
+        {"role": "assistant", "content": json.dumps({"claims": []})},
+        empty_model,
+    )
+    executor = _wire(adapter, provider)
+
+    def ask(schema):
+        request = _request_for(adapter, schema)
+        return asyncio.run(collected(adapter.generate_content_async(request, False)))
+
+    (refused,) = ask(SystemModel)
+    ask(SCHEMA)
+    ask(SystemModel)
+
+    first, retried, other, again = provider.calls
+    assert first["response_format"] is not None
+    assert retried["response_format"] is None
+    assert other["response_format"] is not None
+    assert again["response_format"] is None
+    assert executor.rung == "native"
+    assert refused.custom_metadata[SCHEMA_FALLBACK_METADATA_KEY] == "grammar_too_large"
+
+
+def test_every_refusal_rule_states_its_scope():
+    assert REFUSAL_SCOPE.keys() == SCHEMA_REFUSALS.keys()
 
 
 def test_another_400_still_fails_the_call():
