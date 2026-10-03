@@ -37,6 +37,7 @@ from analysis_service.pipeline import AdkPipelineRunner
 from analysis_service.report import Report
 from analysis_service.sources import Source, SourceLimits
 from analysis_service.validation import ValidationIssue
+from analysis_service.vendors import ProviderAuthError
 from tests.factories import (
     DEFAULT_FRAMEWORKS,
     SEEDING_BUDGET,
@@ -746,6 +747,30 @@ class TestAdmissionOutcomes:
 
         assert refused.status_code == 500
         # With a ceiling of one, a held slot would answer this with a 429.
+        assert admitted.status_code == 201
+
+    def test_a_missing_credential_is_a_503_that_names_no_setting(self, caplog):
+        """A runner build that needs a credential raises a ConfigError, which
+        names an environment variable: the log gets it, and the caller does not."""
+        client, _ = make_client(max_active_jobs=1)
+        working = client.app.state.runner_for
+
+        def unconfigured(selection, entry):
+            raise ProviderAuthError(
+                "vendor 'anthropic' needs ANALYSIS_ANTHROPIC_API_KEY; it is unset"
+            )
+
+        client.app.state.runner_for = unconfigured
+        with caplog.at_level(logging.ERROR):
+            refused = client.post("/v1/jobs", json=submission(), headers=auth())
+        client.app.state.runner_for = working
+        admitted = client.post("/v1/jobs", json=submission(), headers=auth())
+
+        assert refused.status_code == 503
+        assert refused.headers["content-type"] == "application/problem+json"
+        assert "ANALYSIS_ANTHROPIC_API_KEY" not in refused.text
+        assert "ANALYSIS_ANTHROPIC_API_KEY" in caplog.text
+        # No slot is held, so the ceiling of one still admits the next job.
         assert admitted.status_code == 201
 
 

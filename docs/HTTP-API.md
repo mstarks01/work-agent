@@ -456,6 +456,7 @@ shipped value is 3.
 | Status | Cause |
 | --- | --- |
 | `429` | This token is already at its ceiling. The message names your current count and the limit. |
+| `503` | The deployment cannot run an analysis, for example because a provider credential is missing. The message names no setting; the operator reads the cause in the service log. The answers route answers the same way. No job is created. |
 
 This one is checked **after** the table above, so a submission that breaches a
 size rung *and* sits on the ceiling gets the rung's status rather than `429`.
