@@ -34,7 +34,7 @@ from analysis_service import (
 )
 from analysis_service.deployment import Deployment
 from analysis_service.vendors import ProviderAuthError
-from tests.factories import TEST_TIER_ENV, sample_selection
+from tests.factories import TEST_TIER_ENV, report_state, sample_selection
 from webapp.main import Analyses, Startup, create_app, render_report
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -517,9 +517,7 @@ def test_the_injection_point_escapes_every_angle_bracket():
     outcome = asyncio.run(
         engine.analyze([Source.description("A web app.")], system_name=BREAKOUT)
     )
-    page = render_report(
-        outcome.report, answered=(), answered_links=(), final=False, shown=()
-    ).html
+    page = render_report(outcome.report, report_state(outcome.report)).html
 
     payload = re.search(
         r'<script type="application/json" id="report"[^>]*>(.*?)</script>',
@@ -972,13 +970,8 @@ def test_no_free_text_field_reaches_the_page_as_markup():
     fix. This covers the server-side half; the client-side half is the sink
     lint above, since no offline test here can run the DOM.
     """
-    page = render_report(
-        report_with_markup_everywhere(),
-        answered=(),
-        answered_links=(),
-        final=False,
-        shown=(),
-    ).html
+    report = report_with_markup_everywhere()
+    page = render_report(report, report_state(report)).html
 
     assert MARKUP_PAYLOAD not in page
     assert "<img" not in page
@@ -1061,9 +1054,7 @@ def test_a_submitted_nonce_placeholder_is_not_substituted():
     from tests.factories import sample_report, sample_threat
 
     report = sample_report(threats=[sample_threat(title="__CSP_NONCE__")])
-    rendered = render_report(
-        report, answered=(), answered_links=(), final=False, shown=()
-    )
+    rendered = render_report(report, report_state(report))
 
     nonce = re.search(r"script-src 'nonce-([^']+)'", rendered.csp).group(1)
     payload = re.search(
@@ -1084,9 +1075,7 @@ def test_the_page_carries_the_open_facts_its_findings_rest_on():
     from tests.factories import sample_report
 
     report = sample_report()
-    rendered = render_report(
-        report, answered=(), answered_links=(), final=False, shown=()
-    )
+    rendered = render_report(report, report_state(report))
     payload = re.search(
         r'<script type="application/json" id="open_facts"[^>]*>(.*?)</script>',
         rendered.html,
@@ -1104,9 +1093,7 @@ def test_the_page_carries_the_link_questions_its_catalog_raises():
     from tests.factories import sample_report
 
     report = sample_report()
-    rendered = render_report(
-        report, answered=(), answered_links=(), final=False, shown=()
-    )
+    rendered = render_report(report, report_state(report))
     payload = re.search(
         r'<script type="application/json" id="link_questions"[^>]*>(.*?)</script>',
         rendered.html,
@@ -1484,9 +1471,7 @@ class TestTheReportPageGetsARowPerUnit:
         from tests.factories import sample_report, sample_threat
 
         report = sample_report(threats=[sample_threat(title="</script>")])
-        html = render_report(
-            report, answered=(), answered_links=(), final=False, shown=()
-        ).html
+        html = render_report(report, report_state(report)).html
 
         payload = re.search(
             r'<script type="application/json" id="units"[^>]*>(.*?)</script>',

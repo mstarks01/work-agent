@@ -149,7 +149,6 @@ from analysis_service.answer_round import (
     SkipKey,
     SourcesOverLimit,
     StaleRevision,
-    question_set,
 )
 from analysis_service.claims import UnknownKey
 from analysis_service.deployment import Deployment
@@ -508,23 +507,14 @@ def unit_rows(report: Report) -> dict[str, list[dict[str, str]]]:
     return rows
 
 
-def render_report(
-    report: Report,
-    *,
-    answered: Sequence[FactAnswer],
-    answered_links: Sequence[LinkAnswer],
-    final: bool,
-    shown: Sequence[UnknownKey],
-    corrections: Sequence[FactAnswer] = (),
-    resumed_by: str | None = None,
-) -> RenderedPage:
+def render_report(report: Report, state: AnswerState) -> RenderedPage:
     """``report_view.html``, carrying this run's report.
 
-    ``answered``, ``answered_links``, ``final`` and ``shown`` are the run's
-    answers, whether a follow-up wrote its report, and what the pause showed,
-    which decide what the page still asks and how it labels each question.
-    ``corrections`` is what a final report's owner corrected since, and
-    ``resumed_by`` the run its follow-up started, where one holds it.
+    ``state`` is the run's :class:`~analysis_service.answer_round.AnswerState`:
+    its answers, whether a follow-up wrote its report, what the pause showed,
+    what its owner corrected since and the run its follow-up started. It
+    decides what the page still asks and how it labels each question, from
+    the same Question Set the answer route admits against.
 
     The template is a self-contained renderer for the report schema — no build
     step, no framework, its own inline CSS and JS. This fills its one payload
@@ -541,18 +531,7 @@ def render_report(
     A viewer that lost its payload placeholder raises at
     :func:`~webapp.page.render` rather than serving a report of nothing.
     """
-    asked = question_set(
-        report.system_model,
-        report.assertions.catalog if report.assertions else None,
-        {},
-        report.analyses,
-        waiting=False,
-        answered=answered,
-        answered_links=answered_links,
-        final=final,
-        shown=shown,
-        resumed_by=resumed_by,
-    ).to_json()
+    asked = state.questions.to_json()
     return render(
         VIEWER.read_text(encoding="utf-8"),
         _REPORT_GRANTS,
@@ -568,9 +547,11 @@ def render_report(
         final=script_json(asked["final"]),
         resumed_by=script_json(asked["resumed_by"]),
         corrections=script_json(
-            _corrections_payload(report, answered, corrections) if final else {}
+            _corrections_payload(report, state.facts, state.corrections)
+            if state.final
+            else {}
         ),
-        provenance=script_json(_provenance_payload(report, answered, shown)),
+        provenance=script_json(_provenance_payload(report, state.facts, state.shown)),
     )
 
 
@@ -856,17 +837,7 @@ def create_app(
         run = analyses.get(run_id)
         if run is None or run.report is None:
             return PlainTextResponse("no such report", status_code=404)
-        return response(
-            render_report(
-                run.report,
-                answered=run.facts,
-                answered_links=run.links,
-                final=run.final,
-                shown=run.shown,
-                corrections=run.corrections,
-                resumed_by=None if run.holding is None else run.holding.id,
-            )
-        )
+        return response(render_report(run.report, run.state()))
 
     @app.post("/correct/{run_id}")
     async def correct(run_id: str, request: Request) -> Response:

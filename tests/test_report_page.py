@@ -16,7 +16,7 @@ import pytest
 
 from analysis_service.claims import UnknownRef
 from analysis_service.fact_answers import FactAnswer
-from tests.factories import asking_threat, sample_report, valid_model
+from tests.factories import asking_threat, report_state, sample_report, valid_model
 from webapp.main import render_report
 
 _SHIM = r"""
@@ -92,7 +92,7 @@ ASKED = UnknownRef(
 def page(answered=(), shown=(), final=False):
     report = sample_report([asking_threat(ASKED)])
     return render_report(
-        report, answered=answered, answered_links=[], final=final, shown=shown
+        report, report_state(report, answered=answered, final=final, shown=shown)
     ).html
 
 
@@ -152,11 +152,12 @@ def test_a_corrected_finding_is_marked_on_its_card():
     report = sample_report([asking_threat(ASKED)])
     html = render_report(
         report,
-        answered=[FactAnswer(key=ASKED.key, value="TLS 1.3")],
-        answered_links=[],
-        final=True,
-        shown=[],
-        corrections=[FactAnswer(key=ASKED.key, value="unknown")],
+        report_state(
+            report,
+            answered=[FactAnswer(key=ASKED.key, value="TLS 1.3")],
+            final=True,
+            corrections=[FactAnswer(key=ASKED.key, value="unknown")],
+        ),
     ).html
     assert "Corrected after this report" in run_report_page(html)["analyses"]
 
@@ -172,9 +173,7 @@ def test_an_owner_s_answer_is_marked_as_unchecked():
     quote = Ground(kind="quote", text=fact_line(answer), source_label=ANSWERS_LABEL)
     derived = sample_threat().grounds[1]
     report = sample_report([sample_threat(grounds=[quote, derived])])
-    html = render_report(
-        report, answered=[answer], answered_links=[], final=False, shown=[]
-    ).html
+    html = render_report(report, report_state(report, answered=[answer])).html
     text = run_report_page(html)["analyses"]
     assert "your answer; the service did not check it" in text
     assert f"— {ANSWERS_LABEL}" not in text
