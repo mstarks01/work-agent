@@ -247,7 +247,8 @@ def main(argv: list[str] | None = None) -> int:
         "\nSend that one file. The reader opens it in any browser, walks as"
         "\nmany cases as they choose, and sends back one JSON file. Then:"
         f"\n\n  python -m evals.harness.run sitting-import sitting-{submitted_by}.json"
-        "\n  python -m evals.harness.run submit sitting"
+        f" --submitted-by {submitted_by}"
+        "\n\nand open a pull request that carries the one file it writes."
     )
     return 0
 

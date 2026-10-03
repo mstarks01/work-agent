@@ -20,15 +20,13 @@ envelope (A08). A mark that names no recorded finding refuses its case rather
 than being dropped (A10). Nothing in the file decides anything: it supplies
 answers, and the rules that judge them are the same ones the app runs.
 
-It applies through :func:`~evals.harness.sitting.finish`, and never beside it.
-That is what makes an imported sitting indistinguishable from one held in the
-app: the same document, the same appended entry, the same cleared line, and the
-same **Draft Sitting** left behind, so the operator can drop a case or put it
-back before the press. A second write path here would be a second set of rules,
-and the looser one would win.
+Each case is held to :func:`~evals.harness.sitting.sitting_problems`, the
+reader that also checks a merged submission, and the import writes the one
+submission file the app's press writes, under the same name. So an imported
+sitting and one held in the app are the same bytes, checked the same way.
 
-The operator runs ``submit sitting`` afterwards. Nothing here opens a pull
-request, and nothing here reaches the network.
+The operator then opens a pull request that carries that one file and nothing
+else. Nothing here opens a pull request, and nothing here reaches the network.
 """
 
 from __future__ import annotations
@@ -309,9 +307,8 @@ def command_import(args: argparse.Namespace) -> int:
     party here who is not the operator, and a sitting record says who read a
     case.
 
-    Checked **before** :func:`apply`, because apply writes the corpus, the
-    reading document, the unreviewed list and the draft store. A refusal that
-    came after them would leave a tree only ``git checkout`` puts back.
+    Checked **before** :func:`apply`, because apply writes the submission
+    file, and a refusal after it would leave a file to delete by hand.
     """
     root = Path(args.root).resolve() if args.root else sittings.REPO_ROOT
     submitted_for = args.submitted_for or args.submitted_by
@@ -339,8 +336,9 @@ def command_import(args: argparse.Namespace) -> int:
     for case_id in written:
         print(f"  {case_id}")
     print(
-        f"\n{len(written)} case(s) recorded in this tree."
-        "\nRun `python -m evals.harness.run submit sitting` to open the PR."
+        f"\n{len(written)} case(s) recorded in this tree, in"
+        f" {relative_path(envelope)}."
+        "\nOpen a pull request that carries that one file and nothing else."
     )
     return 0
 
