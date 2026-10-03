@@ -445,10 +445,14 @@ reference catalog: the counts say what the run produced, and `absences` is the
 one that answers the audit directly, because a control the sources say is *not
 there* has nowhere to live in a System Model attribute.
 
-One pair of counts does compare the two representations. `projected` is how
-many graph attributes the catalog's rows reach, and `projection_agrees` how
-many of those read the same **control state** as the blessed model's own value
-— through `control_state`, the reader both sides already go through.
+A few counts do compare the two representations. `projected` is how many graph
+attributes the catalog's rows reach. Three counts say how many of those agree
+with the blessed model's own value, compared as `PROJECTION_COMPARED` says (a
+mechanism through `control_state`, the reader both sides already go through),
+and split by what they agree about. `agrees_stated` agrees on a fact the
+blessed model states, `agrees_absent` agrees that a control is absent, and
+`agrees_unstated` agrees that neither side states the fact. They stay apart
+because agreeing on an unstated fact costs nothing.
 `projection_degraded` counts the attributes whose projected value falls back to
 `unknown` because a scope, a second value or a second predicate would not fit
 one string. A degraded projection is the compatibility layer reporting its loss

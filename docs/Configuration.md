@@ -646,11 +646,9 @@ Whether a provider accepts a large schema as tool parameters is not measured
 yet. A smaller schema remains the other answer.
 
 Every LLM node carries a schema the adapter can convert, so this setting is the
-only thing deciding whether one is sent. (That was not always true: the six
-category agents and both critic passes once bound bare `list[...]` schemas, which ADK
-cannot convert — it sent none and they generated unconstrained, silently. They
-now carry wrapper models, and a test asserts every node's schema survives the
-conversion.)
+only thing deciding whether one is sent. ADK cannot convert a bare `list[...]`
+schema and sends none for it, so every list-shaped answer is a wrapper model,
+and a test asserts every node's schema survives the conversion.
 
 It enters the execution identity, so a sweep measured with constrained output
 does not certify a run made without it. It is deliberately **not** promotable: a

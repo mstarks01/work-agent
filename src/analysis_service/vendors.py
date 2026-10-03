@@ -707,8 +707,11 @@ _OPENROUTER_CLAUDE_RULE = _FormRule(
 # Claude's constrained decoding refuses ``minimum``, ``maximum``,
 # ``multipleOf``, ``minLength`` and ``maxLength`` with a 400 error (Anthropic's
 # structured-outputs page, read 2026-10-02). The refusal belongs to the model
-# family, so a vendor that serves Claude beside other families keys the rule
-# by family. ``_CLAUDE_FAMILY`` reads every vendor's spelling of a Claude.
+# family, so every row whose ``form_rules`` serve Claude beside other families
+# gives Claude this entry first, as ``form_rules`` lists every family a row can
+# serve. On a tool rung, where nothing refuses the bounds, the entry still
+# gives Claude the schema text it reads on every other route (ADR 0058).
+# ``_CLAUDE_FAMILY`` reads every vendor's spelling of a Claude.
 _CLAUDE_BOUNDS = _SchemaRuleFor(family=_CLAUDE_FAMILY, rule="bounds_described")
 
 
@@ -1255,7 +1258,7 @@ VENDORS: dict[VendorName, Vendor] = {
         routes_to_one_provider=True,
         upstream_pin=None,
         prompt_cache=None,
-        schema_rules=(_every_model("as_built"),),
+        schema_rules=(_CLAUDE_BOUNDS, _every_model("as_built")),
         # Vertex admits no raw-API-key path under any adapter
         # (``BerriAI/litellm#21036``), so ``vertex + api_key`` is
         # unrepresentable rather than validated against. Under ``IAM`` it
@@ -1308,7 +1311,7 @@ VENDORS: dict[VendorName, Vendor] = {
         routes_to_one_provider=True,
         upstream_pin=None,
         prompt_cache=_OPENAI_PROMPT_CACHE,
-        schema_rules=(_every_model("as_built"),),
+        schema_rules=(_CLAUDE_BOUNDS, _every_model("as_built")),
         credentials={CredentialMode.API_KEY: _api_key_source("openai")},
         form_rules=(_CLAUDE_RULE, _CATCH_ALL),
         sdk=None,
@@ -1394,7 +1397,7 @@ VENDORS: dict[VendorName, Vendor] = {
         routes_to_one_provider=True,
         upstream_pin=None,
         prompt_cache=None,
-        schema_rules=(_every_model("as_built"),),
+        schema_rules=(_CLAUDE_BOUNDS, _every_model("as_built")),
         # The Developer API takes a key and nothing else. It is a different
         # provider from ``vertex`` rather than a second mode on it:
         # ``get_llm_provider`` resolves ``gemini/`` and ``vertex_ai/`` to two

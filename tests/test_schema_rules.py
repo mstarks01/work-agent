@@ -29,7 +29,12 @@ from analysis_service.model_gate import _litellm, schema_support
 from analysis_service.provider import InProcessExecutor
 from analysis_service.resilience import load_resilience
 from analysis_service.sampling import load_sampling
-from analysis_service.vendors import VENDOR_NAMES, VendorName, vendor_for
+from analysis_service.vendors import (
+    _CLAUDE_FAMILY,
+    VENDOR_NAMES,
+    VendorName,
+    vendor_for,
+)
 from tests.factories import PROJECT_ROOT, collected, tiers_for, translator_of
 
 #: Every call here ends at a client the test supplies, never at a network.
@@ -210,6 +215,23 @@ def test_every_vendor_names_a_rule_the_executor_can_apply(vendor):
     entries = vendor_for(vendor).schema_rules
     assert {entry.rule for entry in entries} <= SCHEMA_RULES.keys()
     assert entries[-1].family.pattern == "", "the last entry answers every model"
+
+
+@pytest.mark.parametrize("vendor", VENDOR_NAMES)
+def test_every_row_that_serves_claude_describes_its_bounds(vendor):
+    """``schema_rules`` answers for Claude wherever ``form_rules`` serves it.
+
+    Checked against the other table rather than a list of vendors, so a row
+    added tomorrow with a Claude form rule cannot send Claude its bounds.
+    """
+    row = vendor_for(vendor)
+    serves_claude = any(rule.family is _CLAUDE_FAMILY for rule in row.form_rules)
+
+    if not serves_claude:
+        pytest.skip(f"{vendor} serves no Claude")
+    assert row.schema_rule(CLAUDE_ON.get(vendor, "claude-sonnet-4-6")) == (
+        "bounds_described"
+    )
 
 
 @pytest.mark.parametrize(("vendor", "model"), sorted(CLAUDE_ON.items()))
