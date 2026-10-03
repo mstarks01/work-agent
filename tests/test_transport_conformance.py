@@ -195,7 +195,7 @@ def test_one_call_makes_exactly_one_request(wire):
 def test_the_node_s_schema_reaches_the_provider(wire):
     """The native structured-output path, as the build-time gate admits it.
 
-    ``_ladder`` puts a tier on the native rung where the library sends a schema
+    ``rungs_for`` puts a tier on the native rung where the library sends a schema
     natively. This is the other half of that claim: on
     such a model, the schema really does travel as ``response_format``.
     """

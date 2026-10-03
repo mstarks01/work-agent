@@ -964,7 +964,7 @@ class NodeRun:
     attempts: int  # provider calls this execution took; 1 unless the driver retried
     reasks: int  # 1 where the first answer failed its schema and the node asked once more
     schema_path: Literal["native", "tool", "prompt"] | None  # how the schema travelled
-    schema_fallback: str | None  # a rule name from retry.SCHEMA_REFUSALS
+    schema_fallback: str | None  # a rule name from ladder.SCHEMA_REFUSALS
     served_trust: (
         Literal["provider_reported", "requested_echo"] | None
     )  # what `model` is worth as evidence; None for code-only nodes

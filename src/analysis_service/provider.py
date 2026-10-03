@@ -57,7 +57,7 @@ import json
 import re
 from collections.abc import AsyncGenerator, Callable, Mapping, Sequence
 from dataclasses import dataclass, replace
-from typing import Any, Literal, Protocol, Self, runtime_checkable
+from typing import Any, Protocol, Self, runtime_checkable
 
 from google.adk.models.base_llm import BaseLlm
 from google.adk.models.llm_request import LlmRequest
@@ -67,14 +67,19 @@ from google.genai import types
 from pydantic import BaseModel, ValidationError
 
 from analysis_service.charges import CHARGE_METADATA_KEY, UPSTREAM_METADATA_KEY
+from analysis_service.ladder import (
+    OUTPUT_TOOL_NAME,
+    PATH_OF_RUNG,
+    Ladder,
+    Rung,
+    SchemaPath,
+    SchemaRefusal,
+)
 from analysis_service.offline import refuse_live_inference
 from analysis_service.prompt_cache import CACHE_WRITE_METADATA_KEY
 from analysis_service.retry import (
-    REFUSAL_SCOPE,
     ProviderFailure,
-    RefusalScope,
     RetryPolicy,
-    SchemaRefusal,
     classify,
     reject_truncated,
     stamp_attempt,
@@ -84,21 +89,6 @@ from analysis_service.retry import (
 #: re-asks its node took: 0 or 1.
 REASKS_METADATA_KEY = "reasks"
 
-#: How a node schema travelled (ADR 0058): in the provider's structured-output
-#: field, as a tool's parameters, or stated in the request text.
-SchemaPath = Literal["native", "tool", "prompt"]
-
-#: The rungs a tier's schema can travel on, best first (ADR 0058). Each rung
-#: names the path it records; ``unconstrained`` is a tier that sends no schema.
-Rung = Literal["native", "forced_tool", "offered_tool", "prompt", "unconstrained"]
-PATH_OF_RUNG: Mapping[Rung, SchemaPath | None] = {
-    "native": "native",
-    "forced_tool": "tool",
-    "offered_tool": "tool",
-    "prompt": "prompt",
-    "unconstrained": None,
-}
-
 #: What the model reads on the ``prompt`` rung, before the schema itself.
 PROMPT_SCHEMA_INSTRUCTION = (
     "Answer with one JSON object that matches this JSON schema. Write the JSON"
@@ -106,7 +96,7 @@ PROMPT_SCHEMA_INSTRUCTION = (
 )
 
 #: The ``custom_metadata`` key under which a response carries the
-#: :data:`~analysis_service.retry.SCHEMA_REFUSALS` rule that moved its tier down
+#: :data:`~analysis_service.ladder.SCHEMA_REFUSALS` rule that moved its tier down
 #: its ladder. Present only on the call that met the refusal.
 SCHEMA_FALLBACK_METADATA_KEY = "schema_fallback"
 
@@ -123,9 +113,7 @@ REASK_INSTRUCTION = (
 )
 REASK_CLOSING = "Answer again with the complete corrected JSON, and nothing else."
 
-#: The tool a ``tool`` tier sends a node schema as, and forces the model to call
-#: (ADR 0058). The executor turns the call back into the JSON text a node reads.
-OUTPUT_TOOL_NAME = "submit_answer"
+#: What the model reads about :data:`~analysis_service.ladder.OUTPUT_TOOL_NAME`.
 OUTPUT_TOOL_DESCRIPTION = (
     "Submit your answer. The arguments are the answer, and must match this schema."
 )
@@ -379,82 +367,65 @@ class InProcessExecutor:
 
     def __init__(
         self,
-        ladder: Sequence[tuple[Rung, BaseLlm]],
+        ladder: Ladder,
+        translators: Mapping[Rung, BaseLlm],
         rewrite_schema: Callable[[Mapping[str, Any]], Mapping[str, Any]],
     ) -> None:
-        if not ladder:
-            raise ValueError("an executor needs at least one rung")
-        self._ladder = tuple(ladder)
-        self._step = 0
-        #: The step for each schema a provider refused on its own, keyed by
-        #: :func:`_schema_key`. A call reads it with the tier's step, and the
-        #: larger of the two wins.
-        self._schema_steps: dict[str, int] = {}
+        if set(translators) != set(ladder.rungs):
+            raise ValueError("an executor needs one translator for each rung")
+        self._ladder = ladder
+        self._translators = dict(translators)
         self._rewrite_schema = rewrite_schema
 
     @property
     def translator(self) -> BaseLlm:
-        """The configured adapter this runs calls through, on the current rung.
+        """The configured adapter this runs calls through, on the tier's rung.
 
         Exposed for the same reason ADK exposes ``LiteLlm.llm_client``: a test
         that wants to drive the real code down to a transport it controls needs
         a seam to reach, and the alternative is for ``src`` to learn that a test
         is running. Read-only, and nothing in the service reads it.
         """
-        return self._ladder[self._step][1]
+        return self._translators[self._ladder.rung]
 
     @property
-    def ladder(self) -> tuple[tuple[Rung, BaseLlm], ...]:
-        """Every rung this tier can send a schema on, best first."""
+    def translators(self) -> Mapping[Rung, BaseLlm]:
+        """The configured adapter for each rung of the ladder."""
+        return self._translators
+
+    @property
+    def ladder(self) -> Ladder:
+        """The rungs this tier can send a schema on, and the rung each request takes."""
         return self._ladder
-
-    @property
-    def rung(self) -> Rung:
-        """The rung the next call is sent on, where its schema was not refused alone."""
-        return self._ladder[self._step][0]
 
     async def generate(self, request: GenerationRequest) -> Sequence[GenerationResult]:
         # Outside the ``try``, so the refusal is never classified as a provider
         # failure and the retry loop above never asks again.
         refuse_live_inference(request.route)
-        key = _schema_key(request.output_schema)
-        step = max(self._step, self._schema_steps.get(key, 0))
+        schema = request.output_schema
+        step = self._ladder.step_for(schema)
         refusal: SchemaRefusal | None = None
         while True:
             try:
                 results = await self._generate(request, step)
             except ProviderCallFailed as failed:
                 refused = failed.failure.schema_refusal
-                last = step + 1 >= len(self._ladder)
-                if refused is None or request.output_schema is None or last:
+                if refused is None or schema is None:
                     raise
-                refusal = refused
-                step = self._moved_below(step, key, REFUSAL_SCOPE[refused])
+                moved = self._ladder.moved_below(step, schema, refused)
+                if moved is None:
+                    raise
+                refusal, step = refused, moved
                 continue
             if refusal is None:
                 return results
             return [replace(result, schema_fallback=refusal) for result in results]
 
-    def _moved_below(self, step: int, key: str, scope: RefusalScope) -> int:
-        """Move one rung below ``step``, and never back up (ADR 0058).
-
-        A ``pair`` refusal moves the whole tier, because the provider refuses
-        that rung for every request to this ``(vendor, model)``. A ``schema``
-        refusal moves only the schema ``key`` names, so the tier's other nodes
-        keep their rung. Either stays for the life of the process. Lanes run
-        together on one tier, so another lane may have moved it already: each
-        step only grows.
-        """
-        if scope == "pair":
-            self._step = max(self._step, step + 1)
-        else:
-            self._schema_steps[key] = max(self._schema_steps.get(key, 0), step + 1)
-        return max(self._step, self._schema_steps.get(key, 0))
-
     async def _generate(
         self, request: GenerationRequest, step: int
     ) -> Sequence[GenerationResult]:
-        rung, adapter = self._ladder[step]
+        rung = self._ladder.rungs[step]
+        adapter = self._translators[rung]
         llm_request = self._for_vendor(request).into_llm_request()
         path = PATH_OF_RUNG[rung] if request.output_schema is not None else None
         if path == "tool":
@@ -578,11 +549,6 @@ class ExecutedLlm(BaseLlm):
                 self.retry_policy.budget.credit()
                 return results, attempt
         raise AssertionError(f"retry loop fell through: {last!r}")
-
-
-def _schema_key(schema: Mapping[str, Any] | None) -> str:
-    """One node schema, as the key a refusal of it alone is kept under."""
-    return json.dumps(schema, sort_keys=True, default=str)
 
 
 def schema_as_tool(llm_request: LlmRequest) -> LlmRequest:

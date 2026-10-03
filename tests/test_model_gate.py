@@ -278,12 +278,12 @@ class TestAModelThatRefusesTheParameterAtAll:
         out of the library where the answer was a plain refusal. Under
         ``native`` the answer is still a refusal.
         """
-        from analysis_service.binding import _ladder
+        from analysis_service.ladder import rungs_for
         from analysis_service.model_gate import ModelGateError
         from analysis_service.sampling import TierSampling
 
         with pytest.raises(ModelGateError, match="cannot constrain"):
-            _ladder(
+            rungs_for(
                 vendor_for("bedrock"),
                 self.REFUSING,
                 TierSampling(constrain_output=True, structured_output="native"),
@@ -292,10 +292,10 @@ class TestAModelThatRefusesTheParameterAtAll:
 
     def test_auto_states_the_schema_in_the_request_instead(self):
         """ADR 0058: the lowest rung takes every model, so ``auto`` builds."""
-        from analysis_service.binding import _ladder
+        from analysis_service.ladder import rungs_for
         from analysis_service.sampling import TierSampling
 
-        ladder = _ladder(
+        ladder = rungs_for(
             vendor_for("bedrock"),
             self.REFUSING,
             TierSampling(constrain_output=True),
@@ -317,7 +317,7 @@ class TestAModelThatRefusesTheParameterAtAll:
 
         The matrix may print what the map says. The gate may not act on it.
         """
-        from analysis_service.binding import _ladder
+        from analysis_service.ladder import rungs_for
         from analysis_service.model_gate import (
             library_sends_no_native_schema,
             native_structured_output,
@@ -332,7 +332,7 @@ class TestAModelThatRefusesTheParameterAtAll:
         )
         assert not library_sends_no_native_schema(vendor, model)
         native = TierSampling(constrain_output=True, structured_output="native")
-        assert _ladder(vendor, model, native, "tiers.strong") == ("native",)
+        assert rungs_for(vendor, model, native, "tiers.strong") == ("native",)
 
     def test_the_matrix_renders_a_cell_rather_than_failing(self):
         from analysis_service.conformance import Capability, profile

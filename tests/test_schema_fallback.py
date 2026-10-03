@@ -17,16 +17,16 @@ from google.adk.models.llm_request import LlmRequest
 from google.genai import types
 
 from analysis_service.binding import build_tier_adapters
+from analysis_service.ladder import OUTPUT_TOOL_NAME, REFUSAL_SCOPE, SCHEMA_REFUSALS
 from analysis_service.model_gate import _litellm
 from analysis_service.provider import (
-    OUTPUT_TOOL_NAME,
     PROMPT_SCHEMA_INSTRUCTION,
     SCHEMA_FALLBACK_METADATA_KEY,
     SCHEMA_PATH_METADATA_KEY,
     InProcessExecutor,
 )
 from analysis_service.resilience import load_resilience
-from analysis_service.retry import REFUSAL_SCOPE, SCHEMA_REFUSALS, classify
+from analysis_service.retry import classify
 from analysis_service.sampling import load_sampling
 from analysis_service.system_model import SystemModel
 from tests.factories import collected, rungs_of, tiers_for
@@ -85,7 +85,7 @@ def _wire(adapter, provider: _Provider) -> InProcessExecutor:
     """Point every rung's translator at ``provider``."""
     executor = adapter.executor
     assert isinstance(executor, InProcessExecutor)
-    for _, translator in executor.ladder:
+    for translator in executor.translators.values():
         translator_any: Any = translator
         translator_any.llm_client = provider
     return executor
@@ -222,7 +222,7 @@ def test_a_grammar_refusal_moves_only_the_schema_it_refused():
     assert retried["response_format"] is None
     assert other["response_format"] is not None
     assert again["response_format"] is None
-    assert executor.rung == "native"
+    assert executor.ladder.rung == "native"
     assert refused.custom_metadata[SCHEMA_FALLBACK_METADATA_KEY] == "grammar_too_large"
 
 
@@ -239,7 +239,7 @@ def test_another_400_still_fails_the_call():
         _ask(adapter)
 
     assert len(provider.calls) == 1
-    assert adapter.executor.rung == "native"
+    assert adapter.executor.ladder.rung == "native"
 
 
 def test_two_lanes_refused_at_once_both_fall_back():
@@ -281,7 +281,7 @@ def test_a_refused_forced_tool_is_offered_instead():
     assert response.custom_metadata[SCHEMA_FALLBACK_METADATA_KEY] == (
         "forced_tool_refused"
     )
-    assert adapter.executor.rung == "offered_tool"
+    assert adapter.executor.ladder.rung == "offered_tool"
 
 
 def test_a_model_that_refuses_tools_gets_the_schema_in_its_prompt():
@@ -303,7 +303,7 @@ def test_a_model_that_refuses_tools_gets_the_schema_in_its_prompt():
     assert PROMPT_SCHEMA_INSTRUCTION in json.dumps(prompted["messages"])
     assert SCHEMA.model_validate_json(response.content.parts[0].text).claims == []
     assert response.custom_metadata[SCHEMA_PATH_METADATA_KEY] == "prompt"
-    assert adapter.executor.rung == "prompt"
+    assert adapter.executor.ladder.rung == "prompt"
 
 
 def test_a_refusal_on_the_last_rung_fails_the_call():

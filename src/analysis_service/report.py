@@ -50,8 +50,7 @@ from analysis_service.charges import MAX_CALL_CHARGE_USD, UPSTREAM_MAX_CHARS
 from analysis_service.claims import FrameworkAnalysis, FrameworkName, SharedElementName
 from analysis_service.evidence import ground_issues
 from analysis_service.frameworks import block_type_for
-from analysis_service.provider import SchemaPath
-from analysis_service.retry import SchemaRefusal
+from analysis_service.ladder import SchemaPath, SchemaRefusal
 from analysis_service.sources import Source, clean_system_name
 from analysis_service.system_model import (
     BoundaryCrossing,
@@ -488,7 +487,7 @@ class NodeRun(BaseModel):
     sent no schema.
 
     ``schema_fallback`` names the rule in
-    :data:`~analysis_service.retry.SCHEMA_REFUSALS` that moved this node's tier
+    :data:`~analysis_service.ladder.SCHEMA_REFUSALS` that moved this node's tier
     down its ladder, on the call where the provider refused the rung above.
     It is the rule's name and never the provider's message, which can quote
     the prompt back.

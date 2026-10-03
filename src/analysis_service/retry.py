@@ -71,7 +71,8 @@ import random
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from enum import StrEnum
-from typing import Literal
+
+from analysis_service.ladder import SchemaRefusal, refusal_of
 
 logger = logging.getLogger(__name__)
 
@@ -123,8 +124,9 @@ _MAX_TOKENS_FINISH_REASON = "MAX_TOKENS"
 # The remedy half of every truncation message, shared with
 # ``graph._TRUNCATION_HINT`` because a run can reach truncation from either
 # direction and both want the operator to turn the same knob. It lives in this
-# module for a mechanical reason: ``retry`` imports nothing from the package, so
-# ``graph`` can import *it* without the cycle the other direction would make.
+# module for a mechanical reason: ``retry`` imports only ``ladder``, which
+# imports nothing from the package when it loads, so ``graph`` can import
+# *it* without the cycle the other direction would make.
 TRUNCATION_REMEDY = (
     "Raise max_output_tokens for this node's tier in config/sampling.toml, or"
     " reduce what the node is asked to produce."
@@ -458,76 +460,6 @@ _KIND_FOR_STATUS: Mapping[int, FailureKind] = {
 }
 
 
-#: Why a provider refused how a schema was sent (ADR 0058). Any of these moves
-#: the tier one rung down its ladder.
-SchemaRefusal = Literal[
-    "grammar_too_large",
-    "forced_tool_refused",
-    "tools_refused",
-    "no_endpoint",
-    "schema_field_refused",
-]
-
-#: The messages that mean a provider refused how a schema was sent, by rule,
-#: checked in this order. Matched in lower case. The record keeps the rule name
-#: and never the message, which can quote the prompt back (OWASP LLM02). None
-#: of these was confirmed by a live call unless its comment says so.
-SCHEMA_REFUSALS: Mapping[SchemaRefusal, tuple[str, ...]] = {
-    # Anthropic, against ``SystemModel``: recorded in ``config/sampling.toml``.
-    "grammar_too_large": ("compiled grammar is too large",),
-    # Anthropic refuses a forced tool together with extended thinking, and a
-    # model with thinking always on cannot turn it off. Matches the field name
-    # on every vendor: ``tool_choice``, or Bedrock's ``toolChoice``.
-    "forced_tool_refused": ("forces tool use", "tool_choice", "toolchoice"),
-    # A model that takes no tools at all, in the words vendors use for it.
-    "tools_refused": (
-        "does not support tool",
-        "doesn't support tool",
-        "tool use is not supported",
-        "tools are not supported",
-        "function calling is not",
-        "toolconfig",
-    ),
-    # OpenRouter, where no upstream serves the parameters the request carries.
-    "no_endpoint": ("no endpoints found",),
-    # A 400 that names a field which carries the schema: OpenAI's and
-    # OpenRouter's ``response_format``, Anthropic's ``output_format``,
-    # Bedrock's ``outputConfig``, Gemini's ``response_schema``. AWS documents
-    # a 400 for an unsupported schema keyword on Bedrock, and does not document
-    # the message (structured-outputs page, read 2026-10-02).
-    "schema_field_refused": (
-        "outputconfig",
-        "output_config",
-        "output_format",
-        "response_format",
-        "response_schema",
-        "responseschema",
-        "response_json_schema",
-        "responsejsonschema",
-        "json_schema",
-        "structured output",
-    ),
-}
-
-#: What a refusal is a property of (ADR 0058). A ``pair`` refusal moves the
-#: whole tier one rung down, because the provider refuses how the schema is sent
-#: for every request to that ``(vendor, model)``. A ``schema`` refusal moves only
-#: the schema the provider refused, because the same model takes a smaller
-#: schema on the same rung.
-RefusalScope = Literal["pair", "schema"]
-REFUSAL_SCOPE: Mapping[SchemaRefusal, RefusalScope] = {
-    "grammar_too_large": "schema",
-    "forced_tool_refused": "pair",
-    "tools_refused": "pair",
-    "no_endpoint": "pair",
-    "schema_field_refused": "pair",
-}
-
-#: The statuses a refusal arrives with: a bad request, and OpenRouter's 404
-#: when no upstream serves the request.
-_REFUSAL_STATUSES = frozenset({400, 404})
-
-
 @dataclass(frozen=True)
 class ProviderFailure:
     """One failed provider call, as the facts the callers actually ask for.
@@ -555,7 +487,8 @@ class ProviderFailure:
     retry_after_seconds: float | None
     detail: str
     cause: BaseException | None = None
-    #: The :data:`SCHEMA_REFUSALS` rule this failure matched, or ``None``.
+    #: The :data:`~analysis_service.ladder.SCHEMA_REFUSALS` rule this failure
+    #: matched, or ``None``.
     schema_refusal: SchemaRefusal | None = None
 
 
@@ -574,19 +507,8 @@ def classify(exc: BaseException) -> ProviderFailure:
         retry_after_seconds=_retry_after_seconds(exc),
         detail=type(exc).__name__,
         cause=exc,
-        schema_refusal=_schema_refusal(exc),
+        schema_refusal=refusal_of(exc),
     )
-
-
-def _schema_refusal(exc: BaseException) -> SchemaRefusal | None:
-    """The :data:`SCHEMA_REFUSALS` rule a 400 matches, or ``None``."""
-    if getattr(exc, "status_code", None) not in _REFUSAL_STATUSES:
-        return None
-    message = str(exc).lower()
-    for rule, phrases in SCHEMA_REFUSALS.items():
-        if any(phrase in message for phrase in phrases):
-            return rule
-    return None
 
 
 def _kind_of(exc: BaseException, retryable: bool) -> FailureKind:
