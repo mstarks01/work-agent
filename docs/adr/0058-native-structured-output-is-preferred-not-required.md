@@ -74,10 +74,13 @@ installed library, which the identity already hashes.
 or OpenRouter's 404 when no upstream serves the request, that matches a rule in
 `retry.SCHEMA_REFUSALS` sends the same request again on the next rung. The
 rules cover a refused schema field on every vendor's spelling, a grammar too
-large, a refused forced tool, and a model that takes no tools. The refusal is a
-property of the `(vendor, model)` pair, so the tier stays on the lower rung for
-the life of the process. Any other error stays a failure, and so does a refusal
-on the last rung.
+large, a refused forced tool, and a model that takes no tools. Most refusals
+are a property of the `(vendor, model)` pair, so the tier stays on the lower
+rung for the life of the process. A grammar too large is a property of one
+schema, because the same model takes a smaller schema natively, so only that
+schema moves down and the tier's other nodes keep their rung.
+`retry.REFUSAL_SCOPE` states which scope each rule has. Any other error stays
+a failure, and so does a refusal on the last rung.
 
 **Three safeguards keep the tool path equal to native:**
 

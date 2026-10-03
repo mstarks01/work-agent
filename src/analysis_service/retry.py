@@ -509,6 +509,20 @@ SCHEMA_REFUSALS: Mapping[SchemaRefusal, tuple[str, ...]] = {
     ),
 }
 
+#: What a refusal is a property of (ADR 0058). A ``pair`` refusal moves the
+#: whole tier one rung down, because the provider refuses how the schema is sent
+#: for every request to that ``(vendor, model)``. A ``schema`` refusal moves only
+#: the schema the provider refused, because the same model takes a smaller
+#: schema on the same rung.
+RefusalScope = Literal["pair", "schema"]
+REFUSAL_SCOPE: Mapping[SchemaRefusal, RefusalScope] = {
+    "grammar_too_large": "schema",
+    "forced_tool_refused": "pair",
+    "tools_refused": "pair",
+    "no_endpoint": "pair",
+    "schema_field_refused": "pair",
+}
+
 #: The statuses a refusal arrives with: a bad request, and OpenRouter's 404
 #: when no upstream serves the request.
 _REFUSAL_STATUSES = frozenset({400, 404})
