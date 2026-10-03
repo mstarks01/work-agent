@@ -74,3 +74,90 @@ def test_a_catalog_claim_is_keyed_by_its_requirement():
 
     assert finding_key(first, flows) == finding_key(same, flows)
     assert finding_key(first, flows) != finding_key(other, flows)
+
+
+def _completed(store, report, resumption=None):
+    """A completed job of alice's, holding ``report``."""
+    import asyncio
+
+    from analysis_service.jobs import JobRecord
+    from analysis_service.sources import Source
+    from tests.factories import admit, sample_selection
+
+    record = JobRecord.create(
+        owner_subject="alice",
+        sources=[Source.description("A web app talks to a database.")],
+        frameworks=sample_selection(),
+    )
+    if resumption is not None:
+        record.resumption = resumption
+    record.transition("running")
+    record.report = report
+    record.transition("completed")
+    asyncio.run(admit(store, record))
+    return record.id
+
+
+def _follow_up_of(parent_id):
+    from analysis_service.jobs import Checkpoint, Resumption
+
+    return Resumption(
+        parent_id=parent_id,
+        checkpoint=Checkpoint(system_model=valid_model(), assertions=None),
+        follow_up=True,
+    )
+
+
+class TestTheChangesRoute:
+    """``GET /v1/jobs/{id}/changes`` serves the comparison to any client (#561)."""
+
+    def test_a_follow_up_lists_how_each_finding_moved(self):
+        from tests.test_api import auth, make_client
+
+        client, store = make_client()
+        parent = _completed(store, sample_report([sample_threat(verdict=NEEDS_INFO)]))
+        child = _completed(
+            store, sample_report([sample_threat()]), _follow_up_of(parent)
+        )
+
+        response = client.get(f"/v1/jobs/{child}/changes", headers=auth())
+
+        assert response.status_code == 200, response.text
+        body = response.json()
+        assert body["parent_id"] == parent
+        assert [(f["change"], f["before"], f["after"]) for f in body["findings"]] == [
+            ("changed", "needs-info", "confirmed")
+        ]
+
+    def test_a_job_that_is_not_a_follow_up_is_refused(self):
+        from tests.test_api import auth, make_client
+
+        client, store = make_client()
+        job = _completed(store, sample_report([sample_threat()]))
+
+        response = client.get(f"/v1/jobs/{job}/changes", headers=auth())
+
+        assert response.status_code == 409
+        assert "not a follow-up" in response.text
+
+    def test_a_follow_up_whose_earlier_report_is_gone_is_refused(self):
+        from tests.test_api import auth, make_client
+
+        client, store = make_client()
+        child = _completed(store, sample_report([]), _follow_up_of("gone"))
+
+        response = client.get(f"/v1/jobs/{child}/changes", headers=auth())
+
+        assert response.status_code == 409
+        assert "no longer held" in response.text
+
+    def test_another_subject_reads_nothing(self):
+        from tests.test_api import auth, make_client
+
+        client, store = make_client()
+        parent = _completed(store, sample_report([]))
+        child = _completed(store, sample_report([]), _follow_up_of(parent))
+
+        response = client.get(f"/v1/jobs/{child}/changes", headers=auth("bob-token"))
+
+        assert response.status_code == 404
