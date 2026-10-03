@@ -47,6 +47,7 @@ sys.path.insert(0, str(_REPO_ROOT / "src"))
 sys.path.insert(0, str(_REPO_ROOT))
 
 from analysis_service.actions import FAMILIES
+from analysis_service.assertions import support_span
 from analysis_service.claims import (
     FrameworkName,
     Rating,
@@ -60,7 +61,7 @@ from analysis_service.report import (
     InputRef,
     SourceRef,
 )
-from analysis_service.sources import SourceKind
+from analysis_service.sources import SourceKind, text_digest
 from analysis_service.system_model import (
     ELEMENT_GROUPS,
     SystemModel,
@@ -81,6 +82,7 @@ from evals.harness.reference import (
 from evals.harness.verbs import unknown_verbs
 from evals.reference_facts import (
     FACTS_FILE,
+    ReferenceFacts,
     drafted_cases,
     facts_path,
     load_facts,
@@ -1146,9 +1148,46 @@ def _check_facts(
     if not facts_path(case_dir).is_file():
         return
     try:
-        reference_catalog(load_facts(case_dir), model, sources)
+        facts = load_facts(case_dir)
+        reference_catalog(facts, model, sources)
     except CorpusError as exc:
         yield f"{FACTS_FILE}: {exc}"
+        return
+    yield from _unheld_issues(case_dir, facts, sources)
+
+
+def _unheld_issues(
+    case_dir: Path, facts: ReferenceFacts, sources: Mapping[str, str]
+) -> Iterator[str]:
+    """Each unheld fact quotes its source and names claims the case still holds.
+
+    A quote is located by :func:`~analysis_service.assertions.support_span`,
+    the reader that locates a row's quote, so the two lists cannot disagree
+    about what the source says. A claim is matched by its place and its
+    digest, so an edit to either leaves the entry stale and fails here.
+    """
+    for number, entry in enumerate(facts.unheld):
+        where = f"{FACTS_FILE}: unheld {number}"
+        for quote in entry.quotes:
+            text = sources.get(quote.source_label)
+            if (
+                text is None
+                or support_span(quote.quote, quote.source_label, text) is None
+            ):
+                yield f"{where}: {quote.source_label!r} does not carry {quote.quote!r}"
+        for resting in entry.claims:
+            path = claims_file(case_dir, resting.framework)
+            records = _load_json_array(path) if path.is_file() else []
+            record = records[resting.index] if resting.index < len(records) else None
+            sentence = record.get("claim") if isinstance(record, dict) else None
+            if (
+                not isinstance(sentence, str)
+                or text_digest(sentence) != resting.claim_sha256
+            ):
+                yield (
+                    f"{where}: {resting.framework} claim {resting.index}"
+                    " does not match its digest"
+                )
 
 
 def calibration_inputs() -> tuple[
@@ -1375,7 +1414,8 @@ def main() -> int:
         print(
             f"{case_dir.name}: {FACTS_FILE} holds {len(facts.rows)} rows,"
             f" {unsigned} unsigned, {len(facts.disputed)} disputed,"
-            f" {aliases} alias ruling(s), {facts.unsigned_aliases} unsigned"
+            f" {aliases} alias ruling(s), {facts.unsigned_aliases} unsigned,"
+            f" {len(facts.unheld)} unheld"
         )
     # Lane -> whether any case anywhere carries a must-find record for it. The
     # merge bar's second check is over the whole corpus, so it is accumulated

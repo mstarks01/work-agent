@@ -17,9 +17,13 @@ Deterministic, credential-free, and free of provider calls.
 
 from __future__ import annotations
 
+import json
+import shutil
+
 import pytest
 
 from analysis_service.assertions import project
+from analysis_service.sources import text_digest
 from evals import verify_corpus
 from evals.harness.modes import PROJECTION_COMPARED, reachable_controls
 from evals.harness.reference import load_case
@@ -129,6 +133,8 @@ def test_no_row_is_signed_by_whoever_drafted_it(drafted):
         assert row.reviewed_by != DRAFTER, row.rationale
     for dispute in facts.disputed:
         assert dispute.reviewed_by != DRAFTER, dispute.basis
+    for entry in facts.unheld:
+        assert entry.reviewed_by != DRAFTER, entry.rationale
 
 
 def test_a_ruling_names_who_made_it(drafted):
@@ -217,3 +223,74 @@ def test_an_unsigned_case_is_named_rather_than_trusted(drafted):
             " It may be run; it may not be quoted as a required-fact denominator."
         )
     assert all(row.reviewed_by for row in facts.rows)
+
+
+def _unheld_case(tmp_path, quote, claim):
+    """A copy of case 08 whose one unheld fact carries ``quote`` and ``claim``."""
+    case_dir = tmp_path / "08-sso-identity-broker"
+    shutil.copytree(verify_corpus.CORPUS_DIR / case_dir.name, case_dir)
+    path = facts_path(case_dir)
+    raw = json.loads(path.read_text(encoding="utf-8"))
+    raw["unheld"] = [
+        {
+            "fact": "a nightly pull",
+            "quotes": [{"source_label": "System description", "quote": quote}],
+            "claims": [claim],
+            "rationale": "no predicate",
+        }
+    ]
+    path.write_text(json.dumps(raw), encoding="utf-8")
+    return case_dir
+
+
+def _issues(case_dir):
+    case = load_case(case_dir)
+    sources = {source.label: source.text for source in case.sources}
+    return list(verify_corpus._check_facts(case_dir, case.model, sources))
+
+
+def _stride_claim(index):
+    path = verify_corpus.CORPUS_DIR / "08-sso-identity-broker/claims/stride.json"
+    sentence = json.loads(path.read_text(encoding="utf-8"))[index]["claim"]
+    return {
+        "framework": "stride",
+        "index": index,
+        "claim_sha256": text_digest(sentence),
+    }
+
+
+def test_an_unheld_fact_that_quotes_and_matches_passes(tmp_path):
+    case_dir = _unheld_case(
+        tmp_path, "The broker pulls the changes once a night", _stride_claim(16)
+    )
+
+    assert _issues(case_dir) == []
+
+
+def test_an_unheld_quote_the_source_does_not_carry_fails(tmp_path):
+    case_dir = _unheld_case(tmp_path, "The broker pulls hourly", _stride_claim(16))
+
+    assert ["does not carry" in issue for issue in _issues(case_dir)] == [True]
+
+
+def test_an_unheld_claim_that_moved_fails(tmp_path):
+    """The digest of claim 16 at index 15 is a claim that moved or changed."""
+    claim = {**_stride_claim(16), "index": 15}
+    case_dir = _unheld_case(
+        tmp_path, "The broker pulls the changes once a night", claim
+    )
+
+    assert ["does not match its digest" in issue for issue in _issues(case_dir)] == [
+        True
+    ]
+
+
+def test_an_unheld_claim_past_the_end_fails(tmp_path):
+    claim = {**_stride_claim(16), "index": 999}
+    case_dir = _unheld_case(
+        tmp_path, "The broker pulls the changes once a night", claim
+    )
+
+    assert ["does not match its digest" in issue for issue in _issues(case_dir)] == [
+        True
+    ]

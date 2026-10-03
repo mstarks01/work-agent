@@ -24,6 +24,14 @@ matches fails a lint rather than lingering in prose. An entry waits until a
 person rules on it. A ruling to change the model removes the entry when the
 model changes, and a ruling to keep the model stays as a signed entry.
 
+A third list, ``unheld``, names each fact the source states that no assertion
+predicate can hold, with its quote and the reference claims that rest on it.
+A reviewer who meets such a fact has no row to write, so without this list the
+fact reaches no instrument. ``evals/verify_corpus.py`` counts the entries per
+case, so a missing predicate is a number in the tree. When a registry version
+adds a predicate that holds the fact, the entry becomes a row in ``rows`` and
+leaves this list.
+
 Two conventions the rows follow, because the projection reads them. A fact
 that projects into a graph field — a mechanism, a transport, a zone, an
 exposure — sits on the graph subject, unscoped and under one predicate, so
@@ -61,8 +69,10 @@ from analysis_service.assertions import (
     AssertionRecord,
     CatalogProposal,
     QualifierKind,
+    QuoteProposal,
     subject_id,
 )
+from analysis_service.claims import FrameworkName
 from analysis_service.system_model import SystemModel
 from evals.harness.reference import CorpusError
 
@@ -131,6 +141,34 @@ class Dispute(BaseModel):
     #: The source's words, or their absence, that the dispute rests on.
     basis: str = Field(min_length=1)
     ruling: Ruling | None = None
+    reviewed_by: str | None = None
+
+
+class RestingClaim(BaseModel):
+    """One reference claim, by its place in a claims file and its digest."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    framework: FrameworkName
+    index: int = Field(ge=0)
+    #: :func:`~analysis_service.sources.text_digest` of the claim's sentence,
+    #: so the entry stops matching the moment the claim moves or changes. A
+    #: digest rather than the sentence, because this file is a generation
+    #: input and the leakage lint refuses a reference claim in one.
+    claim_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+
+
+class UnheldFact(BaseModel):
+    """One stated fact that no assertion predicate can hold."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    #: The fact in the drafter's words, the way a predicate would name it.
+    fact: str = Field(min_length=1)
+    quotes: list[QuoteProposal] = Field(min_length=1)
+    claims: list[RestingClaim] = Field(min_length=1)
+    #: Why no registered predicate holds the fact.
+    rationale: str = Field(min_length=1)
     reviewed_by: str | None = None
 
 
@@ -225,6 +263,7 @@ class ReferenceFacts(BaseModel):
     drafted_by: Literal["agent-stand-in"] = DRAFTER
     rows: list[FactRow] = Field(min_length=1)
     disputed: list[Dispute] = Field(default_factory=list)
+    unheld: list[UnheldFact] = Field(default_factory=list)
     aliases: ReferenceAliases = Field(default_factory=ReferenceAliases)
 
     @property
