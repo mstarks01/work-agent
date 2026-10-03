@@ -1062,13 +1062,29 @@
         if (!waitsOn.has(finding)) waitsOn.set(finding, []);
         waitsOn.get(finding).push(index);
       }));
+      // Each finding's lane, read from the field its package stamps, so the
+      // scope line can say how many lanes the answers reach.
+      const laneOf = new Map(R.analyses.flatMap(block => block.claims.map(c =>
+        [`${block.framework}/${c.id}`, c.category || c.chapter || block.framework])));
       const tally = el("div", "meta");
+      const scope = el("div", "meta");
       function recount() {
         const known = index => factAnswers[index].known();
         const covered = [...waitsOn.values()].filter(asked => asked.every(known)).length;
         tally.textContent =
           `Your answers cover every question for ${covered} of the ${waitsOn.size} findings ` +
           "that wait on one. The analysis decides again whether they are settled.";
+        // What pressing the button does, before it is pressed (#561): how far
+        // the answers reach, and what runs. A follow-up runs the whole
+        // analysis once (ADR 0044), and code records every answer (ADR 0046).
+        const given = factAnswers.filter(answer => answer.known()).length;
+        const reached = [...waitsOn].filter(([, asked]) => asked.some(known)).map(([f]) => f);
+        const lanes = new Set(reached.map(f => laneOf.get(f)).filter(Boolean));
+        scope.textContent = given
+          ? `${given} answer(s) reach ${reached.length} finding(s) in ${lanes.size} lane(s). ` +
+            "Code records each answer, and no model interprets it before the analysis. " +
+            "The follow-up then runs the whole analysis once, and its report is final."
+          : "No answer given yet.";
       }
       ordered.forEach((q, index) => {
         const into = !q.findings.length ? unwaited : index < SHOWN ? box : more;
@@ -1083,7 +1099,7 @@
       });
       if (material.length > SHOWN) box.append(more);
       if (aside.length) box.append(unwaited);
-      box.append(tally);
+      box.append(tally, scope);
       recount();
     }
 
