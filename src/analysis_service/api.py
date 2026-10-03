@@ -15,6 +15,8 @@
   ``Last-Event-ID``.
 * ``GET /v1/jobs/{id}/report`` — the full report once the job completes, and a
   409 before that.
+* ``GET /v1/jobs/{id}/changes`` — for a follow-up, how each finding moved since
+  the report its answers came from, under the same rule as both reports.
 * ``GET /healthz`` — unauthenticated, for Cloud Run probes.
 
 Every error body is RFC 9457 ``application/problem+json``. Every `/v1` route
@@ -89,6 +91,7 @@ from analysis_service.parsing import ascii_int
 from analysis_service.pipeline import entry_of
 from analysis_service.questions import question_fallback
 from analysis_service.report import FrameworkSelection
+from analysis_service.report_changes import report_changes
 from analysis_service.report_conditions import corrected_findings
 from analysis_service.selection import SelectionError, resolve_selection
 from analysis_service.sources import Source, SourceLimits, clean_system_name
@@ -1134,6 +1137,50 @@ def create_app(
     ) -> JSONResponse:
         served = await _servable_report(request, job_id, subject)
         return served if isinstance(served, JSONResponse) else JSONResponse(served)
+
+    @app.get("/v1/jobs/{job_id}/changes")
+    async def get_changes(
+        job_id: str, request: Request, subject: str = Depends(require_subject)
+    ) -> JSONResponse:
+        """How each finding of a follow-up moved since the report before it (#561).
+
+        Both reports are served under their own rule first, so a comparison
+        never names a finding of a report this caller may not read. ``409``
+        where the job is not a follow-up, or the store no longer holds the
+        report its answers came from.
+        """
+        served = await _servable_report(request, job_id, subject)
+        if isinstance(served, JSONResponse):
+            return served
+        store: JobStore = request.app.state.store
+        # The envelope leaves the resumption out, so it is read by name.
+        resumption = await store.resumption(job_id, subject)
+        if resumption is None or not resumption.follow_up:
+            raise HTTPException(
+                status_code=409,
+                detail="the job is not a follow-up: it resumed from no finished report",
+            )
+        if await store.owned(resumption.parent_id, subject) is None:
+            raise HTTPException(
+                status_code=409,
+                detail="the report this follow-up's answers came from is no longer held",
+            )
+        earlier = await _servable_report(request, resumption.parent_id, subject)
+        if isinstance(earlier, JSONResponse):
+            return earlier
+        before = await store.report(resumption.parent_id, subject)
+        after = await store.report(job_id, subject)
+        if before is None or after is None:
+            logger.error("follow-up %s or its parent has no report attached", job_id)
+            raise HTTPException(status_code=500, detail="an internal error occurred")
+        changes = await anyio.to_thread.run_sync(report_changes, before, after)
+        return JSONResponse(
+            {
+                "job_id": job_id,
+                "parent_id": resumption.parent_id,
+                "findings": [change.to_json() for change in changes],
+            }
+        )
 
     @app.post("/v1/jobs/{job_id}/corrections")
     async def correct_job(
