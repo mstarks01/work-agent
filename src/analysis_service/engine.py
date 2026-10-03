@@ -40,16 +40,14 @@ import logging
 import time
 from collections.abc import Callable, Mapping, Sequence
 from functools import partial
-from typing import Self
+from typing import Any, Self
 
-from analysis_service.answer_round import QuestionSet, SkipKey, question_set
-from analysis_service.claims import FrameworkName, UnknownKey
+from analysis_service.answer_round import ResumedJob
+from analysis_service.claims import FrameworkName
 from analysis_service.deployment import Deployment
-from analysis_service.fact_answers import FactAnswer
 from analysis_service.frameworks import PACKAGES
 from analysis_service.graph import Entry
 from analysis_service.jobs import (
-    Checkpoint,
     JobRecord,
     NodeCallback,
     PipelineOutcome,
@@ -57,14 +55,12 @@ from analysis_service.jobs import (
     Resumption,
 )
 from analysis_service.links import (
-    LinkAnswer,
     with_link_answers,
 )
 from analysis_service.pipeline import entry_of
-from analysis_service.report import FrameworkSelection, Report
+from analysis_service.report import FrameworkSelection
 from analysis_service.selection import SelectionError, resolve_selection
 from analysis_service.sources import (
-    LimitBreach,
     Source,
     SourceLimits,
     clean_system_name,
@@ -253,117 +249,52 @@ class Engine:
         )
         return await self._run(job, on_node)
 
-    def breach(self, sources: Sequence[Source]) -> LimitBreach | None:
-        """The first input bound ``sources`` breaks, or ``None`` if they fit.
+    @property
+    def limits(self) -> SourceLimits:
+        """The input bounds a submission here must fit.
 
-        A surface that keeps answers before it resumes asks this at each save,
+        A surface that keeps answers before it resumes passes these to
+        :meth:`~analysis_service.answer_round.AnswerState.answer` at each save,
         so a round that no start could run is refused when it is saved.
         """
-        return self._limits.breach(sources)
+        return self._limits
 
-    def questions(
-        self,
-        checkpoint: Checkpoint,
-        report: Report | None = None,
-        *,
-        answered: Sequence[FactAnswer],
-        answered_links: Sequence[LinkAnswer],
-        final: bool,
-        shown: Sequence[UnknownKey] = (),
-        skipped: Sequence[SkipKey] = (),
-        resumed_by: str | None = None,
-    ) -> QuestionSet:
-        """Every question a run asks: a paused run's early list, or its report's.
-
-        ``report`` is the finished run's report, and ``None`` for a paused run.
-        ``answered`` and ``answered_links`` are the answers the run was given,
-        a paused run's saved rounds included. ``final`` marks a report the
-        follow-up wrote, which asks nothing, ``shown`` is every early
-        question the pause showed, and ``skipped`` every one its submitter
-        skipped for now. ``resumed_by`` names the run these answers started,
-        where it holds this one, which then asks nothing.
-        """
-        return question_set(
-            checkpoint.system_model,
-            None if checkpoint.assertions is None else checkpoint.assertions.catalog,
-            {selection.name: selection.options for selection in self._frameworks},
-            () if report is None else report.analyses,
-            waiting=report is None,
-            answered=answered,
-            answered_links=answered_links,
-            final=final,
-            shown=shown,
-            skipped=skipped,
-            resumed_by=resumed_by,
-        )
+    @property
+    def framework_options(self) -> dict[FrameworkName, Mapping[str, Any]]:
+        """Each framework a job here is analysed under, with its options."""
+        return {selection.name: selection.options for selection in self._frameworks}
 
     async def resume(
         self,
-        sources: Sequence[Source],
-        checkpoint: Checkpoint,
-        links: Sequence[LinkAnswer] = (),
+        resumed: ResumedJob,
         *,
-        facts: Sequence[FactAnswer] = (),
-        report: Report | None = None,
-        earlier_links: Sequence[LinkAnswer] = (),
-        earlier_facts: Sequence[FactAnswer] = (),
-        final: bool,
-        shown: Sequence[UnknownKey] = (),
-        skipped: Sequence[SkipKey] = (),
         system_name: str | None = None,
         caller: str = DEFAULT_CALLER,
         on_node: NodeCallback | None = None,
     ) -> PipelineOutcome:
-        """Continue an earlier run from its checkpoint, with the submitter's answers.
+        """Run the Resumed Job an earlier run's answers started.
 
-        ``checkpoint`` is what a paused run held, or what a finished report's
-        model and catalog are, and ``report`` is that finished report.
-        ``sources``, ``earlier_links`` and ``earlier_facts`` are what that run
-        was given; ``links`` and ``facts`` are the new answers, which go over
-        the earlier ones. ``final`` is True where that run's report
-        was written by a follow-up, and so takes no answer. ``shown`` and
-        ``skipped`` are a paused run's pause history, as :meth:`questions`
-        takes them. :meth:`questions` admits the answers, so an answer to a
-        fact the run did not ask is refused. The run starts at ``prepare``, so no
-        extraction and no assertion pass runs again (#1252).
+        :meth:`~analysis_service.answer_round.AnswerState.answer` admits the
+        answers and returns ``resumed``. The run starts at ``prepare`` from its
+        checkpoint, so no extraction and no assertion pass runs again (#1252).
         """
-        if links and not self._carries_catalog:
+        if resumed.links and not self._carries_catalog:
             raise EngineInputError(
                 "this deployment builds no assertion catalog, so nothing would"
                 " read a link answer"
             )
-        try:
-            admitted = self.questions(
-                checkpoint,
-                report,
-                answered=earlier_facts,
-                answered_links=earlier_links,
-                final=final,
-                shown=shown,
-                skipped=skipped,
-            ).admit(
-                sources=sources,
-                earlier_links=earlier_links,
-                earlier_facts=earlier_facts,
-                links=links,
-                facts=facts,
-            )
-        except ValueError as exc:
-            raise EngineInputError(str(exc)) from exc
-        breach = self.breach(admitted.sources)
-        if breach is not None:
-            raise EngineInputError(breach.message)
         job = JobRecord.create(
             owner_subject=caller,
-            sources=admitted.sources,
+            sources=resumed.sources,
             frameworks=self._frameworks,
             system_name=_engine_system_name(system_name),
-            links=admitted.links,
-            facts=admitted.facts,
+            links=resumed.links,
+            facts=resumed.facts,
+            shown_early=resumed.shown,
             resumption=Resumption(
                 parent_id="in-process",
-                checkpoint=checkpoint,
-                follow_up=report is not None,
+                checkpoint=resumed.checkpoint,
+                follow_up=resumed.follow_up,
             ),
         )
         return await self._run(job, on_node)
@@ -447,7 +378,7 @@ class Engine:
             with_link_answers(sources, ())
         except ValueError as exc:
             raise EngineInputError(str(exc)) from exc
-        breach = self.breach(sources)
+        breach = self._limits.breach(sources)
         if breach is not None:
             raise EngineInputError(breach.message)
         return JobRecord.create(

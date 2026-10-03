@@ -1,12 +1,14 @@
 """The questions one round asks, and the answers it admits.
 
-**One value answers both "what did this job ask" and "may this answer land".**
-The HTTP routes, the first-run app and the in-process engine each serve a
-job's questions and admit a submitter's answers. A :class:`QuestionSet` is
-built once from the model and catalog the questions were asked about, and its
-:meth:`~QuestionSet.admit` takes the answers. The facts it admits are the keys
-of the questions it holds, so the list a caller serves and the list it accepts
-cannot differ.
+**One value answers "what does this job ask", "may this answer land" and
+"what does it start".** The HTTP routes, the first-run app and the eval replay
+each build an :class:`AnswerState` from their own job record. Its
+:attr:`~AnswerState.questions` is the :class:`QuestionSet` they serve, and its
+:meth:`~AnswerState.answer` checks the round revision, admits the answers,
+checks the source limits and returns a :class:`SavedRound` or a
+:class:`ResumedJob`. The caller only stores the one or starts the other. The
+facts it admits are the keys of the questions it holds, so the list a caller
+serves and the list it accepts cannot differ.
 
 **A job waiting on answers asks the early list; a finished one asks the
 report's list.** Both ask the link questions its catalog raises. A waiting job
@@ -40,7 +42,8 @@ from __future__ import annotations
 from collections import Counter
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, replace
-from typing import Annotated, Any
+from functools import cached_property
+from typing import TYPE_CHECKING, Annotated, Any
 
 from pydantic import StringConstraints
 
@@ -67,17 +70,28 @@ from analysis_service.links import (
     resumed_sources,
 )
 from analysis_service.questions import FactQuestion, fact_questions
-from analysis_service.sources import Source
+from analysis_service.sources import LimitBreach, Source, SourceLimits
 from analysis_service.system_model import SystemModel
+
+if TYPE_CHECKING:
+    # ``jobs`` imports this module for the skip vocabulary.
+    from analysis_service.jobs import Checkpoint
 
 __all__ = [
     "EARLY_RULES",
     "MAX_SKIPS",
     "AdmittedRound",
     "AlreadyResumed",
+    "AnswerState",
+    "Answers",
     "EarlyRule",
+    "MissingRevision",
     "QuestionSet",
+    "ResumedJob",
+    "SavedRound",
     "SkipKey",
+    "SourcesOverLimit",
+    "StaleRevision",
     "by_turn",
     "next_round",
     "passes_floor",
@@ -662,3 +676,182 @@ def _known_content(answer: FactAnswer | None) -> frozenset[tuple[str, str]]:
             (facet, value) for facet, value in answer.facets.items() if value != UNKNOWN
         )
     return frozenset({("", answer.value)}) if answer.known else frozenset()
+
+
+class StaleRevision(Exception):
+    """Answers to a waiting job that name an earlier round revision than its own."""
+
+
+class MissingRevision(ValueError):
+    """Answers to a waiting job that name no round revision."""
+
+
+class SourcesOverLimit(Exception):
+    """Answers whose composed sources break the deployment's source limits."""
+
+    def __init__(self, breach: LimitBreach) -> None:
+        super().__init__(breach.message)
+        self.breach = breach
+
+
+@dataclass(frozen=True)
+class Answers:
+    """One submission of answers to a job's questions.
+
+    ``save`` keeps a waiting job's round and starts nothing. ``skips`` names
+    questions of this round the submitter skips for now; only a saved round
+    skips. ``revision`` is the round revision the questions were read with,
+    which a waiting job requires.
+    """
+
+    links: Sequence[LinkAnswer] = ()
+    facts: Sequence[FactAnswer] = ()
+    save: bool = False
+    skips: Sequence[SkipKey] = ()
+    revision: int | None = None
+
+
+@dataclass(frozen=True)
+class SavedRound:
+    """What a waiting job keeps after a saved round. No model runs.
+
+    ``revision`` is the round revision the save read. The store writes the
+    round only while the job still holds that revision, so of two saves that
+    read one revision only the first lands.
+    """
+
+    links: list[LinkAnswer]
+    facts: list[FactAnswer]
+    shown: tuple[UnknownKey, ...]
+    skipped: tuple[SkipKey, ...]
+    revision: int
+
+
+@dataclass(frozen=True)
+class ResumedJob:
+    """The **Resumed Job** a submission starts: what its run reads, and where it starts.
+
+    The run starts at ``prepare`` from ``checkpoint``, so no extraction and no
+    assertion pass runs again (#1252). ``follow_up`` is True where the answers
+    are to a finished report, so the new job's report is final (ADR 0054).
+    """
+
+    sources: list[Source]
+    links: list[LinkAnswer]
+    facts: list[FactAnswer]
+    shown: tuple[UnknownKey, ...]
+    checkpoint: Checkpoint
+    follow_up: bool
+
+
+@dataclass(frozen=True)
+class AnswerState:
+    """The **Answer State** of one job: everything its questions and answers read.
+
+    Each place that serves a job's questions builds one from its own job
+    record, and asks it for the questions (:attr:`questions`), for the
+    outcome of a submission (:meth:`answer`), or for a final report's
+    corrections (:meth:`correct`). It writes nothing: the caller stores a
+    :class:`SavedRound` or starts a :class:`ResumedJob`.
+
+    ``checkpoint`` is the model and catalog the questions ask about: a waiting
+    job's, or a finished report's. ``analyses`` are the report's findings, and
+    empty for a waiting job. ``waiting`` marks a job that waits on answers
+    before its analysis, and ``final`` a report its follow-up wrote.
+    ``sources``, ``links`` and ``facts`` are what the job was given, a
+    waiting job's saved rounds included. ``shown`` is every early question
+    the pause showed, ``skipped`` every question its submitter skipped for
+    now, and ``corrections`` what a final report's owner corrected since.
+    ``revision`` is how many rounds a waiting job saved. ``resumed_by`` names
+    the job these answers started, where it holds this one.
+    """
+
+    checkpoint: Checkpoint
+    frameworks: Mapping[FrameworkName, Mapping[str, Any]]
+    analyses: Sequence[FrameworkAnalysis]
+    waiting: bool
+    final: bool
+    sources: Sequence[Source]
+    links: Sequence[LinkAnswer]
+    facts: Sequence[FactAnswer]
+    shown: Sequence[UnknownKey]
+    skipped: Sequence[SkipKey]
+    corrections: Sequence[FactAnswer]
+    revision: int
+    resumed_by: str | None
+
+    @cached_property
+    def questions(self) -> QuestionSet:
+        """Every question this job asks."""
+        assertions = self.checkpoint.assertions
+        return question_set(
+            self.checkpoint.system_model,
+            None if assertions is None else assertions.catalog,
+            self.frameworks,
+            self.analyses,
+            waiting=self.waiting,
+            answered=self.facts,
+            answered_links=self.links,
+            final=self.final,
+            shown=self.shown,
+            skipped=self.skipped,
+            resumed_by=self.resumed_by,
+        )
+
+    def answer(
+        self, answers: Answers, *, limits: SourceLimits | None
+    ) -> SavedRound | ResumedJob:
+        """The round a waiting job keeps, or the Resumed Job the answers start.
+
+        A refusal raises: :class:`MissingRevision` or :class:`StaleRevision`
+        for a waiting job's revision, :class:`AlreadyResumed` where these
+        answers already started a job that holds this one,
+        :class:`~analysis_service.links.NoCatalogError` for a link answer to a
+        job with no catalog, :class:`SourcesOverLimit` where the composed
+        sources break ``limits``, and a ``ValueError`` that names the
+        submitter's own choices otherwise. ``limits`` is ``None`` only where
+        the job holds no sources to bound, as an eval replay of rounds.
+        """
+        if self.waiting:
+            if answers.revision is None:
+                raise MissingRevision("send the revision the questions were read with")
+            if answers.revision != self.revision:
+                raise StaleRevision(
+                    "the saved answers changed since these questions were read"
+                )
+        admitted = self.questions.admit(
+            sources=self.sources,
+            earlier_links=self.links,
+            earlier_facts=self.facts,
+            links=answers.links,
+            facts=answers.facts,
+            save=answers.save,
+            skips=answers.skips,
+        )
+        # Checked for a save too: a saved round that no start could run would
+        # hold the job until the submitter shortens an answer.
+        breach = None if limits is None else limits.breach(admitted.sources)
+        if breach is not None:
+            raise SourcesOverLimit(breach)
+        if answers.save:
+            return SavedRound(
+                links=admitted.links,
+                facts=admitted.facts,
+                shown=admitted.shown,
+                skipped=admitted.skipped,
+                revision=self.revision,
+            )
+        return ResumedJob(
+            sources=admitted.sources,
+            links=admitted.links,
+            facts=admitted.facts,
+            shown=admitted.shown,
+            checkpoint=self.checkpoint,
+            follow_up=not self.waiting,
+        )
+
+    def correct(self, facts: Sequence[FactAnswer]) -> list[FactAnswer]:
+        """Every correction a final report carries once ``facts`` land, or a ``ValueError``."""
+        return self.questions.correct(
+            earlier_facts=self.facts, corrections=self.corrections, facts=facts
+        )

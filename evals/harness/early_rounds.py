@@ -41,15 +41,17 @@ from typing import Any
 
 from analysis_service.analysis import control_state
 from analysis_service.answer_round import (
-    QuestionSet,
+    Answers,
+    AnswerState,
+    SavedRound,
     SkipKey,
     passes_floor,
-    question_set,
 )
 from analysis_service.assertions import UNKNOWN
 from analysis_service.claims import FrameworkName, UnknownKey
 from analysis_service.early_questions import EarlyQuestion, early_questions
 from analysis_service.fact_answers import FactAnswer, answered_keys, merged_facts
+from analysis_service.jobs import Checkpoint
 from analysis_service.report import Report
 from analysis_service.system_model import SystemModel
 
@@ -177,21 +179,49 @@ def _eligible(listed: Sequence[EarlyQuestion]) -> set[UnknownKey]:
     return {question.key for question in listed if passes_floor(question, listed)}
 
 
-def _admitted(asked: QuestionSet, answered: list[FactAnswer], given: list[FactAnswer]):
+def _state(
+    model: SystemModel,
+    frameworks: Mapping[FrameworkName, Mapping[str, Any]],
+    answered: Sequence[FactAnswer],
+    skipped: Sequence[SkipKey],
+) -> AnswerState:
+    """A paused job with no sources and no catalog, after the rounds so far."""
+    return AnswerState(
+        checkpoint=Checkpoint(system_model=model, assertions=None),
+        frameworks=frameworks,
+        analyses=(),
+        waiting=True,
+        final=False,
+        sources=(),
+        links=(),
+        facts=answered,
+        shown=(),
+        skipped=skipped,
+        corrections=(),
+        revision=0,
+        resumed_by=None,
+    )
+
+
+def _saved(state: AnswerState, facts: list[FactAnswer], skips=()) -> SavedRound:
+    """One saved round. The replay holds no sources, so no source limit applies."""
+    saved = state.answer(
+        Answers(facts=facts, save=True, skips=skips, revision=state.revision),
+        limits=None,
+    )
+    if not isinstance(saved, SavedRound):
+        raise TypeError("a saved round starts no job")
+    return saved
+
+
+def _admitted(state: AnswerState, given: list[FactAnswer]) -> list[FactAnswer]:
     """``given`` as the service saves it; a refused answer becomes "I don't know"."""
     kept: list[FactAnswer] = []
     for answer in given:
         try:
-            asked.admit(
-                sources=[],
-                earlier_links=[],
-                earlier_facts=answered,
-                links=[],
-                facts=[*kept, answer],
-                save=True,
-            )
+            _saved(state, [*kept, answer])
         except ValueError:
-            question = next(q for q in asked.early if q.key == answer.key)
+            question = next(q for q in state.questions.early if q.key == answer.key)
             answer = dont_know(question)
         kept.append(answer)
     return kept
@@ -216,18 +246,8 @@ def replay(
     skipped: tuple[SkipKey, ...] = ()
     rounds = 0
     for rounds in range(MAX_ROUNDS):
-        asked = question_set(
-            extracted,
-            None,
-            frameworks,
-            [],
-            waiting=True,
-            answered=answered,
-            answered_links=[],
-            final=False,
-            shown=[],
-            skipped=skipped,
-        )
+        state = _state(extracted, frameworks, answered, skipped)
+        asked = state.questions
         if asked.done:
             break
         seen |= {question.key for question in asked.early}
@@ -245,16 +265,8 @@ def replay(
             for key, reply in replies.items()
             if reply is None or (reply.facets is not None and key not in complete)
         ]
-        kept = _admitted(asked, answered, given)
-        skipped = asked.admit(
-            sources=[],
-            earlier_links=[],
-            earlier_facts=answered,
-            links=[],
-            facts=kept,
-            save=True,
-            skips=skips,
-        ).skipped
+        kept = _admitted(state, given)
+        skipped = _saved(state, kept, skips).skipped
         answered = merged_facts(answered, kept)
         asked_keys |= {question.key for question in asked.early}
     else:

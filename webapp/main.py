@@ -142,8 +142,13 @@ from analysis_service.answer_forms import (
 from analysis_service.answer_round import (
     MAX_SKIPS,
     AlreadyResumed,
+    Answers,
+    AnswerState,
     QuestionSet,
+    SavedRound,
     SkipKey,
+    SourcesOverLimit,
+    StaleRevision,
     question_set,
 )
 from analysis_service.claims import UnknownKey
@@ -302,19 +307,24 @@ class Run:
             return "running"
         return "awaiting-answers" if self.checkpoint is not None else "failed"
 
-    def questions(self) -> QuestionSet:
-        """Every question this run asks, from the engine and checkpoint it holds."""
+    def state(self) -> AnswerState:
+        """What this run's questions and answers read, from its engine and checkpoint."""
         if self.engine is None or self.checkpoint is None:
             raise RuntimeError(f"run {self.id} has reached no checkpoint")
         holding = self.holding
-        return self.engine.questions(
-            self.checkpoint,
-            self.report,
-            answered=self.facts,
-            answered_links=self.links,
+        return AnswerState(
+            checkpoint=self.checkpoint,
+            frameworks=self.engine.framework_options,
+            analyses=() if self.report is None else self.report.analyses,
+            waiting=self.report is None,
             final=self.final,
+            sources=self.sources,
+            links=self.links,
+            facts=self.facts,
             shown=self.shown,
             skipped=self.skipped,
+            corrections=self.corrections,
+            revision=self.revision,
             resumed_by=None if holding is None else holding.id,
         )
 
@@ -744,7 +754,7 @@ def create_app(
                 {"message": "That run asks no question, or no longer exists."},
                 status_code=404,
             )
-        questions = parent.questions()
+        state = parent.state()
         try:
             body = await request.json()
             raw = body["links"]
@@ -754,14 +764,12 @@ def create_app(
             raw_facts = body.get("facts", [])
             if not isinstance(raw_facts, list) or len(raw_facts) > MAX_FACT_ANSWERS:
                 raise TypeError
-            facts = [_fact_answer(fact, questions) for fact in raw_facts]
+            facts = [_fact_answer(fact, state.questions) for fact in raw_facts]
             save = body.get("save", False)
             if not isinstance(save, bool):
                 raise TypeError
             skips = _skips(body.get("skip", []))
             revision = body.get("revision")
-            if revision is None and questions.waiting:
-                raise TypeError
             if revision is not None and (
                 not isinstance(revision, int) or isinstance(revision, bool)
             ):
@@ -776,23 +784,20 @@ def create_app(
                 },
                 status_code=400,
             )
-        if questions.waiting and revision != parent.revision:
+        try:
+            outcome = state.answer(
+                Answers(
+                    links=links, facts=facts, save=save, skips=skips, revision=revision
+                ),
+                limits=parent.engine.limits,
+            )
+        except StaleRevision:
             return JSONResponse(
                 {
                     "message": "Your saved answers changed in another tab or"
                     " window. Reload this page to see them."
                 },
                 status_code=409,
-            )
-        try:
-            admitted = questions.admit(
-                sources=parent.sources,
-                earlier_links=parent.links,
-                earlier_facts=parent.facts,
-                links=links,
-                facts=facts,
-                save=save,
-                skips=skips,
             )
         except AlreadyResumed:
             return JSONResponse(
@@ -802,24 +807,21 @@ def create_app(
                 },
                 status_code=409,
             )
+        except SourcesOverLimit as exc:
+            return JSONResponse({"message": exc.breach.message}, status_code=400)
         except ValueError as exc:
             # The answer rules' own refusals name the submitter's choices, so
             # they are safe to show.
             return JSONResponse({"message": str(exc)}, status_code=400)
-        breach = parent.engine.breach(admitted.sources)
-        if breach is not None:
-            # Checked for a save too: a saved round that no start could run
-            # would hold the run until the submitter shortens an answer.
-            return JSONResponse({"message": breach.message}, status_code=400)
-        if save:
+        if isinstance(outcome, SavedRound):
             # A saved round runs no model: the answers go onto the paused run,
             # and the next round is read off the model with them in. Where
             # none is left, the page says so and waits for its start button.
-            parent.links, parent.facts = admitted.links, admitted.facts
-            parent.shown = list(admitted.shown)
-            parent.skipped = list(admitted.skipped)
+            parent.links, parent.facts = outcome.links, outcome.facts
+            parent.shown = list(outcome.shown)
+            parent.skipped = list(outcome.skipped)
             parent.revision += 1
-            return JSONResponse(paused_payload(parent, parent.questions()))
+            return JSONResponse(paused_payload(parent, parent.state().questions))
         try:
             run = analyses.claim(answering=parent)
         except RegistryFull as exc:
@@ -831,23 +833,10 @@ def create_app(
             )
         parent.resumed_by = run
         run.engine, run.sources = parent.engine, parent.sources
-        run.links, run.facts = admitted.links, admitted.facts
-        run.final = parent.report is not None
-        run.shown = list(admitted.shown)
-        start = partial(
-            parent.engine.resume,
-            parent.sources,
-            parent.checkpoint,
-            links,
-            facts=facts,
-            report=parent.report,
-            earlier_links=parent.links,
-            earlier_facts=parent.facts,
-            final=parent.final,
-            shown=parent.shown,
-            skipped=parent.skipped,
-            system_name="Your system",
-        )
+        run.links, run.facts = outcome.links, outcome.facts
+        run.final = outcome.follow_up
+        run.shown = list(outcome.shown)
+        start = partial(parent.engine.resume, outcome, system_name="Your system")
         run.task = asyncio.create_task(_drive(analyses, run, start))
         return JSONResponse({"run": run.id})
 
@@ -893,13 +882,13 @@ def create_app(
             return JSONResponse(
                 {"message": "That report no longer exists."}, status_code=404
             )
-        questions = run.questions()
+        state = run.state()
         try:
             body = await request.json()
             raw = body["facts"]
             if not isinstance(raw, list) or len(raw) > MAX_FACT_ANSWERS:
                 raise TypeError
-            facts = [_fact_answer(fact, questions) for fact in raw]
+            facts = [_fact_answer(fact, state.questions) for fact in raw]
         except RefusedAnswer as exc:
             return JSONResponse({"message": str(exc)}, status_code=400)
         except (ValidationError, ValueError, KeyError, TypeError):
@@ -908,9 +897,7 @@ def create_app(
                 status_code=400,
             )
         try:
-            run.corrections = questions.correct(
-                earlier_facts=run.facts, corrections=run.corrections, facts=facts
-            )
+            run.corrections = state.correct(facts)
         except ValueError as exc:
             return JSONResponse({"message": str(exc)}, status_code=400)
         return JSONResponse({"run": run.id})
@@ -1061,7 +1048,7 @@ async def _drive(
             await _emit(run, "done", {"url": f"/report/{run.id}"})
         elif isinstance(outcome, PipelineAwaiting):
             run.checkpoint = outcome.checkpoint
-            await _emit(run, "questions", paused_payload(run, run.questions()))
+            await _emit(run, "questions", paused_payload(run, run.state().questions))
         else:
             await _emit(
                 run,
