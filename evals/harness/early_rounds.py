@@ -203,7 +203,9 @@ def _state(
     )
 
 
-def _saved(state: AnswerState, facts: list[FactAnswer], skips=()) -> SavedRound:
+def _saved(
+    state: AnswerState, facts: list[FactAnswer], skips: Sequence[SkipKey] = ()
+) -> SavedRound:
     """One saved round. The replay holds no sources, so no source limit applies."""
     saved = state.answer(
         Answers(facts=facts, save=True, skips=skips, revision=state.revision),

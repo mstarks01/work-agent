@@ -277,7 +277,13 @@ class Engine:
         :meth:`~analysis_service.answer_round.AnswerState.answer` admits the
         answers and returns ``resumed``. The run starts at ``prepare`` from its
         checkpoint, so no extraction and no assertion pass runs again (#1252).
+        The sources are held to this engine's bounds again, as
+        :meth:`analyze` holds a submission's, because a caller can build
+        ``resumed`` without the answer round.
         """
+        breach = self._limits.breach(resumed.sources)
+        if breach is not None:
+            raise EngineInputError(breach.message)
         if resumed.links and not self._carries_catalog:
             raise EngineInputError(
                 "this deployment builds no assertion catalog, so nothing would"
