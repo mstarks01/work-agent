@@ -47,9 +47,12 @@ from analysis_service import budgets
 from analysis_service.answer_round import (
     MAX_SKIPS,
     AlreadyResumed,
-    QuestionSet,
+    Answers,
+    AnswerState,
+    SavedRound,
     SkipKey,
-    question_set,
+    SourcesOverLimit,
+    StaleRevision,
 )
 from analysis_service.assertions import AssertionRecord
 from analysis_service.auth import (
@@ -682,42 +685,31 @@ async def _owned_job(request: Request, job_id: str, subject: str) -> JobRecord:
     return record
 
 
-def _question_set(
+def _answer_state(
     record: JobRecord,
     model: SystemModel,
     assertions: AssertionRecord | None,
     analyses: list[FrameworkAnalysis],
     resumed_by: str | None,
-) -> QuestionSet:
-    """Every question a job asks, from what :func:`_answerable` read."""
-    return question_set(
-        model,
-        None if assertions is None else assertions.catalog,
-        {selection.name: selection.options for selection in record.frameworks},
-        analyses,
+) -> AnswerState:
+    """What a job's questions and answers read, from what :func:`_answerable` read."""
+    return AnswerState(
+        checkpoint=Checkpoint(system_model=model, assertions=assertions),
+        frameworks={
+            selection.name: selection.options for selection in record.frameworks
+        },
+        analyses=analyses,
         waiting=record.status == "awaiting-answers",
-        answered=record.facts,
-        answered_links=record.links,
         final=record.resumption is not None and record.resumption.follow_up,
+        sources=record.sources,
+        links=record.links,
+        facts=record.facts,
         shown=record.shown_early,
         skipped=record.skipped_early,
+        corrections=record.corrections,
+        revision=record.round_revision,
         resumed_by=resumed_by,
     )
-
-
-def _check_revision(sent: int | None, current: int) -> None:
-    """Refuse answers to a waiting job that name no round revision, or an old one."""
-    if sent is None:
-        raise HTTPException(
-            status_code=400,
-            detail="send the revision the questions were read with",
-        )
-    if sent != current:
-        raise HTTPException(
-            status_code=409,
-            detail="the saved answers changed since these questions were read;"
-            " read the questions again",
-        )
 
 
 def _questions_payload(
@@ -728,7 +720,7 @@ def _questions_payload(
     resumed_by: str | None,
 ) -> dict[str, Any]:
     """Every question a job asks, as the questions route serves them."""
-    questions = _question_set(record, model, assertions, analyses, resumed_by)
+    questions = _answer_state(record, model, assertions, analyses, resumed_by).questions
     return questions.to_json() | {
         "fallback": question_fallback(analyses).to_json(),
         "revision": record.round_revision,
@@ -1046,43 +1038,47 @@ def create_app(
         answerable = await _answerable(request, job_id, subject)
         if isinstance(answerable, JSONResponse):
             return answerable
-        parent, model, assertions, _, _ = answerable
-        if parent.status == "awaiting-answers":
-            _check_revision(answers.revision, parent.round_revision)
-        # Derived from the report, as the questions route derives its lists, so
-        # it runs off the event loop for the same reason.
-        questions = await anyio.to_thread.run_sync(_question_set, *answerable)
+        parent = answerable[0]
+        state = _answer_state(*answerable)
+        # The questions are derived from the report, as the questions route
+        # derives its lists, so the answer runs off the event loop for the
+        # same reason.
         try:
-            admitted = questions.admit(
-                sources=parent.sources,
-                earlier_links=parent.links,
-                earlier_facts=parent.facts,
-                links=answers.links,
-                facts=answers.facts,
-                save=answers.save,
-                skips=answers.skip,
+            outcome = await anyio.to_thread.run_sync(
+                partial(
+                    state.answer,
+                    Answers(
+                        links=answers.links,
+                        facts=answers.facts,
+                        save=answers.save,
+                        skips=answers.skip,
+                        revision=answers.revision,
+                    ),
+                    limits=request.app.state.limits,
+                )
             )
+        except StaleRevision as exc:
+            raise HTTPException(
+                status_code=409, detail=f"{exc}; read the questions again"
+            ) from exc
         except (NoCatalogError, AlreadyResumed) as exc:
             raise HTTPException(status_code=409, detail=str(exc)) from exc
+        except SourcesOverLimit as exc:
+            raise HTTPException(
+                status_code=_STATUS_BY_RUNG[exc.breach.rung], detail=str(exc)
+            ) from exc
         except ValueError as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
-        # Checked for a save too: a saved round that no start could run would
-        # hold the job until the submitter shortens an answer.
-        breach = request.app.state.limits.breach(admitted.sources)
-        if breach is not None:
-            raise HTTPException(
-                status_code=_STATUS_BY_RUNG[breach.rung], detail=breach.message
-            )
-        if answers.save:
+        if isinstance(outcome, SavedRound):
             store: JobStore = request.app.state.store
             if not await store.save_round(
                 parent.id,
                 subject,
-                admitted.links,
-                admitted.facts,
-                admitted.shown,
-                admitted.skipped,
-                parent.round_revision,
+                outcome.links,
+                outcome.facts,
+                outcome.shown,
+                outcome.skipped,
+                outcome.revision,
             ):
                 raise HTTPException(
                     status_code=409,
@@ -1093,19 +1089,19 @@ def create_app(
             return JSONResponse({"job_id": parent.id, "saved": True})
         record = JobRecord.create(
             owner_subject=subject,
-            sources=admitted.sources,
+            sources=outcome.sources,
             frameworks=parent.frameworks,
             system_name=parent.system_name,
-            links=admitted.links,
-            facts=admitted.facts,
-            shown_early=admitted.shown,
+            links=outcome.links,
+            facts=outcome.facts,
+            shown_early=outcome.shown,
             resumption=Resumption(
                 parent_id=parent.id,
-                checkpoint=Checkpoint(system_model=model, assertions=assertions),
+                checkpoint=outcome.checkpoint,
                 certification=parent.certification,
-                follow_up=not questions.waiting,
+                follow_up=outcome.follow_up,
             ),
-            reserved_tokens=budgets.estimate(admitted.sources, parent.frameworks),
+            reserved_tokens=budgets.estimate(outcome.sources, parent.frameworks),
         )
         return await _admit_and_start(request, record, background_tasks, subject)
 
@@ -1144,13 +1140,9 @@ def create_app(
         if isinstance(answerable, JSONResponse):
             return answerable
         parent, _, _, analyses, _ = answerable
-        questions = await anyio.to_thread.run_sync(_question_set, *answerable)
+        state = _answer_state(*answerable)
         try:
-            corrections = questions.correct(
-                earlier_facts=parent.facts,
-                corrections=parent.corrections,
-                facts=body.facts,
-            )
+            corrections = await anyio.to_thread.run_sync(state.correct, body.facts)
         except ValueError as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
         store: JobStore = request.app.state.store
