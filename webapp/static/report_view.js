@@ -485,93 +485,104 @@
 
     card.append(proseEl("div","desc", t.description));
 
-    // Directly under the argument it qualifies. The prose above cites an
-    // element this report does not describe, which a reader following the ID
-    // into the model table below would otherwise discover by finding nothing.
-    const references = marks.references.get(t.id);
-    if (references && references.length) {
-      const note = el("div", "caveat");
-      note.append("\u26a0 Named as affected but not in the system model, so dropped from this claim: ");
-      references.forEach((m, i) => { if (i) note.append(", "); note.append(code(m)); });
-      card.append(note);
-    }
-    const mentions = marks.mentions.get(t.id);
-    if (mentions && mentions.length) {
-      const note = el("div", "caveat");
-      note.append("\u26a0 Cited above but not in the system model: ");
-      mentions.forEach((m, i) => { if (i) note.append(", "); note.append(code(m)); });
-      card.append(note);
-    }
-
-    // Beside it, and deliberately worded as a citation failure rather than a
-    // doubt about the finding: the grounds shown below are the ones that did
-    // resolve, and they are why this claim is still here.
-    const composed = marks.composed.get(t.id);
-    if (composed && composed.length) {
-      const note = el("div", "caveat");
-      note.append("\u26a0 Cited evidence not in this job's catalog, and dropped: ");
-      composed.forEach((r, i) => { if (i) note.append(", "); note.append(code(r)); });
-      card.append(note);
-    }
-
+    // The default view answers what a reader triages on (#561): why it
+    // matters, what is missing, what it touches and what to do next. The
+    // evidence behind it, and every warning about a citation that did not
+    // resolve, sits under one toggle further down, so nothing is removed.
     if (t.severity) {
-      const rationale = el("div","field");
-      rationale.append(lbl("Severity rationale"), el("br"), prose(t.severity.justification));
-      card.append(rationale);
+      const why = el("div","field");
+      why.append(lbl("Why it matters"), el("br"), prose(t.severity.justification));
+      card.append(why);
     }
 
-    const refs = el("div","field refs");
-    refs.append(lbl("Affected elements"), el("br"));
-    t.affected_element_ids.forEach(r => refs.append(ref(r)));
-    card.append(refs);
-
-    // After the analysis, not before it: the card's job on first read is
-    // triage, and attribution is what you turn to once a finding has your
-    // attention.
-    card.append(groundsBlock(marks, t));
-
-    // A needs-info banner may repeat an element/attribute pair that also
-    // appears as an unknown-attribute ground above. Both stay: the ground is
-    // the lane agent's *trigger*, the banner is the critic's citation for its
-    // *verdict*. Different authors, and this block's whole value is that it
-    // says who justified what.
-    if (t.verdict.status === "needs-info" && t.verdict.related_unknowns.length) {
+    // The facts a needs-info finding waits on, each by what it asks and why
+    // it is still open. The critic's own sentence restates them, so it moves
+    // under the toggle rather than repeating above it.
+    const conditional = t.verdict.status === "needs-info" && t.verdict.related_unknowns.length;
+    const waits = conditional ? (CONDITIONS[`${t.framework}/${t.id}`] || []) : [];
+    if (conditional) {
       const u = el("div","unknown");
-      u.append(el("b", null, "Needs info."), " ", prose(t.verdict.reason));
-      const waits = CONDITIONS[`${t.framework}/${t.id}`] || [];
+      u.append(el("b", null, "Needs info."), " Missing information:");
       if (waits.length) {
-        // Each fact by what it asks, and why it is still open. Until each is
-        // confirmed, the finding is neither confirmed nor cleared.
         const list = el("ul");
-        waits.forEach(w => list.append(el("li", null, `${w.label} \u2014 ${WHY_OPEN[w.status] || w.status}`)));
-        u.append(" It waits on:", list, el("div", null,
-          "Until these are confirmed, this finding is neither confirmed nor cleared. " +
-          (FINAL
-            ? "To settle it, confirm them with the people who run the component, then correct an answer below or submit the description again."
-            : "To settle it, confirm them with the people who run the component, and answer them in the follow-up below.")));
+        waits.forEach(w => list.append(el("li", null, `${w.label} — ${WHY_OPEN[w.status] || w.status}`)));
+        u.append(list, el("div", null,
+          "Until these are confirmed, this finding is neither confirmed nor cleared."));
       } else {
-        u.append(" Unknown: ");
+        u.append(" ");
         t.verdict.related_unknowns.forEach((r, i) => {
           if (i) u.append(", ");
-          u.append(ref(r.element_id), " \u2192 ", code(r.attribute));
+          u.append(ref(r.element_id), " → ", code(r.attribute));
         });
       }
       card.append(u);
     }
+
+    const refs = el("div","field refs");
+    refs.append(lbl("Affected"), el("br"));
+    t.affected_element_ids.forEach(r => refs.append(ref(r)));
+    card.append(refs);
+
     if (t.verdict.status === "rejected") {
       const why = el("div","field");
       why.append(lbl("Reason dismissed"), el("br"), prose(t.verdict.reason));
       card.append(why);
     }
+
+    // What to do next: settle the open facts, then the mitigations, or the
+    // statement that none was proposed.
+    const next = el("div","field");
+    next.append(el("div","lbl","Next step"));
+    if (waits.length) {
+      next.append(el("div", null, FINAL
+        ? "Confirm the missing information with the people who run the component, then correct an answer below or submit the description again."
+        : "Confirm the missing information with the people who run the component, and answer the questions in the follow-up below."));
+    }
     if (t.mitigations && t.mitigations.length) {
       const list = el("ul","mits"); t.mitigations.forEach(m => list.append(proseEl("li", null, m.summary)));
-      const wrap = el("div","field"); wrap.append(el("div","lbl","Mitigations"), list); card.append(wrap);
+      next.append(list);
     } else if (marks.unmitigated.has(t.id)) {
-      // Where the Mitigations block would have been, so its absence is stated
-      // rather than left as a gap the reader has to notice.
-      card.append(el("div", "caveat",
-        "\u26a0 No mitigation proposed, and this finding does not rest on an unknown that would explain why."));
+      next.append(el("div", "caveat",
+        "⚠ No mitigation proposed, and this finding does not rest on an unknown that would explain why."));
     }
+    if (next.children.length > 1) card.append(next);
+
+    // Everything behind the default view: the critic's reason, the grounds
+    // with who justified what, and each citation the service dropped. A
+    // `details` element, so the browser does the toggling, keyboard included.
+    const prov = el("details","prov");
+    prov.append(el("summary", null, "Show technical provenance"));
+    if (conditional && t.verdict.reason) {
+      const reason = el("div","field");
+      reason.append(lbl("The critic's reason"), el("br"), prose(t.verdict.reason));
+      prov.append(reason);
+    }
+    prov.append(groundsBlock(marks, t));
+    const references = marks.references.get(t.id);
+    if (references && references.length) {
+      const note = el("div", "caveat");
+      note.append("⚠ Named as affected but not in the system model, so dropped from this claim: ");
+      references.forEach((m, i) => { if (i) note.append(", "); note.append(code(m)); });
+      prov.append(note);
+    }
+    const mentions = marks.mentions.get(t.id);
+    if (mentions && mentions.length) {
+      const note = el("div", "caveat");
+      note.append("⚠ Cited in the description but not in the system model: ");
+      mentions.forEach((m, i) => { if (i) note.append(", "); note.append(code(m)); });
+      prov.append(note);
+    }
+    // Worded as a citation failure rather than a doubt about the finding: the
+    // grounds above are the ones that did resolve, and they are why this
+    // claim is still here.
+    const composed = marks.composed.get(t.id);
+    if (composed && composed.length) {
+      const note = el("div", "caveat");
+      note.append("⚠ Cited evidence not in this job's catalog, and dropped: ");
+      composed.forEach((r, i) => { if (i) note.append(", "); note.append(code(r)); });
+      prov.append(note);
+    }
+    card.append(prov);
     return card;
   }
 
