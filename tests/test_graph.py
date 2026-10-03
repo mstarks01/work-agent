@@ -2112,7 +2112,10 @@ def test_assemble_splits_rulings_and_builds_the_summary():
     confirmed = sample_ruling("S-01")
     rejected = sample_ruling(
         "T-01",
-        verdict={"reason": "duplicate of S-01", "rejected_because": "duplicate"},
+        verdict={
+            "reason": "a spoofing action filed as tampering",
+            "rejected_because": "lane",
+        },
     )
     drafts = [
         sample_draft("S-01"),

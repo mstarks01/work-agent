@@ -658,7 +658,7 @@ class TestTheCriticReadsTheRowItIsAskedToRuleOn:
         ground = evidence_catalog(valid_model(), held)[assertion_id(stated)]
         draft = sample_draft("S-01", grounds=[ground])
 
-        (view,) = critic_view([draft], valid_model(), assertions=held)
+        (view,) = critic_view([draft], assertions=held)
 
         (fact,) = view["assertion_facts"]
         assert fact["assertion"] == assertion_id(stated)
@@ -671,7 +671,7 @@ class TestTheCriticReadsTheRowItIsAskedToRuleOn:
         ground = evidence_catalog(valid_model(), held)[assertion_id(row())]
         draft = sample_draft("S-01", grounds=[ground])
 
-        (view,) = critic_view([draft], valid_model(), assertions=held)
+        (view,) = critic_view([draft], assertions=held)
 
         assert view["assertion_facts"][0]["says"] in render_catalog(
             evidence_catalog(valid_model(), held), held
@@ -679,7 +679,7 @@ class TestTheCriticReadsTheRowItIsAskedToRuleOn:
         assert view["assertion_facts"][0]["says"] == ground_gloss(ground, held)
 
     def test_a_job_that_ran_no_catalog_carries_no_key(self):
-        (view,) = critic_view([sample_draft("S-01")], valid_model())
+        (view,) = critic_view([sample_draft("S-01")])
 
         assert "assertion_facts" not in view
 

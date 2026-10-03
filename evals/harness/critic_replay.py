@@ -146,7 +146,6 @@ async def compose(
     record = archived.report.assertions
     view = critic_view(
         archived.drafts,
-        archived.report.system_model,
         repaired=archived.marks.repaired_quotes,
         unverified=archived.marks.unverified_grounds,
         assertions=None if record is None else record.catalog,

@@ -51,9 +51,9 @@ from pydantic import ValidationError
 
 from analysis_service.actions import menu
 from analysis_service.claims import (
+    CriticStep,
     Ground,
     Proposal,
-    RejectionStep,
 )
 from analysis_service.compact import (
     COMPACT_FORMAT,
@@ -889,9 +889,9 @@ def test_the_analyze_prompt_names_every_evidence_list(list_name):
     )
 
 
-@pytest.mark.parametrize("step", sorted(get_args(RejectionStep)))
+@pytest.mark.parametrize("step", sorted(get_args(CriticStep)))
 def test_the_critic_prompt_names_every_rejection_step(step):
-    """A step the code can store is a step the critic was taught to write.
+    """A step the critic may write is a step the critic was taught to write.
 
     ``rejected_because`` is the field a reader of the rejected array switches
     on, and a critic can only fill it with a value the prompt names. Keyed to

@@ -189,17 +189,14 @@ class TestJoinDrafts:
         )
 
     def test_two_conditional_drafts_at_one_place_both_reach_the_critic(self, model):
-        """The fan-in deletes neither, and the critic is shown the pair.
+        """The fan-in deletes neither, and the critic rules on each.
 
-        **One question, one reader.** Whether two drafts are one finding is the
-        critic's judgement, and every draft reaches it — a conditional one
-        included. A second reader here would key on the lane, the verb and the
-        endpoint-resolved place, which is
-        :func:`~analysis_service.critic.duplicate_groups`'s own key, and it
-        would answer first by deleting one of the pair.
-
-        Both halves are asserted together, so neither can drift into answering
-        on its own.
+        **One question, one reader.** Whether a draft holds is the critic's
+        judgement, and every draft reaches it — a conditional one included. A
+        second reader here keyed on the lane, the verb and the
+        endpoint-resolved place would answer first by deleting one of the
+        pair, and every archived duplicate rejection dropped a different
+        finding (QA-2026-10-03-02-E3).
         """
         pair = [self._conditional("D-01", "first"), self._conditional("D-02", "second")]
 
@@ -207,12 +204,9 @@ class TestJoinDrafts:
 
         assert [draft.title for draft in joined.drafts] == ["first", "second"]
         assert joined.marks.dropped_claims == []
-        assert critic.duplicate_groups(joined.drafts, model) == {
-            "D-01": ["D-02"],
-            "D-02": ["D-01"],
-        }
-        view = {row["id"]: row for row in critic.critic_view(joined.drafts, model)}
-        assert view["D-01"]["same_action_as"] == ["D-02"]
+        view = {row["id"]: row for row in critic.critic_view(joined.drafts)}
+        assert set(view) == {"D-01", "D-02"}
+        assert not any("same_action_as" in row for row in view.values())
 
     def test_two_conditional_drafts_at_two_places_both_survive(self, model):
         """The key is the action and the place, not the fact they are both open."""
@@ -672,7 +666,7 @@ class TestQuoteVerification:
         joined = join_drafts(drafts, STRIDE, model, SOURCES)
 
         (view,) = critic.critic_view(
-            joined.drafts, model, repaired=joined.marks.repaired_quotes
+            joined.drafts, repaired=joined.marks.repaired_quotes
         )
 
         assert view["repaired_quotes"] == [
@@ -682,7 +676,7 @@ class TestQuoteVerification:
                 "moved": [],
             }
         ]
-        (plain,) = critic.critic_view(joined.drafts, model)
+        (plain,) = critic.critic_view(joined.drafts)
         assert "repaired_quotes" not in plain
 
     def test_the_critic_is_shown_which_quote_was_not_found(self, model):
@@ -702,11 +696,11 @@ class TestQuoteVerification:
         joined = join_drafts(drafts, STRIDE, model, SOURCES)
 
         (view,) = critic.critic_view(
-            joined.drafts, model, unverified=joined.marks.unverified_grounds
+            joined.drafts, unverified=joined.marks.unverified_grounds
         )
         assert [entry["index"] for entry in view["unverified_quotes"]] == [0]
         assert LABEL in view["unverified_quotes"][0]["reason"]
-        (plain,) = critic.critic_view(joined.drafts, model)
+        (plain,) = critic.critic_view(joined.drafts)
         assert "unverified_quotes" not in plain
 
     def test_a_claim_whose_every_ground_fails_is_dropped_and_marked(self, model):

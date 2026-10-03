@@ -80,7 +80,7 @@ def compose(
 
     **One half of the production view is absent, and this is where that is
     written down.** ``merge_drafts`` builds the first pass's view as
-    ``critic_view(drafts, model, repaired=marks.repaired_quotes)``, so a
+    ``critic_view(drafts, repaired=marks.repaired_quotes)``, so a
     production critic sees what the agent wrote beside each span the repair
     pass put in its place. :class:`~evals.critic_review.model.CriticFixture`
     has no field for a repaired quote and ``cases.json`` carries none, so this
@@ -99,7 +99,7 @@ def compose(
                 for crossing in model.boundary_crossings()
             ]
         ),
-        "drafts": render_fenced(critic_view(drafts, model)),
+        "drafts": render_fenced(critic_view(drafts)),
         "input_text": render_sources(sources),
     }
     prompt = compose_critic_prompt(prompt_loader)

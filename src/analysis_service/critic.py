@@ -7,14 +7,14 @@ given, each ruling carrying a well-formed verdict and each ``needs-info``
 naming an unknown the model contains; that a re-ask changed only what the
 problems named; and, at assembly, that a ruling becomes a claim from the copy
 this service already holds. The view a critic reads is built here too, with
-the pairs it would otherwise hunt for computed onto it, so the first pass and
-the re-ask cannot disagree about what a critic sees.
+the facts code can compute already on it, so the first pass and the re-ask
+cannot disagree about what a critic sees.
 
 The checks that run *before* a critic reads anything — element references,
 unique IDs, grounds that resolve, quotes that are in the source they name —
 are the fan-in's, in :mod:`analysis_service.fan_in`. A package's critic prompt
-names those as already done, so its judgement is spent on evidence, lanes,
-duplicates and whatever else that framework grades. For grounds, it is spent on
+names those as already done, so its judgement is spent on evidence, lanes
+and whatever else that framework grades. For grounds, it is spent on
 the one question code cannot answer: whether a quote that is verbatim actually
 supports the finding it was filed under.
 
@@ -41,7 +41,6 @@ from __future__ import annotations
 from collections import Counter
 from collections.abc import Collection, Iterable, Mapping, Sequence
 from dataclasses import dataclass
-from types import MappingProxyType
 from typing import Any, NamedTuple, get_args
 
 from analysis_service.assertions import AssertionCatalog
@@ -64,7 +63,6 @@ from analysis_service.frameworks import FrameworkSchemas, lane_of
 from analysis_service.question_kinds import QUESTION_KINDS
 from analysis_service.references import snap
 from analysis_service.system_model import (
-    ModelIndex,
     SystemModel,
     TrustBoundary,
     attribute_names,
@@ -470,39 +468,6 @@ def _named(refs: Iterable[UnknownRef]) -> str:
     return ", ".join(name_unknown(ref) for ref in refs)
 
 
-def _duplicate_on_unit_issues(
-    drafts: Sequence[Claim], rulings: Iterable[Ruling]
-) -> list[UnreconciledRuling]:
-    """Every ``duplicate`` rejection of a draft that rules on a unit of its own.
-
-    A package whose drafts name a unit — a catalog requirement — decides
-    duplication by that unit's identifier, and :func:`~analysis_service.fan_in._drop_duplicate_ids` has
-    already dropped the second copy before any critic reads the set. So a
-    ``duplicate`` rejection here can only mean the critic judged two rulings on
-    two *different* requirements to be one concern, which is a ruling the
-    standard does not have: each requirement is its own question. The re-ask
-    asks for the answer to that question instead. A package whose drafts name
-    no unit is untouched, because there the critic is the only reader of
-    duplication.
-    """
-    unit_by_id = {draft.id: type(draft).unit_of(draft) for draft in drafts}
-    return [
-        UnreconciledRuling.of(
-            claim_id=ruling.id,
-            kind="duplicate-on-unit",
-            message=f"claim {ruling.id!r} rules on {unit_by_id[ruling.id]!r}, and a"
-            " duplicate of a unit-bearing draft is decided by its identifier"
-            " before you see it, so rejecting it as a duplicate of another"
-            " requirement names no check: rule on this requirement, or reject it"
-            " for evidence with the fact that rules it out",
-        )
-        for ruling in rulings
-        if ruling.verdict.status == "rejected"
-        and ruling.verdict.rejected_because == "duplicate"
-        and unit_by_id.get(ruling.id)
-    ]
-
-
 def _dismissal_off_grounds_issues(
     drafts: Sequence[Claim], rulings: Iterable[Ruling]
 ) -> list[UnreconciledRuling]:
@@ -583,9 +548,9 @@ def finding_key(claim: Claim, flows: Mapping[str, tuple[str, str]]) -> FindingKe
     A claim with a verb is one action at one place in one lane: its
     framework, its lane, its verb and its endpoint-resolved targets. A claim
     with no verb belongs to a package whose identity is a catalog identifier,
-    so it is its framework and the unit it rules on. Read by the critic's
-    duplicate pairs and by :mod:`analysis_service.report_changes`, which
-    matches one report's findings to an earlier report's.
+    so it is its framework and the unit it rules on. Read by
+    :mod:`analysis_service.report_changes`, which matches one report's
+    findings to an earlier report's.
     """
     if claim.verb is None:
         return (claim.framework, type(claim).unit_of(claim))
@@ -595,36 +560,6 @@ def finding_key(claim: Claim, flows: Mapping[str, tuple[str, str]]) -> FindingKe
         claim.verb,
         endpoint_targets(claim.affected_element_ids, flows),
     )
-
-
-def duplicate_groups(
-    drafts: Sequence[Claim], system_model: SystemModel
-) -> dict[str, list[str]]:
-    """Each draft's ID against the other drafts naming one action at one place in its lane.
-
-    The critic's duplicate step is a comparison of three fields — the lane, the
-    verb and the endpoint-resolved targets — made here so the critic reads the
-    pairs rather than hunting for them (#440). The lane is part of the key
-    because it is part of a claim's identity: the corpus records one verb at
-    one place in two lanes as two findings, and the critic prompt says two
-    lanes are never duplicates. A read and a write of one flow carry two verbs,
-    so they are never paired either.
-
-    A draft with no verb belongs to a package whose identity is a catalog
-    identifier, and its duplicates are ID collisions the join already refuses.
-    """
-    flows = ModelIndex.of(system_model).flow_endpoints
-    by_key: dict[FindingKey, list[str]] = {}
-    for draft in drafts:
-        if draft.verb is None:
-            continue
-        by_key.setdefault(finding_key(draft, flows), []).append(draft.id)
-    return {
-        draft_id: [other for other in ids if other != draft_id]
-        for ids in by_key.values()
-        if len(ids) > 1
-        for draft_id in ids
-    }
 
 
 def review_issues(
@@ -676,7 +611,6 @@ def review_issues(
     dropped = sorted(drafted_ids - ruled_ids)
     per_ruling = (
         _dismissal_off_grounds_issues(drafts, rulings)
-        + _duplicate_on_unit_issues(drafts, rulings)
         + _verdict_shape_issues(rulings)
         + _unresolved_unknown_ref_issues(rulings, system_model)
     )
@@ -883,16 +817,14 @@ _DRAFT_UNRULED_FIELDS: frozenset[str] = frozenset()
 
 def _ruling_view(
     drafts: Sequence[Claim],
-    duplicates: Mapping[str, Sequence[str]] = MappingProxyType({}),
     repaired: Sequence[RepairedQuote] = (),
     unverified: Sequence[UnverifiedGround] = (),
     assertions: AssertionCatalog | None = None,
 ) -> list[dict]:
     """The drafts as a critic reads them, with no empty branches.
 
-    The three shared steps read ``description`` (evidence), the lane and
-    ``affected_element_ids`` (duplicate), over ``grounds``. Everything else here
-    is for whatever its own framework grades.
+    The two shared steps read ``description`` (evidence) and the lane, over
+    ``grounds``. Everything else here is for whatever its own framework grades.
 
     ``mitigations`` is the largest block, and it is a package's field rather
     than the neutral claim's: a
@@ -966,11 +898,6 @@ def _ruling_view(
         # facts (#1082).
         if rows := _assertion_rows(draft, assertions):
             view["assertion_facts"] = rows
-        # Computed, never drafted: the IDs of the other drafts naming the same
-        # action at the same place (:func:`~analysis_service.critic.duplicate_groups`),
-        # so the critic's duplicate step reads a pair instead of hunting for it.
-        if draft.id in duplicates:
-            view["same_action_as"] = list(duplicates[draft.id])
         # Also computed: the package's own table says this draft's action is not
         # one its lane files. The ruling is settled in code; the key tells the
         # critic not to spend a judgement on it.
@@ -1007,7 +934,6 @@ def _assertion_rows(draft: Claim, assertions: AssertionCatalog | None) -> list[d
 
 def critic_view(
     drafts: Sequence[Claim],
-    system_model: SystemModel,
     *,
     only: Collection[str] | None = None,
     repaired: Sequence[RepairedQuote] = (),
@@ -1029,12 +955,6 @@ def critic_view(
     fifths of a report's findings with their reasoning read by nobody, and a
     draft could reach that state by citing an unknown it did not depend on.
 
-    **The pairs are computed over every shown draft, never over ``only``.** A
-    duplicate is a relation between two drafts, so narrowing the set first would
-    leave a draft paired with nothing and read as unique. ``only`` narrows what
-    is *rendered* and nothing else: the re-ask reproduces rulings rather than
-    drafts, and an ID is the whole of a claim it need not read.
-
     ``repaired`` is the fan-in's :class:`~analysis_service.claims.RepairedQuote`
     marks, rendered onto the draft each one names so the evidence step reads
     what the agent wrote beside the span the service put in its place.
@@ -1050,10 +970,8 @@ def critic_view(
     identity, whose value and scope are digests, so without this the critic is
     asked whether a claim follows from a fact it cannot read.
     """
-    shown = list(drafts)
-    duplicates = duplicate_groups(shown, system_model)
-    chosen = shown if only is None else [d for d in shown if d.id in only]
-    return _ruling_view(chosen, duplicates, repaired, unverified, assertions)
+    chosen = list(drafts) if only is None else [d for d in drafts if d.id in only]
+    return _ruling_view(chosen, repaired, unverified, assertions)
 
 
 @dataclass(frozen=True)
@@ -1126,7 +1044,6 @@ def review(
         roster=[draft.id for draft in drafts],
         unreconciled=critic_view(
             drafts,
-            system_model,
             only=problems.implicated,
             repaired=repaired,
             unverified=unverified,

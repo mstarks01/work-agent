@@ -501,10 +501,10 @@ def lane_of(claim: Claim) -> str | None:
     """The lane a claim was reached in, read from the field its package stamps.
 
     ``None`` for a package whose claims carry no lane field. The one reader for
-    the two seams that key a duplicate by its lane (#440): the critic's pairs
-    and the fan-in's settled drop. The scorer keys a claim's identity by its
-    lane too, and the corpus records one action at one place in two lanes as
-    two findings, so a duplicate check that ignored the lane deleted what the
+    the seams that key a claim by its lane: the fan-in's settled drop and
+    :func:`~analysis_service.critic.finding_key`. The scorer keys a claim's
+    identity by its lane too, and the corpus records one action at one place in
+    two lanes as two findings, so a check that ignored the lane deleted what the
     reference set counts.
     """
     field = PACKAGES[claim.framework].id_rule.lane_field

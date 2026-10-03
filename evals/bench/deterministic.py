@@ -68,7 +68,6 @@ from analysis_service.compact import (
     REF_TAGS,
     REFERENCE_FIELDS,
 )
-from analysis_service.critic import duplicate_groups
 from analysis_service.execution import GraphExecutor
 from analysis_service.fan_in import (
     _bound_element_references,
@@ -345,10 +344,6 @@ def case_index() -> None:
     _timed(
         "_scope_grounds: 2,000 claims",
         lambda: _scope_grounds(claims, index, None),
-    )
-    _timed(
-        "duplicate_groups: 2,000 claims",
-        lambda: duplicate_groups(claims, model),
     )
 
 
