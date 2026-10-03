@@ -55,14 +55,14 @@
     {
       "id": "process:rewards-api",
       "name": "rewards api",
-      "description": "Reads and writes members' points. Accepts signed JWT bearer access tokens and checks only the signature, with a public key it downloads at start-up; it does not check which client or audience a token was issued for. Redeeming points for a gift card needs only a token with the redeem scope.",
+      "description": "Reads and writes members' points. Accepts signed JWT bearer access tokens and checks the signature, with a public key it downloads at start-up; it does not check which client or audience a token was issued for. Redeeming points for a gift card needs only a token with the redeem scope.",
       "assets": [
         "financial",
         "pii"
       ],
       "source_excerpt": "It does not check which client or which audience a token was issued for.",
       "source_label": "System description",
-      "technology": "API that validates JWT signatures only",
+      "technology": "API that validates JWT signatures and checks no client or audience",
       "trust_zone": "boundary:rewards-cloud",
       "exposure": "internet-facing",
       "interface_kind": "web"

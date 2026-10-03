@@ -6,13 +6,13 @@
       "process:mobile-app",
       "process:authorization-server"
     ],
-    "claim": "An attacker who copies a member's mobile refresh token from the phone keeps getting access tokens as that member indefinitely, because the token's expiry slides forward on every use.",
-    "tier": "must-find",
+    "claim": "An attacker who copies a member's mobile refresh token can continue obtaining access tokens while sliding its expiry forward, if effective sender binding or replay defenses do not block the attacker and the token is not revoked.",
+    "tier": "expected",
     "severity": {
       "likelihood": "medium",
       "impact": "high"
     },
-    "notes": "Stated outright: the refresh token never expires and slides ninety days on each use. Nothing the source states bounds the window, and nothing detects a second holder.",
+    "notes": "The sliding expiry with no absolute lifetime is stated. Continued use of a copied token also needs the sender binding, replay detection and revocation to fail, and the source states none of them.",
     "verb": "use-credential"
   },
   {
@@ -21,14 +21,14 @@
       "flow:process:mobile-app>process:authorization-server>token-requests",
       "process:mobile-app"
     ],
-    "claim": "A malicious app on the member's phone intercepts the mobile app's authorization code and redeems it as the mobile app, if the app sends no PKCE challenge.",
+    "claim": "A malicious app that intercepts the mobile app's authorization code may impersonate that client at the token endpoint if the server accepts the code without requiring and validating PKCE.",
     "tier": "expected",
     "severity": {
       "likelihood": "medium",
       "impact": "high"
     },
     "notes": "Conditional on the unrecorded PKCE. A public client has no secret, so the code is the whole credential at the token endpoint.",
-    "verb": "use-credential"
+    "verb": "impersonate"
   },
   {
     "category": "spoofing",
@@ -52,13 +52,13 @@
       "flow:entity:member>process:authorization-server>sign-in-and-consent",
       "process:authorization-server"
     ],
-    "claim": "An attacker guesses members' passwords on the authorization server's sign-in page and signs in as them.",
+    "claim": "An attacker guesses members' passwords on the authorization server's sign-in page and signs in as them, if the sign-in has no second factor and no defence against guessing.",
     "tier": "expected",
     "severity": {
       "likelihood": "medium",
       "impact": "medium"
     },
-    "notes": "The sign-in is a password alone and the source states no lockout or rate limit. An expected finding, not a must-find: the silence is ordinary, not a stated gap.",
+    "notes": "Conditional: the source establishes neither a password-only sign-in nor missing defences against guessing.",
     "verb": "guess-credential"
   },
   {
@@ -98,13 +98,13 @@
       "process:rewards-api",
       "process:authorization-server"
     ],
-    "claim": "An attacker who can answer the rewards API's start-up key download serves a public key of their own, and the API then accepts access tokens the attacker signs.",
+    "claim": "An attacker who can replace the public key the rewards API downloads at start-up has the API accept access tokens the attacker signs, if the API does not verify the key's source or its delivery.",
     "tier": "expected",
     "severity": {
       "likelihood": "low",
       "impact": "high"
     },
-    "notes": "The source states the key is downloaded at start-up and does not say from where or how it is checked. Low likelihood; the whole API's trust rests on that one fetch.",
+    "notes": "The source states the key is downloaded at start-up and does not say from where or how it is checked. Answering the download alone does not establish that the API accepts an untrusted key.",
     "verb": "forge"
   },
   {
@@ -144,13 +144,13 @@
       "store:identity-database",
       "flow:process:authorization-server>store:identity-database>read-and-write-accounts-and-grants"
     ],
-    "claim": "An attacker who obtains a copy of the identity database recovers members' refresh tokens and password hashes, since its protection at rest is not recorded.",
+    "claim": "An attacker who obtains a readable copy of the identity database recovers members' password hashes, and their refresh tokens if those are stored in a reusable form.",
     "tier": "expected",
     "severity": {
       "likelihood": "low",
       "impact": "high"
     },
-    "notes": "Conditional on the unrecorded at-rest protection. It matters more here than on the other stores because the mobile refresh tokens never expire.",
+    "notes": "Conditional on the unrecorded protection at rest and on how refresh tokens are stored. Password hashes are not plaintext passwords.",
     "verb": "recover-credential"
   },
   {
@@ -160,13 +160,13 @@
       "flow:entity:member>process:authorization-server>sign-in-and-consent",
       "flow:process:mobile-app>process:authorization-server>token-requests"
     ],
-    "claim": "An attacker floods the authorization server's sign-in and token endpoints until members and partner apps can no longer get tokens.",
+    "claim": "An attacker may prevent members and partner apps from obtaining new tokens by flooding the authorization server's sign-in and token endpoints, if accepted malicious traffic exhausts their capacity and abuse defenses do not prevent it.",
     "tier": "expected",
     "severity": {
       "likelihood": "medium",
       "impact": "medium"
     },
-    "notes": "Every client depends on the one authorization server, and the source states no rate limit. The rewards API cannot serve anyone once tokens stop.",
+    "notes": "Every client depends on the one authorization server, and the source states no rate limit. Already-issued tokens remain usable for their remaining lifetime.",
     "verb": "flood"
   },
   {
@@ -176,13 +176,13 @@
       "entity:partner-app",
       "process:authorization-server"
     ],
-    "claim": "A partner app presents a member's access token to the support console, which accepts it because both services trust the same signing key and neither checks the audience, and it closes members' accounts.",
-    "tier": "must-find",
+    "claim": "A partner app presents a member's access token to the support console and closes members' accounts, if the console does not restrict tokens to the ones meant for it and does not check that the caller may close accounts.",
+    "tier": "expected",
     "severity": {
       "likelihood": "medium",
       "impact": "high"
     },
-    "notes": "The case's central finding, assembled from three stated facts: no audience check, one signing key for both services, and the console on the same public hostname. Whether the console also checks a role is not stated, which is what keeps the likelihood at medium.",
+    "notes": "One signing key serves both services and the console shares the public hostname. The missing audience check is stated for the rewards API only: the console's audience and role checks are unknown.",
     "verb": "escalate"
   },
   {
@@ -208,13 +208,13 @@
       "store:identity-database",
       "flow:process:mobile-app>process:rewards-api>call-rewards-api"
     ],
-    "claim": "A member whose account support closed keeps redeeming points with a refresh token the closure never revoked.",
-    "tier": "must-find",
+    "claim": "A member whose account support closed uses an unrevoked refresh token to obtain new access tokens and redeem points, if the token endpoint and rewards API do not reject the closed account.",
+    "tier": "expected",
     "severity": {
       "likelihood": "medium",
       "impact": "medium"
     },
-    "notes": "Stated outright: closing an account marks it closed in the directory and leaves the grant store untouched. Whether the token endpoint reads the closed flag is not stated.",
+    "notes": "Closing an account marks it closed and leaves the grant store untouched. Whether the token endpoint or the rewards API reads the closed flag is not stated.",
     "verb": "abuse-grant"
   },
   {

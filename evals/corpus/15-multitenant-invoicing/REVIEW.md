@@ -172,10 +172,10 @@ The narrower question, per record: **does this requirement apply to this system,
 
 > mark:
 
-**A2.** `V8.4.1` — Nothing states that the billing app keeps a user's reads and writes inside their own company: it loads invoices by number, adds the tenant filter by hand, and the database enforces no tenant rule.
+**A2.** `V8.4.1` — Nothing states that the billing app checks, on each request, that the invoice it loads by number belongs to the user's company.
 
 - `process:billing-app`, `store:tenant-database`, `flow:entity:company-user>process:billing-app>manage-invoices`
-- Whether the check exists is a property of the app's code.
+- The app adds company filters by hand. Per-invoice ownership enforcement is unspecified. Missing row-level security in the database alone is not a vulnerability.
 
 > mark:
 
@@ -186,24 +186,24 @@ The narrower question, per record: **does this requirement apply to this system,
 
 > mark:
 
-**A4.** `V8.2.3` — The billing app saves every field an edit posts, so no field is restricted to the users allowed to change it.
+**A4.** `V8.2.3` — The billing app saves every field an invoice edit posts, so nothing states that the paid flag and the payout bank account are limited to the users allowed to change them.
 
 - `process:billing-app`, `flow:entity:company-user>process:billing-app>manage-invoices`
-- Stated outright: the paid flag and the payout bank account included.
+- Saving every posted field supports mass assignment. Whether any role is held back from those fields is unknown.
 
 > mark:
 
-**A5.** `V8.1.1` — Nobody wrote down who may read or change which invoices, beyond an admin and viewer role.
+**A5.** `V8.1.1` — The description does not define what each role may do to which invoices, beyond naming an admin and a viewer role.
 
 - `process:billing-app`
-- A fuller description could state the rules; the source names the roles and nothing they allow.
+- The description states tenant membership and query filtering; it does not define the complete permissions of each role.
 
 > mark:
 
-**A6.** `V8.1.2` — Nobody wrote down which invoice fields each role may read or change.
+**A6.** `V8.1.2` — The description does not define which invoice fields each role may read or change.
 
 - `process:billing-app`
-- The field-level half of V8.1.1.
+- The field-level half of V8.1.1. This does not show that no policy exists elsewhere.
 
 > mark:
 
@@ -217,10 +217,10 @@ The narrower question, per record: **does this requirement apply to this system,
 
 > mark:
 
-**A8.** `V15.1.3` — Nobody wrote down that PDF rendering is resource-demanding or how its load is limited.
+**A8.** `V15.1.3` — The supplied description documents asynchronous, serial PDF rendering but does not explain how it prevents excessive submissions from denying timely service to other users or tenants.
 
 - `process:billing-app`, `process:pdf-renderer`, `store:render-queue`
-- The source states the opposite of a limit: any user, any invoice, as often as they like.
+- Missing documentation of the protection strategy, not proof that every operational defence is absent.
 
 > mark:
 
@@ -244,7 +244,7 @@ The narrower question, per record: **does this requirement apply to this system,
 
 > mark:
 
-## Part 3 — the 12 recorded STRIDE threats
+## Part 3 — the 15 recorded STRIDE threats
 
 Only after your own list exists.
 
@@ -289,7 +289,7 @@ on either of them. That is the finding this sitting exists for.
 
 > mark:
 
-**4.** An attacker who can write to the render queue plants a job naming another company's ID, and the renderer files a PDF under the company the job names.
+**4.** An attacker who can write to the render queue plants a job whose company ID does not match its invoice, and the renderer files that invoice's PDF under the wrong company, unless it checks that the two belong together.
 
 - `flow:process:billing-app>store:render-queue>queue-render-job`, `store:render-queue`, `process:pdf-renderer`
 - severity: low/medium · verb: `plant`
@@ -300,18 +300,18 @@ on either of them. That is the finding this sitting exists for.
 
 ### repudiation
 
-**5.** A support agent acting as a customer user changes that company's invoices, and the record shows only the customer user, so nothing can show the agent did it.
+**5.** A support agent acting as a customer user changes that company's invoices, and the database record names only the customer user, not the agent.
 
 - `flow:process:admin-console>process:billing-app>open-session-as-customer-user`, `process:admin-console`, `store:tenant-database`
 - severity: medium/medium · verb: `unattributable`
-- Stated outright: everything the agent does is recorded against the customer user. The customer cannot even dispute it, because the record names them.
+- Stated outright: everything the agent does is recorded against the customer user.
 
 > mark:
 
 
 ### information-disclosure
 
-**6.** Anyone steps through invoice numbers on the payment page and reads every company's invoices, customer names and bank details, because the numbers count up across all companies and the page asks for no sign-in.
+**6.** Anyone steps through invoice numbers on the payment page and reads every company's invoices, company names and bank details, because the numbers count up across all companies and the page asks for no sign-in.
 
 - `flow:entity:payer>process:billing-app>open-payment-page`, `process:billing-app`, `entity:payer`
 - severity: high/high · verb: `elicit`
@@ -327,11 +327,11 @@ on either of them. That is the finding this sitting exists for.
 
 > mark:
 
-**8.** An attacker who obtains a copy of the tenant database reads every company's invoices and payout bank details, since its protection at rest is not recorded.
+**8.** An attacker who steals a copy of the tenant database may read every company's invoices and payout bank details if the copy is unencrypted or the attacker can also obtain the means to decrypt it.
 
 - `store:tenant-database`, `flow:process:billing-app>store:tenant-database>read-and-write-tenant-data`
 - severity: low/high · verb: `read`
-- Conditional on the unrecorded at-rest protection; one copy holds every tenant.
+- Protection at rest is unspecified; one copy holds every tenant.
 
 > mark:
 
@@ -349,7 +349,7 @@ on either of them. That is the finding this sitting exists for.
 
 ### denial-of-service
 
-**10.** A user asks for PDFs as often as they like and fills the render queue, so the one-job-at-a-time renderer stops producing PDFs for every other company.
+**10.** A user asks for PDFs as often as they like and fills the render queue, so the one-job-at-a-time renderer delays every other company's PDFs.
 
 - `flow:entity:company-user>process:billing-app>manage-invoices`, `process:pdf-renderer`, `store:render-queue`
 - severity: medium/medium · verb: `flood`
@@ -368,11 +368,44 @@ on either of them. That is the finding this sitting exists for.
 
 > mark:
 
-**12.** A support agent opens a session as a customer admin and uses that company's admin rights, which reach beyond anything support needs.
 
-- `flow:process:admin-console>process:billing-app>open-session-as-customer-user`, `process:admin-console`, `process:billing-app`
-- severity: low/medium · verb: `abuse-grant`
-- The grant is legitimate and unbounded in the source: any customer user, with no stated reason or approval. Low likelihood because agents are our own staff.
+### information-disclosure
+
+**12.** A company user who requests another company's invoice PDF may obtain its contents if job creation or rendering fails to enforce tenant ownership and PDF retrieval also permits that user to fetch the result.
+
+- `flow:entity:company-user>process:billing-app>manage-invoices`, `process:billing-app`, `process:pdf-renderer`
+- severity: low/high · verb: `elicit`
+- The source states that any user may ask for a PDF of any invoice. It does not state that the job carries the requesting user's company or that the user can fetch the result.
+
+> mark:
+
+**13.** An attacker on an internal network path may read sensitive invoice or job data if transport protection does not prevent interception.
+
+- `flow:process:billing-app>store:tenant-database>read-and-write-tenant-data`, `flow:process:billing-app>store:render-queue>queue-render-job`, `flow:process:pdf-renderer>store:render-queue>take-render-jobs`, `flow:process:pdf-renderer>store:tenant-database>read-invoice`, `flow:process:pdf-renderer>store:pdf-bucket>write-pdf`, `flow:process:billing-app>store:pdf-bucket>fetch-pdfs`
+- severity: low/high · verb: `intercept`
+- Transport protection on the billing app's and the renderer's connections to the database, the queue and the bucket is unspecified.
+
+> mark:
+
+
+### tampering
+
+**14.** An attacker on a render-job network path may change the company ID or invoice number if authenticated integrity protection does not prevent alteration.
+
+- `flow:process:billing-app>store:render-queue>queue-render-job`, `flow:process:pdf-renderer>store:render-queue>take-render-jobs`
+- severity: low/medium · verb: `alter-in-transit`
+- Integrity protection on the render-job paths is unspecified, and the renderer trusts the job's company ID.
+
+> mark:
+
+
+### information-disclosure
+
+**15.** An attacker who steals a copy of the PDF bucket may read every company's invoice PDFs if the copy is unencrypted or the attacker can also obtain the means to decrypt it.
+
+- `store:pdf-bucket`, `flow:process:billing-app>store:pdf-bucket>fetch-pdfs`
+- severity: low/high · verb: `read`
+- Protection at rest for the shared bucket is unspecified; it holds every company's PDFs.
 
 > mark:
 
@@ -422,8 +455,8 @@ your missing list, your notes and a digest of each file you read:
       "opened_digests": {
       "source.md": "5f6c64fc0b7494033e74547c61f660750882de95b66dd8ca9370eef14e7c796f",
       "model.json": "55a71c8adc0434496dc4e280dbfc108ff84f7bb72dc629515f65560480226bff",
-      "claims/asvs.json": "bd9e0e03c33124071dd75d2a684f07075a11526dd573612885150efbe82dd62d",
-      "claims/stride.json": "4ac30820b7fb579fd988b13a809aa70014b9f6d56767f6cb7578c9495acfb551"
+      "claims/asvs.json": "dfd36f46fa16127d8c03766461e13af894d199c1cbdc04155e5fe5afae1a0f1d",
+      "claims/stride.json": "429edf408e26c9c6fb149ef9fe0c84535c4138ce3e145937dfebcb3c8b4c46d4"
       }
     }
   }

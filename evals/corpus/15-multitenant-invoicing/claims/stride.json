@@ -53,7 +53,7 @@
       "store:render-queue",
       "process:pdf-renderer"
     ],
-    "claim": "An attacker who can write to the render queue plants a job naming another company's ID, and the renderer files a PDF under the company the job names.",
+    "claim": "An attacker who can write to the render queue plants a job whose company ID does not match its invoice, and the renderer files that invoice's PDF under the wrong company, unless it checks that the two belong together.",
     "tier": "expected",
     "severity": {
       "likelihood": "low",
@@ -69,13 +69,13 @@
       "process:admin-console",
       "store:tenant-database"
     ],
-    "claim": "A support agent acting as a customer user changes that company's invoices, and the record shows only the customer user, so nothing can show the agent did it.",
+    "claim": "A support agent acting as a customer user changes that company's invoices, and the database record names only the customer user, not the agent.",
     "tier": "must-find",
     "severity": {
       "likelihood": "medium",
       "impact": "medium"
     },
-    "notes": "Stated outright: everything the agent does is recorded against the customer user. The customer cannot even dispute it, because the record names them.",
+    "notes": "Stated outright: everything the agent does is recorded against the customer user.",
     "verb": "unattributable"
   },
   {
@@ -85,7 +85,7 @@
       "process:billing-app",
       "entity:payer"
     ],
-    "claim": "Anyone steps through invoice numbers on the payment page and reads every company's invoices, customer names and bank details, because the numbers count up across all companies and the page asks for no sign-in.",
+    "claim": "Anyone steps through invoice numbers on the payment page and reads every company's invoices, company names and bank details, because the numbers count up across all companies and the page asks for no sign-in.",
     "tier": "must-find",
     "severity": {
       "likelihood": "high",
@@ -116,13 +116,13 @@
       "store:tenant-database",
       "flow:process:billing-app>store:tenant-database>read-and-write-tenant-data"
     ],
-    "claim": "An attacker who obtains a copy of the tenant database reads every company's invoices and payout bank details, since its protection at rest is not recorded.",
+    "claim": "An attacker who steals a copy of the tenant database may read every company's invoices and payout bank details if the copy is unencrypted or the attacker can also obtain the means to decrypt it.",
     "tier": "expected",
     "severity": {
       "likelihood": "low",
       "impact": "high"
     },
-    "notes": "Conditional on the unrecorded at-rest protection; one copy holds every tenant.",
+    "notes": "Protection at rest is unspecified; one copy holds every tenant.",
     "verb": "read"
   },
   {
@@ -147,7 +147,7 @@
       "process:pdf-renderer",
       "store:render-queue"
     ],
-    "claim": "A user asks for PDFs as often as they like and fills the render queue, so the one-job-at-a-time renderer stops producing PDFs for every other company.",
+    "claim": "A user asks for PDFs as often as they like and fills the render queue, so the one-job-at-a-time renderer delays every other company's PDFs.",
     "tier": "must-find",
     "severity": {
       "likelihood": "medium",
@@ -172,19 +172,68 @@
     "verb": "escalate"
   },
   {
-    "category": "elevation-of-privilege",
+    "category": "information-disclosure",
     "affected_element_ids": [
-      "flow:process:admin-console>process:billing-app>open-session-as-customer-user",
-      "process:admin-console",
-      "process:billing-app"
+      "flow:entity:company-user>process:billing-app>manage-invoices",
+      "process:billing-app",
+      "process:pdf-renderer"
     ],
-    "claim": "A support agent opens a session as a customer admin and uses that company's admin rights, which reach beyond anything support needs.",
+    "claim": "A company user who requests another company's invoice PDF may obtain its contents if job creation or rendering fails to enforce tenant ownership and PDF retrieval also permits that user to fetch the result.",
+    "tier": "expected",
+    "severity": {
+      "likelihood": "low",
+      "impact": "high"
+    },
+    "notes": "The source states that any user may ask for a PDF of any invoice. It does not state that the job carries the requesting user's company or that the user can fetch the result.",
+    "verb": "elicit"
+  },
+  {
+    "category": "information-disclosure",
+    "affected_element_ids": [
+      "flow:process:billing-app>store:tenant-database>read-and-write-tenant-data",
+      "flow:process:billing-app>store:render-queue>queue-render-job",
+      "flow:process:pdf-renderer>store:render-queue>take-render-jobs",
+      "flow:process:pdf-renderer>store:tenant-database>read-invoice",
+      "flow:process:pdf-renderer>store:pdf-bucket>write-pdf",
+      "flow:process:billing-app>store:pdf-bucket>fetch-pdfs"
+    ],
+    "claim": "An attacker on an internal network path may read sensitive invoice or job data if transport protection does not prevent interception.",
+    "tier": "expected",
+    "severity": {
+      "likelihood": "low",
+      "impact": "high"
+    },
+    "notes": "Transport protection on the billing app's and the renderer's connections to the database, the queue and the bucket is unspecified.",
+    "verb": "intercept"
+  },
+  {
+    "category": "tampering",
+    "affected_element_ids": [
+      "flow:process:billing-app>store:render-queue>queue-render-job",
+      "flow:process:pdf-renderer>store:render-queue>take-render-jobs"
+    ],
+    "claim": "An attacker on a render-job network path may change the company ID or invoice number if authenticated integrity protection does not prevent alteration.",
     "tier": "expected",
     "severity": {
       "likelihood": "low",
       "impact": "medium"
     },
-    "notes": "The grant is legitimate and unbounded in the source: any customer user, with no stated reason or approval. Low likelihood because agents are our own staff.",
-    "verb": "abuse-grant"
+    "notes": "Integrity protection on the render-job paths is unspecified, and the renderer trusts the job's company ID.",
+    "verb": "alter-in-transit"
+  },
+  {
+    "category": "information-disclosure",
+    "affected_element_ids": [
+      "store:pdf-bucket",
+      "flow:process:billing-app>store:pdf-bucket>fetch-pdfs"
+    ],
+    "claim": "An attacker who steals a copy of the PDF bucket may read every company's invoice PDFs if the copy is unencrypted or the attacker can also obtain the means to decrypt it.",
+    "tier": "expected",
+    "severity": {
+      "likelihood": "low",
+      "impact": "high"
+    },
+    "notes": "Protection at rest for the shared bucket is unspecified; it holds every company's PDFs.",
+    "verb": "read"
   }
 ]

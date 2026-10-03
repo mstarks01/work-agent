@@ -19,10 +19,10 @@
       "store:tenant-database",
       "flow:entity:company-user>process:billing-app>manage-invoices"
     ],
-    "claim": "Nothing states that the billing app keeps a user's reads and writes inside their own company: it loads invoices by number, adds the tenant filter by hand, and the database enforces no tenant rule.",
+    "claim": "Nothing states that the billing app checks, on each request, that the invoice it loads by number belongs to the user's company.",
     "tier": "must-find",
     "disposition": "needs-code",
-    "notes": "Whether the check exists is a property of the app's code."
+    "notes": "The app adds company filters by hand. Per-invoice ownership enforcement is unspecified. Missing row-level security in the database alone is not a vulnerability."
   },
   {
     "chapter": "authorization",
@@ -43,10 +43,10 @@
       "process:billing-app",
       "flow:entity:company-user>process:billing-app>manage-invoices"
     ],
-    "claim": "The billing app saves every field an edit posts, so no field is restricted to the users allowed to change it.",
+    "claim": "The billing app saves every field an invoice edit posts, so nothing states that the paid flag and the payout bank account are limited to the users allowed to change them.",
     "tier": "must-find",
-    "disposition": "gap-from-prose",
-    "notes": "Stated outright: the paid flag and the payout bank account included."
+    "disposition": "needs-code",
+    "notes": "Saving every posted field supports mass assignment. Whether any role is held back from those fields is unknown."
   },
   {
     "chapter": "authorization",
@@ -54,10 +54,10 @@
     "affected_element_ids": [
       "process:billing-app"
     ],
-    "claim": "Nobody wrote down who may read or change which invoices, beyond an admin and viewer role.",
+    "claim": "The description does not define what each role may do to which invoices, beyond naming an admin and a viewer role.",
     "tier": "expected",
     "disposition": "needs-more-prose",
-    "notes": "A fuller description could state the rules; the source names the roles and nothing they allow."
+    "notes": "The description states tenant membership and query filtering; it does not define the complete permissions of each role."
   },
   {
     "chapter": "authorization",
@@ -65,10 +65,10 @@
     "affected_element_ids": [
       "process:billing-app"
     ],
-    "claim": "Nobody wrote down which invoice fields each role may read or change.",
+    "claim": "The description does not define which invoice fields each role may read or change.",
     "tier": "expected",
     "disposition": "needs-more-prose",
-    "notes": "The field-level half of V8.1.1."
+    "notes": "The field-level half of V8.1.1. This does not show that no policy exists elsewhere."
   },
   {
     "chapter": "secure-coding-and-architecture",
@@ -90,10 +90,10 @@
       "process:pdf-renderer",
       "store:render-queue"
     ],
-    "claim": "Nobody wrote down that PDF rendering is resource-demanding or how its load is limited.",
+    "claim": "The supplied description documents asynchronous, serial PDF rendering but does not explain how it prevents excessive submissions from denying timely service to other users or tenants.",
     "tier": "expected",
     "disposition": "needs-more-prose",
-    "notes": "The source states the opposite of a limit: any user, any invoice, as often as they like."
+    "notes": "Missing documentation of the protection strategy, not proof that every operational defence is absent."
   },
   {
     "chapter": "authentication",
