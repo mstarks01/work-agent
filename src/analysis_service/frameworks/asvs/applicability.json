@@ -35,49 +35,49 @@
       "id": "V1.2.4",
       "applies_if": "database",
       "rationale": "the subject is a database query",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V1.2.5",
       "applies_if": "os-command",
       "rationale": "the subject is an operating system command",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V1.2.6",
       "applies_if": "ldap",
       "rationale": "the subject is an LDAP query",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V1.2.7",
       "applies_if": "xpath",
       "rationale": "the subject is an XPath query",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V1.2.8",
       "applies_if": "latex",
       "rationale": "the subject is a LaTeX processor",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V1.2.9",
       "applies_if": "dynamic-regex",
       "rationale": "the subject is a regular expression built from input",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V1.2.10",
       "applies_if": "spreadsheet-export",
       "rationale": "the subject is a CSV or spreadsheet export",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V1.3.1",
-      "applies_if": "rich-text-input",
-      "rationale": "the subject is HTML a user authors",
-      "reviewed_by": null
+      "applies_if": "untrusted-html",
+      "rationale": "the subject is HTML from an untrusted source",
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V1.3.2",
@@ -93,39 +93,39 @@
     },
     {
       "id": "V1.3.4",
-      "applies_if": "rich-text-input",
-      "rationale": "the subject is SVG a user supplies",
-      "reviewed_by": null
+      "applies_if": "untrusted-svg",
+      "rationale": "the subject is SVG from an untrusted source",
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V1.3.5",
-      "applies_if": "rich-text-input",
-      "rationale": "the subject is markup or style content a user supplies",
-      "reviewed_by": null
+      "applies_if": "untrusted-scriptable-content",
+      "rationale": "the subject is untrusted content that can carry scripts or expressions",
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V1.3.6",
-      "applies_if": "url-fetch",
-      "rationale": "the subject is a request to a URL that untrusted input shapes",
-      "reviewed_by": null
+      "applies_if": "untrusted-outbound-destination",
+      "rationale": "the subject is a server-side call whose destination untrusted input can shape",
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V1.3.7",
-      "applies_if": "template-engine",
-      "rationale": "the subject is a server-side template",
-      "reviewed_by": null
+      "applies_if": "untrusted-template-input",
+      "rationale": "the subject is a template that untrusted input reaches",
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V1.3.8",
       "applies_if": "jndi",
       "rationale": "the subject is a JNDI lookup",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V1.3.9",
-      "applies_if": "cache-service",
-      "rationale": "the subject is data sent to a cache service",
-      "reviewed_by": null
+      "applies_if": "memcache",
+      "rationale": "the subject is content sent to a memcache protocol service",
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V1.3.10",
@@ -137,7 +137,7 @@
       "id": "V1.3.11",
       "applies_if": "mail-sending",
       "rationale": "the subject is input passed to a mail system",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V1.3.12",
@@ -149,25 +149,25 @@
       "id": "V1.4.1",
       "applies_if": "memory-unsafe-code",
       "rationale": "the subject is code without memory safety",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V1.4.2",
-      "applies_if": "memory-unsafe-code",
-      "rationale": "the section governs code without memory safety",
-      "reviewed_by": null
+      "applies_if": "overflow-capable-arithmetic",
+      "rationale": "the subject is arithmetic whose overflow can change behaviour",
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V1.4.3",
-      "applies_if": "memory-unsafe-code",
-      "rationale": "the subject is manually managed memory",
-      "reviewed_by": null
+      "applies_if": "manually-managed-resources",
+      "rationale": "the subject is memory or a resource the code must release explicitly",
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V1.5.1",
       "applies_if": "xml-parsing",
       "rationale": "the subject is an XML parser",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V1.5.2",
@@ -221,7 +221,7 @@
       "id": "V2.3.1",
       "applies_if": "multi-step-flow",
       "rationale": "the subject is a flow of ordered steps",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V2.3.2",
@@ -239,13 +239,13 @@
       "id": "V2.3.4",
       "applies_if": "limited-resource",
       "rationale": "the subject is a resource of limited quantity",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V2.3.5",
       "applies_if": "high-value-flow",
       "rationale": "the subject is a high-value business flow",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V2.4.1",
@@ -255,38 +255,33 @@
     },
     {
       "id": "V2.4.2",
-      "applies_if": {
-        "any": [
-          "browser-frontend",
-          "native-client"
-        ]
-      },
-      "rationale": "the subject is a business flow that people perform through a user interface",
-      "reviewed_by": null
+      "applies_if": "human-paced-business-flow",
+      "rationale": "the subject is a business flow with a realistic minimum human completion time",
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V3.1.1",
       "applies_if": "browser-frontend",
       "rationale": "the subject is content or behaviour a web browser receives",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V3.2.1",
-      "applies_if": "browser-frontend",
-      "rationale": "the subject is content or behaviour a web browser receives",
-      "reviewed_by": null
+      "applies_if": "browser-accessible-http",
+      "rationale": "the subject is HTTP content a browser can open, including API and file responses with no frontend",
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V3.2.2",
       "applies_if": "browser-frontend",
       "rationale": "the subject is content or behaviour a web browser receives",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V3.2.3",
       "applies_if": "browser-frontend",
       "rationale": "the subject is content or behaviour a web browser receives",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V3.3.1",
@@ -297,7 +292,7 @@
         ]
       },
       "rationale": "the subject is a cookie the application sets for a browser",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V3.3.2",
@@ -308,7 +303,7 @@
         ]
       },
       "rationale": "the subject is a cookie the application sets for a browser",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V3.3.3",
@@ -319,7 +314,7 @@
         ]
       },
       "rationale": "the subject is a cookie the application sets for a browser",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V3.3.4",
@@ -330,7 +325,7 @@
         ]
       },
       "rationale": "the subject is a cookie the application sets for a browser",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V3.3.5",
@@ -341,139 +336,149 @@
         ]
       },
       "rationale": "the subject is a cookie the application sets for a browser",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V3.4.1",
       "applies_if": "browser-frontend",
       "rationale": "the subject is content or behaviour a web browser receives",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V3.4.2",
       "applies_if": "cors",
       "rationale": "the subject is a cross-origin response",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V3.4.3",
       "applies_if": "browser-frontend",
       "rationale": "the subject is content or behaviour a web browser receives",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V3.4.4",
       "applies_if": "browser-frontend",
       "rationale": "the subject is content or behaviour a web browser receives",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V3.4.5",
       "applies_if": "browser-frontend",
       "rationale": "the subject is content or behaviour a web browser receives",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V3.4.6",
       "applies_if": "browser-frontend",
       "rationale": "the subject is content or behaviour a web browser receives",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V3.4.7",
       "applies_if": "browser-frontend",
       "rationale": "the subject is content or behaviour a web browser receives",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V3.4.8",
       "applies_if": "browser-frontend",
       "rationale": "the subject is content or behaviour a web browser receives",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V3.5.1",
       "applies_if": "browser-frontend",
       "rationale": "the subject is content or behaviour a web browser receives",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V3.5.2",
       "applies_if": "browser-frontend",
       "rationale": "the subject is content or behaviour a web browser receives",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V3.5.3",
       "applies_if": "browser-frontend",
       "rationale": "the subject is content or behaviour a web browser receives",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V3.5.4",
       "applies_if": "browser-frontend",
       "rationale": "the subject is content or behaviour a web browser receives",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V3.5.5",
-      "applies_if": "browser-frontend",
-      "rationale": "the subject is content or behaviour a web browser receives",
-      "reviewed_by": null
+      "applies_if": {
+        "all": [
+          "browser-frontend",
+          "postmessage-receiver"
+        ]
+      },
+      "rationale": "the subject is a message the browser code receives from another document",
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V3.5.6",
       "applies_if": "browser-frontend",
       "rationale": "the subject is content or behaviour a web browser receives",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V3.5.7",
       "applies_if": "browser-frontend",
       "rationale": "the subject is content or behaviour a web browser receives",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V3.5.8",
       "applies_if": "browser-frontend",
       "rationale": "the subject is content or behaviour a web browser receives",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V3.6.1",
-      "applies_if": "browser-frontend",
-      "rationale": "the subject is content or behaviour a web browser receives",
-      "reviewed_by": null
+      "applies_if": {
+        "all": [
+          "browser-frontend",
+          "external-browser-resources"
+        ]
+      },
+      "rationale": "the subject is a browser resource hosted outside the application",
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V3.7.1",
       "applies_if": "browser-frontend",
       "rationale": "the subject is content or behaviour a web browser receives",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V3.7.2",
       "applies_if": "browser-frontend",
       "rationale": "the subject is content or behaviour a web browser receives",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V3.7.3",
       "applies_if": "browser-frontend",
       "rationale": "the subject is content or behaviour a web browser receives",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V3.7.4",
       "applies_if": "browser-frontend",
       "rationale": "the subject is content or behaviour a web browser receives",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V3.7.5",
       "applies_if": "browser-frontend",
       "rationale": "the subject is content or behaviour a web browser receives",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V4.1.1",
@@ -501,9 +506,14 @@
     },
     {
       "id": "V4.1.5",
-      "applies_if": "high-value-flow",
-      "rationale": "the subject is a highly sensitive request or transaction",
-      "reviewed_by": null
+      "applies_if": {
+        "any": [
+          "high-value-flow",
+          "multi-system-request"
+        ]
+      },
+      "rationale": "the subject is a highly sensitive request or one that passes through more than one system",
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V4.2.1",
@@ -531,224 +541,229 @@
     },
     {
       "id": "V4.2.5",
-      "applies_if": "outbound-http",
-      "rationale": "the subject is an HTTP request the application builds and sends",
-      "reviewed_by": null
+      "applies_if": "http-request-construction",
+      "rationale": "the subject is an HTTP request the frontend or the backend builds",
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V4.3.1",
       "applies_if": "graphql",
       "rationale": "the subject is a GraphQL API",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V4.3.2",
       "applies_if": "graphql",
       "rationale": "the subject is a GraphQL API",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V4.4.1",
       "applies_if": "websocket",
       "rationale": "the subject is a WebSocket connection",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V4.4.2",
       "applies_if": "websocket",
       "rationale": "the subject is a WebSocket handshake",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V4.4.3",
       "applies_if": "websocket",
       "rationale": "the subject is the session of a WebSocket connection",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V4.4.4",
       "applies_if": "websocket",
       "rationale": "the subject is the session of a WebSocket connection",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V5.1.1",
       "applies_if": "file-upload",
       "rationale": "the subject is a file the application accepts",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V5.2.1",
       "applies_if": "file-upload",
       "rationale": "the subject is a file the application accepts",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V5.2.2",
       "applies_if": "file-upload",
       "rationale": "the subject is a file the application accepts",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V5.2.3",
       "applies_if": "archive-files",
       "rationale": "the subject is a compressed file the application accepts",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V5.2.4",
       "applies_if": "file-upload",
       "rationale": "the subject is a file the application accepts",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V5.2.5",
       "applies_if": "archive-files",
       "rationale": "the subject is a compressed file the application accepts",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V5.2.6",
       "applies_if": "image-files",
       "rationale": "the subject is an image the application accepts",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V5.3.1",
-      "applies_if": "file-upload",
-      "rationale": "the subject is a stored file that untrusted input produced",
-      "reviewed_by": null
+      "applies_if": "public-files-from-untrusted-input",
+      "rationale": "the subject is a stored file from untrusted input that HTTP requests can reach",
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V5.3.2",
-      "applies_if": "file-upload",
-      "rationale": "the subject is a file path that a submitted filename can shape",
-      "reviewed_by": null
+      "applies_if": "untrusted-file-path-input",
+      "rationale": "the subject is a file path that untrusted filenames or metadata can shape",
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V5.3.3",
-      "applies_if": "archive-files",
-      "rationale": "the subject is a compressed file the application unpacks",
-      "reviewed_by": null
+      "applies_if": "server-side-file-processing",
+      "rationale": "the subject is a file the server processes, such as an archive it unpacks",
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V5.4.1",
-      "applies_if": {
-        "any": [
-          "file-upload",
-          "file-download"
-        ]
-      },
-      "rationale": "the subject is a filename the application receives or serves",
-      "reviewed_by": null
+      "applies_if": "file-download",
+      "rationale": "the subject is a filename the application uses when it serves a file",
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V5.4.2",
       "applies_if": "file-download",
       "rationale": "the subject is a file the application serves",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V5.4.3",
-      "applies_if": "file-upload",
-      "rationale": "the subject is a file from an untrusted source",
-      "reviewed_by": null
+      "applies_if": {
+        "all": [
+          "untrusted-file-source",
+          "file-download"
+        ]
+      },
+      "rationale": "the subject is a served file from an untrusted source",
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V6.1.1",
       "applies_if": "authentication",
       "rationale": "the subject is an authentication function",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V6.1.2",
       "applies_if": "password-authentication",
       "rationale": "the subject is a password users choose",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V6.1.3",
-      "applies_if": "authentication",
-      "rationale": "the subject is an authentication pathway",
-      "reviewed_by": null
+      "applies_if": {
+        "all": [
+          "authentication",
+          "multiple-authentication-pathways"
+        ]
+      },
+      "rationale": "the subject is more than one authentication pathway",
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V6.2.1",
       "applies_if": "password-authentication",
       "rationale": "the subject is a password users choose",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V6.2.2",
       "applies_if": "password-authentication",
       "rationale": "the subject is a password users choose",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V6.2.3",
       "applies_if": "password-authentication",
       "rationale": "the subject is a password users choose",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V6.2.4",
       "applies_if": "password-authentication",
       "rationale": "the subject is a password users choose",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V6.2.5",
       "applies_if": "password-authentication",
       "rationale": "the subject is a password users choose",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V6.2.6",
       "applies_if": "password-authentication",
       "rationale": "the subject is a password users choose",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V6.2.7",
       "applies_if": "password-authentication",
       "rationale": "the subject is a password users choose",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V6.2.8",
       "applies_if": "password-authentication",
       "rationale": "the subject is a password users choose",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V6.2.9",
       "applies_if": "password-authentication",
       "rationale": "the subject is a password users choose",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V6.2.10",
       "applies_if": "password-authentication",
       "rationale": "the subject is a password users choose",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V6.2.11",
       "applies_if": "password-authentication",
       "rationale": "the subject is a password users choose",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V6.2.12",
       "applies_if": "password-authentication",
       "rationale": "the subject is a password users choose",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V6.3.1",
       "applies_if": "authentication",
       "rationale": "the subject is an authentication function",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V6.3.2",
@@ -760,193 +775,235 @@
       "id": "V6.3.3",
       "applies_if": "authentication",
       "rationale": "the subject is the authentication of access; a second factor is the control",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V6.3.4",
       "applies_if": "authentication",
       "rationale": "the subject is an authentication pathway",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V6.3.5",
       "applies_if": "authentication",
       "rationale": "the subject is an authentication attempt",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V6.3.6",
       "applies_if": "authentication",
       "rationale": "the subject is an authentication factor",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V6.3.7",
       "applies_if": "authentication",
       "rationale": "the subject is a change to authentication details",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V6.3.8",
       "applies_if": "authentication",
       "rationale": "the subject is an authentication challenge",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V6.4.1",
-      "applies_if": "authentication",
-      "rationale": "the subject is an initial secret the application issues for sign-in",
-      "reviewed_by": null
+      "applies_if": "initial-authentication-secrets",
+      "rationale": "the subject is an initial password or activation secret the application issues",
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V6.4.2",
       "applies_if": "authentication",
       "rationale": "the subject is account recovery; the absence of hints is the control",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V6.4.3",
-      "applies_if": "password-authentication",
+      "applies_if": {
+        "all": [
+          "password-authentication",
+          "password-reset"
+        ]
+      },
       "rationale": "the subject is the reset of a forgotten password",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V6.4.4",
       "applies_if": "multi-factor-authentication",
       "rationale": "the subject is the recovery of a lost second factor",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V6.4.5",
-      "applies_if": "authentication",
+      "applies_if": "expiring-authentication-mechanisms",
       "rationale": "the subject is an authentication mechanism that expires",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V6.4.6",
-      "applies_if": "password-authentication",
+      "applies_if": {
+        "all": [
+          "password-authentication",
+          "administrator-password-reset"
+        ]
+      },
       "rationale": "the subject is a password reset an administrator starts",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V6.5.1",
-      "applies_if": "one-time-codes",
-      "rationale": "the subject is a one-time code",
-      "reviewed_by": null
+      "applies_if": {
+        "any": [
+          "lookup-secrets",
+          "out-of-band-authentication",
+          "totp"
+        ]
+      },
+      "rationale": "the subject is a lookup secret, an out-of-band authenticator or a time-based one-time password",
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V6.5.2",
-      "applies_if": "one-time-codes",
+      "applies_if": "stored-lookup-secrets",
       "rationale": "the subject is a stored lookup secret",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V6.5.3",
-      "applies_if": "one-time-codes",
-      "rationale": "the subject is the generation of a one-time code",
-      "reviewed_by": null
+      "applies_if": {
+        "any": [
+          "lookup-secret-generation",
+          "out-of-band-code-generation",
+          "totp-seed-generation"
+        ]
+      },
+      "rationale": "the subject is the generation of a lookup secret, an out-of-band code or a TOTP seed",
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V6.5.4",
-      "applies_if": "one-time-codes",
-      "rationale": "the subject is a one-time code",
-      "reviewed_by": null
+      "applies_if": {
+        "any": [
+          "lookup-secrets",
+          "out-of-band-codes"
+        ]
+      },
+      "rationale": "the subject is a lookup secret or an out-of-band code",
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V6.5.5",
-      "applies_if": "one-time-codes",
-      "rationale": "the subject is a one-time code",
-      "reviewed_by": null
+      "applies_if": {
+        "any": [
+          "out-of-band-authentication",
+          "totp"
+        ]
+      },
+      "rationale": "the subject is an out-of-band authenticator or a time-based one-time password",
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V6.5.6",
       "applies_if": "authentication",
       "rationale": "the subject is an authentication factor",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V6.5.7",
       "applies_if": "biometric-authentication",
       "rationale": "the subject is a biometric factor",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V6.5.8",
-      "applies_if": "one-time-codes",
+      "applies_if": "totp",
       "rationale": "the subject is a time-based one-time password",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V6.6.1",
-      "applies_if": "one-time-codes",
-      "rationale": "the subject is a code sent by phone or SMS",
-      "reviewed_by": null
+      "applies_if": "pstn-out-of-band-authentication",
+      "rationale": "the subject is out-of-band authentication by phone or SMS",
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V6.6.2",
-      "applies_if": "one-time-codes",
-      "rationale": "the subject is an out-of-band code",
-      "reviewed_by": null
+      "applies_if": "out-of-band-authentication",
+      "rationale": "the subject is an out-of-band authenticator",
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V6.6.3",
-      "applies_if": "one-time-codes",
+      "applies_if": "out-of-band-codes",
       "rationale": "the subject is an out-of-band code",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V6.6.4",
-      "applies_if": "one-time-codes",
+      "applies_if": "push-authentication",
       "rationale": "the subject is a push notification for sign-in",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V6.7.1",
-      "applies_if": "cryptographic-authenticators",
-      "rationale": "the subject is a cryptographic authenticator",
-      "reviewed_by": null
+      "applies_if": "authenticator-certificates",
+      "rationale": "the subject is a certificate that verifies an authentication assertion",
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V6.7.2",
       "applies_if": "cryptographic-authenticators",
       "rationale": "the subject is a cryptographic authenticator",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V6.8.1",
-      "applies_if": "federated-identity",
-      "rationale": "the subject is an identity provider",
-      "reviewed_by": null
+      "applies_if": {
+        "all": [
+          "federated-identity",
+          "multiple-identity-providers"
+        ]
+      },
+      "rationale": "the subject is more than one accepted identity provider",
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V6.8.2",
       "applies_if": "federated-identity",
       "rationale": "the subject is an assertion from an identity provider",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V6.8.3",
       "applies_if": "saml",
       "rationale": "the subject is a SAML assertion",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V6.8.4",
-      "applies_if": "federated-identity",
-      "rationale": "the subject is an identity provider",
-      "reviewed_by": null
+      "applies_if": {
+        "all": [
+          "federated-identity",
+          "authentication-assurance-policy"
+        ]
+      },
+      "rationale": "the subject is a policy on the authentication strength, method or recency an identity provider must give",
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V7.1.1",
       "applies_if": "sessions",
       "rationale": "the subject is a user session",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V7.1.2",
       "applies_if": "sessions",
       "rationale": "the subject is a user session",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V7.1.3",
@@ -957,61 +1014,61 @@
         ]
       },
       "rationale": "the subject is a session shared with an identity provider",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V7.2.1",
       "applies_if": "sessions",
       "rationale": "the subject is a session token",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V7.2.2",
       "applies_if": "sessions",
       "rationale": "the subject is a session token",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V7.2.3",
       "applies_if": "reference-session-tokens",
       "rationale": "the subject is an opaque session token",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V7.2.4",
       "applies_if": "sessions",
       "rationale": "the subject is a session token",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V7.3.1",
       "applies_if": "sessions",
       "rationale": "the subject is a user session",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V7.3.2",
       "applies_if": "sessions",
       "rationale": "the subject is a user session",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V7.4.1",
       "applies_if": "sessions",
       "rationale": "the subject is a user session",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V7.4.2",
       "applies_if": "sessions",
       "rationale": "the subject is a user session",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V7.4.3",
       "applies_if": "sessions",
       "rationale": "the subject is a user session",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V7.4.4",
@@ -1027,25 +1084,25 @@
         ]
       },
       "rationale": "the subject is a user interface that shows a session",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V7.4.5",
       "applies_if": "sessions",
       "rationale": "the subject is a user session",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V7.5.1",
       "applies_if": "authentication",
       "rationale": "the subject is an account attribute that authentication rests on",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V7.5.2",
       "applies_if": "sessions",
       "rationale": "the subject is a user session",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V7.5.3",
@@ -1056,7 +1113,7 @@
         ]
       },
       "rationale": "the subject is a highly sensitive operation by an authenticated user",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V7.6.1",
@@ -1067,7 +1124,7 @@
         ]
       },
       "rationale": "the subject is a session shared with an identity provider",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V7.6.2",
@@ -1078,283 +1135,368 @@
         ]
       },
       "rationale": "the subject is a session created through an identity provider",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V8.1.1",
       "applies_if": "restricted-access",
       "rationale": "the subject is a restriction on who may reach a function or data",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V8.1.2",
       "applies_if": "restricted-access",
       "rationale": "the subject is a restriction on who may reach a function or data",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V8.1.3",
       "applies_if": "restricted-access",
       "rationale": "the subject is a restriction on who may reach a function or data",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V8.1.4",
       "applies_if": "restricted-access",
       "rationale": "the subject is a restriction on who may reach a function or data",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V8.2.1",
       "applies_if": "restricted-access",
       "rationale": "the subject is a restriction on who may reach a function or data",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V8.2.2",
       "applies_if": "restricted-access",
       "rationale": "the subject is a restriction on who may reach a function or data",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V8.2.3",
       "applies_if": "restricted-access",
       "rationale": "the subject is a restriction on who may reach a function or data",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V8.2.4",
       "applies_if": "restricted-access",
       "rationale": "the subject is a restriction on who may reach a function or data",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V8.3.1",
       "applies_if": "restricted-access",
       "rationale": "the subject is a restriction on who may reach a function or data",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V8.3.2",
       "applies_if": "restricted-access",
       "rationale": "the subject is a restriction on who may reach a function or data",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V8.3.3",
       "applies_if": "restricted-access",
       "rationale": "the subject is a restriction on who may reach a function or data",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V8.4.1",
       "applies_if": "multi-tenancy",
       "rationale": "the subject is the separation of tenants",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V8.4.2",
       "applies_if": "administrative-interface",
       "rationale": "the subject is an administrative interface",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V9.1.1",
-      "applies_if": "self-contained-tokens",
-      "rationale": "the subject is a self-contained token",
-      "reviewed_by": null
+      "applies_if": "self-contained-token-consumer",
+      "rationale": "the subject is a self-contained token the application consumes",
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V9.1.2",
       "applies_if": "self-contained-tokens",
       "rationale": "the subject is a self-contained token",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V9.1.3",
-      "applies_if": "self-contained-tokens",
-      "rationale": "the subject is a self-contained token",
-      "reviewed_by": null
+      "applies_if": "self-contained-token-consumer",
+      "rationale": "the subject is a self-contained token the application consumes",
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V9.2.1",
-      "applies_if": "self-contained-tokens",
-      "rationale": "the subject is a self-contained token",
-      "reviewed_by": null
+      "applies_if": {
+        "all": [
+          "self-contained-token-consumer",
+          "token-validity-period"
+        ]
+      },
+      "rationale": "the subject is the validity period of a consumed self-contained token",
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V9.2.2",
-      "applies_if": "self-contained-tokens",
-      "rationale": "the subject is a self-contained token",
-      "reviewed_by": null
+      "applies_if": "self-contained-token-consumer",
+      "rationale": "the subject is a self-contained token the application consumes",
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V9.2.3",
-      "applies_if": "self-contained-tokens",
-      "rationale": "the subject is a self-contained token",
-      "reviewed_by": null
+      "applies_if": "self-contained-token-consumer",
+      "rationale": "the subject is a self-contained token the application consumes",
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V9.2.4",
-      "applies_if": "self-contained-tokens",
-      "rationale": "the subject is a self-contained token",
-      "reviewed_by": null
+      "applies_if": {
+        "all": [
+          "self-contained-token-issuer",
+          "shared-signing-key-audiences"
+        ]
+      },
+      "rationale": "the subject is a signing key the issuer uses for more than one audience",
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V10.1.1",
       "applies_if": "oauth",
       "rationale": "the subject is an OAuth token",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V10.1.2",
-      "applies_if": "oauth-client",
-      "rationale": "the subject is an OAuth client",
-      "reviewed_by": null
+      "applies_if": {
+        "all": [
+          "oauth-client",
+          "user-agent-authorization-flow"
+        ]
+      },
+      "rationale": "the subject is an OAuth client's authorization through a user agent",
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V10.2.1",
-      "applies_if": "oauth-client",
-      "rationale": "the subject is an OAuth client",
-      "reviewed_by": null
+      "applies_if": {
+        "all": [
+          "oauth-client",
+          "authorization-code-flow"
+        ]
+      },
+      "rationale": "the subject is an OAuth client's use of the code grant",
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V10.2.2",
-      "applies_if": "oauth-client",
-      "rationale": "the subject is an OAuth client",
-      "reviewed_by": null
+      "applies_if": {
+        "all": [
+          "oauth-client",
+          "multiple-authorization-servers"
+        ]
+      },
+      "rationale": "the subject is an OAuth client that works with more than one authorization server",
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V10.2.3",
       "applies_if": "oauth-client",
       "rationale": "the subject is an OAuth client",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V10.3.1",
       "applies_if": "oauth-resource-server",
       "rationale": "the subject is an OAuth resource server",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V10.3.2",
       "applies_if": "oauth-resource-server",
       "rationale": "the subject is an OAuth resource server",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V10.3.3",
-      "applies_if": "oauth-resource-server",
-      "rationale": "the subject is an OAuth resource server",
-      "reviewed_by": null
+      "applies_if": {
+        "all": [
+          "oauth-resource-server",
+          "user-identity-authorization"
+        ]
+      },
+      "rationale": "the subject is a resource server decision that depends on the user",
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V10.3.4",
-      "applies_if": "oauth-resource-server",
-      "rationale": "the subject is an OAuth resource server",
-      "reviewed_by": null
+      "applies_if": {
+        "all": [
+          "oauth-resource-server",
+          "authentication-assurance-policy"
+        ]
+      },
+      "rationale": "the subject is a resource server policy on authentication strength, method or recency",
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V10.3.5",
       "applies_if": "oauth-resource-server",
       "rationale": "the subject is an OAuth resource server",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V10.4.1",
       "applies_if": "oauth-authorization-server",
       "rationale": "the subject is an OAuth authorization server",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V10.4.2",
-      "applies_if": "oauth-authorization-server",
-      "rationale": "the subject is an OAuth authorization server",
-      "reviewed_by": null
+      "applies_if": {
+        "all": [
+          "oauth-authorization-server",
+          "authorization-code-flow"
+        ]
+      },
+      "rationale": "the subject is the authorization code flow at an OAuth authorization server",
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V10.4.3",
-      "applies_if": "oauth-authorization-server",
-      "rationale": "the subject is an OAuth authorization server",
-      "reviewed_by": null
+      "applies_if": {
+        "all": [
+          "oauth-authorization-server",
+          "authorization-code-flow"
+        ]
+      },
+      "rationale": "the subject is the authorization code flow at an OAuth authorization server",
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V10.4.4",
       "applies_if": "oauth-authorization-server",
       "rationale": "the subject is an OAuth authorization server",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V10.4.5",
-      "applies_if": "oauth-authorization-server",
-      "rationale": "the subject is an OAuth authorization server",
-      "reviewed_by": null
+      "applies_if": {
+        "all": [
+          "oauth-authorization-server",
+          "public-client-refresh-tokens"
+        ]
+      },
+      "rationale": "the subject is a refresh token an authorization server issues to a public client",
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V10.4.6",
-      "applies_if": "oauth-authorization-server",
-      "rationale": "the subject is an OAuth authorization server",
-      "reviewed_by": null
+      "applies_if": {
+        "all": [
+          "oauth-authorization-server",
+          "authorization-code-flow"
+        ]
+      },
+      "rationale": "the subject is the authorization code flow at an OAuth authorization server",
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V10.4.7",
-      "applies_if": "oauth-authorization-server",
-      "rationale": "the subject is an OAuth authorization server",
-      "reviewed_by": null
+      "applies_if": {
+        "all": [
+          "oauth-authorization-server",
+          "unauthenticated-dynamic-registration"
+        ]
+      },
+      "rationale": "the subject is dynamic client registration without authentication",
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V10.4.8",
-      "applies_if": "oauth-authorization-server",
-      "rationale": "the subject is an OAuth authorization server",
-      "reviewed_by": null
+      "applies_if": {
+        "all": [
+          "oauth-authorization-server",
+          "refresh-tokens"
+        ]
+      },
+      "rationale": "the subject is a refresh token an authorization server issues",
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V10.4.9",
-      "applies_if": "oauth-authorization-server",
-      "rationale": "the subject is an OAuth authorization server",
-      "reviewed_by": null
+      "applies_if": {
+        "all": [
+          "oauth-authorization-server",
+          {
+            "any": [
+              "refresh-tokens",
+              "reference-access-tokens"
+            ]
+          }
+        ]
+      },
+      "rationale": "the subject is a refresh token or a reference access token an authorization server issues",
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V10.4.10",
-      "applies_if": "oauth-authorization-server",
-      "rationale": "the subject is an OAuth authorization server",
-      "reviewed_by": null
+      "applies_if": {
+        "all": [
+          "oauth-authorization-server",
+          "confidential-client-backchannel"
+        ]
+      },
+      "rationale": "the subject is a confidential client's back-channel call to the authorization server",
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V10.4.11",
       "applies_if": "oauth-authorization-server",
       "rationale": "the subject is an OAuth authorization server",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V10.4.12",
       "applies_if": "oauth-authorization-server",
       "rationale": "the subject is an OAuth authorization server",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V10.4.13",
-      "applies_if": "oauth-authorization-server",
-      "rationale": "the subject is an OAuth authorization server",
-      "reviewed_by": null
+      "applies_if": {
+        "all": [
+          "oauth-authorization-server",
+          "authorization-code-flow"
+        ]
+      },
+      "rationale": "the subject is the authorization code flow at an OAuth authorization server",
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V10.4.14",
       "applies_if": "oauth-authorization-server",
       "rationale": "the subject is an OAuth authorization server",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V10.4.15",
       "applies_if": "oauth-authorization-server",
       "rationale": "the subject is an OAuth authorization server",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V10.4.16",
       "applies_if": "oauth-authorization-server",
       "rationale": "the subject is an OAuth authorization server",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V10.5.1",
@@ -1365,7 +1507,7 @@
         ]
       },
       "rationale": "the subject is an OpenID Connect relying party",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V10.5.2",
@@ -1376,7 +1518,7 @@
         ]
       },
       "rationale": "the subject is an OpenID Connect relying party",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V10.5.3",
@@ -1387,7 +1529,7 @@
         ]
       },
       "rationale": "the subject is an OpenID Connect relying party",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V10.5.4",
@@ -1398,18 +1540,19 @@
         ]
       },
       "rationale": "the subject is an OpenID Connect relying party",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V10.5.5",
       "applies_if": {
         "all": [
           "oauth-client",
-          "oidc"
+          "oidc",
+          "oidc-backchannel-logout"
         ]
       },
-      "rationale": "the subject is an OpenID Connect relying party",
-      "reviewed_by": null
+      "rationale": "the subject is a back-channel logout request to a relying party",
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V10.6.1",
@@ -1420,36 +1563,52 @@
         ]
       },
       "rationale": "the subject is an OpenID provider",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V10.6.2",
       "applies_if": {
         "all": [
           "oauth-authorization-server",
-          "oidc"
+          "oidc",
+          "rp-initiated-logout"
         ]
       },
-      "rationale": "the subject is an OpenID provider",
-      "reviewed_by": null
+      "rationale": "the subject is logout a relying party starts at an OpenID provider",
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V10.7.1",
-      "applies_if": "oauth-authorization-server",
-      "rationale": "the subject is consent at an OAuth authorization server",
-      "reviewed_by": null
+      "applies_if": {
+        "all": [
+          "oauth-authorization-server",
+          "user-delegated-authorization"
+        ]
+      },
+      "rationale": "the subject is consent when a user delegates access at an OAuth authorization server",
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V10.7.2",
-      "applies_if": "oauth-authorization-server",
-      "rationale": "the subject is consent at an OAuth authorization server",
-      "reviewed_by": null
+      "applies_if": {
+        "all": [
+          "oauth-authorization-server",
+          "user-delegated-authorization"
+        ]
+      },
+      "rationale": "the subject is consent when a user delegates access at an OAuth authorization server",
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V10.7.3",
-      "applies_if": "oauth-authorization-server",
-      "rationale": "the subject is consent at an OAuth authorization server",
-      "reviewed_by": null
+      "applies_if": {
+        "all": [
+          "oauth-authorization-server",
+          "user-delegated-authorization"
+        ]
+      },
+      "rationale": "the subject is consent when a user delegates access at an OAuth authorization server",
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V11.1.1",
@@ -1509,31 +1668,36 @@
       "id": "V11.3.1",
       "applies_if": "encryption",
       "rationale": "the subject is encryption the application performs",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V11.3.2",
       "applies_if": "encryption",
       "rationale": "the subject is encryption the application performs",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V11.3.3",
       "applies_if": "encryption",
       "rationale": "the subject is data the application encrypts",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V11.3.4",
       "applies_if": "encryption",
       "rationale": "the subject is encryption the application performs",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V11.3.5",
-      "applies_if": "encryption",
-      "rationale": "the subject is encryption the application performs",
-      "reviewed_by": null
+      "applies_if": {
+        "all": [
+          "encryption",
+          "separate-cipher-and-mac"
+        ]
+      },
+      "rationale": "the subject is encryption that combines a cipher with a separate MAC",
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V11.4.1",
@@ -1543,9 +1707,9 @@
     },
     {
       "id": "V11.4.2",
-      "applies_if": "password-authentication",
-      "rationale": "the subject is a stored password",
-      "reviewed_by": null
+      "applies_if": "stored-password-verifiers",
+      "rationale": "the subject is a stored password verifier",
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V11.4.3",
@@ -1587,13 +1751,13 @@
       "id": "V11.7.1",
       "applies_if": "sensitive-data",
       "rationale": "the subject is sensitive data in use",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V11.7.2",
       "applies_if": "sensitive-data",
       "rationale": "the subject is sensitive data in use",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V12.1.1",
@@ -1611,7 +1775,7 @@
       "id": "V12.1.3",
       "applies_if": "mutual-tls",
       "rationale": "the subject is a TLS client certificate",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V12.1.4",
@@ -1651,21 +1815,21 @@
     },
     {
       "id": "V12.3.3",
-      "applies_if": "internal-services",
-      "rationale": "the subject is a connection between the application's own components",
-      "reviewed_by": null
+      "applies_if": "internal-http-connections",
+      "rationale": "the subject is an HTTP connection between the application's own components",
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V12.3.4",
-      "applies_if": "internal-services",
-      "rationale": "the subject is a connection between the application's own components",
-      "reviewed_by": null
+      "applies_if": "internal-tls-connections",
+      "rationale": "the subject is a TLS connection between the application's own components",
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V12.3.5",
       "applies_if": "internal-services",
       "rationale": "the subject is a connection between the application's own components",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V13.1.1",
@@ -1693,21 +1857,21 @@
     },
     {
       "id": "V13.2.1",
-      "applies_if": "internal-services",
-      "rationale": "the subject is communication between backend components",
-      "reviewed_by": null
+      "applies_if": "backend-service-connections",
+      "rationale": "the subject is communication between backend components and services",
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V13.2.2",
-      "applies_if": "internal-services",
-      "rationale": "the subject is communication between backend components",
-      "reviewed_by": null
+      "applies_if": "service-accounts",
+      "rationale": "the subject is an account the application uses with a service",
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V13.2.3",
-      "applies_if": "internal-services",
-      "rationale": "the subject is a credential one backend component presents to another",
-      "reviewed_by": null
+      "applies_if": "backend-service-credentials",
+      "rationale": "the subject is a credential a backend component presents to a service",
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V13.2.4",
@@ -1723,9 +1887,9 @@
     },
     {
       "id": "V13.2.6",
-      "applies_if": "internal-services",
-      "rationale": "the subject is a connection to a separate service",
-      "reviewed_by": null
+      "applies_if": "separate-service-connections",
+      "rationale": "the subject is a connection to a separate internal or external service",
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V13.3.1",
@@ -1795,68 +1959,63 @@
     },
     {
       "id": "V14.1.1",
-      "applies_if": "sensitive-data",
-      "rationale": "the subject is sensitive data; classifying it is the control",
-      "reviewed_by": null
+      "applies_if": "always",
+      "rationale": "classifying data is how the application finds its sensitive data, so the task applies before any is known",
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V14.1.2",
       "applies_if": "sensitive-data",
       "rationale": "the subject is sensitive data",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V14.2.1",
-      "applies_if": {
-        "any": [
-          "sensitive-data",
-          "authentication"
-        ]
-      },
-      "rationale": "the subject is sensitive data in a request, and a credential or session token is such data",
-      "reviewed_by": null
+      "applies_if": "sensitive-http-requests",
+      "rationale": "the subject is sensitive data in an HTTP request",
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V14.2.2",
       "applies_if": "sensitive-data",
       "rationale": "the subject is sensitive data in a server cache",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V14.2.3",
       "applies_if": "sensitive-data",
       "rationale": "the subject is sensitive data sent to other parties",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V14.2.4",
       "applies_if": "sensitive-data",
       "rationale": "the subject is sensitive data",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V14.2.5",
-      "applies_if": "sensitive-data",
-      "rationale": "the subject is sensitive content a cache can hold",
-      "reviewed_by": null
+      "applies_if": "http-caching",
+      "rationale": "the subject is a response an HTTP cache can hold",
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V14.2.6",
       "applies_if": "sensitive-data",
       "rationale": "the subject is sensitive data in a response",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V14.2.7",
       "applies_if": "sensitive-data",
       "rationale": "the subject is stored sensitive data",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V14.2.8",
       "applies_if": "file-upload",
       "rationale": "the subject is the metadata of a file users submit",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V14.3.1",
@@ -1872,7 +2031,7 @@
         ]
       },
       "rationale": "the subject is authenticated data held on a client",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V14.3.2",
@@ -1883,13 +2042,13 @@
         ]
       },
       "rationale": "the subject is sensitive data a browser can cache",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V14.3.3",
       "applies_if": "browser-frontend",
       "rationale": "the subject is data a browser stores",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V15.1.1",
@@ -1961,7 +2120,7 @@
       "id": "V15.3.2",
       "applies_if": "outbound-http",
       "rationale": "the subject is a call the backend makes to an external URL",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V15.3.3",
@@ -1983,14 +2142,9 @@
     },
     {
       "id": "V15.3.6",
-      "applies_if": {
-        "any": [
-          "browser-frontend",
-          "server-side-javascript"
-        ]
-      },
-      "rationale": "the subject is JavaScript code",
-      "reviewed_by": null
+      "applies_if": "javascript-code",
+      "rationale": "the subject is JavaScript code in any in-scope component",
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V15.3.7",
@@ -2056,19 +2210,19 @@
       "id": "V16.2.5",
       "applies_if": "sensitive-data",
       "rationale": "the subject is sensitive data that can reach a log",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V16.3.1",
       "applies_if": "authentication",
       "rationale": "the subject is an authentication operation; logging it is the control",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V16.3.2",
       "applies_if": "restricted-access",
       "rationale": "the subject is an authorization decision; logging it is the control",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V16.3.3",
@@ -2128,73 +2282,73 @@
       "id": "V17.1.1",
       "applies_if": "turn-server",
       "rationale": "the subject is a TURN server",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V17.1.2",
       "applies_if": "turn-server",
       "rationale": "the subject is a TURN server",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V17.2.1",
       "applies_if": "webrtc",
       "rationale": "the subject is a DTLS certificate that WebRTC uses",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V17.2.2",
       "applies_if": "media-server",
       "rationale": "the subject is a WebRTC media server",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V17.2.3",
       "applies_if": "media-server",
       "rationale": "the subject is a WebRTC media server",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V17.2.4",
       "applies_if": "media-server",
       "rationale": "the subject is a WebRTC media server",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V17.2.5",
       "applies_if": "media-server",
       "rationale": "the subject is a WebRTC media server",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V17.2.6",
       "applies_if": "media-server",
       "rationale": "the subject is a WebRTC media server",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V17.2.7",
       "applies_if": "media-recording",
       "rationale": "the subject is recording at a WebRTC media server",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V17.2.8",
       "applies_if": "webrtc",
       "rationale": "the subject is a DTLS certificate that WebRTC uses",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V17.3.1",
       "applies_if": "signaling-server",
       "rationale": "the subject is a WebRTC signaling server",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V17.3.2",
       "applies_if": "signaling-server",
       "rationale": "the subject is a WebRTC signaling server",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     }
   ]
 }

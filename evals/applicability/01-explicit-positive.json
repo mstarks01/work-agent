@@ -2,7 +2,7 @@
   "test_class": "explicit-positive",
   "drafted_by": "agent",
   "signed_by": null,
-  "note": "A stated OAuth client makes the client rules apply and OAuth present; the server role stays open.",
+  "note": "A stated OAuth client makes OAuth present. A client rule that also needs a flow stays open, and so does the server role.",
   "framework": "asvs",
   "options": {
     "level": 2
@@ -16,7 +16,7 @@
   ],
   "answers": {},
   "expected": {
-    "V10.2.1": "applicable",
+    "V10.2.1": "unknown",
     "V10.1.1": "applicable",
     "V10.4.1": "unknown"
   }
