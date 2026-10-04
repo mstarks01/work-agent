@@ -12,6 +12,7 @@ from analysis_service.capabilities import (
     CapabilityFact,
     Presence,
     expression_keys,
+    lineage,
 )
 from analysis_service.frameworks.asvs.applicability import (
     APPLICABILITY,
@@ -60,10 +61,12 @@ def test_every_answer_is_deterministic():
 
 
 def test_every_capability_has_a_reader_in_the_table():
+    """A parent is read through its children: its answer settles theirs."""
     read = {
         key
         for expression in APPLICABILITY.values()
-        for key in expression_keys(expression)
+        for named in expression_keys(expression)
+        for key in (named, *lineage(named))
     }
     assert read == set(CAPABILITIES)
 
@@ -92,7 +95,7 @@ def test_oauth_present_leaves_only_the_role_questions_open():
 def test_an_oauth_client_is_not_asked_the_authorization_server_rules():
     known = _known(oauth_client="present", oauth_authorization_server="absent")
     decisions = applicability_for(3, known)
-    assert decisions["V10.2.1"].state == "applicable"
+    assert decisions["V10.2.3"].state == "applicable"
     assert decisions["V10.4.1"].state == "not-applicable"
     assert decisions["V10.6.1"].state == "not-applicable"
 
@@ -117,4 +120,4 @@ def test_the_browser_chapter_leaves_a_machine_to_machine_api():
     decisions = applicability_for(3, _known(browser_frontend="absent"))
     chapter = [row for row in decisions if row.startswith("V3.")]
     ruled_out = [row for row in chapter if decisions[row].state == "not-applicable"]
-    assert ruled_out == [row for row in chapter if row != "V3.4.2"]
+    assert ruled_out == [row for row in chapter if row not in {"V3.2.1", "V3.4.2"}]

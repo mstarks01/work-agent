@@ -142,7 +142,14 @@ def test_every_parent_is_a_capability_and_no_lineage_loops():
 def test_every_question_is_a_yes_or_no_question():
     for key, capability in CAPABILITIES.items():
         assert capability.question.endswith("?"), key
-        assert capability.question.split()[0] in {"Do", "Does", "Is", "Are"}, key
+        assert capability.question.split()[0] in {
+            "Do",
+            "Does",
+            "Is",
+            "Are",
+            "Can",
+            "Must",
+        }, key
 
 
 def test_the_expression_grammar_refuses_what_it_does_not_define():

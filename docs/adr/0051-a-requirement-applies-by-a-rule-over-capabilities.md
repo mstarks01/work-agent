@@ -20,7 +20,7 @@ stated reason", or "the input does not say, and this is the fact we need".
 ## Decision
 
 **A capability is a closed fact about the whole application.**
-`analysis_service.capabilities.CAPABILITIES` holds 59 of them, such as
+`analysis_service.capabilities.CAPABILITIES` holds 118 of them, such as
 `browser-frontend`, `oauth-client` and `turn-server`. Each has a meaning, a
 yes-or-no question and an optional parent. The table is framework-neutral: a
 capability says what the application has, never what a framework asks of it.
@@ -33,8 +33,14 @@ it is.
 **Each requirement has one applicability expression.**
 `frameworks/asvs/applicability.json` holds a row for each of the 345
 requirements: `always`, one capability, or `all` and `any` over smaller
-expressions. The rationale is in this repository's words. 103 rows are
-`always`, and 242 read at least one capability.
+expressions. The rationale is in this repository's words. 104 rows are
+`always`, and 241 read at least one capability.
+
+**A conjunction reads facts about the whole application.** `all(oauth-client,
+authorization-code-flow)` holds when some component is an OAuth client and
+some component uses the code flow, even if they are two components. So the
+error goes one way: a requirement can stay applicable when it applies to no
+component, and a requirement is never ruled out by a wrong pairing.
 
 **The evaluator uses three-valued logic.** An unknown term is never false. So
 a requirement is `not-applicable` only when a capability it needs is stated
@@ -115,8 +121,10 @@ The page asks every part in the same round as its parent, because a resumed
 job does not pause again. So a "yes" to OAuth asks the role questions at once,
 on the same page.
 
-An agent drafted every row and every question. `reviewed_by` is `None` on each
-until the maintainer reads it.
+`reviewed_by` names who accepted a row or a capability, and is `None` until
+the maintainer reads it. The maintainer reviewed every conditional row, the
+`always` row V14.1.1, and 35 of the capabilities. The other 103 `always` rows
+and the other 83 capabilities are not reviewed.
 
 The presence tests in `frameworks/asvs/rules.py` stay as leads for a lane. They
 decide no applicability.
