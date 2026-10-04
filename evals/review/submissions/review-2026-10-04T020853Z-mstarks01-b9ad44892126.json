@@ -1,0 +1,67 @@
+{
+  "envelope": 1,
+  "submitted_by": "mstarks01",
+  "submitted_for": "mstarks01",
+  "generated": "2026-10-04T020853Z",
+  "cases": {
+    "14-loyalty-oauth-platform": {
+      "own_list": [
+        "Prefix-matched redirect URIs can send authorization codes to an attacker-controlled location.",
+        "If the mobile flow lacks PKCE, an intercepted authorization code can be exchanged by another app.",
+        "A compromised or malicious partner can redeem points because every partner receives every scope.",
+        "A support-console token may be accepted by the rewards API because audience and client restrictions are not checked.",
+        "Anyone who obtains bearer tokens from the request logs can replay them to the rewards API.",
+        "A stolen mobile refresh token can sustain access indefinitely by repeatedly extending its expiry.",
+        "Closed accounts retain refresh tokens that may still mint access tokens unless account status is checked on refresh.",
+        "A disconnected partner retains access for the remaining lifetime of its already-issued one-hour access tokens.",
+        "A stolen authorization-server session can remain usable during thirty days of inactivity because no idle timeout is defined.",
+        "A stolen redeem-scoped token can cash out points without fresh member authentication or transaction approval.",
+        "Client-only ledger records cannot establish which member approved a disputed redemption.",
+        "MODEL: The rewards API is described as checking only signatures, but the source does not say expiration or all other JWT checks are absent."
+      ],
+      "marks": {
+        "v5:f138acf58eb2512c": "agree",
+        "v5:ada4cf9f4038434d": "agree",
+        "v5:2388b1b66b69a7de": "agree",
+        "v6:cbb87f71eb7280f6": "agree",
+        "v6:e234f4cc2a560bdb": "agree",
+        "v6:4c5d0756a3997536": "agree",
+        "v6:7a20c5f6a06c1fa3": "agree",
+        "v6:c315308d5a94f7e6": "agree",
+        "v6:a0667756b811b60a": "agree",
+        "v6:8c35e5757d3994ef": "agree",
+        "v6:e692237509fb41e9": "agree",
+        "v5:61cceebf2758c863": "agree",
+        "v5:2ac79592351ede3c": "agree",
+        "v5:b7936aa2ad5df852": "agree",
+        "v5:ef301c98d501ad28": "agree",
+        "v5:91288896211b18ef": "agree",
+        "v5:4908870eb3f8e4b5": "duplicate",
+        "v5:f2037e711b5ee336": "agree",
+        "v5:913381b82beb2cf5": "agree",
+        "v5:01b9475d0d737b71": "agree",
+        "v5:f5fd4c86f4360125": "agree",
+        "v5:28fd818aad05bcc2": "duplicate",
+        "v5:b0eb4d8f704c2bd8": "agree",
+        "v5:4d542352d6703d28": "agree",
+        "v5:69fa9772424c6aa4": "agree",
+        "v5:59c6a841e4f82093": "duplicate",
+        "v6:0e908e8769e6cfff": "agree",
+        "v6:0ebd30b1aecfb594": "duplicate",
+        "v6:72ba23284ebcb308": "agree",
+        "v6:9d29d0f3a762a1f2": "agree",
+        "v6:3933086ffb180211": "agree",
+        "v6:8e7e2d08781a670b": "agree",
+        "v6:b20c43e86806d1d7": "agree"
+      },
+      "missing": [],
+      "notes": "Confirming sitting on case 14's PKCE rationale (#1457), ruled as item 2 of the corpus batch ballot of 2026-10-04. Reader's note: the revised rationale preserves the conditional PKCE attack without claiming the authorization code is the only validation input; the unchanged claim remains supported. Every finding is unchanged in key and text and carries the reader's mark from the confirming sitting of 2026-10-04 (#1453), and the own list is carried from that sitting.\nNotes of the sitting of 2026-10-04, carried:\nConfirming sitting on the rulings applied in #1439, sent as CSV in conversation. The own list is the one written on 2026-10-03 before the recorded sets were opened, carried forward. Changed and new findings were marked afresh; unchanged findings (same fingerprint and same text) carry the reader's 2026-10-03 mark, each reviewed in this ballot. The round 2 missing threats are now claims, so the missing list is empty. n refers to the row number of this ballot, which numbered both cases together.\nMODEL: The rewards API model says it checks only signatures. The source says it checks signatures and omits client/audience checks; it does not say expiration or all other JWT checks are absent. Do not propagate rewards API validation behavior to the support console.\nRow 19 combines two attack mechanisms under one fingerprint. Preserve the supplied fingerprint for this ballot, then split the claim data and correct the identity rule. Detailed conditional rewrites and the mixed judgment are in its note.\nNo additional unmatched threat from my own list: its items 1-11 map respectively to ballot rows 1/22, 3/19, 6/30, 9, 18/26, 4/19, 16/31, 32, 15, 17, and 25. Coverage here includes rows requiring correction; it is not a statement that all claims are accepted.\nCorrection to my own-list items 6 and 9: unlimited sliding lifetime does not alone prove indefinite replay of a copied refresh token; effective sender binding or replay defenses may prevent it. No decided idle timeout is a policy/evidence gap, not proof the deployed server lacks one. Apply the rewrites in 19 and 15.\nRow review notes and proposed corrections:\nn=1 [asvs V9.2.3 (self-contained-tokens); agree; new]: Supported as an unresolved support-console audience check, not proof the console accepts rewards tokens.\nn=2 [asvs V7.3.1 (session-management); agree; changed]: Supported as an undefined timeout policy and unresolved enforcement setting; it no longer asserts that the deployed server has no idle timeout.\nn=3 [asvs V7.4.2 (session-management); agree; changed]: Supported as an unresolved account-status check during refresh. Stored token records alone do not establish continued usability.\nn=4 [stride spoofing; agree; changed]: The revised conditions correctly separate unlimited sliding lifetime from the unknown defenses against use of a copied token. This is distinct from the authorization-code mechanism in 5.\nn=5 [stride spoofing; agree; new]: Supported conditional code-interception threat, now separate from 4. Rationale correction: absence of a client secret does not establish that the code is the only validation input; say server PKCE enforcement is unspecified and the attack depends on acceptance of the intercepted code.\nn=6 [stride spoofing; agree; changed]: Supported as a conditional password-guessing scenario, not a demonstrated control failure. Success still requires guessing a valid password; do not infer password weakness from the absence of described defenses.\nn=7 [stride tampering; agree; changed]: Supported conditional key-substitution threat. Attacker control of the downloaded key and failure of trusted-source/delivery verification are explicit prerequisites.\nn=8 [stride information-disclosure; agree; changed]: Supported conditional exposure of a readable database copy. Reusable refresh-token storage is explicitly conditional, and password hashes are not described as plaintext passwords.\nn=9 [stride denial-of-service; agree; changed]: The revised claim explicitly requires exhaustion of capacity despite abuse defenses and correctly limits the immediate effect to obtaining new tokens.\nn=10 [stride elevation-of-privilege; agree; changed]: Supported conditional console attack. Both token-audience separation and account-closing authorization must fail; neither failure is established by the shared key or hostname.\nn=11 [stride elevation-of-privilege; agree; changed]: The revised claim correctly distinguishes refresh from redemption and makes continued use conditional on both services accepting the closed account. Redemption also remains subject to the existing redeem-scope requirement.\nn=26 [asvs V10.4.1 (oauth-and-oidc); agree; unchanged]: Prefix matching is explicit. This is the same redirect weakness expressed as an attack in row 42; retain both framework records.\nn=27 [asvs V10.4.3 (oauth-and-oidc); agree; unchanged]: Ten minutes is explicit and exceeds the one-minute L3 maximum in V10.4.3.\nn=28 [asvs V10.4.6 (oauth-and-oidc); agree; unchanged]: Supported as an unresolved PKCE requirement, not proof PKCE is absent. Inspect server enforcement as well as the mobile request.\nn=29 [asvs V10.4.8 (oauth-and-oidc); agree; unchanged]: The source explicitly gives sliding expiry without an absolute lifetime. Replay resistance is a separate question in row 30.\nn=30 [asvs V10.4.5 (oauth-and-oidc); agree; unchanged]: Supported as missing evidence about refresh-token replay defenses. At L3, do not treat rotation alone as sufficient; verify sender constraint.\nn=31 [asvs V10.4.11 (oauth-and-oidc); duplicate; unchanged]: Same as 46. Keep both under separate-framework scoring; this row records the V10.4.11 scope-assignment requirement. Duplicate denotes overlap, not a drop instruction.\nn=32 [asvs V10.2.3 (oauth-and-oidc); agree; unchanged]: The requested scopes are unspecified even though assigned scopes are excessive. This concerns externally operated partner clients; treat it as partner evidence to obtain, not a proven defect in platform-owned code. Authorization requests are not represented by the named token-request flow.\nn=33 [asvs V10.4.16 (oauth-and-oidc); agree; unchanged]: Shared-secret authentication is explicit and does not meet the stated L3 public-key authentication requirement. Sending the secret in an HTTPS body is not itself evidence of leakage.\nn=34 [asvs V10.3.1 (oauth-and-oidc); agree; unchanged]: The rewards API explicitly omits audience checking. A token intended for the support console may therefore be accepted by the rewards API; the reverse direction is not established.\nn=35 [asvs V10.3.5 (oauth-and-oidc); agree; unchanged]: Plain bearer tokens are explicit. Missing sender constraint is a separate control gap from the specific log leak in row 45.\nn=36 [asvs V10.4.14 (oauth-and-oidc); duplicate; unchanged]: Same underlying sender-constraint finding as 35. Keep both: V10.4.14 addresses authorization-server issuance and V10.3.5 addresses resource-server enforcement, with separate requirement identities. Duplicate denotes overlap, not a drop instruction.\nn=37 [asvs V9.2.4 (self-contained-tokens); agree; unchanged]: Supported as an evidence gap: audience inclusion in issued tokens is unspecified. Token issuance and recipient validation are different controls, so this is not a duplicate of 34.\nn=38 [asvs V9.1.3 (self-contained-tokens); agree; unchanged]: Supported as an unresolved trust configuration for the downloaded verification key, not evidence that an attacker can replace it.\nn=39 [asvs V7.5.3 (session-management); agree; unchanged]: The source expressly says redemption requires only a valid redeem-scoped token, supporting the absence of further transaction authentication or approval.\nn=40 [asvs V16.2.5 (security-logging-and-error-handling); duplicate; unchanged]: Same as 45. Keep both under separate-framework scoring; retain V16.2.5 on this ASVS record. Duplicate denotes overlap, not a drop instruction.\nn=41 [stride spoofing; agree; unchanged]: Supported conditional credential-compromise scenario: possession of the client secret permits client impersonation. It does not alone grant a member token; retain the need for a valid authorization grant and do not imply the request body leaks the secret.\nn=42 [stride information-disclosure; duplicate; unchanged]: Same as 26. Keep both under separate-framework scoring. The attacker must control an accepted prefix-matching URL; code theft alone does not establish redemption without the confidential client secret.\nn=43 [stride tampering; agree; unchanged]: A supported conditional threat on the stated ledger-write path. Keep both prerequisites: attacker reachability to the ledger and missing effective authorization/authentication for writes; a cloud foothold alone does not establish either.\nn=44 [stride repudiation; agree; unchanged]: The ledger explicitly records the client, not the approving member. Keep the conclusion limited to what that ledger can establish about a particular redemption.\nn=45 [stride information-disclosure; agree; unchanged]: Headers are logged and tokens are bearer credentials. Reading a still-valid logged token enables replay within that token's existing permissions and remaining lifetime.\nn=46 [stride elevation-of-privilege; agree; unchanged]: Every partner receives every scope, including redemption, although some partners only need balance reads. Member consent to the scopes does not make that excess privilege necessary.\nn=47 [stride elevation-of-privilege; agree; unchanged]: Explicit residual-access window after disconnect. Limit impact to the existing token's privileges and remaining lifetime, at most one hour; this is not indefinite access.",
+      "opened_digests": {
+        "source.md": "d414cc10c981749e783270475acdaa286ead5d32d22e334e4f6d1e23ae385a29",
+        "model.json": "eb6210790530ebcb9aeac28c28b0d0eceb9676b38790d4f12656f72678c9074b",
+        "claims/asvs.json": "1383f84a4e5de056f8afa84f3b7bab01a03f2d4971846e4e1aaa0a0385e6ead8",
+        "claims/stride.json": "cfcca71fe5e7e3d14cb9d70e720d7229ca3959a68674292f21eee4378c89d4e9"
+      }
+    }
+  }
+}
