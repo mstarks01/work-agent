@@ -450,6 +450,30 @@ def cast(
     )
 
 
+#: One finding: a fingerprint and the mechanism of the first claim that took
+#: it. Two claims under one fingerprint are one finding unless their
+#: mechanisms are distinct (ADR 0060). The queue asks one question per
+#: identity, and the ledger counts by it.
+Identity = tuple[str, tuple[str, ...]]
+
+
+def identity_of(
+    value: str, mechanism: tuple[str, ...], groups: dict[str, list[tuple[str, ...]]]
+) -> Identity:
+    """The finding a claim joins: the first under its fingerprint whose
+    mechanism is not distinct from its own, or a new one.
+
+    ``groups`` holds the mechanisms already taken per fingerprint, so one call
+    site's findings share it and agree on every grouping.
+    """
+    taken = groups.setdefault(value, [])
+    for held in taken:
+        if not distinct_mechanisms(held, mechanism):
+            return value, held
+    taken.append(mechanism)
+    return value, mechanism
+
+
 @dataclass
 class Ledger:
     """Every vote ever cast, in the order it was cast.
@@ -517,15 +541,19 @@ class Ledger:
                 answers[voter] = vote
         return answers
 
-    def pool(self) -> frozenset[str]:
-        """The reference pool: every fingerprint a live verdict puts in it.
+    def pool(self) -> frozenset[Identity]:
+        """The reference pool: every finding a live verdict puts in it.
 
         Derived, never stored. A pool file kept beside the ledger would be a
         second source of truth that could disagree with it, and the disagreement
-        would be silent. Recomputing costs one pass over a small file.
+        would be silent. Recomputing costs one pass over a small file. Counted
+        by :data:`Identity`, so two findings under one fingerprint are two.
         """
+        groups: dict[str, list[tuple[str, ...]]] = {}
         return frozenset(
-            key[0] for key, vote in self.current().items() if vote.joins_the_pool
+            identity_of(value, mechanism, groups)
+            for (value, _, mechanism), vote in self.current().items()
+            if vote.joins_the_pool
         )
 
     def for_fingerprint(self, value: str) -> tuple[Vote, ...]:
@@ -536,16 +564,19 @@ class Ledger:
         """Everyone who has ever voted, sorted, for the agreement measures."""
         return tuple(sorted({vote.voter for vote in self.votes}))
 
-    def double_voted(self) -> tuple[str, ...]:
-        """Fingerprints two or more people answered independently.
+    def double_voted(self) -> tuple[Identity, ...]:
+        """Findings two or more people answered independently.
 
         The sample that measures reviewer agreement, which is the ceiling on
-        what any single vote can mean. Nothing else in this repository has ever
-        had one.
+        what any single vote can mean. Counted by :data:`Identity`, so two
+        people who answered two findings under one fingerprint are not a
+        double vote.
         """
-        by_finding: dict[str, set[str]] = {}
+        groups: dict[str, list[tuple[str, ...]]] = {}
+        by_finding: dict[Identity, set[str]] = {}
         for vote in self.votes:
-            by_finding.setdefault(vote.fingerprint, set()).add(vote.voter)
+            identity = identity_of(vote.fingerprint, vote.components.mechanism, groups)
+            by_finding.setdefault(identity, set()).add(vote.voter)
         return tuple(sorted(key for key, who in by_finding.items() if len(who) > 1))
 
 

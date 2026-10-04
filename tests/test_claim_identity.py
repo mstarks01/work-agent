@@ -194,21 +194,18 @@ def test_the_exemption_list_does_not_rot(collisions):
 
 
 class TestTheFourReadersOfOnePlace:
-    """Four pieces of code fold a claim's citations into "one place in the graph".
+    """Code folds a claim's citations into "one place in the graph" in one function.
 
-    ``critic.endpoint_targets`` folds a draft's citations for the runtime
-    duplicate step; ``identity.endpoint_form`` folds them for the scorer and for
-    ``fingerprint.components_for``. They are two implementations of one rule in
-    two modules, and until this ran nothing compared them — ``endpoint_targets``
-    says it is "kept in step by ``tests/test_evals_identity.py``" and that file
-    never mentions it. They agree today only because a literal ``"boundary:"``
-    in one happens to match ``TrustBoundary.id_prefix`` read by the other.
+    ``critic.endpoint_targets`` is the fold, and ``identity.endpoint_form``,
+    which the scorer and ``fingerprint.components_for`` read, calls it. The
+    test below still compares the two on every corpus citation, so a second
+    implementation cannot creep back in unnoticed.
 
-    On top of that fold sit three *relations*, and they are deliberately
-    different, which is why this asserts the implications between them rather
-    than equality:
+    On top of that fold sit relations, and they are deliberately different,
+    which is why this asserts the implications between them rather than
+    equality:
 
-    - ``duplicate_groups`` — exact folded targets and one verb, **across** lanes.
+    - ``critic.finding_key`` — exact folded targets and one verb, within a lane.
     - ``SubsetVerbIdentity`` — folded targets by **subset** and one action,
       within a lane.
     - ``fingerprint`` — exact folded targets, one verb, one lane, one case.
@@ -234,8 +231,8 @@ class TestTheFourReadersOfOnePlace:
             "analysis_service.critic.endpoint_targets and"
             " evals.harness.identity.endpoint_form fold one claim's citations"
             f" into two different places: {disagreements}. They are one rule"
-            " with two readers, so the runtime would call two drafts duplicates"
-            " that the scorer counts as two findings, or the reverse."
+            " with two readers, so the service would call two claims one finding"
+            " that the scorer counts as two, or the reverse."
         )
 
     def test_the_two_folds_drop_a_zone_by_the_same_definition(self):
