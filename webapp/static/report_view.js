@@ -271,15 +271,18 @@
   const rulesOut = (block, c) =>
     answersInUnits(block) && c.verdict.status === "rejected" && c.verdict.rejected_because === "evidence";
 
-  // Each branch named in its own words, so the four read as different *kinds*
-  // of justification rather than four formattings of one. The two attribute
-  // branches carry identical fields, so this line is the only place a reader
-  // can tell "nobody said" from "somebody said no".
+  // Each kind named in its own words, so they read as different *kinds* of
+  // justification rather than formattings of one. The two attribute kinds
+  // carry identical fields, and so do the two assertion kinds, so this line is
+  // the only place a reader can tell "nobody said" from "somebody said".
   const GROUND_KIND = {
     "quote": "Quoted from the submission",
     "unknown-attribute": "Unstated in the submission",
     "absent-attribute": "Stated absent in the submission",
     "derived-fact": "Derived from the model",
+    "absent-element": "Named nowhere in the submission",
+    "assertion": "Stated as a fact in the submission",
+    "unknown-assertion": "Left open by the submission",
   };
   // Past this, a quote is clamped to three lines behind a toggle. Short quotes
   // are the common case and get no affordance.
@@ -382,9 +385,9 @@
   // One grounds entry. Every string here is model-authored or lifted verbatim
   // out of the submitter's own prose, so it goes in as text and never as markup.
   //
-  // Grounds are the neutral half of a claim: the three branches are properties
-  // of the shared System Model and of the submission, not of any framework's
-  // method, so this renders identically in every block.
+  // Grounds are the neutral half of a claim: every kind is a property of the
+  // shared System Model and of the submission, not of any framework's method,
+  // so this renders identically in every block.
   function groundEntry(marks, claimId, ground, index) {
     const row = el("div", "ground " + ground.kind);
     row.append(el("div", "kind", GROUND_KIND[ground.kind] || ground.kind));
@@ -431,8 +434,14 @@
       if (ANSWERED_ATTRIBUTES.has(`${ground.element_id}>${ground.attribute}`)) {
         body.append(el("span", "cite", " (your answer; the service did not check it)"));
       }
-    } else {
+    } else if (ground.kind === "derived-fact") {
       body.append(ref(ground.flow_id));
+    } else if (ground.kind === "absent-element") {
+      body.append(code(ground.term));
+    } else {
+      // An assertion row: its reference is a digest with no short label, so
+      // ref shows the reference itself.
+      body.append(ref(ground.assertion));
     }
     row.append(body);
     return row;

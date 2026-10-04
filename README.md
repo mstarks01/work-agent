@@ -36,9 +36,11 @@ The implementation follows this path:
    cannot be represented safely. A claim based on an attribute the input left
    unknown is mechanically assigned `needs-info`.
 6. Each framework's reviewer (called the **critic** in the code) judges the
-   remaining drafts. It may confirm or reject them, remove duplicates, and—for
-   STRIDE—correct severity. Code checks that every draft received one coherent
-   ruling. A malformed review gets one retry; another failure fails the job.
+   remaining drafts. It says which check a draft fails, if any, and which open
+   facts its argument depends on, and code decides the verdict from those
+   answers. For STRIDE it also rates confidence. Code checks that every draft
+   received one coherent ruling. A malformed review gets one retry; another
+   failure fails the job.
 7. Code builds one report containing the shared system model and one analysis
    block per selected framework.
 

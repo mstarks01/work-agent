@@ -50,12 +50,13 @@ costs the finding rather than moving it. That keeps the categorisation
 measurable — it is observable only because misfiled drafts are visible — and it
 means the report undercounts a threat that genuinely spans two categories.
 
-**One finding per action and place.** Two drafts naming one verb against one set
-of endpoint-resolved elements are one finding. This is coarser than reality: two
-interpreter injections at one process may need different controls and count as
-one here, and two principals escalating at one target likewise. Where a fix
-would differ, the drafts are kept — the critic's duplicate test is one
-countermeasure closing both, not one harm.
+**One finding per action, place and mechanism.** Two drafts naming one verb
+against one set of endpoint-resolved elements are one finding, unless the
+controls their grounds cite do not overlap, or they cite two different flows
+between the same two elements (ADRs 0060 and 0061). This is still coarser than
+reality: two interpreter injections at one process that cite the same control
+count as one here. The critic rules each draft on its own and rejects none as
+a duplicate (ADR 0059), so both drafts stay in the report.
 
 **A local severity matrix.** `frameworks/stride/severity_rubric.md` maps a
 likelihood and an impact, each a model judgement, onto a band by arithmetic this
