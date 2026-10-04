@@ -1387,3 +1387,54 @@ def test_a_written_value_stays_inside_its_cell(render):
     assert all(line.startswith("| ") and line.endswith(" |") for line in table)
     assert all(line.count(" | ") == 1 for line in table)
     assert "admins \\| x ## a heading" in rendered
+
+
+class TestACitedRowIsPartOfAClaimsMechanism:
+    """A stated control reaches the mechanism through its row (ADR 0062)."""
+
+    def test_a_row_and_an_unknown_attribute_are_two_mechanisms(self):
+        """Case 01's leaked password rests on stated rows, its offline copy on
+        an unstated attribute: two findings under one key."""
+        from analysis_service.claims import Ground
+        from analysis_service.critic import (
+            distinct_mechanisms,
+            grounded_mechanism,
+            row_controls,
+        )
+
+        held = assertions(row())
+        stated = evidence_catalog(valid_model(), held)[assertion_id(row())]
+        unstated = Ground(
+            kind="unknown-attribute",
+            element_id="store:orders-db",
+            attribute="encryption_at_rest",
+        )
+        rows = row_controls(held)
+
+        on_row = grounded_mechanism(sample_draft("S-01", grounds=[stated]), rows)
+        on_attribute = grounded_mechanism(
+            sample_draft("S-02", grounds=[unstated]), rows
+        )
+
+        assert on_row == {"mfa-requirement"}
+        assert distinct_mechanisms(on_row, on_attribute)
+
+    def test_a_row_names_the_attribute_its_predicate_projects_into(self):
+        """A row and an attribute ground about one control read alike."""
+        from analysis_service.critic import row_controls
+
+        exposed = row(
+            subject=LOGIN_FLOW,
+            predicate="transport-encryption",
+            value=ABSENT,
+        )
+
+        assert set(row_controls(assertions(exposed, subjects=(LOGIN,))).values()) == {
+            "encryption_in_transit"
+        }
+
+    def test_a_job_with_no_catalog_reads_no_row(self):
+        """The layer off: no row is cited and the mechanism is the attributes."""
+        from analysis_service.critic import NO_ROWS, row_controls
+
+        assert row_controls(None) is NO_ROWS

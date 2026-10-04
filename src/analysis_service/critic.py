@@ -41,9 +41,10 @@ from __future__ import annotations
 from collections import Counter
 from collections.abc import Collection, Iterable, Mapping, Sequence
 from dataclasses import dataclass
+from types import MappingProxyType
 from typing import Any, NamedTuple, get_args
 
-from analysis_service.assertions import AssertionCatalog
+from analysis_service.assertions import REGISTRY, AssertionCatalog, assertion_id
 from analysis_service.claims import (
     ASSERTION_GROUNDS,
     ATTRIBUTE_GROUNDS,
@@ -544,19 +545,52 @@ def endpoint_targets(
 FindingKey = tuple[object, ...]
 
 
-def grounded_mechanism(claim: Claim) -> frozenset[str]:
-    """The controls a claim's own grounds say are unstated or missing.
+#: No catalog: the rows a job without an assertion pass carries.
+NO_ROWS: Mapping[str, str] = MappingProxyType({})
+
+
+def row_controls(assertions: AssertionCatalog | None) -> Mapping[str, str]:
+    """Each settled row's ID against the control it names, built once per job.
+
+    The control is the attribute the row's predicate projects into, so a row
+    and an attribute ground about one control read alike, or the predicate's
+    own name where it projects into nothing. Looked up by the row's exact ID,
+    which a reader never splits.
+    """
+    if assertions is None:
+        return NO_ROWS
+    return MappingProxyType(
+        {
+            assertion_id(entry): REGISTRY[entry.predicate].projects_into
+            or entry.predicate
+            for entry in assertions.entries
+            if entry.predicate in REGISTRY
+        }
+    )
+
+
+def grounded_mechanism(
+    claim: Claim, rows: Mapping[str, str] = NO_ROWS
+) -> frozenset[str]:
+    """The controls a claim's own grounds say are unstated, missing or settled.
 
     Read from fields, never prose: the attribute of each unknown or absent
-    ground. A fake server rests on the client never checking the server
-    (``encryption_in_transit``) and a fake caller on the server never checking
-    the caller (``authentication``), and the two share a lane, a verb and a
-    place.
+    ground, and the control of each assertion row it cites, from ``rows``
+    (:func:`row_controls`). A fake server rests on the client never checking
+    the server (``encryption_in_transit``) and a fake caller on the server
+    never checking the caller (``authentication``), and the two share a lane,
+    a verb and a place. A leaked password rests on stated rows
+    (``credential-custody``) and an offline copy on an unstated attribute
+    (``encryption_at_rest``).
     """
     return frozenset(
         ground.attribute
         for ground in claim.grounds
         if ground.kind in ATTRIBUTE_GROUNDS and ground.attribute
+    ) | frozenset(
+        rows[ground.assertion]
+        for ground in claim.grounds
+        if ground.kind in ASSERTION_GROUNDS and ground.assertion in rows
     )
 
 
@@ -582,9 +616,15 @@ def cited_channels(
     return cited & sibling_flows(flows) if cited else frozenset()
 
 
-def mechanism_of(claim: Claim, flows: Mapping[str, tuple[str, str]]) -> frozenset[str]:
+def mechanism_of(
+    claim: Claim,
+    flows: Mapping[str, tuple[str, str]],
+    rows: Mapping[str, str] = NO_ROWS,
+) -> frozenset[str]:
     """A claim's whole mechanism: its grounded controls and its channels."""
-    return grounded_mechanism(claim) | cited_channels(claim.affected_element_ids, flows)
+    return grounded_mechanism(claim, rows) | cited_channels(
+        claim.affected_element_ids, flows
+    )
 
 
 def _apart(one: frozenset[str], other: frozenset[str]) -> bool:
