@@ -1,0 +1,69 @@
+{
+  "envelope": 1,
+  "submitted_by": "mstarks01",
+  "submitted_for": "mstarks01",
+  "generated": "2026-10-04",
+  "cases": {
+    "01-payments-checkout": {
+      "own_list": [
+        "An attacker who obtains a shopper's password can sign in as that shopper and place fraudulent orders because shopper MFA is explicitly absent.",
+        "A caller with network access to the order service can inject fabricated orders over its unauthenticated gRPC interface, bypassing the storefront's shopper checks.",
+        "An internet attacker can submit a forged settlement webhook and mark an unpaid order paid if the storefront does not verify the processor's identity and message authenticity.",
+        "A party able to resubmit a genuine settlement callback could apply it to the wrong order or repeat a payment-state transition if the API fails to bind it to the expected transaction and enforce idempotency.",
+        "A person who recovers the worker's environment-held database password and can reach PostgreSQL can read customer records and rewrite orders directly using the full-read/write application account.",
+        "An observer on the storefront-to-worker or worker-to-database network path can capture customer addresses and order data if those internal channels lack transport confidentiality.",
+        "An attacker obtaining raw database media or a storage snapshot could read the customer corpus if those copies lack encryption whose keys remain separate from the attacker.",
+        "A shopper can repeatedly submit expensive order requests to exhaust the shared storefront, worker, or database capacity if admission and per-account work limits do not bound the induced work.",
+        "A caller using the unauthenticated internal order endpoint can dispute having submitted a particular order because the described receipt identifies only the order service, not the initiating caller.",
+        "A signed-in shopper could retrieve or change another shopper's order if the storefront trusts caller-supplied order/customer identifiers without checking ownership on the server."
+      ],
+      "marks": {
+        "v5:d7731bcf75fc2c82": "agree",
+        "v5:70c5b3a170508da6": "agree",
+        "v5:fc4bfd0960ef198d": "agree",
+        "v5:866be3634c93ef90": "agree",
+        "v5:f7e8244bdd7f6c74": "agree",
+        "v5:93c07130842358fa": "agree",
+        "v5:b144a4c9d899ee0a": "agree",
+        "v5:652da28b442a26b3": "agree",
+        "v5:e8fe546c8e9c26fc": "agree",
+        "v5:92f4060d3b17d290": "agree",
+        "v5:6e370f89ee84d142": "agree",
+        "v5:20e842cab0beed53": "agree",
+        "v5:23df383ce237ff0e": "agree",
+        "v5:e8defbe46332e752": "agree",
+        "v5:c11d20aaca27918d": "reject",
+        "v5:26417fabecbcdf95": "agree",
+        "v5:24d318438f2b84c8": "agree",
+        "v5:aff9a2d34eaf1b79": "agree",
+        "v6:6500a06262a31a1f": "agree",
+        "v6:f9359ba8e162f344": "agree",
+        "v6:4f140b4fdc4756f3": "agree",
+        "v6:1bb536caff886f09": "agree",
+        "v6:d6e8452ca410f55f": "agree",
+        "v6:8e1df5b65b166564": "agree",
+        "v6:d7b7b8eb3b4c68d2": "unsure",
+        "v6:d8860a071c14255a": "agree",
+        "v6:db16495d7bc4f394": "unsure",
+        "v6:b2b1372076d75638": "unsure",
+        "v6:a960649290ed6a8b": "agree",
+        "v6:a30cabb85dbcb62c": "agree",
+        "v6:0510f11efb1c5b74": "agree",
+        "v6:df21ea8a3fef953a": "agree",
+        "v6:630e61e2b73c9bd6": "agree",
+        "v6:3982f85004e1a8db": "agree",
+        "v6:da698b4318cc71e7": "agree",
+        "v6:f0f023cfc6ec2d1a": "agree",
+        "v6:4600107f912be68f": "agree"
+      },
+      "missing": [],
+      "notes": "Confirming sitting on the corpus batch of 2026-10-04 (#1454), ruled as CSV in conversation. The V13.2.2 claim lost three words its source does not state (#447) and was marked afresh: agree. Reader's note: the quoted source supports full read/write for the application account but does not specify every table; agree to the factual claim; the account being shared or read/write does not alone prove privileges exceed the order service's needs. Every other finding is unchanged in key and text and carries the reader's mark of 2026-09-22, and the own list is carried from that sitting.\nNotes of the sitting of 2026-09-22, carried:\nReview basis: supplied source texts and model; no repository code consulted. Earlier reviews were visible, so this is not a blind first pass. Agree accepts the stated conditional threat or unanswered ASVS evidence question, not proof of a missing implementation control. ASVS marks assess the supplied claim; they are not an independent compliance certification. Duplicate references use case-local n and concern repeated attack mechanisms, not merely matching elements or different CIA effects. Corrected wording in these notes is proposed only; original claims and fingerprints remain unchanged. No additional claim from my ten-item own-list is absent from this case when ASVS and STRIDE coverage are considered together.\nRow review notes and proposed corrections:\nn=1 [asvs V1.2.4; agree]: Valid unanswered query-construction question; not evidence of SQL injection.\nn=2 [asvs V2.1.1; agree]: The supplied text contains no validation policy. This does not establish that no separate policy exists.\nn=3 [asvs V2.2.2; agree]: Server-side order validation is unresolved, not shown absent.\nn=4 [asvs V3.3.1; agree]: A session cookie is explicit; its attributes require verification.\nn=5 [asvs V4.1.1; agree]: Response content-type handling is an unanswered HTTP-interface question.\nn=6 [asvs V6.2.1; agree]: Password use is explicit; minimum length is unstated.\nn=7 [asvs V6.3.1; agree]: Anti-automation is unknown. Absent MFA does not prove absent throttling.\nn=8 [asvs V7.4.1; agree]: Session termination and invalidation are unresolved.\nn=9 [asvs V7.2.3; agree]: Cookie-token generation and entropy are not described; no weak token is established.\nn=10 [asvs V13.2.2; agree]: The broad application grant is stated. Replace 'every table' with the stated full read/write scope; excessive privilege requires comparison with necessary operations.\nn=11 [asvs V8.2.2; agree]: Valid object-authorization question. The shared database account does not establish missing shopper ownership checks or their precise enforcement component.\nn=12 [asvs V11.3.2; agree]: At-rest protection and cipher are unstated; this is an evidence gap, not proof of plaintext storage.\nn=13 [asvs V12.3.3; agree]: The gRPC protection question is valid. Correct the rationale: case 05 does not establish that unmarked internal links are unencrypted.\nn=14 [asvs V13.3.1; agree]: Environment injection does not establish the presence or absence of a secrets manager.\nn=15 [asvs V14.1.1; reject]: Classification can imply protection requirements; the text merely does not document them. Rewrite as an unanswered classification-to-controls mapping question.\nn=16 [asvs V15.2.1; agree]: Component support/update status is not established by naming Node and Python.\nn=17 [asvs V16.2.1; agree]: The stated receipt identifies the service, not the initiating shopper. Do not generalize this to all security logs.\nn=18 [asvs V16.5.1; agree]: Error-response behavior is unresolved; information leakage is not demonstrated.\nn=19 [stride spoofing; agree]: Valid conditional use of a stolen accepted session cookie. Theft and continued token validity are prerequisites.\nn=20 [stride spoofing; agree]: Valid conditional webhook forgery if sender/message verification is ineffective; unknown authentication is not absent authentication.\nn=21 [stride spoofing; duplicate]: Same reachable caller, unauthenticated gRPC, and fabricated-order operation as 40; retain 40 as the more explicit attack description.\nn=22 [stride spoofing; agree]: A valid stolen application password enables service impersonation from a reachable database position. The source does not establish credential lifetime.\nn=23 [stride tampering; agree]: Conditional active interception; requires an on-path position and ineffective integrity protection. A storefront foothold alone does not establish either.\nn=24 [stride tampering; agree]: The full-read/write account supports direct order tampering after credential compromise. Specific schema fields and necessary privilege scope remain to be checked.\nn=25 [stride tampering; agree]: Retain the replay/transaction-binding mechanism separately from 20. Specify missing freshness, idempotency, or order binding; editing/forging alone overlaps 20.\nn=26 [stride tampering; unsure]: The service account is known to write receipts, not to overwrite or delete them. Need its grants, versioning and retention policy; CMEK does not answer this.\nn=27 [stride repudiation; agree]: The described receipt alone cannot bind an order to its initiating shopper. Reject the rationale's assumption that this is the system's only audit evidence.\nn=28 [stride repudiation; unsure]: Unknown callback authentication leaves attribution unresolved. Obtain retained callbacks, transaction identifiers and reconciliation records before deciding repudiation.\nn=29 [stride repudiation; unsure]: A shared database identity does not exclude individually attributed application or operator audit records.\nn=30 [stride information-disclosure; agree]: Valid conditional raw-media/backup disclosure if protection is ineffective. Mere database reachability does not bypass encryption or access controls.\nn=31 [stride information-disclosure; agree]: Conditional passive interception of sensitive gRPC payloads. Requires path observation and ineffective confidentiality.\nn=32 [stride information-disclosure; agree]: Conditional database-channel disclosure; verify network transport and confidentiality separately from database authentication.\nn=33 [stride information-disclosure; agree]: Reading the process environment can recover the stated password. Crash dumps and logs are possible additional routes, not established disclosures.\nn=34 [stride denial-of-service; agree]: Conditional webhook request-flood threat. Correct 'unauthenticated': verification is unknown, and admission/work limits must also be inadequate.\nn=35 [stride denial-of-service; duplicate]: Database-connection exhaustion is a downstream bottleneck of the order-submission flood in 36, not a separately specified attack.\nn=36 [stride denial-of-service; agree]: Valid conditional checkout exhaustion if admission, request-cost and resource bounds are ineffective.\nn=37 [stride elevation-of-privilege; duplicate]: Same unauthenticated core order invocation and outcome as 40; a boundary-crossing or elevation label does not add an attack.\nn=38 [stride elevation-of-privilege; reject]: A compromised service inheriting its existing database permissions is a blast-radius statement, not a demonstrated privilege escalation. Retain consequences under credential abuse/tampering.\nn=39 [stride spoofing; agree]: Compromised valid passwords can obtain shopper sessions where MFA is explicitly absent. Credential stuffing success also depends on credentials and anti-automation controls.\nn=40 [stride tampering; agree]: Explicitly absent gRPC authentication supports direct fabricated-order submission by a reachable attacker, without an on-path prerequisite.\n\nSecond sitting, 2026-09-22. The marks on the findings this case carried on 2026-09-21 are the reader's own from that sitting, carried forward: each binds to a current finding by fingerprint, so it rules on a claim whose identity has not moved. The own list is that sitting's, which was written blind. The findings added since were all drafted from that own list, so no blind reading remained to protect on them; the reader marked every one of them on 2026-09-22 as a conditional threat scenario, and not as an assertion that the unspecified controls are absent.",
+      "opened_digests": {
+        "source.md": "00335740adbf8247bb22bdaeedb9e574f75fb6a6615c772edc13a72fff07be08",
+        "model.json": "74e3ec437918f4b7b18e3e1d31bda01c479568f4f2ea196e581c3601c2e7d893",
+        "claims/asvs.json": "ed4890f6875e09e82bdd676ed1e6732576e6b6f1e0343663ad92f4dd999355d2",
+        "claims/stride.json": "711b1ff56bee230040480f39869cd6b32fe4977e1739442d1ad8ed70bdeb4763"
+      }
+    }
+  }
+}
