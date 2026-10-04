@@ -50,7 +50,7 @@ from analysis_service.claims import (
     Claim,
     FrameworkName,
 )
-from analysis_service.critic import grounded_mechanism
+from analysis_service.critic import mechanism_of
 from analysis_service.report import Report
 from analysis_service.system_model import ModelIndex
 from evals.harness.content import prose as prose_digest
@@ -131,7 +131,7 @@ def measure_case(
             identifier=identifier_of(framework, claim.id),
         )
         current = list(
-            votes.verdicts_for(value, grounded_mechanism(claim), live).values()
+            votes.verdicts_for(value, mechanism_of(claim, flows), live).values()
         )
         if not current:
             continue

@@ -29,7 +29,7 @@ from analysis_service.critic import (
     FindingKey,
     distinct_mechanisms,
     finding_key,
-    grounded_mechanism,
+    mechanism_of,
 )
 from analysis_service.report import Report
 from analysis_service.system_model import ModelIndex
@@ -64,11 +64,13 @@ class FindingChange:
         }
 
 
-def _findings(report: Report) -> Iterator[tuple[FindingKey, RuledClaim]]:
+def _findings(
+    report: Report,
+) -> Iterator[tuple[FindingKey, frozenset[str], RuledClaim]]:
     flows = ModelIndex.of(report.system_model).flow_endpoints
     for block in report.analyses:
         for claim in (*block.claims, *block.rejected_claims):
-            yield finding_key(claim, flows), claim
+            yield finding_key(claim, flows), mechanism_of(claim, flows), claim
 
 
 def report_changes(before: Report, after: Report) -> tuple[FindingChange, ...]:
@@ -77,18 +79,15 @@ def report_changes(before: Report, after: Report) -> tuple[FindingChange, ...]:
     Two claims of one report that share a key are matched in report order, so
     each earlier claim answers for at most one later one.
     """
-    earlier: dict[FindingKey, list[RuledClaim]] = {}
-    for key, claim in _findings(before):
-        earlier.setdefault(key, []).append(claim)
+    earlier: dict[FindingKey, list[tuple[frozenset[str], RuledClaim]]] = {}
+    for key, mechanism, claim in _findings(before):
+        earlier.setdefault(key, []).append((mechanism, claim))
     changes = []
-    for key, claim in _findings(after):
+    for key, mechanism, claim in _findings(after):
         status = claim.verdict.status
-        mechanism = grounded_mechanism(claim)
         candidates = earlier.get(key, [])
         matched = [
-            c
-            for c in candidates
-            if not distinct_mechanisms(mechanism, grounded_mechanism(c))
+            held for held in candidates if not distinct_mechanisms(mechanism, held[0])
         ]
         if not matched:
             changes.append(
@@ -99,13 +98,13 @@ def report_changes(before: Report, after: Report) -> tuple[FindingChange, ...]:
             continue
         first = matched[0]
         candidates.remove(first)
-        was = first.verdict.status
+        was = first[1].verdict.status
         change: Change = "unchanged" if was == status else "changed"
         changes.append(
             FindingChange(claim.framework, claim.id, claim.title, change, was, status)
         )
-    for claims in earlier.values():
-        for claim in claims:
+    for held_claims in earlier.values():
+        for _, claim in held_claims:
             if claim.verdict.status != "rejected":
                 changes.append(
                     FindingChange(

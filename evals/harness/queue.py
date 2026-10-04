@@ -46,7 +46,11 @@ from pathlib import Path
 from typing import Any
 
 from analysis_service.claims import Claim, FrameworkName
-from analysis_service.critic import distinct_mechanisms, grounded_mechanism
+from analysis_service.critic import (
+    cited_channels,
+    distinct_mechanisms,
+    grounded_mechanism,
+)
 from evals.harness import content as digests
 from evals.harness import ledger
 from evals.harness.fingerprint import Components, key_claim
@@ -352,7 +356,7 @@ def build(
     """
     groups: dict[str, list[tuple[str, ...]]] = {}
     keyed = [
-        (identity_of(value, finding.mechanism, groups), components, finding)
+        (identity_of(value, components.mechanism, groups), components, finding)
         for value, components, finding in _keyed(findings, flows_by_case)
     ]
     # First occurrence wins here for the same reason it wins below: two runs
@@ -440,7 +444,8 @@ def _keyed(
             flows_by_case.get(finding.case, {}),
             verb=finding.verb,
             identifier=finding.identifier,
-            mechanism=finding.mechanism,
+            mechanism=frozenset(finding.mechanism)
+            | cited_channels(finding.element_ids, flows_by_case.get(finding.case, {})),
         )
         yield value, components, finding
 
@@ -501,8 +506,8 @@ def merge_runs(
     groups: dict[str, list[tuple[str, ...]]] = {}
     for findings in runs:
         in_run: dict[Identity, Finding] = {}
-        for value, _, finding in _keyed(findings, flows_by_case):
-            in_run.setdefault(identity_of(value, finding.mechanism, groups), finding)
+        for value, components, finding in _keyed(findings, flows_by_case):
+            in_run.setdefault(identity_of(value, components.mechanism, groups), finding)
         produced_in.update(in_run.keys())
         for identity, finding in in_run.items():
             first.setdefault(identity, finding)
