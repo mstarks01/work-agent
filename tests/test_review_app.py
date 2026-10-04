@@ -180,7 +180,7 @@ def test_a_vote_is_appended_and_the_finding_does_not_come_back(client):
     assert len(ledger) == 1
     assert ledger.votes[0].voter == "ada"
     assert ledger.votes[0].config == "engine-1.2.3"
-    assert ledger.pool() == {first["fingerprint"]}
+    assert {value for value, _ in ledger.pool()} == {first["fingerprint"]}
 
     assert app.get("/api/next").json()["fingerprint"] != first["fingerprint"]
 
@@ -197,7 +197,9 @@ def test_a_style_downvote_keeps_the_finding_in_the_pool(client):
             "reason": "poorly-written",
         },
     )
-    assert load(session.ledger_path).pool() == {item["fingerprint"]}
+    assert {value for value, _ in load(session.ledger_path).pool()} == {
+        item["fingerprint"]
+    }
 
 
 def test_a_substance_downvote_does_not(client):

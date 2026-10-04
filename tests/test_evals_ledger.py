@@ -220,7 +220,7 @@ def test_the_pool_is_derived_from_the_live_verdicts(tmp_path):
         path,
     )
 
-    pool = load(path).pool()
+    pool = {value for value, _ in load(path).pool()}
     assert fingerprint(components("process:a"), version=version_for("stride")) in pool
     assert (
         fingerprint(components("process:b"), version=version_for("stride")) in pool
@@ -294,7 +294,7 @@ def test_double_voted_findings_are_the_agreement_sample(tmp_path):
 
     ledger = load(path)
     assert ledger.double_voted() == (
-        fingerprint(components("process:a"), version=version_for("stride")),
+        (fingerprint(components("process:a"), version=version_for("stride")), ()),
     )
     assert ledger.voters() == ("ada", "sam")
 
@@ -786,3 +786,42 @@ def test_a_vote_stored_without_a_mechanism_still_binds(tmp_path):
     ledger = load(path)
 
     assert ledger.verdicts_for(ledger.votes[0].fingerprint, ("authentication",))
+
+
+def _two_findings_under_one_key(path, verdicts, voters):
+    """Votes on a fake server and a fake caller, which share one fingerprint."""
+    from dataclasses import replace
+
+    server = replace(components(), mechanism=("encryption_in_transit",))
+    caller = replace(components(), mechanism=("authentication",))
+    for parts, verdict, voter in zip((server, caller), verdicts, voters):
+        append(
+            cast(
+                parts,
+                "01",
+                verdict,
+                voter,
+                reason="not-a-threat" if verdict == "down" else None,
+                content=SAMPLE_CONTENT,
+                prose=SAMPLE_PROSE,
+            ),
+            path,
+        )
+    return load(path)
+
+
+def test_the_pool_counts_two_findings_under_one_key_as_two(tmp_path):
+    ledger = _two_findings_under_one_key(
+        tmp_path / "votes", ("up", "up"), ("sam", "sam")
+    )
+
+    assert len(ledger.pool()) == 2
+
+
+def test_two_voters_on_two_findings_under_one_key_are_no_double_vote(tmp_path):
+    """Two people who answered two different findings did not answer one twice."""
+    ledger = _two_findings_under_one_key(
+        tmp_path / "votes", ("up", "up"), ("sam", "ada")
+    )
+
+    assert ledger.double_voted() == ()

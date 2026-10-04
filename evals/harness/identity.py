@@ -37,7 +37,11 @@ from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from typing import Literal, Protocol
 
-from analysis_service.critic import cited_channels, distinct_mechanisms
+from analysis_service.critic import (
+    cited_channels,
+    distinct_mechanisms,
+    endpoint_targets,
+)
 from analysis_service.frameworks.stride.record import StrideCategory
 from evals.harness.verbs import same_action
 
@@ -118,18 +122,13 @@ def endpoint_form(element_ids: Iterable[str], flows: FlowMap) -> frozenset[str]:
     difference and labels the pair a match — and this is what makes those two
     citations equal without asking anybody.
 
-    It reads the flow map rather than parsing an **Element ID**, because a flow's
-    ID spells its endpoints by *name* and two elements of different types may
-    legally carry one name inside a **System Model**.
+    It asks :func:`~analysis_service.critic.endpoint_targets`, the service's
+    fold, rather than repeating it, so the scorer and the service cannot fold a
+    place two ways. That fold reads the flow map rather than parsing an
+    **Element ID**, because a flow's ID spells its endpoints by *name* and two
+    elements of different types may legally carry one name.
     """
-    resolved: set[str] = set()
-    for element_id in comparable_elements(element_ids):
-        endpoints = flows.get(element_id)
-        if endpoints is None:
-            resolved.add(element_id)
-        else:
-            resolved.update(endpoints)
-    return frozenset(resolved)
+    return endpoint_targets(element_ids, flows)
 
 
 def flow_directions(

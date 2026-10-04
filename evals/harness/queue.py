@@ -56,7 +56,7 @@ from evals.harness import content as digests
 from evals.harness import ledger
 from evals.harness.fingerprint import Components, key_claim
 from evals.harness.identity import FlowMap
-from evals.harness.ledger import Ledger
+from evals.harness.ledger import Identity, Ledger, identity_of
 
 
 @dataclass(frozen=True)
@@ -390,29 +390,6 @@ def build(
         items.values(),
         key=lambda item: (-item.priority, item.finding.case, item.finding.title),
     )
-
-
-#: One question in the queue: a fingerprint and the mechanism of the first
-#: finding that took it. Two findings under one fingerprint are one question
-#: unless their mechanisms are distinct.
-Identity = tuple[str, tuple[str, ...]]
-
-
-def identity_of(
-    value: str, mechanism: tuple[str, ...], groups: dict[str, list[tuple[str, ...]]]
-) -> Identity:
-    """The question a finding joins: the first under its fingerprint whose
-    mechanism is not distinct from its own, or a new one.
-
-    ``groups`` holds the mechanisms already taken per fingerprint, so one call
-    site's findings share it and agree on every grouping.
-    """
-    taken = groups.setdefault(value, [])
-    for held in taken:
-        if not distinct_mechanisms(held, mechanism):
-            return value, held
-    taken.append(mechanism)
-    return value, mechanism
 
 
 def _keyed(
