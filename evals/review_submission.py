@@ -54,8 +54,8 @@ class MergedReview:
     def order(self) -> tuple[str, str]:
         """What "later" means for a merged sitting, spelled once.
 
-        The ``generated`` date is the only date a file carries, so it decides.
-        The name breaks a tie between two signatures on one date, and both of
+        The ``generated`` stamp is the only time a file carries, so it decides.
+        The name breaks a tie between two signatures with one stamp, and both of
         those stay live; a tie inside one signature is refused by
         :func:`_live`, because nothing in the files says which the reader
         wrote last.
@@ -155,11 +155,12 @@ def _live(reviews: list[MergedReview]) -> tuple[list[MergedReview], list[str]]:
     """The live sitting per case and signature, and every tie nothing breaks.
 
     A reader who sits one case twice replaces their earlier sitting, and
-    "later" is the ``generated`` date. Two sittings by one signature of one
-    case on one date carry nothing that says which the reader wrote last, so
-    neither is live and both are named. A merged file is never removed:
+    "later" is the ``generated`` stamp, which carries the time to the second
+    (:func:`~evals.harness.envelope.stamp`). Two sittings by one signature of
+    one case with one stamp carry nothing that says which the reader wrote
+    last, so neither is live and both are named. A merged file is never removed:
     :func:`verify_pull_request` refuses a pull request that deletes or edits
-    one. So the remedy is a sitting dated later.
+    one. So the remedy is a later sitting.
     """
     grouped: dict[tuple[str, str], list[MergedReview]] = {}
     for review in reviews:

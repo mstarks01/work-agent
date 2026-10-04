@@ -469,7 +469,7 @@ and it is recorded as **one JSON file** under `evals/review/submissions/`:
   "envelope": 1,
   "submitted_by": "<the GitHub login opening the PR>",
   "submitted_for": "<who read the case: a login, or the word anonymous>",
-  "generated": "<YYYY-MM-DD>",
+  "generated": "<YYYY-MM-DDTHHMMSSZ>",
   "cases": {
     "<case id>": {
       "own_list": ["<what you wrote before the sets opened>"],
@@ -722,11 +722,11 @@ reference set, not the roster, not a test. A pull request that touches anything
 else fails the scope check by name. So a correction you would make to a recorded
 set travels as prose in your notes, and a maintainer makes the change.
 
-**A second sitting of one case replaces your first by its date.** The
-`generated` date is the only date a submission carries. Two sittings of one
-case by one reader on one date say nothing about which came last, so CI refuses
-the second one on that day. Sit it again on a later date, or ask a maintainer to
-drop one of the two.
+**A second sitting of one case replaces your first by its time.** The
+`generated` stamp is the only time a submission carries, and it is written to
+the second, so two sittings on one day are ordered. Two sittings of one case by
+one reader with the same stamp say nothing about which came last, so CI refuses
+the second one. A merged submission is never removed, so sit it again.
 
 `tests/test_case_review.py` fails on a new case that arrives with no submission
 clearing it, and its `UNREVIEWED` table says what each unread case leaves

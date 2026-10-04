@@ -35,6 +35,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Annotated
 
@@ -109,6 +110,22 @@ MAX_MARKS = 500
 MAX_BYTES = 4 * 1024 * 1024
 
 
+#: A date, or a date with a UTC time. :func:`stamp` writes the second. The
+#: time carries no colon, because the stamp is part of the submission's file
+#: name, and it sorts after the bare date of its day, so a stamped sitting is
+#: later than a dated one from the same day.
+GENERATED_PATTERN = r"^\d{4}-\d{2}-\d{2}(T\d{6}Z)?$"
+
+
+def stamp(now: datetime | None = None) -> str:
+    """The ``generated`` value for an envelope built at ``now``, in UTC.
+
+    To the second, so one reader's two sittings of one case on one day have
+    an order: :func:`~evals.review_submission._live` reads the later one.
+    """
+    return (now or datetime.now(UTC)).astimezone(UTC).strftime("%Y-%m-%dT%H%M%SZ")
+
+
 class EnvelopeError(RuntimeError):
     """An envelope this operator's tree will not take, and why."""
 
@@ -155,10 +172,11 @@ class Envelope(BaseModel):
         pattern=r"^[A-Za-z0-9](?:-?[A-Za-z0-9])*$", max_length=MAX_NAME
     )
     submitted_for: str = Field(pattern=SUBMITTED_FOR_PATTERN, max_length=MAX_NAME)
-    #: The date the page was generated, which is what a stale envelope is
-    #: dated by. It is not the sitting's date: the entry is dated when it is
+    #: When the page was generated, as :func:`stamp` writes it, which is what
+    #: a stale envelope is dated by and what orders one reader's sittings of
+    #: one case. It is not the sitting's date: the entry is dated when it is
     #: recorded, because that is when the digests are taken.
-    generated: str = Field(pattern=r"^\d{4}-\d{2}-\d{2}$")
+    generated: str = Field(pattern=GENERATED_PATTERN)
     cases: dict[str, CaseAnswers] = Field(max_length=MAX_CASES)
 
 

@@ -11,7 +11,6 @@ from __future__ import annotations
 import argparse
 import re
 import sys
-from datetime import UTC, datetime
 from pathlib import Path
 from typing import Literal, NamedTuple, get_args
 
@@ -159,7 +158,7 @@ def _review_envelope(
             envelope=envelopes.VERSION,
             submitted_by=author,
             submitted_for=_reviewer(author, reviewer_mode),
-            generated=datetime.now(UTC).date().isoformat(),
+            generated=envelopes.stamp(),
             cases=cases,
         )
     except ValidationError as exc:

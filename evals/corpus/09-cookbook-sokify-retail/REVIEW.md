@@ -449,7 +449,7 @@ your missing list, your notes and a digest of each file you read:
   "envelope": 1,
   "submitted_by": "<the GitHub login opening the PR>",
   "submitted_for": "<who read the case: a login, or the word anonymous>",
-  "generated": "<YYYY-MM-DD>",
+  "generated": "<YYYY-MM-DDTHHMMSSZ>",
   "cases": {
     "09-cookbook-sokify-retail": {
       "own_list": ["<what you wrote before the sets opened>"],
