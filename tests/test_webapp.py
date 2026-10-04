@@ -1511,3 +1511,32 @@ def test_a_ruling_that_a_unit_does_not_apply_sits_on_the_units_row():
     ), "the requirement row reads the ruling as Does not apply"
     assert "dismissed.forEach" in script, "the dismissed list is the rest"
     assert '"Does not apply"]] : []' in script, "the tile exists only where units do"
+
+
+def test_a_run_whose_runner_cannot_be_built_names_the_setting():
+    """A resumed run builds its graph on first use, after the route answered.
+
+    A missing credential then raises inside the run. The local app shows the
+    configuration message, as its start route and its diagnostic page do. A
+    :class:`~analysis_service.errors.ConfigError` names an environment variable
+    and never its value.
+    """
+    import asyncio
+
+    from webapp.main import _drive
+
+    message = "vendor 'vertex' needs ANALYSIS_VERTEX_PROJECT; it is unset or empty"
+
+    async def start(on_node):
+        raise ProviderAuthError(message)
+
+    async def drive():
+        analyses = Analyses()
+        run = analyses.claim()
+        await _drive(analyses, run, start)
+        return await run.events.get()
+
+    event, data = asyncio.run(drive())
+
+    assert event == "failed"
+    assert message in json.loads(data)["message"]

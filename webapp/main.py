@@ -1019,6 +1019,17 @@ async def _drive(
         # than this deployment allows. The message is about the caller's input
         # and is safe to show.
         await _emit(run, "failed", {"message": str(exc)})
+    except ConfigError as exc:
+        # A resumed run builds its graph on first use, so a credential that
+        # went bad after startup raises here. The message names a setting and
+        # never its value, and the start route and the diagnostic page show
+        # it to the same local operator.
+        logger.error("run %s could not build its runner: %s", run.id, exc)
+        await _emit(
+            run,
+            "failed",
+            {"message": f"This app's configuration is incomplete: {exc}"},
+        )
     except EngineDeadlineError as exc:
         # Distinct from the generic failure for the reason
         # ``jobs.DEADLINE_FAILURE_MESSAGE`` gives: a deadline is an operational
