@@ -506,3 +506,38 @@ class TestARewrittenFindingIsAskedAgain:
         item = build([finding()], FLOWS, Ledger())[0]
 
         assert (item.content, item.prose) == (SAMPLE_CONTENT, SAMPLE_PROSE)
+
+
+def test_two_mechanisms_under_one_fingerprint_are_two_questions():
+    """A fake server and a fake caller share a key, and are two findings (ADR 0060).
+
+    A vote on one answers that one only.
+    """
+    from dataclasses import replace
+
+    server = replace(finding(title="Fake server"), mechanism=("encryption_in_transit",))
+    caller = replace(finding(title="Fake caller"), mechanism=("authentication",))
+
+    items = build([server, caller], FLOWS, Ledger())
+    assert sorted(item.finding.title for item in items) == [
+        "Fake caller",
+        "Fake server",
+    ]
+    assert len({item.fingerprint for item in items}) == 1
+    assert len({item.key for item in items}) == 2
+
+    voted = replace(value_of(server), mechanism=server.mechanism)
+    ledger = Ledger(votes=[cast(voted, "01", "up", "sam", content=server.content)])
+    assert [item.finding.title for item in build([server, caller], FLOWS, ledger)] == [
+        "Fake caller"
+    ]
+
+
+def test_one_finding_citing_overlapping_controls_in_two_runs_is_one_question():
+    """The same finding cites a slightly different set from run to run."""
+    from dataclasses import replace
+
+    first = replace(finding(), mechanism=("authentication",))
+    second = replace(finding(), mechanism=("authentication", "encryption_in_transit"))
+
+    assert len(build([first, second], FLOWS, Ledger())) == 1

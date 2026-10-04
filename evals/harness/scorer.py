@@ -60,6 +60,7 @@ from analysis_service.claims import (
     SeverityLevel,
     derive_severity_level,
 )
+from analysis_service.critic import grounded_mechanism
 from analysis_service.frameworks.stride.record import DraftThreat, StrideCategory
 from analysis_service.system_model import ModelIndex
 from evals.harness.content import structural
@@ -753,7 +754,7 @@ def _standing_of_unmatched(
             flows,
             verb=threat.verb,
         )
-        current = [vote for (key, _), vote in votes.current().items() if key == value]
+        current = list(votes.verdicts_for(value, grounded_mechanism(threat)).values())
         unlisted.append(
             UnlistedThreat(
                 threat_id=threat.id,

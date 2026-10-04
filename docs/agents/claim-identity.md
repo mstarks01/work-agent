@@ -262,6 +262,16 @@ evidence, not a vote. So it moves no number and it is not spent: it holds for
 its own sitting, and a later one asks again over whatever evidence exists by
 then. Every other verdict is spent once and kept for ever.
 
+### Two mechanisms under one key are two findings
+
+A key can hold two different findings: a fake server and a fake caller share a
+lane, a verb and a place. So every vote also stores the claim's mechanism, the
+controls its grounds say are unstated or missing, and two claims under one key
+are two findings where both mechanisms name something and do not overlap
+(`critic.distinct_mechanisms`, ADR 0060). `Ledger.verdicts_for` is the one
+reader of which vote answers a finding, and the review queue asks one question
+per key and mechanism. A vote stored without a mechanism binds as before.
+
 ### A vote also records what it judged
 
 The rule above recognises a **topic**, and is blind to what a claim says. That

@@ -161,3 +161,38 @@ class TestTheChangesRoute:
         response = client.get(f"/v1/jobs/{child}/changes", headers=auth("bob-token"))
 
         assert response.status_code == 404
+
+
+def test_two_mechanisms_under_one_key_are_matched_apart():
+    """Two claims at one place resting on disjoint controls are two findings (ADR 0060)."""
+    from analysis_service.claims import Ground
+
+    flow = "flow:process:web-app>store:orders-db>store-order"
+    store = "store:orders-db"
+
+    def resting_on(threat_id, element, attribute, verdict=None):
+        ground = Ground(
+            kind="unknown-attribute", element_id=element, attribute=attribute
+        )
+        fields = {
+            "category": "information-disclosure",
+            "verb": "read",
+            "affected_element_ids": [flow, store],
+            "grounds": [ground],
+        }
+        if verdict is not None:
+            fields["verdict"] = verdict
+        return sample_threat(threat_id, **fields)
+
+    before = sample_report(
+        [
+            resting_on("I-01", flow, "encryption_in_transit"),
+            resting_on("I-02", store, "encryption_at_rest"),
+        ]
+    )
+    after = sample_report([resting_on("I-01", store, "encryption_at_rest")])
+
+    assert _moves(before, after) == {
+        ("I-01", "unchanged", "confirmed", "confirmed"),
+        ("I-01", "gone", "confirmed", None),
+    }

@@ -79,6 +79,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, Literal
 
+from analysis_service.critic import distinct_mechanisms
 from evals.harness.content import (
     PROSE_PREFIX,
     STRUCTURAL_PREFIX,
@@ -469,29 +470,52 @@ class Ledger:
     def __iter__(self) -> Iterator[Vote]:
         return iter(self.votes)
 
-    def current(self) -> dict[tuple[str, str], Vote]:
-        """The live verdict per ``(fingerprint, voter)``: the latest event.
+    def current(self) -> dict[tuple[str, str, tuple[str, ...]], Vote]:
+        """The live verdicts per finding and voter: the latest event of each.
 
-        Latest by position rather than by timestamp. The file is append-only, so
-        position *is* chronology, and two events written inside one second would
-        otherwise tie on a value recorded to the second.
+        Keyed by fingerprint, voter and mechanism. A later vote replaces an
+        earlier vote by one voter on one key unless the two rest on distinct
+        mechanisms (:func:`~analysis_service.critic.distinct_mechanisms`, ADR
+        0060): then both are live, because they answer two findings that
+        share a key. Latest by position rather than by timestamp: the file is
+        append-only, so position *is* chronology. Iteration order is the order
+        the live votes were cast.
         """
-        live: dict[tuple[str, str], Vote] = {}
+        live: dict[tuple[str, str, tuple[str, ...]], Vote] = {}
         for vote in self.votes:
-            live[(vote.fingerprint, vote.voter)] = vote
+            mechanism = vote.components.mechanism
+            for key in [
+                key
+                for key in live
+                if key[:2] == (vote.fingerprint, vote.voter)
+                and not distinct_mechanisms(key[2], mechanism)
+            ]:
+                del live[key]
+            live[(vote.fingerprint, vote.voter, mechanism)] = vote
         return live
 
-    def current_by_finding(self) -> dict[str, list[Vote]]:
-        """Every finding's live verdicts, keyed by fingerprint, in one pass.
+    def verdicts_for(
+        self,
+        value: str,
+        mechanism: Iterable[str],
+        live: Mapping[tuple[str, str, tuple[str, ...]], Vote] | None = None,
+    ) -> dict[str, Vote]:
+        """Each voter's live verdict on the finding at ``value`` with ``mechanism``.
 
-        What a reader of many findings wants: filtering :meth:`current` per
-        finding walks the whole ledger once per question, and both the scorer
-        and the writing instrument ask it of every claim in a sweep.
+        **The one reader of which vote answers a finding.** A vote applies
+        where its key is the finding's and its mechanism is not distinct from
+        the finding's; where two of one voter's live votes apply, the later
+        one answers. ``live`` is :meth:`current` already read, for a caller
+        asking about many findings.
         """
-        by_finding: dict[str, list[Vote]] = {}
-        for (value, _), vote in self.current().items():
-            by_finding.setdefault(value, []).append(vote)
-        return by_finding
+        wanted = tuple(mechanism)
+        answers: dict[str, Vote] = {}
+        for (key, voter, cast), vote in (
+            self.current() if live is None else live
+        ).items():
+            if key == value and not distinct_mechanisms(cast, wanted):
+                answers[voter] = vote
+        return answers
 
     def pool(self) -> frozenset[str]:
         """The reference pool: every fingerprint a live verdict puts in it.

@@ -4,9 +4,10 @@ A report's follow-up runs again on the owner's answers (ADR 0054). Its reader
 needs to know what those answers did: which findings the run confirmed,
 which it ruled out, which are new and which it no longer raised (#561).
 
-A finding is matched by :func:`~analysis_service.critic.finding_key`, the one
-reader of which finding a claim is, so the comparison reads no prose and makes
-no model call. Rejected drafts take part on both sides, because a draft the
+A finding is matched by :func:`~analysis_service.critic.finding_key` and,
+under one key, by :func:`~analysis_service.critic.distinct_mechanisms`: two
+claims are one finding where their keys agree and their grounded controls are
+not disjoint. The comparison reads no prose and makes no model call. Rejected drafts take part on both sides, because a draft the
 earlier report rejected and the follow-up confirmed is a change a reader has to
 see.
 
@@ -24,7 +25,12 @@ from dataclasses import dataclass
 from typing import Literal
 
 from analysis_service.claims import RuledClaim
-from analysis_service.critic import FindingKey, finding_key
+from analysis_service.critic import (
+    FindingKey,
+    distinct_mechanisms,
+    finding_key,
+    grounded_mechanism,
+)
 from analysis_service.report import Report
 from analysis_service.system_model import ModelIndex
 
@@ -77,7 +83,13 @@ def report_changes(before: Report, after: Report) -> tuple[FindingChange, ...]:
     changes = []
     for key, claim in _findings(after):
         status = claim.verdict.status
-        matched = earlier.get(key)
+        mechanism = grounded_mechanism(claim)
+        candidates = earlier.get(key, [])
+        matched = [
+            c
+            for c in candidates
+            if not distinct_mechanisms(mechanism, grounded_mechanism(c))
+        ]
         if not matched:
             changes.append(
                 FindingChange(
@@ -85,7 +97,9 @@ def report_changes(before: Report, after: Report) -> tuple[FindingChange, ...]:
                 )
             )
             continue
-        was = matched.pop(0).verdict.status
+        first = matched[0]
+        candidates.remove(first)
+        was = first.verdict.status
         change: Change = "unchanged" if was == status else "changed"
         changes.append(
             FindingChange(claim.framework, claim.id, claim.title, change, was, status)

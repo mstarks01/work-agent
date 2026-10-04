@@ -46,6 +46,7 @@ from typing import Any, NamedTuple, get_args
 from analysis_service.assertions import AssertionCatalog
 from analysis_service.claims import (
     ASSERTION_GROUNDS,
+    ATTRIBUTE_GROUNDS,
     Claim,
     RepairedQuote,
     RuledClaim,
@@ -540,6 +541,36 @@ def endpoint_targets(
 
 #: A finding's identity, as :func:`finding_key` spells it.
 FindingKey = tuple[object, ...]
+
+
+def grounded_mechanism(claim: Claim) -> frozenset[str]:
+    """The controls a claim's own grounds say are unstated or missing.
+
+    Read from fields, never prose: the attribute of each unknown or absent
+    ground. A fake server rests on the client never checking the server
+    (``encryption_in_transit``) and a fake caller on the server never checking
+    the caller (``authentication``), and the two share a lane, a verb and a
+    place.
+    """
+    return frozenset(
+        ground.attribute
+        for ground in claim.grounds
+        if ground.kind in ATTRIBUTE_GROUNDS and ground.attribute
+    )
+
+
+def distinct_mechanisms(first: Iterable[str], second: Iterable[str]) -> bool:
+    """True where two claims rest on controls that do not overlap at all.
+
+    **The one reader of "two mechanisms at one place"** (ADR 0060). Both sets
+    must name something, so a claim whose grounds cite no control, and every
+    record stored before mechanisms were, binds as it did. Overlap rather than
+    equality, because one finding cites a slightly different set from one run
+    to the next: equality split 39 of 165 archived cross-run pairs of one
+    finding, and non-overlap splits 3 (ledger ``QA-2026-10-03-02-E7``).
+    """
+    one, other = frozenset(first), frozenset(second)
+    return bool(one) and bool(other) and not one & other
 
 
 def finding_key(claim: Claim, flows: Mapping[str, tuple[str, str]]) -> FindingKey:

@@ -164,10 +164,17 @@ class VoteBody(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    fingerprint: str = Field(min_length=3, max_length=64)
+    #: The item's :attr:`~evals.harness.queue.QueueItem.key`: its fingerprint,
+    #: and its mechanism where it has one.
+    fingerprint: str = Field(min_length=3, max_length=256)
     verdict: str = Field(min_length=1, max_length=32)
     reason: str | None = Field(default=None, max_length=64)
     note: str = Field(default="", max_length=1000)
+
+
+def _identity(item: review_queue.QueueItem) -> review_queue.Identity:
+    """The question an item is, as the queue keys it."""
+    return item.fingerprint, item.components.mechanism
 
 
 @dataclass
@@ -206,11 +213,11 @@ class Session:
         against the words this sitting is showing rather than against whatever
         a later sweep produces.
         """
-        contents = {item.fingerprint: item.content for item in self.items}
+        contents = {_identity(item): item.content for item in self.items}
         skip = review_queue.answered(
             ledger, voter=self.voter, sitting=self.sitting, contents=contents
         )
-        return [item for item in self.items if item.fingerprint not in skip]
+        return [item for item in self.items if _identity(item) not in skip]
 
     def find(self, value: str) -> review_queue.QueueItem:
         """The item a vote names, or a refusal.
@@ -220,7 +227,7 @@ class Session:
         nothing can ever resolve back to a finding.
         """
         for item in self.items:
-            if item.fingerprint == value:
+            if item.key == value:
                 return item
         raise HTTPException(status_code=404, detail="no such finding in this queue")
 

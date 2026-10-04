@@ -176,7 +176,7 @@ def test_a_correction_is_a_new_event_and_the_old_one_survives(tmp_path):
 
     ledger = load(path)
     assert len(ledger) == 2, "the first vote was overwritten"
-    key = (fingerprint(components(), version=version_for("stride")), "sam")
+    key = (fingerprint(components(), version=version_for("stride")), "sam", ())
     assert ledger.current()[key].verdict == "down"
     assert [vote.verdict for vote in ledger.for_fingerprint(key[0])] == ["up", "down"]
 
@@ -737,3 +737,52 @@ class TestTheVoteRecordsWhatItJudged:
         ledger = load(path)
 
         assert len(ledger.for_fingerprint(ledger.votes[0].fingerprint)) == 1
+
+
+def test_a_vote_on_a_distinct_mechanism_keeps_the_other_live(tmp_path):
+    """Two findings under one fingerprint keep a voter's two answers (ADR 0060).
+
+    A fake server rests on ``encryption_in_transit`` and a fake caller on
+    ``authentication``; a vote on one leaves the voter's vote on the other live.
+    """
+    from dataclasses import replace
+
+    path = tmp_path / "votes"
+    server = replace(components(), mechanism=("encryption_in_transit",))
+    caller = replace(components(), mechanism=("authentication",))
+    for parts, verdict in ((server, "up"), (caller, "down")):
+        append(
+            cast(
+                parts,
+                "01",
+                verdict,
+                "sam",
+                reason="not-a-threat" if verdict == "down" else None,
+                content=SAMPLE_CONTENT,
+                prose=SAMPLE_PROSE,
+            ),
+            path,
+        )
+    ledger = load(path)
+    value = ledger.votes[0].fingerprint
+
+    assert len(ledger.current()) == 2
+    assert ledger.verdicts_for(value, ("encryption_in_transit",))["sam"].verdict == "up"
+    assert ledger.verdicts_for(value, ("authentication",))["sam"].verdict == "down"
+    # A finding citing both controls is either one, and the later answer holds.
+    both = ("authentication", "encryption_in_transit")
+    assert ledger.verdicts_for(value, both)["sam"].verdict == "down"
+
+
+def test_a_vote_stored_without_a_mechanism_still_binds(tmp_path):
+    """An archived vote carries no mechanism, and an empty set binds by the rule."""
+    path = tmp_path / "votes"
+    append(
+        cast(
+            components(), "01", "up", "sam", content=SAMPLE_CONTENT, prose=SAMPLE_PROSE
+        ),
+        path,
+    )
+    ledger = load(path)
+
+    assert ledger.verdicts_for(ledger.votes[0].fingerprint, ("authentication",))
