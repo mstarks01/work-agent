@@ -21,9 +21,10 @@ and every rule term names a capability with a question. So they are not
 figures here; ``covered`` checks that each fixture got one entry per unit.
 
 The question simulation asks a fixture's early capability questions in the
-order a paused job lists them, answers each from the fixture's ``truth``, and
-counts how many unknown requirements each answer settled. A part whose parent
-is answered "no" is not asked, as the pause page hides it. Nothing here calls a
+rounds a paused job serves them, answers each from the fixture's ``truth``, and
+counts how many unknown requirements each answer settled. A later round is read
+off the model with the earlier answers in, and a part whose parent its round
+answers "no" is not asked, as the pause page hides it. Nothing here calls a
 model, so every figure costs nothing.
 """
 
@@ -36,8 +37,9 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from analysis_service.answer_round import next_round
 from analysis_service.capabilities import CAPABILITIES
-from analysis_service.claims import FrameworkName, UnknownRef
+from analysis_service.claims import FrameworkName, UnknownKey, UnknownRef
 from analysis_service.early_questions import capability_questions
 from analysis_service.fact_answers import FactAnswer
 from analysis_service.fact_writes import answered_model
@@ -218,6 +220,8 @@ class QuestionRun:
     unknown_before: int
     unknown_after: int
     asked: int
+    #: Rounds the pause showed before no question was left.
+    rounds: int
     #: Unknown requirements each asked question settled, in order.
     settled: tuple[int, ...]
     #: Parts not asked because their parent was answered "no".
@@ -248,6 +252,7 @@ class QuestionRun:
             "unknown_before": self.unknown_before,
             "unknown_after": self.unknown_after,
             "asked": self.asked,
+            "rounds": self.rounds,
             "settled": list(self.settled),
             "redundant": self.redundant,
             "avoided": self.avoided,
@@ -259,7 +264,13 @@ class QuestionRun:
 
 
 def simulate_questions(fixture: Fixture) -> QuestionRun:
-    """Answer the paused job's capability questions from the fixture's truth."""
+    """Answer the paused job's capability questions from the fixture's truth.
+
+    Round by round, as :func:`~analysis_service.answer_round.next_round` serves
+    them: each round is read off the model with every earlier answer in, so an
+    answer drops a question it settled from every later round. Within a round,
+    a part whose parent the round asks is hidden until the parent is "yes".
+    """
     model = _model(fixture)
     options = {fixture.framework: fixture.options}
 
@@ -269,26 +280,40 @@ def simulate_questions(fixture: Fixture) -> QuestionRun:
         )
 
     before = unknown(model)
-    given: dict[str, str] = {}
-    settled, avoided, conformance = [], 0, 0
-    for question in capability_questions(model, options):
-        key = question.key[5]
-        if key not in CAPABILITIES:
-            conformance += 1
-            continue
-        parent = question.parent[5] if question.parent else ""
-        if parent and given.get(parent) != "yes":
-            avoided += 1
-            continue
-        given[key] = _ANSWER[fixture.truth.get(key, "unknown")]
-        count = unknown(model)
-        model = answered_model(model, _answers({key: given[key]}))
-        settled.append(count - unknown(model))
+    held: dict[UnknownKey, FactAnswer] = {}
+    settled, avoided, conformance, rounds = [], 0, 0, 0
+    while True:
+        shown, _, _ = next_round(
+            capability_questions(model, options), frozenset(held), held
+        )
+        if not shown:
+            break
+        rounds += 1
+        asked = {question.key for question in shown}
+        given: dict[UnknownKey, str] = {}
+        for question in shown:
+            key = question.key[5]
+            if key not in CAPABILITIES:
+                conformance += 1
+                held[question.key] = FactAnswer(key=question.key, value="unknown")
+                continue
+            if question.parent in asked and given.get(question.parent) != "yes":
+                avoided += 1
+                continue
+            answer = FactAnswer(
+                key=question.key, value=_ANSWER[fixture.truth.get(key, "unknown")]
+            )
+            given[question.key] = answer.value
+            held[question.key] = answer
+            count = unknown(model)
+            model = answered_model(model, [answer])
+            settled.append(count - unknown(model))
     return QuestionRun(
         name=fixture.name,
         unknown_before=before,
         unknown_after=unknown(model),
         asked=len(settled),
+        rounds=rounds,
         settled=tuple(settled),
         avoided=avoided,
         conformance=conformance,

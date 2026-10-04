@@ -7,6 +7,8 @@ from typing import Any
 
 import pytest
 
+from analysis_service.answer_round import EARLY_RULES
+from analysis_service.capabilities import CAPABILITIES
 from evals.harness.rule_applicability import (
     FIXTURES_DIR,
     Fixture,
@@ -95,6 +97,18 @@ def test_the_simulation_asks_a_part_only_under_a_yes():
     # Every OAuth and WebRTC part waits behind a "no" and is not asked.
     assert run.avoided >= 7
     assert run.conformance == 0
+
+
+def test_the_simulation_asks_in_the_rounds_a_pause_serves():
+    """#1291: a later round is read off the earlier answers, within the limit."""
+    truth = dict.fromkeys(CAPABILITIES, "present") | {
+        "oauth-client": "absent",
+        "oauth-authorization-server": "absent",
+        "webrtc": "absent",
+    }
+    run = simulate_questions(_fixture(options={"level": 3}, truth=truth))
+    assert run.rounds > 1
+    assert run.asked <= EARLY_RULES["capability"].limit
 
 
 def test_the_simulation_settles_what_the_truth_answers():

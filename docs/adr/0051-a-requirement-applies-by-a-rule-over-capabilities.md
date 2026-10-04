@@ -124,9 +124,13 @@ may rule an open unit out on the fact that question asks about, and the fan-in
 refuses an exclusion of a unit that applies. The lane skills name the model
 fields that answer a question, and they state no presence test of their own.
 
-The page asks every part in the same round as its parent, because a resumed
-job does not pause again. So a "yes" to OAuth asks the role questions at once,
-on the same page.
+A paused job asks in rounds (ADR 0053). Each round is read off the model with
+the earlier answers in, so an answer drops every question it settled from the
+later rounds. A part joins its parent's round and stays hidden until the parent
+is "yes". One round can still ask a moot question: where its only partners in
+a conjunction are answered "no" on the same page, as `authorization-code-flow`
+is beside `oauth-client` and `oauth-authorization-server`. The benchmark's
+simulation asks in the same rounds, through `next_round`.
 
 `reviewed_by` names who accepted a row or a capability, and is `None` until
 the maintainer reads it. The maintainer reviewed every capability, every
