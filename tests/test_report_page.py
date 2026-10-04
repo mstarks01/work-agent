@@ -16,7 +16,13 @@ import pytest
 
 from analysis_service.claims import UnknownRef
 from analysis_service.fact_answers import FactAnswer
-from tests.factories import asking_threat, report_state, sample_report, valid_model
+from tests.factories import (
+    asking_threat,
+    report_state,
+    sample_report,
+    sample_threat,
+    valid_model,
+)
 from webapp.main import render_report
 
 _SHIM = r"""
@@ -359,3 +365,89 @@ def test_the_page_reads_each_lane_from_the_service_s_table():
     assert json.loads(lanes) == {
         name: package.id_rule.lane_field for name, package in PACKAGES.items()
     }
+
+
+def test_every_ground_kind_renders_its_label_and_its_reference():
+    """A ground of each kind shows a label and what it cites, never ``undefined``.
+
+    The page listed four kinds, and rendered every kind it did not name as a
+    flow, so an assertion row or an absent term showed ``undefined``.
+    """
+    from typing import get_args
+
+    from analysis_service.claims import Ground, GroundKind
+
+    fields = {
+        "quote": {"text": "a quote", "source_label": "description"},
+        "unknown-attribute": {"element_id": "process:a", "attribute": "auth"},
+        "absent-attribute": {"element_id": "process:a", "attribute": "auth"},
+        "derived-fact": {"flow_id": "flow:x"},
+        "absent-element": {"term": "directory service"},
+        "assertion": {"assertion": "row-stated"},
+        "unknown-assertion": {"assertion": "row-open"},
+    }
+    assert set(fields) == set(get_args(GroundKind))
+    report = sample_report([sample_threat()])
+    # Placed after validation: the page renders what it is given, and the
+    # report's own rules would want a catalog and a model for every reference.
+    report.analyses[0].claims[0] = (
+        report.analyses[0]
+        .claims[0]
+        .model_copy(
+            update={
+                "grounds": [
+                    Ground.model_construct(kind=kind, **values)
+                    for kind, values in fields.items()
+                ]
+            }
+        )
+    )
+    text = run_report_page(render_report(report, report_state(report)).html)["analyses"]
+
+    assert "undefined" not in text
+    for cited in ("directory service", "row-stated", "row-open"):
+        assert cited in text
+
+
+def _page_table_keys(name):
+    """The keys of one ``const NAME = {...}`` table in the page script."""
+    from tests.test_webapp import viewer_javascript
+
+    body = re.search(
+        rf"const {name} = \{{(.*?)\}};", viewer_javascript(), re.DOTALL
+    ).group(1)
+    return set(re.findall(r'(?:^|[,\n])\s*"?([\w-]+)"?\s*:', body))
+
+
+def _scope_states():
+    from analysis_service.claims import ScopeEntry
+
+    return ScopeEntry.model_fields["state"].annotation
+
+
+@pytest.mark.parametrize(
+    ("table", "vocabulary"),
+    [
+        ("GROUND_KIND", "analysis_service.claims:GroundKind"),
+        ("SEV", "analysis_service.claims:SeverityLevel"),
+        ("VERDICT", "analysis_service.claims:VerdictStatus"),
+        ("VERDICT_STATE", "analysis_service.claims:VerdictStatus"),
+        ("SCOPE_STATE", None),
+    ],
+)
+def test_each_page_table_answers_for_its_whole_vocabulary(table, vocabulary):
+    """A page table keyed by a closed vocabulary holds every value of it.
+
+    A value the table lacks renders as a raw key or as nothing: the ground
+    table once lacked three kinds.
+    """
+    import importlib
+    from typing import get_args
+
+    if vocabulary is None:
+        values = get_args(_scope_states())
+    else:
+        module, name = vocabulary.split(":")
+        values = get_args(getattr(importlib.import_module(module), name))
+
+    assert _page_table_keys(table) == set(values)
