@@ -55,6 +55,11 @@
   // analysis_service.open_facts.reference_labels, so the page parses no
   // reference.
   const NAMES = JSON.parse(document.getElementById("names").textContent);
+  // The field each framework stamps a finding's lane into, or null where it
+  // stamps none: the service's own table, so a framework added later needs
+  // no edit here.
+  const LANES = JSON.parse(document.getElementById("lanes").textContent);
+  const laneOf = (framework, claim) => LANES[framework] ? claim[LANES[framework]] : null;
   // How each finding moved since the report a follow-up's answers came from,
   // matched server-side by analysis_service.report_changes. Empty for any
   // other report.
@@ -469,11 +474,8 @@
         "Corrected after this report: an answer this finding rests on was " +
         "changed after the analysis ran. The analysis did not run again."));
     }
-    // The lane, where the framework stamps one. Each package names the field
-    // itself — STRIDE's is its category, ASVS's is its chapter — so this reads
-    // the ones it knows and a framework it does not know renders without a lane
-    // chip rather than not rendering.
-    const lane = t.category || t.chapter;
+    // The lane, where the framework stamps one.
+    const lane = laneOf(t.framework, t);
     if (lane) card.append(el("div","cat", lane));
 
     const badges = el("div","badges");
@@ -1064,8 +1066,8 @@
       }));
       // Each finding's lane, read from the field its package stamps, so the
       // scope line can say how many lanes the answers reach.
-      const laneOf = new Map(R.analyses.flatMap(block => block.claims.map(c =>
-        [`${block.framework}/${c.id}`, c.category || c.chapter || block.framework])));
+      const laneOfFinding = new Map(R.analyses.flatMap(block => block.claims.map(c =>
+        [`${block.framework}/${c.id}`, laneOf(block.framework, c) || block.framework])));
       const tally = el("div", "meta");
       const scope = el("div", "meta");
       function recount() {
@@ -1079,7 +1081,7 @@
         // analysis once (ADR 0044), and code records every answer (ADR 0046).
         const given = factAnswers.filter(answer => answer.known()).length;
         const reached = [...waitsOn].filter(([, asked]) => asked.some(known)).map(([f]) => f);
-        const lanes = new Set(reached.map(f => laneOf.get(f)).filter(Boolean));
+        const lanes = new Set(reached.map(f => laneOfFinding.get(f)).filter(Boolean));
         scope.textContent = given
           ? `${given} answer(s) reach ${reached.length} finding(s) in ${lanes.size} lane(s). ` +
             "Code records each answer, and no model interprets it before the analysis. " +

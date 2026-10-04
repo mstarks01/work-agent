@@ -156,6 +156,27 @@ class TestTheAgreementReport:
         )
         assert agreement(ledger, self.table())[0].rate == 1.0
 
+    def test_the_later_of_two_votes_under_one_key_is_compared(self):
+        """``Ledger.verdicts_for`` picks the vote that answers a finding.
+
+        Sam answered two findings under one fingerprint, and both apply to the
+        finding Ada answered. The later one is Sam's answer to it.
+        """
+        from dataclasses import replace
+
+        def on(voter, mechanism, verdict="up", reason=None):
+            parts = replace(components("process:a"), mechanism=mechanism)
+            return cast(parts, "01", verdict, voter, reason=reason)
+
+        ledger = Ledger(
+            votes=[
+                on("ada", ("authentication", "encryption_in_transit")),
+                on("sam", ("authentication",), "down", "not-a-threat"),
+                on("sam", ("encryption_in_transit",)),
+            ]
+        )
+        assert agreement(ledger, self.table())[0].rate == 1.0
+
     def test_an_unrostered_voter_is_left_out(self):
         ledger = Ledger(votes=[vote("stranger"), vote("sam")])
         assert agreement(ledger, self.table()) == []

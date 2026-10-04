@@ -344,3 +344,18 @@ def test_a_first_report_says_nothing_about_changes():
 
     assert "Since the report your answers came from" not in text
     assert "in the earlier report" not in text
+
+
+def test_the_page_reads_each_lane_from_the_service_s_table():
+    """The page names no package's lane field: it reads ``lane_field``.
+
+    A lane read from guessed field names counts every finding of a framework
+    it does not know as one lane in the follow-up's scope line.
+    """
+    from analysis_service.frameworks import PACKAGES
+
+    (lanes,) = re.findall(r'id="lanes"[^>]*>(.*?)</script>', page(), re.DOTALL)
+
+    assert json.loads(lanes) == {
+        name: package.id_rule.lane_field for name, package in PACKAGES.items()
+    }

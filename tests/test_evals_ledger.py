@@ -825,3 +825,56 @@ def test_two_voters_on_two_findings_under_one_key_are_no_double_vote(tmp_path):
     )
 
     assert ledger.double_voted() == ()
+
+
+def test_a_rekey_preview_finds_the_pool_unmoved_across_a_version(tmp_path, capsys):
+    """A version change moves every key and none of the findings the pool holds."""
+    import argparse
+
+    from evals.harness.ledger import command_rekey
+
+    path = tmp_path / "votes"
+    append(
+        cast(
+            components(),
+            "01",
+            "up",
+            "sam",
+            version=1,
+            content=SAMPLE_CONTENT,
+            prose=SAMPLE_PROSE,
+        ),
+        path,
+    )
+
+    assert command_rekey(argparse.Namespace(ledger=str(path), yes=False)) == 0
+    assert "POOL MOVED" not in capsys.readouterr().out
+
+
+def test_a_rekey_preview_names_a_rule_that_splits_a_finding(tmp_path, capsys):
+    """The positive control: version 1 reads no verb, so a later rule splits.
+
+    Two votes on one place with two verbs are one finding under version 1 and
+    two under the current rule, so the pool's votes move.
+    """
+    import argparse
+
+    from evals.harness.ledger import command_rekey
+
+    path = tmp_path / "votes"
+    for verb in ("read", "alter"):
+        append(
+            cast(
+                components(verb=verb),
+                "01",
+                "up",
+                "sam",
+                version=1,
+                content=SAMPLE_CONTENT,
+                prose=SAMPLE_PROSE,
+            ),
+            path,
+        )
+
+    command_rekey(argparse.Namespace(ledger=str(path), yes=False))
+    assert "POOL MOVED: 1 findings before, 2 after" in capsys.readouterr().out

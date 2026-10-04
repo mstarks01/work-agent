@@ -541,3 +541,30 @@ def test_one_finding_citing_overlapping_controls_in_two_runs_is_one_question():
     second = replace(finding(), mechanism=("authentication", "encryption_in_transit"))
 
     assert len(build([first, second], FLOWS, Ledger())) == 1
+
+
+def test_a_voters_later_vote_decides_whether_an_item_is_answered():
+    """Two of one voter's votes apply to one item, and the later one answers.
+
+    ``Ledger.verdicts_for`` is the rule. An older upvote on one control and a
+    later "needs evidence" from another sitting on the other leave the item
+    open, because the later answer asked to see it again.
+    """
+    from dataclasses import replace
+
+    known = replace(finding(), mechanism=("authentication", "encryption_in_transit"))
+    parts = value_of(known)
+    ledger = Ledger(
+        votes=[
+            cast(replace(parts, mechanism=("authentication",)), "01", "up", "sam"),
+            cast(
+                replace(parts, mechanism=("encryption_in_transit",)),
+                "01",
+                "needs-evidence",
+                "sam",
+                sitting="earlier",
+            ),
+        ]
+    )
+
+    assert len(build([known], FLOWS, ledger, voter="sam", sitting="now")) == 1

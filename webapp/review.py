@@ -166,8 +166,8 @@ class VoteBody(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     #: The item's :attr:`~evals.harness.queue.QueueItem.key`: its fingerprint,
-    #: and its mechanism where it has one.
-    fingerprint: str = Field(min_length=3, max_length=256)
+    #: and a digest of its mechanism where it has one.
+    fingerprint: str = Field(min_length=3, max_length=64)
     verdict: str = Field(min_length=1, max_length=32)
     reason: str | None = Field(default=None, max_length=64)
     note: str = Field(default="", max_length=1000)

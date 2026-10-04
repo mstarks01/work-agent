@@ -160,7 +160,7 @@ from analysis_service.fact_answers import (
     fact_label,
     merged_facts,
 )
-from analysis_service.frameworks import package_for
+from analysis_service.frameworks import PACKAGES, package_for
 from analysis_service.jobs import (
     Checkpoint,
     JobStatus,
@@ -567,6 +567,9 @@ def render_report(
             }
             if previous is not None
             else {}
+        ),
+        lanes=script_json(
+            {name: package.id_rule.lane_field for name, package in PACKAGES.items()}
         ),
         names=script_json(
             reference_labels(

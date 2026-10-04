@@ -28,7 +28,6 @@ from itertools import combinations
 from pathlib import Path
 from typing import Literal
 
-from analysis_service.critic import distinct_mechanisms
 from evals.harness import ledger, roster
 from evals.harness.ledger import Ledger, Vote
 from evals.harness.roster import Roster, Standing
@@ -131,40 +130,28 @@ def agreement(votes: Ledger, roster: Roster) -> list[PairAgreement]:
     with no overlap at all is dropped rather than reported as zero agreement.
     """
     live = votes.current()
-    # Keyed by fingerprint and mechanism: one voter may hold two live votes
-    # under one fingerprint, on two findings with distinct mechanisms (ADR
-    # 0060). Two voters agree or disagree only on votes that answer one
-    # finding, which is where the mechanisms are not distinct.
-    by_voter: dict[str, dict[tuple[str, tuple[str, ...]], Vote]] = {}
-    for (value, voter, mechanism), vote in live.items():
-        by_voter.setdefault(voter, {})[(value, mechanism)] = vote
+    voters = sorted({voter for _, voter, _ in live})
 
     pairs = []
-    for first, second in combinations(sorted(by_voter), 2):
+    for first, second in combinations(voters, 2):
         if first not in roster or second not in roster:
             continue
+        # Which of ``second``'s votes answers each finding ``first`` answered
+        # is :meth:`~evals.harness.ledger.Ledger.verdicts_for`'s rule: one
+        # voter may hold two live votes under one fingerprint (ADR 0060).
         shared = [
-            (mine, theirs)
-            for mine in sorted(by_voter[first])
-            if (
-                theirs := next(
-                    (
-                        key
-                        for key in sorted(by_voter[second])
-                        if key[0] == mine[0]
-                        and not distinct_mechanisms(key[1], mine[1])
-                    ),
-                    None,
-                )
-            )
+            (vote, theirs)
+            for (value, voter, mechanism), vote in sorted(live.items())
+            if voter == first
+            and (theirs := votes.verdicts_for(value, mechanism, live).get(second))
             is not None
         ]
         if not shared:
             continue
         compared = agreed = excluded = 0
         for mine, theirs in shared:
-            one = classify(by_voter[first][mine])
-            other = classify(by_voter[second][theirs])
+            one = classify(mine)
+            other = classify(theirs)
             if one == "open" or other == "open":
                 excluded += 1
                 continue

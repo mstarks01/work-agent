@@ -549,12 +549,21 @@ class Ledger:
         would be silent. Recomputing costs one pass over a small file. Counted
         by :data:`Identity`, so two findings under one fingerprint are two.
         """
+        return frozenset(self.pool_members())
+
+    def pool_members(self) -> dict[Identity, frozenset[Components]]:
+        """Each finding in the pool, against the components of its live votes.
+
+        The components are what a re-key keeps, so two pools keyed under two
+        rules compare by these where their identities cannot.
+        """
         groups: dict[str, list[tuple[str, ...]]] = {}
-        return frozenset(
-            identity_of(value, mechanism, groups)
-            for (value, _, mechanism), vote in self.current().items()
-            if vote.joins_the_pool
-        )
+        members: dict[Identity, set[Components]] = {}
+        for (value, _, mechanism), vote in self.current().items():
+            if vote.joins_the_pool:
+                identity = identity_of(value, mechanism, groups)
+                members.setdefault(identity, set()).add(vote.components)
+        return {identity: frozenset(held) for identity, held in members.items()}
 
     def for_fingerprint(self, value: str) -> tuple[Vote, ...]:
         """Every vote on one finding, oldest first, including superseded ones."""
@@ -771,15 +780,18 @@ def command_rekey(args: argparse.Namespace) -> int:
     # the other, which is a post-condition stated rather than evaluated -- and a
     # re-key that moved a row to a different finding is exactly what it would
     # have had to catch.
-    before, after = current.pool(), Ledger(votes=moved).pool()
+    # Compared by the votes each finding holds, never by key: a re-key moves
+    # every key of a row whose version changed.
+    before = set(current.pool_members().values())
+    after = set(Ledger(votes=moved).pool_members().values())
     if before == after:
         print(f"{len(before)} findings in the pool, before and after")
     else:
         print(
             f"POOL MOVED: {len(before)} findings before, {len(after)} after."
-            " A re-key recomputes a key and must not change which findings the"
-            " pool holds; this ledger has a row whose components and key"
-            " disagree."
+            " The new rule puts the pool's votes into other findings: it joins"
+            " findings the old rule kept apart, or splits one. Read those rows"
+            " before you write."
         )
 
     if not args.yes:

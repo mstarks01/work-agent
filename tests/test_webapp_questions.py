@@ -21,6 +21,7 @@ from analysis_service import Engine, StubPipelineRunner
 from analysis_service.assertions import AssertionRecord
 from analysis_service.claims import UnknownRef
 from analysis_service.fact_answers import FACET_ANSWERS, FactAnswer
+from analysis_service.frameworks import PACKAGES
 from analysis_service.jobs import Checkpoint, PipelineAwaiting, PipelineCompleted
 from analysis_service.question_kinds import QUESTION_KINDS
 from tests import test_open_facts, test_questions, test_webapp
@@ -696,6 +697,10 @@ def _run_answer_block(
     # stands for one with no findings.
     if isinstance(payloads.get("report"), dict):
         payloads["report"] = {"analyses": [], **payloads["report"]}
+    # The page reads each lane through the service's own table, as it is served.
+    payloads.setdefault(
+        "lanes", {name: pkg.id_rule.lane_field for name, pkg in PACKAGES.items()}
+    )
     javascript = viewer_javascript()
     helpers = javascript.split(FIRST_VIEWER_CONSTANT)[0]
     start = javascript.index(start_marker)
