@@ -118,7 +118,7 @@
       "store:orders-db",
       "flow:process:order-service>store:orders-db>read-write-orders"
     ],
-    "claim": "The order service reaches the orders database through one application account holding full read and write on every table.",
+    "claim": "The order service reaches the orders database through one application account holding full read and write.",
     "tier": "must-find",
     "disposition": "gap-from-prose",
     "notes": "Stated outright, so the ruling is plain. The fact is a backend account's privilege, which is this requirement's subject; whether the application restricts a shopper to their own orders is V8.2.2 and a separate question."
