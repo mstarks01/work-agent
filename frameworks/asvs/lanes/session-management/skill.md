@@ -8,9 +8,9 @@ Chapter boundaries: establishing identity in the first place is chapter V6. A se
 
 ## Applicability
 
-**This chapter needs a session.** ASVS names stateless APIs as its own example of a system where these requirements do not apply, and that exclusion is worth taking seriously: a machine-to-machine surface authenticating each request independently holds no session to manage.
+The service decides which requirements of this chapter apply, and the scope line lists the ones it rules in and the ones it leaves open. They stay open until the input says whether the application keeps users signed in across requests. A machine-to-machine surface that authenticates each request on its own holds no session to manage.
 
-Read the model for a session: a `DataFlow.authentication` naming a session cookie or a session token, a store holding session state, an interactive human entity. Where the input describes per-request credentials and nothing else, rule the chapter out and name that.
+Read the model for a session: a `DataFlow.authentication` naming a session cookie or a session token, a store holding session state, an interactive human entity. Where the input describes per-request credentials and nothing else, rule the open requirements out and name that.
 
 ### The requirements of this chapter
 

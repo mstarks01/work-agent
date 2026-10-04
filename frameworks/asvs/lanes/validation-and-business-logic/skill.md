@@ -8,9 +8,9 @@ Chapter boundaries: what happens to accepted data at an interpreter is chapter V
 
 ## Applicability
 
-This chapter applies to every application. Two of its requirements need more: a validation rule enforced on the client alone needs code that runs on an untrusted side, and the sequencing requirements need a flow with more than one step.
+The service decides which requirements of this chapter apply, and the scope line lists the ones it rules in and the ones it leaves open. The business-flow requirements stay open until the input says whether the application has a flow of ordered steps, a resource of limited quantity, a highly sensitive operation, or a flow a person needs time to complete.
 
-Read the model for both. A `technology` naming a browser framework or a mobile app answers the first. A `description` naming a checkout, an onboarding sequence or an approval workflow answers the second. Where neither appears, say so and rule the requirement out on that fact.
+Read the model for them. A `description` naming a checkout, an onboarding sequence or an approval workflow answers the first. Where none appears, say so and rule the open requirement out on that fact.
 
 ### The requirements of this chapter
 

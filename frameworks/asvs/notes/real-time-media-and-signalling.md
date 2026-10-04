@@ -11,7 +11,7 @@ The model names WebRTC, a peer connection, a STUN or TURN server, SDP, a data ch
 - **A TURN server relays traffic.** Where direct connection fails, media flows through infrastructure the operator runs, which brings its own authentication and resource requirements — an open relay is usable by anyone who finds it.
 - **A data channel is an application input.** Anything arriving over one is untrusted input, so V2's requirements apply to it exactly as they do to a form post.
 - **Peer addresses leak.** A direct connection reveals network addresses to the other party, which is a privacy consideration the chapter names.
-- **Most systems answer no.** If nothing in the model carries real-time media, the honest ruling is that this chapter does not apply, recorded as such rather than raised conditionally.
+- **Most systems answer no.** If nothing in the model carries real-time media, the honest ruling on each open requirement is that it does not apply, recorded as such rather than raised conditionally.
 
 ## Guardrails
 

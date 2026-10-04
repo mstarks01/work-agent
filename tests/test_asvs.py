@@ -25,6 +25,7 @@ import pytest
 from pydantic import ValidationError
 
 from analysis_service.analysis import TEXT_ATTRIBUTES, WHOLE_WORD, matches_term
+from analysis_service.capabilities import CAPABILITIES
 from analysis_service.claims import (
     Ground,
     QuoteCandidate,
@@ -1446,6 +1447,52 @@ class TestTheScopeLineNamesTheUnitsAtTheLevel:
         for unit in ASVS.record.units_for({"level": 1}, "authentication"):
             assert unit in line
         assert "V6.2.10" not in line  # a level-2 requirement stays off a level-1 line
+
+    def test_the_scope_line_gives_the_lane_the_rule_for_each_unit(self):
+        """#1291: the lane reads the table's answer, not its own presence test."""
+        from analysis_service.coverage import lane_scope
+
+        def stated(capability, state):
+            return CapabilityStatement(
+                capability=capability,
+                state=state,
+                source_excerpt="stated by a test",
+                source_label="description",
+            )
+
+        model = valid_model().model_copy(
+            update={
+                "capabilities": [
+                    stated("oauth-client", "present"),
+                    stated("oauth-authorization-server", "absent"),
+                ]
+            }
+        )
+        options = {"level": 3}
+        lane = "oauth-and-oidc"
+        record = ASVS.record
+        line = lane_scope(
+            lane,
+            ASVS,
+            model,
+            None,
+            options,
+            units=record.units_for(options, lane),
+            ruled_out=tuple(record.ruled_out(model, options, lane)),
+            ruled_in=tuple(record.ruled_in(model, options, lane)),
+            applicability=record.applicability(model, options),
+        )
+
+        ruled_out, rest = line.split("apply by the service's rule", 1)
+        applies, opened = rest.split("is open", 1)
+        assert "V10.4.1" in ruled_out
+        assert "V10.4.1" not in applies + opened
+        assert "V10.2.3" in applies
+        assert "V10.2.3" not in opened
+        code_flow = CAPABILITIES["authorization-code-flow"].question
+        assert opened.count(code_flow) == 1
+        assert "V10.2.1" in opened.split(code_flow, 1)[1].split(")", 1)[0]
+        assert "is open" not in lane_scope("spoofing", STRIDE, model, None)
 
 
 class TestAnUndecidedPreconditionIsItsOwnScopeState:

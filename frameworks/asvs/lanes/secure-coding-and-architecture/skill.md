@@ -8,7 +8,7 @@ Chapter boundaries: encoding at an interpreter is chapter V1. Configuration and 
 
 ## Applicability
 
-This chapter applies to every application. It is the chapter with the least to read in a System Model, because its subject is code rather than structure — and that is a fact worth stating in a ruling rather than working around.
+The service decides which requirements of this chapter apply, and the scope line lists the ones it rules in and the ones it leaves open. It is the chapter with the least to read in a System Model, because its subject is code rather than structure — and that is a fact worth stating in a ruling rather than working around.
 
 What the model does answer is separation: `trust_zone` on each element and the derived boundary crossings say how the system is divided, and the requirements about component separation rest on exactly that. For the rest, name the requirement, say the input carries prose rather than code, and let the ruling be needs-info.
 

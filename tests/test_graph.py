@@ -3016,6 +3016,26 @@ def test_a_lane_agent_is_told_which_level_its_job_asked_for(domain_loader):
     assert "asked for" not in stride_scope
 
 
+def test_a_lane_agent_is_told_what_the_applicability_rule_decided(domain_loader):
+    """#1291: the prepared prompt carries the rule's applies and open lists."""
+    ctx = FakeContext(**ASVS_OPTIONS)
+    graph.prepare_analysis(
+        valid_model().model_dump(mode="json"),
+        ctx,
+        BOTH_KEYS,
+        BOTH,
+        domain_loader,
+        repo_package_loaders(BOTH),
+    )
+
+    asvs_scope = ctx.state[graph.Lane("asvs", "cryptography").key("scope")]
+    stride_scope = ctx.state[LANES[0].key("scope")]
+
+    assert "apply by the service's rule" in asvs_scope
+    assert "is open" in asvs_scope
+    assert "is open" not in stride_scope
+
+
 def test_a_graph_entered_past_the_gate_reports_nothing_out_of_scope():
     """The analysis eval mode seeds a blessed model and runs no gate.
 

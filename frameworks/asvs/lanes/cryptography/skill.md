@@ -8,7 +8,7 @@ Chapter boundaries: cryptography on the wire is chapter V12. What a token's sign
 
 ## Applicability
 
-**This chapter needs the application to encrypt or sign something.** A system that terminates TLS at a load balancer and encrypts nothing itself answers little of it.
+The service decides which requirements of this chapter apply, and the scope line lists the ones it rules in and the ones it leaves open. Most of the chapter stays open until the input says whether an in-scope component encrypts data beyond the transport.
 
 Read the model's `encryption_at_rest` and `encryption_in_transit` attributes and any technology naming a key manager or an HSM. `unknown` on either is the open question that most rulings here rest on; `none` is the submitter answering it. Keep the two apart — they lead to different rulings.
 

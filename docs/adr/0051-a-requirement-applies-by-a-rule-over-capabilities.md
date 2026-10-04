@@ -117,6 +117,13 @@ subject. So every conditional requirement stays `unknown` until an early
 question asks for the capability, even where a source states the absence. A
 job with questions off keeps them `unknown`, and its lanes rule on them.
 
+**A lane reads the rule, not its own presence test.** The scope line gives each
+lane three lists from the rule: the units code ruled out, the units that apply,
+and each open unit under the capability question that would settle it. A lane
+may rule an open unit out on the fact that question asks about, and the fan-in
+refuses an exclusion of a unit that applies. The lane skills name the model
+fields that answer a question, and they state no presence test of their own.
+
 The page asks every part in the same round as its parent, because a resumed
 job does not pause again. So a "yes" to OAuth asks the role questions at once,
 on the same page.

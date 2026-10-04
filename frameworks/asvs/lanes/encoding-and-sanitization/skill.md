@@ -8,9 +8,9 @@ Chapter boundaries: whether an input is *accepted at all* is chapter V2. Whether
 
 ## Applicability
 
-This chapter applies to every application, because every application builds at least one interpreted string. The presence tests inside it are finer: a requirement about parameterized queries needs a query-driven store, one about rich text needs an application that accepts authored content, and one about XML needs a parser.
+The service decides which requirements of this chapter apply, and the scope line lists the ones it rules in and the ones it leaves open. Each interpreter requirement stays open until the input says whether the application feeds that interpreter: a query-driven store, authored markup, an XML parser.
 
-The System Model tells you which interpreters exist through free text — a `technology` naming a database engine, a `protocol` naming SOAP, a `data_description` naming user-authored content. Where the input names no interpreter of a given kind, the requirement about it is one you rule does not apply, and you say which absence decided it.
+The System Model tells you which interpreters exist through free text — a `technology` naming a database engine, a `protocol` naming SOAP, a `data_description` naming user-authored content. Where the input names no interpreter of a given kind, an open requirement about it is one you can rule does not apply, and you say which absence decided it.
 
 ### The requirements of this chapter
 

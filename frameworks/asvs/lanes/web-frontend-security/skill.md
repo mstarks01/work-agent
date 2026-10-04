@@ -8,9 +8,9 @@ Chapter boundaries: how a response body was built is chapter V1. What a session 
 
 ## Applicability
 
-**This chapter needs a browser frontend.** ASVS says so itself: for a machine-to-machine API, the requirements here about web frontends are not relevant. That is a chapter-wide presence test, and it is the clearest one in the standard.
+The service decides which requirements of this chapter apply, and the scope line lists the ones it rules in and the ones it leaves open. Most wait on whether people use the application through a web browser. A few wait on whether it serves anything a browser can open, which an API with no frontend still does.
 
-Read the model for it. A `technology` naming a browser framework or a web UI, an `ExternalEntity` of kind `human` reaching a web process, a `protocol` naming HTTP against a user-facing element — any of these answers it. A system whose only external callers are machines does not, and then most of this chapter is ruled out on one stated fact. Say which fact.
+Read the model for it. A `technology` naming a browser framework or a web UI, an `ExternalEntity` of kind `human` reaching a web process, a `protocol` naming HTTP against a user-facing element — any of these answers it. A system whose only external callers are machines does not, and then the open requirements that wait on a browser frontend can be ruled out on that fact. Say which fact.
 
 ### The requirements of this chapter
 

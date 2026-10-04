@@ -8,11 +8,11 @@ Chapter boundaries: how a token was obtained is chapter V6 or chapter V10. How a
 
 ## Applicability
 
-**This chapter needs a self-contained token**: a credential the verifier reads for itself rather than looking up. Where no element of the model states one, the chapter has no subject and the exclusion rests on that absence — which `absent_elements` records and the service checks.
+The service decides which requirements of this chapter apply, and the scope line lists the ones it rules in and the ones it leaves open. Most stay open until the input says whether the application consumes or issues a self-contained token: a credential the verifier reads for itself rather than looking up.
 
-Read the model's `authentication` values and technology fields for a JWT, a JWS, a JWE, a bearer token or an OIDC ID token. Where none appears, rule the chapter out and name the credential the model does state.
+Read the model's `authentication` values and technology fields for a JWT, a JWS, a JWE, a bearer token or an OIDC ID token. Where none appears, rule the open requirements out and name the credential the model does state.
 
-**A container is not a representation.** "A session cookie" names where the credential rides and not what it carries: a signed cookie holding claims is self-contained, and this package's own note on identity after the login says so. So the exclusion is that nothing in the model names a self-contained token — never that the cookie was shown to be opaque. Write it that way, and where the input *does* say the credential carries its own claims, the chapter applies whatever it rides in.
+**A container is not a representation.** "A session cookie" names where the credential rides and not what it carries: a signed cookie holding claims is self-contained, and this package's own note on identity after the login says so. So the exclusion is that nothing in the model names a self-contained token — never that the cookie was shown to be opaque. Write it that way, and where the input *does* say the credential carries its own claims, the requirement applies whatever it rides in.
 
 ### The requirements of this chapter
 

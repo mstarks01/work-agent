@@ -1759,6 +1759,7 @@ def prepare_analysis(
         ruled_out: dict[str, str] = {}
         ruled_in: dict[str, str] = {}
         idle_lanes: list[str] = []
+        applicability = package.record.applicability(model, options.get(name) or {})
         for position, lane in enumerate(nodes.lanes):
             candidate_set = candidates[lane.lane]
             # The package's own rules may rule a lane's units out of this model
@@ -1768,9 +1769,10 @@ def prepare_analysis(
                 model, options.get(name) or {}, lane.lane
             )
             ruled_out.update(lane_ruled_out)
-            ruled_in.update(
-                package.record.ruled_in(model, options.get(name) or {}, lane.lane)
+            lane_ruled_in = package.record.ruled_in(
+                model, options.get(name) or {}, lane.lane
             )
+            ruled_in.update(lane_ruled_in)
             units = package.record.units_for(options.get(name) or {}, lane.lane)
             if package.record.idle(model, options.get(name) or {}, lane.lane):
                 idle_lanes.append(lane.lane)
@@ -1791,6 +1793,8 @@ def prepare_analysis(
                         options.get(name) or {},
                         units=units or (),
                         ruled_out=tuple(lane_ruled_out),
+                        ruled_in=tuple(lane_ruled_in),
+                        applicability=applicability,
                     ),
                     "reference_notes": compose_notes(loader, notes),
                     "prior_cases": compose_cases(loader, cases),

@@ -8,9 +8,9 @@ Chapter boundaries: how a caller proves who they are is chapter V6. What a token
 
 ## Applicability
 
-This chapter applies wherever the application exposes a programmatic interface, which is nearly every system this service sees. The one presence test inside it is the WebSocket requirement, which needs a flow whose `protocol` names a WebSocket.
+The service decides which requirements of this chapter apply, and the scope line lists the ones it rules in and the ones it leaves open. The WebSocket requirements stay open until the input says whether the application uses WebSockets.
 
-Read the model's `DataFlow` protocols. They are the record of what each connection speaks, and they are the evidence for both the chapter's applicability and its exclusions.
+Read the model's `DataFlow` protocols. They are the record of what each connection speaks, and they are the evidence both for a ruling and for ruling an open requirement out.
 
 ### The requirements of this chapter
 

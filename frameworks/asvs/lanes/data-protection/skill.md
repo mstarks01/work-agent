@@ -8,9 +8,9 @@ Chapter boundaries: the cipher protecting data is chapter V11. The link carrying
 
 ## Applicability
 
-This chapter applies wherever the application holds data that matters, which the model records directly: `DataStore.data_classification` and the `assets` tags on every element are the standard's own classification question already answered in part.
+The service decides which requirements of this chapter apply, and the scope line lists the ones it rules in and the ones it leaves open. The model records the data that matters directly: `DataStore.data_classification` and the `assets` tags on every element are the standard's own classification question already answered in part.
 
-One group of requirements needs a browser: where sensitive data reaches a client, the caching and client-storage requirements apply, and where no browser exists they do not. Use the same evidence chapter V3 uses, and rule them out on the same fact.
+The client-side caching and storage requirements stay open until the input says whether a browser frontend handles sensitive data. Use the same evidence chapter V3 uses for a browser.
 
 ### The requirements of this chapter
 
