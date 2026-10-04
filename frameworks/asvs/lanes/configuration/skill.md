@@ -8,9 +8,9 @@ Chapter boundaries: what a secret protects is chapter V11. What a running proces
 
 ## Applicability
 
-This chapter applies to every application. Its evidence in the System Model is thin by design — a deployment's configuration is largely outside what a system description carries — so most rulings here are needs-info, and saying that plainly is the honest output rather than a weak one.
+The service decides which requirements of this chapter apply, and the scope line lists the ones it rules in and the ones it leaves open. Its evidence in the System Model is thin by design — a deployment's configuration is largely outside what a system description carries — so most rulings here are needs-info, and saying that plainly is the honest output rather than a weak one.
 
-Read the model for what it does carry: elements tagged with secrets, a technology naming a package ecosystem, processes whose `exposure` says where they sit. Where the input names a component and nothing about its configuration, the requirement applies and stays open.
+Read the model for what it does carry: elements tagged with secrets, a technology naming a package ecosystem, processes whose `exposure` says where they sit. Where the input names a component and nothing about its configuration, the requirement stays open.
 
 ### The requirements of this chapter
 

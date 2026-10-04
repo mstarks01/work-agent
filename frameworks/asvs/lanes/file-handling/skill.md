@@ -8,9 +8,9 @@ Chapter boundaries: encoding a filename into a path or a page is chapter V1. Who
 
 ## Applicability
 
-**This chapter needs a file upload.** Where the application receives no file from an untrusted source, the whole chapter is out of scope, and that is one of the exclusions the standard's own guidance invites.
+The service decides which requirements of this chapter apply, and the scope line lists the ones it rules in and the ones it leaves open. They stay open until the input says whether the application accepts files, serves them, or lets an untrusted name shape a path.
 
-Read the model for it: a `data_description` naming an attachment or an upload, a `DataStore` whose `technology` names object storage fed from a user-facing process, a flow carrying multipart content. Where none appears, rule the chapter out and name the absence.
+Read the model for it: a `data_description` naming an attachment or an upload, a `DataStore` whose `technology` names object storage fed from a user-facing process, a flow carrying multipart content. Where none appears, rule the open requirements out and name the absence.
 
 ### The requirements of this chapter
 

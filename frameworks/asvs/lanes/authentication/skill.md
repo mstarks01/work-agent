@@ -8,7 +8,7 @@ Chapter boundaries: what happens once identity is established is chapter V7. Wha
 
 ## Applicability
 
-**This chapter needs the application to authenticate somebody.** A pipeline with no interactive caller and no credential does not answer it. Inside the chapter the tests are finer, and the largest group needs a *password* specifically: ten of its level 1 requirements do not apply to a system that authenticates only with certificates or federated tokens.
+The service decides which requirements of this chapter apply, and the scope line lists the ones it rules in and the ones it leaves open. The password requirements, for example, stay open until the input says whether an in-scope component handles passwords.
 
 Read the model's `DataFlow.authentication` values, its `ExternalEntity` kinds, and any `assets` tag naming credentials. An `authentication` reading `unknown` means the question is open, never that the control is absent — that distinction decides between a ruling you write conditionally and one you do not write at all.
 

@@ -8,7 +8,7 @@ Chapter boundaries: who the caller is is chapter V6. How a token carries a permi
 
 ## Applicability
 
-This chapter applies to every application that distinguishes between callers at all, which is nearly all of them. Its one structural read is where enforcement happens: a rule applied on an untrusted side is not a control.
+The service decides which requirements of this chapter apply, and the scope line lists the ones it rules in and the ones it leaves open. Its one structural read is where enforcement happens: a rule applied on an untrusted side is not a control.
 
 The System Model carries this through `trust_zone` and through `ExternalEntity.kind`. A flow crossing from a public zone into a service zone is where the decision has to be made, and a boundary crossing in the derived list is the fact to cite.
 

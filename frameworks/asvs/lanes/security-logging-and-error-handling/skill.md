@@ -10,7 +10,7 @@ This chapter carries no level 1 requirement. A run at level 1 rules on nothing h
 
 ## Applicability
 
-This chapter applies to every application, at level 2 and above. Its evidence in the model is a log store where one exists, and the flows that reach it.
+The service decides which requirements of this chapter apply, and the scope line lists the ones it rules in and the ones it leaves open. Its evidence in the model is a log store where one exists, and the flows that reach it.
 
 Where the input describes no logging at all, that is a stated absence for some requirements and an open question for others — the standard asks both that events are logged and that logs are protected, and a system with no log answers the first and not the second. Keep them apart.
 

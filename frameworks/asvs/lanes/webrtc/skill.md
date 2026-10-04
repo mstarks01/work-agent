@@ -10,9 +10,9 @@ This chapter carries no level 1 requirement. A run at level 1 rules on nothing h
 
 ## Applicability
 
-**This chapter needs WebRTC.** ASVS names it as an exclusion in its own guidance, beside OAuth: where there is no use of WebRTC, the chapter can be ignored. It is the cleanest exclusion in the standard and it applies to almost every system this service sees.
+The service decides which requirements of this chapter apply, and the scope line lists the ones it rules in and the ones it leaves open. They stay open until the input says whether the application uses WebRTC, and the server requirements until it says which servers are in scope.
 
-Read the model's flow protocols and technologies for WebRTC, SRTP, STUN, TURN or a data channel. Where none appears — which is the ordinary case — rule the whole chapter out and name the protocols the flows do state.
+Read the model's flow protocols and technologies for WebRTC, SRTP, STUN, TURN or a data channel. Where none appears — which is the ordinary case — rule the open requirements out and name the protocols the flows do state.
 
 ### The requirements of this chapter
 

@@ -8,7 +8,7 @@ Chapter boundaries: what the application encrypts itself is chapter V11. What a 
 
 ## Applicability
 
-This chapter applies wherever two elements exchange data over a network, which is every system with more than one element. Its structural evidence is the strongest in the standard for this service: `DataFlow.encryption_in_transit` and `DataFlow.protocol` are recorded per link, and the derived boundary crossings say which links leave a trust zone.
+The service decides which requirements of this chapter apply, and the scope line lists the ones it rules in and the ones it leaves open. The requirements about connections between the application's own components stay open until the input says how they talk. Its structural evidence is the strongest in the standard for this service: `DataFlow.encryption_in_transit` and `DataFlow.protocol` are recorded per link, and the derived boundary crossings say which links leave a trust zone.
 
 Cite those directly. A crossing whose `encryption_in_transit` reads `unknown` is a needs-info ruling with an element and an attribute already named; one reading `none` is a ruling you write plainly.
 

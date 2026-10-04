@@ -8,9 +8,9 @@ Chapter boundaries: a token's own signature verification is chapter V9. A local 
 
 ## Applicability
 
-**This chapter needs OAuth or OIDC.** ASVS names it as an exclusion in its own guidance: where there is no use of OAuth, the chapter can be ignored.
+The service decides which requirements of this chapter apply, and the scope line lists the ones it rules in and the ones it leaves open. Each role — client, resource server, authorization server, OpenID provider — has its own question, and so does each flow inside a role.
 
-Read the model for an authorization server as an element, or for `authentication` values naming OAuth, OIDC, an identity provider or a named vendor. Where none appears, rule the chapter out and name the credential mechanism the model does state. Where one does appear, note which of the three roles this system plays — the rulings differ by role, and the input often names only one.
+Read the model for an authorization server as an element, or for `authentication` values naming OAuth, OIDC, an identity provider or a named vendor. Where none appears, rule the open requirements out and name the credential mechanism the model does state. Where one does appear, note which of the roles this system plays — the rulings differ by role, and the input often names only one.
 
 ### The requirements of this chapter
 

@@ -57,8 +57,10 @@ from types import MappingProxyType
 
 from analysis_service.analysis import unknown_controls
 from analysis_service.candidates import CandidateSet
+from analysis_service.capabilities import CAPABILITIES
 from analysis_service.claims import (
     ATTRIBUTE_GROUNDS,
+    ApplicabilityEntry,
     Claim,
     LaneCoverage,
 )
@@ -77,6 +79,8 @@ def lane_scope(
     options: Mapping[str, object] = MappingProxyType({}),
     units: Sequence[str] = (),
     ruled_out: Sequence[str] = (),
+    ruled_in: Sequence[str] = (),
+    applicability: Sequence[ApplicabilityEntry] = (),
 ) -> str:
     """One lane's denominators and its job's options, as a line the agent reads.
 
@@ -108,6 +112,12 @@ def lane_scope(
     level. Listed so the agent has the closed set in front of it and files on
     no requirement above the level (#659); a framework with open units hands
     an empty list and renders nothing extra.
+
+    ``ruled_in`` is each unit the package's rule says applies, the same units
+    the fan-in refuses an exclusion on, so the agent is told before it drafts
+    one. ``applicability`` is the package's entries for the job; each
+    ``unknown`` one in ``units`` is listed under the capability questions that
+    would settle it, because those are the facts a lane may rule it out on.
     """
     offered = candidate_set.candidates if candidate_set else ()
     fired = len({candidate.rule_id for candidate in offered})
@@ -127,12 +137,42 @@ def lane_scope(
         if ruled_out
         else ""
     )
+    applies = (
+        f" {len(ruled_in)} units of this lane apply by the service's rule; rule on"
+        f" each, and file none as excluded: {', '.join(ruled_in)}."
+        if ruled_in
+        else ""
+    )
     return (
         f"Scope for your lane: {len(model.elements())} elements, "
         f"{len(model.boundary_crossings())} boundary crossings, "
         f"{len(unknown_controls(model))} unstated controls. "
         f"{len(package.rules_for(lane))} {lane} rules ran; {fired} fired, "
-        f"raising {len(offered)} candidates.{selected}{listed}{excluded}\n"
+        f"raising {len(offered)} candidates.{selected}{listed}{excluded}{applies}"
+        f"{_open(applicability, units)}\n"
+    )
+
+
+def _open(applicability: Sequence[ApplicabilityEntry], units: Sequence[str]) -> str:
+    """The lane's units the rule leaves open, under each question that settles them."""
+    opened = [
+        entry
+        for entry in applicability
+        if entry.state == "unknown" and entry.unit in units
+    ]
+    if not opened:
+        return ""
+    by_question: dict[str, list[str]] = {}
+    for entry in opened:
+        for key in entry.missing:
+            by_question.setdefault(key, []).append(entry.unit)
+    settled_by = "; ".join(
+        f"{CAPABILITIES[key].question} ({', '.join(open_units)})"
+        for key, open_units in by_question.items()
+    )
+    return (
+        f" Whether {len(opened)} units of this lane apply is"
+        f" open, because the input does not answer these questions: {settled_by}."
     )
 
 
