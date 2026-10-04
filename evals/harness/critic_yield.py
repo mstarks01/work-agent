@@ -44,6 +44,7 @@ from dataclasses import dataclass
 from typing import Any, Literal
 
 from analysis_service.claims import FrameworkAnalysis
+from analysis_service.critic import NO_ROWS
 from analysis_service.frameworks.stride.record import DraftThreat, StrideCategory
 from evals.harness.identity import Matcher
 from evals.harness.ledger import Ledger
@@ -275,6 +276,7 @@ def score_case_with_yield(
     matcher: Matcher,
     votes: Ledger,
     block: FrameworkAnalysis | None = None,
+    rows: Mapping[str, str] = NO_ROWS,
 ) -> ScoredCase:
     """Score both sides of the critic through one matcher and one ledger.
 
@@ -286,8 +288,8 @@ def score_case_with_yield(
     drafts do not carry: the step the critic said it rejected each killed draft
     at. Without it every kill is ``unstated``.
     """
-    pre = score_case(case, drafts, matcher, votes)
-    post = score_case(case, produced, matcher, votes)
+    pre = score_case(case, drafts, matcher, votes, rows)
+    post = score_case(case, produced, matcher, votes, rows)
     return ScoredCase(
         score=post, critic_yield=_yield(pre, post, drafts, rejection_steps(block))
     )

@@ -50,7 +50,7 @@ from analysis_service.claims import (
     Claim,
     FrameworkName,
 )
-from analysis_service.critic import mechanism_of
+from analysis_service.critic import NO_ROWS, mechanism_of, row_controls
 from analysis_service.report import Report
 from analysis_service.system_model import ModelIndex
 from evals.harness.content import prose as prose_digest
@@ -99,6 +99,7 @@ def measure_case(
     claims: Iterable[Claim],
     flows: FlowMap,
     votes: Ledger,
+    rows: Mapping[str, str] = NO_ROWS,
 ) -> CaseWriting:
     """Every claim of one block, looked up by its fingerprint and its words.
 
@@ -131,7 +132,7 @@ def measure_case(
             identifier=identifier_of(framework, claim.id),
         )
         current = list(
-            votes.verdicts_for(value, mechanism_of(claim, flows), live).values()
+            votes.verdicts_for(value, mechanism_of(claim, flows, rows), live).values()
         )
         if not current:
             continue
@@ -183,8 +184,9 @@ def measure(
         if report is None:
             continue
         flows = ModelIndex.of(case.model).flow_endpoints
+        held = row_controls(report.assertions.catalog if report.assertions else None)
         rows += [
-            measure_case(case.id, block.framework, block.claims, flows, votes)
+            measure_case(case.id, block.framework, block.claims, flows, votes, held)
             for block in report.analyses
         ]
     return tuple(rows)

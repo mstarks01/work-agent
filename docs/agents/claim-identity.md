@@ -278,6 +278,10 @@ one from a claim on the other (ADR 0061). `identity.endpoint_subset` reads the
 same channels, so the scorer does not match a claim on one sibling to a
 reference on the other.
 
+A cited assertion row adds its control too: the attribute its predicate
+projects into, or the predicate's own name. With the assertion pass on, a
+stated control reaches the mechanism through its row (ADR 0062).
+
 ### A vote also records what it judged
 
 The rule above recognises a **topic**, and is blind to what a claim says. That

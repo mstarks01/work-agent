@@ -60,7 +60,7 @@ from analysis_service.claims import (
     SeverityLevel,
     derive_severity_level,
 )
-from analysis_service.critic import mechanism_of
+from analysis_service.critic import NO_ROWS, mechanism_of
 from analysis_service.frameworks.stride.record import DraftThreat, StrideCategory
 from analysis_service.system_model import ModelIndex
 from evals.harness.content import structural
@@ -446,6 +446,7 @@ def score_case(
     produced: Sequence[DraftThreat],
     matcher: Matcher,
     votes: Ledger,
+    rows: Mapping[str, str] = NO_ROWS,
 ) -> CaseScore:
     """Score one case's produced threats against its reference set.
 
@@ -496,7 +497,7 @@ def score_case(
     )
     misfiled = {error.threat_id for error in lane_errors}
     unlisted, foreign = _standing_of_unmatched(
-        case, produced, votes, unmatched_positions, misfiled
+        case, produced, votes, unmatched_positions, misfiled, rows
     )
 
     return CaseScore(
@@ -710,6 +711,7 @@ def _standing_of_unmatched(
     votes: Ledger,
     unmatched_positions: Sequence[int],
     misfiled: set[str],
+    rows: Mapping[str, str] = NO_ROWS,
 ) -> tuple[tuple[UnlistedThreat, ...], tuple[str, ...]]:
     """Step 4: each unmatched threat's fingerprint, looked up in the ledger.
 
@@ -754,7 +756,9 @@ def _standing_of_unmatched(
             flows,
             verb=threat.verb,
         )
-        current = list(votes.verdicts_for(value, mechanism_of(threat, flows)).values())
+        current = list(
+            votes.verdicts_for(value, mechanism_of(threat, flows, rows)).values()
+        )
         unlisted.append(
             UnlistedThreat(
                 threat_id=threat.id,

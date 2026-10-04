@@ -51,7 +51,7 @@ from analysis_service.certification import CertificationError, CertifyResult, ce
 from analysis_service.claims import (
     FrameworkName,
 )
-from analysis_service.critic import CriticOutputError
+from analysis_service.critic import CriticOutputError, row_controls
 from analysis_service.deployment import Deployment
 from analysis_service.frameworks import PACKAGES
 from analysis_service.graph import Pipeline
@@ -708,7 +708,11 @@ def _score_runs(
             continue
         drafts = runs[case.id].merged_drafts
         produced = stride_threats(runs[case.id].report)
-        entry = score_case_with_yield(case, drafts, produced, matcher, votes, block)
+        report = runs[case.id].report
+        rows = row_controls(report.assertions.catalog if report.assertions else None)
+        entry = score_case_with_yield(
+            case, drafts, produced, matcher, votes, block, rows
+        )
         scored.append(entry)
         if not diagnosable(case):
             continue

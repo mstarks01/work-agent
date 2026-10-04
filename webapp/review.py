@@ -73,6 +73,7 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
+from analysis_service.critic import row_controls
 from analysis_service.frameworks import PACKAGES
 from analysis_service.report import Report
 from evals import verify_corpus
@@ -594,6 +595,7 @@ def findings_from_artifact(path: Path) -> tuple[list[review_queue.Finding], str]
         # `bundle.runs_from_reports` already reads these files this way.
         report = Report.model_validate_json(report_path.read_text(encoding="utf-8"))
         case = report_path.name.removesuffix(".report.json")
+        rows = row_controls(report.assertions.catalog if report.assertions else None)
         for block in report.analyses:
             findings += [
                 review_queue.from_claim(
@@ -603,6 +605,7 @@ def findings_from_artifact(path: Path) -> tuple[list[review_queue.Finding], str]
                     # ``None`` for a package that composes none, which is what
                     # its fingerprint version expects.
                     identifier=identifier_of(block.framework, claim.id),
+                    rows=rows,
                 )
                 for claim in block.claims
             ]

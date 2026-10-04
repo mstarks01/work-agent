@@ -30,6 +30,7 @@ from analysis_service.critic import (
     distinct_mechanisms,
     finding_key,
     mechanism_of,
+    row_controls,
 )
 from analysis_service.report import Report
 from analysis_service.system_model import ModelIndex
@@ -68,9 +69,10 @@ def _findings(
     report: Report,
 ) -> Iterator[tuple[FindingKey, frozenset[str], RuledClaim]]:
     flows = ModelIndex.of(report.system_model).flow_endpoints
+    rows = row_controls(report.assertions.catalog if report.assertions else None)
     for block in report.analyses:
         for claim in (*block.claims, *block.rejected_claims):
-            yield finding_key(claim, flows), mechanism_of(claim, flows), claim
+            yield finding_key(claim, flows), mechanism_of(claim, flows, rows), claim
 
 
 def report_changes(before: Report, after: Report) -> tuple[FindingChange, ...]:

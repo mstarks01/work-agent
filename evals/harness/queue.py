@@ -47,6 +47,7 @@ from typing import Any
 
 from analysis_service.claims import Claim, FrameworkName
 from analysis_service.critic import (
+    NO_ROWS,
     cited_channels,
     distinct_mechanisms,
     grounded_mechanism,
@@ -457,6 +458,7 @@ def from_claim(
     identifier: str | None,
     seen_in: int = 1,
     runs: int = 1,
+    rows: Mapping[str, str] = NO_ROWS,
 ) -> Finding:
     """One produced claim as the queue's shape, digests and all.
 
@@ -480,7 +482,7 @@ def from_claim(
         identifier=identifier,
         seen_in=seen_in,
         runs=runs,
-        mechanism=tuple(sorted(grounded_mechanism(claim))),
+        mechanism=tuple(sorted(grounded_mechanism(claim, rows))),
     )
 
 
