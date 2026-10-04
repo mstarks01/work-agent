@@ -27,7 +27,7 @@
       "likelihood": "medium",
       "impact": "high"
     },
-    "notes": "Conditional on the unrecorded PKCE. A public client has no secret, so the code is the whole credential at the token endpoint.",
+    "notes": "Conditional: whether the authorization server requires and validates PKCE is unspecified. The attack depends on the server accepting the intercepted code; a public client having no secret does not by itself make the code the only check.",
     "verb": "impersonate"
   },
   {
