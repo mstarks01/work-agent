@@ -339,7 +339,7 @@ on either of them. That is the finding this sitting exists for.
 
 - `flow:process:mobile-app>process:authorization-server>token-requests`, `process:mobile-app`
 - severity: medium/high · verb: `impersonate`
-- Conditional on the unrecorded PKCE. A public client has no secret, so the code is the whole credential at the token endpoint.
+- Conditional: whether the authorization server requires and validates PKCE is unspecified. The attack depends on the server accepting the intercepted code; a public client having no secret does not by itself make the code the only check.
 
 > mark:
 
@@ -512,7 +512,7 @@ your missing list, your notes and a digest of each file you read:
       "source.md": "d414cc10c981749e783270475acdaa286ead5d32d22e334e4f6d1e23ae385a29",
       "model.json": "eb6210790530ebcb9aeac28c28b0d0eceb9676b38790d4f12656f72678c9074b",
       "claims/asvs.json": "1383f84a4e5de056f8afa84f3b7bab01a03f2d4971846e4e1aaa0a0385e6ead8",
-      "claims/stride.json": "6523ae929850b63084d57b2a19231600fd4d1e847420cbb94fe97ae04e6953b9"
+      "claims/stride.json": "cfcca71fe5e7e3d14cb9d70e720d7229ca3959a68674292f21eee4378c89d4e9"
       }
     }
   }

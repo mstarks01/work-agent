@@ -59,10 +59,10 @@ from evals.review_submission import REPO_ROOT, unreviewed_cases
 #: merged submissions — so an entry here only ever says what an unread case
 #: leaves unchecked, and a case somebody has since read is spent.
 UNREVIEWED: dict[str, str] = {
-    "01-payments-checkout": (
-        "Read in the sitting of 2026-09-22. The V13.2.2 claim lost three words"
-        " its source does not state, so the changed claim waits on a"
-        " confirming sitting."
+    "14-loyalty-oauth-platform": (
+        "Read in the confirming sitting of 2026-10-04. The PKCE claim's"
+        " rationale was rewritten in the reader's words, so the case waits on"
+        " a confirming sitting."
     ),
 }
 
