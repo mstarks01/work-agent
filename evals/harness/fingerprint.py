@@ -217,6 +217,12 @@ class Components:
     #: another. ``""`` for the versions :data:`READS_SCOPE` says do not read it;
     #: a version that does refuses an empty one.
     scope: str = ""
+    #: The controls the claim's grounds say are unstated or missing, sorted,
+    #: from :func:`~analysis_service.critic.grounded_mechanism`. **Not part of
+    #: the fingerprint**: it tells apart two findings that share one key, by
+    #: :func:`~analysis_service.critic.distinct_mechanisms`, and a vote stored
+    #: without it reads as empty, which binds as before (ADR 0060).
+    mechanism: tuple[str, ...] = ()
 
     def to_json(self) -> dict[str, Any]:
         return {
@@ -226,6 +232,7 @@ class Components:
             "verb": self.verb,
             "identifier": self.identifier,
             "scope": self.scope,
+            "mechanism": list(self.mechanism),
         }
 
     @classmethod
@@ -238,6 +245,7 @@ class Components:
                 verb=raw.get("verb"),
                 identifier=raw.get("identifier"),
                 scope=raw.get("scope", ""),
+                mechanism=tuple(raw.get("mechanism", ())),
             )
         except (KeyError, TypeError) as exc:
             raise FingerprintError(f"malformed components: {exc}") from exc
@@ -317,6 +325,7 @@ def components_for(
     verb: str | None = None,
     identifier: str | None = None,
     scope: str = "",
+    mechanism: Iterable[str] = (),
 ) -> Components:
     """Build the components for one claim, resolving its elements once.
 
@@ -336,6 +345,7 @@ def components_for(
         verb=verb,
         identifier=identifier,
         scope=scope,
+        mechanism=tuple(sorted(mechanism)),
     )
 
 
@@ -396,6 +406,7 @@ def key_claim(
     flows: FlowMap,
     verb: str | None = None,
     identifier: str | None = None,
+    mechanism: Iterable[str] = (),
 ) -> tuple[str, Components]:
     """One claim's fingerprint and components, under its own framework's rule.
 
@@ -433,6 +444,7 @@ def key_claim(
         verb=verb if reads in ("verb", "action") else None,
         identifier=identifier if reads == "identifier" else None,
         scope=scope if READS_SCOPE[version] else "",
+        mechanism=mechanism,
     )
     return fingerprint(components, version=version), components
 

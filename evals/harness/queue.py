@@ -46,6 +46,7 @@ from pathlib import Path
 from typing import Any
 
 from analysis_service.claims import Claim, FrameworkName
+from analysis_service.critic import distinct_mechanisms, grounded_mechanism
 from evals.harness import content as digests
 from evals.harness import ledger
 from evals.harness.fingerprint import Components, key_claim
@@ -82,6 +83,10 @@ class Finding:
     #: How many runs of the sweep produced this finding, out of how many ran.
     seen_in: int = 1
     runs: int = 1
+    #: The controls the claim's grounds say are unstated or missing, sorted,
+    #: from :func:`~analysis_service.critic.grounded_mechanism`. Two findings
+    #: under one fingerprint are two questions where these are distinct.
+    mechanism: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -104,6 +109,17 @@ class QueueItem:
     #: show. ADR 0029: the reader re-reads a change rather than a paraphrase,
     #: and seeing what they said last time is what makes that a re-read.
     previously: str = ""
+
+    @property
+    def key(self) -> str:
+        """What names this item to the page: its fingerprint, and its mechanism
+        where it has one, because two items may share a fingerprint (ADR 0060)."""
+        mechanism = self.components.mechanism
+        return (
+            f"{self.fingerprint}~{'+'.join(mechanism)}"
+            if mechanism
+            else self.fingerprint
+        )
 
     @property
     def content(self) -> str:
@@ -132,6 +148,7 @@ class QueueItem:
         """
         return {
             "fingerprint": self.fingerprint,
+            "key": self.key,
             "case": self.finding.case,
             "lane": self.finding.lane,
             "title": self.finding.title,
@@ -228,9 +245,9 @@ def answered(
     *,
     voter: str,
     sitting: str,
-    contents: Mapping[str, str],
-) -> frozenset[str]:
-    """The fingerprints this queue skips, and the two answers that do not count.
+    contents: Mapping[Identity, str],
+) -> frozenset[Identity]:
+    """The items this queue skips, and the two answers that do not count.
 
     ``needs-evidence`` is not an answer about the finding. The reviewer said
     they could not judge it from what they were shown, and the button says
@@ -244,10 +261,11 @@ def answered(
     what the reviewer was asking for.
 
     An answer on a **re-argued** claim does not count either, and that is
-    :func:`restated`. ``contents`` maps a fingerprint to the structural digest
-    of what this queue would show for it, and a named reviewer's own vote skips
-    the finding only when the two agree. A fingerprint ``contents`` does not
-    name is not in this queue, so its vote is read on its own terms.
+    :func:`restated`. ``contents`` maps each item's :data:`Identity` to the
+    structural digest of what this queue would show for it, and a named
+    reviewer's own vote skips the item only when the two agree. A vote answers
+    an item where its fingerprint is the item's and its mechanism is not
+    distinct from the item's (ADR 0060).
 
     The re-argued clause reads a **named** reviewer's votes only. In a queue
     built for nobody, ``voter`` is empty and anybody's answer skips: re-offering
@@ -260,12 +278,16 @@ def answered(
     it: it counted a `needs-evidence` answer as answered, and dropped what this
     had just re-offered. One rule needs one reader.
     """
+    live = ledger.current()
     return frozenset(
-        value
-        for (value, who), vote in ledger.current().items()
-        if (not voter or who == voter)
+        identity
+        for identity, content in contents.items()
+        for (value, who, cast), vote in live.items()
+        if value == identity[0]
+        and not distinct_mechanisms(cast, identity[1])
+        and (not voter or who == voter)
         and (vote.verdict != "needs-evidence" or vote.sitting == sitting)
-        and (not voter or vote.answers_for(contents.get(value, vote.content)))
+        and (not voter or vote.answers_for(content))
     )
 
 
@@ -273,8 +295,8 @@ def restated(
     ledger: Ledger,
     *,
     voter: str,
-    contents: Mapping[str, str],
-) -> dict[str, str]:
+    contents: Mapping[Identity, str],
+) -> dict[Identity, str]:
     """Each fingerprint this reviewer answered on a claim that has moved since,
     with what they said.
 
@@ -291,9 +313,10 @@ def restated(
     if not voter:
         return {}
     return {
-        value: _said(vote)
-        for (value, who), vote in ledger.current().items()
-        if who == voter and value in contents and not vote.answers_for(contents[value])
+        identity: _said(vote)
+        for identity, content in contents.items()
+        if (vote := ledger.verdicts_for(*identity).get(voter)) is not None
+        and not vote.answers_for(content)
     }
 
 
@@ -317,8 +340,9 @@ def build(
     ``sitting`` is this session's id, which decides how long a ``needs-evidence``
     answer holds -- see :func:`answered`.
 
-    Deduplicated by fingerprint, keeping the first occurrence. Two runs
-    producing one finding is the normal case and is one question, not two.
+    Deduplicated by :data:`Identity`, keeping the first occurrence. Two runs
+    producing one finding is the normal case and is one question, not two;
+    two mechanisms under one fingerprint are two questions (ADR 0060).
     :func:`_keyed` is where a finding gets its fingerprint, under its own
     framework's rule.
 
@@ -326,28 +350,32 @@ def build(
     claim this queue would show: :func:`answered` cannot decide a fingerprint
     until the structural digest beside it exists.
     """
-    keyed = list(_keyed(findings, flows_by_case))
+    groups: dict[str, list[tuple[str, ...]]] = {}
+    keyed = [
+        (identity_of(value, finding.mechanism, groups), components, finding)
+        for value, components, finding in _keyed(findings, flows_by_case)
+    ]
     # First occurrence wins here for the same reason it wins below: two runs
     # producing one finding are one question, and the queue shows the first
     # run's version of it.
-    contents: dict[str, str] = {}
-    for value, _, finding in keyed:
-        contents.setdefault(value, finding.content)
+    contents: dict[Identity, str] = {}
+    for identity, _, finding in keyed:
+        contents.setdefault(identity, finding.content)
     skip = answered(ledger, voter=voter, sitting=sitting, contents=contents)
     reargued = restated(ledger, voter=voter, contents=contents)
 
-    items: dict[str, QueueItem] = {}
-    for value, components, finding in keyed:
-        if value in skip or value in items:
+    items: dict[Identity, QueueItem] = {}
+    for identity, components, finding in keyed:
+        if identity in skip or identity in items:
             continue
-        weight, why = priority_of(finding, restated=value in reargued)
-        items[value] = QueueItem(
-            fingerprint=value,
+        weight, why = priority_of(finding, restated=identity in reargued)
+        items[identity] = QueueItem(
+            fingerprint=identity[0],
             components=components,
             finding=finding,
             priority=weight,
             why=why,
-            previously=reargued.get(value, ""),
+            previously=reargued.get(identity, ""),
         )
 
     # Sorted by weight, then by case and title, so a queue is stable across
@@ -357,6 +385,29 @@ def build(
         items.values(),
         key=lambda item: (-item.priority, item.finding.case, item.finding.title),
     )
+
+
+#: One question in the queue: a fingerprint and the mechanism of the first
+#: finding that took it. Two findings under one fingerprint are one question
+#: unless their mechanisms are distinct.
+Identity = tuple[str, tuple[str, ...]]
+
+
+def identity_of(
+    value: str, mechanism: tuple[str, ...], groups: dict[str, list[tuple[str, ...]]]
+) -> Identity:
+    """The question a finding joins: the first under its fingerprint whose
+    mechanism is not distinct from its own, or a new one.
+
+    ``groups`` holds the mechanisms already taken per fingerprint, so one call
+    site's findings share it and agree on every grouping.
+    """
+    taken = groups.setdefault(value, [])
+    for held in taken:
+        if not distinct_mechanisms(held, mechanism):
+            return value, held
+    taken.append(mechanism)
+    return value, mechanism
 
 
 def _keyed(
@@ -389,6 +440,7 @@ def _keyed(
             flows_by_case.get(finding.case, {}),
             verb=finding.verb,
             identifier=finding.identifier,
+            mechanism=finding.mechanism,
         )
         yield value, components, finding
 
@@ -423,6 +475,7 @@ def from_claim(
         identifier=identifier,
         seen_in=seen_in,
         runs=runs,
+        mechanism=tuple(sorted(grounded_mechanism(claim))),
     )
 
 
@@ -443,18 +496,19 @@ def merge_runs(
     runs, so a lane repeating itself inside one report is a different question
     from a sweep disagreeing with itself.
     """
-    produced_in: Counter[str] = Counter()
-    first: dict[str, Finding] = {}
+    produced_in: Counter[Identity] = Counter()
+    first: dict[Identity, Finding] = {}
+    groups: dict[str, list[tuple[str, ...]]] = {}
     for findings in runs:
-        in_run: dict[str, Finding] = {}
+        in_run: dict[Identity, Finding] = {}
         for value, _, finding in _keyed(findings, flows_by_case):
-            in_run.setdefault(value, finding)
+            in_run.setdefault(identity_of(value, finding.mechanism, groups), finding)
         produced_in.update(in_run.keys())
-        for value, finding in in_run.items():
-            first.setdefault(value, finding)
+        for identity, finding in in_run.items():
+            first.setdefault(identity, finding)
     return [
-        replace(finding, seen_in=produced_in[value], runs=len(runs))
-        for value, finding in first.items()
+        replace(finding, seen_in=produced_in[identity], runs=len(runs))
+        for identity, finding in first.items()
     ]
 
 

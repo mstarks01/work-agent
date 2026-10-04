@@ -50,6 +50,7 @@ from analysis_service.claims import (
     Claim,
     FrameworkName,
 )
+from analysis_service.critic import grounded_mechanism
 from analysis_service.report import Report
 from analysis_service.system_model import ModelIndex
 from evals.harness.content import prose as prose_digest
@@ -111,7 +112,7 @@ def measure_case(
     finding of one place alike.
     """
     lane_of = lane_field(framework)
-    live = votes.current_by_finding()
+    live = votes.current()
     produced = 0
     answered = 0
     objections = 0
@@ -129,7 +130,9 @@ def measure_case(
             verb=claim.verb,
             identifier=identifier_of(framework, claim.id),
         )
-        current = live.get(value, ())
+        current = list(
+            votes.verdicts_for(value, grounded_mechanism(claim), live).values()
+        )
         if not current:
             continue
         words = prose_digest(claim)
