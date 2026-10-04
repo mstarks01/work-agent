@@ -406,6 +406,27 @@
       },
       "rationale": "An explicit absence: the check is named and said not to happen. The missing check is who supplied the file, not where it was sent, and no signature is mentioned — which is why the sitting of 2026-09-18 declined both destination-verification and signature-verification and the row waited for a predicate of its own (#1053).",
       "reviewed_by": "mstarks01"
+    },
+    {
+      "assertion": {
+        "subject_type": "interaction",
+        "subject": "flow:process:ingest-scheduler>process:spark-transform-job>trigger-transform",
+        "predicate": "content-validation",
+        "value": "absent",
+        "reason": null,
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "Nothing validates the row contents beyond the schema."
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      "rationale": "No semantic or business-content validation beyond the stated schema check. The schema check stays present; this is not an assertion that no validation of any kind occurs.",
+      "reviewed_by": "mstarks01"
     }
   ],
   "disputed": [],

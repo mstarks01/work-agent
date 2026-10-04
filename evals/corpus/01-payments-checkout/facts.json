@@ -512,6 +512,27 @@
       },
       "rationale": "Inferred from stated contents: Orders, shopper addresses and card-last-four live in a PostgreSQL database. Only a source that names the tier states it (ruled 2026-09-24, #926).",
       "reviewed_by": "mstarks01"
+    },
+    {
+      "assertion": {
+        "subject_type": "component",
+        "subject": "store:receipt-archive",
+        "predicate": "record-attribution",
+        "value": "intermediary",
+        "reason": null,
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "receipt records which order was written and that the order service wrote it."
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      "rationale": "The quoted receipt attributes the write to the order service, an intermediary for the shopper's order. It supports the stated attribution and does not extend to a claim that no other record identifies the shopper.",
+      "reviewed_by": "mstarks01"
     }
   ],
   "disputed": [],

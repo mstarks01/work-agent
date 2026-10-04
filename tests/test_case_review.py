@@ -54,21 +54,15 @@ from evals.review_submission import REPO_ROOT, unreviewed_cases
 #:
 #: The sitting of 2026-09-21 read cases 01 to 13, and the sitting of
 #: 2026-09-22 cleared the marks acting on it had broken. The sitting of
-#: 2026-10-03 read the two holdout cases #744 added, and acting on its marks
-#: broke them the same way. The table is derived, never maintained —
+#: 2026-10-03 read the two holdout cases #744 added. The table is derived, never maintained —
 #: :func:`~evals.review_submission.unreviewed_cases` reads the corpus and the
 #: merged submissions — so an entry here only ever says what an unread case
 #: leaves unchecked, and a case somebody has since read is spent.
 UNREVIEWED: dict[str, str] = {
-    "14-loyalty-oauth-platform": (
-        "Read in the sitting of 2026-10-03. Acting on its marks changed the"
-        " claim files and the model it read, so the changed rows wait on a"
+    "01-payments-checkout": (
+        "Read in the sitting of 2026-09-22. The V13.2.2 claim lost three words"
+        " its source does not state, so the changed claim waits on a"
         " confirming sitting."
-    ),
-    "15-multitenant-invoicing": (
-        "Read in the sitting of 2026-10-03. Acting on its marks changed the"
-        " claim files it read and added four claims, so the changed rows wait"
-        " on a confirming sitting."
     ),
 }
 
