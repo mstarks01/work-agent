@@ -51,7 +51,6 @@ from __future__ import annotations
 
 import argparse
 import sys
-from datetime import UTC, datetime
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
@@ -60,7 +59,7 @@ from evals import review_submission as review_submissions
 from evals.harness import envelope as envelopes
 from evals.harness import sitting as sittings
 from evals.harness import submit as submit_spine
-from evals.harness.envelope import VERSION
+from evals.harness.envelope import VERSION, stamp
 from evals.harness.reference import (
     ANONYMOUS,
     CorpusError,
@@ -102,7 +101,7 @@ def payload(corpus_dir: Path, submitted_by: str, submitted_for: str) -> dict:
         "envelope": VERSION,
         "submitted_by": submitted_by,
         "submitted_for": submitted_for,
-        "generated": datetime.now(UTC).date().isoformat(),
+        "generated": stamp(),
         # Where the reader's pull request goes. Baked in when the page is
         # built, because the page is opened from a `file://` URL by somebody
         # who has no clone to read a remote from.

@@ -431,3 +431,15 @@ class TestThePressLeavesThePageInPlace:
     def test_noopener_is_never_a_feature_string(self):
         """The feature makes ``window.open`` return null, which is the defect."""
         assert '"noopener"' not in client_script("offline_sitting.js")
+
+
+def test_the_page_stamps_the_time_it_was_built():
+    """The stamp orders one reader's sittings of one case within a day."""
+    import re
+
+    from evals import verify_corpus
+    from webapp.offline_sitting import payload
+
+    built = payload(verify_corpus.CORPUS_DIR, "ada", "ada")
+
+    assert re.fullmatch(r"\d{4}-\d{2}-\d{2}T\d{6}Z", built["generated"])

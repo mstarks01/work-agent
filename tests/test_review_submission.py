@@ -156,6 +156,38 @@ def test_two_sittings_by_one_reader_on_one_date_are_refused(tmp_path: Path):
     assert reviews.unreviewed_cases(tree) == [CASE]
 
 
+def test_two_stamped_sittings_on_one_day_are_ordered(tmp_path: Path):
+    """A stamp carries the time, so one reader may sit one case twice a day."""
+    tree = tree_for(tmp_path)
+    first = dated(envelope_for(tree), "2026-09-05T090000Z", "first")
+    second = dated(envelope_for(tree), "2026-09-05T143000Z", "second")
+    write_review(tree, first)
+    assert reviews.validate(second, tree, author="ada") == []
+
+    write_review(tree, second)
+    current = reviews.current_for_case(tree, CASE)
+    assert current is not None and current.answers.notes == "second"
+
+
+def test_a_stamped_sitting_is_later_than_a_dated_one_of_its_day(tmp_path: Path):
+    """Archived files carry a bare date; a stamp from that day comes after it."""
+    tree = tree_for(tmp_path)
+    write_review(tree, dated(envelope_for(tree), "2026-09-05", "first"))
+    write_review(tree, dated(envelope_for(tree), "2026-09-05T000001Z", "second"))
+    current = reviews.current_for_case(tree, CASE)
+    assert current is not None and current.answers.notes == "second"
+
+
+def test_the_stamp_is_utc_to_the_second_and_names_a_file():
+    from datetime import datetime, timedelta, timezone
+
+    local = datetime(2026, 9, 5, 16, 30, 7, tzinfo=timezone(timedelta(hours=2)))
+    stamped = envelopes.stamp(local)
+
+    assert stamped == "2026-09-05T143007Z"
+    assert ":" not in stamped
+
+
 def test_two_readers_on_one_date_both_cover(tmp_path: Path):
     tree = tree_for(tmp_path)
     write_review(tree, envelope_for(tree, "ada"))
