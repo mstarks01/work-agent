@@ -32,6 +32,7 @@ is why it gates on every PR rather than waiting for a sweep.
 from __future__ import annotations
 
 import itertools
+from types import MappingProxyType
 
 import pytest
 
@@ -348,3 +349,56 @@ def _key(case: GoldenCase, claim: ReferenceThreat, flows) -> str:
         verb=claim.verb,
     )
     return value
+
+
+#: Case 13's shape: two flows between one console and one API, and one other.
+SIBLING_FLOWS = MappingProxyType(
+    {
+        "flow:process:console>process:api>requests": ("process:console", "process:api"),
+        "flow:process:console>process:api>status": ("process:console", "process:api"),
+        "flow:process:api>store:db>write": ("process:api", "store:db"),
+    }
+)
+ON_REST = (
+    "process:console",
+    "process:api",
+    "flow:process:console>process:api>requests",
+)
+ON_SOCKET = (
+    "process:console",
+    "process:api",
+    "flow:process:console>process:api>status",
+)
+
+
+class TestTwoSiblingFlowsAreTwoPlaces:
+    """Case 13's REST requests and WebSocket run between one pair (ADR 0061)."""
+
+    def test_only_a_flow_with_a_sibling_is_a_channel(self):
+        from analysis_service.critic import cited_channels
+
+        assert cited_channels(ON_REST, SIBLING_FLOWS) == {
+            "flow:process:console>process:api>requests"
+        }
+        assert (
+            cited_channels(["flow:process:api>store:db>write"], SIBLING_FLOWS) == set()
+        )
+
+    def test_claims_on_two_siblings_are_two_places(self):
+        from evals.harness.identity import endpoint_subset
+
+        assert not endpoint_subset(ON_REST, ON_SOCKET, SIBLING_FLOWS)
+
+    def test_a_claim_on_the_two_elements_matches_either_sibling(self):
+        from evals.harness.identity import endpoint_subset
+
+        ends = ["process:console", "process:api"]
+        assert endpoint_subset(ends, ON_REST, SIBLING_FLOWS)
+        assert endpoint_subset(ends, ON_SOCKET, SIBLING_FLOWS)
+
+    def test_one_shared_control_does_not_join_two_channels(self):
+        from analysis_service.critic import distinct_mechanisms
+
+        rest = {"authentication", "flow:process:console>process:api>requests"}
+        socket = {"authentication", "flow:process:console>process:api>status"}
+        assert distinct_mechanisms(rest, socket)

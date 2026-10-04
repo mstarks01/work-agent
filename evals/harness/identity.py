@@ -37,6 +37,7 @@ from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from typing import Literal, Protocol
 
+from analysis_service.critic import cited_channels, distinct_mechanisms
 from analysis_service.frameworks.stride.record import StrideCategory
 from evals.harness.verbs import same_action
 
@@ -206,12 +207,23 @@ def endpoint_subset(
     later: no corpus reference resolves to nothing, so this refuses malformed
     input and no measured pair.
 
+    **Two sibling flows are two places** (ADR 0061). The fold sends both of
+    two flows between one pair of elements to that pair, so a claim on one
+    would contain a claim on the other. Where both sides cite a sibling flow
+    and the cited siblings do not overlap, the sides are not one place. A side
+    that cites only the two elements still contains, or is contained by,
+    either sibling.
+
     On its own this over-merges, which is why nothing calls it alone:
     :class:`SubsetVerbIdentity` is the rule, and this is one half of it.
     """
     left = endpoint_form(left_ids, flows)
     right = endpoint_form(right_ids, flows)
     if not left or not right:
+        return False
+    if distinct_mechanisms(
+        cited_channels(left_ids, flows), cited_channels(right_ids, flows)
+    ):
         return False
     return left <= right or right <= left
 

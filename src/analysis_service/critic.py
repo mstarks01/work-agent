@@ -64,6 +64,7 @@ from analysis_service.frameworks import FrameworkSchemas, lane_of
 from analysis_service.question_kinds import QUESTION_KINDS
 from analysis_service.references import snap
 from analysis_service.system_model import (
+    DataFlow,
     SystemModel,
     TrustBoundary,
     attribute_names,
@@ -559,18 +560,58 @@ def grounded_mechanism(claim: Claim) -> frozenset[str]:
     )
 
 
-def distinct_mechanisms(first: Iterable[str], second: Iterable[str]) -> bool:
-    """True where two claims rest on controls that do not overlap at all.
+def sibling_flows(flows: Mapping[str, tuple[str, str]]) -> frozenset[str]:
+    """Every flow that runs between the same two elements as another flow,
+    in either direction."""
+    pairs = Counter(frozenset(ends) for ends in flows.values())
+    return frozenset(flow for flow, ends in flows.items() if pairs[frozenset(ends)] > 1)
 
-    **The one reader of "two mechanisms at one place"** (ADR 0060). Both sets
-    must name something, so a claim whose grounds cite no control, and every
-    record stored before mechanisms were, binds as it did. Overlap rather than
-    equality, because one finding cites a slightly different set from one run
-    to the next: equality split 39 of 165 archived cross-run pairs of one
-    finding, and non-overlap splits 3 (ledger ``QA-2026-10-03-02-E7``).
+
+def cited_channels(
+    element_ids: Iterable[str], flows: Mapping[str, tuple[str, str]]
+) -> frozenset[str]:
+    """The sibling flows a claim cites: the channel its place cannot name.
+
+    :func:`endpoint_targets` folds a flow to its two endpoints, so two flows
+    between one pair of elements are one place, as case 13's REST requests
+    and its WebSocket are. The cited flow ID is what still tells them apart
+    (ADR 0061). A flow with no sibling is fully named by its place and is not
+    a channel.
+    """
+    cited = frozenset(element_ids) & frozenset(flows)
+    return cited & sibling_flows(flows) if cited else frozenset()
+
+
+def mechanism_of(claim: Claim, flows: Mapping[str, tuple[str, str]]) -> frozenset[str]:
+    """A claim's whole mechanism: its grounded controls and its channels."""
+    return grounded_mechanism(claim) | cited_channels(claim.affected_element_ids, flows)
+
+
+def _apart(one: frozenset[str], other: frozenset[str]) -> bool:
+    return bool(one) and bool(other) and not one & other
+
+
+def distinct_mechanisms(first: Iterable[str], second: Iterable[str]) -> bool:
+    """True where two claims under one key are two findings.
+
+    **The one reader of "two mechanisms at one place"** (ADRs 0060 and 0061).
+    A mechanism holds controls and channels: an attribute name, or a sibling
+    flow's ID, which carries the flow prefix. Two claims are apart where their
+    controls do not overlap at all, or their channels do not. Each side must
+    name something, so a claim that cites no control or no sibling flow, and
+    every record stored before mechanisms were, binds as it did. Overlap
+    rather than equality, because one finding cites a slightly different set
+    of controls from one run to the next: equality split 39 of 165 archived
+    cross-run pairs of one finding, and non-overlap splits 3 (ledger
+    ``QA-2026-10-03-02-E7``).
     """
     one, other = frozenset(first), frozenset(second)
-    return bool(one) and bool(other) and not one & other
+    prefix = f"{DataFlow.id_prefix}:"
+    channels = (
+        frozenset(m for m in one if m.startswith(prefix)),
+        frozenset(m for m in other if m.startswith(prefix)),
+    )
+    return _apart(one - channels[0], other - channels[1]) or _apart(*channels)
 
 
 def finding_key(claim: Claim, flows: Mapping[str, tuple[str, str]]) -> FindingKey:

@@ -272,6 +272,12 @@ are two findings where both mechanisms name something and do not overlap
 reader of which vote answers a finding, and the review queue asks one question
 per key and mechanism. A vote stored without a mechanism binds as before.
 
+The mechanism also holds the sibling flows a claim cites: two flows between one
+pair of elements fold to one place, so the cited flow is what tells a claim on
+one from a claim on the other (ADR 0061). `identity.endpoint_subset` reads the
+same channels, so the scorer does not match a claim on one sibling to a
+reference on the other.
+
 ### A vote also records what it judged
 
 The rule above recognises a **topic**, and is blind to what a claim says. That
