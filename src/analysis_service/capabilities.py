@@ -100,24 +100,28 @@ CAPABILITIES: Mapping[str, Capability] = MappingProxyType(
             "people use the application through pages or scripts it serves to a"
             " web browser",
             "Do people use the application through a web browser?",
+            reviewed_by="mstarks01",
         ),
         "browser-accessible-http": _row(
             "the application serves HTTP content that a web browser can open,"
             " including API and file responses with no frontend",
             "Does the application serve pages, scripts, files or HTTP responses"
             " that people can open in a web browser?",
+            reviewed_by="mstarks01",
         ),
         "postmessage-receiver": _row(
             "the application's browser code receives messages from other documents"
             " or windows, such as through postMessage",
             "Does the application's browser code receive messages from other"
             " windows or frames, such as through postMessage?",
+            reviewed_by="mstarks01",
         ),
         "external-browser-resources": _row(
             "the application's pages load scripts, styles or other resources"
             " hosted outside the application",
-            "Do the application's pages load scripts, styles or other resources"
-            " from another host, such as a CDN?",
+            "Do the application's pages load externally hosted scripts, styles or"
+            " other resources, including resources delivered through a CDN?",
+            reviewed_by="mstarks01",
         ),
         "native-client": _row(
             "people use the application through a mobile or desktop app that calls it",
@@ -134,6 +138,7 @@ CAPABILITIES: Mapping[str, Capability] = MappingProxyType(
             " host or port) read its responses through CORS",
             "Does the application allow browser scripts from a different origin"
             " (scheme, host or port) to read its responses through CORS?",
+            reviewed_by="mstarks01",
         ),
         "websocket": _row(
             "the application holds WebSocket connections",
@@ -150,12 +155,14 @@ CAPABILITIES: Mapping[str, Capability] = MappingProxyType(
             " application's responses",
             "Can an HTTP cache, such as a CDN or a proxy, store the application's"
             " responses?",
+            reviewed_by="mstarks01",
         ),
         "sensitive-http-requests": _row(
             "the application's HTTP requests carry sensitive data, including"
             " credentials and session tokens",
             "Do HTTP requests to or from the application carry sensitive data,"
             " such as credentials or session tokens?",
+            reviewed_by="mstarks01",
         ),
         # --- Code and runtimes ---
         "javascript-code": _row(
@@ -163,6 +170,7 @@ CAPABILITIES: Mapping[str, Capability] = MappingProxyType(
             " a native app or an embedded runtime",
             "Does any in-scope component execute JavaScript, including browser,"
             " server, native or embedded code?",
+            reviewed_by="mstarks01",
         ),
         "memory-unsafe-code": _row(
             "part of the application is written in a language without memory"
@@ -172,16 +180,18 @@ CAPABILITIES: Mapping[str, Capability] = MappingProxyType(
             reviewed_by="mstarks01",
         ),
         "overflow-capable-arithmetic": _row(
-            "the application does arithmetic whose overflow can change its"
-            " behaviour, including fixed-width arithmetic in a memory-safe language",
-            "Does the application do fixed-width arithmetic whose overflow could"
-            " change what it does?",
+            "the application performs arithmetic with bounded numeric types that"
+            " can overflow or underflow, whether or not protective checks exist",
+            "Does the application use bounded numeric arithmetic, such as"
+            " fixed-width integers or floating-point numbers?",
+            reviewed_by="mstarks01",
         ),
         "manually-managed-resources": _row(
             "the application allocates memory or other resources that its code"
             " must release explicitly",
             "Does the application's code allocate memory or other resources that"
             " it must release explicitly?",
+            reviewed_by="mstarks01",
         ),
         # --- Interpreters and parsers the application feeds ---
         "database": _row(
@@ -225,6 +235,7 @@ CAPABILITIES: Mapping[str, Capability] = MappingProxyType(
             " protocol",
             "Does the application send content to a memcache protocol service?",
             parent="cache-service",
+            reviewed_by="mstarks01",
         ),
         "mail-sending": _row(
             "the application sends or reads email through a mail server",
@@ -235,12 +246,14 @@ CAPABILITIES: Mapping[str, Capability] = MappingProxyType(
             "the application puts untrusted input into the construction or the"
             " evaluation of a template, by any template engine",
             "Is untrusted input incorporated into template construction or evaluation?",
+            reviewed_by="mstarks01",
         ),
         "dynamic-regex": _row(
             "the application builds regular expressions from untrusted input,"
             " including data it receives from other systems",
             "Does the application construct regular expressions using untrusted"
             " input, including data received indirectly from other systems?",
+            reviewed_by="mstarks01",
         ),
         "xml-parsing": _row(
             "the application parses XML, including SOAP and SVG",
@@ -252,16 +265,19 @@ CAPABILITIES: Mapping[str, Capability] = MappingProxyType(
             " HTML, SVG, Markdown, CSS, BBCode or templates",
             "Does the application accept formatted text or markup from users or"
             " other systems, such as HTML, Markdown or SVG?",
+            reviewed_by="mstarks01",
         ),
         "untrusted-html": _row(
             "the application accepts HTML from an untrusted source",
             "Does the application accept HTML from users or other untrusted sources?",
             parent="rich-text-input",
+            reviewed_by="mstarks01",
         ),
         "untrusted-svg": _row(
             "the application accepts SVG from an untrusted source",
             "Does the application accept SVG from users or other untrusted sources?",
             parent="rich-text-input",
+            reviewed_by="mstarks01",
         ),
         "untrusted-scriptable-content": _row(
             "the application accepts untrusted content that can carry scripts or"
@@ -269,6 +285,7 @@ CAPABILITIES: Mapping[str, Capability] = MappingProxyType(
             "Does the application accept Markdown, CSS, XSL, BBCode or similar"
             " content from users or other untrusted sources?",
             parent="rich-text-input",
+            reviewed_by="mstarks01",
         ),
         "spreadsheet-export": _row(
             "the application exports data as CSV or spreadsheet files",
@@ -284,12 +301,14 @@ CAPABILITIES: Mapping[str, Capability] = MappingProxyType(
         "http-request-construction": _row(
             "frontend or backend code builds HTTP requests to other services",
             "Does frontend or backend code construct HTTP requests to other services?",
+            reviewed_by="mstarks01",
         ),
         "untrusted-outbound-destination": _row(
             "untrusted input, direct or indirect, shapes any part of a"
             " server-side call to another service, by HTTP or another scheme",
             "Can untrusted input influence any part of a server-side call to"
             " another service, such as its scheme, host, port or path?",
+            reviewed_by="mstarks01",
         ),
         # --- Business behaviour ---
         "multi-step-flow": _row(
@@ -304,6 +323,7 @@ CAPABILITIES: Mapping[str, Capability] = MappingProxyType(
             " complete it, whether through a user interface or an API",
             "Does the application have a business flow that a person needs a"
             " minimum time to complete?",
+            reviewed_by="mstarks01",
         ),
         "limited-resource": _row(
             "the application sells, books or allocates things of limited quantity",
@@ -318,10 +338,12 @@ CAPABILITIES: Mapping[str, Capability] = MappingProxyType(
             "Does the application perform highly sensitive operations, such as"
             " money transfers, classified-data access, contract approvals or"
             " safety overrides?",
+            reviewed_by="mstarks01",
         ),
         "multi-system-request": _row(
             "a request or a transaction passes through more than one system",
             "Do requests or transactions pass through more than one system?",
+            reviewed_by="mstarks01",
         ),
         # --- Files ---
         "file-upload": _row(
@@ -336,6 +358,7 @@ CAPABILITIES: Mapping[str, Capability] = MappingProxyType(
             "Does the application accept compressed or archive files, including"
             " ZIP, gzip or archive-based document formats?",
             parent="file-upload",
+            reviewed_by="mstarks01",
         ),
         "image-files": _row(
             "the application accepts image files",
@@ -348,24 +371,28 @@ CAPABILITIES: Mapping[str, Capability] = MappingProxyType(
             " archives, converting or resizing them",
             "Does the application's server process files, such as by extracting,"
             " converting or resizing them?",
+            reviewed_by="mstarks01",
         ),
         "untrusted-file-source": _row(
             "the application receives files from an untrusted source, by upload,"
             " import or another route",
             "Does the application receive files from users, imports or other"
             " untrusted sources?",
+            reviewed_by="mstarks01",
         ),
         "public-files-from-untrusted-input": _row(
             "the application stores files that untrusted input produced, uploaded"
             " or generated, where HTTP requests can reach them directly",
             "Does the application store uploaded or generated files from untrusted"
             " input where people can fetch them directly over HTTP?",
+            reviewed_by="mstarks01",
         ),
         "untrusted-file-path-input": _row(
             "untrusted filenames or file metadata shape file system paths, in an"
             " upload or any other operation",
             "Can untrusted filenames or file metadata influence a file system"
             " path the application uses?",
+            reviewed_by="mstarks01",
         ),
         "file-download": _row(
             "the application sends files to its users, as downloads, exports or"
@@ -380,21 +407,27 @@ CAPABILITIES: Mapping[str, Capability] = MappingProxyType(
             " callers, including optional sign-in",
             "Does the application provide, or need, authentication of users or"
             " callers, including optional sign-in?",
+            reviewed_by="mstarks01",
         ),
         "multiple-authentication-pathways": _row(
-            "the application supports more than one way to authenticate",
-            "Does the application support more than one way to sign in or"
-            " authenticate?",
+            "the application supports multiple authentication pathways or entry points",
+            "Does the application expose more than one authentication pathway, such"
+            " as web, mobile, API or recovery endpoints, even when they use the"
+            " same authentication method?",
             parent="authentication",
+            reviewed_by="mstarks01",
         ),
         "initial-authentication-secrets": _row(
             "the application issues initial passwords or activation secrets",
-            "Does the application issue initial passwords or activation codes?",
+            "Does the application issue initial passwords or activation secrets,"
+            " such as codes or tokens in activation links?",
+            reviewed_by="mstarks01",
         ),
         "expiring-authentication-mechanisms": _row(
             "the application uses an authentication mechanism that expires",
             "Does the application use an authentication mechanism that expires,"
             " such as a certificate or a temporary password?",
+            reviewed_by="mstarks01",
         ),
         "password-authentication": _row(
             "an in-scope component sets, resets, verifies or stores user"
@@ -402,22 +435,29 @@ CAPABILITIES: Mapping[str, Capability] = MappingProxyType(
             "Does an in-scope component set, reset, verify or store user"
             " passwords, including passwords used as an additional factor?",
             parent="authentication",
+            reviewed_by="mstarks01",
         ),
         "password-reset": _row(
             "the application supports the reset of a forgotten password",
-            "Can users reset a forgotten password?",
+            "Does the application support resetting a forgotten password, either"
+            " through self-service or an assisted process?",
             parent="password-authentication",
+            reviewed_by="mstarks01",
         ),
         "administrator-password-reset": _row(
             "an administrator can start the reset of a user's password",
-            "Can an administrator reset a user's password?",
+            "Can an administrator initiate or perform a reset of a user's password?",
             parent="password-authentication",
+            reviewed_by="mstarks01",
         ),
         "stored-password-verifiers": _row(
-            "an in-scope component stores password verifiers, such as password hashes",
-            "Does an in-scope component store password hashes or other password"
-            " verifiers?",
+            "an in-scope component stores data used to verify user passwords,"
+            " regardless of its storage protection",
+            "Does an in-scope component store passwords or representations used to"
+            " verify them, such as hashes, encrypted passwords or plaintext"
+            " passwords?",
             parent="password-authentication",
+            reviewed_by="mstarks01",
         ),
         "multi-factor-authentication": _row(
             "the application offers or requires a second authentication factor",
@@ -433,21 +473,27 @@ CAPABILITIES: Mapping[str, Capability] = MappingProxyType(
             " out-of-band codes or approval requests, or time-based one-time"
             " passwords?",
             parent="authentication",
+            reviewed_by="mstarks01",
         ),
         "lookup-secrets": _row(
             "authentication or recovery uses lookup secrets, such as recovery codes",
             "Does the application accept lookup secrets, such as recovery codes?",
             parent="one-time-codes",
+            reviewed_by="mstarks01",
         ),
         "stored-lookup-secrets": _row(
-            "the application stores lookup secrets to verify them later",
-            "Does the application store lookup secrets, such as recovery codes?",
+            "the application stores lookup secrets or their verifiers for later"
+            " verification",
+            "Does the application store lookup or recovery secrets, or hashes or"
+            " other verifiers of them?",
             parent="one-time-codes",
+            reviewed_by="mstarks01",
         ),
         "lookup-secret-generation": _row(
             "the application generates lookup secrets",
             "Does the application generate lookup secrets, such as recovery codes?",
             parent="one-time-codes",
+            reviewed_by="mstarks01",
         ),
         "out-of-band-authentication": _row(
             "authentication uses an out-of-band channel: a code, an approval"
@@ -455,6 +501,7 @@ CAPABILITIES: Mapping[str, Capability] = MappingProxyType(
             "Does authentication use a separate channel, such as a code by SMS"
             " or email, or an approval request on a device?",
             parent="one-time-codes",
+            reviewed_by="mstarks01",
         ),
         "out-of-band-codes": _row(
             "authentication uses codes that the application sends out of band"
@@ -462,34 +509,40 @@ CAPABILITIES: Mapping[str, Capability] = MappingProxyType(
             "Does the application send codes, such as by SMS or email, that users"
             " enter to authenticate?",
             parent="one-time-codes",
+            reviewed_by="mstarks01",
         ),
         "out-of-band-code-generation": _row(
             "the application generates out-of-band authentication codes",
             "Does the application generate the codes it sends for authentication?",
             parent="one-time-codes",
+            reviewed_by="mstarks01",
         ),
         "pstn-out-of-band-authentication": _row(
             "out-of-band authentication uses the telephone network, by SMS or a"
             " voice call",
             "Does authentication send codes or approval requests by SMS or phone call?",
             parent="one-time-codes",
+            reviewed_by="mstarks01",
         ),
         "push-authentication": _row(
             "authentication sends a push notification for the user to approve",
             "Does authentication use push notifications that users approve?",
             parent="one-time-codes",
+            reviewed_by="mstarks01",
         ),
         "totp": _row(
             "authentication uses time-based one-time passwords",
             "Does authentication use time-based one-time passwords, such as from"
             " an authenticator app?",
             parent="one-time-codes",
+            reviewed_by="mstarks01",
         ),
         "totp-seed-generation": _row(
             "the application generates the seeds for time-based one-time passwords",
             "Does the application generate the seeds for time-based one-time"
             " passwords?",
             parent="one-time-codes",
+            reviewed_by="mstarks01",
         ),
         "biometric-authentication": _row(
             "the application accepts a biometric factor",
@@ -509,6 +562,7 @@ CAPABILITIES: Mapping[str, Capability] = MappingProxyType(
             "certificates verify cryptographic authentication assertions",
             "Are certificates used to verify cryptographic authentication assertions?",
             parent="cryptographic-authenticators",
+            reviewed_by="mstarks01",
         ),
         "federated-identity": _row(
             "users sign in through a separate identity provider (SSO)",
@@ -520,18 +574,22 @@ CAPABILITIES: Mapping[str, Capability] = MappingProxyType(
             "the application accepts more than one identity provider",
             "Does the application accept sign-in from more than one identity provider?",
             parent="federated-identity",
+            reviewed_by="mstarks01",
         ),
         "authentication-assurance-policy": _row(
-            "access requires a stated authentication strength, method or recency,"
-            " whether or not the application enforces it yet",
-            "Does any access require a particular authentication strength, method"
-            " or recency?",
+            "access requires a particular authentication strength, method or"
+            " recency, whether or not this is documented or enforced",
+            "Must any access require a particular authentication strength, method"
+            " or recency, whether or not that requirement is documented or"
+            " enforced?",
+            reviewed_by="mstarks01",
         ),
         "saml": _row(
             "an in-scope relying party consumes SAML assertions for authentication",
             "Does an in-scope relying party consume SAML assertions for"
             " authentication?",
             parent="federated-identity",
+            reviewed_by="mstarks01",
         ),
         "mutual-tls": _row(
             "the application authenticates callers by TLS client certificates",
@@ -558,28 +616,33 @@ CAPABILITIES: Mapping[str, Capability] = MappingProxyType(
             " JWTs or SAML assertions, whether or not they are correctly signed",
             "Does the application issue or consume self-contained tokens, such as"
             " JWTs or SAML assertions, whether or not they are correctly signed?",
+            reviewed_by="mstarks01",
         ),
         "self-contained-token-consumer": _row(
             "the application consumes self-contained tokens",
-            "Does the application accept self-contained tokens, such as JWTs,"
-            " from another party?",
+            "Does the application consume self-contained tokens, including tokens"
+            " it issued itself and later receives back?",
             parent="self-contained-tokens",
+            reviewed_by="mstarks01",
         ),
         "self-contained-token-issuer": _row(
             "the application issues self-contained tokens",
             "Does the application issue self-contained tokens, such as JWTs?",
             parent="self-contained-tokens",
+            reviewed_by="mstarks01",
         ),
         "token-validity-period": _row(
             "a self-contained token states the period in which it is valid",
             "Do the self-contained tokens carry a validity period, such as an"
             " expiry time?",
             parent="self-contained-tokens",
+            reviewed_by="mstarks01",
         ),
         "shared-signing-key-audiences": _row(
             "one signing key signs self-contained tokens for more than one audience",
             "Does one signing key sign tokens for more than one audience?",
             parent="self-contained-tokens",
+            reviewed_by="mstarks01",
         ),
         # --- OAuth and OpenID Connect ---
         "oauth": _row(
@@ -591,6 +654,7 @@ CAPABILITIES: Mapping[str, Capability] = MappingProxyType(
             "an OAuth party in scope uses the authorization code grant",
             "Does an OAuth client or authorization server here use the"
             " authorization code flow?",
+            reviewed_by="mstarks01",
         ),
         "oauth-client": _row(
             "the application obtains tokens from an authorization server as an"
@@ -603,13 +667,16 @@ CAPABILITIES: Mapping[str, Capability] = MappingProxyType(
         "user-agent-authorization-flow": _row(
             "the OAuth client sends the user through a browser or another user"
             " agent to authorize",
-            "Does the OAuth client send users through a browser to authorize it?",
+            "Does the OAuth client use a browser or another user agent to obtain"
+            " user authorization?",
             parent="oauth-client",
+            reviewed_by="mstarks01",
         ),
         "multiple-authorization-servers": _row(
             "the OAuth client works with more than one authorization server",
             "Does the OAuth client work with more than one authorization server?",
             parent="oauth-client",
+            reviewed_by="mstarks01",
         ),
         "oauth-resource-server": _row(
             "the application accepts OAuth access tokens on its API",
@@ -618,9 +685,12 @@ CAPABILITIES: Mapping[str, Capability] = MappingProxyType(
             reviewed_by="mstarks01",
         ),
         "user-identity-authorization": _row(
-            "the resource server's access decisions depend on the user's identity",
-            "Do the API's access decisions depend on which user a token represents?",
+            "the resource server's access decisions need to depend on the user"
+            " represented by the token, whether or not that dependence is enforced",
+            "Must the API's access decisions depend on which user a token"
+            " represents, whether or not that check is currently enforced?",
             parent="oauth-resource-server",
+            reviewed_by="mstarks01",
         ),
         "oauth-authorization-server": _row(
             "an OAuth authorization server, or its configuration in a managed"
@@ -628,41 +698,51 @@ CAPABILITIES: Mapping[str, Capability] = MappingProxyType(
             "Is an OAuth authorization server, including its configuration in a"
             " managed service, within the assessment scope?",
             parent="oauth",
+            reviewed_by="mstarks01",
         ),
         "refresh-tokens": _row(
             "the authorization server issues refresh tokens",
             "Does the authorization server issue refresh tokens?",
             parent="oauth-authorization-server",
+            reviewed_by="mstarks01",
         ),
         "public-client-refresh-tokens": _row(
             "the authorization server issues refresh tokens to public clients",
-            "Does the authorization server issue refresh tokens to public"
-            " clients, such as browser or mobile apps?",
+            "Does the authorization server issue refresh tokens to public clients,"
+            " meaning clients that cannot keep client authentication credentials"
+            " confidential, such as a browser-only app or an installed mobile app?",
             parent="oauth-authorization-server",
+            reviewed_by="mstarks01",
         ),
         "reference-access-tokens": _row(
             "the authorization server issues opaque reference access tokens",
             "Does the authorization server issue opaque reference access tokens?",
             parent="oauth-authorization-server",
+            reviewed_by="mstarks01",
         ),
         "confidential-client-backchannel": _row(
             "confidential clients call the authorization server over a back channel",
             "Do confidential clients call the authorization server directly, such"
             " as at its token endpoint?",
             parent="oauth-authorization-server",
+            reviewed_by="mstarks01",
         ),
         "unauthenticated-dynamic-registration": _row(
-            "the authorization server lets clients register dynamically without"
-            " authentication",
-            "Does the authorization server let clients register dynamically"
-            " without authenticating?",
+            "the authorization server accepts dynamic registrations without"
+            " authenticating the registering party",
+            "Does the authorization server allow dynamic client registration"
+            " without authenticating the party requesting registration?",
             parent="oauth-authorization-server",
+            reviewed_by="mstarks01",
         ),
         "user-delegated-authorization": _row(
-            "users delegate access to clients through the authorization server",
-            "Do users grant clients access through the authorization server, such"
-            " as on a consent screen?",
+            "the authorization server supports delegated access by clients on"
+            " behalf of users, whether or not user consent is correctly obtained",
+            "Does the authorization server let clients obtain access on behalf of"
+            " users, including pre-authorized access or flows with no consent"
+            " screen?",
             parent="oauth-authorization-server",
+            reviewed_by="mstarks01",
         ),
         "oidc": _row(
             "the application uses OpenID Connect for sign-in",
@@ -675,11 +755,13 @@ CAPABILITIES: Mapping[str, Capability] = MappingProxyType(
             "Does the relying party receive back-channel logout requests from the"
             " OpenID provider?",
             parent="oidc",
+            reviewed_by="mstarks01",
         ),
         "rp-initiated-logout": _row(
             "the OpenID provider supports logout that a relying party starts",
             "Does the OpenID provider support logout started by a relying party?",
             parent="oidc",
+            reviewed_by="mstarks01",
         ),
         # --- Authorization ---
         "restricted-access": _row(
@@ -689,6 +771,7 @@ CAPABILITIES: Mapping[str, Capability] = MappingProxyType(
             "Must any function or data be restricted to particular users,"
             " callers, roles or tenants, whether or not that restriction is"
             " currently enforced?",
+            reviewed_by="mstarks01",
         ),
         "multi-tenancy": _row(
             "the system serves several tenants whose data or operations need"
@@ -696,6 +779,7 @@ CAPABILITIES: Mapping[str, Capability] = MappingProxyType(
             "Does the system serve multiple tenants whose data or operations"
             " require isolation, including individual tenants or tenants sharing"
             " backend services?",
+            reviewed_by="mstarks01",
         ),
         "administrative-interface": _row(
             "the application has an interface for administrators",
@@ -710,17 +794,20 @@ CAPABILITIES: Mapping[str, Capability] = MappingProxyType(
             "Does the application handle sensitive data, including personal,"
             " financial or health data, credentials, session tokens, keys or"
             " confidential business information?",
+            reviewed_by="mstarks01",
         ),
         "encryption": _row(
             "an in-scope component encrypts stored or application data beyond"
             " the transport, including configured managed storage",
             "Does an in-scope component encrypt stored or application data beyond"
             " transport encryption, including configured managed storage?",
+            reviewed_by="mstarks01",
         ),
         "separate-cipher-and-mac": _row(
             "the application's encryption combines a cipher with a separate MAC",
             "Does the application's encryption use a separate cipher and MAC?",
             parent="encryption",
+            reviewed_by="mstarks01",
         ),
         # --- Connections between components ---
         "internal-services": _row(
@@ -731,31 +818,39 @@ CAPABILITIES: Mapping[str, Capability] = MappingProxyType(
             reviewed_by="mstarks01",
         ),
         "internal-http-connections": _row(
-            "the application's own components talk to each other over HTTP",
-            "Do the application's own components talk to each other over HTTP?",
+            "the application's own components communicate using HTTP, including"
+            " HTTP over TLS (HTTPS)",
+            "Do the application's own components communicate over HTTP or HTTPS?",
+            reviewed_by="mstarks01",
         ),
         "internal-tls-connections": _row(
             "the application's own components talk to each other over TLS",
             "Do the application's own components talk to each other over TLS?",
+            reviewed_by="mstarks01",
         ),
         "backend-service-connections": _row(
             "backend components communicate with services",
             "Do backend components communicate with other services?",
+            reviewed_by="mstarks01",
         ),
         "service-accounts": _row(
             "the application uses accounts with services, including local"
             " operating system accounts",
-            "Does the application use service accounts, including local"
-            " operating system accounts?",
+            "Does the application use accounts to access services or to run under a"
+            " local operating system identity, including shared, default or"
+            " privileged accounts?",
+            reviewed_by="mstarks01",
         ),
         "backend-service-credentials": _row(
             "a backend component presents credentials to a service",
             "Do backend components present credentials, such as passwords, keys"
             " or tokens, to other services?",
+            reviewed_by="mstarks01",
         ),
         "separate-service-connections": _row(
             "the application connects to a separate internal or external service",
             "Does the application connect to separate internal or external services?",
+            reviewed_by="mstarks01",
         ),
         # --- WebRTC ---
         "webrtc": _row(
@@ -769,6 +864,7 @@ CAPABILITIES: Mapping[str, Capability] = MappingProxyType(
             "Is a TURN relay server, or its managed-service configuration, in"
             " scope for this application?",
             parent="webrtc",
+            reviewed_by="mstarks01",
         ),
         "media-server": _row(
             "a WebRTC media server, or its managed-service configuration, is in"
@@ -776,6 +872,7 @@ CAPABILITIES: Mapping[str, Capability] = MappingProxyType(
             "Is a WebRTC media server, or its managed-service configuration, in"
             " scope for this application?",
             parent="webrtc",
+            reviewed_by="mstarks01",
         ),
         "media-recording": _row(
             "an in-scope WebRTC media server, or a recording service beside it,"
@@ -783,6 +880,7 @@ CAPABILITIES: Mapping[str, Capability] = MappingProxyType(
             "Does an in-scope WebRTC media server, or an associated recording"
             " service, record audio or video?",
             parent="media-server",
+            reviewed_by="mstarks01",
         ),
         "signaling-server": _row(
             "a WebRTC signaling server, or its managed-service configuration, is"
@@ -790,6 +888,7 @@ CAPABILITIES: Mapping[str, Capability] = MappingProxyType(
             "Is a WebRTC signaling server, or its managed-service configuration,"
             " in scope for this application?",
             parent="webrtc",
+            reviewed_by="mstarks01",
         ),
     }
 )

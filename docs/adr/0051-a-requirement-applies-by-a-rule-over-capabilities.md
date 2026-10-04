@@ -122,9 +122,9 @@ job does not pause again. So a "yes" to OAuth asks the role questions at once,
 on the same page.
 
 `reviewed_by` names who accepted a row or a capability, and is `None` until
-the maintainer reads it. The maintainer reviewed every conditional row, the
-`always` row V14.1.1, and 35 of the capabilities. The other 103 `always` rows
-and the other 83 capabilities are not reviewed.
+the maintainer reads it. The maintainer reviewed every capability, every
+conditional row and the `always` row V14.1.1. The other 103 `always` rows are
+not reviewed.
 
 The presence tests in `frameworks/asvs/rules.py` stay as leads for a lane. They
 decide no applicability.
