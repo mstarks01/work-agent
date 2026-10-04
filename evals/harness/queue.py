@@ -39,6 +39,7 @@ somebody else had answered the earlier version, and that is the leak the deleted
 from __future__ import annotations
 
 import argparse
+import hashlib
 from collections import Counter
 from collections.abc import Iterable, Iterator, Mapping, Sequence
 from dataclasses import dataclass, replace
@@ -49,7 +50,6 @@ from analysis_service.claims import Claim, FrameworkName
 from analysis_service.critic import (
     NO_ROWS,
     cited_channels,
-    distinct_mechanisms,
     grounded_mechanism,
 )
 from evals.harness import content as digests
@@ -117,14 +117,18 @@ class QueueItem:
 
     @property
     def key(self) -> str:
-        """What names this item to the page: its fingerprint, and its mechanism
-        where it has one, because two items may share a fingerprint (ADR 0060)."""
+        """What names this item to the page: its fingerprint, and a digest of
+        its mechanism where it has one, because two items may share a
+        fingerprint (ADR 0060).
+
+        A digest, because a mechanism holds sibling flow IDs, and a flow ID
+        carries both endpoints' IDs and its label, so it has no useful bound.
+        """
         mechanism = self.components.mechanism
-        return (
-            f"{self.fingerprint}~{'+'.join(mechanism)}"
-            if mechanism
-            else self.fingerprint
-        )
+        if not mechanism:
+            return self.fingerprint
+        digest = hashlib.sha256("\n".join(mechanism).encode()).hexdigest()[:16]
+        return f"{self.fingerprint}~{digest}"
 
     @property
     def content(self) -> str:
@@ -268,9 +272,9 @@ def answered(
     An answer on a **re-argued** claim does not count either, and that is
     :func:`restated`. ``contents`` maps each item's :data:`Identity` to the
     structural digest of what this queue would show for it, and a named
-    reviewer's own vote skips the item only when the two agree. A vote answers
-    an item where its fingerprint is the item's and its mechanism is not
-    distinct from the item's (ADR 0060).
+    reviewer's own vote skips the item only when the two agree. Which vote
+    answers an item is :meth:`~evals.harness.ledger.Ledger.verdicts_for`'s
+    rule (ADR 0060).
 
     The re-argued clause reads a **named** reviewer's votes only. In a queue
     built for nobody, ``voter`` is empty and anybody's answer skips: re-offering
@@ -284,16 +288,18 @@ def answered(
     had just re-offered. One rule needs one reader.
     """
     live = ledger.current()
-    return frozenset(
-        identity
-        for identity, content in contents.items()
-        for (value, who, cast), vote in live.items()
-        if value == identity[0]
-        and not distinct_mechanisms(cast, identity[1])
-        and (not voter or who == voter)
-        and (vote.verdict != "needs-evidence" or vote.sitting == sitting)
-        and (not voter or vote.answers_for(content))
-    )
+    skipped = set()
+    for identity, content in contents.items():
+        found = ledger.verdicts_for(*identity, live)
+        if voter:
+            found = {voter: found[voter]} if voter in found else {}
+        if any(
+            (vote.verdict != "needs-evidence" or vote.sitting == sitting)
+            and (not voter or vote.answers_for(content))
+            for vote in found.values()
+        ):
+            skipped.add(identity)
+    return frozenset(skipped)
 
 
 def restated(

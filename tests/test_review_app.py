@@ -19,7 +19,7 @@ from evals.harness import bundle
 from evals.harness import queue as review_queue
 from evals.harness.artifact import load_artifact
 from evals.harness.baseline import configuration_label
-from evals.harness.ledger import append, load
+from evals.harness.ledger import Ledger, append, load
 from evals.harness.provenance import ProvenanceError
 from tests.eval_factories import (
     SAMPLE_CONTENT,
@@ -35,6 +35,7 @@ from tests.test_asvs import _block as asvs_block
 from tests.test_asvs import sample_asvs_claim
 from webapp.review import (
     QUESTIONS,
+    VoteBody,
     build_session,
     create_app,
     findings_from_artifacts,
@@ -610,3 +611,19 @@ def test_the_summary_reads_the_ledger_once(client, monkeypatch):
 
     assert app.get("/api/summary").status_code == 200
     assert len(loads) == 1
+
+
+def test_an_item_whose_mechanism_names_long_flows_can_take_a_vote():
+    """A mechanism holds sibling flow IDs, which have no useful bound.
+
+    The item's key is what a vote names, so it stays inside the vote body's
+    bound whatever the mechanism holds.
+    """
+    from dataclasses import replace
+
+    from tests.test_evals_queue import FLOWS, finding
+
+    flows = tuple(f"flow:process:{'a' * 300}>process:b>{label}" for label in "xy")
+    item = review_queue.build([replace(finding(), mechanism=flows)], FLOWS, Ledger())[0]
+
+    assert VoteBody(fingerprint=item.key, verdict="up").fingerprint == item.key

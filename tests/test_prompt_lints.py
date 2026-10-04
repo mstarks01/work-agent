@@ -54,6 +54,7 @@ from analysis_service.claims import (
     CriticStep,
     Ground,
     Proposal,
+    RejectionStep,
 )
 from analysis_service.compact import (
     COMPACT_FORMAT,
@@ -886,6 +887,27 @@ def test_the_analyze_prompt_names_every_evidence_list(list_name):
     assert f"`{list_name}`" in loader.load(ANALYZE_PROMPT_NAME), (
         f"{list_name!r} is an evidence list the resolver reads and the analyze "
         f"prompt never names, so no agent can be expected to fill it."
+    )
+
+
+@pytest.mark.parametrize(
+    "step", sorted(set(get_args(RejectionStep)) - set(get_args(CriticStep)))
+)
+@pytest.mark.parametrize("framework", sorted(PACKAGES))
+def test_no_critic_prompt_offers_a_step_the_critic_cannot_write(step, framework):
+    """A step a report may carry but a critic may not write is never offered.
+
+    ``duplicate`` stays in :data:`RejectionStep` for archived reports, and
+    :data:`CriticStep` refuses it, so a prompt that offers it asks the critic
+    for a ruling the schema refuses.
+    """
+    texts = {
+        CRITIC_PROMPT_NAME: loader.load(CRITIC_PROMPT_NAME),
+        CRITIC_DOC: PACKAGE_LOADERS[framework].load(CRITIC_DOC),
+    }
+    offered = [name for name, text in texts.items() if f"`{step}`" in text]
+    assert not offered, (
+        f"{offered} offer the critic {step!r}, and its schema refuses that step."
     )
 
 
