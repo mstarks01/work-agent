@@ -1,7 +1,8 @@
-"""The withheld-sentence test's file, applied to case 01 (#1225).
+"""The withheld-sentence test's files (#1225, #1283).
 
-Held against the repository's own draft for case 01, so the file that a paid
-run would read is the file these checks pass or refuse.
+Most checks hold against the signed file for case 01, so the file that a paid
+run would read is the file these checks pass or refuse. Every other answers
+file must apply once signed, so a draft is checked before anyone signs it.
 """
 
 from __future__ import annotations
@@ -12,7 +13,9 @@ import pytest
 
 from evals.harness import modes, run
 from evals.harness.provenance import REPO_ROOT
-from evals.harness.withheld import load_answer_file, withheld_case
+from evals.harness.reference import load_corpus, tuning_cases
+from evals.harness.withheld import AnswerFile, load_answer_file, withheld_case
+from evals.verify_corpus import CORPUS_DIR
 from tests.test_evals_modes import case  # noqa: F401  (fixture)
 
 DRAFT = REPO_ROOT / "evals" / "answers" / "01-payments-checkout.json"
@@ -131,3 +134,53 @@ class TestAnswersWithinRounds:
         argv = ["run", "--mode", "withheld", "--case", "01-payments-checkout"]
         assert run.main([*argv, "--answer-rounds", "1"]) == 1
         assert "narrows the answered mode only" in capsys.readouterr().err
+
+
+@pytest.mark.parametrize(
+    "golden", tuning_cases(load_corpus(CORPUS_DIR)), ids=lambda golden: golden.id
+)
+def test_every_case_applies_with_nothing_withheld(golden):
+    """An excerpt the gate accepts is one the withheld check accepts.
+
+    Cases 03 and 07 cite a flow with ``…`` marking a cut, which the gate
+    reads as fragments, and a second reading here refused both cases.
+    """
+    nothing = AnswerFile(
+        signed_by="a test",
+        drafted_by="agent",
+        answers=(),
+        withheld_text=(),
+        withheld_fields=(),
+    )
+    assert withheld_case(golden, nothing).model == golden.model
+
+
+def test_an_excerpt_no_source_holds_is_refused(case, tmp_path):  # noqa: F811
+    def unground(raw):
+        raw["withheld"]["model"].append(
+            {
+                "element_id": "process:order-service",
+                "field": "source_excerpt",
+                "value": "A sentence that no source holds.",
+            }
+        )
+
+    with pytest.raises(modes.EvalRunError, match="no longer in the sources"):
+        withheld_case(case, signed_copy(tmp_path, unground))
+
+
+@pytest.mark.parametrize(
+    "draft", sorted(DRAFT.parent.glob("*.json")), ids=lambda path: path.stem
+)
+def test_every_answers_file_applies_once_signed(draft, tmp_path):
+    """A draft that cannot apply is refused here, before anyone signs it."""
+    raw = json.loads(draft.read_text(encoding="utf-8"))
+    raw["signed_by"] = "a test"
+    path = tmp_path / draft.name
+    path.write_text(json.dumps(raw), encoding="utf-8")
+    golden = next(
+        golden
+        for golden in tuning_cases(load_corpus(CORPUS_DIR))
+        if golden.id == raw["case"]
+    )
+    withheld_case(golden, load_answer_file(path))

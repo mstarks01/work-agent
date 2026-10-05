@@ -1,0 +1,53 @@
+{
+  "case": "03-batch-data-pipeline",
+  "drafted_by": "agent",
+  "signed_by": "",
+  "purpose": "withheld-sentence test for a question kind (#1283): the withheld sentence states one fact the content-validation kind asks, the model fields that quote or paraphrase it are set back, and the answer gives the same fact back as a facet answer to that kind",
+  "targets": [
+    {
+      "withheld": 1,
+      "tier": "must-find",
+      "verb": "alter",
+      "affected_element_ids": [
+        "store:landing-bucket",
+        "process:spark-transform-job"
+      ],
+      "why": "nothing checks the row contents beyond the schema, so altered claim records reach the warehouse"
+    }
+  ],
+  "withheld": {
+    "source": [
+      {
+        "text": "Nothing validates the row contents beyond the schema.",
+        "replacement": ""
+      }
+    ],
+    "model": [
+      {
+        "element_id": "flow:process:spark-transform-job>store:claims-warehouse>load-records",
+        "field": "source_excerpt",
+        "value": "The transform normalizes the records and loads them into BigQuery."
+      },
+      {
+        "element_id": "process:spark-transform-job",
+        "field": "description",
+        "value": "Spark job that normalizes claim records and loads them into the warehouse."
+      }
+    ]
+  },
+  "answers": [
+    {
+      "key": [
+        "process:spark-transform-job",
+        "",
+        "",
+        "",
+        "content-validation",
+        ""
+      ],
+      "facets": {
+        "validates": "no"
+      }
+    }
+  ]
+}
