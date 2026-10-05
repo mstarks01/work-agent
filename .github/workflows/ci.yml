@@ -61,12 +61,9 @@ jobs:
       - name: Lint
         run: uv run ruff check .
 
-      # Markdown is excluded because ruff would reformat the illustrative code
-      # fences in docs/ — schema sketches whose aligned trailing comments are
-      # prose, not source. The formatter's one source-tree exemption
-      # (evals/calibration_labels/build_pairs.py) lives in pyproject.toml.
+      # The formatter's exclusions live in pyproject.toml.
       - name: Format
-        run: uv run ruff format --check . --exclude '*.md'
+        run: uv run ruff format --check .
 
       # Scope and rule selection are in pyproject.toml's [tool.mypy], so this
       # step and a local `uv run mypy` check exactly the same thing.
