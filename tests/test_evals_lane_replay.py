@@ -29,9 +29,8 @@ PACKAGE_LOADER = MarkdownLoader(REPO_ROOT / "frameworks" / "stride")
 PROMPT_LOADER = MarkdownLoader(REPO_ROOT / "prompts")
 
 
-@pytest.fixture
-def recorded(monkeypatch, case, tmp_path):  # noqa: F811
-    """A scripted sweep's reports, and every request its model was sent."""
+def record_requests(monkeypatch) -> list[tuple[str, list]]:
+    """Every request the scripted model is sent from now on, as it was sent."""
     seen: list[tuple[str, list]] = []
     real = grounds.QueuedLlm.generate_content_async
 
@@ -43,6 +42,13 @@ def recorded(monkeypatch, case, tmp_path):  # noqa: F811
             yield response
 
     monkeypatch.setattr(grounds.QueuedLlm, "generate_content_async", recording)
+    return seen
+
+
+@pytest.fixture
+def recorded(monkeypatch, case, tmp_path):  # noqa: F811
+    """A scripted sweep's reports, and every request its model was sent."""
+    seen = record_requests(monkeypatch)
     run = grounds.sweep(monkeypatch, case, None)
     out = tmp_path / "artifact.json"
     write_reports(str(out), "analysis", run.runs)

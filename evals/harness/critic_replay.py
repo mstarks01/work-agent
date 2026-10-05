@@ -33,6 +33,7 @@ import argparse
 import asyncio
 import json
 import sys
+from collections import Counter
 from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
@@ -45,7 +46,7 @@ from google.adk.utils.instructions_utils import inject_session_state
 from google.genai import types
 
 from analysis_service.claims import AnalysisMarks, Claim, FrameworkName, Ruling
-from analysis_service.critic import complete_rulings, critic_view
+from analysis_service.critic import complete_rulings, critic_view, review_issues
 from analysis_service.deployment import Deployment
 from analysis_service.frameworks import PACKAGES, schemas_for
 from analysis_service.graph import (
@@ -64,6 +65,7 @@ from analysis_service.graph import (
 from analysis_service.markdown_loader import MarkdownLoader
 from analysis_service.report import InputRef, Report
 from analysis_service.sources import render_sources
+from analysis_service.system_model import SystemModel
 from evals.harness.artifact import CORPUS_DIR, repo_commit
 from evals.harness.bundle import reports_dir
 from evals.harness.lane_replay import load_material
@@ -80,8 +82,11 @@ class Archived:
     framework: FrameworkName
     drafts: list[Claim]
     marks: AnalysisMarks
-    report: Report
+    #: ``None`` where the case failed before it wrote one, and the material
+    #: came from its failure dump instead.
+    report: Report | None
     shared: dict[str, Any]
+    model: SystemModel
 
 
 def shared_keys(report: Report, case_id: str) -> dict[str, str]:
@@ -106,8 +111,14 @@ def shared_keys(report: Report, case_id: str) -> dict[str, str]:
 
 
 def load(artifact: Path, case_id: str, framework: FrameworkName) -> Archived:
-    """The drafts, marks, report and job-wide keys one critic call read."""
+    """The drafts, marks, report and job-wide keys one critic call read.
+
+    A case that failed after its lanes ran wrote no report, only a failure dump
+    of the graph's state, and that state holds the same material.
+    """
     directory = reports_dir(artifact)
+    if not (directory / f"{case_id}.report.json").is_file():
+        return _from_failure(directory, case_id, framework)
     report = Report.model_validate_json(
         (directory / f"{case_id}.report.json").read_text(encoding="utf-8")
     )
@@ -133,6 +144,33 @@ def load(artifact: Path, case_id: str, framework: FrameworkName) -> Archived:
         marks=marks,
         report=report,
         shared=shared,
+        model=report.system_model,
+    )
+
+
+def _from_failure(directory: Path, case_id: str, framework: FrameworkName) -> Archived:
+    """The material one critic call read, from a failed case's state dump.
+
+    The rendered model and crossings are the keys ``prepare`` wrote. The dump
+    keeps no sources, so they come from the corpus case, as
+    :func:`shared_keys` takes them for a report.
+    """
+    state = json.loads(
+        (directory / f"{case_id}.failure.json").read_text(encoding="utf-8")
+    )["state"]
+    nodes = FrameworkNodes(framework)
+    record = PACKAGES[framework].record
+    return Archived(
+        framework=framework,
+        drafts=[record.model_validate(draft) for draft in state[nodes.key("drafts")]],
+        marks=AnalysisMarks.model_validate(state.get(nodes.key("marks")) or {}),
+        report=None,
+        shared={
+            STATE_SYSTEM_MODEL: state[STATE_SYSTEM_MODEL],
+            STATE_BOUNDARY_CROSSINGS: state[STATE_BOUNDARY_CROSSINGS],
+            STATE_INPUT_TEXT: render_sources(load_case(CORPUS_DIR / case_id).sources),
+        },
+        model=SystemModel.model_validate(state["valid_model"]),
     )
 
 
@@ -143,7 +181,7 @@ async def compose(
 ) -> tuple[str, types.Content]:
     """The instruction and the user turn the critic was sent, rebuilt."""
     nodes = FrameworkNodes(archived.framework)
-    record = archived.report.assertions
+    record = None if archived.report is None else archived.report.assertions
     view = critic_view(
         archived.drafts,
         repaired=archived.marks.repaired_quotes,
@@ -195,10 +233,12 @@ def compare(archived: Archived, rulings: Sequence[Ruling]) -> list[Agreement]:
     The replayed rulings are completed first, as the graph completes them, so
     the status read is the one that would have reached the report.
     """
-    block = next(
-        b for b in archived.report.analyses if b.framework == archived.framework
-    )
-    before = {claim.id: claim.verdict.status for claim in block.all_claims()}
+    before = {}
+    if archived.report is not None:
+        block = next(
+            b for b in archived.report.analyses if b.framework == archived.framework
+        )
+        before = {claim.id: claim.verdict.status for claim in block.all_claims()}
     after = {
         ruling.id: ruling.verdict.status
         for ruling in complete_rulings(archived.drafts, rulings)
@@ -292,6 +332,12 @@ def command_critic_replay(args: argparse.Namespace) -> int:
             f"  {mark} {row.draft_id:10} archived {row.archived:12} replayed {row.replayed}"
         )
     print(f"{same} of {len(rows)} verdicts agree")
+    problems = review_issues(archived.drafts, rulings, archived.model).problems
+    kinds = Counter(problem.kind for problem in problems)
+    print(
+        f"{len(problems)} problems the re-ask would be sent"
+        + "".join(f"; {kind} {count}" for kind, count in sorted(kinds.items()))
+    )
     charged = [charge for charge in spent if charge is not None]
     print(
         f"spent: ${sum(charged):.4f} reported"
