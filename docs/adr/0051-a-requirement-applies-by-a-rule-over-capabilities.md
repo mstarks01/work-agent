@@ -134,9 +134,8 @@ is beside `oauth-client` and `oauth-authorization-server`. The benchmark's
 simulation asks in the same rounds, through `next_round`.
 
 `reviewed_by` names who accepted a row or a capability, and is `None` until
-the maintainer reads it. The maintainer reviewed all 345 rows and the first
-118 capabilities. The 45 capabilities that the review of the `always` rows
-added are not reviewed yet.
+the maintainer reads it. The maintainer reviewed all 345 rows and all 163
+capabilities.
 
 The presence tests in `frameworks/asvs/rules.py` stay as leads for a lane. They
 decide no applicability.
