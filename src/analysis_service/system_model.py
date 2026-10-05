@@ -746,7 +746,16 @@ class EmittedSystemModel(BaseModel):
     list out, and a model that writes it anyway is refused.
     """
 
-    model_config = ConfigDict(extra="forbid")
+    # A provider reads this schema, so its title and description say what the
+    # model is and carry none of the reasons above.
+    model_config = ConfigDict(
+        extra="forbid",
+        title="SystemModel",
+        json_schema_extra={
+            "description": "The canonical structured representation of the"
+            " system under analysis."
+        },
+    )
 
     external_entities: list[ExternalEntity] = Field(default_factory=list)
     processes: list[Process] = Field(default_factory=list)
