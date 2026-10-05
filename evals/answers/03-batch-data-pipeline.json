@@ -1,7 +1,7 @@
 {
   "case": "03-batch-data-pipeline",
   "drafted_by": "agent",
-  "signed_by": "",
+  "signed_by": "mstarks01",
   "purpose": "withheld-sentence test for a question kind (#1283): the withheld sentence states one fact the content-validation kind asks, the model fields that quote or paraphrase it are set back, and the answer gives the same fact back as a facet answer to that kind",
   "targets": [
     {
