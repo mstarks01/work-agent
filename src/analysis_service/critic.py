@@ -113,8 +113,10 @@ def snap_rulings(
     the bounded ``recritic``. Snapping it means a re-ask is spent on a critic
     that pointed somewhere real rather than on one that mis-typed a slug.
 
-    Each fact is then named once, by :func:`_one_per_fact`, so the seam and
-    assembly agree about which entries a verdict carries.
+    A question kind with a ``subject`` beside it keeps the kind, by
+    :func:`_kind_over_subject`. Each fact is then named once, by
+    :func:`_one_per_fact`, so the seam and assembly agree about which entries a
+    verdict carries.
     """
     return [
         ruling.model_copy(
@@ -133,7 +135,9 @@ def snap_rulings(
                                 )
                                 if ref.element_id
                                 else ref
-                                for ref in ruling.verdict.related_unknowns
+                                for ref in map(
+                                    _kind_over_subject, ruling.verdict.related_unknowns
+                                )
                             ]
                         )
                     }
@@ -142,6 +146,19 @@ def snap_rulings(
         )
         for ruling in rulings
     ]
+
+
+def _kind_over_subject(ref: UnknownRef) -> UnknownRef:
+    """An entry naming a question kind and a subject, as the kind alone.
+
+    ``subject`` is the form for a fact no question kind fits, so an entry that
+    names a kind has said one fits, and its subject restates the kind's fixed
+    question. The ASVS critic wrote both on 54 of 203 rulings (#1476). Any
+    other mix has no stated precedence and stays for the review seam.
+    """
+    if set(ref.spellings) == {"question", "subject"}:
+        return ref.model_copy(update={"subject": ""})
+    return ref
 
 
 def _place(ref: UnknownRef) -> tuple[str, str, str]:
