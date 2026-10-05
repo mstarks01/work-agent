@@ -1489,7 +1489,7 @@ class TestTheScopeLineNamesTheUnitsAtTheLevel:
         assert "V10.4.1" not in applies + opened
         assert "V10.2.3" in applies
         assert "V10.2.3" not in opened
-        code_flow = CAPABILITIES["authorization-code-flow"].question
+        code_flow = CAPABILITIES["client-code-flow"].question
         assert opened.count(code_flow) == 1
         assert "V10.2.1" in opened.split(code_flow, 1)[1].split(")", 1)[0]
         assert "is open" not in lane_scope("spoofing", STRIDE, model, None)

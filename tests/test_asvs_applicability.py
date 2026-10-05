@@ -13,6 +13,7 @@ from analysis_service.capabilities import (
     Presence,
     expression_keys,
     lineage,
+    resolve,
 )
 from analysis_service.frameworks.asvs.applicability import (
     APPLICABILITY,
@@ -89,7 +90,7 @@ def test_oauth_present_leaves_only_the_role_questions_open():
     decisions = applicability_for(3, _known(oauth="present"))
     assert decisions["V10.1.1"].state == "applicable"
     assert decisions["V10.4.1"].missing == ("oauth-authorization-server",)
-    assert decisions["V10.5.1"].missing == ("oauth-client", "oidc")
+    assert decisions["V10.5.1"].missing == ("oauth-client", "oidc-relying-party")
 
 
 def test_an_oauth_client_is_not_asked_the_authorization_server_rules():
@@ -98,6 +99,32 @@ def test_an_oauth_client_is_not_asked_the_authorization_server_rules():
     assert decisions["V10.2.3"].state == "applicable"
     assert decisions["V10.4.1"].state == "not-applicable"
     assert decisions["V10.6.1"].state == "not-applicable"
+
+
+def test_a_clients_code_flow_does_not_apply_the_servers_code_flow_rules():
+    """#1468: each term of a conjunction names one party, through its parent."""
+    known = _known(
+        client_code_flow="present",
+        oidc_relying_party="present",
+        oauth_authorization_server="present",
+    )
+    decisions = applicability_for(3, known)
+    assert decisions["V10.2.1"].state == "applicable"
+    assert decisions["V10.5.1"].state == "applicable"
+    assert decisions["V10.4.2"].missing == ("server-code-flow",)
+    assert decisions["V10.6.1"].missing == ("oidc-provider",)
+
+
+def test_each_token_fact_sits_under_the_party_it_describes():
+    known = _known(self_contained_token_issuer="absent")
+    known |= _known(self_contained_token_consumer="absent")
+    facts = resolve(known)
+    assert (
+        facts["token-validity-period"].derived_from == "self-contained-token-consumer"
+    )
+    assert facts["shared-signing-key-audiences"].derived_from == (
+        "self-contained-token-issuer"
+    )
 
 
 def test_webrtc_without_turn_keeps_the_rest_of_the_chapter():

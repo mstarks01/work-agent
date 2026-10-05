@@ -97,7 +97,7 @@ def test_only_the_open_terms_are_missing():
 
 def test_an_absent_parent_makes_every_descendant_absent():
     facts = resolve(_facts(oauth="absent"))
-    for key in ("oauth-client", "oauth-resource-server", "oidc"):
+    for key in ("oauth-client", "oauth-resource-server", "oidc-relying-party"):
         assert facts[key].state == "absent"
         assert facts[key].evidence == ("a:oauth",)
         assert facts[key].derived_from == "oauth"

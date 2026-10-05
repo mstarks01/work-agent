@@ -3,6 +3,8 @@
 - **Status**: accepted
 - **Date**: 2026-09-29
 - **Effort**: [#1291](https://github.com/mstarks01/work-agent/issues/1291)
+- **Amended by**: [ADR 0063](0063-a-conjunction-names-one-party-through-its-parent.md),
+  on conjunctions
 - **Relates to**: [ADR 0027](0027-vocabulary-raises-a-lead-and-rules-nothing-out.md), whose
   rule that silence is not absence this keeps, and
   [ADR 0048](0048-a-paused-job-ranks-its-open-facts-before-any-finding.md),
@@ -20,7 +22,7 @@ stated reason", or "the input does not say, and this is the fact we need".
 ## Decision
 
 **A capability is a closed fact about the whole application.**
-`analysis_service.capabilities.CAPABILITIES` holds 163 of them, such as
+`analysis_service.capabilities.CAPABILITIES` holds 165 of them, such as
 `browser-frontend`, `oauth-client` and `turn-server`. Each has a meaning, a
 yes-or-no question and an optional parent. The table is framework-neutral: a
 capability says what the application has, never what a framework asks of it.
@@ -36,11 +38,11 @@ requirements: `always`, one capability, or `all` and `any` over smaller
 expressions. The rationale is in this repository's words. 47 rows are
 `always`, and 298 read at least one capability.
 
-**A conjunction reads facts about the whole application.** `all(oauth-client,
-authorization-code-flow)` holds when some component is an OAuth client and
-some component uses the code flow, even if they are two components. So the
-error goes one way: a requirement can stay applicable when it applies to no
-component, and a requirement is never ruled out by a wrong pairing.
+**A conjunction names one party through its parent.** A fact that a
+conjunction pairs with a role sits under that role, and its question asks about
+one party, as `client-code-flow` sits under `oauth-client`. A conjunction of
+two facts with no parent link reads the whole application. See
+[ADR 0063](0063-a-conjunction-names-one-party-through-its-parent.md).
 
 **The evaluator uses three-valued logic.** An unknown term is never false. So
 a requirement is `not-applicable` only when a capability it needs is stated
@@ -129,12 +131,12 @@ A paused job asks in rounds (ADR 0053). Each round is read off the model with
 the earlier answers in, so an answer drops every question it settled from the
 later rounds. A part joins its parent's round and stays hidden until the parent
 is "yes". One round can still ask a moot question: where its only partners in
-a conjunction are answered "no" on the same page, as `authorization-code-flow`
-is beside `oauth-client` and `oauth-authorization-server`. The benchmark's
+a conjunction are answered "no" on the same page, as `cookies` is beside a
+"no" to `browser-frontend`. The benchmark's
 simulation asks in the same rounds, through `next_round`.
 
 `reviewed_by` names who accepted a row or a capability, and is `None` until
-the maintainer reads it. The maintainer reviewed all 345 rows and all 163
+the maintainer reads it. The maintainer reviewed all 345 rows and all 165
 capabilities.
 
 The presence tests in `frameworks/asvs/rules.py` stay as leads for a lane. They

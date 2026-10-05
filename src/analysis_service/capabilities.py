@@ -571,8 +571,10 @@ CAPABILITIES: Mapping[str, Capability] = MappingProxyType(
             reviewed_by="mstarks01",
         ),
         "multiple-identity-providers": _row(
-            "the application accepts more than one identity provider",
-            "Does the application accept sign-in from more than one identity provider?",
+            "one part of the application accepts sign-in from more than one identity"
+            " provider",
+            "Does any one part of the application accept sign-in from more than one"
+            " identity provider, not counting providers that other parts accept?",
             parent="federated-identity",
             reviewed_by="mstarks01",
         ),
@@ -632,28 +634,25 @@ CAPABILITIES: Mapping[str, Capability] = MappingProxyType(
             reviewed_by="mstarks01",
         ),
         "token-validity-period": _row(
-            "a self-contained token states the period in which it is valid",
-            "Do the self-contained tokens carry a validity period, such as an"
-            " expiry time?",
-            parent="self-contained-tokens",
+            "at least one self-contained token consumed by the application contains a"
+            " validity time bound, such as an expiry or not-before time",
+            "Does any self-contained token the application consumes contain an expiry"
+            " time, a not-before time or another validity time bound?",
+            parent="self-contained-token-consumer",
             reviewed_by="mstarks01",
         ),
         "shared-signing-key-audiences": _row(
-            "one signing key signs self-contained tokens for more than one audience",
-            "Does one signing key sign tokens for more than one audience?",
-            parent="self-contained-tokens",
+            "the application signs self-contained tokens for more than one audience"
+            " with one signing key",
+            "Does the application use one signing key for the tokens it issues to more"
+            " than one audience?",
+            parent="self-contained-token-issuer",
             reviewed_by="mstarks01",
         ),
         # --- OAuth and OpenID Connect ---
         "oauth": _row(
             "the application takes part in OAuth 2.0 or OpenID Connect",
             "Does the application use OAuth 2.0 or OpenID Connect?",
-            reviewed_by="mstarks01",
-        ),
-        "authorization-code-flow": _row(
-            "an OAuth party in scope uses the authorization code grant",
-            "Does an OAuth client or authorization server here use the"
-            " authorization code flow?",
             reviewed_by="mstarks01",
         ),
         "oauth-client": _row(
@@ -673,8 +672,26 @@ CAPABILITIES: Mapping[str, Capability] = MappingProxyType(
             reviewed_by="mstarks01",
         ),
         "multiple-authorization-servers": _row(
-            "the OAuth client works with more than one authorization server",
-            "Does the OAuth client work with more than one authorization server?",
+            "a single OAuth client in scope can interact with more than one"
+            " authorization server in the deployed system",
+            "Can any single OAuth client in scope interact with more than one"
+            " authorization server, even if it currently uses only one?",
+            parent="oauth-client",
+            reviewed_by="mstarks01",
+        ),
+        "client-code-flow": _row(
+            "an OAuth client in scope uses an authorization-code exchange to obtain"
+            " tokens, including as part of an OpenID Connect hybrid flow",
+            "Does any OAuth client in scope obtain tokens by exchanging an"
+            " authorization code, including as part of an OpenID Connect hybrid flow?",
+            parent="oauth-client",
+            reviewed_by="mstarks01",
+        ),
+        "oidc-relying-party": _row(
+            "an OAuth client in the application signs users in with OpenID Connect, as"
+            " a relying party",
+            "Does an OAuth client in the application sign users in with OpenID"
+            " Connect?",
             parent="oauth-client",
             reviewed_by="mstarks01",
         ),
@@ -698,6 +715,22 @@ CAPABILITIES: Mapping[str, Capability] = MappingProxyType(
             "Is an OAuth authorization server, including its configuration in a"
             " managed service, within the assessment scope?",
             parent="oauth",
+            reviewed_by="mstarks01",
+        ),
+        "server-code-flow": _row(
+            "an authorization server in scope supports issuing authorization codes for"
+            " exchange into tokens, including as part of an OpenID Connect hybrid flow",
+            "Does any authorization server in scope support issuing authorization"
+            " codes for exchange into tokens, including as part of an OpenID Connect"
+            " hybrid flow?",
+            parent="oauth-authorization-server",
+            reviewed_by="mstarks01",
+        ),
+        "oidc-provider": _row(
+            "the authorization server in scope is also an OpenID Connect provider",
+            "Does the authorization server in scope also act as an OpenID Connect"
+            " provider?",
+            parent="oauth-authorization-server",
             reviewed_by="mstarks01",
         ),
         "refresh-tokens": _row(
@@ -744,23 +777,19 @@ CAPABILITIES: Mapping[str, Capability] = MappingProxyType(
             parent="oauth-authorization-server",
             reviewed_by="mstarks01",
         ),
-        "oidc": _row(
-            "the application uses OpenID Connect for sign-in",
-            "Does the application use OpenID Connect for sign-in?",
-            parent="oauth",
-            reviewed_by="mstarks01",
-        ),
         "oidc-backchannel-logout": _row(
-            "the relying party receives OpenID Connect back-channel logout requests",
-            "Does the relying party receive back-channel logout requests from the"
-            " OpenID provider?",
-            parent="oidc",
+            "an OpenID Connect relying party in scope supports receiving back-channel"
+            " logout requests directly from an OpenID provider",
+            "Does any OpenID Connect relying party in scope support receiving logout"
+            " requests directly from an OpenID provider through back-channel logout,"
+            " even if none have arrived yet?",
+            parent="oidc-relying-party",
             reviewed_by="mstarks01",
         ),
         "rp-initiated-logout": _row(
             "the OpenID provider supports logout that a relying party starts",
             "Does the OpenID provider support logout started by a relying party?",
-            parent="oidc",
+            parent="oidc-provider",
             reviewed_by="mstarks01",
         ),
         # --- Authorization ---

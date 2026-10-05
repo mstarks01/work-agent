@@ -1299,7 +1299,7 @@
       "applies_if": {
         "all": [
           "oauth-client",
-          "authorization-code-flow"
+          "client-code-flow"
         ]
       },
       "rationale": "the subject is an OAuth client's use of the code grant",
@@ -1373,7 +1373,7 @@
       "applies_if": {
         "all": [
           "oauth-authorization-server",
-          "authorization-code-flow"
+          "server-code-flow"
         ]
       },
       "rationale": "the subject is the authorization code flow at an OAuth authorization server",
@@ -1384,7 +1384,7 @@
       "applies_if": {
         "all": [
           "oauth-authorization-server",
-          "authorization-code-flow"
+          "server-code-flow"
         ]
       },
       "rationale": "the subject is the authorization code flow at an OAuth authorization server",
@@ -1412,7 +1412,7 @@
       "applies_if": {
         "all": [
           "oauth-authorization-server",
-          "authorization-code-flow"
+          "server-code-flow"
         ]
       },
       "rationale": "the subject is the authorization code flow at an OAuth authorization server",
@@ -1484,7 +1484,7 @@
       "applies_if": {
         "all": [
           "oauth-authorization-server",
-          "authorization-code-flow"
+          "server-code-flow"
         ]
       },
       "rationale": "the subject is the authorization code flow at an OAuth authorization server",
@@ -1513,7 +1513,7 @@
       "applies_if": {
         "all": [
           "oauth-client",
-          "oidc"
+          "oidc-relying-party"
         ]
       },
       "rationale": "the subject is an OpenID Connect relying party",
@@ -1524,7 +1524,7 @@
       "applies_if": {
         "all": [
           "oauth-client",
-          "oidc"
+          "oidc-relying-party"
         ]
       },
       "rationale": "the subject is an OpenID Connect relying party",
@@ -1535,7 +1535,7 @@
       "applies_if": {
         "all": [
           "oauth-client",
-          "oidc"
+          "oidc-relying-party"
         ]
       },
       "rationale": "the subject is an OpenID Connect relying party",
@@ -1546,7 +1546,7 @@
       "applies_if": {
         "all": [
           "oauth-client",
-          "oidc"
+          "oidc-relying-party"
         ]
       },
       "rationale": "the subject is an OpenID Connect relying party",
@@ -1557,7 +1557,7 @@
       "applies_if": {
         "all": [
           "oauth-client",
-          "oidc",
+          "oidc-relying-party",
           "oidc-backchannel-logout"
         ]
       },
@@ -1569,7 +1569,7 @@
       "applies_if": {
         "all": [
           "oauth-authorization-server",
-          "oidc"
+          "oidc-provider"
         ]
       },
       "rationale": "the subject is an OpenID provider",
@@ -1580,7 +1580,7 @@
       "applies_if": {
         "all": [
           "oauth-authorization-server",
-          "oidc",
+          "oidc-provider",
           "rp-initiated-logout"
         ]
       },
