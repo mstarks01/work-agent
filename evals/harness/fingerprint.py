@@ -74,6 +74,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from analysis_service.claims import FrameworkName
+from analysis_service.frameworks import PACKAGES
 from analysis_service.frameworks.asvs.record import requirement_of
 from analysis_service.parsing import ascii_int
 from evals.harness.identity import FlowMap, endpoint_form
@@ -101,22 +102,6 @@ VERSION_FOR: dict[FrameworkName, int] = {
     "stride": 6,
     "asvs": 5,
 }
-
-#: Which field on a claim names the lane it was reached in. **Keyed, never
-#: branched**, and checked against ``PACKAGES`` by
-#: ``tests/test_evals_fingerprint.py``.
-#:
-#: A package names its lane in its own terms — STRIDE reaches a claim in a
-#: category, ASVS reaches one in a chapter — and both are the graph's fact
-#: rather than anything an agent spelled. A reader that fell back to the
-#: framework name keyed every one of a package's findings under one lane, which
-#: made two findings in two chapters one fingerprint and let one vote answer
-#: for both.
-LANE_FIELD: dict[FrameworkName, str] = {
-    "stride": "category",
-    "asvs": "chapter",
-}
-
 
 #: How a package's claim names its catalog identifier, read off the claim ID.
 #: **Keyed, never branched**, and checked against ``PACKAGES`` by
@@ -282,19 +267,23 @@ def identifier_of(framework: FrameworkName, claim_id: str) -> str | None:
 def lane_field(framework: FrameworkName) -> str:
     """Which field of this package's claim carries its lane.
 
-    Raises on a package the table does not name, for the same reason
-    :func:`version_for` does: a claim whose lane cannot be read is a claim that
-    would key under a constant, and every finding of that package would share
-    one fingerprint per place.
+    Read off the package's ``id_rule``, which is the field the graph stamps the
+    lane into. A package names its lane in its own terms: STRIDE reaches a claim
+    in a category, ASVS in a chapter.
+
+    Raises on a package that declares no lane field, for the same reason
+    :func:`version_for` raises on an unknown package: a claim whose lane cannot
+    be read keys under a constant, so two findings in two lanes at one place
+    become one fingerprint and one vote answers for both.
     """
-    try:
-        return LANE_FIELD[framework]
-    except KeyError:
+    package = PACKAGES.get(framework)
+    field = package.id_rule.lane_field if package else None
+    if not field:
         raise FingerprintError(
-            f"no lane field is declared for {framework!r};"
-            " add it to LANE_FIELD — the field its claim carries the lane in,"
-            " which the graph stamps rather than an agent"
-        ) from None
+            f"no lane field is declared for {framework!r}; its package's"
+            " id_rule must name the field the graph stamps the lane into"
+        )
+    return field
 
 
 def version_for(framework: FrameworkName) -> int:

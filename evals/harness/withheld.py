@@ -41,7 +41,7 @@ from analysis_service.fact_answers import FactAnswer
 from analysis_service.fact_writes import check_fact_answers
 from analysis_service.sources import Source
 from analysis_service.system_model import SystemModel
-from analysis_service.validation import CITATION_FIELDS, validate
+from analysis_service.validation import validate
 from evals.harness.modes import EvalRunError
 from evals.harness.reference import GoldenCase
 
@@ -219,7 +219,7 @@ def withheld_case(case: GoldenCase, answer_file: AnswerFile) -> GoldenCase:
     # case the gate admits is never refused here for an excerpt it accepts.
     cited = {source.label: source.text for source in sources}
     for issue in validate(model, sources=cited):
-        if issue.field in CITATION_FIELDS:
+        if issue.is_citation:
             raise EvalRunError(
                 f"{issue.element_id}'s excerpt is no longer in the sources; set"
                 f" it to a sentence that is ({issue.message})"

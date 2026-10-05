@@ -48,7 +48,7 @@ The recurring ways this chapter's requirements go unanswered in a system descrip
 **Uploads exist and no limit is stated.** Size, count and type limits are the requirements here, and prose describing a feature rarely carries any of them.
 **Storage location is described without its serving path.** Where an uploaded file lands is often stated; whether it is served back from a location the browser executes is not. That gap is the requirement.
 **Type is checked by extension in the telling.** Where the input names a permitted file type at all, ask whether the content was checked or only the name.
-**No upload path in the model.** Rule the chapter out on the elements the model does carry, rather than on the absence of the word upload.
+**No upload path in the model.** Rule the open requirements out on the elements the model does carry, rather than on the absence of the word upload.
 
 ## Guardrails
 

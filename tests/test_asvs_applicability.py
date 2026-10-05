@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections import Counter
+from itertools import combinations
 
 import pytest
 
@@ -125,6 +126,60 @@ def test_each_token_fact_sits_under_the_party_it_describes():
     assert facts["shared-signing-key-audiences"].derived_from == (
         "self-contained-token-issuer"
     )
+
+
+#: The conjunctions ADR 0063 lets read the whole application, by decision.
+WHOLE_APPLICATION_CONJUNCTIONS = frozenset(
+    {
+        *(f"V3.3.{n}" for n in range(1, 6)),
+        "V3.5.5",
+        "V3.6.1",
+        "V7.1.3",
+        "V7.4.4",
+        "V7.5.3",
+        "V7.6.1",
+        "V7.6.2",
+        "V14.3.1",
+        "V14.3.2",
+    }
+)
+
+
+def _unrelated_pairs(expression):
+    """Each pair of an ``all``'s terms where neither is the other's ancestor.
+
+    An ``any`` inside it lends each alternative as a term, and the alternatives
+    are never paired with each other, because only one of them has to hold.
+    """
+    if isinstance(expression, str):
+        return
+    ((operator, terms),) = expression.items()
+    if operator == "all":
+        keys = [term for term in terms if isinstance(term, str) and term != ALWAYS]
+        alternatives = [
+            [key for key in term["any"] if isinstance(key, str)]
+            for term in terms
+            if not isinstance(term, str) and "any" in term
+        ]
+        pairs = list(combinations(keys, 2))
+        pairs += [
+            (key, other) for key in keys for group in alternatives for other in group
+        ]
+        yield from (
+            (a, b) for a, b in pairs if a not in lineage(b) and b not in lineage(a)
+        )
+    for term in terms:
+        yield from _unrelated_pairs(term)
+
+
+def test_a_conjunction_names_one_party_through_its_parent():
+    """ADR 0063: a conjunction outside its list pairs a child with its parent."""
+    unrelated = {
+        unit
+        for unit, expression in APPLICABILITY.items()
+        if any(_unrelated_pairs(expression))
+    }
+    assert unrelated == WHOLE_APPLICATION_CONJUNCTIONS
 
 
 def test_the_scan_rule_reads_only_whether_untrusted_files_are_sent_on():

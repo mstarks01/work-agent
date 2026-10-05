@@ -81,7 +81,7 @@ The recurring ways this chapter's requirements go unanswered in a system descrip
 **Redirect URIs are unmentioned.** Exact-match registration is a requirement and a common real defect, and the input almost never carries the registered set.
 **PKCE is assumed.** Where the input describes a public client, the code-exchange protections apply and are open.
 **Client authentication is undescribed.** How the client proves itself to the authorization server is its own requirement, separate from how the user proves themselves.
-**No federation at all.** Rule the chapter out on the mechanism the model states, not on the absence of the word OAuth.
+**No federation at all.** Rule the open requirements out on the mechanism the model states, not on the absence of the word OAuth.
 
 ## Guardrails
 

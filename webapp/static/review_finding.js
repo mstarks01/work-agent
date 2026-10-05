@@ -75,8 +75,8 @@
       method: "POST",
       headers: {"Content-Type": "application/json", "X-Review-Token": TOKEN},
       body: JSON.stringify({
-        // The item's key: its fingerprint, and its mechanism where it has one,
-        // because two items may share a fingerprint (ADR 0060).
+        // The item's key: its fingerprint, and a digest of its mechanism where
+        // it has one, because two items may share a fingerprint (ADR 0060).
         fingerprint: current.key,
         verdict: verdict,
         reason: reason || null,

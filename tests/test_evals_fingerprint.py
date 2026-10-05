@@ -19,7 +19,6 @@ from evals.harness import fingerprint as fingerprint_module
 from evals.harness.fingerprint import (
     EXTRA_COMPONENT,
     IDENTIFIER_OF,
-    LANE_FIELD,
     READS_SCOPE,
     SUPPORTED_VERSIONS,
     VERSION_FOR,
@@ -190,9 +189,10 @@ def test_an_undeclared_framework_raises_rather_than_defaulting():
         version_for("nothing-declares-this")
 
 
-def test_the_lane_table_covers_every_package():
-    """The other half of a key, and the same rule: a table, checked."""
-    assert set(LANE_FIELD) == set(PACKAGES)
+@pytest.mark.parametrize("framework", sorted(PACKAGES))
+def test_the_lane_field_is_the_one_the_graph_stamps(framework):
+    """The other half of a key, read off the package rather than a copy of it."""
+    assert lane_field(framework) == PACKAGES[framework].id_rule.lane_field
 
 
 def test_a_package_with_no_declared_lane_field_raises():

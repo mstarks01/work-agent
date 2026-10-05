@@ -19,7 +19,7 @@ what?**
 | Part | Where it comes from | Read by |
 |---|---|---|
 | framework | the block | v1, v2, v3 |
-| lane | the block, from the field its package declares (`LANE_FIELD`) | v1, v2, v3 |
+| lane | the block, from the field its package's `id_rule` declares (`lane_field`) | v1, v2, v3 |
 | targets | `affected_element_ids`, endpoint-resolved | v1, v2, v3 |
 | action verb | `analysis_service.actions`, a closed set of 20 | v2 only |
 | catalog identifier | the claim ID, read by the package that owns the catalog (`IDENTIFIER_OF`) | v3 only |
