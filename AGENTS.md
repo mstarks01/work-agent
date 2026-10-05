@@ -340,5 +340,5 @@ section. A corpus case converted from somebody else's model records the source
 
 ### Domain docs
 
-Single-context: one `CONTEXT.md` glossary at the repo root, ADRs in `docs/adr/`.
+Single-context: one glossary, `GLOSSARY.md`, at the repo root, ADRs in `docs/adr/`.
 See `docs/agents/domain.md`.

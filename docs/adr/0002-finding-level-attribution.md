@@ -18,7 +18,7 @@ question about any finding is *why do you think so*.
 
 Every threat now carries **Grounds**: one or more records, each a `quote`, an
 `unknown-attribute` or a `derived-fact`. Most of what that entailed is recorded
-where it belongs — the vocabulary in `CONTEXT.md`, the payload in
+where it belongs — the vocabulary in `GLOSSARY.md`, the payload in
 [`docs/Report-Schema.md`](../Report-Schema.md), the rules in docstrings, the
 reasoning in the nine resolution comments. Four decisions are here because each
 lost to a *measurement*, which means each looks reversible to someone reading

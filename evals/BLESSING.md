@@ -461,7 +461,7 @@ is yours, so repair it or delete it, and every other case still walks.
 
 The rest of this section is what it writes.
 
-**This step is now enforced.** The act is a **Case Sitting** (see `CONTEXT.md`),
+**This step is now enforced.** The act is a **Case Sitting** (see `GLOSSARY.md`),
 and it is recorded as **one JSON file** under `evals/review/submissions/`:
 
 ```json

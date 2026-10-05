@@ -15,7 +15,7 @@ and a `source_excerpt` quoted the write-up rather than anything a person said.
 
 A job now takes an ordered, non-empty list of **Sources**, each `{kind, label,
 text}`. Most of what that entailed is recorded where it belongs: the vocabulary
-in `CONTEXT.md`, the reasoning in the ten tickets, the behaviour in code and
+in `GLOSSARY.md`, the reasoning in the ten tickets, the behaviour in code and
 tests. Three decisions are here because they have consequences inside this repo
 that neither a glossary nor a docstring can carry, and because someone will
 otherwise reverse them for good-looking reasons.

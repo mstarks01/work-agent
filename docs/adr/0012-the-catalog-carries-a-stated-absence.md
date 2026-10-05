@@ -25,7 +25,7 @@ Two facts therefore had no **Evidence Reference** at all:
 - a control the input says is **not there** — `authentication: "none; accepted
   by network position"`;
 - a control someone **hedged** — `"unknown; possibly a shared group account"` —
-  because the string is not exactly `unknown`, though `CONTEXT.md` has always
+  because the string is not exactly `unknown`, though `GLOSSARY.md` has always
   defined **Unknown** to include a voiced hedge.
 
 Measured on the 12 corpus cases, which hold 251 control-attribute instances:

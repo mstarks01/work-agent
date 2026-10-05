@@ -17,7 +17,7 @@ measured.
 One directory under `evals/baselines/`, holding up to ten sweeps of **one
 configuration**, with the full report from every case in every sweep. A
 **Baseline** is the unit the comparison numbers read, and the glossary entry in
-[`../CONTEXT.md`](../CONTEXT.md) is its definition.
+[`../GLOSSARY.md`](../GLOSSARY.md) is its definition.
 
 Its identity is computed from the sweeps, never typed: the clean repository
 commit, the corpus digest, the requested model per tier, the resolved sampling

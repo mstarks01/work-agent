@@ -231,7 +231,7 @@ Completed on GitHub Issues (canonical):
   `--accept-cost <usd|unknown>`, and a run that outspends the accepted figure re-prompts
   interactively or stops.
 
-  Corrections worth knowing: #327 named the act — a **Case Sitting**, defined in `CONTEXT.md` by
+  Corrections worth knowing: #327 named the act — a **Case Sitting**, defined in `GLOSSARY.md` by
   PR [#333](https://github.com/mstarks01/work-agent/pull/333), distinct from the Review Sitting
   that produces votes. #334 amended #325 twice: `--yes` and `--allow-unpriced` die on the estimate
   gate, replaced by `--accept-cost`. #335 ruled the place for the ceiling text before #334 ruled

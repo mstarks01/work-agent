@@ -50,7 +50,7 @@ carried no cap in any package. This is the failure `AGENTS.md` names — a
 constant per kind, read by a lint that walks one package's tree, is a gap that
 opens the moment a second package arrives.
 
-**The word collided.** `CONTEXT.md` defines **envelope** as the `Report`
+**The word collided.** `GLOSSARY.md` defines **envelope** as the `Report`
 envelope. The prompt comments used the same word for a token allowance.
 
 ## Decision
@@ -62,7 +62,7 @@ measurement in this repo says a shorter instruction finds more threats.
 **Nothing has to leave to make room for new text.**
 
 **The 6-8K envelope is retired**, along with every comment that argued a number
-against it. `envelope` returns to its one `CONTEXT.md` meaning.
+against it. `envelope` returns to its one `GLOSSARY.md` meaning.
 
 **One table, keyed by asset kind: `TOKEN_CAPS` in
 `analysis_service.token_caps`.** Eight module constants across two modules become

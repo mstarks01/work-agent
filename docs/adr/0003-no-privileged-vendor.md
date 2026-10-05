@@ -182,7 +182,7 @@ lanes that would exercise it do not run.
 - **Unexercised coverage is reported as unexercised.** The CI summary states
   plainly that no live lane has run, rather than letting a green offline check
   read as provider validation. This reuses *unexercised* in the sense
-  `CONTEXT.md` already gives it for certification: a thing the run declared and
+  `GLOSSARY.md` already gives it for certification: a thing the run declared and
   did not exercise, which is not the same as a thing that passed.
 - A live lane pinned to a model the offline matrix does not profile now fails the
   offline suite, so the two cannot drift apart silently.

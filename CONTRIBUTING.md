@@ -59,7 +59,7 @@ anything.
   travels in the same pull request. Your GitHub login is your name in every
   record here, and your **Standing** is what published numbers state alongside
   the numbers themselves — see the glossary entry in
-  [`CONTEXT.md`](CONTEXT.md).
+  [`GLOSSARY.md`](GLOSSARY.md).
 
 ## Contributing code
 

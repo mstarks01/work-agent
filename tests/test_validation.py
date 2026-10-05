@@ -117,7 +117,7 @@ class TestAssumptionsRecordAnInference:
         assert "assumption-on-unknown" in codes(validate(model))
 
     def test_a_decorated_hedge_is_refused_with_the_bare_word(self):
-        """`CONTEXT.md`: a voiced hedge is unknown, and never an assumption."""
+        """`GLOSSARY.md`: a voiced hedge is unknown, and never an assumption."""
         model = valid_model()
         model.assumptions[0].attribute = "technology"
         model.processes[0].technology = "unknown; somebody thought Django"
