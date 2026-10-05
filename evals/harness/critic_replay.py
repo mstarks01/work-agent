@@ -45,15 +45,18 @@ from google.adk.utils.content_utils import to_user_content
 from google.adk.utils.instructions_utils import inject_session_state
 from google.genai import types
 
+from analysis_service.assertions import AssertionRecord
 from analysis_service.claims import AnalysisMarks, Claim, FrameworkName, Ruling
 from analysis_service.critic import complete_rulings, critic_view, review_issues
 from analysis_service.deployment import Deployment
 from analysis_service.frameworks import PACKAGES, schemas_for
 from analysis_service.graph import (
     CRITIC_ROLE,
+    STATE_ASSERTION_CATALOG,
     STATE_BOUNDARY_CROSSINGS,
     STATE_INPUT_TEXT,
     STATE_SYSTEM_MODEL,
+    STATE_VALID_MODEL,
     FrameworkNodes,
     critic_instruction,
     merge_summary,
@@ -87,6 +90,9 @@ class Archived:
     report: Report | None
     shared: dict[str, Any]
     model: SystemModel
+    #: The fact catalog the critic's drafts cited, or ``None`` where the run
+    #: had no assertion pass.
+    assertions: AssertionRecord | None
 
 
 def shared_keys(report: Report, case_id: str) -> dict[str, str]:
@@ -145,6 +151,7 @@ def load(artifact: Path, case_id: str, framework: FrameworkName) -> Archived:
         report=report,
         shared=shared,
         model=report.system_model,
+        assertions=report.assertions,
     )
 
 
@@ -170,7 +177,12 @@ def _from_failure(directory: Path, case_id: str, framework: FrameworkName) -> Ar
             STATE_BOUNDARY_CROSSINGS: state[STATE_BOUNDARY_CROSSINGS],
             STATE_INPUT_TEXT: render_sources(load_case(CORPUS_DIR / case_id).sources),
         },
-        model=SystemModel.model_validate(state["valid_model"]),
+        model=SystemModel.model_validate(state[STATE_VALID_MODEL]),
+        assertions=(
+            None
+            if state.get(STATE_ASSERTION_CATALOG) is None
+            else AssertionRecord.model_validate(state[STATE_ASSERTION_CATALOG])
+        ),
     )
 
 
@@ -181,7 +193,7 @@ async def compose(
 ) -> tuple[str, types.Content]:
     """The instruction and the user turn the critic was sent, rebuilt."""
     nodes = FrameworkNodes(archived.framework)
-    record = None if archived.report is None else archived.report.assertions
+    record = archived.assertions
     view = critic_view(
         archived.drafts,
         repaired=archived.marks.repaired_quotes,

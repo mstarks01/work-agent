@@ -38,7 +38,7 @@ The recurring ways this chapter's requirements go unanswered in a system descrip
 **A token is named and its verification is not.** Which algorithms the verifier accepts, and whether it rejects `none`, is the sharpest requirement here and one prose never carries.
 **Audience and issuer go unmentioned.** A token accepted without an audience check is a token any holder can replay across services. The requirement applies wherever a token appears.
 **Expiry is assumed from the library.** The input says a token is used; it does not say what its lifetime is or whether expiry is enforced.
-**No self-contained token named.** Where no `authentication` value and no technology field names one, rule this chapter out on that absence, and name the credentials the model does state. A session cookie is one of those credentials, not a second fact that rules the chapter out.
+**No self-contained token named.** Where no `authentication` value and no technology field names one, rule the open requirements out on that absence, and name the credentials the model does state. A session cookie is one of those credentials, not a second fact that rules the chapter out.
 
 ## Guardrails
 

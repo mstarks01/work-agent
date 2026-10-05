@@ -43,7 +43,7 @@ Read the model's flow protocols and technologies for WebRTC, SRTP, STUN, TURN or
 
 The recurring ways this chapter's requirements go unanswered in a system description. Each names what to look for; none is a finding on its own.
 
-**No WebRTC in the model.** Rule the chapter out on the stated protocols. This is the expected outcome, and it is an answer rather than a gap.
+**No WebRTC in the model.** Rule the open requirements out on the stated protocols. This is the expected outcome, and it is an answer rather than a gap.
 **A media path exists and its signalling is undescribed.** Where WebRTC does appear, how the peers find each other is the first requirement to rule on.
 **TURN is implied by the topology.** A peer-to-peer path across a NAT boundary needs a relay, and the requirements on it apply once one exists.
 **Resource limits on a media path are unmentioned.** Concurrent channel limits are a requirement wherever a media path is open to untrusted callers.

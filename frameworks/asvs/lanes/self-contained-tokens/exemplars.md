@@ -4,7 +4,7 @@ Two drafts against exemplar system A. This chapter's precondition fails here, an
 
 ## V9.1.2 — This system carries no self-contained token
 
-No element of this model names a self-contained token. That absence is the fact that rules the chapter out — not the cookie, whose contents the input never states.
+No element of this model names a self-contained token. That absence is the fact that rules the open requirements out — not the cookie, whose contents the input never states.
 
 ```json
 {

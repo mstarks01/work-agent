@@ -12,9 +12,11 @@ import json
 
 import pytest
 
+from analysis_service.assertions import AssertionCatalog, AssertionRecord
+from analysis_service.graph import STATE_ASSERTION_CATALOG
 from analysis_service.markdown_loader import MarkdownLoader
 from evals.harness import critic_replay
-from evals.harness.bundle import write_failures
+from evals.harness.bundle import reports_dir, write_failures
 from evals.harness.modes import EvalRunError
 from evals.harness.provenance import REPO_ROOT
 from tests import test_evals_run_grounds as grounds
@@ -209,3 +211,33 @@ def test_a_failed_case_rebuilds_its_critic_request_from_the_dump(
 
     assert archived.report is None
     assert next(contents for text, contents in seen if text == instruction) == [turn]
+
+
+def test_a_failure_dump_keeps_the_fact_catalog_the_drafts_cited(
+    monkeypatch,
+    case,  # noqa: F811
+    tmp_path,
+):
+    """A dump from a run with the assertion pass holds its catalog, and the
+    replay hands the critic view that catalog rather than none."""
+    silent_on_spoofing = json.dumps(
+        {
+            "claims": [
+                grounds.scripted_ruling(case, category)
+                for category in grounds.STRIDE_CATEGORIES
+                if category != "spoofing"
+            ]
+        }
+    )
+    run = grounds.sweep(monkeypatch, case, None, critic_first=[silent_on_spoofing])
+    out = tmp_path / "sweep.json"
+    write_failures(str(out), run.failed_states)
+    dump = reports_dir(out) / f"{case.id}.failure.json"
+    record = AssertionRecord(proposed=0, catalog=AssertionCatalog())
+    written = json.loads(dump.read_text(encoding="utf-8"))
+    written["state"][STATE_ASSERTION_CATALOG] = record.model_dump(mode="json")
+    dump.write_text(json.dumps(written), encoding="utf-8")
+
+    archived = critic_replay.load(out, case.id, "stride")
+
+    assert archived.assertions == record
