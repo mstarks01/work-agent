@@ -92,8 +92,12 @@ so a new caller must filter or state its reason.
 references (02/6, 05/6, 05/7, 12/8) name a read grant or a compromised reader.
 Every run, with or without the completeness instruction, writes a
 storage-copy threat there instead (`QA-2026-09-26-01-E3`). The cause is the
-only store lead, whose question asks who reaches the storage layer. A fix is
-built and not merged; see open work.
+only store lead, whose question asks who reaches the storage layer. The
+`information-disclosure-store-readers` rule now leads the lane to the elements
+that read such a store. In a blind ruling it stated the access-path threat at
+4 of 8 reference places over two passes, against 1 of 8 without it
+(`QA-2026-10-05-02-E3`). It recovers the two read-grant references (02/6,
+12/8) and neither compromised-reader reference (05/6, 05/7).
 
 **Prose-only mismatches (8 rows).** A different principal impersonated, a
 different resource flooded, or a defining part missing
@@ -114,7 +118,7 @@ fan-in loss.
 
 | Item | State | Where |
 |---|---|---|
-| Pattern A lead | Built on branch `pattern-a-store-readers` (commit `897fdc3`); 12 replays done ($0.54); waits on a blind 47-row ballot | #1239 item 1 |
+| Pattern A, compromised reader | The store-readers rule recovers neither 05/6 nor 05/7; no lead states that a compromised reader uses its own access | `QA-2026-10-05-02-E3` |
 | Case Sitting on cases 14 and 15 | Round 1 prepared; waits on the maintainer | #1239 item 2 |
 | Vote on the findings the lane closing added | Not built; the cost side of ADR 0030 | #1239 item 3 |
 | Full 15-case sweep with the lane closing | About $5.50; gives the first holdout reading with the closing | after OpenRouter credits allow |
