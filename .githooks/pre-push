@@ -57,9 +57,9 @@ if command -v uv >/dev/null 2>&1; then
         exit 1
     fi
 
-    if ! uv run ruff format --check . --exclude '*.md'; then
+    if ! uv run ruff format --check .; then
         echo >&2
-        echo "pre-push: ruff format failed. Run 'uv run ruff format . --exclude \"*.md\"'," >&2
+        echo "pre-push: ruff format failed. Run 'uv run ruff format .'," >&2
         echo "or push with --no-verify." >&2
         exit 1
     fi

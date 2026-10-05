@@ -144,11 +144,6 @@ target-version = "py311"
 # (a blind `except Exception`) is wrong. `docs/research/README.md` says so
 # where an editor will be standing. Nothing here is imported by the package,
 # and `[tool.mypy]`'s `files` never named `docs`.
-#
-# `extend-exclude` rather than `exclude`, and that is load-bearing: a
-# command-line `--exclude` REPLACES `exclude`, and both CI and `.githooks/`
-# run `ruff format --check . --exclude '*.md'`. Under `exclude` these
-# files would be checked in exactly the two places that matter.
 extend-exclude = ["docs/research"]
 [tool.mypy]
 # Every Python file in the repository, not just the shipped package. The eval
@@ -191,10 +186,15 @@ module = ["playwright", "playwright.*"]
 ignore_missing_imports = true
 
 [tool.ruff.format]
+# Markdown is excluded because ruff would reformat the illustrative code fences
+# in docs/ -- schema sketches whose aligned trailing comments are prose, not
+# source. It sits here rather than on a command line, so a bare
+# `ruff format .` and the CI check format the same files.
+#
 # Hand-labelled data table: one tuple per row is the editing and grep unit, and
 # 88-column wrapping turns each of its ~400 rows into six lines. Only formatting
 # is opted out here — `ruff check` still covers the file.
-exclude = ["evals/calibration_labels/build_pairs.py"]
+exclude = ["*.md", "evals/calibration_labels/build_pairs.py"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
