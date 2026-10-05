@@ -41,6 +41,7 @@ from analysis_service.fact_answers import FactAnswer
 from analysis_service.fact_writes import check_fact_answers
 from analysis_service.sources import Source
 from analysis_service.system_model import SystemModel
+from analysis_service.validation import CITATION_FIELDS, validate
 from evals.harness.modes import EvalRunError
 from evals.harness.reference import GoldenCase
 
@@ -214,13 +215,14 @@ def withheld_case(case: GoldenCase, answer_file: AnswerFile) -> GoldenCase:
             raise EvalRunError(
                 f"a withheld phrase is still in the case: {phrase[:60]!r}"
             )
-    for element in model.elements():
-        if element.source_excerpt and not _pattern(element.source_excerpt).search(
-            texts
-        ):
+    # The gate's own reading of an excerpt, which takes ``…`` as a cut, so a
+    # case the gate admits is never refused here for an excerpt it accepts.
+    cited = {source.label: source.text for source in sources}
+    for issue in validate(model, sources=cited):
+        if issue.field in CITATION_FIELDS:
             raise EvalRunError(
-                f"{element.id}'s excerpt is no longer in the sources; set it to"
-                " a sentence that is"
+                f"{issue.element_id}'s excerpt is no longer in the sources; set"
+                f" it to a sentence that is ({issue.message})"
             )
     checked = replace(case, sources=sources, model=model)
     try:
