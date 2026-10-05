@@ -14,9 +14,14 @@ import pytest
 
 from analysis_service.markdown_loader import MarkdownLoader
 from evals.harness import critic_replay
+from evals.harness.bundle import write_failures
 from evals.harness.modes import EvalRunError
 from evals.harness.provenance import REPO_ROOT
-from tests.test_evals_lane_replay import recorded  # noqa: F401  (fixture)
+from tests import test_evals_run_grounds as grounds
+from tests.test_evals_lane_replay import (  # noqa: F401  (fixture)
+    record_requests,
+    recorded,
+)
 from tests.test_evals_run_grounds import case  # noqa: F401  (fixture)
 
 PACKAGE_LOADER = MarkdownLoader(REPO_ROOT / "frameworks" / "stride")
@@ -174,3 +179,33 @@ def test_the_replayed_rulings_are_written_completed(recorded, case, tmp_path):  
         assert bool(claim["verdict"]["related_unknowns"]) == (
             claim["id"] in conditional
         )
+
+
+def test_a_failed_case_rebuilds_its_critic_request_from_the_dump(
+    monkeypatch,
+    case,  # noqa: F811
+    tmp_path,
+):
+    """#1476: a case whose critic failed wrote no report, only its state dump,
+    and the replay rebuilds the same request from that dump."""
+    seen = record_requests(monkeypatch)
+    silent_on_spoofing = json.dumps(
+        {
+            "claims": [
+                grounds.scripted_ruling(case, category)
+                for category in grounds.STRIDE_CATEGORIES
+                if category != "spoofing"
+            ]
+        }
+    )
+    run = grounds.sweep(monkeypatch, case, None, critic_first=[silent_on_spoofing])
+    out = tmp_path / "sweep.json"
+    write_failures(str(out), run.failed_states)
+
+    archived = critic_replay.load(out, case.id, "stride")
+    instruction, turn = asyncio.run(
+        critic_replay.compose(archived, PACKAGE_LOADER, PROMPT_LOADER)
+    )
+
+    assert archived.report is None
+    assert next(contents for text, contents in seen if text == instruction) == [turn]
