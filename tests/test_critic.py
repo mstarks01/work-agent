@@ -545,6 +545,39 @@ class TestSnapRulings:
         [snapped] = snap_rulings([ruling], ELEMENT_IDS)
         assert snapped == ruling
 
+    def test_a_question_kind_with_a_subject_keeps_the_kind(self):
+        """#1476: the subject is the fallback where no kind fits, so an entry
+        that names a kind has no use for one."""
+        ruling = sample_ruling(
+            verdict=ProposedVerdict(
+                reason="limits unknown",
+                related_unknowns=[
+                    UnknownRef(
+                        element_id="process:web-app",
+                        question="capacity-limits",
+                        subject="Does the web app bound its request rate?",
+                    )
+                ],
+            )
+        )
+        [snapped] = snap_rulings([ruling], ELEMENT_IDS)
+        [ref] = snapped.verdict.related_unknowns
+        assert (ref.question, ref.subject) == ("capacity-limits", "")
+        assert ref.spellings == ("question",)
+
+    def test_a_question_kind_with_an_attribute_is_left_for_the_review(self):
+        """No stated precedence settles that mix, so the re-ask still sees it."""
+        mixed = UnknownRef(
+            element_id="process:web-app",
+            question="capacity-limits",
+            attribute="exposure",
+        )
+        ruling = sample_ruling(
+            verdict=ProposedVerdict(reason="unknown", related_unknowns=[mixed])
+        )
+        [snapped] = snap_rulings([ruling], ELEMENT_IDS)
+        assert snapped.verdict.related_unknowns == [mixed]
+
 
 class TestAnUnknownGroundMakesTheClaimConditional:
     """A draft citing an ``unknown-attribute`` ground rests on a fact nobody
