@@ -373,13 +373,6 @@ CAPABILITIES: Mapping[str, Capability] = MappingProxyType(
             " converting or resizing them?",
             reviewed_by="mstarks01",
         ),
-        "untrusted-file-source": _row(
-            "the application receives files from an untrusted source, by upload,"
-            " import or another route",
-            "Does the application receive files from users, imports or other"
-            " untrusted sources?",
-            reviewed_by="mstarks01",
-        ),
         "public-files-from-untrusted-input": _row(
             "the application stores files that untrusted input produced, uploaded"
             " or generated, where HTTP requests can reach them directly",
@@ -399,6 +392,13 @@ CAPABILITIES: Mapping[str, Capability] = MappingProxyType(
             " attachments",
             "Does the application send files to users, such as downloads or"
             " email attachments?",
+            reviewed_by="mstarks01",
+        ),
+        "untrusted-file-download": _row(
+            "the application serves or sends files obtained from untrusted sources"
+            " to users or other systems",
+            "Does the application serve or send users or other systems any files"
+            " obtained from untrusted sources, such as uploads or imports?",
             reviewed_by="mstarks01",
         ),
         # --- Authentication ---
@@ -578,12 +578,14 @@ CAPABILITIES: Mapping[str, Capability] = MappingProxyType(
             parent="federated-identity",
             reviewed_by="mstarks01",
         ),
-        "authentication-assurance-policy": _row(
-            "access requires a particular authentication strength, method or"
-            " recency, whether or not this is documented or enforced",
-            "Must any access require a particular authentication strength, method"
-            " or recency, whether or not that requirement is documented or"
-            " enforced?",
+        "idp-assurance-policy": _row(
+            "a function that users reach through identity provider sign-in needs a"
+            " particular authentication strength, method or recency, whether or not"
+            " this is documented or enforced",
+            "Does any function that users reach through identity provider sign-in"
+            " need a particular authentication strength, method or recency, whether"
+            " or not that need is documented or enforced?",
+            parent="federated-identity",
             reviewed_by="mstarks01",
         ),
         "saml": _row(
@@ -706,6 +708,16 @@ CAPABILITIES: Mapping[str, Capability] = MappingProxyType(
             " represented by the token, whether or not that dependence is enforced",
             "Must the API's access decisions depend on which user a token"
             " represents, whether or not that check is currently enforced?",
+            parent="oauth-resource-server",
+            reviewed_by="mstarks01",
+        ),
+        "resource-server-assurance-policy": _row(
+            "some access to an API that accepts OAuth access tokens needs a"
+            " particular authentication strength, method or recency, whether or not"
+            " this is documented or enforced",
+            "Must any access to the API that accepts OAuth access tokens require a"
+            " particular authentication strength, method or recency, whether or not"
+            " that requirement is documented or enforced?",
             parent="oauth-resource-server",
             reviewed_by="mstarks01",
         ),

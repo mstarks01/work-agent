@@ -22,7 +22,7 @@ stated reason", or "the input does not say, and this is the fact we need".
 ## Decision
 
 **A capability is a closed fact about the whole application.**
-`analysis_service.capabilities.CAPABILITIES` holds 165 of them, such as
+`analysis_service.capabilities.CAPABILITIES` holds 166 of them, such as
 `browser-frontend`, `oauth-client` and `turn-server`. Each has a meaning, a
 yes-or-no question and an optional parent. The table is framework-neutral: a
 capability says what the application has, never what a framework asks of it.
@@ -136,7 +136,7 @@ a conjunction are answered "no" on the same page, as `cookies` is beside a
 simulation asks in the same rounds, through `next_round`.
 
 `reviewed_by` names who accepted a row or a capability, and is `None` until
-the maintainer reads it. The maintainer reviewed all 345 rows and all 165
+the maintainer reads it. The maintainer reviewed all 345 rows and all 166
 capabilities.
 
 The presence tests in `frameworks/asvs/rules.py` stay as leads for a lane. They
