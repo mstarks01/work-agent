@@ -113,8 +113,8 @@ def snap_rulings(
     the bounded ``recritic``. Snapping it means a re-ask is spent on a critic
     that pointed somewhere real rather than on one that mis-typed a slug.
 
-    A question kind with a ``subject`` beside it keeps the kind, by
-    :func:`_kind_over_subject`. Each fact is then named once, by
+    An entry that names one fact in two forms keeps the one form
+    :func:`_one_form` states a precedence for. Each fact is then named once, by
     :func:`_one_per_fact`, so the seam and assembly agree about which entries a
     verdict carries.
     """
@@ -136,7 +136,7 @@ def snap_rulings(
                                 if ref.element_id
                                 else ref
                                 for ref in map(
-                                    _kind_over_subject, ruling.verdict.related_unknowns
+                                    _one_form, ruling.verdict.related_unknowns
                                 )
                             ]
                         )
@@ -148,16 +148,26 @@ def snap_rulings(
     ]
 
 
-def _kind_over_subject(ref: UnknownRef) -> UnknownRef:
-    """An entry naming a question kind and a subject, as the kind alone.
+def _one_form(ref: UnknownRef) -> UnknownRef:
+    """An entry naming one fact in two forms, as the form that states it.
 
-    ``subject`` is the form for a fact no question kind fits, so an entry that
-    names a kind has said one fits, and its subject restates the kind's fixed
-    question. The ASVS critic wrote both on 54 of 203 rulings (#1476). Any
-    other mix has no stated precedence and stays for the review seam.
+    Two mixes have a stated precedence, and the ASVS critic wrote each of
+    them on case 01 (#1476):
+
+    * **A question kind and a subject** keep the kind. ``subject`` is the
+      form for a fact no kind fits, so its subject restates the kind's fixed
+      question (54 of 203 rulings).
+    * **A subject and an element with no attribute** keep the subject. An
+      element alone names no field, so the subject is the only statement of
+      the fact (74 of 203 rulings).
+
+    Any other mix stays for the review seam.
     """
-    if set(ref.spellings) == {"question", "subject"}:
+    spellings = set(ref.spellings)
+    if spellings == {"question", "subject"}:
         return ref.model_copy(update={"subject": ""})
+    if spellings == {"attribute", "subject"} and not ref.attribute:
+        return ref.model_copy(update={"element_id": ""})
     return ref
 
 
