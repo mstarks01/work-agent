@@ -46,6 +46,13 @@ Model, the question page and the evaluator do not change.
 - The questions for `multiple-identity-providers` and
   `multiple-authorization-servers` ask about one party, so the person does not
   add up the providers or servers of different parties.
+- `authentication-assurance-policy` becomes `idp-assurance-policy` under
+  `federated-identity` (V6.8.4) and `resource-server-assurance-policy` under
+  `oauth-resource-server` (V10.3.4).
+- `untrusted-file-source` becomes `untrusted-file-download`, which V5.4.3 reads
+  alone. Its question asks whether the application serves or sends files from
+  an untrusted source, to users or to other systems. It has no parent, because
+  "no files sent to users" does not say "no files sent to other systems".
 
 **We rejected a component on each fact.** That design puts a component on each
 `CapabilityFact`, asks a role question for each component, and evaluates each
@@ -64,7 +71,24 @@ longer asked beside two "no" answers on the same page. The benchmark's level 3
 simulation with both OAuth roles absent asked `authorization-code-flow` and
 settled nothing with it. It now asks no code-flow question.
 
-A conjunction of two facts with no parent link still reads the whole
-application, such as `all(browser-frontend, cookies)`. A new conjunction whose
-terms describe one party must use a child under that party, not a sibling or a
-fact with no parent.
+**Some conjunctions still read the whole application, by decision.** Each one
+below pairs two facts with no parent link. Either the second fact already names
+the first fact's party, or a pairing across two parties is rare:
+
+- V3.5.5 and V3.6.1: `postmessage-receiver` names the browser code and
+  `external-browser-resources` names the pages, so each already implies
+  `browser-frontend`.
+- V3.3.1 to V3.3.5, `browser-frontend` with `cookies`: cookies are a browser
+  mechanism, and a cookie that only a native app receives is rare.
+- V7.1.3, V7.6.1 and V7.6.2, `sessions` with `federated-identity`: an
+  application with both almost always creates the session from that sign-in.
+- V7.4.4, V7.5.3 and V14.3.1: authentication or sessions with a client
+  interface or a high-value flow. A pairing across two parties needs an unusual
+  application.
+- V14.3.2, `browser-frontend` with `sensitive-data`: a pairing across two
+  parties can occur. But ten rows read `sensitive-data`, so a child would be a
+  new capability for one row, and the cost of the error is one lane judgement.
+
+The terms inside an `any`, as in V7.4.4, V10.4.9 and V14.3.1, are alternatives,
+so they need no shared party. A new conjunction whose terms describe one party
+must use a child under that party, not a sibling or a fact with no parent.

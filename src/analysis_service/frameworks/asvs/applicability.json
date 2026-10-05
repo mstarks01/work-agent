@@ -665,12 +665,7 @@
     },
     {
       "id": "V5.4.3",
-      "applies_if": {
-        "all": [
-          "untrusted-file-source",
-          "file-download"
-        ]
-      },
+      "applies_if": "untrusted-file-download",
       "rationale": "the subject is a served file from an untrusted source",
       "reviewed_by": "mstarks01"
     },
@@ -997,7 +992,7 @@
       "applies_if": {
         "all": [
           "federated-identity",
-          "authentication-assurance-policy"
+          "idp-assurance-policy"
         ]
       },
       "rationale": "the subject is a policy on the authentication strength, method or recency an identity provider must give",
@@ -1350,7 +1345,7 @@
       "applies_if": {
         "all": [
           "oauth-resource-server",
-          "authentication-assurance-policy"
+          "resource-server-assurance-policy"
         ]
       },
       "rationale": "the subject is a resource server policy on authentication strength, method or recency",

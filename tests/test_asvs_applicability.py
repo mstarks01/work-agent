@@ -127,6 +127,23 @@ def test_each_token_fact_sits_under_the_party_it_describes():
     )
 
 
+def test_the_scan_rule_reads_only_whether_untrusted_files_are_sent_on():
+    """Files sent on to another system count, so no download rules it out."""
+    for state in ("present", "absent"):
+        decisions = applicability_for(3, _known(file_download=state))
+        assert decisions["V5.4.3"].missing == ("untrusted-file-download",)
+
+
+def test_an_assurance_policy_applies_only_to_the_party_it_names():
+    known = _known(
+        idp_assurance_policy="present",
+        oauth_resource_server="present",
+    )
+    decisions = applicability_for(3, known)
+    assert decisions["V6.8.4"].state == "applicable"
+    assert decisions["V10.3.4"].missing == ("resource-server-assurance-policy",)
+
+
 def test_webrtc_without_turn_keeps_the_rest_of_the_chapter():
     decisions = applicability_for(3, _known(webrtc="present", turn_server="absent"))
     assert decisions["V17.1.1"].state == "not-applicable"
