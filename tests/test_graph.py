@@ -1897,6 +1897,43 @@ def test_a_re_ask_that_repairs_only_what_was_named_leaves_no_drift_mark():
     assert [m for m in marks.unreconciled_rulings if m.kind == "unbriefed-change"] == []
 
 
+def test_a_re_ask_that_returns_only_the_named_rulings_reconciles():
+    """#1476: the re-ask returns the rulings the problems name, and the merge
+    keeps the first pass's for every other draft, so the set is whole again."""
+    drafts = [sample_draft("S-01"), sample_draft("T-01", category="tampering")]
+    ctx = FakeContext()
+    route(
+        valid_model().model_dump(mode="json"),
+        [draft.model_dump(mode="json") for draft in drafts],
+        ctx,
+        reviewed_threats={"claims": [sample_ruling("S-01").model_dump(mode="json")]},
+    )
+
+    second = _second_look(ctx, drafts, [sample_ruling("T-01")])
+
+    assert second.actions.route == graph.ROUTE_ACCEPT
+    assert _reviewed_verdicts(ctx) == {"S-01": "confirmed", "T-01": "confirmed"}
+    marks = AnalysisMarks.model_validate(ctx.state[NODES.key("marks")])
+    assert [m for m in marks.unreconciled_rulings if m.kind == "unbriefed-change"] == []
+
+
+def test_an_empty_re_ask_still_fails_the_second_look():
+    """#1476: an empty return repairs nothing, so the named draft stays dropped."""
+    drafts = [sample_draft("S-01"), sample_draft("T-01", category="tampering")]
+    ctx = FakeContext()
+    route(
+        valid_model().model_dump(mode="json"),
+        [draft.model_dump(mode="json") for draft in drafts],
+        ctx,
+        reviewed_threats={"claims": [sample_ruling("S-01").model_dump(mode="json")]},
+    )
+
+    second = _second_look(ctx, drafts, [])
+
+    assert second.actions.route == graph.ROUTE_REVISE
+    assert "T-01" in ctx.state[NODES.key("critic_issues")]
+
+
 def test_a_re_ask_that_respells_a_ruling_is_not_drift():
     """A provider may spell one ruling two ways across two calls: an optional
     key present as ``null`` in one pass and absent in the next. The merge
