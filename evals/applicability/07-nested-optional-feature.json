@@ -1,7 +1,7 @@
 {
   "test_class": "nested",
   "drafted_by": "agent",
-  "signed_by": null,
+  "signed_by": "mstarks01",
   "note": "WebRTC is present and TURN is absent: only the TURN rules leave.",
   "framework": "asvs",
   "options": {
@@ -16,7 +16,7 @@
     {
       "capability": "turn-server",
       "state": "absent",
-      "quote": "We do not run a TURN server."
+      "quote": "No TURN server or managed TURN configuration is within the assessment boundary."
     }
   ],
   "answers": {},

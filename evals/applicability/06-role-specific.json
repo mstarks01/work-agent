@@ -1,7 +1,7 @@
 {
   "test_class": "role-specific",
   "drafted_by": "agent",
-  "signed_by": null,
+  "signed_by": "mstarks01",
   "note": "OAuth is present, but the application is not the authorization server.",
   "framework": "asvs",
   "options": {
@@ -11,12 +11,12 @@
     {
       "capability": "oauth-client",
       "state": "present",
-      "quote": "The app signs users in through Okta."
+      "quote": "The app is an OAuth 2.0 client of Okta."
     },
     {
       "capability": "oauth-authorization-server",
       "state": "absent",
-      "quote": "We do not issue tokens ourselves."
+      "quote": "No OAuth authorization server or OpenID Provider, self-hosted or managed-service configuration, is within this assessment boundary; the external Okta provider is outside it."
     }
   ],
   "answers": {},

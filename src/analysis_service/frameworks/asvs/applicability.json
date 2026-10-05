@@ -5,31 +5,31 @@
       "id": "V1.1.1",
       "applies_if": "always",
       "rationale": "every web application or service receives untrusted input",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V1.1.2",
       "applies_if": "always",
       "rationale": "every application passes data to at least one interpreter",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V1.2.1",
       "applies_if": "always",
       "rationale": "every web application or service builds HTTP responses",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V1.2.2",
-      "applies_if": "always",
-      "rationale": "every web application builds URLs",
-      "reviewed_by": null
+      "applies_if": "dynamic-url-construction",
+      "rationale": "applies where the application builds URLs from untrusted data",
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V1.2.3",
-      "applies_if": "always",
-      "rationale": "every web application or service emits JavaScript or JSON",
-      "reviewed_by": null
+      "applies_if": "dynamic-javascript-or-json-output",
+      "rationale": "applies where the application constructs JavaScript or JSON at run time, including through serializers",
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V1.2.4",
@@ -83,13 +83,13 @@
       "id": "V1.3.2",
       "applies_if": "always",
       "rationale": "avoiding dynamic code execution is the control, and every application can use it",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V1.3.3",
-      "applies_if": "always",
-      "rationale": "every web application or service receives untrusted input",
-      "reviewed_by": null
+      "applies_if": "untrusted-data-in-dangerous-context",
+      "rationale": "applies where the application passes untrusted data into a context that can interpret it dangerously",
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V1.3.4",
@@ -129,9 +129,9 @@
     },
     {
       "id": "V1.3.10",
-      "applies_if": "always",
-      "rationale": "every language the application can be written in has format strings",
-      "reviewed_by": null
+      "applies_if": "untrusted-format-strings",
+      "rationale": "applies where externally influenced format strings reach the application's formatting operations",
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V1.3.11",
@@ -141,9 +141,9 @@
     },
     {
       "id": "V1.3.12",
-      "applies_if": "always",
-      "rationale": "every application matches untrusted input against regular expressions",
-      "reviewed_by": null
+      "applies_if": "regex-processing",
+      "rationale": "applies where the application evaluates regular expressions, including fixed patterns against untrusted strings",
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V1.4.1",
@@ -171,51 +171,51 @@
     },
     {
       "id": "V1.5.2",
-      "applies_if": "always",
-      "rationale": "every web application or service deserializes the requests it receives",
-      "reviewed_by": null
+      "applies_if": "untrusted-data-deserialization",
+      "rationale": "applies where the application reconstructs data or objects from untrusted serialized input",
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V1.5.3",
-      "applies_if": "always",
-      "rationale": "a web request passes through more than one parser in every deployment",
-      "reviewed_by": null
+      "applies_if": "multiple-parsers-same-data",
+      "rationale": "applies where different parsers in the application interpret the same type of data",
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V2.1.1",
       "applies_if": "always",
       "rationale": "the subject is present in every application in scope, so its document is too",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V2.1.2",
-      "applies_if": "always",
-      "rationale": "the subject is present in every application in scope, so its document is too",
-      "reviewed_by": null
+      "applies_if": "related-data-consistency",
+      "rationale": "applies where related data items need cross-field or contextual consistency checks",
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V2.1.3",
-      "applies_if": "always",
-      "rationale": "the subject is present in every application in scope, so its document is too",
-      "reviewed_by": null
+      "applies_if": "business-logic-limits-needed",
+      "rationale": "applies where business operations need limits for each user or for the whole application",
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V2.2.1",
       "applies_if": "always",
       "rationale": "every web application or service receives untrusted input",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V2.2.2",
       "applies_if": "always",
       "rationale": "server-side validation is required whatever client the application has",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V2.2.3",
-      "applies_if": "always",
-      "rationale": "every web application or service receives untrusted input",
-      "reviewed_by": null
+      "applies_if": "related-data-consistency",
+      "rationale": "applies where related data items need cross-field or contextual consistency checks",
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V2.3.1",
@@ -225,15 +225,15 @@
     },
     {
       "id": "V2.3.2",
-      "applies_if": "always",
-      "rationale": "every application has business rules that set limits",
-      "reviewed_by": null
+      "applies_if": "business-logic-limits-needed",
+      "rationale": "applies where business operations need limits for each user or for the whole application",
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V2.3.3",
-      "applies_if": "always",
-      "rationale": "every application that changes state has operations that must complete whole",
-      "reviewed_by": null
+      "applies_if": "atomic-business-operation-needed",
+      "rationale": "applies where a state-changing business operation must complete wholly or restore its earlier valid state",
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V2.3.4",
@@ -251,7 +251,7 @@
       "id": "V2.4.1",
       "applies_if": "always",
       "rationale": "every application has functions a caller can call too often",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V2.4.2",
@@ -482,27 +482,27 @@
     },
     {
       "id": "V4.1.1",
-      "applies_if": "always",
-      "rationale": "every web application or service builds HTTP responses",
-      "reviewed_by": null
+      "applies_if": "http-response-bodies",
+      "rationale": "applies where the application produces HTTP responses that contain message bodies",
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V4.1.2",
       "applies_if": "always",
       "rationale": "every web application or service answers HTTP",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V4.1.3",
-      "applies_if": "always",
-      "rationale": "every deployment sets some headers at a layer in front of the application",
-      "reviewed_by": null
+      "applies_if": "intermediary-header-consumption",
+      "rationale": "applies where the application consumes HTTP headers that an intermediary sets",
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V4.1.4",
       "applies_if": "always",
       "rationale": "every web application or service receives HTTP methods",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V4.1.5",
@@ -519,25 +519,35 @@
       "id": "V4.2.1",
       "applies_if": "always",
       "rationale": "every web application or service receives HTTP messages",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V4.2.2",
-      "applies_if": "always",
-      "rationale": "every web application or service generates HTTP messages",
-      "reviewed_by": null
+      "applies_if": "http-content-length-generation",
+      "rationale": "applies where an in-scope component, including a framework or a proxy, sets Content-Length in the HTTP messages it generates",
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V4.2.3",
-      "applies_if": "always",
-      "rationale": "the HTTP version a deployment accepts is not a fact the input carries",
-      "reviewed_by": null
+      "applies_if": {
+        "any": [
+          "http2-messages",
+          "http3-messages"
+        ]
+      },
+      "rationale": "applies where an in-scope component sends or accepts HTTP/2 messages or where an in-scope component sends or accepts HTTP/3 messages",
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V4.2.4",
-      "applies_if": "always",
-      "rationale": "the HTTP version a deployment accepts is not a fact the input carries",
-      "reviewed_by": null
+      "applies_if": {
+        "any": [
+          "http2-request-reception",
+          "http3-request-reception"
+        ]
+      },
+      "rationale": "applies where an in-scope component accepts HTTP/2 requests or where an in-scope component accepts HTTP/3 requests",
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V4.2.5",
@@ -769,7 +779,7 @@
       "id": "V6.3.2",
       "applies_if": "always",
       "rationale": "every application and its platform can ship default accounts",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V6.3.3",
@@ -1612,57 +1622,57 @@
     },
     {
       "id": "V11.1.1",
-      "applies_if": "always",
-      "rationale": "every web application holds keys, at least for TLS",
-      "reviewed_by": null
+      "applies_if": "cryptographic-keys",
+      "rationale": "applies where an in-scope component uses cryptographic keys",
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V11.1.2",
       "applies_if": "always",
       "rationale": "every web application uses cryptography, at least for TLS",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V11.1.3",
       "applies_if": "always",
       "rationale": "every web application uses cryptography, at least for TLS",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V11.1.4",
       "applies_if": "always",
       "rationale": "every web application uses cryptography, at least for TLS",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V11.2.1",
-      "applies_if": "always",
-      "rationale": "every web application performs cryptographic operations",
-      "reviewed_by": null
+      "applies_if": "cryptographic-operations",
+      "rationale": "applies where an in-scope component uses cryptography, including through managed services and TLS",
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V11.2.2",
-      "applies_if": "always",
-      "rationale": "every web application performs cryptographic operations",
-      "reviewed_by": null
+      "applies_if": "cryptographic-operations",
+      "rationale": "applies where an in-scope component uses cryptography, including through managed services and TLS",
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V11.2.3",
-      "applies_if": "always",
-      "rationale": "every web application uses cryptographic primitives",
-      "reviewed_by": null
+      "applies_if": "cryptographic-operations",
+      "rationale": "applies where an in-scope component uses cryptography, including through managed services and TLS",
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V11.2.4",
-      "applies_if": "always",
-      "rationale": "every web application performs cryptographic operations",
-      "reviewed_by": null
+      "applies_if": "cryptographic-operations",
+      "rationale": "applies where an in-scope component uses cryptography, including through managed services and TLS",
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V11.2.5",
-      "applies_if": "always",
-      "rationale": "every web application performs cryptographic operations",
-      "reviewed_by": null
+      "applies_if": "cryptographic-operations",
+      "rationale": "applies where an in-scope component uses cryptography, including through managed services and TLS",
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V11.3.1",
@@ -1701,9 +1711,9 @@
     },
     {
       "id": "V11.4.1",
-      "applies_if": "always",
-      "rationale": "every web application uses hash functions",
-      "reviewed_by": null
+      "applies_if": "cryptographic-hashing",
+      "rationale": "applies where the application hashes data for a cryptographic purpose, including with an insecure implementation",
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V11.4.2",
@@ -1713,39 +1723,39 @@
     },
     {
       "id": "V11.4.3",
-      "applies_if": "always",
-      "rationale": "every web application relies on signatures, at least for TLS",
-      "reviewed_by": null
+      "applies_if": "authenticity-or-integrity-hashing",
+      "rationale": "applies where hashes support signatures, data authentication or integrity in the application",
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V11.4.4",
-      "applies_if": "always",
-      "rationale": "keys derived from passwords are not a fact the input carries",
-      "reviewed_by": null
+      "applies_if": "password-derived-secret-keys",
+      "rationale": "applies where the application derives secret keys from passwords",
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V11.5.1",
-      "applies_if": "always",
-      "rationale": "every web application generates values that must not be guessed",
-      "reviewed_by": null
+      "applies_if": "unpredictable-values-needed",
+      "rationale": "applies where the application generates values that must be unpredictable, even if they are predictable now",
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V11.5.2",
-      "applies_if": "always",
-      "rationale": "every web application generates random values",
-      "reviewed_by": null
+      "applies_if": "random-value-generation",
+      "rationale": "applies where the application generates random values, including with an insecure generator",
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V11.6.1",
-      "applies_if": "always",
-      "rationale": "every web application relies on key generation and signatures, at least for TLS",
-      "reviewed_by": null
+      "applies_if": "non-tls-public-key-operations",
+      "rationale": "applies where the application generates public keys or creates or verifies signatures outside TLS",
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V11.6.2",
-      "applies_if": "always",
-      "rationale": "every web application relies on key exchange, at least for TLS",
-      "reviewed_by": null
+      "applies_if": "non-tls-key-exchange",
+      "rationale": "applies where the application uses public-key exchange outside TLS",
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V11.7.1",
@@ -1761,15 +1771,15 @@
     },
     {
       "id": "V12.1.1",
-      "applies_if": "always",
-      "rationale": "every web application or service speaks TLS",
-      "reviewed_by": null
+      "applies_if": "tls-use",
+      "rationale": "applies where an in-scope component uses or supports TLS, including managed endpoints",
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V12.1.2",
-      "applies_if": "always",
-      "rationale": "every web application or service speaks TLS",
-      "reviewed_by": null
+      "applies_if": "tls-use",
+      "rationale": "applies where an in-scope component uses or supports TLS, including managed endpoints",
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V12.1.3",
@@ -1779,39 +1789,39 @@
     },
     {
       "id": "V12.1.4",
-      "applies_if": "always",
-      "rationale": "every web application or service presents a certificate",
-      "reviewed_by": null
+      "applies_if": "tls-certificates",
+      "rationale": "applies where the in-scope TLS uses certificates",
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V12.1.5",
-      "applies_if": "always",
-      "rationale": "every web application or service speaks TLS",
-      "reviewed_by": null
+      "applies_if": "tls-use",
+      "rationale": "applies where an in-scope component uses or supports TLS, including managed endpoints",
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V12.2.1",
-      "applies_if": "always",
-      "rationale": "every web application or service faces its clients over HTTP",
-      "reviewed_by": null
+      "applies_if": "external-facing-http-services",
+      "rationale": "applies where the application exposes HTTP services to clients outside its boundary, including clients on a private network",
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V12.2.2",
-      "applies_if": "always",
-      "rationale": "every web application or service faces its clients over HTTP",
-      "reviewed_by": null
+      "applies_if": "external-facing-http-services",
+      "rationale": "applies where the application exposes HTTP services to clients outside its boundary, including clients on a private network",
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V12.3.1",
       "applies_if": "always",
       "rationale": "every application makes inbound and outbound connections",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V12.3.2",
-      "applies_if": "always",
-      "rationale": "every application connects to at least one TLS server, such as its database or a provider",
-      "reviewed_by": null
+      "applies_if": "tls-client",
+      "rationale": "applies where an in-scope component acts as a TLS client",
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V12.3.3",
@@ -1835,25 +1845,25 @@
       "id": "V13.1.1",
       "applies_if": "always",
       "rationale": "the subject is present in every application in scope, so its document is too",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V13.1.2",
-      "applies_if": "always",
-      "rationale": "every application uses at least one other service",
-      "reviewed_by": null
+      "applies_if": "separate-service-connections",
+      "rationale": "applies where the application connects to a separate internal or external service",
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V13.1.3",
-      "applies_if": "always",
-      "rationale": "every application uses external resources, such as connections and threads",
-      "reviewed_by": null
+      "applies_if": "external-resource-use",
+      "rationale": "applies where the application consumes external resources, including services, files, threads or connections",
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V13.1.4",
       "applies_if": "always",
       "rationale": "every application holds secrets, at least a TLS key",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V13.2.1",
@@ -1877,13 +1887,13 @@
       "id": "V13.2.4",
       "applies_if": "always",
       "rationale": "every application communicates with some external resource",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V13.2.5",
       "applies_if": "always",
       "rationale": "every application server can send requests or load files",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V13.2.6",
@@ -1893,69 +1903,69 @@
     },
     {
       "id": "V13.3.1",
-      "applies_if": "always",
-      "rationale": "every application holds backend secrets",
-      "reviewed_by": null
+      "applies_if": "backend-secrets",
+      "rationale": "applies where backend secrets exist in scope, including secrets in managed custody or in insecure storage",
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V13.3.2",
-      "applies_if": "always",
-      "rationale": "every application holds backend secrets",
-      "reviewed_by": null
+      "applies_if": "secret-assets",
+      "rationale": "applies where in-scope secrets need access protection, whether they are protected or not",
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V13.3.3",
-      "applies_if": "always",
-      "rationale": "every application holds key material",
-      "reviewed_by": null
+      "applies_if": "cryptographic-operations",
+      "rationale": "applies where an in-scope component uses cryptography, including through managed services and TLS",
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V13.3.4",
-      "applies_if": "always",
-      "rationale": "every application holds secrets",
-      "reviewed_by": null
+      "applies_if": "secret-assets",
+      "rationale": "applies where in-scope secrets need access protection, whether they are protected or not",
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V13.4.1",
       "applies_if": "always",
       "rationale": "every deployment can expose something it did not intend",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V13.4.2",
       "applies_if": "always",
       "rationale": "every deployment can expose something it did not intend",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V13.4.3",
       "applies_if": "always",
       "rationale": "every deployment can expose something it did not intend",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V13.4.4",
       "applies_if": "always",
       "rationale": "every deployment can expose something it did not intend",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V13.4.5",
       "applies_if": "always",
       "rationale": "every deployment can expose something it did not intend",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V13.4.6",
       "applies_if": "always",
       "rationale": "every deployment can expose something it did not intend",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V13.4.7",
-      "applies_if": "always",
-      "rationale": "every deployment can expose something it did not intend",
-      "reviewed_by": null
+      "applies_if": "web-tier-file-serving",
+      "rationale": "applies where the application's web tier serves files",
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V14.1.1",
@@ -2052,69 +2062,74 @@
     },
     {
       "id": "V15.1.1",
-      "applies_if": "always",
-      "rationale": "every application depends on third-party components",
-      "reviewed_by": null
+      "applies_if": "third-party-components",
+      "rationale": "applies where the application has in-scope third-party dependencies, including runtime and transitive ones",
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V15.1.2",
       "applies_if": "always",
       "rationale": "every application depends on third-party components",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V15.1.3",
       "applies_if": "always",
       "rationale": "identifying costly functions is the control, and every application has some",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V15.1.4",
       "applies_if": "always",
       "rationale": "every application depends on third-party components",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V15.1.5",
       "applies_if": "always",
       "rationale": "identifying dangerous functions is the control",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V15.2.1",
-      "applies_if": "always",
-      "rationale": "every application depends on third-party components",
-      "reviewed_by": null
+      "applies_if": "third-party-components",
+      "rationale": "applies where the application has in-scope third-party dependencies, including runtime and transitive ones",
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V15.2.2",
-      "applies_if": "always",
-      "rationale": "every application has functions that cost time or resources",
-      "reviewed_by": null
+      "applies_if": "resource-demanding-functionality",
+      "rationale": "applies where the application has functionality costly enough to need availability protection, whether protected or not",
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V15.2.3",
       "applies_if": "always",
       "rationale": "every production environment can carry functionality it does not need",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V15.2.4",
-      "applies_if": "always",
-      "rationale": "every application depends on third-party components",
-      "reviewed_by": null
+      "applies_if": "third-party-components",
+      "rationale": "applies where the application has in-scope third-party dependencies, including runtime and transitive ones",
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V15.2.5",
-      "applies_if": "always",
-      "rationale": "documenting and protecting dangerous functions is the control",
-      "reviewed_by": null
+      "applies_if": {
+        "any": [
+          "dangerous-functionality",
+          "risky-third-party-components"
+        ]
+      },
+      "rationale": "applies where the application has dangerous functionality, whether documented or not or where the application uses risky third-party components, whether documented or not",
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V15.3.1",
-      "applies_if": "always",
-      "rationale": "every web application or service returns data objects",
-      "reviewed_by": null
+      "applies_if": "data-object-responses",
+      "rationale": "applies where the application returns the fields of data objects to its consumers",
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V15.3.2",
@@ -2124,21 +2139,21 @@
     },
     {
       "id": "V15.3.3",
-      "applies_if": "always",
-      "rationale": "every web application or service binds request data to objects",
-      "reviewed_by": null
+      "applies_if": "request-object-field-writes",
+      "rationale": "applies where request data writes object fields, by automatic or manual binding",
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V15.3.4",
-      "applies_if": "always",
-      "rationale": "every deployment reads the client address through some layer",
-      "reviewed_by": null
+      "applies_if": "intermediary-client-ip-handling",
+      "rationale": "applies where a proxy or middleware passes client IP information for the application to use",
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V15.3.5",
       "applies_if": "always",
       "rationale": "every application compares values",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V15.3.6",
@@ -2150,61 +2165,61 @@
       "id": "V15.3.7",
       "applies_if": "always",
       "rationale": "every web application or service reads request parameters",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V15.4.1",
-      "applies_if": "always",
-      "rationale": "every web application or service handles concurrent requests",
-      "reviewed_by": null
+      "applies_if": "shared-multithreaded-state",
+      "rationale": "applies where multiple threads in the application access shared objects, including through framework behaviour",
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V15.4.2",
-      "applies_if": "always",
-      "rationale": "every web application or service handles concurrent requests",
-      "reviewed_by": null
+      "applies_if": "check-dependent-resource-actions",
+      "rationale": "applies where the application's actions depend on checks of a resource's state, such as its existence or permissions",
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V15.4.3",
-      "applies_if": "always",
-      "rationale": "every web application or service handles concurrent requests",
-      "reviewed_by": null
+      "applies_if": "concurrency-locks",
+      "rationale": "applies where the application's concurrent code uses locks",
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V15.4.4",
-      "applies_if": "always",
-      "rationale": "every web application or service handles concurrent requests",
-      "reviewed_by": null
+      "applies_if": "contended-thread-resources",
+      "rationale": "applies where threads in the application compete for the allocation of resources",
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V16.1.1",
       "applies_if": "always",
       "rationale": "every application must log; the inventory is the control",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V16.2.1",
       "applies_if": "always",
       "rationale": "every application must log; the metadata is the control",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V16.2.2",
       "applies_if": "always",
       "rationale": "every application must log; the time source is the control",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V16.2.3",
       "applies_if": "always",
       "rationale": "every application must log",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V16.2.4",
       "applies_if": "always",
       "rationale": "every application must log",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V16.2.5",
@@ -2228,55 +2243,55 @@
       "id": "V16.3.3",
       "applies_if": "always",
       "rationale": "every application has security controls whose bypass must be logged",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V16.3.4",
       "applies_if": "always",
       "rationale": "every application can meet an unexpected error",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V16.4.1",
       "applies_if": "always",
       "rationale": "every application must log",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V16.4.2",
       "applies_if": "always",
       "rationale": "every application must log",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V16.4.3",
       "applies_if": "always",
       "rationale": "every application must log",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V16.5.1",
       "applies_if": "always",
       "rationale": "every application can meet an unexpected error",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V16.5.2",
-      "applies_if": "always",
-      "rationale": "every application depends on some external resource",
-      "reviewed_by": null
+      "applies_if": "external-resource-use",
+      "rationale": "applies where the application consumes external resources, including services, files, threads or connections",
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V16.5.3",
       "applies_if": "always",
       "rationale": "every application can meet an unexpected error",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V16.5.4",
       "applies_if": "always",
       "rationale": "every application can meet an unexpected error",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "id": "V17.1.1",

@@ -20,7 +20,7 @@ stated reason", or "the input does not say, and this is the fact we need".
 ## Decision
 
 **A capability is a closed fact about the whole application.**
-`analysis_service.capabilities.CAPABILITIES` holds 118 of them, such as
+`analysis_service.capabilities.CAPABILITIES` holds 163 of them, such as
 `browser-frontend`, `oauth-client` and `turn-server`. Each has a meaning, a
 yes-or-no question and an optional parent. The table is framework-neutral: a
 capability says what the application has, never what a framework asks of it.
@@ -33,8 +33,8 @@ it is.
 **Each requirement has one applicability expression.**
 `frameworks/asvs/applicability.json` holds a row for each of the 345
 requirements: `always`, one capability, or `all` and `any` over smaller
-expressions. The rationale is in this repository's words. 104 rows are
-`always`, and 241 read at least one capability.
+expressions. The rationale is in this repository's words. 47 rows are
+`always`, and 298 read at least one capability.
 
 **A conjunction reads facts about the whole application.** `all(oauth-client,
 authorization-code-flow)` holds when some component is an OAuth client and
@@ -105,10 +105,11 @@ It reports false exclusions, false inclusions, unknown accuracy and how many
 questions settle 50%, 75%, 90% and 100% of what the answers can settle. It
 reads no claim, so it is apart from the conformance and disposition scores.
 
-**A subject that every web application has is `always`.** TLS, third-party
-components and error handling have one honest answer, so a question about them
-tells nothing. A subject that a real application can lack is a capability,
-even where a description rarely states it.
+**A row is `always` only where its subject is in every application in
+scope**, such as error handling, logging and the input it receives. A subject
+that a real application can lack is a capability, even where almost every
+application has it, as TLS and third-party components do. A source that does
+not mention such a subject leaves the row `unknown`, never `applicable`.
 
 ## Consequences
 
@@ -133,9 +134,9 @@ is beside `oauth-client` and `oauth-authorization-server`. The benchmark's
 simulation asks in the same rounds, through `next_round`.
 
 `reviewed_by` names who accepted a row or a capability, and is `None` until
-the maintainer reads it. The maintainer reviewed every capability, every
-conditional row and the `always` row V14.1.1. The other 103 `always` rows are
-not reviewed.
+the maintainer reads it. The maintainer reviewed all 345 rows and the first
+118 capabilities. The 45 capabilities that the review of the `always` rows
+added are not reviewed yet.
 
 The presence tests in `frameworks/asvs/rules.py` stay as leads for a lane. They
 decide no applicability.

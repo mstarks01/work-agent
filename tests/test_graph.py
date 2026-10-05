@@ -3028,7 +3028,7 @@ def test_a_lane_agent_is_told_what_the_applicability_rule_decided(domain_loader)
         repo_package_loaders(BOTH),
     )
 
-    asvs_scope = ctx.state[graph.Lane("asvs", "cryptography").key("scope")]
+    asvs_scope = ctx.state[graph.Lane("asvs", "encoding-and-sanitization").key("scope")]
     stride_scope = ctx.state[LANES[0].key("scope")]
 
     assert "apply by the service's rule" in asvs_scope
