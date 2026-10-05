@@ -894,196 +894,248 @@ CAPABILITIES: Mapping[str, Capability] = MappingProxyType(
         "dynamic-url-construction": _row(
             "the application builds URLs from untrusted data",
             "Does the application build URLs from untrusted data?",
+            reviewed_by="mstarks01",
         ),
         "dynamic-javascript-or-json-output": _row(
             "the application constructs JavaScript or JSON at run time, including"
             " through serializers",
             "Does the application construct JavaScript or JSON at run time,"
             " including through a serializer?",
+            reviewed_by="mstarks01",
         ),
         "untrusted-data-in-dangerous-context": _row(
-            "the application passes untrusted data into a context that can"
-            " interpret it dangerously",
-            "Does the application pass untrusted data into a context that"
-            " interprets it, such as a query, a command or a template?",
+            "the application passes data originating from users or other untrusted"
+            " sources into contexts that interpret it, including when encoding or"
+            " sanitization is already applied",
+            "Does the application use data from users or other untrusted sources in"
+            " an interpreted context, such as a query, command or template,"
+            " including when that data is already encoded or sanitized?",
+            reviewed_by="mstarks01",
         ),
         "untrusted-format-strings": _row(
-            "externally influenced format strings reach the application's"
-            " formatting operations",
-            "Can external input influence a format string that the application's"
-            " code formats?",
+            "the application processes format strings, including fixed strings and"
+            " strings influenced by external input",
+            "Does the application process format strings, such as patterns with"
+            " placeholders for inserting values into text?",
+            reviewed_by="mstarks01",
         ),
         "regex-processing": _row(
             "the application evaluates regular expressions, including fixed"
             " patterns against untrusted strings",
             "Does the application evaluate regular expressions, including fixed"
             " patterns against untrusted input?",
+            reviewed_by="mstarks01",
         ),
         "untrusted-data-deserialization": _row(
             "the application reconstructs data or objects from untrusted serialized"
             " input",
-            "Does the application reconstruct data or objects from serialized input"
-            " that it does not trust?",
+            "Does the application read serialized input, such as JSON, XML or"
+            " stored object data, from users or other untrusted sources and turn it"
+            " into data structures or objects?",
+            reviewed_by="mstarks01",
         ),
         "multiple-parsers-same-data": _row(
             "different parsers in the application interpret the same type of data",
             "Do different parsers in the application interpret the same type of"
             " data, such as JSON or URLs?",
+            reviewed_by="mstarks01",
         ),
         # --- Validation and business logic ---
         "related-data-consistency": _row(
-            "related data items need cross-field or contextual consistency checks",
-            "Do related data items need checks that they are consistent with each"
-            " other?",
+            "the application handles related data items whose valid values depend"
+            " on each other or on their context",
+            "Does the application handle related data items whose valid values"
+            " depend on each other or on context, such as a postal code and"
+            " locality or a start and end date?",
+            reviewed_by="mstarks01",
         ),
         "business-logic-limits-needed": _row(
-            "business operations need limits for each user or for the whole"
-            " application",
-            "Do business operations need limits, for each user or for the whole"
-            " application?",
+            "the application has business operations with valid bounds on amounts,"
+            " quantities, frequency or other business values, per user or across"
+            " the application, whether those bounds are enforced or not",
+            "Does the application have business operations where amounts,"
+            " quantities, frequency or other values can exceed what the business"
+            " allows, for one user or across the application?",
+            reviewed_by="mstarks01",
         ),
         "atomic-business-operation-needed": _row(
             "a state-changing business operation must complete wholly or restore"
             " its earlier valid state",
             "Does the application have a business operation that changes state and"
             " must complete wholly or not at all?",
+            reviewed_by="mstarks01",
         ),
         # --- HTTP ---
         "http-response-bodies": _row(
             "the application produces HTTP responses that contain message bodies",
             "Does the application produce HTTP responses that contain a body?",
+            reviewed_by="mstarks01",
         ),
         "intermediary-header-consumption": _row(
             "the application consumes HTTP headers that an intermediary sets",
             "Does the application read HTTP headers that a proxy, load balancer or"
             " gateway sets?",
+            reviewed_by="mstarks01",
         ),
         "http-content-length-generation": _row(
             "an in-scope component, including a framework or a proxy, sets"
             " Content-Length in the HTTP messages it generates",
             "Does an in-scope component, including a framework or proxy, set"
             " Content-Length on the HTTP messages it generates?",
+            reviewed_by="mstarks01",
         ),
         "http2-messages": _row(
             "an in-scope component sends or accepts HTTP/2 messages",
             "Does an in-scope component send or accept HTTP/2 messages?",
+            reviewed_by="mstarks01",
         ),
         "http3-messages": _row(
             "an in-scope component sends or accepts HTTP/3 messages",
             "Does an in-scope component send or accept HTTP/3 messages?",
+            reviewed_by="mstarks01",
         ),
         "http2-request-reception": _row(
             "an in-scope component accepts HTTP/2 requests",
             "Does an in-scope component accept HTTP/2 requests?",
+            reviewed_by="mstarks01",
         ),
         "http3-request-reception": _row(
             "an in-scope component accepts HTTP/3 requests",
             "Does an in-scope component accept HTTP/3 requests?",
+            reviewed_by="mstarks01",
         ),
         "external-facing-http-services": _row(
             "the application exposes HTTP services to clients outside its boundary,"
             " including clients on a private network",
             "Does the application expose HTTP services to clients outside its own"
             " boundary, including clients on a private network?",
+            reviewed_by="mstarks01",
         ),
         "intermediary-client-ip-handling": _row(
-            "a proxy or middleware passes client IP information for the application"
-            " to use",
-            "Does a proxy or middleware pass the client's IP address to the"
-            " application?",
+            "client requests reach the application or its web server through a"
+            " proxy or middleware, whether original client IP information is"
+            " forwarded or not",
+            "Do client requests reach the application or its web server through a"
+            " proxy or middleware, whether or not it forwards the original client"
+            " IP address?",
+            reviewed_by="mstarks01",
         ),
         "data-object-responses": _row(
             "the application returns the fields of data objects to its consumers",
             "Does the application return data objects, or their fields, to its"
             " consumers?",
+            reviewed_by="mstarks01",
         ),
         "request-object-field-writes": _row(
             "request data writes object fields, by automatic or manual binding",
-            "Does request data write the fields of objects, by automatic binding or"
-            " by code?",
+            "Does the application use data from requests to set or update object"
+            " fields, either automatically through a framework or explicitly in"
+            " code?",
+            reviewed_by="mstarks01",
         ),
         "web-tier-file-serving": _row(
-            "the application's web tier serves files",
-            "Does the application's web tier serve files?",
+            "the application has a web server or other web-facing component capable"
+            " of serving files, including files not intended for publication",
+            "Can the application's web server or another web-facing component serve"
+            " files, including files not intended to be public?",
+            reviewed_by="mstarks01",
         ),
         # --- Cryptography ---
         "cryptographic-keys": _row(
             "an in-scope component uses cryptographic keys",
             "Does an in-scope component use cryptographic keys?",
+            reviewed_by="mstarks01",
         ),
         "cryptographic-operations": _row(
             "an in-scope component uses cryptography, including through managed"
             " services and TLS",
             "Does an in-scope component use cryptography, including through a"
             " managed service or TLS?",
+            reviewed_by="mstarks01",
         ),
         "cryptographic-hashing": _row(
             "the application hashes data for a cryptographic purpose, including"
             " with an insecure implementation",
             "Does the application hash data for a security purpose?",
+            reviewed_by="mstarks01",
         ),
         "authenticity-or-integrity-hashing": _row(
             "hashes support signatures, data authentication or integrity in the"
             " application",
             "Does the application use hashes for signatures, data authentication or"
             " integrity?",
+            reviewed_by="mstarks01",
         ),
         "password-derived-secret-keys": _row(
             "the application derives secret keys from passwords",
             "Does the application derive secret keys from passwords?",
+            reviewed_by="mstarks01",
         ),
         "unpredictable-values-needed": _row(
             "the application generates values that must be unpredictable, even if"
             " they are predictable now",
             "Does the application generate values that must not be guessable, such"
             " as tokens or identifiers?",
+            reviewed_by="mstarks01",
         ),
         "random-value-generation": _row(
             "the application generates random values, including with an insecure"
             " generator",
             "Does the application generate random values?",
+            reviewed_by="mstarks01",
         ),
         "non-tls-public-key-operations": _row(
             "the application generates public keys or creates or verifies"
             " signatures outside TLS",
             "Does the application generate public keys, or create or verify"
             " signatures, outside TLS?",
+            reviewed_by="mstarks01",
         ),
         "non-tls-key-exchange": _row(
             "the application uses public-key exchange outside TLS",
             "Does the application use public-key exchange outside TLS?",
+            reviewed_by="mstarks01",
         ),
         # --- Secure communication ---
         "tls-use": _row(
             "an in-scope component uses or supports TLS, including managed endpoints",
             "Does an in-scope component use or support TLS, including a managed"
             " endpoint?",
+            reviewed_by="mstarks01",
         ),
         "tls-certificates": _row(
             "the in-scope TLS uses certificates",
-            "Does the application's TLS use certificates?",
+            "Does any in-scope component use certificates for TLS, including"
+            " through a managed endpoint?",
+            reviewed_by="mstarks01",
         ),
         "tls-client": _row(
             "an in-scope component acts as a TLS client",
             "Does an in-scope component connect to other services as a TLS client?",
+            reviewed_by="mstarks01",
         ),
         # --- Configuration and resources ---
         "external-resource-use": _row(
             "the application consumes external resources, including services,"
             " files, threads or connections",
-            "Does the application use external resources, such as services, files,"
-            " threads or connections?",
+            "Does the application use resources such as databases, other services,"
+            " files, threads or network connections?",
+            reviewed_by="mstarks01",
         ),
         "backend-secrets": _row(
             "backend secrets exist in scope, including secrets in managed custody"
             " or in insecure storage",
-            "Does the application's backend hold secrets, such as passwords, keys"
-            " or tokens, in any storage?",
+            "Does the application's backend use or manage secrets, such as"
+            " passwords, keys or tokens, including secrets held in memory, embedded"
+            " in code or managed by another in-scope service?",
+            reviewed_by="mstarks01",
         ),
         "secret-assets": _row(
-            "in-scope secrets need access protection, whether they are protected or"
-            " not",
-            "Does the application hold secrets that need access protection?",
+            "secrets exist within the application's scope, including secrets used"
+            " or managed on its behalf by an in-scope service",
+            "Does the application use, store or manage secrets, including through"
+            " another in-scope service?",
+            reviewed_by="mstarks01",
         ),
         # --- Secure coding and architecture ---
         "third-party-components": _row(
@@ -1091,42 +1143,53 @@ CAPABILITIES: Mapping[str, Capability] = MappingProxyType(
             " runtime and transitive ones",
             "Does the application use third-party components, including runtime and"
             " transitive dependencies?",
+            reviewed_by="mstarks01",
         ),
         "resource-demanding-functionality": _row(
-            "the application has functionality costly enough to need availability"
-            " protection, whether protected or not",
-            "Does the application have functions costly enough in time or resources"
-            " to need availability protection?",
+            "the application has functionality that can consume enough time or"
+            " computing resources to impair availability, whether protections are"
+            " already present or not",
+            "Does the application have functionality whose time or resource"
+            " consumption could impair availability if it were used heavily or"
+            " without limits?",
+            reviewed_by="mstarks01",
         ),
         "dangerous-functionality": _row(
             "the application has dangerous functionality, whether documented or not",
             "Does the application have dangerous functionality, such as functions"
             " that can damage data or the system?",
+            reviewed_by="mstarks01",
         ),
         "risky-third-party-components": _row(
             "the application uses risky third-party components, whether documented"
             " or not",
             "Does the application use third-party components that carry particular"
             " risk?",
+            reviewed_by="mstarks01",
         ),
         "shared-multithreaded-state": _row(
             "multiple threads in the application access shared objects, including"
             " through framework behaviour",
             "Do multiple threads in the application access shared objects?",
+            reviewed_by="mstarks01",
         ),
         "check-dependent-resource-actions": _row(
             "the application's actions depend on checks of a resource's state, such"
             " as its existence or permissions",
-            "Does the application act on a resource after a check of its state,"
-            " such as its existence or permissions?",
+            "Does an application action depend on a resource's state, such as"
+            " whether a file exists or a user has permission, including when the"
+            " check and action happen together?",
+            reviewed_by="mstarks01",
         ),
         "concurrency-locks": _row(
             "the application's concurrent code uses locks",
             "Does the application's concurrent code use locks?",
+            reviewed_by="mstarks01",
         ),
         "contended-thread-resources": _row(
             "threads in the application compete for the allocation of resources",
             "Do threads in the application compete for the allocation of resources?",
+            reviewed_by="mstarks01",
         ),
     }
 )
