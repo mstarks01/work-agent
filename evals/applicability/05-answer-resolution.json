@@ -1,7 +1,7 @@
 {
   "test_class": "answer-resolution",
   "drafted_by": "agent",
-  "signed_by": null,
+  "signed_by": "mstarks01",
   "note": "Answers settle what the sources left open. The truth is a web shop with password sign-in and no OAuth.",
   "framework": "asvs",
   "options": {

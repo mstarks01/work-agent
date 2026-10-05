@@ -1,7 +1,7 @@
 {
   "test_class": "conformance-bait",
   "drafted_by": "agent",
-  "signed_by": null,
+  "signed_by": "mstarks01",
   "note": "A missing second factor is the gap V6.3.3 asks about, so it cannot rule V6.3.3 out; it only removes the recovery of a lost factor.",
   "framework": "asvs",
   "options": {

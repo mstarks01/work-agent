@@ -1,7 +1,7 @@
 {
   "test_class": "conflicting",
   "drafted_by": "agent",
-  "signed_by": null,
+  "signed_by": "mstarks01",
   "note": "Two sources that disagree about sessions settle nothing.",
   "framework": "asvs",
   "options": {
@@ -11,12 +11,12 @@
     {
       "capability": "sessions",
       "state": "absent",
-      "quote": "The API is stateless."
+      "quote": "The API does not create, accept or maintain user sessions of any kind."
     },
     {
       "capability": "sessions",
       "state": "present",
-      "quote": "Users stay logged in with a session cookie."
+      "quote": "The API keeps users logged in with a session cookie."
     }
   ],
   "answers": {},

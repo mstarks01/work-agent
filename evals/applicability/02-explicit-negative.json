@@ -1,7 +1,7 @@
 {
   "test_class": "explicit-negative",
   "drafted_by": "agent",
-  "signed_by": null,
+  "signed_by": "mstarks01",
   "note": "A stated absence of OAuth rules out every OAuth requirement at level 1.",
   "framework": "asvs",
   "options": {

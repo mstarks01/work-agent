@@ -224,6 +224,8 @@ class QuestionRun:
     rounds: int
     #: Unknown requirements each asked question settled, in order.
     settled: tuple[int, ...]
+    #: The capability each asked question named, in the same order.
+    keys: tuple[str, ...]
     #: Parts not asked because their parent was answered "no".
     avoided: int
     #: Questions that named no capability of the table. Zero by construction,
@@ -281,7 +283,7 @@ def simulate_questions(fixture: Fixture) -> QuestionRun:
 
     before = unknown(model)
     held: dict[UnknownKey, FactAnswer] = {}
-    settled, avoided, conformance, rounds = [], 0, 0, 0
+    settled, keys, avoided, conformance, rounds = [], [], 0, 0, 0
     while True:
         shown, _, _ = next_round(
             capability_questions(model, options), frozenset(held), held
@@ -308,6 +310,7 @@ def simulate_questions(fixture: Fixture) -> QuestionRun:
             count = unknown(model)
             model = answered_model(model, [answer])
             settled.append(count - unknown(model))
+            keys.append(key)
     return QuestionRun(
         name=fixture.name,
         unknown_before=before,
@@ -315,6 +318,7 @@ def simulate_questions(fixture: Fixture) -> QuestionRun:
         asked=len(settled),
         rounds=rounds,
         settled=tuple(settled),
+        keys=tuple(keys),
         avoided=avoided,
         conformance=conformance,
     )

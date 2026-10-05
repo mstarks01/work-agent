@@ -8,7 +8,7 @@ from typing import Any
 import pytest
 
 from analysis_service.answer_round import EARLY_RULES
-from analysis_service.capabilities import CAPABILITIES
+from analysis_service.capabilities import CAPABILITIES, lineage
 from evals.harness.rule_applicability import (
     FIXTURES_DIR,
     Fixture,
@@ -95,7 +95,10 @@ def test_the_simulation_asks_a_part_only_under_a_yes():
         _fixture(options={"level": 2}, truth={"oauth": "absent", "webrtc": "absent"})
     )
     # Every OAuth and WebRTC part waits behind a "no" and is not asked.
-    assert run.avoided >= 7
+    assert run.avoided
+    assert {"oauth", "webrtc"}.isdisjoint(
+        ancestor for key in run.keys for ancestor in lineage(key)
+    )
     assert run.conformance == 0
 
 
