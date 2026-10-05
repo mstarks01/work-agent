@@ -120,7 +120,7 @@ fan-in loss.
 |---|---|---|
 | Pattern A, compromised reader | The store-readers rule recovers neither 05/6 nor 05/7; no lead states that a compromised reader uses its own access | `QA-2026-10-05-02-E3` |
 | Findings the lane closing added | Voted: of 50 findings that match no reference, 1 up, 7 down and 42 need evidence; the cost side of ADR 0030 waits on answers to the open facts | `QA-2026-10-05-02-E4` |
-| One attack filed in two lanes | Three findings were voted duplicates of a finding in another lane at the same place; one pair shares a mechanism key | `QA-2026-10-05-02-E4`, `QA-2026-09-24-02-E17` |
+| One attack filed in two lanes | 28 of 30 duplicate votes have a partner in another lane at the same place; a shared control does not separate them (it fires on 92 claims voted as their own finding to catch 19); no field-level rule found | `QA-2026-10-05-02-E5` |
 | Full 15-case sweep with the lane closing | About $5.50; gives the first holdout reading with the closing | after OpenRouter credits allow |
 | Intake questions | Ranking design measured offline; not built | #1225 |
 | Readable report remainder | Plain summaries and progressive disclosure | #561 |
