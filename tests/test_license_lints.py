@@ -33,6 +33,7 @@ from __future__ import annotations
 
 import json
 import re
+import subprocess
 import tomllib
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -214,6 +215,38 @@ def fingerprints(text: str) -> set[tuple[str, ...]]:
     }
 
 
+def _ignored(root: Path) -> frozenset[Path]:
+    """The paths under ``root`` that git ignores, which this repo never ships.
+
+    A run's failure dump under ``evals/runs/`` holds the lane prompts, so it
+    quotes the standard; it can never be committed. An untracked file git does
+    not ignore stays in scope, because it can be. Outside a repository, as in
+    a test's temporary directory, nothing is ignored.
+    """
+    listed = subprocess.run(
+        [
+            "git",
+            "-C",
+            str(root),
+            "ls-files",
+            "--others",
+            "--ignored",
+            "--exclude-standard",
+            "--directory",
+            "-z",
+        ],
+        capture_output=True,
+        check=False,
+    )
+    if listed.returncode:
+        return frozenset()
+    return frozenset(
+        (root / entry.decode()).resolve()
+        for entry in listed.stdout.split(b"\0")
+        if entry
+    )
+
+
 def leaks(
     root: Path, governed: frozenset[Path], protected: set[tuple[str, ...]]
 ) -> dict[Path, str]:
@@ -223,8 +256,11 @@ def leaks(
     a file took one sentence or forty.
     """
     found: dict[Path, str] = {}
+    ignored = _ignored(root)
     for path in sorted(root.rglob("*")):
         if not path.is_file() or SKIPPED_DIRS.intersection(path.parts):
+            continue
+        if ignored.intersection((path, *path.parents)):
             continue
         if path in governed:
             continue

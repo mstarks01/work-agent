@@ -4,11 +4,11 @@
 
 Your review of this job's drafts came back with a mechanical problem: your output did not account for exactly the drafts you were given, or a verdict's fields do not fit together. You get one pass to fix it. If it still does not reconcile, the job fails and no report is produced — so correct precisely what is listed and change nothing else.
 
-The problem is structural, not a matter of judgement. You are not being asked to re-run the review or reconsider a verdict you already made. You are being asked to cover the same set of drafts, whole: every draft ruled on exactly once, no ruling for a draft no lane agent produced, each verdict's fields fitting together, and each `needs-info` verdict naming only unknowns the model actually contains. The rulings you already made are correct — carry them across unchanged wherever the listed problem does not touch them.
+The problem is structural, not a matter of judgement. You are not being asked to re-run the review or reconsider a verdict you already made. You are being asked to repair the rulings the problems name, so that the whole set reconciles: every draft ruled on exactly once, no ruling for a draft no lane agent produced, each verdict's fields fitting together, and each `needs-info` verdict naming only unknowns the model actually contains. The rulings you already made are correct, and the service keeps every one the problems do not name — so return only the repaired ones.
 
 ## Input
 
-Every draft ID the lane agents produced — the exact set your rulings must cover, no more and no less, one ruling each:
+Every draft ID the lane agents produced — the exact set the merged review must cover, no more and no less, one ruling each:
 
 {draft_roster}
 
@@ -38,14 +38,14 @@ The submitted sources, which the first pass read for facts the model does not ca
 
 1. Take the problems one at a time. Each names a draft ID and the fault: a draft you never ruled on, a ruling for an ID no lane agent produced, a duplicate ID, a verdict whose fields do not fit together, or a `needs-info` unknown naming an element the model does not contain or an attribute that element does not have.
 2. For a **dropped** draft, add its ruling back with the verdict you intended — rule it now if you never did, grounded in the model facts exactly as in the first pass.
-3. For an **invented** draft — an ID no lane agent produced — remove that ruling. You do not add claims the agents missed; that was true in the first pass and is true here.
-4. For a **duplicate ID**, keep one ruling and drop the other, preserving the one that belongs to the draft that ID names.
+3. For an **invented** draft — an ID no lane agent produced — return no ruling for it. The service drops your first pass's copy. You do not add claims the agents missed; that was true in the first pass and is true here.
+4. For a **duplicate ID**, return one ruling for it: the one that belongs to the draft that ID names.
 5. For an **unresolved unknown**, repoint it at the element and attribute the model actually contains. Where the fact has no place in the model but one of the question kinds at the end of this prompt fits, give that `question` and the `element_id` it is about. If neither fits, state it as a `subject` rather than inventing an element to justify it.
 6. For a **verdict whose fields do not fit together**, supply what is missing rather than re-deciding: write the reason a `needs-info` or `rejected` ruling owes its reader. A ruling with `rejected_because` set lists no open facts: drop `related_unknowns`, or clear `rejected_because` where the argument follows once those facts hold. A `related_unknowns` entry naming an element and attribute must name one the element actually has — the problem list tells you which attributes it has. Where the question is not about this model at all, state it as a `subject` instead of repointing it at a field that merely resolves.
-7. Leave every other ruling and every other field byte-identical. A ruling the problems do not name is already correct — re-deciding it is an unreviewed change, and a rating that drifts here disagrees with a report the first pass already reasoned out.
+7. Return no ruling the problems do not name. The service keeps your first pass's ruling for every other draft, because it is already correct — re-deciding it is an unreviewed change, and a rating that drifts here disagrees with a report the first pass already reasoned out. A ruling you return for an unnamed draft is compared with the first pass and discarded.
 
-Never satisfy the check by asserting a fact the model does not contain. Returning the drafted set whole, with the rulings you already made, is always available and always correct.
+Never satisfy the check by asserting a fact the model does not contain. Returning a ruling for each named draft, grounded in the model facts exactly as in the first pass, is always available and always correct.
 
 ## Output
 
-Return an object with a single field, `claims`, holding one ruling per ID on the roster — `{"claims": [ ... ]}`, nothing outside it — the same set, reconciled, in the same shape as the first review: each ruling carrying the draft's `id`, your `verdict`, and whatever further judgements this framework's rulings carry — exactly as the first pass set them, and none it does not carry. Do not repeat the draft's own fields; they are held beside your ruling and are copied into the report as the agent wrote them. Confirmed and needs-info claims stay together as actionable; rejected claims ride in the separate audit array. The difference against your previous ruling should touch only the drafts the listed problems named.
+Return an object with a single field, `claims`, holding one ruling for each draft ID the problems name — `{"claims": [ ... ]}`, nothing outside it — in the same shape as the first review: each ruling carrying the draft's `id`, your `verdict`, and whatever further judgements this framework's rulings carry — exactly as the first pass set them, and none it does not carry. Do not repeat the draft's own fields; they are held beside your ruling and are copied into the report as the agent wrote them. Confirmed and needs-info claims stay together as actionable; rejected claims ride in the separate audit array. An empty `claims` list repairs nothing, and the job then fails: every named draft needs its ruling.
