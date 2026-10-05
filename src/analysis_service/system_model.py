@@ -1,6 +1,6 @@
 """Canonical System Model: the extraction agent's output, every downstream agent's input.
 
-Terminology for this schema lives in CONTEXT.md.
+Terminology for this schema lives in GLOSSARY.md.
 
 The five element types are the classic DFD-based STRIDE-per-element taxonomy.
 Free-form security-relevant attributes accept the sentinel value ``"unknown"``,

@@ -23,7 +23,7 @@ the rows that change by meaning before any decision.
 **Holdout cases.** Cases 14 and 15 carry `holdout: true`. Every sweep scores
 them and reports them apart (`holdout_split`), and no diagnosis command reads
 them. A gain that the tuned cases show and the holdout cases do not was shaped
-by the cases it was read on. See **Holdout Case** in `CONTEXT.md`.
+by the cases it was read on. See **Holdout Case** in `GLOSSARY.md`.
 
 **Instruments for one lane or one critic call.** `run.py lane-replay` sends one
 captured lane request again, and `--append` adds a user part after the captured

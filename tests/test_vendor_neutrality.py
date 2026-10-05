@@ -681,7 +681,7 @@ VENDOR_TALLY = re.compile(
 #: were written and neither is swept here.
 PROSE = tuple(
     path
-    for path in [REPO_ROOT / "README.md", REPO_ROOT / "CONTEXT.md"]
+    for path in [REPO_ROOT / "README.md", REPO_ROOT / "GLOSSARY.md"]
     + sorted((REPO_ROOT / "docs").glob("*.md"))
     if path.is_file()
 )

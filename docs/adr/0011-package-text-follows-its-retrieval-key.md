@@ -75,7 +75,7 @@ unreviewable against the prior tree. `skills/stride/` already moved under
 #164's ruling, so `knowledge/` and `skills/` both end empty; the text roots
 drop to three (`domains/`, `prompts/`, the new `frameworks/`), `skills/`
 renames to `domains/`, `ANALYSIS_KNOWLEDGE_DIR` is deleted, and
-`ANALYSIS_SKILLS_DIR` becomes `ANALYSIS_DOMAINS_DIR`. `CONTEXT.md`'s
+`ANALYSIS_SKILLS_DIR` becomes `ANALYSIS_DOMAINS_DIR`. `GLOSSARY.md`'s
 **Deployment** entry gets its third edit across this cutover: five config
 files, three text roots.
 

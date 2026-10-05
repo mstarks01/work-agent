@@ -402,7 +402,7 @@ def _assumption_issues(
     extraction inferred with a stated basis, which makes an assumption on an
     attribute still reading ``unknown`` a contradiction of its own record:
     nothing was inferred, so there is nothing for the basis to support.
-    ``CONTEXT.md`` draws the same line — a hedge somebody voiced is
+    ``GLOSSARY.md`` draws the same line — a hedge somebody voiced is
     ``unknown`` and goes in ``notes``, never here — and this is where the
     prompt's rule stops being wording and becomes a rule.
 

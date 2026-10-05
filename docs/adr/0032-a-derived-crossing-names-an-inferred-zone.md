@@ -14,7 +14,7 @@
 
 ## Context
 
-`CONTEXT.md`'s **Assumption** entry gives extraction a tie-break. Where two
+`GLOSSARY.md`'s **Assumption** entry gives extraction a tie-break. Where two
 **Sources** make positive conflicting claims about an attribute that cannot hold
 `unknown`, extraction emits a legal value anyway and records an **Assumption**;
 for `trust_zone` it picks the reading that puts the two ends of a flow in

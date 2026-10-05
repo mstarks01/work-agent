@@ -124,7 +124,7 @@ def test_a_framework_the_sweep_never_ran_contributes_no_rows():
 def test_two_packages_declaring_one_lane_name_stay_apart():
     """The key is ``(framework, lane)``, never the slug alone.
 
-    ``CONTEXT.md`` is explicit that two packages may declare a lane of the same
+    ``GLOSSARY.md`` is explicit that two packages may declare a lane of the same
     name. STRIDE's categories and ASVS's chapters do not collide today, and
     relying on that is the one-package assumption
     ``docs/agents/framework-parity.md`` exists to catch — so the separation is

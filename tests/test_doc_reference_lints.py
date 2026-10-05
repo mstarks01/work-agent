@@ -49,7 +49,7 @@ Three other layers cover what this one cannot, and none replaces another:
 ## The exception table
 
 A document may name something absent **on purpose**, and that is not a defect to
-be fixed. ``docs/agents/domain.md`` says there is no ``CONTEXT-MAP.md``, which is
+be fixed. ``docs/agents/domain.md`` says there is no ``GLOSSARY-MAP.md``, which is
 a true sentence about an absent file; ``docs/agents/provenance.md`` is a
 post-mortem that names the modules a retirement deleted. Forcing either to
 resolve would make the lint demand a falsehood.
@@ -127,8 +127,8 @@ DELIBERATE: dict[tuple[str, str], str] = {
     " 360 KB copy of the corpus that goes stale the moment a claim file moves.",
     (
         "docs/agents/domain.md",
-        "CONTEXT-MAP.md",
-    ): "asserts the file's absence — 'There is no `CONTEXT-MAP.md`'. Resolving it"
+        "GLOSSARY-MAP.md",
+    ): "asserts the file's absence — 'There is no `GLOSSARY-MAP.md`'. Resolving it"
     " would make the sentence false.",
     (
         "docs/adr/0013-asvs-rules-applicability-and-never-a-pass.md",
@@ -160,7 +160,7 @@ DELIBERATE: dict[tuple[str, str], str] = {
     ): "same block, same marking.",
     (
         "tests/test_doc_reference_lints.py",
-        "CONTEXT-MAP.md",
+        "GLOSSARY-MAP.md",
     ): "this module's own docstring, quoting the exception above it.",
 }
 

@@ -247,7 +247,7 @@ class TestEvidenceCatalog:
         )
 
     def test_a_hedged_unknown_is_still_an_unknown(self):
-        """``CONTEXT.md`` defines Unknown to include a voiced hedge, and
+        """``GLOSSARY.md`` defines Unknown to include a voiced hedge, and
         ``control_state`` reads the leading token — so the sentinel decorated
         with the speaker's own doubt is the same fact as the bare one, and the
         catalog no longer misses it for the decoration."""
