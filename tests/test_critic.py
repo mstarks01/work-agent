@@ -565,6 +565,41 @@ class TestSnapRulings:
         assert (ref.question, ref.subject) == ("capacity-limits", "")
         assert ref.spellings == ("question",)
 
+    def test_a_subject_beside_a_bare_element_keeps_the_subject(self):
+        """#1476: an element with no attribute names no field, so the subject
+        is the only statement of the fact."""
+        ruling = sample_ruling(
+            verdict=ProposedVerdict(
+                reason="policy unknown",
+                related_unknowns=[
+                    UnknownRef(
+                        element_id="process:web-app",
+                        subject="Is the decoding order documented?",
+                    )
+                ],
+            )
+        )
+        [snapped] = snap_rulings([ruling], ELEMENT_IDS)
+        [ref] = snapped.verdict.related_unknowns
+        assert (ref.element_id, ref.subject) == (
+            "",
+            "Is the decoding order documented?",
+        )
+        assert ref.spellings == ("subject",)
+
+    def test_a_subject_beside_an_attribute_is_left_for_the_review(self):
+        """An attribute states the fact as well, so no form has precedence."""
+        mixed = UnknownRef(
+            element_id="process:web-app",
+            attribute="exposure",
+            subject="Is the web app public?",
+        )
+        ruling = sample_ruling(
+            verdict=ProposedVerdict(reason="unknown", related_unknowns=[mixed])
+        )
+        [snapped] = snap_rulings([ruling], ELEMENT_IDS)
+        assert snapped.verdict.related_unknowns == [mixed]
+
     def test_a_question_kind_with_an_attribute_is_left_for_the_review(self):
         """No stated precedence settles that mix, so the re-ask still sees it."""
         mixed = UnknownRef(
