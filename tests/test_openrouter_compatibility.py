@@ -25,6 +25,7 @@ no other vendor sends.
 
 from __future__ import annotations
 
+from datetime import UTC, datetime
 from typing import Any
 
 import pytest
@@ -77,7 +78,7 @@ def _transform(status_code: int, body: dict[str, Any]) -> Any:
         messages=[],
         stream=False,
         call_type="completion",
-        start_time=0,
+        start_time=datetime.now(UTC),
         litellm_call_id="offline",
         function_id="offline",
     )

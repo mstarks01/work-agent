@@ -5,6 +5,7 @@ from __future__ import annotations
 import ast
 import re
 import sys
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import ClassVar
 
@@ -430,7 +431,7 @@ class TestTheTableMatchesWhatTheTranslatorDoes:
             messages=[],
             stream=False,
             call_type="completion",
-            start_time=0,
+            start_time=datetime.now(UTC),
             litellm_call_id="offline",
             function_id="offline",
         )
