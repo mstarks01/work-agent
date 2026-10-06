@@ -11,7 +11,7 @@ only the hash, so a vote stores its :class:`Components` instead. Re-keying the
 whole ledger under a new version is then a pure recompute over stored fields:
 offline, with no provider and no re-vote. A model-scored history has the problem
 that a new scorer silently re-scores everything, with no way to recompute the
-old numbers. This module answers it by making the re-score explicit, total and
+earlier numbers. This module answers it by making the re-score explicit, total and
 free.
 
 Version 1 reads what a claim carries today: framework, lane, and the

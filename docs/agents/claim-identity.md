@@ -204,7 +204,7 @@ the whole file under a new version with no re-vote, no provider and no
 credentials.
 
 A model judge cannot offer this property, because a judge upgrade silently
-re-scores every historical number, with no way to recompute the old ones. Here
+re-scores every historical number, with no way to recompute the earlier ones. Here
 the re-score is explicit, total, offline and free.
 
 A sitting's marks are keyed the same way and store only the key, and a

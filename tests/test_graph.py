@@ -699,8 +699,8 @@ def test_the_recorded_model_carries_its_vendor(pipeline):
     # A bare served identifier carries no vendor, and two vendors can serve the
     # same build — so the prefix is part of the identity, not decoration. The
     # test selection runs a different vendor per tier, which is what lets this
-    # also pin that each node records *its own* tier's vendor: against the old
-    # Vertex-on-both default, one global prefix would have passed identically.
+    # also pin that each node records *its own* tier's vendor: where both tiers
+    # name one vendor, one global prefix would pass identically.
     tiers = repo_tiers()
     for node in (graph.EXTRACT_NODE, CRITIC_NODE):
         selection = tiers.resolve_model(TIER_NODES[node])

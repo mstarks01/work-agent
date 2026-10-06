@@ -135,30 +135,6 @@ DELIBERATE: dict[tuple[str, str], str] = {
         "0x04-Assessment_and_Certification.md",
     ): "a document in the upstream OWASP ASVS repository, not in this tree.",
     (
-        "docs/agents/provenance.md",
-        "judge.py",
-    ): "a post-mortem naming the modules the judge's retirement deleted. See ADR 0003.",
-    (
-        "docs/agents/provenance.md",
-        "judge.toml",
-    ): "same post-mortem, same retirement.",
-    (
-        "docs/agents/provenance.md",
-        "evals/prompts/judge_adjudication.md",
-    ): "same post-mortem, same retirement.",
-    (
-        "docs/agents/issue-tracker.md",
-        "analyst.md",
-    ): "inside a block the document marks as 'not the current state'.",
-    (
-        "docs/agents/issue-tracker.md",
-        "docs/Home.md",
-    ): "same block, same marking.",
-    (
-        "docs/agents/issue-tracker.md",
-        "docs/example-report.html",
-    ): "same block, same marking.",
-    (
         "tests/test_doc_reference_lints.py",
         "GLOSSARY-MAP.md",
     ): "this module's own docstring, quoting the exception above it.",
@@ -430,6 +406,17 @@ def test_every_exception_names_a_document_that_exists():
     )
 
     assert not missing, f"DELIBERATE names documents that do not exist: {missing}"
+
+
+def test_every_exception_names_a_reference_its_document_still_makes():
+    """An entry whose document no longer names the reference excuses nothing."""
+    unused = sorted(
+        (document, ref)
+        for document, ref in DELIBERATE
+        if ref not in (REPO_ROOT / document).read_text(encoding="utf-8")
+    )
+
+    assert not unused, f"these DELIBERATE entries excuse nothing; remove them: {unused}"
 
 
 def test_the_scan_actually_finds_references():

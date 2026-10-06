@@ -54,7 +54,7 @@ asserting a fact its own model does not hold — **fires on 231 of 243 claims**,
 because a claim is *supposed* to describe an attack in words the system
 description never uses. Narrowing it to the asset vocabulary fails too.
 
-"A document written in the past tense about a process nobody ran" is the same
+"A document written in past tense about a process nobody ran" is the same
 class of prose analysis and will fail the same way. What is mechanically
 checkable is the *field*: whether it is present, and whether the list naming
 its absence is honest. That is the half to build.
