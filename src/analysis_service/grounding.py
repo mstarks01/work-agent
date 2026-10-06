@@ -106,10 +106,9 @@ _REPAIR_WIDTH_SLACK = 2
 #: How much character comparison the repair rung may do before it gives up,
 #: counted as it happens rather than predicted from the input's shape.
 #:
-#: Counted, because two attempts to predict it were both wrong and wrong in
-#: different directions. The first counted the quote in words while
-#: :meth:`~difflib.SequenceMatcher.ratio` costs characters. The second counted
-#: characters but still predicted, and a prediction cannot order these two:
+#: Counted, because no prediction from shape orders these costs, so the loop
+#: counts work. :meth:`~difflib.SequenceMatcher.ratio` costs characters, and a
+#: prediction in characters still cannot order these two:
 #:
 #: ===================  ==========  ========  =======
 #: source               predicted   real CPU  ratio
@@ -126,13 +125,13 @@ _REPAIR_WIDTH_SLACK = 2
 #: the second, because the first is the larger number.
 #:
 #: So the loop spends this budget as it goes, and it charges for **both** kinds
-#: of work at **different rates**. Two corrections, each from an input that beat
-#: the version before it.
+#: of work at **different rates**.
 #:
-#: Charging only the comparisons that survive the prune reads zero on the input
-#: where the prune itself is the cost: the join and ``quick_ratio`` are each
-#: linear in the span and run on every window, so an English source and a
-#: 333-word quote spent 0 of 50,000,000 units and ran 8.4 seconds. A budget
+#: A charge for only the comparisons that survive the prune would read zero on
+#: the input where the prune itself is the cost: the join and ``quick_ratio``
+#: are each linear in the span and run on every window, so on such a charge an
+#: English source and a 333-word quote spend 0 of 50,000,000 units and run 8.4
+#: seconds. A budget
 #: nothing charges is not a budget.
 #:
 #: And one rate does not serve both, because ``ratio`` is not linear in the
@@ -144,10 +143,9 @@ _REPAIR_WIDTH_SLACK = 2
 #:
 #: The longest quote this rung will try to repair, in normalized characters.
 #:
-#: **The bound that works, after five that did not.** Every earlier attempt
-#: priced a `difflib` comparison from its operands, and six separate models of
-#: that cost were all wrong -- the last by 200x, when 156,976 matching pairs ran
-#: in 0.015 s and 332,002 ran in 6.5 s. `SequenceMatcher` recurses on the blocks
+#: No cost model of `difflib` holds, so this caps the input. A model that
+#: prices a comparison from its operands can be wrong by 200x: 156,976 matching
+#: pairs ran in 0.015 s and 332,002 ran in 6.5 s. `SequenceMatcher` recurses on the blocks
 #: it finds, and nothing computable from the inputs sees how many that will be.
 #:
 #: So this does not predict the cost. It caps the input, and the worst case is
@@ -180,18 +178,18 @@ MAX_REPAIR_QUOTE_CHARS = 400
 #: function of the operands: 156,976 matching character pairs ran in 0.015 s
 #: while 332,002 ran in 6.5 s, a 200x spread on the only cheap statistic that
 #: looked promising. Word counts, character products, prune-aware budgets and a
-#: junk heuristic were each tried and each wrong.
+#: junk heuristic each misprice it too.
 #:
 #: :data:`MAX_REPAIR_QUOTE_CHARS` is what actually bounds a single comparison,
 #: by capping what goes into one. This budget bounds the *number* of them, which
 #: is a count rather than a prediction, and the deadline below catches whatever
-#: both of those still misprice. Three bounds, because the record earned them.
+#: both of those still misprice. Three bounds, because each one alone misses a
+#: case the others catch.
 #:
 #: The weights are the measured ratio between a character of pruning and a unit
-#: of comparison. They are re-derived whenever the comparison changes shape --
-#: `autojunk` moved them once and was then reverted, because it dropped 12.4% of
-#: the repairs a stripped-punctuation quote needs while the transposition the
-#: test happened to use lost 0.0%.
+#: of comparison. They are re-derived whenever the comparison changes shape.
+#: `autojunk` stays off: it drops 12.4% of the repairs a stripped-punctuation
+#: quote needs, while the transposition the test uses loses 0.0%.
 MAX_REPAIR_WORK = 250_000_000
 
 #: What one pruned window costs, per character of the window. Pruning is the
@@ -202,13 +200,13 @@ _CERTAIN = 0.9999
 
 #: The backstop, on a **per-thread** clock. `time.process_time()` sums CPU
 #: across every thread in the process and `graph.py` runs eight node bodies on
-#: one pool, so that spelling made the effective deadline about 0.22 s under a
-#: full pool: one busy caller truncated another job's repairs and the report
-#: became a function of unrelated traffic.
+#: one pool, so that clock would make the effective deadline about 0.22 s under
+#: a full pool: one busy caller would truncate another job's repairs and the
+#: report would become a function of unrelated traffic.
 #:
 #: Four seconds, because legitimate work measured 1.98 s and a backstop that
 #: legitimate work brushes against is not a backstop -- at 2.0 s a slower
-#: machine silently truncated a repair that should have been made. It has to
+#: machine would silently truncate a repair that should be made. It has to
 #: stay finite: the shape that beats the budget, a small alphabet where every
 #: window survives the prune, runs 56.72 s with the budget alone, because the
 #: budget prices each of its comparisons at a hundredth of what they cost.
@@ -302,8 +300,7 @@ def fragments(quote: str) -> tuple[str, ...]:
     normalizes to nothing is not a fragment. **The one reader of that
     split**: :func:`match_normalized` searches these, and a support span
     carries one of them, so a span's quote is the words its offsets hold
-    rather than the whole quote they were cut from (#961). Before this, every
-    fragment span carried the whole quote, and the gate refused every one.
+    rather than the whole quote they were cut from (#961).
     """
     return tuple(raw.strip() for raw in _ELLIPSIS.split(quote) if normalize(raw))
 

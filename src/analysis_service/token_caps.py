@@ -68,59 +68,55 @@ def prompt_key(name: str) -> str:
 TOKEN_CAPS: dict[str, int] = {
     # The five shared bodies, under ``prompts/``.
     #
-    # ``analyze`` raised from 4500 and ``critic`` from 2400 for ADR 0039 rule
-    # 4, which binds these two readers and nothing else: an undecidable
-    # crossing confers eligibility for analysis and establishes nothing, so a
-    # lane agent rests the claim on a fact the model states and a critic
-    # refuses the crossing as a premise. The code already carried the rule —
-    # the catalog omits such a crossing and ``crossing_facts`` marks it — and
-    # neither prompt told its reader what the ``decided`` field it reads means.
+    # ``analyze`` and ``critic`` carry ADR 0039 rule 4, which binds these two
+    # readers and nothing else: an undecidable crossing confers eligibility for
+    # analysis and establishes nothing, so a lane agent rests the claim on a
+    # fact the model states and a critic refuses the crossing as a premise. The
+    # catalog omits such a crossing and ``crossing_facts`` marks it; each
+    # prompt tells its reader what the ``decided`` field it reads means.
     #
-    # ``critic`` raised again to 3000 for the two evidence keys the view now
+    # ``critic`` also says how to rule with the two evidence keys the view
     # carries (#1082). ``unverified_quotes`` names a quote the service looked
     # for and did not find — it renders in ``grounds`` whatever the search
-    # answered, and the critic was told every quote had matched;
-    # ``assertion_facts`` resolves an assertion ground, whose identity digests
-    # the value and the scope, so the critic was asked whether a claim follows
-    # from a fact it could not read. Both are computed rather than drafted,
-    # and both need a sentence saying how to rule with them.
-    # ``analyze`` raised again to 5600 for what an absence establishes (#1110).
-    # The bullet said how to write an ``absent_elements`` entry and never what
-    # one licenses, so a lane read the service's confirmation — no element
-    # names this term — as a verified fact about the deployment. Seven of ten
-    # repudiation findings in the first review sitting could not be judged for
-    # that reason. The two sentences added say an absence rules a claim out and
-    # never holds one up, and that a claim asserting nothing anywhere provides
-    # a property rests on a fact that holds everywhere or is written as what
-    # cannot be produced. Both are properties of a claim rather than of a
-    # package, so they sit here and not in a framework's contract.
-    # ``critic`` raised to 3500 and ``recritic`` to 1400 for the submitted
-    # sources (ADR 0057). Each body gains ``{input_text}``, the sentence that
-    # says the sources are data and not instruction, and, in the critic, the
-    # rule that a source fact can defeat a draft and never closes an open fact.
+    # answered. ``assertion_facts`` resolves an assertion ground, whose
+    # identity digests the value and the scope, so the critic can read the
+    # fact a claim rests on. Both are computed rather than drafted.
+    #
+    # ``analyze`` says what an absence establishes (#1110): an absence rules a
+    # claim out and never holds one up, and a claim that asserts nothing
+    # anywhere provides a property rests on a fact that holds everywhere or is
+    # written as what cannot be produced. Without it, a lane reads the
+    # service's confirmation — no element names this term — as a verified fact
+    # about the deployment; seven of ten repudiation findings in the first
+    # review sitting could not be judged for that reason. Both rules are
+    # properties of a claim rather than of a package, so they sit here and not
+    # in a framework's contract.
+    #
+    # ``critic`` and ``recritic`` carry the submitted sources (ADR 0057). Each
+    # body holds ``{input_text}``, the sentence that says the sources are data
+    # and not instruction, and, in the critic, the rule that a source fact can
+    # defeat a draft and never closes an open fact.
     "prompts/analyze": 5600,
     "prompts/critic": 3500,
     "prompts/recritic": 1400,
-    # Raised from 2900 for the naming rule in rule 3. The extraction sweep of
+    # ``extract`` carries the naming rule in rule 3. The extraction sweep of
     # 2026-09-12 lost 98 blessed elements by ID, 59 of them to a name the model
     # chose differently — a plural, an expanded abbreviation, a qualifier the
     # text never attached — and 38 of the 39 lost flows ran between an endpoint
-    # that had itself drifted.
+    # with a changed name.
     #
-    # Raised again to 3600 for two conventions the reference was applying and
-    # the prompt never stated (#925). `data_classification` now names its four
-    # tiers and says a tier is an inference that takes an assumptions entry;
-    # `interface_kind` now says the test is the interface a caller programs
-    # against, so an RPC service is non-web over any transport. Both were
-    # decided inside the corpus and nowhere else, which graded every extraction
-    # against rules it was never given — the defect the audit is about, in the
-    # contract rather than in the code.
+    # It also states two conventions the reference applies (#925).
+    # `data_classification` names its four tiers and says a tier is an
+    # inference that takes an assumptions entry; `interface_kind` says the test
+    # is the interface a caller programs against, so an RPC service is non-web
+    # over any transport. Without them, every extraction is graded against
+    # rules it is never given.
     #
-    # Raised again to 4100 for the one shape rule 3 had two answers for
-    # (#1040). "Name it as the text does" and "name two same-named elements
-    # apart" cannot both be obeyed where a source genuinely calls two things
-    # by one name, so the rule now states what to write: the text's own
-    # distinguishing word in front, and the shared name in `notes`.
+    # It gives rule 3 one answer for one shape (#1040). "Name it as the text
+    # does" and "name two same-named elements apart" cannot both be obeyed
+    # where a source genuinely calls two things by one name, so the rule states
+    # what to write: the text's own distinguishing word in front, and the
+    # shared name in `notes`.
     "prompts/extract": 4100,
     # The facts-first body (#1003 arm B). It carries the reading rules a second
     # time rather than appending to `extract.md`, because the two routes read
@@ -135,11 +131,11 @@ TOKEN_CAPS: dict[str, int] = {
     # inventory call writes no fact and the rows call names no mention, so
     # neither is paid for the other's vocabulary.
     #
-    # ``extract-inventory`` raised from 1700 for the reading rules (#1082). It
-    # is the pass that decides what exists, and it carried none of them, while
-    # `extract-rows.md` — which may not add a mention or take one away —
-    # carried all six. A planned queue, a question and a withdrawn statement
-    # each reached the closed inventory with nothing later able to remove it.
+    # ``extract-inventory`` carries the reading rules (#1082). It is the pass
+    # that decides what exists, and `extract-rows.md` may not add a mention or
+    # take one away. Without the rules, a planned queue, a question and a
+    # withdrawn statement each reach the closed inventory with nothing later
+    # able to remove them.
     "prompts/extract-inventory": 1900,
     "prompts/extract-rows": 2000,
     # The compact transport's delta, appended after the body above. It is the
@@ -147,28 +143,23 @@ TOKEN_CAPS: dict[str, int] = {
     # and cacheable, against the output it removes — see
     # :mod:`analysis_service.compact`.
     #
-    # Raised from 600 for `compact-v4`'s flow-ref rule. Version 3 left a flow's
-    # ref to the model and it derived one from the endpoints, so two flows
-    # between one pair collided and the route failed its gate on
-    # `duplicate-ref`. The paragraph that fixes it costs about 90 input tokens
-    # against 1.04% of the corpus emission it removes, on ADR 0016's reading
-    # that a cap here alarms rather than rations.
+    # It carries `compact-v4`'s flow-ref rule. A model left to derive a flow's
+    # ref from the endpoints collides two flows between one pair, and the
+    # route fails its gate on `duplicate-ref`. The paragraph costs about 90
+    # input tokens against 1.04% of the corpus emission it removes, on ADR
+    # 0016's reading that a cap here alarms rather than rations.
     "prompts/extract-compact": 750,
-    # Raised from 900 for the `duplicate-id` step (#1040). The repair pass is
-    # the one reader that sees that code, and it had no rule for it: its issue
-    # list named an asset tag, an enum, an endpoint and a trust zone, and
-    # "change nothing the issues do not cite" forbade the flows a rename
-    # carries.
+    # ``repair`` carries the `duplicate-id` step (#1040). The repair pass is
+    # the one reader that sees that code, and "change nothing the issues do not
+    # cite" would otherwise forbid the flows a rename carries.
     #
-    # Raised again to 1200 for three contract corrections (#1082). The prompt
-    # listed `trust_zone` among the fields whose schema forbids `unknown`,
-    # which ADR 0039 reversed, so repair was told to invent a placement the
-    # gate accepts as absent; it pointed at "extraction rule 3's exception"
-    # without carrying extraction's text; and it said "the same shape as
-    # extraction", which is false on the compact route. It also now says which
-    # half of "change nothing the issues do not cite" the service enforces,
-    # because `restore_unimplicated` restores whole elements and never a field
-    # on an implicated one.
+    # It also states three contract points (#1082): `trust_zone` may be
+    # `unknown` (ADR 0039), so repair does not invent a placement; it carries
+    # the text of extraction rule 3's exception rather than a pointer to it;
+    # and it does not claim "the same shape as extraction", which is false on
+    # the compact route. It says which half of "change nothing the issues do
+    # not cite" the service enforces, because `restore_unimplicated` restores
+    # whole elements and never a field on an implicated one.
     "prompts/repair": 1200,
     # The source-driven review body (#1003 arms C and D). The role and predicate
     # tables beside it are rendered, as they are for the facts-first body, so
@@ -178,39 +169,35 @@ TOKEN_CAPS: dict[str, int] = {
     # `assertions.REGISTRY` rather than written here, so a predicate added
     # tomorrow moves the composed instruction and never this file.
     #
-    # Raised from 1700 for the subject rule (#961 step 6). On case 01 the model
-    # found 8 of 23 signed rows in every run, and the 13 it never found all sat
-    # on a principal, a credential or a zone: subjects with no element, which
-    # the procedure named only in passing. The body now lists them as subjects
-    # first, and puts a credential on the principal that presents it.
+    # It carries the subject rule (#961 step 6): principals, credentials and
+    # zones are listed as subjects first, and a credential sits on the
+    # principal that presents it. On case 01, without the rule, the model found
+    # 8 of 23 signed rows in every run, and the 13 it never found all sat on
+    # such a subject.
     "prompts/assert": 2000,
     # One package's own text, under ``frameworks/<name>/``.
     #
-    # ``critic`` raised from 1200, which STRIDE's critic text had sat one token under for
-    # four checkpoint rounds. It said the service "already matched every quote
-    # against the source it names", and `_verify_quotes` marks a quote it could
-    # not find and keeps the draft, so the sentence was false of exactly the
-    # draft that needed the critic most (#1082).
+    # ``critic`` must not say the service "already matched every quote against
+    # the source it names" (#1082): `_verify_quotes` marks a quote it could not
+    # find and keeps the draft, so the sentence would be false of exactly the
+    # draft that needs the critic most.
     f"package/{CRITIC_DOC}": 1400,
-    # Raised from 200 for what ASVS's disclaimer had to say about a `gap`
-    # (#1082). It said every claim asserts that the text "does not settle" the
-    # requirement, which describes one of the three directions ADR 0028 gives
-    # a draft and denies the one the report calls a gap.
+    # ASVS's disclaimer says what a `gap` means (#1082). A claim can take any
+    # of the three directions ADR 0028 gives a draft, including the one the
+    # report calls a gap, so "does not settle" alone does not describe every
+    # claim.
     f"package/{DISCLAIMER_DOC}": 300,
-    # Raised from 1100 for two contract corrections in ASVS's (#1082). The
-    # `needs_evidence` rule read as "would a sentence prove the control", which
-    # nothing ever does, so a question the submitter could answer routed to
-    # `config` and left the report as unreachable rather than as a request; and
-    # "rule on every requirement at or below the level" contradicted the scope
-    # line's own list of units code ruled out. Both now say which reading wins.
+    # ASVS's output contract states two readings (#1082). `needs_evidence`
+    # asks whether the submitter could answer the question, not whether a
+    # sentence would prove the control, so such a question routes to a
+    # request and not to `config`. "Rule on every requirement at or below the
+    # level" yields to the scope line's own list of units code ruled out.
     f"package/{OUTPUT_DOC}": 1400,
     f"package/{SEVERITY_RUBRIC_DOC}": 900,
     "package/lane_skill": 3600,
-    # Raised from 1600 for the fourth spoofing exemplar (#1295). The lane had
-    # one ``impersonate`` draft, and it presented a held credential, which
-    # ``output.md`` files as ``use-credential``. That draft now carries
-    # ``use-credential``, and the new one poses as a caller without a
-    # credential, so the lane demonstrates both verbs.
+    # Four spoofing exemplars (#1295). One presents a held credential and
+    # carries ``use-credential``, as ``output.md`` files it; one poses as a
+    # caller without a credential, so the lane demonstrates both verbs.
     "package/lane_exemplars": 2000,
     # One instruction a lane reads last, in its user turn rather than its
     # instruction, so COMPOSED_ANALYZE_CAP does not count it (ADR 0030).
@@ -240,8 +227,8 @@ def covered_assets(frameworks_dir: Path) -> Iterator[tuple[Path, str]]:
     Walks the **registered** packages rather than the directory listing, so a
     tree a deployment does not carry cannot satisfy the lint, and a package
     ``PACKAGES`` names cannot escape it. A file whose key is absent from
-    :data:`TOKEN_CAPS` raises here rather than passing quietly — which is the
-    whole reason the caps became a table.
+    :data:`TOKEN_CAPS` raises here rather than passing quietly — which is
+    why the caps are a table.
     """
     for name in PACKAGES:
         for path in sorted((frameworks_dir / name).rglob("*.md")):
@@ -265,10 +252,10 @@ COMPOSED_EXTRACT_COMPACT_CAP = (
 #: The whole instruction one lane agent reads, as the caps bound it: the shared
 #: body, the package's output contract, then that lane's exemplars.
 #:
-#: Derived rather than written down, and that is the point. The number this
-#: replaces was set by hand and had to be argued *below* the sum of its parts,
-#: so it bound first and a body cap it could not accommodate was a cap nothing
-#: could reach. A sum cannot do that. What the lint over it still catches is
+#: Derived rather than written down, and that is the point. A hand-set number
+#: would have to stay *below* the sum of its parts, so it would bind first, and
+#: a body cap it could not accommodate would be a cap nothing could reach. A sum
+#: cannot do that. What the lint over it still catches is
 #: composition adding text of its own — the joins, not the content, since every
 #: part already alarms on its own.
 COMPOSED_ANALYZE_CAP = (

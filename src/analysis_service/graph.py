@@ -315,9 +315,8 @@ REREVIEW_ROLE = "rereview"
 CRITIC_FAILED_ROLE = "critic_failed"
 
 #: Every per-framework role, so :meth:`FrameworkNodes.node` names a set rather
-#: than a count. The count was written into that docstring as "six" and a
-#: seventh role arrived without it, which is a fact nothing read; a tuple is a
-#: fact ``tests/test_graph.py`` reads.
+#: than a count. A tuple is a fact ``tests/test_graph.py`` reads; a count in
+#: prose is not.
 ROLES: tuple[str, ...] = (
     JOIN_ROLE,
     MERGE_ROLE,
@@ -534,7 +533,7 @@ def tier_node_by_graph_node(
     """Graph node name -> the canonical LLM node name the tier config keys on.
 
     Built per selection rather than as a module constant, because which nodes
-    exist is now a function of which frameworks the graph was built for. **The
+    exist is a function of which frameworks the graph was built for. **The
     only place that correspondence lives.**
     """
     return {
@@ -967,7 +966,7 @@ class GraphKeys:
     """Both key families for one graph, given the frameworks it carries.
 
     Derived rather than declared as two module constants, because which keys
-    exist is now a function of the selection: a graph built for one framework
+    exist is a function of the selection: a graph built for one framework
     must not accept a write to another's key, and one built for two must accept
     both. Every node function takes this and opens its :class:`SessionState`
     through it, so the check a node passes is the check for the graph it is
@@ -2725,13 +2724,12 @@ def _generate_content_config(sampling: TierSampling) -> types.GenerateContentCon
     ``resolve_sampling`` hands each node its :class:`TierSampling`, so nodes on
     different tiers never share one graph-wide constant.
 
-    **The per-request timeout is not here, and no ``http_options`` is set.** It
-    was, and the carrier changed its unit: ADK hands
-    ``types.HttpOptions.timeout`` to LiteLLM unchanged, the field is documented
-    in milliseconds, and LiteLLM reads seconds. The timeout is now a LiteLLM
-    kwarg on the adapter, where the unit is LiteLLM's own — see
+    **The per-request timeout is not here, and no ``http_options`` is set.**
+    ADK hands ``types.HttpOptions.timeout`` to LiteLLM unchanged, the field is
+    documented in milliseconds, and LiteLLM reads seconds. So the timeout is a
+    LiteLLM kwarg on the adapter, where the unit is LiteLLM's own — see
     :func:`~analysis_service.binding.build_tier_adapters`. Nothing in this file
-    reads ``config/resilience.toml`` any more, which is why no builder below
+    reads ``config/resilience.toml``, which is why no builder below
     carries it.
     """
     return sampling.to_generate_content_config()
@@ -2757,7 +2755,7 @@ def _llm_node(
     (:func:`tier_node_by_graph_node`), so each node runs on its own tier's
     decoding params from the config shared with the eval suite — no node on
     library defaults, none on another tier's sampling. The tier key is passed in
-    rather than looked up, because the map is now built per selection and the
+    rather than looked up, because the map is built per selection and the
     caller already holds it. The per-request timeout is not here: it rides the
     adapter ``resolve_model`` returns.
 
@@ -3874,10 +3872,9 @@ def instruction_digest(llm_nodes: Sequence[LlmAgent]) -> str:
     It is part of certification. The digest is one of the seven parts of the
     **Execution Identity**, so a prompt edit re-baselines every blessed
     fingerprint, and runs read as uncertified until a sanctioned sweep blesses
-    the new ones. That cost was once the argument for recording the digest and
-    not gating it. #504 made the opposite call: a run on edited prompts is not
-    the run a deployment sanctioned, and reporting it as certified was the
-    defect.
+    the new ones. The digest gates certification (#504): a run on edited
+    prompts is not the run a deployment sanctioned, so it does not report as
+    certified.
     """
     payload = json.dumps(
         {node.name: node.instruction for node in llm_nodes},

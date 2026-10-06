@@ -7,10 +7,10 @@ against the same translator, under the same credential. No arrangement of
 checks inside a process protects that process from the code it has loaded, and
 this module does not pretend otherwise.
 
-What it does is make the boundary *expressible*. Before it, a provider call was
-an ADK ``LlmRequest`` handed to a LiteLLM adapter, and moving that call
-elsewhere meant deciding, for every field of every dependency type, whether it
-was part of the contract. Now there is one answer to that question, in code:
+What it does is make the boundary *expressible*. To move a provider call
+elsewhere, someone must decide, for every field of every dependency type,
+whether it is part of the contract. This module states one answer to that
+question, in code:
 :class:`GenerationRequest` is what goes out, :class:`GenerationResult` is what
 comes back, and
 :class:`~analysis_service.retry.ProviderFailure` is what a failure is. That is
@@ -46,8 +46,8 @@ can check.
 
 There is one implementation, :class:`InProcessExecutor`, and it wraps the
 adapter ``binding`` already built. The seam is proven rather than hypothetical
-because every call the service makes now crosses it — the transport tests read
-the same bytes they read before, and ``tests/test_provider_contract.py`` reads
+because every call the service makes crosses it — the transport tests read the
+bytes a direct adapter call would send, and ``tests/test_provider_contract.py`` reads
 the same nine facts off the other side.
 """
 
@@ -476,9 +476,8 @@ class ExecutedLlm(BaseLlm):
     decision whether the call ran here or elsewhere.
 
     A streaming call is refused rather than passed through. Every node in this
-    graph binds an output schema and so never streams; the previous
-    pass-through was an untravelled branch that would have skipped the retry
-    loop, the truncation check and this seam all at once.
+    graph binds an output schema and so never streams. A pass-through would
+    skip the retry loop, the truncation check and this seam all at once.
     """
 
     executor: ProviderExecutor

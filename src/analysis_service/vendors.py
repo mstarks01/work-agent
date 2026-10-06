@@ -355,12 +355,12 @@ class _FormRule:
 #
 # A floating marker is a **whole word** in the identifier, never a fragment of
 # one. A word is a run of letters and digits; every other character delimits.
-# There is no delimiter list, and that absence is the decision: the first list
-# written for this rule held ``-``, ``_``, ``/`` and ``.``, and it missed ``@``,
-# which is what Vertex Model Garden spells its alias with — so
-# ``codestral@latest`` reached a run. Testing a fragment failed the other way:
-# ``amazon.titan-text-express-v1`` contains ``exp`` inside ``express``, so a
-# generally available model was refused with no config knob to fix it.
+# There is no delimiter list, and that absence is the decision. A list of
+# ``-``, ``_``, ``/`` and ``.`` would miss ``@``, which is what Vertex Model
+# Garden spells its alias with, so ``codestral@latest`` would reach a run. A
+# fragment test fails the other way: ``amazon.titan-text-express-v1`` contains
+# ``exp`` inside ``express``, so a generally available model would be refused.
+# Whole words avoid both.
 _WORDS = re.compile(r"[a-z0-9]+", re.IGNORECASE)
 
 #: What an operator is told, by kind of floating form. The two kinds keep two
@@ -401,9 +401,8 @@ _FLOATING_WORDS: dict[str, str] = {
 #: which would then reach a fingerprint and a report.
 #:
 #: **A table, because the properties are vendor-neutral and the syntax is not.**
-#: This was the pattern ``arn:`` alone, which is one cloud's spelling standing
-#: in for a rule written about every cloud — the shape ``AGENTS.md`` names, and
-#: the one that let three Google forms through while refusing the AWS one.
+#: Each cloud's form is a row. A pattern for one cloud's spelling alone, such
+#: as ``arn:``, would let the other clouds' forms through.
 #: ``litellm.get_llm_provider`` resolves each entry below to a provider exactly
 #: as it resolves an ARN, so every refusal here is this service's own and
 #: nothing upstream makes it.
@@ -458,20 +457,18 @@ def _resource_form(model: str) -> str | None:
 # carried a date (``-YYYYMMDD`` direct, ``@YYYYMMDD`` on Vertex) and the bare
 # name *was* a floating alias, which is why one pattern cannot serve both.
 #
-# Matching a shape rather than enumerating builds is what keeps this from
-# repeating the retired-allowlist failure: a Claude model released tomorrow
-# already satisfies it.
+# A shape, not a list of builds: an allowlist fails on the next release, and a
+# shape does not. A Claude model released tomorrow already satisfies it.
 #
 # The pattern still rejects a dated pre-4.6 identifier such as
 # ``claude-3-5-sonnet-20241022``, and that rejection is about its *shape* rather
 # than its age: in that era the bare name was itself a floating alias, so the
 # dated form cannot be told apart from the aliases this rule exists to reject.
 # The minor group is **bounded**, and the major is not. A minor version is one
-# or two digits; a date is eight, and an unbounded group read one as the other.
-# ``claude-opus-4-20250514`` matched as generation 4.20250514, so
-# ``validate_model`` accepted a dated form this comment says it rejects, and
-# ``check_temperature`` then read a generation far above its floor and refused
-# ``temperature`` on a Claude 4.0. One unbounded group caused both halves.
+# or two digits; a date is eight. An unbounded group would read a date as a
+# minor version: ``claude-opus-4-20250514`` would match as generation
+# 4.20250514, ``validate_model`` would accept it, and ``check_temperature``
+# would refuse ``temperature`` on a Claude 4.0. The bound stops this.
 #
 # ``(?!\d)`` is what makes the bound a bound: without it ``\d{1,2}`` would match
 # the first two digits of a date and leave the rest to the pattern's tail. The
@@ -480,9 +477,8 @@ def _resource_form(model: str) -> str | None:
 # **The two segment orders Claude has ever used, written down once each.** Every
 # pattern below is composed from these two atoms, so a spelling is described in
 # one place and a fix to it reaches every reader. That is not a style
-# preference: the unbounded minor group above was one definition read by
-# ``validate_model`` and by ``claude_generation``, and bounding it repaired both
-# halves in one edit.
+# preference: ``validate_model`` and ``claude_generation`` both read these
+# atoms, so one edit reaches both.
 #
 # The modern order is name-then-generation (``claude-sonnet-4-6``). The legacy
 # order is generation-then-name (``claude-3-5-sonnet``), which Anthropic used
@@ -524,8 +520,8 @@ _CLAUDE_ID = re.compile(rf"claude-{_CLAUDE_MODERN}")
 # A scope segment, as Bedrock spells one: ``us.``, ``eu.``, ``global.``. Matched
 # as a **shape** and never enumerated — the pinned cost map already carries
 # seven, three arrived after Claude 3.x, one carries a hyphen, and ``global``
-# names no region at all. An allowlist here would repeat what the retired-build
-# allowlist cost. A shape admits ``xx.anthropic.claude-opus-5``, which then
+# names no region at all. An allowlist fails on the next release, and a shape
+# does not. A shape admits ``xx.anthropic.claude-opus-5``, which then
 # fails at the AWS API: the same class as a misspelled model name, and a shape
 # check never proved a model exists.
 _SCOPE_SEGMENT = r"(?:[a-z][a-z0-9-]*\.)?"
@@ -539,8 +535,7 @@ _SCOPE_SEGMENT = r"(?:[a-z][a-z0-9-]*\.)?"
 # ``openrouter/`` key in the pinned map spells its segment
 # ``[a-z][a-z0-9_-]*`` — ``meta-llama``, ``x-ai``, ``black_forest_labs`` — and
 # litellm's own ``vertex_ai/`` prefix is what a route pasted into a model field
-# carries. A shape without it caught the doubled route on five vendors and not
-# on the sixth.
+# carries. Without the underscore, the shape misses ``vertex_ai/``.
 _GATEWAY_NAME = r"[a-z][a-z0-9_-]*/"
 
 # **Repeated, not optional-once.** One segment is what OpenRouter writes, and
@@ -548,8 +543,8 @@ _GATEWAY_NAME = r"[a-z][a-z0-9_-]*/"
 # "openrouter/anthropic/claude-opus-4.7"`` is the *route* pasted into the model
 # field, and :meth:`Vendor.route` would build
 # ``openrouter/openrouter/anthropic/claude-opus-4.7`` from it. With a single
-# optional segment that identifier reached no family rule, passed unpinned
-# through the catch-all, and died on node one — the exact failure the shared
+# optional segment that identifier would reach no family rule, would pass
+# unpinned through the catch-all, and would die on node one — the exact failure the shared
 # family exists to catch one segment lower down.
 _GATEWAY_SEGMENT = rf"(?:{_GATEWAY_NAME})*"
 _GATEWAY_PREFIX = re.compile(rf"^(?:{_GATEWAY_NAME})+")
@@ -566,9 +561,9 @@ _GATEWAY_PREFIX = re.compile(rf"^(?:{_GATEWAY_NAME})+")
 # ``claude-opus-5``, an ``anthropic`` row spelled ``anthropic.claude-opus-5``
 # and an ``openrouter`` row spelled ``claude-opus-5`` are three halves of one
 # mistake: a tier row copied between vendors. Each reaches a rule and fails its
-# shape with a hint naming the right spelling. With a family per spelling, each
-# vendor caught its own and let the others pass unpinned to the catch-all, where
-# the config loads and the job dies on node one.
+# shape with a hint naming the right spelling. A family per spelling would let
+# each vendor catch its own and let the others pass unpinned to the catch-all,
+# where the config loads and the job dies on node one.
 _CLAUDE_FAMILY = re.compile(
     _GATEWAY_SEGMENT + _SCOPE_SEGMENT + r"(?:anthropic\.)?claude-"
 )
@@ -773,9 +768,9 @@ def claude_generation(model: str) -> tuple[int, int] | None:
 
     The identifier is read through :func:`family_identifier`, so an aggregator's
     own vendor segment does not hide the family behind it. Without that,
-    ``anthropic/claude-opus-4.7`` parsed to nothing, the temperature floor went
-    silent, and a tier that stated a temperature reached a model that rejects
-    the parameter.
+    ``anthropic/claude-opus-4.7`` would parse to nothing, the temperature floor
+    would not fire, and a tier that stated a temperature would reach a model
+    that rejects the parameter.
     """
     match = _CLAUDE_GENERATION.search(family_identifier(model))
     if match is None:
@@ -931,8 +926,7 @@ class Vendor:
     #: :attr:`_ReportedCharge.covers_whole_call` says whether that figure is the
     #: whole of what the call cost.
     #:
-    #: OpenRouter is the row this field was added for, and it is the row that
-    #: needs both halves. It states its charge in ``usage.cost``, which litellm
+    #: OpenRouter is the row that needs both halves. It states its charge in ``usage.cost``, which litellm
     #: asks for on every request and keeps in ``_hidden_params``
     #: (in the ``transform_response`` of its OpenRouter chat config, measured
     #: on 1.104.0). Under
@@ -972,11 +966,11 @@ class Vendor:
     #: vendors — Bedrock reads Claude under its own spelling — not because a
     #: vendor decides what a Claude identifier looks like.
     #:
-    #: ``openai`` once listed the catch-all alone, and that was a defect: the
-    #: prefix reaches any OpenAI-compatible endpoint, and a gateway serving
-    #: Claude passes the vendor's own identifier straight through. So a
-    #: floating alias and a dated form were refused on two vendors and accepted
-    #: on the third, and an operator moving a tier between vendors met a
+    #: ``openai`` lists the Claude rule too, because the prefix reaches any
+    #: OpenAI-compatible endpoint, and a gateway serving Claude passes the
+    #: vendor's own identifier straight through. With the catch-all alone, a
+    #: floating alias would be refused on two vendors and accepted on the
+    #: third. An operator moving a tier between vendors would then meet a
     #: different set of legal identifiers, which is the disagreement the
     #: pinned-form rule exists to remove.
     #:
@@ -1049,7 +1043,7 @@ class Vendor:
         """The adapter kwarg that pins a request to ``upstreams``, or nothing.
 
         Empty where the deployment declared no upstreams, so a direct vendor
-        and an unpinned gateway both build the adapter they always did. Raises
+        and an unpinned gateway both build an adapter with no upstream kwarg. Raises
         where upstreams were declared for a vendor with nothing to pin, which
         the loader refuses first; this is the second reader saying the same
         thing rather than a silent kwarg the gateway would ignore.
@@ -1224,7 +1218,7 @@ class Vendor:
         A narrower question than :meth:`required_env_vars` answers, and the
         difference matters: a caller redacting provider error text must remove
         a key and must **not** remove a region. One list answering both
-        questions removed the region, which is the one fact that diagnoses a
+        questions would remove the region, which is the one fact that diagnoses a
         wrong-region request.
         """
         return tuple(entry.var for entry in self._source_for(mode).env if entry.secret)
@@ -1414,8 +1408,8 @@ VENDORS: dict[VendorName, Vendor] = {
         sdk=None,
     ),
     # An aggregator: one endpoint in front of many providers' catalogues. The
-    # row differs from every other one in a way the registry had not had to
-    # express — **its model identifier carries a vendor of its own**.
+    # row differs from every other one in one way: **its model identifier
+    # carries a vendor of its own**.
     # ``anthropic/claude-opus-4.7`` is one model name with a slash in it, and
     # the route becomes ``openrouter/anthropic/claude-opus-4.7``. Every other
     # row names a model whose identifier is a bare string. The gateway segment

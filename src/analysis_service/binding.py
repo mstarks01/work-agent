@@ -15,14 +15,14 @@ LiteLLM's fail-closed ``drop_params`` cannot catch a param it is never told
 about. The fourth is there because the other carrier changes its unit.
 
 * ``seed`` and ``reasoning_effort``. On the config instead, they would vanish
-  silently, while ``sampling_fingerprint`` went on attesting to a seed the
+  silently, while ``sampling_fingerprint`` would go on attesting to a seed the
   request never carried.
 * ``timeout``, the per-request bound from ``config/resilience.toml``. ADK *does*
   forward this one, off ``types.HttpOptions.timeout`` — and that field is
   documented in milliseconds while LiteLLM reads the number it receives as
-  seconds. The shipped ``timeout_ms = 300000`` therefore bought a 3.5-day bound,
-  so no request was ever cut and a wedged provider connection held a job slot
-  until the job deadline fired. Converting at that carrier is not available: the
+  seconds. On that carrier, ``timeout_ms = 300000`` would bound a request at 3.5
+  days, and a wedged provider connection would hold a job slot until the job
+  deadline fired. A conversion at that carrier is not available: the
   field is typed ``int``, so a sub-second timeout would raise at graph build
   time. LiteLLM's own kwarg is documented in seconds and takes a float.
 * ``num_retries``, pinned at zero. That is not because retry is off. Retry is
@@ -140,8 +140,8 @@ _NUM_RETRIES_KWARG = "num_retries"
 # It sits here rather than on the node's ``http_options`` because that carrier
 # changes the unit. ``types.HttpOptions.timeout`` is documented in milliseconds
 # and ADK's LiteLLM path hands the number to LiteLLM unchanged, where it is read
-# as seconds — so the shipped ``timeout_ms = 300000`` bought a 3.5-day bound and
-# no request was ever cut. See :meth:`ResilienceConfig.request_timeout_seconds`.
+# as seconds. On that carrier, ``timeout_ms = 300000`` would bound a request at
+# 3.5 days. See :meth:`ResilienceConfig.request_timeout_seconds`.
 #
 # Deliberately **not** run through ``assert_kwarg_supported``, for the reason
 # the ``response_format`` note below gives: that function asks
@@ -178,8 +178,8 @@ _TIMEOUT_KWARG = "timeout"
 # Claude generation; what fails is the pair of a generation and a value it
 # rejects, and the message names the value as the thing to remove.
 #
-# Deliberately a **generation floor, not a support table**. Decision #12 removed
-# the per-``(vendor, model)`` sampling set from the registry because mirroring
+# Deliberately a **generation floor, not a support table**. The registry holds
+# no per-``(vendor, model)`` sampling set (Decision #12), because mirroring
 # what LiteLLM computes forks a subsystem that drifts; a floor does not fork it,
 # and when LiteLLM's map catches up this check becomes redundant rather than
 # contradictory. 4.6 still accepts ``temperature``, so the floor is 4.7.

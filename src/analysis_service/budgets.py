@@ -90,8 +90,8 @@ def llm_calls_for(frameworks: Sequence[FrameworkSelection]) -> int:
 
     Derived from ``PACKAGES`` rather than written down, for the reason
     :func:`~analysis_service.frameworks.widest_fan_out` exists: a lane count in
-    prose went stale in four modules when ASVS took the fan-out from 6 to 23. A
-    package registered tomorrow moves this number with no edit here.
+    prose goes stale when a package changes the fan-out. A package registered
+    tomorrow moves this number with no edit here.
     """
     return _SHARED_LLM_CALLS + sum(
         len(PACKAGES[selection.name].lanes) + _PER_FRAMEWORK_REVIEW_CALLS
@@ -184,9 +184,8 @@ def retried_prompt_tokens(node: NodeRun) -> int:
 
     One reader for a rule two callers need. `measured_tokens` charges these to
     a window; `evals.harness.consent` prices them into the figure a contributor
-    is asked to accept. The two disagreed: the budget charged them and the
-    consent price did not, so a sweep offered $9.75 against a $25.35 bill at the
-    shipped `attempts = 3`. Each was tested against its own expectation.
+    is asked to accept. Both callers read this function, so the window charge
+    and the consent price agree.
 
     Only the calls that answered are metered: one, or two where the node took a
     schema re-ask. Every attempt that failed before them sent a prompt no larger

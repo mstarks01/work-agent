@@ -12,9 +12,9 @@ map's business, and the shipped map puts ``critic/<name>`` and
 ``recritic/<name>`` on ``strong``. That is the same domain as the analysis,
 which is cheaper and is what most deployments want. What the tier buys is that a
 deployment can move them, and ``review_independence`` in the config file is
-where it says how far apart they have to be. With two tiers, the only way to make criticism
-distinct was to run it on ``base``, which is a re-ask on a cheaper model than
-the pass it corrects. :func:`critic_pairing_issues` exists to refuse that.
+where it says how far apart they have to be. Without ``review``, the only way
+to make criticism distinct is to run it on ``base``, which is a re-ask on a
+cheaper model than the pass it corrects. :func:`critic_pairing_issues` exists to refuse that.
 
 Vendor and model are two keys rather than one router string. Three consumers
 need the vendor as a key: the credential mode it implies, the family-branching
@@ -122,8 +122,9 @@ ReviewIndependence = Literal["shared", "distinct_model", "distinct_provider"]
 #
 # **The keys are the service's, and there is one set per framework rather than
 # one per lane.** A framework's lanes all run the same judgement on the same
-# tier, so six keys holding one value had no reader; what an operator actually
-# chooses between is running one framework's analysis cheaper than another's.
+# tier, so one key per lane would hold one value that nothing reads. What an
+# operator chooses between is running one framework's analysis cheaper than
+# another's.
 #
 # ``recritic/<name>`` is the bounded critic re-ask: a distinct node so it is
 # pinned in its own right, and the loader requires it to resolve to the same
@@ -302,11 +303,9 @@ class ModelTierConfig(BaseModel):
         """The tiers this deployment runs something on.
 
         **The one reader of "is this tier bound".** The node map is what says
-        so, and ``set(self.nodes.values())`` was written out in three modules
-        while two more sites answered the same question from ``self.tiers`` and
-        got a wider answer. A tier with a selection that no node points at
-        costs no adapter, no credential and no SDK, so every site that decides
-        what a deployment needs has to mean this set and not that one.
+        so. A tier with a selection that no node points at costs no adapter, no
+        credential and no SDK. Every site that decides what a deployment needs
+        reads this set, and not the wider set in ``self.tiers``.
 
         A frozenset because callers only ask what is in it.
         """
@@ -319,10 +318,8 @@ class ModelTierConfig(BaseModel):
         The question "which providers does this deployment actually call", which
         three callers ask: the credential-mode rule below, the build in
         :func:`~analysis_service.binding.build_tier_adapters`, and the
-        diagnostic page that tells an operator which variables to set. The page
-        answered it from every tier and listed a vendor whose credentials
-        nothing needs — telling somebody to set a key for a provider no request
-        reaches, on the page whose whole value is being right about that.
+        diagnostic page that tells an operator which variables to set. An answer
+        from every tier would list a vendor whose credentials nothing needs.
 
         Tier order rather than sorted, so the list reads base-first the way the
         config file does and does not reorder when a vendor is renamed.
@@ -338,8 +335,8 @@ class ModelTierConfig(BaseModel):
     @model_validator(mode="after")
     def _check_complete(self) -> Self:
         # The tiers this map runs something on, not all of them. `build_adapters`
-        # binds no adapter for an unused tier, so demanding a selection for one
-        # asked an operator to choose a model no request reaches.
+        # binds no adapter for an unused tier, so a demand for a selection for one
+        # would ask an operator to choose a model no request reaches.
         in_use = self.bound_tiers
         missing_tiers = [
             tier for tier in TIER_NAMES if tier in in_use and tier not in self.tiers
@@ -357,11 +354,9 @@ class ModelTierConfig(BaseModel):
         if missing:
             raise ValueError(f"nodes missing entries for: {missing}")
         # Both cross-node rules, run here because this is the one place a
-        # complete node -> tier map exists. `critic_pairing_issues` was written
-        # as a free function and never called from anywhere, so the pairing the
-        # config file said the loader checked was in fact unchecked; a third
-        # tier is where that would first have cost something, since `review` is
-        # a place a critic can move to and leave its re-ask behind.
+        # complete node -> tier map exists. The loader runs both cross-node
+        # rules here. The pairing matters because `review` is a place a critic
+        # can move to and leave its re-ask behind.
         problems = critic_pairing_issues(self.nodes.__getitem__)
         problems += self.independence_breaches()
         problems += self._credential_mode_problems()
@@ -381,9 +376,7 @@ class ModelTierConfig(BaseModel):
         replaced.
 
         Only vendors a **bound** tier selects are required to declare. A
-        multi-mode vendor nobody calls needs no identity — and that sentence was
-        already here while the code read every tier, so a deployment could not
-        start until it declared a mode for a vendor no adapter was built for.
+        multi-mode vendor nobody calls needs no identity.
         :attr:`bound_vendors` is the reader that makes the rule match its own
         statement, and the same one the build uses.
         """
@@ -568,7 +561,7 @@ class ModelTierConfig(BaseModel):
         key says nothing about which provider or which build answered.
         ``openai`` beside ``openrouter`` is two keys and may be one upstream;
         ``gpt-5.6`` beside ``openai/gpt-5.6`` is two strings and is one model.
-        So each policy now reads the thing rather than the label, and they read
+        So each policy reads the thing rather than the label, and they read
         different things because the two facts are knowable to different
         degrees. See :meth:`_independence_detail`.
         """
@@ -602,8 +595,8 @@ class ModelTierConfig(BaseModel):
         (:func:`~analysis_service.vendors.family_identifier`). A slug pins the
         model whichever route carries it, so ``openai/gpt-5.6`` through an
         aggregator and ``gpt-5.6`` direct are one model and a critic on the
-        second removes none of the first's blind spots. The vendor is no longer
-        part of the comparison: this policy is about the build, and two routes
+        second removes none of the first's blind spots. The vendor is not part
+        of the comparison: this policy is about the build, and two routes
         to one build share its blind spots however they are keyed.
 
         The limit is worth stating rather than hiding: a family a vendor spells
@@ -814,16 +807,13 @@ def tiers_in_use(nodes_raw: object) -> set[str]:
 
     A tier is a place a node can sit, and an empty place costs nothing to leave
     empty: :func:`~analysis_service.binding.build_tier_adapters` already skips a tier nothing is bound to, so
-    a selection for one is a pair no request ever reaches. Requiring it anyway
-    made a first run name a vendor and a model for a tier the shipped map does
-    not use, which is a choice with no consequence -- and the answer the config
-    file suggested was to repeat the ``strong`` pair, which is a choice that
-    says nothing at all.
+    a selection for one is a pair no request ever reaches. A tier that no node
+    uses needs no selection.
 
-    The reason the requirement existed still holds and is kept: the day somebody
-    moves ``critic/*`` onto ``review`` is the wrong day to find out no model was
-    chosen for it. That day is a node-map edit, and this is read on that edit,
-    so the check fires then -- at the same moment, with the same message.
+    A tier in use still needs one: the day somebody moves ``critic/*`` onto
+    ``review`` is the wrong day to find out no model was chosen for it. That
+    day is a node-map edit, and this is read on that edit, so the check fires
+    then -- at the same moment, with the same message.
     """
     nodes = nodes_raw if isinstance(nodes_raw, dict) else {}
     return {tier for tier in nodes.values() if tier in TIER_NAMES}
@@ -836,7 +826,7 @@ def _require_selected_tiers(
 
     Separate from :meth:`ModelTierConfig._check_complete`, which catches the
     same gap for a config built in code and reports it as a pydantic validation
-    error. This one exists for the case that is now the *shipped* state — a
+    error. This one exists for the *shipped* state — a
     first run against a config that selects nothing — where the error is the
     entire onboarding instruction, so it names the vendors that are available
     and both places a selection can be made. A pydantic error dump at that
