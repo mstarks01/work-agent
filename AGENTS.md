@@ -51,9 +51,10 @@ See `docs/agents/vendor-parity.md`.
 ### Quality audits
 
 "Run a quality audit" invokes `.claude/skills/quality-audit/`. Before you
-propose a fix, read the experiment ledger with `run.py experiments
---signature`. Record every experiment, including the ones that lost. **Report
-quality** work starts from `docs/agents/report-quality.md`.
+propose a fix, read the experiment ledger with `uv run python -m
+evals.harness.run experiments --signature`. Record every experiment, including
+the ones that lost. **Report quality** work starts from
+`docs/agents/report-quality.md`.
 
 ### Offline completion and paid runs
 
@@ -74,8 +75,8 @@ offline evidence; its live quality effect remains unmeasured." See
 
 Give a rule one reader and let every other site call it. Where a second reader
 is unavoidable, test the two against each other. Before you change any slug,
-identity or digest rule, run `run.py replay` over `evals/emissions/`. See
-`docs/agents/one-rule-one-reader.md`.
+identity or digest rule, run `uv run python -m evals.harness.run replay` over
+`evals/emissions/`. See `docs/agents/one-rule-one-reader.md`.
 
 ### Name the shapes before you read the value
 

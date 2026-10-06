@@ -87,9 +87,9 @@ uv run pytest -q
 ```
 
 **Read each instrument's whole output.** Filtering a command for the lines you
-expected is how this audit's first pass missed `run.py score` saying
-`NOT COMPARABLE TO THIS ARTIFACT'S OWN FIGURES` and built a finding on a number
-the tool had already disowned. Save the output, then read it.
+expected hides a line such as `run.py score`'s
+`NOT COMPARABLE TO THIS ARTIFACT'S OWN FIGURES`, which disowns the number above
+it. Save the output, then read it.
 
 **5. Rank the failures.** One row per failure, ordered by how many important
 outcomes it can recover. Use the output contract in
@@ -181,8 +181,7 @@ Before any paid sweep, run one case first and read its provenance.
 - Never close an unmet empirical criterion with offline evidence. Split it
   onto its own issue and keep it unmet.
 - Measure a shipped rule by calling the shipped function. A script that
-  copies the rule measures the copy: E13 ranked early questions with its own
-  loop, and E16 measured `early_questions` itself.
+  copies the rule measures the copy.
 - A structural identity match is not proof that a finding is semantically
   right, and an unlisted output is not automatically wrong.
 - A change to one framework package owes an explicit answer for every other
