@@ -168,7 +168,7 @@ def create_app(session: Session, page: str, script: str) -> FastAPI:
     are different modules: a surface passes its page in rather than writing
     this module's global, so the two cannot disagree about which page is live.
 
-    The template must carry the five placeholders filled below, and
+    The template must carry the six placeholders filled below, and
     :func:`~webapp.page.render` raises where it does not.
     """
     app = FastAPI(title="Case sitting", docs_url=None, redoc_url=None, openapi_url=None)
@@ -187,6 +187,7 @@ def create_app(session: Session, page: str, script: str) -> FastAPI:
                 # Read off the one table, so a mark the method adds
                 # arrives on the page without a second list to edit.
                 markvalues=script_json(list(sittings.MARKS)),
+                donestates=script_json(list(sittings.DONE_STATES)),
             )
         )
 
@@ -370,7 +371,7 @@ def create_app(session: Session, page: str, script: str) -> FastAPI:
                 "ready": [_stage_row(row) for row in carried],
                 "held_back": [_stage_row(row) for row in held_back],
                 "unfinished": sum(
-                    1 for row in rows if row.state not in ("finished", "signed")
+                    1 for row in rows if row.state not in sittings.DONE_STATES
                 ),
             }
         )

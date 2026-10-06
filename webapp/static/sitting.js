@@ -37,8 +37,8 @@ async function saveDraft() {
 
 // The state and the label both come off `/api/review-states`. The page keys
 // on the state — the vocabulary the rail already speaks — and spells no label
-// of its own, so a label the server changes changes nothing here.
-const DONE = ["finished", "signed"];
+// of its own, so a label the server changes changes nothing here. `DONE`, the
+// states that need nothing more, comes from the server with the page.
 
 // The one state whose row does not press and carries a reason for it. Spelled
 // once, because the mark that draws it and the sentence that explains it have

@@ -472,6 +472,7 @@ def _scope_states():
         ("VERDICT", "analysis_service.claims:VerdictStatus"),
         ("VERDICT_STATE", "analysis_service.claims:VerdictStatus"),
         ("SCOPE_STATE", None),
+        ("CHANGE_LINE", "analysis_service.report_changes:Change"),
     ],
 )
 def test_each_page_table_answers_for_its_whole_vocabulary(table, vocabulary):
@@ -489,3 +490,23 @@ def test_each_page_table_answers_for_its_whole_vocabulary(table, vocabulary):
         values = get_args(getattr(importlib.import_module(module), name))
 
     assert _page_table_keys(table) == set(values)
+
+
+def test_the_severity_bar_reads_the_service_s_order():
+    """The page orders severity by ``SEVERITY_ORDER`` as the server sends it.
+
+    The page holds no order of its own, so a level the service adds lands in
+    the bar. ``SEV`` labels each level, and the table test holds its keys.
+    """
+    from analysis_service.critic import SEVERITY_ORDER
+    from tests.test_webapp import viewer_javascript
+
+    (order,) = re.findall(
+        r'<script type="application/json" id="severity_order"[^>]*>(.*?)</script>',
+        page(),
+    )
+    assert json.loads(order) == list(SEVERITY_ORDER)
+    assert re.search(
+        r'const SEV_ORDER = JSON\.parse\(document\.getElementById\("severity_order"\)',
+        viewer_javascript(),
+    )

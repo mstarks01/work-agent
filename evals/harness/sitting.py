@@ -134,6 +134,22 @@ TO_DO = "to do"
 #: by. The prose beside each one is :attr:`Row.status`, and it is a tooltip.
 RowState = Literal["todo", "draft", "finished", "signed", "error"]
 
+#: Whether a row in each state needs nothing more from its reader. The table
+#: holds every :data:`RowState`, so a new state needs a decision here.
+ROW_DONE: Mapping[RowState, bool] = {
+    "todo": False,
+    "draft": False,
+    "finished": True,
+    "signed": True,
+    "error": False,
+}
+
+#: The states that :data:`ROW_DONE` calls done. The stage counts the other rows,
+#: and the page gets this tuple to count the rail, so the two counts agree.
+DONE_STATES: tuple[RowState, ...] = tuple(
+    state for state, done in ROW_DONE.items() if done
+)
+
 
 class SittingError(ValueError):
     """The sitting cannot be recorded; the message says what stops it."""

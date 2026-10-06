@@ -96,6 +96,10 @@ PARTIAL: dict[tuple[str, str], str] = {
         "the fallback for a case declaring no framework; which frameworks run"
         " is a property of the case, read through case_frameworks"
     ),
+    ("evals.harness.sitting", "DONE_STATES"): (
+        "the states a row needs nothing more in, so a state that still waits on"
+        " its reader is absent by construction"
+    ),
     ("evals.verify_corpus", "UNMEASURED_LANES"): (
         "the packages holding a lane no case exercises, which a package whose"
         " every lane is exercised does not appear in"
