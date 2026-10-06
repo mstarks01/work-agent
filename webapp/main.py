@@ -671,6 +671,7 @@ def _earlier_payload(
     left out, is left to its question, because one submission answers a fact
     once.
     """
+    options = list(components(report.system_model))
     return {
         "answers": _answer_rows(
             report, [answer for answer in answered if answer.key not in asked]
@@ -678,7 +679,7 @@ def _earlier_payload(
         "links": [
             {
                 "principal": link.principal,
-                "options": list(components(report.system_model)),
+                "options": options,
                 "answer": link.model_dump(mode="json"),
             }
             for link in links

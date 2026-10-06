@@ -93,7 +93,7 @@ def runner():
     return PausingRunner()
 
 
-def app_for(tiers, runner, catalog=True):
+def app_for(tiers, runner, catalog=True, analyses=None):
     """The first-run app over ``runner``, as the browser tests serve it too."""
 
     def engine_for(selection):
@@ -108,7 +108,7 @@ def app_for(tiers, runner, catalog=True):
     startup = Startup(
         engine_for=engine_for, frameworks=CARRIED, tiers=tiers, error=None
     )
-    return create_app(startup)
+    return create_app(startup, analyses)
 
 
 def client_for(tiers, runner, catalog=True):
@@ -1158,6 +1158,56 @@ def test_a_failed_resumed_run_leaves_its_paused_run_to_answer_again(start):
     assert first.waiting and not first.resumed
     assert first.facts[0].value == "TLS"
     assert analyses.claim(answering=first) is not None
+
+
+class FailingOnceRunner(PausingRunner):
+    """Pauses, then fails its first resumption with a provider error."""
+
+    def __init__(self) -> None:
+        super().__init__(catalog=False)
+        self.failed = False
+
+    async def run(self, job, on_node):
+        if job.resumption is not None and not self.failed:
+            from litellm.exceptions import APIConnectionError
+
+            self.failed = True
+            raise APIConnectionError("the provider", "openai", "a-model")
+        return await super().run(job, on_node)
+
+
+def test_a_full_registry_retries_a_failed_resumed_run_with_its_saved_answers(tiers):
+    """The retry runs through the answer route from the kept checkpoint
+    (#1289, F1)."""
+    from webapp.main import Analyses
+
+    runner = FailingOnceRunner()
+    client = TestClient(
+        app_for(tiers, runner, catalog=False, analyses=Analyses(1)), base_url=LOOPBACK
+    )
+    paused = start(client, questions=True)
+    shown = event(client.get(f"/events/{paused}").text, "questions")
+    saved_fact = {"key": shown["facts"][0]["key"], "value": "yes"}
+    saved = client.post(
+        f"/answer/{paused}",
+        json={"links": [], "facts": [saved_fact], "save": True, "revision": 0},
+        headers=SAME_ORIGIN,
+    )
+    assert saved.status_code == 200, saved.text
+
+    def resume():
+        started = client.post(
+            f"/answer/{paused}",
+            json={"links": [], "facts": [], "revision": saved.json()["revision"]},
+            headers=SAME_ORIGIN,
+        )
+        assert started.status_code == 200, started.text
+        return client.get(f"/events/{started.json()['run']}").text
+
+    assert "event: failed" in resume()
+    assert "event: done" in resume()
+    [retried] = runner.resumed_facts
+    assert saved_fact["key"] in [list(fact.key) for fact in retried]
 
 
 def test_a_paused_run_goes_once_its_resumed_run_has_a_report():
