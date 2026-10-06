@@ -95,7 +95,7 @@ def test_the_deadline_converts_to_the_seconds_asyncio_wants():
 
 
 def test_a_job_deadline_is_required_rather_than_defaulted():
-    """No value means "no deadline" — that was version 3, and it is the defect."""
+    """A missing value is refused, never read as "no deadline"."""
     fields = {
         "version": SUPPORTED_VERSION,
         "attempts": 3,
@@ -148,9 +148,8 @@ def test_a_zero_retry_budget_is_refused(tmp_path):
 def test_the_request_timeout_converts_like_the_deadline_does():
     """Both durations are milliseconds in the file and seconds to their consumer.
 
-    One of them converting was the whole defect: ``deadline_seconds`` divided
-    and the timeout's carrier did not, so a five-minute bound reached LiteLLM
-    as 300000 seconds.
+    Both must convert. A carrier that does not divide would hand LiteLLM a
+    five-minute bound as 300000 seconds.
     """
     loaded = config()
     assert loaded.request_timeout_seconds() == 300.0
@@ -258,10 +257,9 @@ def test_the_timeout_reaching_litellm_is_the_one_the_file_states(
 ):
     """The two readers, tested against each other rather than each against itself.
 
-    This is the assertion the defect got past. ``timeout_ms`` was asserted
-    against ``http_options.timeout`` here and in ``test_graph.py``, and both
-    agreed with the code because both read the same side of the seam. The unit
-    changed on the *other* side, inside ADK, where nothing looked.
+    A test that asserts ``timeout_ms`` against ``http_options.timeout`` reads
+    the same side of the seam as the code, so it agrees with the code. The unit
+    changes on the *other* side, inside ADK.
 
     So this drives the installed ADK adapter the shipped build produces and
     reads the kwarg LiteLLM is actually handed. No request is made: the
@@ -325,9 +323,8 @@ class _StopBeforeTheRequest(Exception):
 
 
 def test_the_backoff_knobs_stay_out_of_the_schema():
-    # They were removed for connecting to nothing, and a curve now exists to
-    # describe — but it is pinned in analysis_service.retry, because it does not
-    # vary by deployment. What varies is retry_budget_ratio.
+    # The backoff curve is pinned in analysis_service.retry, because it does
+    # not vary by deployment. What varies is retry_budget_ratio.
     for knob in ("initial_delay", "max_delay", "exp_base", "jitter"):
         with pytest.raises(ValueError):
             config(**{knob: 1.0})
@@ -360,8 +357,8 @@ def test_input_bounds_are_required_not_defaulted(tmp_path):
 
 
 def test_the_ceiling_is_required_rather_than_defaulted(tmp_path):
-    # No value means "unlimited" — that was version 4, and it is the defect. A
-    # deployment that has not chosen a per-caller ceiling does not load.
+    # A missing value is refused, never read as "unlimited". A deployment that
+    # has not chosen a per-caller ceiling does not load.
     path = write(tmp_path, VALID.replace("max_active_jobs = 3\n", ""))
     with pytest.raises(ResilienceConfigError, match="max_active_jobs"):
         load_resilience(path, env={})

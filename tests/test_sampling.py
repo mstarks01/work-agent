@@ -157,9 +157,8 @@ class TestFileValidation:
             load_sampling(path, env={})
 
     def test_no_ceiling_is_mirrored_for_max_output_tokens(self, config_path):
-        # The ceiling is a per-(vendor, model) fact; mirroring one here is the
-        # mistake Vendor.supported was. A large value loads; the provider is
-        # what rejects it.
+        # The ceiling is a per-(vendor, model) fact, so this file mirrors none.
+        # A large value loads; the provider is what rejects it.
         path = config_path(config_toml(base_body="max_output_tokens = 200000\n"))
         assert load_sampling(path, env={}).for_tier("base").max_output_tokens == 200000
 
@@ -231,7 +230,7 @@ class TestParamSplit:
 
     def test_the_generate_content_config_carries_neither(self):
         # Put on the config instead, they would vanish silently while the
-        # fingerprint went on attesting to a seed the request never carried.
+        # fingerprint would go on attesting to a seed the request never carried.
         gcc = TierSampling(
             temperature=0.3, top_p=0.9, seed=7, thinking="high"
         ).to_generate_content_config()
@@ -448,10 +447,9 @@ class TestConstrainOutput:
 class TestAPenaltyIsFinite:
     """The sweep of finding 3's class, over the file a contributor writes.
 
-    ``NodeRun.reported_charge_usd`` was the instance the checkpoint round
-    found. These two are the same shape one file over: TOML reads ``inf`` and
-    ``nan`` as float literals, and nothing between the loader and the wire
-    said otherwise.
+    ``NodeRun.reported_charge_usd`` is the same shape one file over. TOML reads
+    ``inf`` and ``nan`` as float literals, so the loader must refuse them before
+    they reach the wire.
     """
 
     @pytest.mark.parametrize("name", ("presence_penalty", "frequency_penalty"))

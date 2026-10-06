@@ -145,11 +145,11 @@ def test_a_rename_keeps_its_flows_instead_of_dangling():
 
 
 def test_two_things_the_text_names_alike_survive_the_repair():
-    """The shape #1040 is about, end to end through both halves of the fix.
+    """The shape #1040 is about, end to end through both halves of the rule.
 
     Two distinct processes arrive under one name, so both carry one ID and the
     gate reports ``duplicate-id`` against it. ``prompts/extract.md`` rule 3
-    now says to put the text's own distinguishing word in front of each, and
+    says to put the text's own distinguishing word in front of each, and
     this is what lets the repair that does so through: both elements land, and
     the flow between them points at the names the repair gave.
     """

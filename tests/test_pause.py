@@ -346,8 +346,8 @@ class TestTheEventStreamCap:
 
 
 class TestThePausePathIsCertified:
-    """The head's nodes were never checked against the manifest, and a waiting
-    job served its questions without asking the gate (#1294, item 1)."""
+    """The gate checks the head's nodes against the manifest, and a waiting job
+    asks the gate before it serves its questions (#1294, item 1)."""
 
     FP = "a" * 64
 

@@ -1,40 +1,21 @@
 """Every place outside the registry that names a vendor, and why.
 
-## What went wrong, and why nothing caught it
-
-Nobody had ever read the ``vertex`` row as a subject.
-[#607](https://github.com/mstarks01/work-agent/issues/607) listed six defects in
-it, every one found in passing by a session charting a Bedrock map and looking
-at something else, and the audit that answered it found more. Not one of them
-raised. Each reported a smaller, plausible answer instead.
-
-``SERVED_TRUST = "provider_reported"`` was true with one vendor and stayed
-true-looking when a second arrived that echoes the request rather than naming
-the build. ``_credential_vars`` branched on the credential mode and demanded a
-Google file path, so a platform-identity deployment failed closed before the
-adapter was built. ``_FORM_RULES["openai"]`` held the catch-all alone, so the
-same identifier was legal on one vendor and refused on two others.
+## The rule
 
 **A one-vendor assumption is vacuously correct when it is written and silently
-wrong afterwards.** That is the same sentence
-``tests/test_framework_neutrality.py`` opens with, about frameworks, and the
-lesson reached ``AGENTS.md`` as prose while the *check* was built for frameworks
-only. Vendors got the sentence and not the mechanism. This module is the
-mechanism.
+wrong afterwards.** ``tests/test_framework_neutrality.py`` states the same rule
+for frameworks. A vendor defect does not raise: it reports a smaller, plausible
+answer instead. The defects that
+[#607](https://github.com/mstarks01/work-agent/issues/607) records are of this
+kind.
 
-## The shape that survived, and the shape that did not
-
-Sorting the seven vendor defects by what they touched gives the same rule the
-framework audit gave, with no exceptions:
-
-* **A table keyed by vendor was always already correct.** ``VENDORS`` and
-  ``REFERENCE_MODELS`` needed no change through the whole audit. A missing key
-  raises at the first call, so the edit is forced.
-* **A constant, a branch or a missing entry was always wrong.** The
-  ``served_trust`` constant, the ``_credential_vars`` branch on mode, the
-  redactor reading the wrong list, the workflow lane naming ``vertex``, and the
-  ``_FORM_RULES`` entry with its key present and its value short — every gap was
-  one of those four.
+* **A table keyed by vendor is correct by construction.** A missing key raises
+  at the first call, so the edit is forced. ``VENDORS`` and
+  ``REFERENCE_MODELS`` are tables of this kind.
+* **A constant, a branch or a short table entry is wrong without a sign.** A
+  constant answers for every vendor, a branch on a mode answers for the
+  vendors its author knew, and an entry with its key present and its value
+  short passes a key check.
 
 ## What this module does, in three layers
 
@@ -45,14 +26,14 @@ finds every module-level mapping keyed by a closed vendor vocabulary by reading
 the modules, rather than by listing the tables somebody remembered. A table that
 does not answer for every vendor fails, *including a table added tomorrow*. This
 is ``AGENTS.md``'s "check the table against its registry" made automatic, so
-that a new table cannot fail as quietly as the branch it replaced.
+that a new table cannot fail as quietly as a branch.
 
 **2. Declaration — is naming a vendor here right?** The literal and identifier
 scans below, which are the framework module's shape. A name outside the registry
 must say why it is there, as a property of the vendor rather than as its name.
 
 **3. Property — is the answer right?** Completeness cannot see a wrong value:
-``_FORM_RULES["openai"]`` had its key. Those tests live beside the rules they
+a short entry still has its key. Those tests live beside the rules they
 check — ``test_vendors.py`` for the registry's own contract,
 ``test_identity.py`` for what the installed translator actually does, and
 ``test_conformance.py`` for the live lanes — because a property is best asserted
@@ -424,11 +405,11 @@ def test_the_walk_reaches_the_records_a_row_nests():
 def test_no_vendor_field_has_a_default():
     """A default is how a new vendor row stays silent about a fact.
 
-    This is the mechanism that fixes the `served_trust` class of defect rather
-    than the instance. It was a module constant, so every vendor inherited one
-    answer and nobody was asked. Making it a required field means a fourth row
-    cannot construct without stating its own — and a field that later grows a
-    default would quietly restore the constant.
+    This rule covers the `served_trust` class of defect, not only the
+    instance (#607). A module constant gives every vendor one answer, and
+    nobody is asked. A required field means a new row cannot construct
+    without stating its own, and a field with a default would quietly act
+    as the constant.
 
     The rule covers every record a row nests, not `Vendor` alone: the
     credential sources, their variables, the form rules and the SDK entry hold
@@ -636,11 +617,8 @@ def test_every_declaration_gives_a_reason(declaration):
 #
 # The module scan above reads Python, and `test_conformance.py` holds the smoke
 # lane to the registry. Between them they cover every table and every workflow.
-# Neither reads a sentence, and a sentence is where the last two rows went
-# missing. `README.md` and `docs/Configuration.md` each listed the vendors and
-# stopped at `gemini`, so `openrouter` shipped undocumented. Three paragraphs
-# said "three vendors" from the day `bedrock` made it four, and went on saying
-# it through two more rows. Nothing failed, and nothing could.
+# Neither reads a sentence. A prose list of the vendors can stop short of the
+# registry, and a tally such as "three vendors" can stay after a row is added.
 #
 # Two rules, one per failure, both decidable. A list is fenced and checked
 # against the registry. A tally that stands in for "all of them" is refused
@@ -739,8 +717,7 @@ def test_no_document_counts_the_registry(path):
 # than reasoned, on ``google/gemini-3.5-flash-lite`` through OpenRouter: refused
 # at every ``maxItems`` from 8 to 500, while the same cap on a nested array, or
 # on a root array of strings, is accepted — which is why ``SystemModel`` runs
-# there with five capped ``assets`` lists. ``anyOf`` was the first suspect and is
-# not the cause.
+# there with five capped ``assets`` lists. ``anyOf`` is not the cause.
 #
 # ``docs/research/structured-output-shapes.md`` is the measurement, with the
 # probe that re-derives it. The tables live there rather than here so that one
@@ -847,7 +824,7 @@ def test_every_schema_that_caps_a_root_array_is_declared():
 
     A new ``max_length`` on a root list of objects fails here. That is the
     point: the alternative is finding out from a node that dies on one vendor
-    and runs everywhere else, which is what this table was written from.
+    and runs everywhere else.
     """
     capping = {
         name

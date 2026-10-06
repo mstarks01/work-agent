@@ -245,11 +245,11 @@ class TestBoundaryCrossings:
 class TestAnAssumedZoneReachesItsCrossing:
     """#468: the inference has to say so where a lane agent reads it.
 
-    An :class:`Assumption` sits on the model's top-level list, and the crossing
-    it produced carried nothing about it — so an agent reading the strongest
-    input it has could not tell a zone the input stated from one the service
-    placed. Measured on the 13 corpus cases at the time this landed: 9 of 43
-    crossings rest on a zone extraction inferred.
+    An :class:`Assumption` sits on the model's top-level list, so the crossing
+    it produces must carry it. Otherwise an agent that reads the crossing
+    cannot tell a zone the input stated from one the service placed. Measured
+    on the 13 corpus cases: 9 of 43 crossings rest on a zone extraction
+    inferred.
     """
 
     @staticmethod

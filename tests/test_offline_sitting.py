@@ -203,7 +203,7 @@ def test_a_line_holds_no_line_break():
 
 
 def test_the_webapp_and_the_envelope_share_one_line_type():
-    """Two copies of one shape drift. This is the pair that held the defect."""
+    """Two copies of one shape drift, so the webapp and the envelope share one."""
     from evals.harness.envelope import Line as EnvelopeLine
     from webapp.sitting_base import Line as WebappLine
 
@@ -359,8 +359,8 @@ class TestThePressLeavesThePageInPlace:
     The page holds the reader's answers in memory. A press that navigated the
     reader's own tab would take them to GitHub and drop every unsaved mark
     behind it. ``window.open`` with ``noopener`` in its feature string returns
-    ``null`` by specification, so a fallback onto ``window.location`` was the
-    path every browser took. The block runs under ``node`` with a stubbed
+    ``null`` by specification, so a fallback onto ``window.location`` would run
+    in every browser. The block runs under ``node`` with a stubbed
     window, in both states a browser can leave it.
     """
 
@@ -429,7 +429,7 @@ class TestThePressLeavesThePageInPlace:
         assert "blocked" in result["said"]
 
     def test_noopener_is_never_a_feature_string(self):
-        """The feature makes ``window.open`` return null, which is the defect."""
+        """The feature makes ``window.open`` return null, so the page never uses it."""
         assert '"noopener"' not in client_script("offline_sitting.js")
 
 

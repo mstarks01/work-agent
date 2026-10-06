@@ -14,13 +14,10 @@ ladder as the ladder expects. Two of them turn out to be about a path this
 service does not take, and that is recorded rather than hidden — a test that
 asserts about unreached machinery reads as coverage and is not.
 
-The retry question closed differently from how it was asked. This vendor read
-differently from the other five because the ladder keyed on the exception class
-litellm chose, and litellm chooses that per provider. The ladder keys on the
-status code now, so there is nothing left here that is true only of an
-aggregator; ``tests/test_retry.py`` asserts the agreement across every
-registered vendor, and this module keeps only the wrapped-envelope half, which
-no other vendor sends.
+The retry ladder keys on the status code, not on the exception class litellm
+chooses per provider, so no retry behaviour is true only of an aggregator.
+``tests/test_retry.py`` asserts the agreement across every registered vendor.
+This module keeps only the wrapped-envelope half, which no other vendor sends.
 """
 
 from __future__ import annotations

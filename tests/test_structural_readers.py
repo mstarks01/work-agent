@@ -312,10 +312,9 @@ FAULTS: Mapping[str, Fault] = {
     ),
     # The gate reaches this one through the summary rather than through a rule
     # of its own: `by_severity_confirmed` counts the confirmed claims, so a
-    # rejected verdict left in `claims` makes the recount disagree. It moved
-    # here from the app-only list when that field landed, and it is the shape
-    # this file exists to notice -- a reader gaining a rule for free is as much
-    # a drift between the two as a reader losing one.
+    # rejected verdict left in `claims` makes the recount disagree. A reader
+    # that gains a rule through another field is as much a disagreement
+    # between the two readers as one that loses a rule.
     "a rejected verdict sits in claims": Fault(
         _rejected_verdict_in_claims, _both_where_harm_is_graded
     ),

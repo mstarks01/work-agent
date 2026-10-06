@@ -724,7 +724,7 @@ class TestAnAttributeAnswerOverACatalogRow:
 
 
 class TestAnAnsweredZone:
-    """An answered zone is no longer an inference (#1289, Q3)."""
+    """An answered zone is not an inference (#1289, Q3)."""
 
     PROCESS = "process:web-app"
 
@@ -789,7 +789,7 @@ class TestTheAdmissionCheck:
         check_answers([link], [], valid_model(), open_catalog(), (), asked_links=ASKED)
 
     def test_a_link_to_a_principal_nobody_asked_about_is_refused(self):
-        """A stated link was replaced by an answer to no question (#1289, F3)."""
+        """An answer to no question cannot replace a stated link (#1289, F3)."""
         stated = Assertion(
             subject=PRINCIPAL,
             predicate="represented-by",
@@ -938,8 +938,8 @@ ALL_KNOWN = dict.fromkeys(CAPACITY_FACETS, "yes")
 
 
 class TestAFacetAnswerCoversOnlyWhenEveryFacetIsKnown:
-    """A capacity answer of rate "yes" and the rest "unknown" counted a finding
-    as covered once its other fact was answered (#1289, B2).
+    """A capacity answer of rate "yes" and the rest "unknown" does not cover a
+    finding, even when its other fact is answered (#1289, B2).
 
     One conditional finding waits on the capacity limits of a process, as the
     critic names a kind, and on one other fact.

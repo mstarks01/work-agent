@@ -1,8 +1,8 @@
 """CI lints over the real Markdown trees the graph composes instructions from.
 
-Two roots, because the cutover split one. A lane skill and the severity rubric
-are **STRIDE's**, under ``frameworks/stride/``, since a lane is a package's own
-partition of its subject and the rubric grades that package's own record. A
+Two roots. A lane skill and the severity rubric are **STRIDE's**, under
+``frameworks/stride/``, since a lane is a package's own partition of its
+subject and the rubric grades that package's own record. A
 domain pack is **shared**, under ``domains/``, since it describes a technology
 rather than a framework and every carried framework's lanes may earn it. That
 split is ADR 0011's rule — a document's home follows its retrieval key — and
@@ -10,7 +10,7 @@ these lints are where it is enforced against the tree rather than argued about.
 
 The package gate (:func:`~analysis_service.frameworks.validate_package`) already
 refuses a package whose lanes are missing files or whose ``## Scope`` headings
-have drifted. What is here is what the gate does not reach: the token caps, the
+do not match. What is here is what the gate does not reach: the token caps, the
 full heading set, and the shared root's own contract.
 """
 
@@ -35,15 +35,13 @@ DOMAINS_DIR = PROJECT_ROOT / "domains"
 
 # Every capped file of every registered package, resolved to its cap's key.
 # Collected once, and parametrized over, so a package ``PACKAGES`` names cannot
-# have text no lint reads — which is exactly what ASVS's seventeen lane skills
-# and its lane digest had while the caps were a constant per kind and the lints
-# below walked ``frameworks/stride`` alone.
+# have text no lint reads.
 PACKAGE_ASSETS = sorted(covered_assets(FRAMEWORKS_DIR))
 
 #: One loader per registered package, and every ``(framework, lane)`` pair whose
 #: skill ships. What the lane lints below parametrize over.
 #:
-#: **The same widening #280 made to the exemplar lints.** A lane skill states one
+#: **Every package, as for the exemplar lints (#280).** A lane skill states one
 #: package's subject, but every rule below is a rule about what a *skill* may be —
 #: its section shape, its non-emptiness, what it may tell a model about its own
 #: input — and those hold for every package that ships one.
@@ -75,7 +73,7 @@ def test_lane_skill_has_exact_fixed_headings_in_order(framework, lane):
     """Duplicate of the package gate's own check, and kept deliberately.
 
     :func:`~analysis_service.frameworks.validate_package` refuses a package whose
-    lane headings have drifted, so this cannot fail alone. What it buys is that
+    lane headings do not match, so this cannot fail alone. What it buys is that
     the failure names the lane at collection time rather than at deployment
     construction, which is where a maintainer editing a skill is looking.
     """
@@ -159,10 +157,9 @@ def test_the_shared_domains_root_carries_nothing_but_packs():
     """No framework's text leaked back into the root every framework reads.
 
     The package's own root is covered by the gate, which refuses unread
-    Markdown under it. This is the other direction, and it is the one the
-    cutover could plausibly get wrong: ``domains/`` was carved out of the old
-    ``skills/`` tree, and a lane skill left behind here would be loadable by
-    every framework rather than by the one that wrote it.
+    Markdown under it. This is the other direction: a lane skill under
+    ``domains/`` would be loadable by every framework rather than by the one
+    that wrote it.
     """
     entries = [path for path in DOMAINS_DIR.iterdir() if not path.name.startswith(".")]
     assert all(path.suffix == ".md" for path in entries)

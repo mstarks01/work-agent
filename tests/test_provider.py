@@ -273,8 +273,8 @@ class TestWhatAFailureIs:
         """The rule that keeps this a label rather than a second reader.
 
         A spent quota and a throttle are both 429 and the kinds differ; what
-        decides the retry is ``retryable``, which came from the same one rule
-        it always did.
+        decides the retry is ``retryable``, which comes from the one shared
+        rule.
         """
         spent = ValueError("no credit")
         spent.status_code = 429

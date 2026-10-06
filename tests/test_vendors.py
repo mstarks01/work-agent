@@ -287,12 +287,12 @@ class TestPlatformIdentity:
         assert kwargs == {"vertex_project": "p", "vertex_location": "us-east5"}
 
     def test_no_google_credentials_file_is_required(self):
-        """The defect this mode fixes: corporate Google IAM could not run.
+        """Corporate Google IAM runs without a credentials file.
 
-        ``Vendor._require`` demanded ``GOOGLE_APPLICATION_CREDENTIALS``, so a
-        Workload Identity deployment failed closed before LiteLLM ran — even
-        though ``vertex_llm_base.load_auth`` takes ``credentials=None`` and
-        calls ``google.auth.default()``, which resolves exactly that identity.
+        A demand for ``GOOGLE_APPLICATION_CREDENTIALS`` would fail a Workload
+        Identity deployment closed before LiteLLM runs, but
+        ``vertex_llm_base.load_auth`` takes ``credentials=None`` and calls
+        ``google.auth.default()``, which resolves exactly that identity.
         """
         env = {"ANALYSIS_VERTEX_PROJECT": "p", "ANALYSIS_VERTEX_LOCATION": "us-east5"}
         assert "GOOGLE_APPLICATION_CREDENTIALS" not in env
@@ -468,8 +468,7 @@ class TestPinnedFormRule:
 
     #: The vendors that spell the Claude family the bare way, derived from the
     #: table above. The dated and pre-4.6 forms are the cases that decide it:
-    #: they were refused on ``vertex`` and ``anthropic`` and accepted on
-    #: ``openai``, because that row listed the catch-all alone.
+    #: each vendor in this set must refuse them alike.
     BARE_SPELLING: ClassVar[tuple[str, ...]] = tuple(
         name for name, spell in CLAUDE_SPELLING.items() if spell is _bare
     )
@@ -499,7 +498,7 @@ class TestPinnedFormRule:
         "claude-sonnet-4-6": True,
         "claude-haiku-4-5": True,
         "claude-opus-4-1": True,
-        # A floating alias from the era when the bare name was one.
+        # A floating alias: in the Claude 3 generation, the bare name is one.
         "claude-3-opus": False,
         "claude-3-sonnet": False,
         # The dated forms, direct and Vertex-spelled.
@@ -542,7 +541,7 @@ class TestPinnedFormRule:
     def test_a_scoped_bedrock_spelling_is_refused_where_it_is_not_served(
         self, name, model
     ):
-        """The other half of the copy-paste, and it was open until #603's review.
+        """The other half of the copy-paste (#603).
 
         One family pattern reads every spelling any vendor gives the family, so
         a row copied *out* of the bedrock table meets a rule and fails its shape
@@ -718,10 +717,9 @@ class TestPinnedFormRule:
         it carries the account that owns it into a fingerprint and a report.
         A rule that lived in the Claude shape would leave a Nova ARN accepted.
 
-        **The Google forms are here because the rule was one cloud's syntax.**
-        The docstring said "on two properties rather than on whose syntax it
-        is" and the pattern was ``arn:``, so a Vertex endpoint and a Developer
-        API tuned model both passed. Parametrizing over every vendor is what
+        **The Google forms are here because a rule can be one cloud's syntax.**
+        A pattern of ``arn:`` alone would pass a Vertex endpoint and a
+        Developer API tuned model. Parametrizing over every vendor is what
         keeps the next spelling from being a `bedrock`-only thought.
         """
         with pytest.raises(ValueError, match="rather than a model build"):
@@ -798,13 +796,13 @@ class TestPinnedFormRule:
         "model", ["claude-opus-4-20250514", "claude-sonnet-4-20250514"]
     )
     def test_a_date_is_not_a_minor_version(self, name, model):
-        """The minor group was ``\\d+``, so it read a date as a version.
+        """A minor group of ``\\d+`` would read a date as a version.
 
-        Both halves of the rule were wrong at once. ``validate_model`` accepted
-        a dated form the module's own comment says it rejects, and
-        ``claude_generation`` returned ``(4, 20250514)`` — so the build-time
-        sampling rule read a generation far above its floor and refused
-        ``temperature`` on a Claude 4.0, which accepts it.
+        Both halves of the rule depend on it. ``validate_model`` refuses the
+        dated form, and ``claude_generation`` returns ``(4, 0)``. A parse that
+        returned ``(4, 20250514)`` would make the build-time sampling rule read
+        a generation far above its floor and refuse ``temperature`` on a
+        Claude 4.0, which accepts it.
 
         The two answers are separate on purpose. These vendors refuse the dated
         *shape*, and the parse still reads the generation the identifier names,
@@ -836,11 +834,10 @@ class TestPinnedFormRule:
         """No generation is too old to name: the rule reads shape, not version.
 
         These two are the case that decides it. Both are well-formed dateless
-        IDs and both are older than the generation this service once floored
-        at, so a rule that read the version would reject them and a rule that
-        reads the shape takes them. Which model a deployment can afford to run
-        is its own call, and the vendor serving the build is the authority on
-        whether it still exists.
+        IDs and both are old generations, so a rule that read the version
+        could reject them, and a rule that reads the shape takes them. Which
+        model a deployment can afford to run is its own call, and the vendor
+        serving the build is the authority on whether it still exists.
         """
         assert vendor_for(name).validate_model(model, source="t") == model
 
@@ -855,7 +852,7 @@ class TestPinnedFormRule:
             )
 
     def test_a_family_is_a_pattern_matched_at_the_start(self):
-        """The family is a `re.Pattern`, and it anchors where a prefix did.
+        """The family is a `re.Pattern`, anchored at the start like a prefix.
 
         A prefix cannot say "broad here, strict there": a Bedrock Claude that
         omits ``anthropic.`` has to reach the Claude rule and fail its shape

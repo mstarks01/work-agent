@@ -145,9 +145,9 @@ class TestVerdictShapes:
         """The second spelling, for a fact the system model has no slot for.
 
         A framework ruling on requirements asks most of its questions about a
-        codebase rather than about an element. With only the element spelling
-        available its commonest verdict was inexpressible, and the legal move
-        left was to point at whatever attribute happened to resolve.
+        codebase rather than about an element. With only the element spelling,
+        its commonest verdict would be inexpressible, and the only legal move
+        would be to point at whatever attribute happens to resolve.
         """
         verdict = Verdict(
             status="needs-info",
@@ -161,10 +161,9 @@ class TestVerdictShapes:
     def test_a_subject_only_ref_is_not_a_dangling_element_reference(self):
         """The referential check must skip the spelling that names no element.
 
-        Found by a fixture rather than by a run: every live subject so far
-        arrived beside an element reference the critic also filled in, so the
-        pure case was never exercised. An empty ``element_id`` is the shape
-        here, not a reference to nothing.
+        A live subject usually arrives beside an element reference the critic
+        also fills in, so this fixture drives the pure case. An empty
+        ``element_id`` is the shape here, not a reference to nothing.
         """
         report = sample_report(
             [
@@ -262,8 +261,8 @@ class TestProposedVerdictCarriesNoRuleBetweenFields:
 
         ``review_issues`` requires the ruled set to equal the drafted set, which
         an ill-formed ID fails on both sides at once — so a pattern here could
-        only fire on an ID the reconciliation was about to reject anyway, and it
-        fired earlier and fatally.
+        only fire on an ID the reconciliation is about to reject anyway, and it
+        would fire earlier and fatally.
         """
         rulings = ThreatRulings.model_validate(
             {
@@ -280,8 +279,9 @@ class TestProposedVerdictCarriesNoRuleBetweenFields:
         assert rulings.claims[0].id == "S-1"
 
     def test_the_field_level_constraints_are_untouched(self):
-        """Only the rules *between* fields moved. A closed vocabulary is
-        something a provider schema can carry, so it stays where it was."""
+        """Only the rules *between* fields sit outside the field. A closed
+        vocabulary is something a provider schema can carry, so it stays on
+        the field."""
         with pytest.raises(ValidationError):
             ProposedVerdict.model_validate({"status": "maybe"})
 
@@ -404,9 +404,9 @@ class TestThreat:
             sample_threat(grounds=[])
 
     def test_the_record_no_longer_re_validates_an_id_it_did_not_compose(self):
-        """``^[STRIDE]-\\d{2}$`` and the category-letter check are gone.
+        """The record checks neither ``^[STRIDE]-\\d{2}$`` nor the category letter.
 
-        Both asked a record to re-check a string the *service* built: the ID is
+        Both would ask a record to re-check a string the *service* built: the ID is
         composed by the package's own ``IdRule`` from the lane the resolver was
         called for, and the lane is stamped from the same call — so the letter
         and the category could not disagree unless the composition itself were
@@ -1016,14 +1016,14 @@ class TestTheSamplingClearBlock:
         )
 
     def test_every_resolved_param_survives_a_round_trip_through_the_report(self):
-        """The drift guard, and it is about a failure that costs a whole run.
+        """The block's types match the model they record, or a run is lost.
 
         ``report.py`` cannot import ``sampling`` — that import cycles back
         through skills — so the block's value types are written out by hand and
         nothing but this ties them to the model they record. A param whose type
         the block cannot carry does not fail at config load or at the
-        build-time gate: it fails at assembly, after every node has been paid
-        for. ``thinking`` did exactly that.
+        build-time gate: it fails at assembly, after the job pays for every
+        node. ``thinking``, whose value is a string, is the param to watch.
         """
         resolved = self.fully_set()
         report = sample_report().model_copy(update={"sampling": {"base": {}}})

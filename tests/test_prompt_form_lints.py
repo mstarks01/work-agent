@@ -2,10 +2,9 @@
 
 ``UnknownRef`` holds one open fact in one of several forms in one flat shape,
 so the provider schema cannot say that an entry uses one. The prompts say it.
-Three prompts list the forms, and two of them drifted: the ASVS critic addendum
-named two of four, and its critic wrote two forms at once on 29 of 203 rulings
-(#1476). The forms come from the provider schema, so a form added tomorrow is
-asked of every list.
+Three prompts list the forms, and each list must name every form. A list that
+names two of four lets the critic write two forms at once (#1476). The forms
+come from the provider schema, so a new form is asked of every list.
 """
 
 from __future__ import annotations

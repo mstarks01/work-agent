@@ -216,7 +216,7 @@ class TestTheRounds:
         assert "event: done" in done
 
     def test_a_save_from_a_page_left_on_an_earlier_round_is_refused(self, tiers):
-        """A page left open on an earlier round saved over a later one (#1289)."""
+        """A page left open on an earlier round cannot save over a later one (#1289)."""
         client = client_for(tiers, PausingRunner(catalog=False), catalog=False)
         paused = start(client, questions=True)
         shown = event(client.get(f"/events/{paused}").text, "questions")
@@ -273,10 +273,10 @@ class TestTheRounds:
         assert saved.status_code == 400
 
     def test_a_start_after_a_skipped_round_admits_what_the_route_admits(self, tiers):
-        """The route admitted a round-2 answer and the engine refused it (#1289).
+        """The engine admits each round-2 answer the route admits (#1289).
 
-        The engine built its round again without the skipped list, so it asked
-        round 1 again and the run failed after the route returned 200.
+        An engine that built its round again without the skipped list would ask
+        round 1 again, and the run would fail after the route returned 200.
         """
         client = client_for(tiers, PausingRunner(catalog=False), catalog=False)
         paused = start(client, questions=True)
@@ -306,7 +306,7 @@ class TestTheRounds:
         assert "event: done" in client.get(f"/events/{started.json()['run']}").text
 
     def test_a_refused_answer_names_its_question(self, tiers):
-        """Every malformed answer got one message that named nothing (#1289)."""
+        """A refusal of a malformed answer names its question (#1289)."""
         client = client_for(tiers, PausingRunner(catalog=False), catalog=False)
         paused = start(client, questions=True)
         first = event(client.get(f"/events/{paused}").text, "questions")["facts"][0]
@@ -764,7 +764,7 @@ def _subject_question(name, findings):
 
 
 def test_an_early_row_carries_its_element_s_source_words(tiers):
-    """The owner could not see what the service read about an element (#1289, B2)."""
+    """The owner sees what the service read about an element (#1289, B2)."""
     client = client_for(tiers, PausingRunner(catalog=False), catalog=False)
     paused = start(client, questions=True)
     shown = event(client.get(f"/events/{paused}").text, "questions")
@@ -808,7 +808,7 @@ calls.push(walk(ids.questions).map(h => ({{ text: h.textContent, title: h.title 
 
 
 def test_the_report_names_the_findings_a_question_settles():
-    """The report showed a count, never which findings wait (#1289, B1)."""
+    """The report names which findings wait, not only a count (#1289, B1)."""
     payloads = {
         "report": {
             "system_model": valid_model().model_dump(mode="json"),
@@ -1160,8 +1160,8 @@ async def _cancelled(on_node):
 
 @pytest.mark.parametrize("start", [_deadline, _bad_config, _rejected, _cancelled])
 def test_a_failed_resumed_run_leaves_its_paused_run_to_answer_again(start):
-    """A full registry removed the paused run its answers resumed from, and
-    the resumed run then failed with no checkpoint (#1289, F1)."""
+    """A full registry keeps the paused run a failed resumed run came from,
+    so its checkpoint stays for another answer (#1289, F1)."""
     from webapp.main import _drive
 
     analyses, (first, _) = _waiting_registry()
@@ -1246,7 +1246,7 @@ def test_a_paused_run_goes_once_its_resumed_run_has_a_report():
 
 
 def test_a_run_waits_until_the_run_its_answers_started_has_a_report():
-    """A failed resumed run left its paused run open to eviction (#1289)."""
+    """A paused run stays until the run its answers started has a report (#1289)."""
     _, (paused, _) = _waiting_registry()
     resumed = Run(id="resumed")
     paused.resumed_by = resumed
@@ -1417,7 +1417,8 @@ def _report_control_sent(steps: str) -> list:
 @pytest.mark.parametrize("before", list(CONTROL_SENDS))
 @pytest.mark.parametrize("after", list(CONTROL_SENDS))
 def test_a_control_sends_the_state_chosen_last(send, before, after):
-    """Blank after "There is none" sent ``none`` (#1289, B1).
+    """The last state wins: blank after "There is none" sends no ``none``
+    (#1289, B1).
 
     Both pages read one rule: the selector is the answer, and the text is
     read only under "mechanism".
@@ -1430,7 +1431,7 @@ def test_a_control_sends_the_state_chosen_last(send, before, after):
 
 @pytest.mark.parametrize("button", ["save", "continue"])
 def test_a_refused_answer_shows_beside_the_buttons_and_keeps_the_answers(button):
-    """The refusal showed above the description, out of sight (#1289)."""
+    """The refusal shows beside the buttons, in sight (#1289)."""
     steps = f"""
 state.value = "none"; state.listeners.change();
 globalThis.fetch = async (url, init) => {{
@@ -1449,7 +1450,7 @@ calls.push({{ shown: !ids["answer-problem"].hidden,
 
 @pytest.mark.parametrize("send", [_early_control_sent, _report_control_sent])
 def test_a_text_box_takes_no_more_than_its_field_holds(send):
-    """Every box took 1,000 characters where the field held 200 (#1289)."""
+    """Each box takes no more characters than its field holds (#1289)."""
     steps = """
 input.value = "x".repeat(input.maxLength); input.listeners.input();
 """
@@ -1668,7 +1669,7 @@ await ids.continue.listeners.click(); await settle();
 
 @pytest.mark.parametrize(("rows", "shared"), [(1, False), (2, True)])
 def test_a_facet_table_sets_a_column_only_over_two_rows(rows, shared):
-    """A table of one row showed a "Same for all" row that set only that row."""
+    """A table of one row shows no "Same for all" row."""
     elements = [valid_model().data_stores[0], valid_model().data_flows[0]]
     facts = [facet_fact(element) for element in elements[:rows]]
     steps = f"""
@@ -1787,7 +1788,7 @@ await settle();
     ("withheld", "said"), [(0, "No question is left."), (3, "3 more question(s)")]
 )
 def test_the_last_save_waits_for_the_start_button(withheld, said):
-    """A save that left nothing to ask started the analysis (#1289, item 7)."""
+    """A save that leaves nothing to ask waits for the start button (#1289, item 7)."""
     link = {"principal": "shopper accounts", "element": "entity:shopper"}
     ready = {
         "run": "r1",
@@ -1864,7 +1865,7 @@ def _text_row(key, label):
 
 
 def test_the_round_size_counts_its_link_questions():
-    """The line said how many choices a round asks, and left out its link
+    """The line that says how many choices a round asks counts its link
     questions, 1 to 3 a pause on the archived reports with a catalog (#1289)."""
     row = _text_row(["", "", "", "who?", "", ""], "who?")
     link = {
@@ -1886,8 +1887,8 @@ calls.push(walk(ids.questions).map(n => n.textContent).find(t => t.includes("Thi
 
 
 def test_the_round_size_leaves_out_a_part_until_its_parent_is_yes():
-    """A part hidden until its parent's "yes" was counted in the round's
-    choices, so the line named a choice the page did not show (#1289)."""
+    """A part hidden until its parent's "yes" is not counted in the round's
+    choices, so the line names only choices the page shows (#1289)."""
     parent_key = ["", "", "", "", "", "oauth"]
     choices = [{"id": "yes", "name": ""}, {"id": "no", "name": ""}]
     parent = _text_row(parent_key, "OAuth?") | {
@@ -1924,7 +1925,7 @@ calls.push(said());
 
 
 def test_a_part_of_a_part_hides_with_its_parent():
-    """A part's own part stayed shown after the part above it hid."""
+    """A part's own part hides when the part above it hides."""
     choices = [{"id": "yes", "name": ""}, {"id": "no", "name": ""}]
     keys = [["", "", "", "", "", name] for name in ("a", "b", "c")]
     rows = [
@@ -2015,8 +2016,8 @@ await ids.skip.listeners.click(); await settle();
 
 
 def test_skip_the_rest_sets_aside_a_question_answered_in_part():
-    """A question with facets answered in part came back first in every round,
-    and "Skip the rest" left it alone (#1289)."""
+    """ "Skip the rest" sets aside a question with facets answered in part, so
+    it does not come back first in every round (#1289)."""
     key = ["process:web-app", "", "", "", "capacity-limits", ""]
     facets = [{"id": f, "question": f"{f}?"} for f in ("rate", "size")]
     row = _text_row(key, "Web App") | {
@@ -2093,7 +2094,7 @@ await ids.skip.listeners.click(); await settle();
 
 
 def test_skip_the_rest_skips_a_link_only_round():
-    """The page sent an empty save, which the service refuses (#1289, A2)."""
+    """The page sends no empty save, which the service refuses (#1289, A2)."""
     body = _skip_the_rest([_LINK], [])
     assert body["links"] == []
     assert body["skip"] == [_LINK["key"]]
@@ -2127,8 +2128,8 @@ await ids.save.listeners.click(); await settle();
 
 
 def test_a_question_answered_in_part_and_skipped_has_one_editor():
-    """It was listed under "Your answers" and "Skipped for now", and the two
-    editors sent two answers to one key, which the service refuses (#1289, A3).
+    """It has one editor, so the page cannot send two answers to one key,
+    which the service refuses (#1289, A3).
     """
     key = ["store:db", "", "", "", "capacity-limits", ""]
     facets = [{"id": f, "question": f"{f}?"} for f in ("rate", "size")]
@@ -2203,7 +2204,7 @@ await ids.continue.listeners.click(); await settle();
 
 
 def test_a_table_that_comes_back_keeps_its_earlier_facets():
-    """A size answer in a later round kept the rate answer (#1289, F2)."""
+    """A size answer in a later round keeps the earlier rate answer (#1289, F2)."""
     store = valid_model().data_stores[0]
     fact = facet_fact(store)
     earlier = {**fact, "answer": {"key": fact["key"], "facets": {"rate": "yes"}}}
@@ -2352,7 +2353,7 @@ def test_a_paused_run_starts_one_analysis(tiers):
 
 
 def test_a_refused_answer_to_a_skipped_question_names_it(tiers):
-    """The label map left out skipped questions, which still take answers."""
+    """The label map includes skipped questions, which still take answers."""
     client = client_for(tiers, PausingRunner(catalog=False), catalog=False)
     paused = start(client, questions=True)
     first = event(client.get(f"/events/{paused}").text, "questions")["facts"][0]
@@ -2374,7 +2375,7 @@ def test_a_refused_answer_to_a_skipped_question_names_it(tiers):
 
 
 def test_a_save_after_the_start_is_refused(tiers):
-    """A save after the start landed on the paused run, and no run read it."""
+    """A save after the start is refused, because no run would read it."""
     client = client_for(tiers, PausingRunner(catalog=False), catalog=False)
     paused = start(client, questions=True)
     first = event(client.get(f"/events/{paused}").text, "questions")["facts"][0]
@@ -2401,8 +2402,8 @@ def test_a_save_after_the_start_is_refused(tiers):
     ids=["running", "ended-without-a-report", "completed"],
 )
 def test_the_app_and_the_store_free_a_parent_alike(state, status):
-    """The first-run app and the job store each held "a failed resumed run
-    frees its parent", each tested against its own expectation (#1289)."""
+    """The first-run app and the job store each hold "a failed resumed run
+    frees its parent", so they are tested against each other (#1289)."""
     import asyncio
 
     from analysis_service.jobs import InMemoryJobStore, JobRecord, Resumption
@@ -2430,7 +2431,7 @@ def test_the_app_and_the_store_free_a_parent_alike(state, status):
 
 @pytest.mark.parametrize("save", [True, False], ids=["save", "start"])
 def test_answers_that_break_the_input_limits_are_refused_at_once(tiers, save):
-    """The route took answers over the limits, and the run then failed."""
+    """The route refuses answers over the limits before a run can fail on them."""
     client = client_for(tiers, PausingRunner(catalog=False), catalog=False)
     head = "A web app talks to a database. "
     text = head + "x" * (100 * 1024 - len(head) - 10)
@@ -2496,8 +2497,8 @@ for (const combo of {json.dumps(combos)}) {{
 
 
 def test_a_report_whose_follow_up_started_asks_nothing_and_says_where_it_went(tiers):
-    """The first-run app still offered a report's follow-up after its answers
-    started one, and every answer to it was refused (#1369)."""
+    """The first-run app offers no follow-up for a report whose answers
+    started one, and says where that follow-up is (#1369)."""
     client = client_for(tiers, PausingRunner(catalog=False), catalog=False)
     finished = start(client, questions=False)
     client.get(f"/events/{finished}")
@@ -2721,8 +2722,8 @@ await buttons[buttons.length - 1].listeners.click();
 class TestCompoundAnswers:
     """The page's facet editors, held against admission and the merge.
 
-    The page sent a facet answer the follow-up refuses (F2a), and showed a
-    retained facet blank and counted it unanswered (F2b, #1289). Each test
+    The page sends only facet answers the follow-up admits (F2a), and shows
+    a retained facet and counts it answered (F2b, #1289). Each test
     serializes answers with the shipped script and hands them to production
     code.
     """
@@ -2798,7 +2799,8 @@ for (const combo of combos) {
         ],
     )
     def test_every_change_the_editor_offers_is_admitted(self, before):
-        """F2a: complete-known to all-unknown was offered and refused."""
+        """F2a: every change the editor offers is admitted, such as
+        complete-known to all-unknown."""
         answer = self.earlier(before)
         lists, rows = self.drive(answer, asked=False)
 
@@ -2861,7 +2863,7 @@ for (const combo of combos) {
         assert offered is admitted
 
     def test_a_retained_facet_is_shown_and_counted_as_the_merge_reads_it(self):
-        """F2b: a saved facet showed blank, and the count read only new lists."""
+        """F2b: a saved facet shows, and the count reads it as the merge does."""
         answer = self.earlier({"records-actor": "yes"})
         lists, rows = self.drive(answer, asked=True)
 
