@@ -64,14 +64,24 @@ order, and the page starts a new box each time the question group changes,
 so a heading can come back within a round. Summing the frameworks' scores
 put ten capability questions first, and the page showed them in one box: an
 owner who stopped after ten choices completed no STRIDE finding with ASVS
-selected, where STRIDE alone completed 517 (E29). Turns need no calibration
-between frameworks, because each framework's scores order only its own
-questions, so a package added later takes its turn with no edit. Measured
+selected, where STRIDE alone completed 517 (E29). Measured
 on the same archive with both selected, at 10 choices STRIDE completes 1,036
 findings and ASVS 125, where the summed order completed 0 and 0; the cost is
 ASVS units settled early, 1,209 against 2,186 at 10 choices; from 30
 choices on the two orders settle within 2% of each other (E32). With one framework selected, nothing
 changes (maintainer's decision of 2026-10-01).
+
+**A turn ranks a shared field question on the summed score.** A
+framework's turn takes the first question in the list that serves it, and the list ranks a field
+question that two frameworks share by the sum of their scores. So the order
+inside a turn depends on the scale of each framework's prior. A package added
+later takes its turn with no edit, but its prior can move the shared questions
+in another framework's turn, so a new prior needs the offline replay
+(`run.py early-policies`). A queue for each framework, ranked by that
+framework's part of the score alone, completed fewer findings early: with both
+frameworks selected, at 10 choices, 875 STRIDE findings against 1,125, and 18
+critical against 89 (`QA-2026-10-06-01-E1`). The maintainer chose the summed
+score on 2026-10-06.
 
 **A limit bounds the questions not yet answered at all.** Every saved answer
 counts toward its kind's limit. A question with facets that a round answered
