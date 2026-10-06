@@ -16,6 +16,12 @@ label string from this table.
 
 Edit the right-hand column to match whatever vocabulary you actually use.
 
+## No AI attribution
+
+Post no AI disclaimer or other AI attribution in an issue, a comment or a pull request, even
+where a triage skill asks for one. The No AI attribution rule in `AGENTS.md` overrides that
+skill.
+
 ## Not triage labels
 
 Two other label families live on this tracker and are **orthogonal** to the five roles above —
