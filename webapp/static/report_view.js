@@ -45,6 +45,11 @@
   // findings they reach, built server-side (ADR 0054). Empty otherwise.
   const CORRECTIONS = JSON.parse(document.getElementById("corrections").textContent);
   const CORRECTED = new Set(CORRECTIONS.findings || []);
+  // A first report's answers and link answers, built server-side, so its
+  // follow-up can take a new answer to each. Empty otherwise.
+  const EARLIER = JSON.parse(document.getElementById("earlier").textContent);
+  const EARLIER_FACTS = EARLIER.answers || [];
+  const EARLIER_LINKS = EARLIER.links || [];
   // Where each finding's facts came from, built server-side: the label of the
   // owner's answers Source, the attributes the owner answered, and why each
   // conditional finding's facts are still open.
@@ -973,7 +978,8 @@
     note.append(link, ".");
     $("links").append(note);
   }
-  if (LINK_QUESTIONS.length || FACT_QUESTIONS.length) {
+  const earlierCount = EARLIER_FACTS.length + EARLIER_LINKS.length;
+  if (LINK_QUESTIONS.length || FACT_QUESTIONS.length || earlierCount) {
     // The follow-up is optional and starts closed: the report is complete
     // without it, and answering runs the analysis once more.
     const box = el("details", "followup");
@@ -981,6 +987,7 @@
     box.append(el("summary", null,
       `Optional follow-up: ${FACT_QUESTIONS.length + LINK_QUESTIONS.length} question(s)` +
       (waiting ? ` about facts that ${waiting} conditional finding(s) wait on` : "") +
+      (earlierCount ? `, and ${earlierCount} earlier answer(s) you can change` : "") +
       ". Answer what you can, and the analysis runs once more, which takes a " +
       "few minutes. After that, the report is final."));
     $("links").append(box);
@@ -1114,13 +1121,62 @@
       recount();
     }
 
+    // The answers this report read. A row sends a new answer only once its
+    // "Change" button opens it, so the follow-up reads only what changed.
+    const earlierFacts = [];
+    if (earlierCount) {
+      const said = a => a.facets
+        ? Object.entries(a.facets).map(([facet, value]) => `${facet}: ${value}`).join("; ")
+        : (a.value === DONT_KNOW ? "I don't know" : a.value);
+      box.append(el("h2", null, "Earlier answers"), el("div", "meta",
+        "This report read these answers. If one is wrong, or you now know what was " +
+        "\"I don't know\", change it, and the follow-up reads the new answer. A " +
+        "known answer cannot change back to \"I don't know\" here."));
+      const changer = (row, shown, open) => {
+        const change = el("button", null, "Change");
+        change.type = "button";
+        change.addEventListener("click", () => {
+          change.hidden = true;
+          shown.replaceChildren(" \u2014 ", ...open());
+        });
+        row.append(shown, " ", change);
+      };
+      EARLIER_LINKS.forEach(a => {
+        const row = el("p");
+        const element = a.answer.element;
+        row.append(el("b", null, a.principal));
+        changer(row, el("span", null, ` \u2014 ${element === "none"
+          ? "none of these" : NAMES[element] || element}`), () => {
+          const select = el("select");
+          select.dataset.principal = a.principal;
+          a.options.forEach(id => select.append(option(NAMES[id] ? `${NAMES[id]} (${id})` : id, id)));
+          select.append(option("None of these", "none"));
+          select.value = element;
+          linkSelects.push(select);
+          return [select];
+        });
+        box.append(row);
+      });
+      EARLIER_FACTS.forEach(a => {
+        const row = el("p");
+        row.append(el("b", null, a.label));
+        changer(row, el("span", null, ` \u2014 ${said(a.answer)}`), () => {
+          const editor = editorFor(a, a.answer, () => {});
+          earlierFacts.push(editor.read);
+          return editor.nodes;
+        });
+        box.append(row);
+      });
+    }
+
     const again = el("button", null, "Run the follow-up with these answers");
     const note = el("div", "meta");
     again.addEventListener("click", async () => {
       const links = linkSelects
         .filter(s => s.value)
         .map(s => ({ principal: s.dataset.principal, element: s.value }));
-      const facts = factAnswers.map(answer => answer.read()).filter(Boolean);
+      const facts = [...factAnswers.map(answer => answer.read()),
+        ...earlierFacts.map(read => read())].filter(Boolean);
       again.disabled = true;
       // The run id is this page's own path: /report/{run}.
       const run = location.pathname.split("/").pop();
