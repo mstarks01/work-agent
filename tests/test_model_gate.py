@@ -79,6 +79,20 @@ class TestValueConstraintsAreCaught:
     def test_o_series_accepts_its_one_legal_temperature(self):
         gate("openai", "o3", temperature=1.0)
 
+    def test_a_fault_in_litellm_is_not_read_as_a_refusal(self, monkeypatch):
+        """Only ``UnsupportedParamsError`` is a refusal. Any other error
+        propagates, so the conformance matrix never reads a fault as
+        ``UNSUPPORTED`` and its sweep test sees a new type."""
+        from analysis_service.model_gate import _litellm
+
+        def broken(**params):
+            raise RuntimeError("internal litellm fault")
+
+        monkeypatch.setattr(_litellm.utils, "get_optional_params", broken)
+
+        with pytest.raises(RuntimeError, match="internal litellm fault"):
+            gate("openai", "o3", temperature=1.0)
+
 
 class TestWhatTheGateCannotDo:
     """The two holes, both closed elsewhere rather than left open."""
