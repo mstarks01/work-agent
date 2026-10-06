@@ -315,13 +315,12 @@ def _probe_structured_output(vendor: Vendor, model: str) -> Capability:
     it as partial support would invite exactly the deployment the build-time
     gate exists to refuse.
 
-    **``UNKNOWN`` is the third answer, and leaving it out was a defect in the
-    one module that exists to carry it.** This read LiteLLM's boolean lookup,
-    which returns ``False`` both for a map entry that says no and for one that
-    says nothing. So the matrix printed ``unsupported`` for
-    ``openrouter/anthropic/claude-sonnet-4.6``, whose entry is merely silent and
-    which honours a schema when asked — the module's own header calls rendering
-    an unknown as ``UNSUPPORTED`` "inventing a fact", and it was inventing one.
+    **``UNKNOWN`` is the third answer.** LiteLLM's boolean lookup returns
+    ``False`` both for a map entry that says no and for one that says nothing,
+    so this does not read it. A silent entry is ``UNKNOWN``: for example,
+    ``openrouter/anthropic/claude-sonnet-4.6`` has a silent entry and honours a
+    schema when asked. The module's own header calls rendering an unknown as
+    ``UNSUPPORTED`` "inventing a fact".
 
     :attr:`ProviderProfile.known` could not catch it: that flag is per *entry*,
     and this pair has an entry. Coverage has to be answered per capability.

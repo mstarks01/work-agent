@@ -13,8 +13,9 @@ whole, and it exists because the per-call knobs cannot. ``timeout_ms`` bounds
 one HTTP request. ``attempts`` multiplies it. The retry arithmetic below
 multiplies it again. The graph then runs five LLM stages in series on its
 longest path. Those compose to a worst case in hours, while every individual
-bound still holds. Before this knob, a product of four numbers nobody chose set
-a job's tail, and a wedged run held a ``running`` job until the process died. A
+bound still holds. Without this knob, a product of four numbers that nobody
+chose sets a job's tail, and a wedged run holds a ``running`` job until the
+process dies. A
 deadline is the one bound whose worst case is the number somebody wrote down.
 
 ``max_active_jobs`` and the four ``*_per_window`` knobs bound a caller rather
@@ -64,11 +65,11 @@ literally the request count per node. With it on it would not be: LiteLLM's
 ``num_retries`` counts retries after the first try, and it also sets the
 provider SDK's own ``max_retries`` from that same value on the way to the
 client. The first attempt would therefore carry its own SDK-level retries
-underneath, and the worst case per node was ``2 * attempts - 1`` requests: five
-at the shipped three, and five times the fan-out in the seconds the lane agents
+underneath, and the worst case per node would be ``2 * attempts - 1``
+requests: five at the shipped three, and five times the fan-out in the seconds the lane agents
 go out together. Against a per-minute quota, that burst is what turns one 429
 into a run that spends its budget on retried 429s, which is OWASP LLM10. Passing
-``max_retries`` did not close it, because ``num_retries`` overwrites it on the
+``max_retries`` does not close it, because ``num_retries`` overwrites it on the
 way to the client. ``tests/test_model_gate.py`` probes exactly that.
 
 So the layer is off, at ``num_retries=0`` and one request per call, and the loop
@@ -82,12 +83,9 @@ full bucket and is retried as before. Turning ``attempts`` down during an
 incident still works and is still the blunt instrument. The budget is what makes
 that rarely necessary.
 
-The backoff knobs that version 2 removed stay removed, and the reasoning has
-changed. They went because LiteLLM picked its own curve internally, so the
-config surface connected to nothing. A curve now exists to describe: full
-jitter, with a provider's ``Retry-After`` overriding it.
-:mod:`analysis_service.retry` pins it rather than this file re-opening it,
-because the curve does not vary by deployment. What varies is how much retrying
+The file has no backoff knobs, because :mod:`analysis_service.retry` pins the
+curve: full jitter, with a provider's ``Retry-After`` overriding it. The curve
+does not vary by deployment. What varies is how much retrying
 a deployment will tolerate, and that is the one number this file carries.
 
 Loading fails closed. A malformed file, an out-of-range value, an unknown key or
@@ -282,15 +280,13 @@ class ResilienceConfig(BaseModel):
         The sibling of :meth:`deadline_seconds`, and it exists for the reason
         that one gives: the file states every duration in milliseconds, so the
         conversion lives here and no caller has to remember which unit it is
-        holding. Both durations convert in one place, because one of them
-        converting was how ``timeout_ms`` came to mean nothing.
+        holding. Both durations convert in one place.
 
         **It does not ride on ``http_options``, and the reason is a type.**
-        That was the carrier, and ``types.HttpOptions.timeout`` is documented in
-        milliseconds while ADK's LiteLLM path forwards the number to LiteLLM
-        verbatim, where it is read as seconds. The shipped 300000 therefore
-        bought a 3.5-day bound and no request was ever cut. Converting at the
-        carrier does not fix it either: that field is typed ``int``, so a
+        ``types.HttpOptions.timeout`` is documented in milliseconds, while
+        ADK's LiteLLM path forwards the number to LiteLLM verbatim, where it is
+        read as seconds. On that carrier, 300000 would bound a request at 3.5
+        days. A conversion at the carrier does not fix it either: that field is typed ``int``, so a
         sub-second ``timeout_ms`` would raise at graph build time rather than
         time a request out. LiteLLM's own ``timeout`` kwarg is documented in
         seconds and takes a float, so the value goes there instead — one hop,

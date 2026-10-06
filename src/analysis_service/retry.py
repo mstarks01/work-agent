@@ -37,11 +37,8 @@ because a provider asking for an hour has already answered the question a retry
 exists to ask. It arrives on the exception where litellm files it, which is not
 where an exception's ``headers`` attribute is — see :data:`_HEADER_ATTRIBUTES`.
 
-This reverses version 2's removal of the backoff knobs, and only because the
-premise changed. They went because they connected to nothing: LiteLLM picked its
-own curve internally, and the config surface was decoration. With the loop here,
-a curve exists to describe. This module pins it rather than re-opening it as
-configuration, because it does not vary by deployment. The one number that does
+The curve is pinned here, because the loop lives here. This module pins it
+rather than open it as configuration, because it does not vary by deployment. The one number that does
 vary is how much retrying a deployment will tolerate, and that is
 ``retry_budget_ratio`` in ``config/resilience.toml``.
 
@@ -100,10 +97,7 @@ _BACKOFF_CAP_SECONDS = 30.0
 # the reason the two constants above are.
 #
 # **60 seconds, sized against the limit that actually sends the header.** The
-# ceiling was the backoff cap — the longest wait this module would choose for
-# itself — for as long as no ``Retry-After`` reached it. PR #833 found that
-# none ever had, because the header arrives on an attribute this module was not
-# reading, so the number was chosen against a value that never came.
+# ceiling is sized against the per-minute window, not the backoff cap (PR #833).
 #
 # A tokens-per-minute window is 60 seconds wide, so a provider naming 45 is
 # naming a limit that really does reopen, and refusing it fails a node that one
@@ -327,9 +321,10 @@ def _clears_with_time(exc: BaseException) -> bool:
 #: them — and fills ``exc.headers`` only from the ``headers=`` kwarg a proxy
 #: supplies. What it does instead is attach every mapped exception's response
 #: headers as ``litellm_response_headers``, which is where a real
-#: ``Retry-After`` arrives. Reading ``headers`` alone therefore found nothing on
-#: every provider failure this service can meet, while a test that built the
-#: exception with ``headers={...}`` agreed with the rule.
+#: ``Retry-After`` arrives. ``headers`` alone is empty on a provider failure,
+#: so the reader also checks ``litellm_response_headers``. A test that builds
+#: the exception with ``headers={...}`` would agree with a rule that reads
+#: ``headers`` alone.
 #:
 #: ``tests/test_provider_contract.py`` drives a 429 from an HTTP transport up to
 #: this function, so the attribute name is held against the installed library
@@ -343,7 +338,7 @@ def _response_headers(exc: BaseException) -> Mapping | None:
     Every shape the producers emit, handled rather than assumed: a plain
     ``dict`` from a proxy-supplied ``headers=``, an ``httpx.Headers`` from
     litellm's own attachment — a ``Mapping`` and not a ``dict``, which an
-    ``isinstance(..., dict)`` test silently refused — ``None`` where the
+    ``isinstance(..., dict)`` test would silently refuse — ``None`` where the
     attribute exists and was never filled, and no attribute at all on an
     exception from outside the provider library.
 
@@ -424,8 +419,7 @@ class FailureKind(StrEnum):
     answer.** :func:`classify` computes ``retryable`` from
     :func:`_is_transient` and the wait from :func:`_retry_after_seconds`, then
     names what it saw. A kind that decided retrying for itself would be the
-    two-readers failure this module was already bitten by — the rule and its
-    test agreeing about a shape the provider does not send.
+    two-readers failure — the rule and its test agreeing about a shape the provider does not send.
 
     The members are #824's own list and nothing beyond it. A truncated
     completion is deliberately **not** one: the provider reported that call a
@@ -568,9 +562,8 @@ class RetryPolicy:
 
     ``attempts`` keeps the meaning it has in ``config/resilience.toml`` — a
     *total* count, not retries-after-the-first — so the number an operator turns
-    down mid-incident still means what the file says. It is now honest as well:
-    with the library's own layer off, ``attempts`` is the request count per node
-    rather than half of a product with it.
+    down mid-incident still means what the file says. With the library's own
+    layer off, ``attempts`` is the request count per node.
     """
 
     attempts: int
@@ -602,13 +595,13 @@ class RetryPolicy:
         :func:`classify` read the rules once.
 
         **The answer says which rule refused**, because :meth:`give_up` needs
-        that and asking again is how it got a different answer. Four conditions
-        overlap: a budget can be empty while a provider also asks for an hour,
-        and a reader that recomputed "was it the budget" from ``attempt``,
-        ``retryable`` and ``tokens`` named the budget for a refusal the header
-        made. It then raised :class:`RetryBudgetExhausted` in place of the
-        provider's own exception, so an operator read "the whole service is
-        failing" off one slow provider.
+        that and a second question can get a different answer. Four conditions
+        overlap: a budget can be empty while a provider also asks for an hour.
+        A reader that recomputed "was it the budget" from ``attempt``,
+        ``retryable`` and ``tokens`` would name the budget for a refusal the
+        header made. It would then raise :class:`RetryBudgetExhausted` in place
+        of the provider's own exception, so an operator would read "the whole
+        service is failing" off one slow provider.
 
         Order matters: the transient check comes first so a non-transient
         failure never spends a token it was never going to benefit from.
@@ -666,9 +659,9 @@ class RetryPolicy:
         naming what it was.
 
         ``refusal`` is :meth:`refuse_retry`'s own answer, passed in rather than
-        recomputed. That is the whole of the fix: the four conditions overlap,
-        and a second derivation from the same three fields named the budget for
-        a refusal a ``Retry-After`` made.
+        recomputed, because the four conditions overlap. A second derivation
+        from the same three fields can name the wrong cause, such as the budget
+        for a refusal a ``Retry-After`` made.
         """
         if refusal is not RetryRefusal.BUDGET_SPENT:
             return failure.cause or RuntimeError(

@@ -106,8 +106,8 @@ def snap_rulings(
 ) -> list[Ruling]:
     """The same fold over the one reference a ruling carries.
 
-    A ruling names no element of its own — that was given up deliberately when
-    the critic stopped re-emitting drafts — except inside a ``needs-info``
+    A ruling names no element of its own — deliberately, because the critic
+    does not re-emit drafts — except inside a ``needs-info``
     verdict's ``related_unknowns``, which points at the unknown that has to be
     answered. Unresolvable there is not fatal on the first look: it routes to
     the bounded ``recritic``. Snapping it means a re-ask is spent on a critic
@@ -291,9 +291,9 @@ def _unresolved_unknown_ref_issues(
     answer with a needs-info on ``notes``, which it did in 14 of the 38 reports
     archived under ``evals/runs/``: a question about a sentence, pointed at a
     field that happened to resolve. The check stops at the attribute's
-    existence. Requiring the named attribute to actually *hold* the ``unknown``
-    sentinel was refused: it encodes a judgement as a mechanical rule and
-    misfires on a stated-but-vague value — "some encryption" in
+    existence. It deliberately does not require the named attribute to *hold*
+    the ``unknown`` sentinel: that would encode a judgement as a mechanical rule
+    and misfire on a stated-but-vague value — "some encryption" in
     ``encryption_at_rest``, where a needs-info is legitimate and the field is
     not literally ``unknown``.
 
@@ -554,7 +554,7 @@ def endpoint_targets(
     :attr:`~analysis_service.system_model.ModelIndex.flow_endpoints` — rather
     than the model, and the eval side's ``endpoint_form`` takes the same map.
     A caller folding many claims builds it once: derived per call, the fold
-    walked every flow in the model for every claim it was asked about.
+    would walk every flow in the model for every claim it was asked about.
     """
     targets: set[str] = set()
     for element_id in element_ids:
@@ -739,7 +739,7 @@ def review_issues(
     Element references are deliberately **not** checked: a ruling carries none.
     They are the join seam's business (:func:`~analysis_service.fan_in.join_drafts`
     drops and marks a reference the model does not contain, and fails closed
-    on a ground it cannot derive), and since the critic no longer re-emits
+    on a ground it cannot derive), and since the critic does not re-emit
     them there is no second place they can break. An issue
     listed here has to be one the re-ask can actually fix, and a draft's bad
     reference never was.
@@ -805,12 +805,11 @@ def merge_retry(
 ) -> tuple[list[Mapping[str, Any]], list[UnreconciledRuling]]:
     """The re-ask's rulings for what the problems named, the first pass's for the rest.
 
-    The re-ask prompt asks for exactly this and nothing enforced it: the first
-    review and the re-ask wrote one state key, and the check that ran on the
-    re-ask compared it with the drafts and never with the first pass. So a
-    re-ask that changed a confirmed ruling to rejected while adding the one it
-    dropped was accepted whole, and the change reached the report as if the
-    review had reasoned it out.
+    The re-ask prompt asks for exactly this, and this function enforces it: the
+    re-ask's ruling applies only to IDs a problem named. Without it, a re-ask
+    that changed a confirmed ruling to rejected while it added the one it
+    dropped would be accepted whole, and the change would reach the report as
+    if the review had reasoned it out.
 
     Over payloads the caller has already put in the ruling model's own
     spelling, because what is merged is what ``reviewed`` holds and what
@@ -826,7 +825,7 @@ def merge_retry(
     An ID no lane agent drafted is not resolved here. The first pass's copy
     is left out, because removing it was the re-ask's whole instruction; a
     copy the re-ask returned anyway is passed through, so the check that
-    follows names it and the job fails as it always did. A re-ask that
+    follows names it and the job fails. A re-ask that
     invents is the service's defect, and a mark is not the place for one.
     """
     named = set(repairable)
@@ -988,7 +987,7 @@ def _ruling_view(
     on a field whose own validator forbids it carrying anything.
 
     THE HAZARD THIS BUYS, stated rather than left to be discovered: a field
-    added to a package's record with a default now disappears from that
+    added to a package's record with a default disappears from that
     framework's critic's view whenever it holds that default, silently and with
     nothing downstream able to see it. Every field a critic rules on is required
     today and so cannot be dropped;
@@ -1099,10 +1098,9 @@ def critic_view(
     what the agent wrote beside the span the service put in its place.
     ``unverified`` is the other half of the same seam: the quote grounds the
     service looked for and did not find, which still render because a draft
-    must keep at least one ground. Both passes get both, and **that is a
-    change from the first shipping of this view** — the re-ask was handed
-    neither, so a critic told once that a quote was invented read the same
-    quote clean on the second look.
+    must keep at least one ground. **Both passes get both**, so a critic told
+    once that a quote was invented does not read the same quote clean on the
+    second look.
 
     ``assertions`` is the job's assertion catalog, read for the rows this
     draft's assertion grounds point at. A ground carries the row's computed

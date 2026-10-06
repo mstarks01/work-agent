@@ -12,7 +12,7 @@ Four things about the surface:
   ``litellm.utils.get_optional_params``'s signature, so it is the one param the
   build-time gate cannot cover: LiteLLM re-injects it raw into the request body
   after the check. A wrong value would then be silent, while the fingerprint
-  went on attesting to it.
+  would go on attesting to it.
 * ``thinking`` is a uniform ``low``/``medium``/``high`` enum rather than a
   per-tier integer budget. ``reasoning_effort`` reaches every vendor — Anthropic
   through adaptive ``thinking`` plus ``output_config.effort``, identically
@@ -41,9 +41,7 @@ Four things about the surface:
   Every LLM node carries a schema the adapter can convert, so this field is the
   only thing that decides whether one is sent.
 
-  Turning it off is not currently a working configuration. An earlier version of
-  this note claimed it gives up constrained generation only, and that was wrong.
-  Measured against Claude Sonnet 4.6 with the extraction schema suppressed, the
+  Turning it off is not currently a working configuration. Measured against Claude Sonnet 4.6 with the extraction schema suppressed, the
   model fenced its JSON in a ```` ```json ```` block, which ADK hands to
   validation unstripped, so it fails before anything reads it. The model also
   omitted required fields, including every ``trust_boundaries[*].kind``. The

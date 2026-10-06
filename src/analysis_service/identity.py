@@ -18,11 +18,11 @@ build is what the provider said answered, read off its own event stream, and
 nothing here verifies it: a compromised translator can return any string. With
 the served build alone in the payload, such a translator picks a build the
 manifest already blesses and certifies whatever it likes — the deployment asked
-for a cheap model, the translator claimed an approved one, and the fingerprint
-matched. Binding the requested route as well makes the manifest bless a pair,
+for a cheap model, the translator claims an approved one, and the fingerprint
+matches. Binding the requested route as well makes the manifest bless a pair,
 and the requested half comes from the deployment's own configuration, where the
-translator has no say. The provider's claim can no longer select an approved
-entry by itself. It still cannot be verified by itself either, which is why
+translator has no say. The provider's claim cannot select an approved entry by
+itself. It still cannot be verified by itself either, which is why
 ``served_trust`` is in the payload rather than in a comment.
 
 **No endpoint or region is in the payload, on any vendor.** That is a ruling
@@ -30,14 +30,12 @@ rather than an omission: a region names where a request went, not what decided
 the answer, and two regions serving one set of weights would give one run two
 fingerprints for no difference a reader could act on.
 
-Widening the identity re-baselines every blessed fingerprint. A prompt edit, a
-``litellm`` bump or a service release now moves every hash, so a deployment's
-manifest goes stale and its runs report uncertified until a sanctioned sweep
-blesses the new ones. That is the cost, and it is the point: a run on edited
-prompts is not the run that was sanctioned, and reporting it as certified was
-the defect. It is also why the manifest is versioned. A file blessed against the
-old two-part hash fails closed, rather than certifying against a payload it
-never saw.
+A prompt edit, a ``litellm`` bump or a service release moves every hash, so a
+deployment's manifest goes stale and its runs report uncertified until a
+sanctioned sweep blesses the new ones. That is the cost, and it is the point: a
+run on edited prompts is not the run that was sanctioned, so it does not report
+as certified. It is also why the manifest is versioned. A manifest of an older
+version fails closed, rather than certifying against a payload it never saw.
 """
 
 from __future__ import annotations
@@ -66,10 +64,10 @@ IDENTITY_VERSION: Final = 2
 #: payload spells the distribution names it read rather than a shape that has to
 #: be kept in step with them.
 #:
-#: ``google-genai`` sits there too, and was missing: it is what ADK hands a
-#: request to, four shipped modules import it, and ``google-adk==2.5.0`` permits
-#: any ``2.x`` -- so it moved while an identity that did not name it hashed the
-#: same before and after, which is the exact drift this table exists to catch.
+#: ``google-genai`` is listed because ADK hands requests to it, four shipped
+#: modules import it, and ``google-adk==2.5.0`` permits any ``2.x``. An identity
+#: that did not name it would hash the same before and after it moved, which is
+#: the exact drift this table exists to catch.
 BUILD_DISTRIBUTIONS: Final = (
     "analysis-service",
     "google-adk",

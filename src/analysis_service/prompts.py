@@ -110,7 +110,7 @@ EXTRACTION_DELTAS: dict[str, tuple[str, ...]] = {
 
 # The token caps over these bodies are drift alarms rather than a budget, and
 # they live in one table with every other one: ``analysis_service.token_caps``.
-# ADR 0016 says why they stopped being an argued number per file.
+# ADR 0016 says why they are one table.
 
 
 def compose_analyze_prompt(
@@ -331,8 +331,8 @@ Stage = Literal["bundle", "catalog", "batch"]
 
 #: How a ``reference`` predicate's value is spelled, per stage that renders the
 #: table. **A table rather than one sentence**, because the answer differs by
-#: stage and the single sentence was wrong at every one of them: it said "the
-#: name of a component", and no resolver takes a display name. A bundle stage
+#: stage. No resolver takes a display name, so each stage states its spelling.
+#: A bundle stage
 #: writes the handle it invented in the same emission
 #: (:func:`~analysis_service.factbundle._referent` looks the value up among the
 #: bundle's own handles); a catalog stage writes the subject's identity, which
