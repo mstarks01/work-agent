@@ -332,7 +332,7 @@ def test_the_advice_is_scored_apart_from_the_fate(fixtures, model):
 
 
 def test_a_surviving_draft_with_no_reading_is_counted_unread(fixtures, model):
-    """The state that had no observable, now named rather than read as approval."""
+    """A surviving draft with no reading is counted unread, not read as approval."""
     payload = {
         "claims": [
             rule(
@@ -429,7 +429,7 @@ def test_an_anchor_is_a_phrase_and_never_a_bag_of_words():
 
 
 def test_a_word_inside_a_longer_word_is_not_an_anchor():
-    """The property the word-boundary form had, kept."""
+    """A word inside a longer word does not engage, as with a word boundary."""
     assert not R._engages("the injector was replaced", ("inject",))
     assert R._engages("an attacker injects a row", ("inject",))
 
@@ -520,14 +520,14 @@ def test_a_killed_discriminator_is_not_reported_as_a_deficient_set(fixtures, mod
 
 
 def test_a_deficient_set_is_not_reported_as_a_killed_discriminator(fixtures, model):
-    """The other direction of the same warning, and the one that was wrong.
+    """The other direction of the same warning.
 
-    Reading the expectation on every row scored ``set_carries_both_answers``
-    true on any set holding one negative fixture, because a negative row
-    carries unsound advice by construction. So the set as it stood before the
-    ninth fixture — no row surviving with advice the reader ruled unsound —
-    reported "the critic rejected the discriminator" at a critic that had
-    agreed with every signed expectation.
+    A read of the expectation on every row would score
+    ``set_carries_both_answers`` true on any set that holds one negative
+    fixture, because a negative row carries unsound advice by construction.
+    A set with no row that survives with advice the reader ruled unsound would
+    then report "the critic rejected the discriminator" at a critic that agrees
+    with every signed expectation.
 
     The harness is that set and that critic.
     """

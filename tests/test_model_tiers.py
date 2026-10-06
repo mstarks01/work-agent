@@ -125,7 +125,7 @@ class TestNodeInventory:
         )
 
     def test_the_tiers_are_named_on_a_capability_axis(self):
-        # Not flash/pro: those were one vendor's product names and would be an
+        # Not flash/pro: those are one vendor's product names and would be an
         # active lie under a Claude or GPT model string. `review` names a place
         # criticism can be bound to rather than a capability, which is the
         # exception the third tier is: it exists so a critic can be moved off
@@ -382,8 +382,7 @@ class TestPinValidation:
                 validate_model_string(value, vendor, source="t")
 
     def test_an_older_generation_in_the_pinned_form_is_accepted(self):
-        # Well-formed and older than the generation this service once floored
-        # at. The rule reads the identifier's shape, never its version, so
+        # Well-formed and of an older generation. The rule reads the identifier's shape, never its version, so
         # which model is worth running stays the deployment's call.
         assert (
             validate_model_string("claude-haiku-4-5", "anthropic", source="t")

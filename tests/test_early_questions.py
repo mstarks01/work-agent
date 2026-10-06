@@ -183,7 +183,7 @@ class TestTheOrder:
 
 
 def test_the_framework_order_changes_no_question():
-    """The #1289 reproduction: the reasons once followed the selection order."""
+    """The reasons do not follow the framework selection order (#1289)."""
     model = valid_model()
     forward = early_questions(model, {"stride": {}, "asvs": {"level": 2}}, None)
     backward = early_questions(model, {"asvs": {"level": 2}, "stride": {}}, None)

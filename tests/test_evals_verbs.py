@@ -5,8 +5,8 @@ The vocabulary itself ships in :mod:`analysis_service.actions` and is checked by
 covering the set. What is left here is what only a measurement has: which verbs
 count as **one** action, and the three corpus pairs the rule cannot tell apart.
 
-A table nobody compares to its registry fails as quietly as the ``if`` it
-replaced, which is why :data:`~evals.harness.verbs.EQUIVALENT` is checked
+A table nobody compares to its registry fails as quietly as an ``if``,
+which is why :data:`~evals.harness.verbs.EQUIVALENT` is checked
 against the shipped set rather than trusted.
 
 Deterministic and free of provider calls, so it gates on every PR.
@@ -34,10 +34,9 @@ def test_equivalence_groups_name_real_verbs():
 def test_the_shipped_equivalence_is_free_on_both_error_axes():
     """The table held one group as of 2026-09-10, and it was priced first.
 
-    The table was empty from the first cut because every apparent synonym
-    resolved to one verb once assigned from the action and its object class.
-    The first Baseline showed a pair the labels cannot separate: forge, inject
-    and plant. A group earns its place by costing nothing on either axis: no
+    Most apparent synonyms resolve to one verb once assigned from the action
+    and its object class. The first Baseline shows a set the labels cannot
+    separate: forge, inject and plant. A group earns its place by costing nothing on either axis: no
     labelled non-match it merges, no reference pair the corpus records as two
     findings it calls one. Priced here against an empty table, through the
     pricing module's own readers, so a later group is held to the same bar.

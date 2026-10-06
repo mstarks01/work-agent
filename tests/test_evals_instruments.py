@@ -8,13 +8,11 @@ wired into four places. The property that makes the table worth having is
 package's instruments, skips the ones that read a record it never produced, and
 does not fail inside them.
 
-Before the table, it half-held. A STRIDE-only sweep worked, because every
-instrument that could fail was STRIDE's. An ASVS-only sweep raised
-``EvalRunError: the report carries no stride analysis block`` from
-``_score_runs``, which reaches for STRIDE's claims on every case in the sweep.
-No corpus case declares ASVS alone, so nothing caught it — the same shape as
-every gap in ``docs/agents/framework-parity.md``: correct when written, wrong
-the moment a second package arrived, and silent either way.
+Each instrument declares the frameworks it reads. Without that declaration,
+an ASVS-only sweep would raise ``EvalRunError: the report carries no stride
+analysis block`` from ``_score_runs``, which reaches for STRIDE's claims on
+every case in the sweep. No corpus case declares ASVS alone, so only this
+module drives that sweep. See ``docs/agents/framework-parity.md``.
 
 ## Why these run offline
 
@@ -199,8 +197,8 @@ class TestScoringSkipsAPackageItDoesNotRead:
     def test_an_asvs_only_report_is_skipped_rather_than_raised_on(self):
         """The defect the table's ``frameworks`` declaration closes.
 
-        This raised ``EvalRunError`` before: the STRIDE scorer asked every case
-        in the sweep for a block only STRIDE produces.
+        Without it, the STRIDE scorer would ask every case in the sweep for a
+        block only STRIDE produces, and raise ``EvalRunError``.
         """
         from evals.harness.bundle import optional_block
         from evals.harness.run import _score_runs
@@ -243,9 +241,8 @@ class TestTheDeclaredKeysAreTheWrittenKeys:
     """``Instrument.keys`` against what ``Instrument.artifact`` actually writes.
 
     The declaration is what :mod:`evals.harness.artifact` builds ``DECLARED_KEYS``
-    from, and a declaration that drifted from its writer would let the loader
-    demand a key nothing produces — or, worse, stay quiet about one that went
-    missing.
+    from, and a declaration that differs from its writer would let the loader
+    demand a key nothing produces, or stay quiet about a missing one.
     """
 
     @pytest.mark.parametrize("name", sorted(INSTRUMENTS))

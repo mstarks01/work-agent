@@ -1,10 +1,9 @@
-"""ASVS's scorer, and the sweep wiring that finally reaches it.
+"""ASVS's scorer, and the sweep wiring that reaches it (#200).
 
-Before #200 the corpus held 63 ASVS reference records and nothing read them:
-``EVAL_FRAMEWORKS`` built every sweep's graph for STRIDE alone, so ASVS's lanes
-never ran and its block never existed. These tests hold the two halves of the
-fix — the confusion matrix itself, and the wiring that decides which frameworks
-a case's graph is built for.
+The sweep must build each case's graph for every framework the case names, or
+the ASVS reference records have no reader. These tests hold the two halves: the
+confusion matrix itself, and the wiring that decides which frameworks a case's
+graph is built for.
 
 Everything here is free of provider calls, because the scorer is a set
 comparison: ASVS matches by requirement ID, so #167 removed claim equivalence from this
@@ -473,10 +472,10 @@ def test_grounds_reads_a_lane_without_naming_any_framework_s_field():
 def test_coverage_reports_every_lane_of_every_framework_that_ran():
     """The row count a two-framework sweep owes, against a one-framework sweep.
 
-    Before #213 the sweep collected ``stride_block(report).coverage`` and ASVS's
-    17 lanes were computed, carried on the report and dropped. The framework list
-    is what was *built*, so a package whose every lane went silent still gets its
-    rows — which is the finding the table exists to show.
+    The sweep collects the coverage of every framework, so ASVS's 17 lanes
+    reach the table (#213). The framework list is what was *built*, so a package
+    whose every lane is silent still gets its rows, which is the finding the
+    table exists to show.
     """
     from evals.harness.coverage import aggregate_coverage
 
@@ -532,7 +531,7 @@ def test_over_applied_requirements_are_surfaced_for_the_next_reading(case):
 
 
 def test_stability_reads_the_applicability_block_too():
-    """ASVS run-to-run spread was unmeasured; #200's body said otherwise.
+    """The stability report measures ASVS run-to-run spread too (#200).
 
     ASVS matches by requirement ID with no model call, so a sweep of
     ASVS-only cases still carries a comparable half where STRIDE's is absent.
@@ -816,7 +815,7 @@ class TestObservingOneRequirement:
         assert observe("V1.2.4", *_surfaces(block)).kind == "needs-info"
 
     def test_a_rejection_is_read_from_the_array_it_actually_lives_in(self):
-        """The bug #472 fixed, pinned on this scorer too."""
+        """A rejection is read from ``rejected_claims`` on this scorer too (#472)."""
         block = DispositionBlock(rejected_claims=[ruling("V1.2.4", "rejected")])
 
         assert observe("V1.2.4", *_surfaces(block)).kind == "rejected"
@@ -842,8 +841,8 @@ class TestObservingOneRequirement:
     def test_an_undecidable_scope_entry_reads_as_silence(self):
         """The framework never ran, so nothing answered the requirement (#659).
 
-        It was ``not-applicable`` before, which scored a correct exclusion
-        for a run that never decided anything.
+        A ``not-applicable`` reading would score a correct exclusion for a
+        run that decided nothing.
         """
         entry = Scoped("V1.2.4", state="undecidable", reason="the input never says")
         block = DispositionBlock(scope=[entry])
@@ -1026,10 +1025,10 @@ def test_the_pooled_rates_carry_their_own_denominators(case):
 def test_evidence_kind_accuracy_counts_what_was_right_and_not_what_was_named(case):
     """A wrong answer that is none of the three named failures is still wrong.
 
-    The rate counted the reachable records left after subtracting the three
-    failures it names. A run that *rejected* a requirement needing source code
-    falls into none of them, so it landed in the numerator and the routing rate
-    read 100% on a record the accuracy figure beside it scored 0%.
+    A rate that counts the reachable records left after it subtracts the three
+    named failures is wrong here. A run that *rejects* a requirement that needs
+    source code falls into none of them, so that rate would read 100% on a
+    record the accuracy figure beside it scores 0%.
     """
     needs_code = _requirement_expecting(case, "needs-code")
     scores = [

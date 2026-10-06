@@ -1,8 +1,7 @@
 """Re-scoring a finished sweep, so a vote reaches a number without a provider.
 
-A vote is cast *after* the sweep that produced the finding. Before ``score``
-existed the answer reached the numbers only on the next sweep, and a sweep costs
-a provider — so the cheapest half of the loop waited on the most expensive one.
+A vote is cast *after* the sweep that produced the finding. ``score`` brings
+the answer into the numbers without the next sweep, which costs a provider.
 
 Driven offline against the scripted sweep in
 :mod:`tests.test_evals_run_grounds`, which produces real reports through the

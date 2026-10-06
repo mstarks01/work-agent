@@ -513,13 +513,13 @@ class TestThePrefixFallbackStopsAtOneSegment:
     def test_an_aggregator_route_is_unpriced_rather_than_priced_elsewhere(self):
         """Two segments in front of the name, and the second is a vendor.
 
-        Taking the text after the last slash stripped both, so
-        ``openrouter/deepseek/deepseek-v4-pro`` was priced off DeepSeek's own
-        entry at 4.35e-07 per input token against the 9.48e-07 OpenRouter
-        charges — an under-statement of 2.2x reaching a consent screen with the
+        Taking the text after the last slash strips both, so
+        ``openrouter/deepseek/deepseek-v4-pro`` would be priced off DeepSeek's
+        own entry at 4.35e-07 per input token against the 9.48e-07 OpenRouter
+        charges. That is an under-statement of 2.2x on a consent screen with the
         OpenRouter route printed beside it.
 
-        Unpriced is the honest answer, and the estimate path already states it.
+        Unpriced is the honest answer, and the estimate path states it.
         """
         route = "openrouter/deepseek/deepseek-v4-pro"
         assert prices.unit_prices(route) is None
@@ -887,10 +887,9 @@ class TestAnArtifactNameCarriesNoDirectory:
 
 
 class TestAFrameworkNameIsASlug:
-    """`frameworks` was declared as a plain list and validated element by
-    element nowhere, so the value carried into a Baseline's identity -- and from
-    there into the published table -- was whatever a contributor wrote, with no
-    length bound at all while every model name beside it had one."""
+    """Each `frameworks` element is a bounded slug, like every model name
+    beside it. The value goes into a Baseline's identity and from there into the
+    published table, so a plain list would carry whatever a contributor wrote."""
 
     @pytest.mark.parametrize(
         "name",
@@ -943,10 +942,9 @@ class TestOneReaderForRecordedDollars:
 
 def test_the_ancestor_check_measures_against_the_remote_main_where_one_exists(tmp_path):
     """A pull-request checkout in CI carries origin/main and no local main, so
-    a check that asked for main read every merged Baseline as a fork-only
-    commit. The contribution workflow failed on every pull request since the
-    first Baseline landed. A clone with no remote still measures against its
-    own main."""
+    a check that asks for main would read every merged Baseline as a fork-only
+    commit and fail the contribution workflow. A clone with no remote measures
+    against its own main."""
     import subprocess
 
     def git(cwd, *args):

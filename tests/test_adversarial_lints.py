@@ -112,12 +112,12 @@ def report_with(names: list[str]) -> Report:
 
 
 class TestTheCitationTripwire:
-    """The fifth outcome the module documents, and the one nothing ran.
+    """The fifth outcome the module documents.
 
     ``citation_failures`` asserts what the grounding gate already enforces, so
     it is empty on every passing run by construction. That is exactly why it
-    has to be wired in: an assertion nobody calls asserts nothing, and this one
-    carried a bug for its whole life because no test ever reached it.
+    has to be driven: an assertion nobody calls asserts nothing, and a defect in
+    it stays hidden until a test reaches it.
     """
 
     def test_an_unlabelled_ground_cites_nothing(self):
@@ -125,7 +125,8 @@ class TestTheCitationTripwire:
         derived ground kinds leave it there, so most real grounds carry one.
 
         Read as a citation, every one of them names a source the report does
-        not carry -- which flagged 1,730 grounds in the corpus as miscitations.
+        not carry, which would flag 1,730 grounds in the corpus as
+        miscitations.
         """
         report = report_with(["Ticket API"])
 

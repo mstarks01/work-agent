@@ -253,8 +253,8 @@ def _entry(pair, **overrides):
 def test_an_unclear_label_loads(tmp_path, pairs):
     """A reader who cannot decide a pair records that, and the loader takes it.
 
-    Before this the loader failed closed on any label but the two, which forced
-    an undecidable pair into a binary the evidence does not support.
+    A loader that fails closed on any label but the two would force an
+    undecidable pair into a binary the evidence does not support.
     """
     path = tmp_path / "pairs.json"
     path.write_text(json.dumps([_entry(pairs[0], label="unclear")]))
@@ -359,8 +359,8 @@ def test_recorded_annotation_counts_are_pinned(pairs):
 def test_the_merge_direction_is_measured_over_distinct_reference_claims(pairs):
     """The direction the labels cannot answer, and why it reads the corpus.
 
-    Both are real measurements since #511 assigned the ``no-match`` half its
-    elements and verbs. They read different populations and neither replaces
+    Both are real measurements, because #511 assigns the ``no-match`` half
+    its elements and verbs. They read different populations and neither replaces
     the other: the candidate pairs resemble what a live run emits, and every
     within-lane pair of reference claims is a pair the corpus already calls two
     findings, so every merge there is an error by construction.

@@ -222,12 +222,10 @@ class TestOidcSettings:
 class TestSigningAlgorithms:
     """Configurable, from a vetted set — never widened by configuration.
 
-    RS256-only was a historical assumption rather than a decision
-    ([#116](https://github.com/mstarks01/work-agent/issues/116)): the field
-    existed but nothing read it from the environment, so a standards-compliant
-    IdP signing ES256 could not be pointed at this service at all. It is now
-    deploy-time configuration, and the allowlist is what keeps "configurable"
-    from meaning "whatever the operator or the IdP says".
+    The algorithm set is deploy-time configuration, so a standards-compliant
+    IdP that signs ES256 can use this service
+    ([#116](https://github.com/mstarks01/work-agent/issues/116)). The allowlist
+    keeps "configurable" from meaning "whatever the operator or the IdP says".
     """
 
     def _env(self, **extra: str) -> dict[str, str]:
@@ -494,9 +492,9 @@ class TestAKeyOfTheWrongFamily:
 class TestAKeyIsUsedForWhatTheIssuerSaysItIsFor:
     """A JWKS entry's ``use`` is the issuer declaring what a key is for.
 
-    The matcher read only ``kid``, so an encryption key published in the same
-    set verified signatures — using a key against its stated purpose. PyJWT's
-    own client filters this way; this one did not.
+    A matcher that reads only ``kid`` lets an encryption key in the same set
+    verify signatures, which uses a key against its stated purpose. This
+    matcher filters on ``use``, as PyJWT's own client does.
     """
 
     def _client(self, *keys):

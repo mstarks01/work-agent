@@ -250,7 +250,7 @@ class TestEvidenceCatalog:
         """``GLOSSARY.md`` defines Unknown to include a voiced hedge, and
         ``control_state`` reads the leading token — so the sentinel decorated
         with the speaker's own doubt is the same fact as the bare one, and the
-        catalog no longer misses it for the decoration."""
+        catalog does not miss it for the decoration."""
         model = valid_model()
         model.data_flows[0].authentication = "unknown; possibly a shared group account"
 
@@ -408,12 +408,12 @@ class TestEvidenceCatalog:
         assert assertion_id(unsettled) not in catalog
 
     def test_an_open_question_is_offered_as_one(self):
-        """The gap this closes: a fact the sources were asked and left open.
+        """A fact the sources were asked and left open is offered.
 
-        An element attribute nobody stated is already offered, so an agent can
-        raise a conditional claim on it. A predicate with no graph field had no
-        such offer, and its subject may be a principal, so the attribute walk
-        above could never reach it.
+        An element attribute nobody stated is offered, so an agent can raise a
+        conditional claim on it. A predicate with no graph field gets the same
+        offer here, because its subject may be a principal and the attribute
+        walk above cannot reach it.
         """
         open_row = row(value=UNKNOWN, reason="silent", explanation="")
         catalog = evidence_catalog(valid_model(), assertions(open_row))
@@ -952,12 +952,11 @@ class TestResolveProposals:
 
 
 class TestTheMisShapeIsUnreachable:
-    """The traceback that motivated the cutover, asserted inexpressible.
+    """A mis-shaped ground cannot be expressed.
 
-    A ``derived-fact`` carrying an ``attribute`` and no ``flow_id`` killed a
-    node, and with it all six lanes. The point is not that the agent is now
-    told not to do that — it is that the field it did it in no longer exists on
-    anything an agent emits.
+    A ``derived-fact`` that carries an ``attribute`` and no ``flow_id`` would
+    fail a node, and with it all six lanes. No instruction prevents it: the
+    field does not exist on anything an agent emits.
     """
 
     def test_an_agent_cannot_emit_a_ground_at_all(self):
@@ -1005,7 +1004,7 @@ class TestTheMisShapeIsUnreachable:
         assert not draft.grounds[0].attribute
 
     def test_an_agent_cannot_name_a_lane_or_a_threat_id_at_all(self):
-        """The category-letter mismatch, gone the way the mis-shape went.
+        """The category-letter mismatch cannot be expressed either.
 
         An agent that restated its own category and composed an ID whose
         letter had to agree with it would hold two spellings of a constant the

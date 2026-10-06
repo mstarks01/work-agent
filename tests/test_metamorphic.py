@@ -1,8 +1,8 @@
 """Metamorphic checks over the mechanical seams (#675 D26).
 
 Every hand-picked case in this suite is one input the author thought of. The
-defects the audits kept finding were shapes nobody listed — U+2028 in a value,
-an element order that moved a number, a rename that split a key. So these
+shapes nobody lists are the risk: U+2028 in a value, an element order that
+moves a number, a rename that splits a key. So these
 tests generate small valid models from a seed, apply one transformation whose
 effect on the answer is known, and check the answer moved exactly that way:
 not at all for a reorder, one-to-one for a rename, refusal for a duplicate.
@@ -255,7 +255,7 @@ def test_a_report_round_trips_through_json(framework):
 
 @pytest.mark.parametrize("terminator", _HAZARDS)
 def test_every_line_terminator_survives_the_fence(terminator):
-    """The shape ``unfence`` once missed: a payload holding U+2028 round-tripped corrupted."""
+    """A payload that holds U+2028 or another line terminator round-trips intact."""
     value = {
         "notes": f"before{terminator}after",
         "quote": f"tick{terminator}```{terminator}",

@@ -221,10 +221,10 @@ def test_a_killed_draft_at_the_place_with_the_reference_verb_is_the_critics(
 
 def test_an_equivalent_verb_is_the_reference_action(case, flows, monkeypatch):
     """The identity rule reads verbs through the equivalence table, so this
-    instrument does too. The table is empty today; with a string comparison
-    the two agreed until the first entry landed, and then a killed draft under
-    an equivalent verb fell through to the lead, and a surviving one at the
-    place read as a verb loss the scorer had already forgiven."""
+    instrument does too. With a string comparison, the first entry in the
+    table would send a killed draft under an equivalent verb through to the
+    lead, and a surviving one at the place would read as a verb loss the scorer
+    forgives."""
     from evals.harness import verbs
 
     reference = case.stride_claims()[0]

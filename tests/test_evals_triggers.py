@@ -60,8 +60,8 @@ CORPUS = Path(__file__).resolve().parents[1] / "evals" / "corpus"
 #: deterministic: it runs the rules over blessed models with no provider call,
 #: so an unchanged tree gives an identical number every time.
 #: The keys are ``overlap``, because that is what the number is: a rule fired
-#: in the claim's lane on an element the claim names. It was ``recall``, which
-#: read as detection recall and is not what any of the readings above measured.
+#: in the claim's lane on an element the claim names. It is not detection
+#: recall, and no reading above measures detection recall.
 TRIGGER_FLOORS: dict[str, dict[str, float]] = {
     "stride": {"must_find_overlap": 0.70, "overlap": 0.65},
     "asvs": {"must_find_overlap": 0.40, "overlap": 0.34},
@@ -77,16 +77,17 @@ TRIGGER_FLOORS: dict[str, dict[str, float]] = {
 #: empty exemption list, so every one of these rules does fire on some blessed
 #: model. They fire somewhere and not on the elements the reference records
 #: name, which is the sharper finding and the one only this module can make.
-#: **Four lanes left this list** when the six chapters that had no rule at all
-#: got one: ``authorization``, ``configuration``, ``secure-communication`` and
-#: ``security-logging-and-error-handling`` now draw leads on their own reference
-#: records. ``secure-coding-and-architecture`` and ``webrtc`` gained a rule and
-#: stayed, which is the distinction this module exists to make — the first fires
-#: on models but not on the elements its records name, and the second fires
+#: ``authorization``, ``configuration``, ``secure-communication`` and
+#: ``security-logging-and-error-handling`` each have a rule that draws leads on
+#: their own reference records, so they are not listed.
+#: ``secure-coding-and-architecture`` and ``webrtc`` have a rule and are listed,
+#: which is the distinction this module exists to make: the first fires on
+#: models but not on the elements its records name, and the second fires
 #: nowhere at all and says so in ``UNEXERCISED``. ``validation-and-business-logic``
-#: left when #430 gave it a rule that reads a crossing from an external entity,
-#: which is the element its reference records name. ``self-contained-tokens``
-#: left when case 14 gave its records a token-verifying process to name.
+#: is not listed, because its rule (#430) reads a crossing from an external
+#: entity, which is the element its reference records name.
+#: ``self-contained-tokens`` is not listed, because case 14 gives its records a
+#: token-verifying process to name.
 UNTRIGGERED_LANES: dict[str, str] = dict.fromkeys(
     (
         "cryptography",
@@ -100,11 +101,9 @@ UNTRIGGERED_LANES: dict[str, str] = dict.fromkeys(
 #: Cases where a package's whole reference set draws no structural lead. Work
 #: nobody has done, on the same terms.
 #:
-#: **Empty.** ``04-ml-inference-service`` was the one entry: none of its ten
-#: ASVS records drew a lead, because the case is a model-inference service whose
-#: requirements land in chapters that had no rule at all. Giving those chapters
-#: rules is what emptied this list, which is the clearest evidence the six were
-#: worth writing — a whole case moved from drawing nothing to drawing leads.
+#: **Empty.** Every case's reference set draws a lead. The ten ASVS records of
+#: ``04-ml-inference-service`` land in chapters that each have a rule, so they
+#: draw leads too.
 UNLED_CASES: dict[tuple[str, str], str] = {}
 
 

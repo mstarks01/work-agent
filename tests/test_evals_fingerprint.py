@@ -149,9 +149,9 @@ def test_the_table_and_the_hash_agree_about_what_a_version_reads(version):
 def test_version_6_keys_two_equivalent_verbs_alike_and_version_4_does_not():
     """The matcher and the vote key read "one action" through one table.
 
-    Version 4 hashed the verb as written, so the first EQUIVALENT group would
-    have let the scorer match an `inject` draft to a `forge` reference while a
-    vote on the `forge` claim missed it. Version 6 reads the canonical verb.
+    Version 4 hashes the verb as written, so the first EQUIVALENT group would
+    let the scorer match an `inject` draft to a `forge` reference while a vote on
+    the `forge` claim misses it. Version 6 reads the canonical verb.
     """
     from evals.harness.verbs import EQUIVALENT
 
@@ -384,12 +384,12 @@ def test_malformed_components_are_refused_by_name():
 def test_no_entry_point_defaults_the_version_a_package_is_keyed_under():
     """The rule that keys a package is a table, so nothing may stand in for it.
 
-    `VERSION_FOR` was already a table, already complete, and already checked
-    against `PACKAGES` -- and every ASVS vote still failed, because `cast` took
-    its version from a constant instead of asking the table. A complete table a
-    caller can bypass is the same defect as the `if` it replaced, one level
-    down, and a default is how a caller bypasses one silently: the call site
-    that forgets looks exactly like the call site that meant it.
+    `VERSION_FOR` is a complete table, checked against `PACKAGES`. A caller
+    that takes its version from a constant instead of the table still fails
+    every ASVS vote. A complete table that a caller can bypass is the same
+    defect as an `if`, one level down, and a default is how a caller bypasses
+    one silently: the call site that forgets looks exactly like the call site
+    that meant it.
 
     So a version parameter has no default anywhere. A caller that omits it fails
     at the call, which is where somebody can see it.
@@ -427,13 +427,13 @@ class TestReadingAVersionBackOffAValue:
 
     @pytest.mark.parametrize("head", ISDIGIT_TRAPS)
     def test_a_shape_isdigit_gets_wrong_is_not_a_fingerprint(self, head):
-        """``str.isdigit`` was the guard and it is wrong twice over.
+        """``str.isdigit`` is the wrong guard, in two ways.
 
         It passes ``"²"``, which ``int`` refuses with a ``ValueError``, and a
-        string past 4300 digits, which ``int`` also refuses — so a preflight
-        that meant to name a malformed value raised a traceback instead. It
-        also passes a fullwidth digit that ``int`` *accepts*, which gave one
-        version two spellings.
+        string past 4300 digits, which ``int`` also refuses, so a preflight
+        that means to name a malformed value would raise a traceback instead.
+        It also passes a fullwidth digit that ``int`` *accepts*, which would
+        give one version two spellings.
         """
         assert head.isdigit(), "this case only means something while isdigit passes it"
         with pytest.raises(FingerprintError, match="is not a fingerprint"):

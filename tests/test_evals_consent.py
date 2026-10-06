@@ -66,7 +66,7 @@ def artifact_document(usage, seed=1, cases=("01-a-case",)):
 
     ``usage`` is ``{node: (prompt, cached, completion)}``. The borrowed
     estimate prices exactly these counts, so they are the whole point of the
-    fixture — the recorded actual is no longer read for a guess.
+    fixture. The recorded actual is not read for a guess.
     """
     tiers = {tier: TierSampling(temperature=0.2, seed=7) for tier in ROUTES}
     node_runs = {
@@ -216,9 +216,9 @@ class TestTheEstimate:
         assert all(amount == pytest.approx(amounts[0]) for amount in amounts)
 
     def test_a_run_naming_fewer_cases_is_priced_per_case(self, tmp_path, priced):
-        """#751: a one-case run was quoted the lender's thirteen-case figure and
-        refused a consent four times its spend. The lender's counts are a whole
-        sweep's, so the named count takes the lender's mean per case."""
+        """A one-case run is priced per case, not at the lender's thirteen-case
+        figure (#751). The lender's counts are a whole sweep's, so the named
+        count takes the lender's mean per case."""
         thirteen = tuple(f"{index:02d}-case" for index in range(1, 14))
         merged(
             tmp_path,
@@ -277,10 +277,10 @@ class TestTheEstimate:
         turn must therefore move the estimate more for the strong one, because
         that is where the tokens are.
 
-        The ratio this replaced summed one rate per model and divided, so it
-        answered the opposite way round: it moved by +5.35 for the base route
-        and +0.05 for the strong. The two implementations disagree on the
-        sign here, which is what makes this a test rather than a restatement.
+        A ratio that sums one rate per model and divides answers the
+        opposite way round: it moves by +5.35 for the base route and +0.05 for
+        the strong. The two methods disagree on the sign here, which makes this
+        a test rather than a restatement.
         """
         usage = {"extract": (0, 0, 100), "critic": (0, 0, 100_000)}
         merged(
@@ -997,8 +997,7 @@ class TestABorrowedArtifactStaysInsideItsBaseline:
 
     def test_an_absolute_artifact_name_is_refused(self, tmp_path):
         """`Path("/baselines/x") / "/etc/passwd"` is `/etc/passwd`: an absolute
-        right-hand side replaces the left rather than extending it. The same
-        shape was found in `sitting.moved` and `markdown_loader` this round."""
+        right-hand side replaces the left rather than extending it."""
         directory = tmp_path / "baseline"
         directory.mkdir()
 

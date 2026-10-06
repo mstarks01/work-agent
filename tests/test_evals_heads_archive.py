@@ -1,9 +1,9 @@
 """What a sweep keeps beside its artifact, for the modes that keep a catalog.
 
-The writer had its own list of modes and the replay had another, and the
-head-only mode landed in one of them: every run archived nothing and the empty
-directory was invisible until a replay looked for it. Both now read
-:data:`~evals.harness.replay.KEEPS`, and these hold them to it.
+The writer and the replay both read :data:`~evals.harness.replay.KEEPS`, and
+these tests hold them to it. Two lists of modes can disagree, and then a run
+archives nothing and the empty directory stays invisible until a replay looks
+for it.
 """
 
 from __future__ import annotations

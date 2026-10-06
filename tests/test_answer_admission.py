@@ -1,9 +1,9 @@
 """What a submission's fact answers may name, and how long a line they may write.
 
-Each harness here is the one run 11 of the security audit measured with
-(#1294): an answer at the documented limit that failed the resumed job, two
-spellings of one fact that both landed, and answers to questions the service
-never asked.
+Each harness here comes from run 11 of the security audit (#1294). The
+tests pin three rules: an answer at the documented limit resumes the job, two
+spellings of one fact merge to one answer, and the service refuses an answer
+to a question it did not ask.
 """
 
 from __future__ import annotations
@@ -67,8 +67,8 @@ def sized(key, length):
 )
 class TestTheLineAnAnswerWrites:
     def test_the_longest_admitted_line_builds_its_span(self, key):
-        """A 915-character answer completed and a 916-character one failed the
-        resumed job: the check bounded the value, and the span quotes the line.
+        """An answer at the longest admitted line builds its span, because the
+        check bounds the line that the span quotes, not only the value.
         """
         model = open_description()
         answer = sized(key, MAX_QUOTE_CHARS)
@@ -142,13 +142,14 @@ class TestOneFactHasOneSpelling:
         assert FactAnswer(key=sent, value="yes").key == kept
 
     def test_two_spellings_of_one_fact_merge_to_one_answer(self):
-        """Both answers landed, and every lane prompt carried both lines."""
+        """Two spellings of one fact give one answer, so a lane prompt carries
+        one line."""
         first = FactAnswer(key=(FLOW, "", "", "", "code-execution", ""), value="yes")
         second = FactAnswer(key=(FLOW, "", " ", "", "code-execution", ""), value="no")
         assert merged_facts([first], [second]) == [second]
 
     def test_a_later_facet_answer_keeps_the_earlier_facets(self):
-        """A size answer in round two lost the rate answer of round one
+        """A size answer in round two keeps the rate answer of round one
         (#1289, F2)."""
         key = (FLOW, "", "", "", "capacity-limits", "")
         rate = FactAnswer(key=key, facets={"rate": "yes"})
@@ -172,8 +173,8 @@ class TestOneFactHasOneSpelling:
 
 
 class TestOnlyAnAskedFactTakesAnAnswer:
-    """54 of 54 unasked element and kind pairs were admitted, and an invented
-    subject reached every lane prompt."""
+    """The service refuses an answer to an element and kind pair that it did
+    not ask, so an invented subject cannot reach a lane prompt."""
 
     def asked(self):
         checkpoint = held()
@@ -332,8 +333,8 @@ def _known_answer(question: dict) -> dict:
 
 
 class TestTheRoundsEnd:
-    """A later round asked "I don't know" facts again, and the rounds after a
-    report had no end."""
+    """A later round does not ask an "I don't know" fact again, and the
+    rounds after a report end."""
 
     def test_i_do_not_know_is_not_asked_again(self):
         first = _asked_after([]).early[0].key
@@ -457,8 +458,8 @@ class TestTheBoundedRounds:
         assert withheld == len([q for q in listed if q.kind != "capability"])
 
     def test_a_question_answered_in_part_comes_back_outside_the_limit(self):
-        """Thirty partial answers hid every question and started the analysis
-        as if nothing were left (#1289, B3)."""
+        """A question with a partial answer stays outside the limit, so thirty
+        partial answers do not hide every question (#1289, B3)."""
         from analysis_service.answer_round import EARLY_RULES, next_round
 
         facets = QUESTION_KINDS["capacity-limits"].facets
@@ -574,8 +575,8 @@ class TestTheBoundedRounds:
 
 
 class TestSkipForNow:
-    """A blank row came back every round, and a wholly blank round could not
-    be saved, so a submitter who could not answer had no way on (#1289)."""
+    """A skipped question leaves the rounds, and a wholly blank round can be
+    saved, so a submitter who cannot answer can go on (#1289)."""
 
     def test_a_skipped_question_leaves_the_rounds_and_is_listed(self):
         first = _asked_after([]).early[0]
@@ -1012,7 +1013,7 @@ class TestOneResumedJob:
 
 
 def test_a_save_after_the_start_is_refused():
-    """A save after the start landed on the paused job, and no job read it."""
+    """The service refuses a save after the start, because no job reads it."""
     client, store = catalog_client()
     waited = waiting(store)
     body = client.get(f"/v1/jobs/{waited}/questions", headers=auth()).json()
@@ -1062,7 +1063,8 @@ def test_both_routes_refuse_one_set_of_odd_fields(odd, tiers):
 
 @pytest.mark.parametrize("save", [True, False], ids=["save", "start"])
 def test_answers_that_break_the_input_limits_are_refused_at_once(save):
-    """A save over the limits landed, and every later start then failed."""
+    """The service refuses a save over the input limits at once, so a later
+    start cannot fail on it."""
     from analysis_service.sources import SourceLimits, total_bytes
 
     client, store = catalog_client()
@@ -1165,9 +1167,8 @@ def test_no_round_opens_with_more_questions_than_the_one_before(case, run):
 
 
 class TestAJobItsAnswersResumed:
-    """The questions route offered a job's questions after its answers started
-    a job, and every answer to them was refused (#1369, checkpoint round over
-    reviewed/2026-09-30)."""
+    """After a job's answers start a job, the questions route names the job
+    that holds them (#1369, checkpoint round over reviewed/2026-09-30)."""
 
     def test_its_questions_name_the_job_that_holds_it(self):
         from tests.test_questions import TestTheRoutes
@@ -1206,9 +1207,9 @@ BOTH = {"stride": {}, "asvs": {"level": 2}}
 
 
 class TestTheFrameworksTakeTurns:
-    """With ASVS selected, a round showed ten capability questions before any
-    STRIDE question, so an owner who stopped after ten choices completed no
-    STRIDE finding (#1289, QA-2026-09-26-03-E29)."""
+    """With ASVS and STRIDE selected, the frameworks take turns in a round. So
+    an owner who stops after ten choices still completes a STRIDE finding
+    (#1289, QA-2026-09-26-03-E29)."""
 
     def round_of(self, frameworks):
         return question_set(

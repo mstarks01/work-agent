@@ -255,12 +255,11 @@ class TestARefusedSubmissionIsCheap:
     `JobRecord` exists -- so the ceiling, the rate and both token budgets count
     nothing about it.
 
-    That made the cheapest request the most expensive one to answer. 200 KB of
-    empty objects, under `BodyLimitMiddleware`'s cap, had Pydantic validate
-    every element and the handler render every complaint: 2.2 seconds of event
-    loop and an 8.5 MB response, at 43 times the request. One caller held the
-    loop with well under a request a second, and nothing in the admission
-    machinery could see it, because admission is downstream of here.
+    So a refusal must stay cheap. Without a bound, 200 KB of empty objects
+    under `BodyLimitMiddleware`'s cap makes Pydantic validate every element and
+    the handler render every complaint. That measured 2.2 seconds of event loop
+    and an 8.5 MB response, at 43 times the request. The admission machinery
+    cannot see it, because admission is downstream of here.
     """
 
     ROOMY: ClassVar[SourceLimits] = SourceLimits(
@@ -306,12 +305,11 @@ class TestARefusedSubmissionIsCheap:
 
 
 class TestSystemNameIsBoundedLikeALabel:
-    """It reaches the report a consumer renders, and this was the one entry
-    point to the pipeline that refused it nothing but a length.
+    """It reaches the report a consumer renders, so this entry point refuses
+    more than a bad length.
 
     A Source label refuses these categories and the token subject refuses them
-    too; the same value arriving here was checked only for being 1 to 200
-    characters.
+    too. The system name refuses the same categories.
     """
 
     @pytest.mark.parametrize(
@@ -550,11 +548,10 @@ class TestInputLadder:
         assert "request body" in response.json()["detail"]
 
     def test_an_undeclared_body_is_counted_rather_than_trusted(self):
-        # The bypass the header-only guard had: a chunked request carries no
-        # content-length at all, so a check that reads the header sees nothing
-        # to compare and waves the whole payload through to be buffered and
-        # parsed. Streaming the body from a generator is what makes httpx send
-        # it chunked.
+        # A chunked request carries no content-length, so a check that reads
+        # only the header sees nothing to compare and lets the whole payload
+        # through. Streaming the body from a generator makes httpx send it
+        # chunked.
         client, _ = make_client()
         over_cap = TEST_LIMITS.max_total_bytes * _BODY_SLACK * 2
 
@@ -924,10 +921,10 @@ class TestEvents:
 class TestFrameworksListIsBounded:
     """A frameworks list longer than the registry is refused before route work.
 
-    The list had no upper bound, and the route de-duplicated it with an O(n^2)
-    scan, so a large body stalled the event loop before any job record existed.
-    The schema bound refuses it up front; a valid selection names each framework
-    at most once, so no legitimate request is affected.
+    The route de-duplicates the list with an O(n^2) scan, so an unbounded list
+    would stall the event loop before any job record exists. The schema bound
+    refuses it up front. A valid selection names each framework at most once, so
+    no legitimate request is affected.
     """
 
     def test_a_repeated_framework_is_refused_and_named(self):
@@ -953,8 +950,8 @@ class TestBodyCapOnEveryPost:
 
     FastAPI parses a body before it resolves the route's dependencies, and
     authentication is one, so an uncapped POST route buffers what an anonymous
-    caller sends before it answers 401. A cap keyed to ``/v1/jobs`` left the
-    answers route open in exactly that way (run 11, finding 1).
+    caller sends before it answers 401. A cap keyed only to ``/v1/jobs`` would
+    leave the answers route open in that way (run 11, finding 1).
     """
 
     @staticmethod
@@ -1122,10 +1119,10 @@ class TestConsumptionBudgets:
 
 
 class TestAHeaderThatDoesNotSpellANumber:
-    """``str.isdigit`` was the guard on both, and it is wrong on both.
+    """``str.isdigit`` is the wrong guard for both headers.
 
-    A client sets these. A shape ``isdigit`` passes and ``int`` refuses reached
-    ``int`` and raised, which is a 500 on a header the caller controls.
+    A client sets these. A shape that ``isdigit`` passes and ``int`` refuses
+    would raise in ``int``, which is a 500 on a header the caller controls.
     """
 
     @pytest.mark.parametrize("declared", ISDIGIT_TRAPS)

@@ -43,10 +43,10 @@ def test_dangling_element_reference_fails_the_gate():
 def test_a_subject_only_unknown_is_not_a_dangling_reference():
     """The second `related_unknowns` spelling names no element to resolve.
 
-    The gate re-derives a service rule one seam later, and it drifted: the
-    report learned this spelling when it arrived and this did not, so the first
-    ASVS corpus sweep hard-failed on eleven correctly shaped claims. Nothing
-    offline caught it because the scripted critic never emits a subject.
+    The gate re-derives a service rule one seam later, so it must accept each
+    spelling the report accepts. Otherwise an ASVS corpus sweep fails on
+    correctly shaped claims. Other offline tests cannot see this, because the
+    scripted critic never emits a subject.
     """
     payload = sample_report().model_dump(mode="json")
     claim = claims_of(payload)[0]

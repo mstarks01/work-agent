@@ -98,7 +98,7 @@ def test_from_env_resolves_the_repo_configs_without_credentials():
 
 
 def test_each_config_file_is_read_exactly_once(monkeypatch):
-    """The duplication this replaces: model_tiers.toml was read five times."""
+    """Each config file, model_tiers.toml among them, is read once."""
     from analysis_service import deployment as module
 
     reads: list[str] = []
@@ -159,9 +159,8 @@ def test_every_bundled_root_the_wheel_force_includes_exists():
     hatchling raises ``FileNotFoundError`` on one that is not there — but only
     when a *wheel* is built. Every test here, and every `uv run` in this repo,
     uses an editable install, which links back to the checkout and force-includes
-    nothing. So a root renamed on the read side while `pyproject.toml` kept the
-    old name stays green locally and fails in CI at the build step, which is
-    exactly what the frameworks cutover did to `skills/` and `knowledge/`.
+    nothing. So a root renamed on the read side but not in `pyproject.toml`
+    stays green locally and fails in CI at the build step.
 
     Asserted against the file rather than a copied list: a fifth root added to
     the wheel is covered by this test existing.
@@ -625,7 +624,7 @@ max_output_tokens = 8192
 max_output_tokens = 8192
 """
 
-# A stated temperature, which the shipped file no longer carries. The gate is
+# A stated temperature, which the shipped file does not carry. The gate is
 # about a *param*, so nothing it does is reachable until a deployment sets one,
 # and the env override is the ordinary way that happens. The value is 1: the
 # provider library rejects 0 on these models by itself, so 1 is the value that
@@ -676,9 +675,8 @@ def test_the_shipped_sampling_builds_on_a_claude_that_removed_temperature():
     """The same selection, with nothing stated: no param, so no gate to fail.
 
     The pair this service ships for is a current Claude on the shipped file,
-    and that pair has to build. It did not while the file pinned a temperature
-    — every Anthropic deployment naming a model newer than the pinned LiteLLM
-    map died here — so this is the regression the pin left behind.
+    and that pair has to build. A pinned temperature would make every Anthropic
+    deployment that names a model newer than the pinned LiteLLM map fail here.
     """
     pipeline = Deployment.from_env(
         env=ANTHROPIC_ENV
@@ -1037,7 +1035,7 @@ def test_a_replaced_deployment_starts_with_an_empty_runner_cache():
 
 
 def test_the_route_enforces_the_gate_the_runner_certified_with():
-    """The reach through the runner's private attribute this replaced."""
+    """The route reads the gate from the deployment, not from the runner."""
     deployment = Deployment.from_env(env=VERTEX_ENV)
 
     app = create_app(deployment=deployment, store=InMemoryJobStore(), verifier=object())

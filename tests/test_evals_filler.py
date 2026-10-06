@@ -1,9 +1,8 @@
 """The instrument that catches a justification which passes and says nothing.
 
-Both fixtures below are the two real defects, reduced. Neither was visible to
-any offline check when it shipped, because the suite scripts the agents: a
-scripted pointer always resolves and a scripted quote always verifies, so every
-check went green over two packages and eight months.
+Both fixtures below are real defects, reduced. Other offline checks cannot see
+them, because the suite scripts the agents: a scripted pointer always resolves
+and a scripted quote always verifies.
 """
 
 from __future__ import annotations

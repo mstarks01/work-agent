@@ -1,8 +1,8 @@
 """An attribute answer is the effective fact for every reader, whatever the catalog held.
 
-The questions audit (#1289, Q1) found an answer that the model took and the
-catalog then wrote over in ``prepare``, and every function's own test agreed
-with itself. So this module drives the real resume graph from ``prepare`` once
+The catalog must not write over an answer that the model takes in
+``prepare`` (#1289, Q1). A test of one function at a time cannot see that
+defect. So this module drives the real resume graph from ``prepare`` once
 for each shape a catalog can hold about one attribute, and asks every reader
 the same question: the report's model, its catalog, and the view a later
 reader such as the post-review reassessment prepares from them.

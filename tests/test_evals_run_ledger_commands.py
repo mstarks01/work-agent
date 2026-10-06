@@ -2,8 +2,8 @@
 
 ``rekey`` is the operation the whole versioning argument rests on — a better
 recogniser changes every key, and a vote stores its components so moving the
-ledger is arithmetic over a file rather than a re-vote. Before these tests the
-capability was claimed in three docstrings and reachable from nothing.
+ledger is arithmetic over a file rather than a re-vote. These tests drive it
+from the command line.
 
 Deterministic and free of provider calls, so they gate on every PR.
 """

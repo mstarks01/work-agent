@@ -1684,9 +1684,8 @@ class TestTheOneReaderOfAReferentType:
 
     Three sites read "which subject type does this reference point at": this
     function, ``prompts._value_form`` and ``evals.harness.replay``. The last
-    two spelled ``next(iter(predicate.refers_to))`` again because this one was
-    private, and that spelling has no answer for the 12 predicates that refer
-    to nothing.
+    two call this one. The spelling ``next(iter(predicate.refers_to))`` has no
+    answer for the 12 predicates that refer to nothing.
     """
 
     def test_a_referring_predicate_names_its_one_type(self):
@@ -1694,12 +1693,12 @@ class TestTheOneReaderOfAReferentType:
         assert referent_type(REGISTRY["network-membership"]) == "zone"
 
     def test_a_predicate_that_refers_to_nothing_answers_none(self):
-        """The shape the second readers missed. ``next(iter(...))`` raised here."""
+        """The shape that ``next(iter(...))`` has no answer for."""
         assert referent_type(REGISTRY["mfa-requirement"]) is None
         assert referent_type(REGISTRY["credential-custody"]) is None
 
     def test_every_registered_predicate_has_an_answer(self):
-        """No predicate makes this raise, which is what the second readers did."""
+        """No predicate makes this raise."""
         for name, predicate in REGISTRY.items():
             found = referent_type(predicate)
             assert (found is not None) == bool(predicate.refers_to), name
@@ -1771,7 +1770,7 @@ class TestAGraphAttributeAndItsRowsStatingOpposites:
         )
 
     def test_a_stated_absence_under_a_graph_control_is_reported(self):
-        """The defect #926 was opened for, now visible in the report."""
+        """A stated absence under a graph control shows in the report (#926)."""
         held = catalog([stated(value=ABSENT)])
         found = contradictions(held, self.model())
         assert [(entry.attribute, entry.carried) for entry in found] == [

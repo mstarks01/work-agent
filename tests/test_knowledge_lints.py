@@ -11,13 +11,12 @@ So both directions are checked here, along with the structure the composition
 depends on and the token caps that keep parallel lanes affordable.
 
 **Over :data:`~analysis_service.frameworks.PACKAGES`, not over one directory.**
-Both packages ship a corpus and every check below runs over both. That is what
-the registry bought: ASVS's 11 notes and 6 cases arrived in #272 already
-linted, with no edit here. A package shipping none is still covered — it writes
-two empty tables and the gate passes it vacuously, which is the shape
-:class:`~analysis_service.frameworks.KnowledgeTables` describes. Naming one
-package's directory would have meant a second package's first document shipped
-unlinted.
+Both packages ship a corpus and every check below runs over both, so a new
+package's corpus is linted with no edit here (#272). A package shipping none is
+still covered: it writes two empty tables and the gate passes it vacuously,
+which is the shape :class:`~analysis_service.frameworks.KnowledgeTables`
+describes. A check that names one package's directory would leave another
+package's documents unlinted.
 """
 
 from __future__ import annotations
@@ -67,13 +66,11 @@ RETRIEVED_CORPUS_CEILING = 4000
 #: it vacuously". Recorded so a reader knows the silence is the contract and not
 #: a lint that stopped running.
 #:
-#: **Empty today.** ASVS sat here while its corpus was unwritten, and the reason
-#: given was a real one: its lane skills already carry the published requirement
-#: text for the whole chapter, so a note restating a requirement would put the
-#: catalog in a second place to drift. That risk did not go away when the corpus
-#: was written — it is now held off by
-#: :func:`~tests.test_license_lints.test_no_upstream_sentence_appears_in_an_ungoverned_file` instead of by the absence of
-#: any notes at all. A package added here later needs its own reason, in this
+#: **Empty today.** ASVS's lane skills carry the published requirement text for
+#: the whole chapter, so a note that restates a requirement would put the
+#: catalog in a second place to drift.
+#: :func:`~tests.test_license_lints.test_no_upstream_sentence_appears_in_an_ungoverned_file`
+#: holds that risk off. A package added here needs its own reason, in this
 #: comment, in the same shape.
 EMPTY_CORPUS: set[str] = set()
 
@@ -257,10 +254,9 @@ class TestBudget:
 
         Retrieval is capped per lane rather than per corpus, so this is the real
         number: two notes and one case, each at its own cap. The ceiling is
-        stated here rather than derived from the domain-pack cap it was once
-        compared against — that cap is a drift alarm now (ADR 0016) and moves
-        when a pack is edited, which is not a reason for a retrieval ceiling to
-        move.
+        stated here rather than derived from the domain-pack cap. That cap is
+        a drift alarm (ADR 0016) and moves when a pack is edited, which is not
+        a reason for a retrieval ceiling to move.
 
         Per lane, so it does not move when a package declares more lanes: ASVS's
         17 lanes each carry this ceiling and none of them carries it 17 times.

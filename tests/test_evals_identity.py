@@ -1,11 +1,10 @@
 """Mechanical claim identity, scored against the recorded labels.
 
 The measurement [#201](https://github.com/mstarks01/work-agent/issues/201) asks
-for. `tests/test_claim_identity.py` answered the false-merge direction over the
-blessed reference sets — the lane and the element set separate 243 of 244 claims
-— and could not answer the direction the issue's title names, because the
-calibration set's candidate side was a bare string. It now carries element IDs,
-so this runs :class:`~evals.harness.identity.MechanicalIdentity` through
+for. `tests/test_claim_identity.py` answers the false-merge direction over the
+blessed reference sets: the lane and the element set separate 243 of 244 claims.
+The calibration set's candidate side carries element IDs, so this module
+answers the direction the issue's title names. It runs :class:`~evals.harness.identity.MechanicalIdentity` through
 :func:`~evals.harness.calibration.measure_agreement`, against the same hand
 labels and the same 90% bar every matcher is held to.
 
@@ -53,11 +52,10 @@ from evals.harness.verbs import UNSEPARATED, same_action
 #: What element agreement alone is worth on the recorded labels, over the 261
 #: scored pairs that carry candidate element IDs and a verb.
 #:
-#: **Both halves are assigned now.** Until #511 only the 200 ``match``
-#: candidates carried the fields, so this rule was priced on the split
-#: direction alone and its ``false_matches`` was structurally zero. The 111
-#: scored negatives now say what element equality really costs: it merges 22 of
-#: them. Every number here is quoted in #201, so moving one means updating the
+#: **Both halves are assigned** (#511). The ``match`` and the ``no-match``
+#: candidates both carry the fields, so this rule is priced in both
+#: directions. The 111 scored negatives say what element equality really
+#: costs: it merges 22 of them. Every number here is quoted in #201, so moving one means updating the
 #: issue.
 MEASURED = {
     "assigned_pairs": 261,
@@ -109,8 +107,8 @@ DIRECTION = {
 #: - ``splits`` counts the 200 ``match`` pairs a rule calls different.
 #: - ``candidate_merges`` counts the scored ``no-match`` pairs it calls the
 #:   same, ``no_match_pairs`` of them. These are candidate paraphrases, which is
-#:   the population a live run emits, and they were unmeasurable before #511
-#:   assigned them elements and verbs.
+#:   the population a live run emits, and #511 assigns them elements and
+#:   verbs.
 #: - ``reference_merges`` counts the within-lane pairs of distinct corpus claims
 #:   it calls the same, ``within_lane_pairs`` of them. Every one is an error by
 #:   construction.
@@ -134,12 +132,9 @@ FRONTIER = {
     "subset": {"splits": 33, "candidate_merges": 54, "reference_merges": 18},
     "endpoint subset": {"splits": 12, "candidate_merges": 69, "reference_merges": 41},
     "overlap": {"splits": 3, "candidate_merges": 66, "reference_merges": 56},
-    # 99 before the reference corrections of #925. Case 02's calibration pair
-    # about disabling the Pub/Sub topic named the gateway-to-normalizer flow,
-    # because the broker was not an element to name; it now names
-    # ``store:pub-sub``, which is one fewer candidate that merges under the
-    # loosest rung. The frontier's shape is unchanged and so is the argument
-    # drawn from it.
+    # Case 02's calibration pair about disabling the Pub/Sub topic names
+    # ``store:pub-sub`` (#925), which is one candidate that does not merge
+    # under the loosest rung.
     "endpoint overlap": {
         "splits": 1,
         "candidate_merges": 81,

@@ -594,8 +594,9 @@ class TestExecuteJob:
         assert record.measured_tokens == 3_857
 
     def test_a_graph_that_raised_mid_run_settles_to_a_larger_floor(self):
-        """A small job reserved 3,857 tokens while its instructions alone were
-        about 456,000, and the failure discarded that measurement (run 11)."""
+        """A job that fails mid-run settles to its measured tokens, not its
+        reservation: a small job reserves 3,857 tokens while its instructions
+        alone are about 456,000 (run 11)."""
         record = self.run_with(MidGraphFailingRunner(tokens=456_000), reserved=3_857)
         assert record.status == "failed"
         assert record.measured_tokens == 456_000
@@ -605,8 +606,9 @@ class TestJobDeadline:
     """The one bound on a job as a whole (wayfinder #61).
 
     The per-call knobs compose to a worst case in the hours while each is
-    individually respected, so before this the tail was a product of numbers
-    nobody chose and a wedged run held ``running`` until the process died.
+    individually respected. Without a job deadline, the tail is a product of
+    numbers nobody chose, and a wedged run holds ``running`` until the process
+    dies.
     """
 
     def test_a_wedged_run_fails_at_the_deadline_instead_of_hanging(self):

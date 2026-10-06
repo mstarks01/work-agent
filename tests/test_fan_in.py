@@ -680,13 +680,13 @@ class TestQuoteVerification:
         assert "repaired_quotes" not in plain
 
     def test_the_critic_is_shown_which_quote_was_not_found(self, model):
-        """The other half of the repair mark, and it was missing (#1082).
+        """The other half of the repair mark (#1082).
 
         A quote the ladder could not find still renders, because ``grounds``
         is ``min_length=1`` and dropping the last entry would delete the
-        finding. Nothing carried the failure into the view, so a critic told
-        the service had matched every quote read an invented sentence beside
-        a verified crossing and had no way to see the difference.
+        finding. So the view carries the failure. Without it, a critic would
+        read an invented sentence beside a verified crossing and have no way
+        to see the difference.
         """
         drafts = self.quoting(
             "The database accepts every forged administrator token.",

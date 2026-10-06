@@ -325,11 +325,9 @@ class TestABaseRosterWhoseVotersIsNotATable:
     """`voters = "ada"` at the base revision, which is legal TOML.
 
     Both roster checks read that file, and each has to handle the same two
-    shapes. `_roster_delta` did and `_check_no_self_raise` did not, so the
-    scalar reached `.get` and an `AttributeError` left the whole preflight —
-    the failure `voters.toml`'s own note already records from the entry level.
-    Both read `submit._voters_table` now, and these drive the shape that proved
-    it rather than a simpler one written afterwards.
+    shapes. Both read `submit._voters_table`, so the scalar never reaches
+    `.get` and no `AttributeError` leaves the preflight. `voters.toml`'s own
+    note records that failure from the entry level.
     """
 
     BASE = 'version = 1\nvoters = "ada"\n'
@@ -702,7 +700,7 @@ class TestRepoSlug:
 def test_the_comparison_table_is_derived_and_selects_no_kind(repo):
     """`run.py comparison` writes evals/baselines/README.md from the merged
     Baselines, so a change to it alone is the generator changing. Read as a
-    Baseline submission, a code change that altered the table's shape failed
+    Baseline submission, a code change that alters the table's shape would fail
     "the change is one Baseline directory" with no diff that could pass."""
     assert submit._is_derived("evals/baselines/README.md")
     assert not submit._is_derived("evals/baselines/one/baseline.json")
@@ -791,9 +789,9 @@ class TestOnlyAnAddedSweepIsABaselineSubmission:
 
         A version migration rewrites the artifact and re-stamps the manifest,
         and the reports it produced do not move. Read by filename alone, the
-        renamed sweep looked contributed and the code change beside it had no
-        diff that could pass — which is the state this selector exists to
-        prevent.
+        renamed sweep would look contributed and the code change beside it
+        would have no diff that could pass. This selector exists to prevent
+        that state.
         """
         reports = {"01-a-case.report.json": "b" * 64}
         self.sealed(repo, "mstarks01-6d1837ed", reports)
@@ -871,9 +869,9 @@ class TestOnlyAnAddedSweepIsABaselineSubmission:
         """#893: an archive migration catches the whole archive up at once.
 
         Three merged Baselines, all rewritten, none gaining a sweep. Read
-        through ``_baseline_dir`` alone this was "more than one directory" and
-        failed closed into selecting the kind, so the code half of the diff was
-        a stray with no diff that could pass.
+        through ``_baseline_dir`` alone this is "more than one directory" and
+        fails closed into selecting the kind, so the code half of the diff
+        would be a stray with no diff that could pass.
         """
         directories = [
             self._merged_named(repo, name, [f"mstarks01-{n}.json"])
@@ -948,8 +946,8 @@ class TestOnlyAnAddedSweepIsABaselineSubmission:
 
 
 class TestThePushLeavesNoLocalBranch:
-    """A failed push left ``submit/review/<login>-<date>`` behind, and every
-    retry that day refused to create it again (run 11)."""
+    """A failed push leaves no ``submit/review/<login>-<date>`` branch behind,
+    so a retry that day can create it again (run 11)."""
 
     @staticmethod
     def repository(tmp_path):

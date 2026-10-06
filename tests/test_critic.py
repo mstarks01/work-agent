@@ -389,7 +389,7 @@ class TestVerdictShapeIsReAskableRatherThanFatal:
 
     def test_two_independent_faults_on_one_ruling_are_two_messages(self, model):
         """A merged message would leave the second to be found on a pass that
-        no longer exists."""
+        does not exist."""
         problems = review_issues(
             [sample_draft("S-01")],
             self._rulings(
@@ -795,7 +795,7 @@ class TestAnUnknownGroundMakesTheClaimConditional:
         assert problems.implicated == frozenset({"S-01"})
 
     def test_the_critic_is_shown_the_draft_its_grounds_make_conditional(self, model):
-        """The change: an unknown ground no longer routes a draft past review.
+        """An unknown ground does not route a draft past review.
 
         Its grounds still say the claim is conditional. Whether the argument
         follows from what it cites is a different question, and a rule cannot
@@ -996,12 +996,11 @@ class TestAMisfiledVerbIsRejectedInCode:
 
 
 class TestAnAbsenceRidesTheCriticPath:
-    """#412: the fifth branch names no element, and four seams assumed one did.
+    """The fifth branch names no element, and four seams must accept that (#412).
 
-    Each of them read "the place this ground is about" as an element ID or a
-    flow ID, so a ground that is about the whole model reached them carrying
-    neither. The suite could not see it: nothing drove this branch past
-    resolution.
+    Each seam reads "the place this ground is about" as an element ID or a flow
+    ID. A ground that is about the whole model reaches them with neither, so
+    these tests drive this branch past resolution.
     """
 
     @pytest.fixture
@@ -1104,10 +1103,9 @@ def test_ruling_view_says_when_a_verb_belongs_to_another_lane():
 class TestOneReviewCall:
     """The check and the re-ask view come out of one call, over one set.
 
-    Before this, a graph node called four functions in the right order and
-    composed the view itself. What that risked is the thing the pair exists to
-    prevent: the messages naming one set of drafts and the view carrying
-    another.
+    A graph node that called four functions and composed the view itself
+    could let the messages name one set of drafts and the view carry another.
+    The pair exists to prevent that.
     """
 
     def test_a_pass_that_reconciles_is_accepted_with_its_count(self):
@@ -1249,16 +1247,15 @@ PRODUCERS = {
 class TestEveryProblemCarriesItsClaimAndItsKind:
     """The typed half of a review problem, and the table that keeps it whole.
 
-    ``unreconciled_rulings`` carried bare sentences once, so counting causes
-    meant a regular expression over prose, and counting distinct *rulings* was
-    not possible at all — one ruling writes more than one sentence. Each check
-    now names the claim it is about and which check found it.
+    Each check names the claim it is about and which check found it. Bare
+    sentences would make a count of causes a regular expression over prose, and
+    a count of distinct *rulings* impossible, because one ruling writes more
+    than one sentence.
 
     **The table below is checked against the closed set**, so a kind nobody
     writes and a check whose kind is not in the vocabulary both fail here. That
     is the rule this repo applies to every table keyed by a vocabulary: a
-    table nobody compares to its registry fails as quietly as the branch it
-    replaced.
+    table nobody compares to its registry fails as quietly as a branch.
     """
 
     def _asvs_draft(self):

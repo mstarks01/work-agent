@@ -11,24 +11,22 @@ it, so prose that still states the earlier one is simply wrong. Every figure bel
 is of this kind, and every one is computed offline with no provider call.
 
 **A module docstring is prose too.** `fingerprint.py` and `verbs.py` argue for
-version 2 from these numbers, and they went stale the moment the fixtures grew
-because nothing here read a `.py` file. A claim names any path in the
-repository; the extension decides nothing.
+version 2 from these numbers, and they go stale when the fixtures grow unless
+this module reads a `.py` file. A claim names any path in the repository; the
+extension decides nothing.
 
 A **figure one act moves** is the third kind, and prose must not state it at
-all. The unread-case count was stated in two guides and checked here, and the
-pair deadlocked: ``verify_pull_request`` refuses a review pull request that
-changes anything but its one JSON file, and this module refuses prose stating a
-figure the tree no longer derives. Neither rule is wrong. The sitting app hands
-a reader a GitHub link that carries one file, and a maintainer commits it
-straight to the base branch, so no pull-request check can reach the prose on
-the path that most sittings take — and every sitting left the base branch red
-until a second commit moved a sentence. `unreviewed_cases` derives the count,
-`webapp/sitting.py --list` prints it, and the guides now point at that rather
-than spelling a number a merge invalidates. A figure a single act moves belongs
-in a reader, never in a sentence.
+all. ``verify_pull_request`` refuses a review pull request that changes anything
+but its one JSON file, and this module refuses prose that states a figure the
+tree does not derive. Neither rule is wrong, but together they leave no green
+path for a figure such as the unread-case count. The sitting app hands a reader
+a GitHub link that carries one file, and a maintainer commits it straight to
+the base branch, so no pull-request check can reach the prose on that path.
+`unreviewed_cases` derives the count, `webapp/sitting.py --list` prints it, and
+the guides point at that rather than spell a number a merge invalidates. A
+figure a single act moves belongs in a reader, never in a sentence.
 
-A **recorded observation** is what a run once produced: luna's 3.4%
+A **recorded observation** is what one run produced: luna's 3.4%
 unverified-quote rate, the 231 of 243 claims a mechanical check fired on,
 the 30 labels sitting 01 read. Those stay true when the code moves, because
 they describe an event rather than a state. Nothing here checks them, and a
@@ -357,9 +355,9 @@ FIGURES: tuple[Figure, ...] = (
                     " merges of {cand_of} and {merges} false merges of"
                     " {merge_of}"
                 ),
-                # Two: the headline sentence and the harness table's row. The
-                # headline was stale and the lint could not see it, because the
-                # wrap split the rendered string across two lines.
+                # Two: the headline sentence and the harness table's row. A
+                # template that does not span the wrap cannot see the headline,
+                # because the wrap splits the rendered string across two lines.
                 2,
             ),
             (
@@ -781,20 +779,16 @@ def test_the_read_audit_observes_something(figure_reads):
 def test_no_figure_moves_when_a_sitting_merges(figure, figure_reads):
     """A figure one merge moves cannot be stated in prose, so none is here.
 
-    The rule this encodes cost two commits per sitting before it existed. The
-    unread-case count was stated in ``CONTRIBUTING.md`` and
-    ``evals/BLESSING.md`` and checked above, while
     :func:`evals.review_submission.verify_pull_request` refuses a review pull
-    request that changes anything but its one JSON file. Both rules are right
-    and together they had no green path: the sitting landed alone and left the
-    base branch failing this module until a second commit moved a sentence.
+    request that changes anything but its one JSON file. A figure that a merged
+    sitting moves and that prose states would then fail this module on every
+    sitting, with no green path.
 
-    The count did not stop being worth reading. It stopped being worth
-    *writing*: ``webapp/sitting.py --list`` prints it from the same reader the
-    gate uses, and the guides point at that.
+    Such a count is worth reading, not *writing*: ``webapp/sitting.py --list``
+    prints it from the same reader the gate uses, and the guides point at that.
 
-    **Observed rather than named.** This asked which readers a ``compute``
-    mentioned until 2026-09-12, and a name is the wrong question: an alias
+    **Observed rather than named.** The test reads what a ``compute`` opens,
+    not which readers it names, because a name is the wrong question: an alias
     import, a helper three deep, a direct ``glob`` of the directory and a
     ``functools.partial`` all pass a name check. A sitting adds one file under
     ``evals/review/submissions/``, so a figure that never reads that directory

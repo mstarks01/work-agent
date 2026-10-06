@@ -23,8 +23,7 @@ committed bytes against it.
 for every file its sweep owns, so its ``files`` map is the list of exactly what
 a Baseline seals. Reading the file set from there means a sixth kind added to
 ``bundle`` tomorrow arrives here as a file with no declared producer, and fails,
-rather than being quietly unread the way ``*.drafts.json`` and
-``*.proposals.json`` were.
+rather than staying unread.
 
 The encodings are currently indistinguishable on the tree's own contents: every
 committed file is ASCII and every manifest is already key-sorted, so all three
@@ -106,17 +105,15 @@ def test_a_baseline_is_archived():
 
 
 def test_every_sealed_file_has_a_declared_producer():
-    """The completeness half, and the one that was missing.
+    """The completeness half.
 
     ``*.drafts.json`` and ``*.proposals.json`` are 26 of the 42 files a Baseline
-    seals, and the lint that held the archive to its producer's bytes read
-    neither of them — it read ``*.report.json`` and the artifact, and its own
-    comment asserted that the report pattern claimed the whole ``.reports``
-    directory. It claims a third of it.
+    seals. The ``*.report.json`` pattern claims only a third of the
+    ``.reports`` directory.
 
-    Driven off the manifest, so this cannot happen again by omission: a file
-    kind a Baseline seals and nobody declared a producer for arrives here as
-    ``None`` and fails, naming the file.
+    The test reads the manifest, so a file kind that a Baseline seals and that
+    has no declared producer arrives here as ``None`` and fails, naming the
+    file.
     """
     undeclared = sorted(
         str(path.relative_to(REPO_ROOT)) for path, kind in SEALED if kind is None

@@ -73,8 +73,7 @@ class TestEveryPackageIsRead:
     Driven from ``PACKAGES`` rather than from a list of names, so a framework
     added to the registry is a framework this test starts requiring rows for.
     A reading that covered one package would be the gap
-    ``docs/agents/framework-parity.md`` exists to catch, and it is the exact
-    gap the token caps had before ADR 0016.
+    ``docs/agents/framework-parity.md`` exists to catch (ADR 0016).
     """
 
     @pytest.mark.parametrize("framework", sorted(PACKAGES))

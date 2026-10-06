@@ -36,12 +36,11 @@ def _hypergeometric_probability(
 def test_review_02_manifests_still_verify_against_themselves():
     """What a superseded reading still owes: its own arithmetic.
 
-    The draw itself is gone. The Case Sitting of 2026-09-21 deleted 41 reference
-    claims, and a fixture is labelled against a claim by its place, so 51
-    fixtures went with them — 18 of them fixtures a person had read. The sample
-    was drawn from a population of 295 that no longer exists, so
-    ``random.Random(seed).sample`` cannot be re-run here and this test no longer
-    pretends it can.
+    The draw cannot be repeated. The Case Sitting of 2026-09-21 deleted 41
+    reference claims, and a fixture is labelled against a claim by its place, so
+    51 fixtures left with them, 18 of them fixtures a person read. The sample's
+    population of 295 is not in the tree, so ``random.Random(seed).sample``
+    cannot run here.
 
     What survives is checkable and is checked: the seed still hashes to its
     recorded digest, each manifest still digests to the value beside it, the two

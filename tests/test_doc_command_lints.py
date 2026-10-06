@@ -8,10 +8,9 @@ question ``argparse`` already answers.
 
 It is worth answering because these documents are procedures. ``evals/BLESSING.md``
 and ``evals/VOTING.md`` are not prose about the harness, they are the steps a
-person follows with a terminal open, so a flag that no longer exists is a broken
-instrument rather than a typo. That is not hypothetical: removing
-``rekey --to-version`` left it printed in two documents, one of them the
-documented way to move the ledger after a rule change, and nothing failed.
+person follows with a terminal open, so a flag that does not exist is a broken
+step rather than a typo. A removed flag can stay printed in a document, and no
+other check fails.
 
 **Flags, not whole invocations.** The lint checks that each subcommand exists and
 that each ``--flag`` beside it is one that subcommand accepts. It deliberately

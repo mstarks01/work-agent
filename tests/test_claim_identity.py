@@ -131,13 +131,13 @@ def identity_key(case: GoldenCase, claim: ReferenceThreat) -> str:
     ruled distinct.
 
     **The elements are endpoint-resolved, because the shipped rule resolves
-    them.** This read raw ``affected_element_ids`` and so answered about a key
-    nothing uses: a claim citing a flow and a claim citing the process at its
-    end landed on two keys here and on one in
-    :func:`~evals.harness.fingerprint.components_for`. It reported **one**
-    collision where the shipped fold finds **six**, so five pairs this file
-    exists to surface were invisible — including the only one the ledger will
-    actually merge. Resolving here is not a relaxation of the equality rule
+    them.** A read of raw ``affected_element_ids`` answers about a key nothing
+    uses: a claim citing a flow and a claim citing the process at its end land
+    on two keys there and on one in
+    :func:`~evals.harness.fingerprint.components_for`. That read finds **one**
+    collision where the shipped fold finds **six**, so it hides five pairs this
+    file exists to surface, and one of them is the pair the ledger merges.
+    Resolving here is not a relaxation of the equality rule
     above; it is the same rule over the same spelling of a place.
     """
     flows = ModelIndex.of(case.model).flow_endpoints
