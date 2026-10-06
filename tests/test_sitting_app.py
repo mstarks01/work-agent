@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -1904,6 +1905,16 @@ class TestTheSubmitStage:
         sign(tree, OTHER, "sam")
         app = browser(session_for(tree, "ada"))
         assert self.stage(app)["unfinished"] == len(CASES) - 1
+
+    def test_the_rail_counts_by_the_states_the_stage_counts_by(self, client):
+        """The rail's "remaining" and the stage's "unfinished" read one tuple.
+
+        The server puts ``DONE_STATES`` into the page as ``DONE``, and the page
+        script declares no ``DONE`` of its own.
+        """
+        app, _, _ = client
+        (done,) = re.findall(r"\bconst DONE = (.*?);\n", app.get("/").text)
+        assert json.loads(done) == list(sittings.DONE_STATES)
 
     def test_a_record_names_no_path_in_the_working_tree(self, tree):
         """Recording writes nothing into the tree, so the answer names no file.

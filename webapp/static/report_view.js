@@ -386,8 +386,19 @@
   }
 
   const SEV = { critical: ["Critical","--sev-critical"], high: ["High","--sev-high"], medium: ["Medium","--sev-medium"], low: ["Low","--sev-low"] };
-  const SEV_ORDER = ["critical","high","medium","low"];
+  // Every severity level, most severe first: the service's own order. SEV
+  // holds a label and a colour for each level, and a test holds its keys to
+  // the same set.
+  const SEV_ORDER = JSON.parse(document.getElementById("severity_order").textContent);
   const VERDICT = { confirmed: ["Confirmed","✓"], "needs-info": ["Needs info","?"], rejected: ["Rejected","✕"] };
+  // What the tally says for each kind of change. A kind the table does not
+  // hold throws, so it cannot render as a verdict.
+  const CHANGE_LINE = {
+    new: () => "new",
+    unchanged: () => "unchanged",
+    changed: (c) => `${VERDICT[c.before][0]} \u2192 ${VERDICT[c.after][0]}`,
+    gone: () => "no longer raised",
+  };
   const svar = (lvl) => `var(${SEV[lvl][1]})`;
 
   // header
@@ -949,10 +960,7 @@
   if (CHANGES.length) {
     const tally = new Map();
     CHANGES.forEach(c => {
-      const line = c.change === "new" ? "new"
-        : c.change === "gone" ? "no longer raised"
-        : c.change === "unchanged" ? "unchanged"
-        : `${VERDICT[c.before][0]} \u2192 ${VERDICT[c.after][0]}`;
+      const line = CHANGE_LINE[c.change](c);
       tally.set(line, (tally.get(line) || 0) + 1);
     });
     const box = el("div", "meta");

@@ -143,6 +143,7 @@ from analysis_service.answer_round import (
     StaleRevision,
 )
 from analysis_service.claims import UnknownKey
+from analysis_service.critic import SEVERITY_ORDER
 from analysis_service.deployment import Deployment
 from analysis_service.early_questions import EarlyQuestion
 from analysis_service.fact_answers import (
@@ -612,6 +613,7 @@ def render_report(
             if previous is not None
             else {}
         ),
+        severity_order=script_json(list(SEVERITY_ORDER)),
         lanes=script_json(
             {name: package.id_rule.lane_field for name, package in PACKAGES.items()}
         ),

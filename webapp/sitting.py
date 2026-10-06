@@ -416,6 +416,7 @@ details.standard { margin:.3rem 0 .1rem; font-size:.88rem; } details.standard su
 const TOKEN = <!--token-->;
 const MIN_OWN_LIST = <!--minownlist-->;
 const MARK_VALUES = <!--markvalues-->;
+const DONE = <!--donestates-->;
 </script>
 <script nonce="__CSP_NONCE__"><!--script--></script></body></html>
 """
