@@ -48,9 +48,9 @@ supersedes in `supersedes`; nothing rewrites an earlier row.
 Six outcomes, and the loader refuses a seventh: `supported`, `refuted`, `null`,
 `inconclusive`, `blocked`, `superseded`.
 
-**`refuted` and `null` are the valuable rows.** A plausible prompt edit has
-measured worse here twice, and the record of that is what stops the third
-attempt. An audit that only records its successes teaches the next audit
+**`refuted` and `null` are the valuable rows.** The record of a refuted edit
+is what stops the next attempt at it. An audit that only records its successes
+teaches the next audit
 nothing.
 
 `reads` is the field that makes staleness work: list the repository paths the

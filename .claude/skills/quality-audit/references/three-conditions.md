@@ -31,8 +31,8 @@ uv run python -m evals.harness.run bottleneck
 uv run python -m evals.harness.run oracle
 ```
 
-`bottleneck` and `oracle` are the results of #1033. They already split
-extraction loss from representation loss on every signed case, at no cost.
+`bottleneck` and `oracle` already split extraction loss from representation
+loss on every signed case, at no cost.
 #1003's arm comparison is the facts-first evidence. `run.py compare-arms`
 re-reads it. If these already answer the question, report the answer and stop
 here.
@@ -63,8 +63,7 @@ cases back for confirmation (#1093).
 
 State the baseline with its run identity, metric, denominator, scorer and
 reference version (`SKILL.md` step 3). A figure from an earlier thread is not a
-baseline. For example, "roughly 41%" was reference coverage, not must-find
-coverage.
+baseline.
 
 **Done when** every sampled miss has a frozen argument, the set names its
 negative control, and the baseline names all five identity parts.
@@ -187,8 +186,8 @@ reads the shipped route on material the change never saw.
 **One exception: a gate that isolates one flag.** A gate that holds the signed
 model fixed to compare one switch on and off may read `analysis` mode, because
 the fixed model is its control, and not a claim about the route. The
-`ANALYSIS_ASSERTIONS` gates in `evals/harness/promotion.py` (#926) are the case
-the maintainer accepted on 2026-09-24. Such a gate decides the flag only. A
+`ANALYSIS_ASSERTIONS` gates in `evals/harness/promotion.py` are such a gate.
+Such a gate decides the flag only. A
 claim that the whole route improved still needs the ordinary pipeline on fresh
 cases.
 

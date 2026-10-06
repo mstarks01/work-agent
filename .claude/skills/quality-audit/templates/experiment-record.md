@@ -16,7 +16,7 @@ required field, an outcome outside the six, a phase outside the table, or an
   "audit_id": "QA-2026-09-20-01",
   "recorded": "2026-09-20T14:02:11Z",
   "revision": "fd04ad1d369e51ec4dbfe8d51a305ff6b7015a80",
-  "signature": "stride case-09: the authentication lane cites the place and writes another action",
+  "signature": "stride case-09: the spoofing lane cites the place and writes another action",
   "hypothesis": "the shipped exemplar teaches a verb the reference set does not accept",
   "falsifier": "price-verbs shows the equivalence merges labelled non-matches, or the verb rows in that lane number fewer than the band",
   "intervention": "priced the equivalence on the frontier against the d3f1898 Baseline",
@@ -27,8 +27,8 @@ required field, an outcome outside the six, a phase outside the table, or an
   "scope": "case 09 only, stride, one archived Baseline, scorer at this revision",
   "reads": [
     "evals/harness/verbs.py",
-    "frameworks/stride/lanes/authentication/skill.md",
-    "evals/corpus/09-*/reference.json"
+    "frameworks/stride/lanes/spoofing/skill.md",
+    "evals/corpus/09-cookbook-sokify-retail/claims/stride.json"
   ],
   "artifacts": [
     "/tmp/09-rescored.json"
