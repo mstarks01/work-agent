@@ -5,17 +5,17 @@ output can be satisfiable by construction for one package's claim shape and not
 for another's. The model, required to satisfy it, finds the value that always
 passes. Every check goes green, and the output tells a reader nothing.
 
-Two instances reached production before anybody looked:
+Two shapes pass every offline check:
 
-* A ``needs-info`` verdict had to name an element and one of its attributes. A
+* A ``needs-info`` verdict has to name an element and one of its attributes. A
   framework that rules on requirements asks most of its questions about a
-  codebase rather than about an element, so it pointed at ``notes``. Every
+  codebase rather than about an element, so it can point at ``notes``. Every
   element type carries that field, so it always resolves and never informs.
 * A claim that rules a requirement not applicable has to carry grounds, and
   every ground kind names something that exists. The justifying fact is that the
-  model contains no such component, so the agent cited an arbitrary verified
-  quote: "no LDAP directory query path is identified", grounded on a sentence
-  about the authorization code flow with PKCE.
+  model contains no such component, so the agent can cite an arbitrary verified
+  quote, such as "no LDAP directory query path is identified" grounded on a
+  sentence about the authorization code flow with PKCE.
 
 Neither is visible offline. The suite scripts the agents, so pointers always
 resolve and quotes always verify, and every check here passes against a scripted

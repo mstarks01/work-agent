@@ -69,10 +69,9 @@ from typing import Any, NamedTuple
 from analysis_service.model_tiers import TierName
 from analysis_service.vendors import vendor_for_route
 
-# The tier whose model names a baseline. Spelled, not indexed: this read
-# ``TIER_NAMES[-1]`` until `review` was appended to the vocabulary and every
-# baseline silently became ``<commit>-unknown-<hash>``. A position in a
-# vocabulary is not a fact about which tier does the analysis.
+# The tier whose model names a baseline. Spelled, not indexed: a position in
+# the tier vocabulary is not the analysis tier, so the tier is named. An index
+# would name every baseline ``<commit>-unknown-<hash>`` once a tier is appended.
 _NAMING_TIER: TierName = "strong"
 from analysis_service.report import TokenUsage
 from evals.harness.archive import archive_bytes
@@ -236,9 +235,8 @@ class BaselineIdentity:
 class _BaselineRule(NamedTuple):
     """One rule a **Baseline** applies on top of :class:`BaselineIdentity`.
 
-    Named rather than counted. This said "the five identity parts" from #321
-    until #910 added the two the operator's endpoint choice needs, and the
-    count was the half nothing recomputed.
+    Named rather than counted. No prose states the count, because nothing
+    recomputes a count in prose.
 
     ``unmet`` answers with the sentence a Baseline refuses the sweep with, or
     with ``""`` where the sweep satisfies the rule. ``marker`` is what a vote's
@@ -614,17 +612,16 @@ def _recomputed_cost(artifact: EvalArtifact, recorded: Mapping[str, Any]) -> flo
 
 #: A registered package name, which is the only thing this field ever holds.
 #: The artifact declares ``frameworks`` as a plain list and validates no element,
-#: so before this the value reaching the published table was whatever a
-#: contributor wrote -- unbounded in length, unlike every model name beside it.
+#: so this pattern is the only bound on the value that reaches the published
+#: table.
 _FRAMEWORK_NAME = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
 
 #: How long one may be. A slug shape alone is not a bound: 300 lowercase
-#: letters are a slug, and the whole point here is that this field had no
-#: length while every model name beside it had one.
+#: letters are a slug. Every model name beside it has a length bound too.
 #:
-#: Public, because ``submit`` reads the same rule before a declared name
-#: reaches a path and had no bound at all. One number, two readers that call
-#: it, rather than two numbers that drift.
+#: Public, because ``submit`` reads the same constant before a declared name
+#: reaches a path. One number, two readers that call it, rather than two
+#: numbers that drift.
 FRAMEWORK_NAME_MAX = 40
 
 
@@ -689,11 +686,12 @@ def assemble(root: Path, author: str, artifact_paths: list[Path]) -> Path:
     **A sweep is keyed by its own bytes, so re-assembling one replaces it.**
     The stem is a digest of the artifact, which makes re-running ``submit
     baseline`` over the same file the same sweep rather than a second one.
-    Appending it twice was invisible to :func:`verify` — the file digests and
-    the cost arithmetic both recompute per entry and a duplicate agrees with
-    itself — and it doubled the directory's recorded cost, spent one of the
-    ten cap slots, and printed a range across two identical values, which is
-    the fake spread ``comparison.py`` exists to prevent.
+    :func:`verify` cannot see a duplicate — the file digests and the cost
+    arithmetic both recompute per entry and a duplicate agrees with itself —
+    so the key is the digest. A duplicate would double the directory's
+    recorded cost, spend one of the ten cap slots, and print a range across
+    two identical values, which is the fake spread ``comparison.py`` exists to
+    prevent.
     """
     artifacts = [load_artifact(path) for path in artifact_paths]
     identities = {BaselineIdentity.from_artifact(artifact) for artifact in artifacts}
@@ -798,10 +796,9 @@ def default_base_ref(root: Path) -> str:
     ``origin/main`` where the clone has one, which is every clone with a
     remote and every pull-request checkout in CI, where no local ``main``
     exists at all. A clone with no remote falls back to its own ``main``.
-    The contribution workflow failed on every pull request since the first
-    Baseline landed because the check asked for ``main`` in a checkout that
-    carried only ``origin/main``, and read a merged Baseline as a fork-only
-    commit.
+    A pull-request checkout carries only ``origin/main``, so the check reads
+    it first; a read of ``main`` there would see a merged Baseline as a
+    fork-only commit.
     """
     if _git(root, "rev-parse", "--verify", "--quiet", "origin/main") is not None:
         return "origin/main"

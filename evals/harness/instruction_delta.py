@@ -3,13 +3,12 @@
 ## The question this answers
 
 The token caps are drift alarms (ADR 0016). They say how far the static
-instruction moved, and claim nothing about how well it works. The claim nobody
-could check was the retired envelope's, that a lane agent analyses worse above
-some length, because a raise that improved findings and a deletion that cost
-them looked alike to a sweep.
+instruction moved, and claim nothing about how well it works. This instrument
+records each node's instruction size and digest, so a sweep can tell a raise
+from a deletion.
 
-#279 recorded the independent variable: each node's built instruction size and
-digest, in the artifact beside the scores. This is the reading over two of them.
+The artifact records the independent variable beside the scores: each node's
+built instruction size and digest (#279). This is the reading over two of them.
 Given the sweep before an edit and the sweep after, it prints which nodes'
 instructions changed, by how many tokens, and every measurement that moved
 beside them.

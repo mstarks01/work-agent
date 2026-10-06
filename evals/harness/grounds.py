@@ -40,7 +40,7 @@ counting. A counted case is still a failed case, and the sweep still exits
 non-zero.
 
 A mis-shaped ``Ground`` is the one thing here that is not measured, because it
-is no longer an agent behaviour; see :class:`GroundMisShape`.
+is the code that shapes a ``Ground``, not an agent; see :class:`GroundMisShape`.
 
 Nothing here gates. Every rate is an instrument. No threshold is asserted,
 because none has been observed yet, and the whole point is the first sweep.

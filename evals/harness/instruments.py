@@ -3,12 +3,9 @@
 ## Why a table
 
 An instrument is one reading over a finished sweep: a per-case row, a fold over
-those rows, a rendering, and the artifact keys it owns. Eight of them exist, and
-each one already had all four parts. Nothing named the shape, so each was wired
-by hand into four places in :mod:`evals.harness.run`: a field on ``ModeRun``, an
-accumulator in ``_run_mode``, a ``_print_*`` function, and a literal in the
-artifact. Adding ASVS's two instruments cost six artifact keys and two
-renderers, written one at a time.
+those rows, a rendering, and the artifact keys it owns. Eight of them exist.
+Each instrument declares its four parts in one entry, so no instrument is wired
+by hand into :mod:`evals.harness.run`.
 
 This is the rule ``docs/agents/framework-parity.md`` states for frameworks,
 applied to the other axis: prefer a table over a constant or a branch. A missing
@@ -540,9 +537,9 @@ def artifact_blocks(sweep: Sweep) -> dict[str, Any]:
 #:
 #: **Keyed, never branched.** A package added to
 #: :data:`~analysis_service.frameworks.PACKAGES` and missing here raises at the
-#: first case that carries its block, which is the whole reason this is a table:
-#: the ``if`` it replaced dispatched to one package by name and would have gone
-#: on scoring nothing for a third, quietly.
+#: first case that carries its block, which is the whole reason this is a table.
+#: A branch on a package name would score nothing for an unlisted package, and
+#: would say nothing.
 #:
 #: ``None`` is a declaration, not a hole. It says this package earns no
 #: *per-case* scorer, which is true of a package whose numbers pool rather than

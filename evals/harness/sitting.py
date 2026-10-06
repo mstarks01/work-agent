@@ -881,7 +881,7 @@ def document(
 
     ``held`` names the surface the read happened on. It is a value the caller
     supplies rather than a sentence written here, because there is more than
-    one surface now and a hardcoded one would be false on all but the first.
+    one surface and a hardcoded one would be false on all but one.
 
     ``marks`` is keyed by fingerprint, and a key naming no recorded finding of
     this case refuses the whole document. It is either a page that lost its

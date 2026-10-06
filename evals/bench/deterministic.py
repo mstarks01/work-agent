@@ -586,17 +586,15 @@ def as_compact(model: dict) -> dict:
     **The ref is the element's own name slug behind its tag, because that is what
     a model writes.** A positional ref would be shorter and would make this
     figure look better; five live sweeps put the mean ref at 20.8 characters,
-    which is a name. Pricing against a six-character ref overstated the saving by
-    nearly double — 9.6% against 5.0% — and that overstatement stood in this
-    file, in :mod:`analysis_service.compact` and in ADR 0035 until the third
-    live sweep exposed it.
+    which is a name. A six-character ref overstates the saving by nearly
+    double — 9.6% against 5.0%.
 
     **A flow's name is its label, so this prices a label-derived flow ref** —
-    which is what ``compact-v4`` asks for and what ``compact-v3`` did not say.
-    Version 3 left the model to choose and it chose the endpoints, at 33.2
-    characters against a label's 17.4 over this corpus. So this figure ran ahead
-    of the emission by a further 1.04% of the full model for three live sweeps,
-    on top of the six-character ref #960 corrected.
+    which is what ``compact-v4`` asks for. Under ``compact-v3`` the model
+    chooses, and it chooses the endpoints, at 33.2 characters against a
+    label's 17.4 over this corpus. A label-derived ref under ``compact-v3``
+    would put this figure ahead of the emission by a further 1.04% of the full
+    model (#960).
 
     The cost is that the expansion is handed refs that *look* like names. It
     still rebuilds every identifier from the ``name`` field rather than from the

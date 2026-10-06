@@ -3,9 +3,8 @@
   //
   // So nothing on this page interpolates a value into innerHTML. Text goes in
   // as textContent and structure is built as DOM nodes — which is why there is
-  // no escape helper here to forget to call. That discipline had already
-  // failed once, unnoticed, in the element table's attribute column. Forgetting
-  // `textContent` now shows junk on screen instead of executing script.
+  // no escape helper here to forget to call. A forgotten `textContent` shows
+  // junk text and runs no script.
   //
   // `append` is the primitive that makes this cheap: it takes nodes and
   // strings, and a string always becomes a text node, never markup.
@@ -268,9 +267,9 @@
   const cell = (...kids) => { const n = el("td"); n.append(...kids); return n; };
 
   // What a scope state means to a reader, and the class that colours it. The
-  // wording is the point: `not-raised` used to read as `applicable`, which
-  // told a reader the unit applies when the only fact is that no lane filed
-  // on it (#659). Each says what happened, and none of them says "satisfied".
+  // wording is the point: `not-raised` must not read as `applicable`, because
+  // the only fact is that no lane filed on the unit (#659). Each says what
+  // happened, and none of them says "satisfied".
   const SCOPE_STATE = {
     "not-raised": ["No claim filed",
       "The lane ran and raised nothing on this unit. That is not a finding that it is met, and not a ruling that it applies."],
@@ -321,7 +320,7 @@
   // are the common case and get no affordance.
   const CLAMP_OVER = 220;
 
-  // Every mark now sits in the block whose claims it points at, so these are
+  // Every mark sits in the block whose claims it points at, so these are
   // built per block rather than once for the page. Claim IDs are unique only
   // *within* a block — two frameworks may legitimately compose the same string
   // for unrelated things — so a page-wide map would collide the moment a report
@@ -409,8 +408,8 @@
   // "in the model", never "analysed". `elements_analyzed` is the embedded
   // model's own element count and nothing more: no stage records that an
   // element was examined, and the coverage block below counts which elements a
-  // draft *cited*, which is a different fact again. The old wording told a
-  // reader every one of them had been looked at, which no field here supports.
+  // draft *cited*, which is a different fact again. No field here supports
+  // the statement that every element was examined.
   const frameworks = R.analyses.map(b => b.framework).join(", ");
   $("scope").textContent =
     `${R.elements_analyzed} elements in the model, under ${frameworks}`;

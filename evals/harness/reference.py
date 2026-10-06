@@ -295,9 +295,9 @@ class CaseRulings(BaseModel):
 #: **It is a relation between a requirement and a submission, never a property
 #: of the requirement.** The same requirement is ``gap-from-prose`` in a case
 #: whose description happens to state that nothing rate-limits a caller, and
-#: ``needs-code`` in one that says nothing about it. #418 removed a table keyed
-#: by requirement for exactly this reason, and a disposition that lived on the
-#: catalog rather than on the case would be that table again.
+#: ``needs-code`` in one that says nothing about it. A table keyed by requirement
+#: cannot hold this (#418), and a disposition that lived on the catalog rather
+#: than on the case would be that table.
 AsvsDisposition = Literal[
     "not-applicable",
     "gap-from-prose",

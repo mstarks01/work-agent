@@ -3,15 +3,14 @@
 ## Why this is measured
 
 The token caps over the static instruction are drift alarms (ADR 0016). They say
-how far the text has moved, and claim nothing about how well it works. The claim
-nobody could check was the one the retired 6-8K envelope made, that a lane agent
-analyses worse above some length. No instrument read prompt size, so a raise
-that improved findings and a deletion that cost them looked alike to a sweep.
+how far the text has moved, and claim nothing about how well it works. This
+instrument records each node's instruction size and digest, so a sweep can tell
+a raise that improved findings from a deletion that cost them.
 
 This is the instrument that makes the comparison possible. It records, beside
 the scores in the same artifact, what each node was told: the size of its
 composed instruction, and that instruction's own digest. Two artifacts either
-side of a prompt edit now answer which node's instruction moved, by how much,
+side of a prompt edit answer which node's instruction moved, by how much,
 and what the scores did. That is what a raise costs, as against a deletion.
 
 ## What it does not do

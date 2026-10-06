@@ -407,9 +407,9 @@ _FOOTHOLD = re.compile(
 #: nothing the next reader can check. Name the privilege the actor reaches that
 #: the flow between the two cited elements does not carry.
 #:
-#: Empty, and that is a measurement rather than a default: the seven claims
-#: this rule was written from were all ruled out by the Case Sitting of
-#: 2026-09-21 and dropped by #1123, and no claim in the corpus raises it today.
+#: Empty, and that is a measurement rather than a default: the Case Sitting of
+#: 2026-09-21 ruled out the seven claims this rule is drawn from (#1123), and no
+#: claim in the corpus raises it.
 ESCALATE_DECLARED: Mapping[tuple[str, tuple[str, ...]], str] = {}
 
 
@@ -422,10 +422,8 @@ def _escalate_leads(
     authorization verbs to write: where the actor holds the grant and the
     finding is that the grant reaches further than its purpose, the verb is
     ``abuse-grant``, **however large the harm**; ``escalate`` is for reaching
-    what the actor's position never carried. Nothing held the reference set to
-    that rule, so the rule had a reader on the drafting side and none here, and
-    the two drifted until a person read them — six claims and every
-    elevation-of-privilege record in two cases (#1125).
+    what the actor's position never carried. This check holds the reference set
+    to the drafting-side rule (#1125).
 
     The condition is decidable and it is the model's, not a word's. A claim
     raises when it cites two elements the blessed model already joins with a
@@ -487,8 +485,8 @@ def _stale_escalate_declarations(
 ) -> Iterator[str]:
     """Declarations for a claim that no longer raises, so the table cannot rot.
 
-    A table nobody compares to what it answers for fails as quietly as the
-    branch it replaced. An entry whose claim was re-verbed, reworded onto other
+    A table nobody compares to what it answers for fails as quietly as a
+    branch. An entry whose claim was re-verbed, reworded onto other
     elements or dropped is answering nothing, and the reason it carries is the
     one thing a later reader would trust.
     """
@@ -942,16 +940,9 @@ def declared_options(meta: dict) -> dict[str, Mapping[str, Any]]:
 #:
 #: **Missing work, never an exemption.** Every entry is a case the corpus should
 #: grade and does not, so every ASVS number in the suite is computed over less of
-#: the corpus than it could be. The list is meant to reach zero, and is there now.
-#:
-#: It held four cases between
-#: [#234](https://github.com/mstarks01/work-agent/pull/234), which made the
-#: precondition read what a **Process** presents, and
-#: [#236](https://github.com/mstarks01/work-agent/pull/236), which wrote the four
-#: reference sets. Kept rather than deleted because the next package whose
-#: precondition can refuse will need it the same way: a case that starts
-#: satisfying one and carries no records for it belongs here by name, not in
-#: silence.
+#: the corpus than it could be. The list is empty. It stays for the next package
+#: whose precondition can refuse a case: a case that starts satisfying one and
+#: carries no records for it belongs here by name, not in silence.
 PENDING_REFERENCE_SETS: dict[str, frozenset[str]] = {}
 
 
@@ -1198,9 +1189,8 @@ def calibration_inputs() -> tuple[
     The blessed model's element IDs, and each STRIDE reference claim mapped to
     its own sorted element IDs **and its verb**. The verb is half of what the
     identity rule reads, and a fixture carrying a stale one measures the rule
-    against a claim the corpus no longer states: two case-02 pairs held
-    ``impersonate`` after the corpus moved to ``use-credential``, and this
-    check saw nothing because it read the elements alone. STRIDE's reference file only, because the
+    against a claim the corpus does not state. The check reads the verb as
+    well as the elements. STRIDE's reference file only, because the
     composed identity is STRIDE's: a framework that matches by requirement ID
     reaches no claim-equivalence question and contributes no pair.
     """

@@ -53,12 +53,12 @@ place. :data:`READS_SCOPE` says which versions read it, and a version that does
 refuses an empty one the way version 2 refuses a missing verb.
 
 Version 6 reads the action through :data:`~evals.harness.verbs.EQUIVALENT`,
-so two verbs the labels cannot separate key alike. Version 4 hashed the verb
-as written, which was one reader of "one action" beside the matcher's
-:func:`~evals.harness.verbs.same_action`: the day a group landed, a vote on a
-``forge`` claim would have missed an ``inject`` one the scorer matched. The
-version is in the value, so a ledger row keyed at 4 re-keys to 6 by
-recomputation and never compares across the table change by accident.
+so two verbs the labels cannot separate key alike. Version 4 hashes the verb
+as written, so it keys ``forge`` and ``inject`` apart while the matcher's
+:func:`~evals.harness.verbs.same_action` matches them: under it, a vote on a
+``forge`` claim misses an ``inject`` one the scorer matched. The version is in
+the value, so a ledger row keyed at 4 re-keys to 6 by recomputation and never
+compares across the table change by accident.
 
 Every version stays computable, and that is not a compatibility shim. Which rule
 keys a package is :data:`VERSION_FOR`, and the entries follow from what a
@@ -87,7 +87,7 @@ from evals.harness.verbs import canonical, check_verb
 #:
 #: Which rule keys each framework's findings. **Keyed, never branched**, and
 #: checked against ``PACKAGES`` by ``tests/test_evals_fingerprint.py`` — a table
-#: nobody compares to its registry fails as quietly as the ``if`` it replaced.
+#: nobody compares to its registry fails as quietly as a branch.
 #:
 #: The entries are not a preference. They follow from what a package's claims
 #: are: an open claim set has no identifier behind it, so the action is half of
@@ -133,7 +133,7 @@ SUPPORTED_VERSIONS = (1, 2, 3, 4, 5, 6)
 #:
 #: ``test_every_supported_version_declares_what_it_reads`` checks it against
 #: :data:`SUPPORTED_VERSIONS` in both directions, because a table nobody
-#: compares to its registry fails as quietly as the ``if`` it replaced.
+#: compares to its registry fails as quietly as a branch.
 #: ``action`` is the verb read through the equivalence table; ``verb`` is the
 #: verb as written. Both require a verb on the claim.
 EXTRA_COMPONENT: dict[int, str | None] = {

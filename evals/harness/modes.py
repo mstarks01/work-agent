@@ -270,9 +270,8 @@ class AnalysisRun:
 def _tags(value: list[str]) -> str:
     """One element's asset tags as a comparable string, order removed.
 
-    Every tag counts, on both sides. #877 retired the two that named what a
-    failure would cost rather than what the element holds, so this scorer no
-    longer drops a half: the vocabulary itself carries the rule now.
+    Every tag counts, on both sides. Every tag names what an element holds,
+    never what a failure would cost (#877), so every tag counts.
 
     :func:`~analysis_service.analysis.comparable_asset_tags` builds the value,
     here and in the candidate rule that reports an element's tags, so the
@@ -418,12 +417,11 @@ def _endpoint_key(element_id: str) -> str:
     behind an entity's or a boundary's name, and an ID that is not a flow ID
     under any shipped identity version has no parts to drop.
 
-    Through the identity's own decoder rather than a split of its own. This read
-    the first two colon-separated segments while a flow ID was
-    ``flow:<endpoints>:<label>``; under a version whose endpoints carry their
-    types that returns ``flow:<one prefix>`` for every flow in the model, so
-    every crossing keyed alike and the precision reading went to 1.0 over a
-    model that separated everything from everything.
+    Through the identity's own decoder rather than a split of its own. Under a
+    version whose endpoints carry their types, a split on the first two
+    colon-separated segments returns ``flow:<one prefix>`` for every flow in
+    the model, so every crossing would key alike and the precision reading
+    would go to 1.0 over a model that separated everything from everything.
     """
     try:
         version = flow_id_version(element_id)
@@ -942,7 +940,7 @@ class ExtractionScore:
 
     @property
     def zone_recall(self) -> float:
-        """The half :attr:`endpoint_recall` no longer counts: the trust zones.
+        """The half :attr:`endpoint_recall` does not count: the trust zones.
 
         Kept apart rather than dropped. A zone name reaches no claim, but the
         zones are what :meth:`~analysis_service.system_model.SystemModel.boundary_crossings`
@@ -1272,13 +1270,13 @@ def case_framework_options(case: GoldenCase) -> dict[str, dict[str, Any]]:
     model and raises ``MissingFrameworkOptions`` when one is absent, because no
     package field carries a default. ``AdkPipelineRunner`` builds this map from
     the job's ``frameworks`` list; this builds the same map from the case's,
-    which is where a corpus case has always declared them.
+    which is where a corpus case declares them.
 
-    Missing until #290, and it made ``analysis`` and ``end-to-end`` unrunnable
-    for any package with a required option. It went unnoticed because STRIDE
-    declares none, so the omission was invisible for as long as STRIDE was the
-    only package — and ``tests/test_graph.py`` seeds ``ASVS_OPTIONS`` by hand,
-    so no offline test drove the path that omits them.
+    Without this map, ``analysis`` and ``end-to-end`` cannot run for any
+    package with a required option (#290). STRIDE declares none, so only a
+    second package exercises this, and ``tests/test_graph.py`` seeds
+    ``ASVS_OPTIONS`` by hand, so no offline test drives the path that omits
+    them.
     """
     return {
         declaration.name: dict(declaration.options)
@@ -1990,10 +1988,10 @@ def _name_tokens_absent(
     this component, so it neither measures invention nor rules it out (#961).
     What it does is name the elements a reader should open first.
 
-    Singular and plural are one word here. A source writing "game servers",
-    "Analysts" and "dashboards" had a model's ``game server``, ``analyst`` and
-    ``dashboard`` read as three invented components on the first run that used
-    this — 3.5 a run, against a true count near zero. Which of the two forms an
+    Singular and plural are one word here. Otherwise a source writing "game
+    servers", "Analysts" and "dashboards" would have a model's ``game server``,
+    ``analyst`` and ``dashboard`` read as three invented components (measured
+    3.5 a run, against a true count near zero). Which of the two forms an
     extraction should write is the naming rule's question, and it is measured
     as recall against the corpus; charging it a second time here as invention
     would count one disagreement twice.
@@ -2003,9 +2001,9 @@ def _name_tokens_absent(
     words is a component nobody mentioned. A flow's name is a label the model
     coins for an interaction — ``dashboards-query-telemetry-lake`` — and rule 2
     of ``extract.md`` has it invent a zone for each one the text implies, so
-    neither is a name the source was ever going to contain. Asking anyway read
-    41 coined flow labels and 3 invented zones as invention on the first run
-    that used this.
+    neither is a name the source was ever going to contain. Asking anyway reads
+    coined flow labels and invented zones as invention (measured 41 labels and
+    3 zones in one run).
 
     What it is not is a rename test. Deciding that an extra element is a
     blessed one under another name is a reader's ruling, which

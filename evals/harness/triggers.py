@@ -15,8 +15,8 @@ concern about the same place. Case 13 reads 19/19 with two of its hits like
 that: the stale importer-token claim is credited by other flows' unknown
 authentication, and the XXE disclosure claim by unprotected transit on the
 archive path. Neither shows the mechanism was recognised. A number named
-``recall`` invites exactly the reading this cannot support, so the word is gone
-from what a reader quotes.
+``recall`` invites exactly the reading this cannot support, so no quoted figure
+is named recall.
 
 A miss is the sharper half and stays trustworthy: no rule in the lane named any
 element the claim is about, so there was no structural lead to take up.

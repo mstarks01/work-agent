@@ -63,10 +63,9 @@ from evals.harness.scorer import (
 #
 # **Composed from ``Standing`` rather than restating it.** The ways an unmatched
 # finding can stand are the scorer's vocabulary, and a second copy here would
-# disagree with it the first time one was added -- which is what happened when
-# ``stale`` landed: this literal listed four standings and ``_dispositions``
-# assigned a fifth. So the four names below are the ones this module owns, and
-# every standing arrives with the scorer's own type.
+# disagree with it the first time one was added. So the four names below are
+# the ones this module owns, and every standing arrives with the scorer's own
+# type.
 Disposition = (
     Literal["matched-must-find", "matched-expected", "lane-error", "unscored"]
     | Standing
@@ -146,9 +145,9 @@ class CriticYield:
     def matched_lost(self) -> int:
         """Of :attr:`matched_killed`, the kills whose reference no surviving
         claim took: the net destruction. A killed draft's reference can be
-        matched again by another draft after the critic, and the first
-        Baseline had two such kills read as two destroyed findings while the
-        report still carried both. ``matched_killed`` stays the gross count."""
+        matched again by another draft after the critic, so the gross count
+        overstates the loss: such a kill reads as a destroyed finding while the
+        report still carries it. ``matched_killed`` stays the gross count."""
         return sum(
             1
             for draft in self.killed

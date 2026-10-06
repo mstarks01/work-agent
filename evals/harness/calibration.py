@@ -14,9 +14,7 @@ dispositions say whether identity is decidable and, when it is, whether the
 claims match. A matcher's agreement with the scored labels must be at least 90%. The
 comparator is Semgrep's 92% to 96% on an analogous triage task. The matcher
 under this bar is the identity rule from :mod:`evals.harness.identity`. The
-model judge this scoreboard was built for is retired, and the scoreboard
-outlived it: any future rule version is priced here against the same labels
-before it ships.
+scoreboard prices a rule version against the same labels before it ships.
 
 The bar is the admission gate for a candidate rule. A rule nobody has measured
 has no pinned counts to regress against, and the bar is the only thing that can
@@ -530,8 +528,7 @@ def _asvs_collides(left: Any, right: Any, flows: FlowMap) -> bool:
 
 #: What identity evidence each package needs. **Keyed, never branched**, and
 #: checked against ``PACKAGES`` by ``tests/test_framework_neutrality.py`` — a
-#: table nobody compares to its registry fails as quietly as the ``if`` it
-#: replaced.
+#: table nobody compares to its registry fails as quietly as a branch.
 #:
 #: A package added to ``PACKAGES`` and missing here raises at
 #: :func:`measure_merges`, which is the question its author should answer: what

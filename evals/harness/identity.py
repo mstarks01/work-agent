@@ -2,8 +2,8 @@
 
 [#201](https://github.com/mstarks01/work-agent/issues/201) proposed resolving a
 **Claim** to the parts that decide its identity, so two spellings of one threat
-compare equal without a model. This is that rule. Since the model judge was
-retired it is the only decider of claim equivalence in the harness: the scorer
+compare equal without a model. This is that rule. It is the only decider of
+claim equivalence in the harness: the scorer
 matches with it, the queue keys findings with the same components, and a human
 vote answers what no comparison of fields can.
 

@@ -175,10 +175,9 @@ class UnlistedThreat:
 
     A standing is read against the claim this run produced, never against the
     fingerprint alone. A vote whose structural digest differs from this claim's
-    stands ``stale``: the 2026-09-09 audit replaced every retained case 01 title
-    and explanation with text asserting the opposite of the finding and no key
-    moved, so a standing carried across that would have called a contradiction a
-    human-validated finding.
+    stands ``stale``. A title and an explanation can change to text that asserts
+    the opposite of the finding while no key moves, so a standing carried across
+    that change would call a contradiction a human-validated finding.
     """
 
     threat_id: str
@@ -356,9 +355,9 @@ class CaseScore:
         from :attr:`eligible_count` — so producing more conditional findings
         lowers this number without a person reading one of them. Read it beside
         :attr:`eligible_count` and :attr:`reviewed_count`, which
-        :meth:`to_json` carries for exactly that reason. The definition is
-        unchanged because it is what the recorded artifacts hold; what changed
-        is that the two denominators it hides now travel with it.
+        :meth:`to_json` carries for exactly that reason. The definition matches
+        what the recorded artifacts hold, and the two denominators it hides
+        travel with it.
         """
         return ratio(self.standing_counts["rejected"], self.produced_count)
 
@@ -819,9 +818,9 @@ def exemplar_delta(scores: Sequence[CaseScore]) -> dict[str, float]:
 
     "Near" is every architecture the exemplars demonstrate, so the number
     survives the exemplar set growing: with two worked systems and one corpus
-    control apiece, this still asks the one question worth asking, which is
-    whether recall depends on having been shown the architecture. What it can
-    no longer do is attribute a gap to a *particular* exemplar system — for
+    control apiece, this asks the one question worth asking, which is
+    whether recall depends on having been shown the architecture. What it
+    cannot do is attribute a gap to a *particular* exemplar system — for
     that, read the per-case coverage figures behind it.
     """
     near = [score for score in scores if score.exemplar_proximity == "near"]

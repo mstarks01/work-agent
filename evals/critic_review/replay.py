@@ -301,8 +301,9 @@ class ReplayScore:
         those rows are the whole denominator of
         :attr:`recommendation_agreed`. Where every one of them expects the same
         ``sound``, a critic answering with that constant and never opening the
-        block scores full marks — the failure :attr:`unsupported_removed` and
-        :attr:`valid_preserved` were split apart to avoid.
+        block scores full marks — the failure that keeping
+        :attr:`unsupported_removed` and :attr:`valid_preserved` separate
+        prevents.
 
         **It is a fact about the run, not about the set.** A set carrying both
         answers still reports false here when the critic rejected the row that
@@ -336,10 +337,9 @@ class ReplayScore:
         """Surviving drafts citing an unknown that the ruling set none aside.
 
         **A state, never a fault.** A draft that genuinely rests on the fact it
-        cites deserves a ``needs-info`` dismissing nothing, and on the first
-        live run both ``credible-conditional`` fixtures landed here having been
-        ruled exactly right. Reading this list as a score would mark a correct
-        critic down twice.
+        cites deserves a ``needs-info`` dismissing nothing, so both
+        ``credible-conditional`` fixtures can land here ruled exactly right.
+        Reading this list as a score would mark a correct critic down twice.
 
         What it is for is the row where the reader ruled the unknown
         immaterial. There, an empty dismissal is the critic #894 is about — one
@@ -362,9 +362,8 @@ class ReplayScore:
     def recommendation_unread(self) -> tuple[FixtureOutcome, ...]:
         """Surviving drafts the critic ruled without reading the advice on them.
 
-        The state that had no observable: a critic that weighed the
-        recommendation and one that never looked emitted the same ruling. A
-        rejected draft owes no reading and is not counted here.
+        These are surviving drafts whose ruling records no reading of the
+        advice. A rejected draft owes no reading and is not counted here.
         """
         return tuple(
             o
@@ -419,9 +418,9 @@ def carries_both_answers(rows: Iterable[tuple[bool, bool | None]]) -> bool:
     Only a surviving draft carries a reading, so the survivors are the whole
     denominator of :attr:`ReplayScore.recommendation_agreed`. Where they all
     expect the same ``sound``, a critic answering with that constant and never
-    opening the block scores full marks, which is the failure
+    opening the block scores full marks, which is the failure that keeping
     :attr:`ReplayScore.unsupported_removed` and
-    :attr:`ReplayScore.valid_preserved` were split apart to avoid. A row the
+    :attr:`ReplayScore.valid_preserved` separate prevents. A row the
     reader says must die is not in the question: its advice is unsound by
     construction, so counting it makes every set look discriminating.
     """
@@ -454,8 +453,7 @@ def _engages(reason: str, anchors: tuple[str, ...]) -> bool:
 
     An anchor matches where its words appear in order and together, so a
     multi-word anchor is a phrase rather than a bag, and a word inside a longer
-    word is not a match — the property the word-boundary form had and the one
-    worth keeping.
+    word is not a match.
     """
     words = _words(reason)
     for anchor in anchors:

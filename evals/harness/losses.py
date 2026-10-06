@@ -5,10 +5,9 @@ same rulings, so a fix carries its ceiling before anybody pays for a run: an
 exemplar edit is priced on the misses the verb lost, a candidate rule on the
 misses no rule led to. The class is the expected recovery and not a causal
 bound; a gain outside it is a signal to read, never noise, and the cause order
-below records one observation per miss rather than every contributor. On
-2026-09-09 an exemplar edit went to a $6 sweep
-with no such number; read off the Baseline afterwards, its ceiling was five
-must-finds of 129, inside the run-to-run band.
+below records one observation per miss rather than every contributor. Read the
+ceiling before a paid sweep. On the first Baseline, one exemplar edit had a
+ceiling of five must-finds of 129, inside the run-to-run band.
 
 Seven causes, decided in this order for one missed reference:
 
@@ -51,10 +50,9 @@ Seven causes, decided in this order for one missed reference:
 A ``place`` or ``unled`` row also says whether the lane wrote *near* the
 reference: ``displaced_draft_id`` names a surviving claim in the lane that
 shares at least one endpoint-resolved element with the reference without
-either set containing the other. The second Baseline moved nine verb losses
-into these two causes and nothing said whether the lane had gone silent or
-had written the finding one element over; those are two different fixes, and
-the row now tells them apart.
+either set containing the other. The row tells a silent lane apart from a
+lane that wrote the finding one element over, because those are two
+different fixes.
 
 Every fact read here is one the harness already holds in a closed form: the
 scorer's element relation, the identity rule's own answer to whether two verbs
@@ -110,7 +108,7 @@ FanInEffect = Literal["removed", "narrowed"]
 #:
 #: Nothing here judges whether two claims are one finding; a rule cannot, and
 #: the model judge is retired. This says only how the two places relate, which
-#: is already computed and was thrown away, so a reader can sort a verb reading
+#: the scorer computes and this keeps, so a reader can sort a verb reading
 #: list by strength and a ceiling can be stated over the ``equal`` rows alone.
 Relation = Literal["equal", "reference-contains", "draft-contains", "overlap"]
 RELATIONS: tuple[Relation, ...] = (
@@ -169,8 +167,7 @@ class Loss:
     #: This is what separates two defects a ``place`` row otherwise spells the
     #: same way. ``pooled`` means a person read the neighbouring claim and
     #: accepted it, so the lane found something real and wrote it one element
-    #: over. ``rejected`` means the lane wrote something a person refused. The
-    #: 2026-09-22 audit had to join the ledger by hand to tell those apart.
+    #: over. ``rejected`` means the lane wrote something a person refused.
     displaced_standing: Standing | None = None
     #: For a ``fan-in`` row: the title of the lane's proposal at the place,
     #: what the fan-in did to it, and why, read from the block's own marks —

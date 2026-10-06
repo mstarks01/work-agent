@@ -56,16 +56,16 @@ __all__ = [
 
 #: Verbs that count as **one** action for matching, as a set of groups.
 #:
-#: **One group, and it was priced before it shipped.** The table was empty
-#: from the vocabulary's first cut, because every apparent synonym over the
-#: calibration labels resolved to one verb once the verb was assigned from the
-#: action and its object class, which is what :data:`GLOSS` is for. The first
-#: Baseline (#728) then showed a pair the labels cannot separate at any price:
-#: ``forge``, ``inject`` and ``plant`` name the same finding in five reference
-#: rows and two lane drafts, and ``run.py price-verbs`` measured the merge at
-#: zero new false merges over the labelled pairs and zero new reference merges
-#: over the corpus, for four more matched references (#730). A merge that
-#: costs nothing on either error axis is the one this mechanism exists for.
+#: **One group, priced before it shipped.** Most apparent synonyms over the
+#: calibration labels resolve to one verb once the verb is assigned from the
+#: action and its object class, which is what :data:`GLOSS` is for. One group
+#: does not, and the labels cannot separate it at any price: on the first
+#: Baseline (#728), ``forge``, ``inject`` and ``plant`` name the same finding in
+#: five reference rows and two lane drafts, and ``run.py price-verbs`` measured
+#: the merge at zero new false merges over the labelled pairs and zero new
+#: reference merges over the corpus, for four more matched references (#730). A
+#: merge that costs nothing on either error axis is the one this mechanism
+#: exists for.
 #:
 #: The fingerprint reads a verb through :func:`canonical` at the version
 #: :data:`~evals.harness.fingerprint.VERSION_FOR` names, so a vote on a
