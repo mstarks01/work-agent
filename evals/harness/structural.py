@@ -29,10 +29,10 @@ failure that did not say whose block it was in would send a reader through all
 of them. The neutral half runs over every block. The severity check is STRIDE's,
 and runs only where the package's record grades harm.
 
-One check is deliberately gone. ``^[STRIDE]-\d{2}$`` and the category-letter
-assertion were deleted with ``schema_version`` 3.0. The service composes the ID
-from the package's own ``IdRule``, and stamps the lane from the same call, so
-the letter and the lane cannot disagree unless the composition itself is wrong.
+No check re-validates the ID's shape or its category letter. The service
+composes the ID from the package's own ``IdRule``, and stamps the lane from the
+same call, so the letter and the lane cannot disagree unless the composition
+itself is wrong.
 Re-validating the string would hide that rather than catch it.
 """
 

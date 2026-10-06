@@ -14,10 +14,8 @@ one, and every number is offline:
   matched references and must-finds, against the shipped rule.
 
 This is the frontier ``tests/test_evals_identity.py`` pins for the shipped
-rule, opened to a candidate and given a gain column. It exists because on
-2026-09-09 an exemplar edit went to a paid sweep with no such number, and the
-same afternoon a script in a scratch directory priced three candidates in
-seconds. A measurement nobody can run is not a measurement (#730).
+rule, opened to a candidate and given a gain column. It prices a candidate verb
+rule offline, before any paid sweep (#730).
 
 Nothing here adopts anything. A candidate that prices well is still a decision
 for the maintainer, because a reference merge is a pair the corpus says are

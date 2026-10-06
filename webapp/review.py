@@ -386,8 +386,8 @@ def _require_token(request: Request, session: Session) -> None:
     Beside the origin check rather than instead of it, because they refuse
     different things: the origin check refuses a page on another origin, and
     this refuses a request that never read this one. The ledger is the supply
-    chain of every published quality number, and the sitting app's writes have
-    carried both since they were written.
+    chain of every published quality number. Every write from the sitting app
+    carries both.
     """
     sent = request.headers.get("x-review-token", "")
     if not secrets.compare_digest(sent.encode(), session.token.encode()):

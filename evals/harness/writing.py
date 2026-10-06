@@ -7,8 +7,8 @@ split is the whole control for a reviewer's taste, and it stops "I dislike this
 sentence" reading as "the tool found a threat that is not there".
 
 The split only works if the objection lands somewhere. This module is where it
-lands. The ledger kept the reason, and until this instrument no command read it,
-so a reviewer's answer about the prose changed nothing anybody could see.
+lands. This instrument reads the reason the ledger keeps, so a reviewer's
+answer about the prose changes something a reader can see.
 
 It is neutral over frameworks. How a claim reads is not a property of a claim
 set, so this walks whatever blocks the sweep produced and reports one row per

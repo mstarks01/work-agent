@@ -265,10 +265,8 @@ def build(root: Path = REPO_ROOT) -> str:
         return HEADER + EMPTY
 
     parts = [HEADER]
-    # By name, and by name alone: one tree gives one table. A merge date used
-    # to sort here, read from git at build time, and a depth-one checkout
-    # answered with its boundary commit's date, so the committed table read
-    # as stale on any pull request dated after the Baseline landed.
+    # By name, and by name alone: one tree gives one table. A git date depends
+    # on checkout depth, so rows sort by name.
     rows.sort(key=lambda row: row.name)
     grouped: dict[tuple[str, str], list[Row]] = {}
     for row in rows:

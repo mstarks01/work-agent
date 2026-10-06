@@ -245,9 +245,8 @@ def _is_derived(rel: str) -> bool:
 
     Derived files leave the delta before any check reads it, which is what
     makes a regeneration an ordinary code change: it selects no kind, so it
-    names no submitter and appends no entry. Before this, refreshing the
-    reading documents was classified as twelve sittings by twelve people who
-    had not read anything, and there was no diff that could pass.
+    names no submitter and appends no entry. A regeneration of the reading
+    documents is a code change, not a sitting.
     """
     name = rel.rsplit("/", 1)[-1]
     return any(
@@ -928,9 +927,7 @@ KINDS: dict[str, Kind] = {
         prefix="evals/baselines/",
         # The comparison table: `run.py comparison` writes it from the merged
         # Baselines, so a change to it alone is the generator changing and not
-        # a Baseline arriving. Before this, a code change that altered the
-        # table's shape was read as a Baseline submission and failed its own
-        # checks.
+        # a Baseline arriving.
         derived=frozenset({"README.md"}),
         # A Baseline directory outlives the PR that laid it down, so a later
         # diff may touch it without contributing anything.

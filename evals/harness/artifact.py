@@ -8,7 +8,7 @@ hand-kept halves would agree only by habit — and a key the writer stopped
 producing would read as a sweep that measured nothing, which is a plausible
 number rather than an error.
 
-The keys are now declared: the envelope's here, and every instrument's on its
+The keys are declared: the envelope's here, and every instrument's on its
 own entry in :data:`~evals.harness.instruments.INSTRUMENTS`. :func:`build`
 writes exactly that set and :func:`load_artifact` refuses a file missing any of
 it, so ``ARTIFACT_VERSION`` guards a described shape rather than a number.
@@ -259,9 +259,9 @@ class EvalArtifact:
     def block(self, key: str) -> Any:
         """One declared block of the artifact, by key.
 
-        **Raises rather than defaulting.** ``raw.get("scores") or ()`` is what
-        this replaces, and it read a sweep whose scores block went missing as a
-        sweep that scored nothing — the same number, from opposite facts.
+        **Raises rather than defaulting.** A default would read a missing
+        scores block as a sweep that scored nothing — the same number, from
+        opposite facts.
 
         Checked here rather than at load, because which blocks a reader needs is
         the reader's own business: ``promote`` works from ``provenance`` alone
@@ -485,10 +485,8 @@ def build(
     The run-level facts — provenance, usage, latency, structural failures and
     the payloads — are read off ``sweep.run``, which is the one record of what
     the sweep did. ``provenance`` is what actually generated, per node
-    execution: the record ``promote`` reads back. It replaces the
-    ``node_fingerprints`` map, which carried the hashes without the served
-    builds they were computed from, so a promotion could not be driven from a
-    finished sweep at all
+    execution: the record ``promote`` reads back. It carries the served builds
+    beside their hashes, so a promotion can be driven from a finished sweep
     ([#117](https://github.com/mstarks01/work-agent/issues/117)).
 
     ``trusted`` rides beside the aggregates so nothing downstream folds an

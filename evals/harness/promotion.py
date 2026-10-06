@@ -226,11 +226,10 @@ def _refused_share(
 
     Distinct rows, through :meth:`~AssertionRecord.refused_rows`, never a count
     of issues: one row draws several reasons, and a graph contradiction refuses
-    nothing. Before #926's audit this divided the issue count and called it the
-    unsupported-assertion rate, which it is not — a row can quote the source
-    exactly and state something the quote does not say, and the gate passes
-    it. :func:`support_shares` reports that question and :data:`PENDING`
-    holds its gate.
+    nothing. An issue count is not the unsupported-assertion rate (#926), and
+    neither is this — a row can quote the source exactly and state something
+    the quote does not say, and the gate passes it. :func:`support_shares`
+    reports that question and :data:`PENDING` holds its gate.
     """
     record = _record(report)
     if record is None or not record.proposed:

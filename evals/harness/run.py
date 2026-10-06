@@ -313,10 +313,8 @@ async def _run_mode(
     decides which faults the loop records and carries on from; every other one
     stops the sweep the way a refused spend hold does — the cases left are named
     in ``stopped_before``, the fault is a Tier 1 failure, and the caller writes
-    the artifact and the reports for the cases that finished. Before this, the
-    fault left as an exception and took the finished cases with it: on
-    2026-09-12 a provider refused on credit part-way through an end-to-end
-    sweep, and the $2.85 already spent produced no artifact at all (#886).
+    the artifact and the reports for the cases that finished. Finished cases
+    keep their artifact when a later case faults (#886).
 
     ``accepted`` is the amount the estimate gate took consent for, and the
     hold runs **between batches, never inside one**: a case that has started
@@ -593,7 +591,7 @@ async def _run_mode(
             # From this batch's first case to the end of the corpus, skipped
             # cases included. Those spend nothing, so counting them pushes the
             # projection up — the safe direction for a gate somebody consents
-            # to, and the reading this had before batches existed.
+            # to.
             remaining = [later.id for later in cases[batch[0][0] :]]
             try:
                 accepted = consent.hold(accepted, executions, remaining, ask, ran=ran)
@@ -750,10 +748,9 @@ def _scored_sweep(
     One spelling for the two commands that compute these numbers: ``run``,
     which scores the sweep it just produced, and ``score``, which re-scores a
     finished one against the ledger as it stands now. Both read the same four
-    inputs and fill the same three fields, so an instrument added to the scored
-    half had to be found in two places. ``INSTRUMENTS`` already made the
-    printing and the artifact one table; this is the computing half of the same
-    argument.
+    inputs and fill the same three fields, so one function computes the scored
+    half for both commands. ``INSTRUMENTS`` makes the printing and the artifact
+    one table; this is the computing half of the same argument.
 
     Claim matching is the identity rule and a standing comes from the vote
     ledger. Both are offline, so these readings cost no provider and a sweep is
@@ -868,8 +865,8 @@ def _models_record(deployment: Deployment) -> dict[str, Any]:
         "tiers_config_version": tiers.version,
         # Dumped, not handed over whole: a ``TierSelection`` is a pydantic model
         # and the artifact is written with ``json.dumps``, which cannot encode
-        # one. Nothing offline caught that, because the artifact is only built
-        # on a live sweep.
+        # one. Only a live sweep builds the artifact, so no offline test reaches
+        # this.
         "tiers": {
             tier: selection.model_dump(mode="json") | _pin_record(tiers, selection)
             for tier, selection in tiers.tiers.items()
@@ -2562,8 +2559,8 @@ def _agreement_arguments(parser: argparse.ArgumentParser) -> None:
 
 #: Every subcommand, in the order ``--help`` lists them.
 #:
-#: Each ``run`` lives in the module that owns its subject, which is where
-#: ``submit`` and ``verify-contribution`` already were. What stays here is the
+#: Each ``run`` lives in the module that owns its subject, as ``submit`` and
+#: ``verify-contribution`` do. What stays here is the
 #: sweep and the readings taken over one: ``run`` *is* this module, and
 #: ``score``, ``promote``, ``pairing``, ``stability`` and ``calibrate`` each
 #: share a private helper with it, so moving one would split a pair rather than

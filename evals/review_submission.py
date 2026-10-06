@@ -193,7 +193,7 @@ def current_reviews(root: Path) -> dict[str, dict[str, MergedReview]]:
     """Which sitting currently covers each **Framework** of each case.
 
     Keyed ``case -> framework -> review``, because coverage is per framework
-    and always was: ``tests/test_case_review.py`` says a case reviewed for one
+    and ``tests/test_case_review.py`` says a case reviewed for one
     framework stays unread for the other. A case reads as read when every
     framework it declares has an entry here.
 
@@ -264,7 +264,7 @@ def latest_for_case(root: Path, case_id: str) -> MergedReview | None:
     that edit needs the other answer: what did the last sitting say? Its marks
     are keyed by fingerprint, so every one that still names a finding is still
     an answer, and the draft the surface seeds from it pins the files as they
-    are now. Without this reader, one added claim cost a whole case's read.
+    are now. Without this reader, one added claim would cost a whole case's read.
     """
     try:
         submissions = list(iter_submissions(root))

@@ -82,12 +82,9 @@ def _one_line(value: str) -> str:
     because the sink joins these into Markdown with `- ` in front of each.
 
     The rule is :func:`~analysis_service.sources.carries_line_break`, **called
-    rather than half-copied**. A tuple of four terminators lived beside the
-    source label's own check and this line type imported it, which left every
-    ``Cc`` terminator through: ``str.splitlines`` splits on ten characters and
-    the label was fenced against all of them only because a category check sat
-    next to the tuple. A fence sized to itself is safe only while its
-    neighbours are fenced too, and this one had no neighbour.
+    rather than half-copied**. ``str.splitlines`` splits on ten characters, so
+    a local tuple of four terminators would let the other ``Cc`` terminators
+    through.
 
     A control character that is *not* a terminator is another question and not
     this one — a reader may tab inside their own list item.

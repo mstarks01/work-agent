@@ -197,14 +197,14 @@ def _bare_name(model: str) -> str | None:
 
     An aggregator's identifier carries a vendor of its own, so a route like
     ``openrouter/deepseek/deepseek-v4-pro`` has two segments in front of the
-    name. Taking the text after the *last* slash stripped both and priced the
+    name. Taking the text after the *last* slash strips both and prices the
     route off a third party's entry. Measured against OpenRouter's live
     catalogue on 2026-09-11: of 444 slugs, 82 had an ``openrouter/`` key, 39
     were priced correctly by coincidence and **6 were priced wrongly**, the
-    worst under-stating by 2.2x — ``deepseek/deepseek-v4-pro`` billed at
-    4.35e-07 against the 9.48e-07 OpenRouter charges. An under-stated figure is
-    the one direction :class:`UnitPrices` says it never goes, and it reached the
-    consent screen with the route's own name printed beside it.
+    worst under-stating by 2.2x — ``deepseek/deepseek-v4-pro`` at 4.35e-07
+    against the 9.48e-07 OpenRouter charges. An under-stated figure is the one
+    direction :class:`UnitPrices` says it never goes, and the consent screen
+    prints it beside the route's own name.
 
     So a remainder that still carries a slash is not this route's model name,
     and there is no price here. The caller reports it as ``unpriced``, which is
@@ -212,8 +212,7 @@ def _bare_name(model: str) -> str | None:
 
     This rule covers a prefix no vendor claims. A registered aggregator is
     refused one step earlier and for a stronger reason — see
-    :func:`_routes_to_many_providers`, which is what settled that the entries
-    reached *through* this rule were never the whole error.
+    :func:`_routes_to_many_providers`.
     """
     _, separator, rest = model.partition("/")
     if not separator or "/" in rest:

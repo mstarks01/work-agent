@@ -37,7 +37,7 @@ from analysis_service.frameworks import FrameworkName
 #: other three measure nothing.
 #:
 #: ``nonsense-argument`` — grounds that resolve and a conclusion they do not
-#: support. This is the failure the change exists to catch.
+#: support. This is the failure this class catches.
 #:
 #: ``irrelevant-unknown`` — an unknown the claim does not depend on. Appending
 #: one is how a draft reaches the report unread today, so one fixture of this
@@ -124,7 +124,7 @@ class Expectation(BaseModel):
     #:
     #: **Whether the critic noticed is observable.** A ruling carries its own
     #: reading of the advice, so a critic that opened the block and one that
-    #: never did no longer emit the same ruling:
+    #: never did emit different rulings:
     #: ``FixtureOutcome.recommendation_read`` reads it, and
     #: ``ReplayScore.recommendation_unread`` counts the drafts that survived
     #: with no reading apart from the ones that disagree.

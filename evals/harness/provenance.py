@@ -224,11 +224,10 @@ class RunProvenance(BaseModel):
     #: a hash of a different payload, and comparing the two is exactly the
     #: silent mismatch versioning exists to prevent.
     #:
-    #: **Required, with no default.** A default meant an artifact that omitted
-    #: the field claimed the version it was about to be checked against. Under
-    #: one version that was harmless. Under two it is not: every artifact
-    #: written before version 2 would claim version 2 and fail on the recompute
-    #: with "the recorded fingerprint does not follow from ..." — the wrong
+    #: **Required, with no default.** A default would make an artifact that
+    #: omits the field claim the version it is about to be checked against: an
+    #: artifact written under version 1 would claim version 2 and fail on the
+    #: recompute with "the recorded fingerprint does not follow from ..." — the wrong
     #: error, naming the wrong cause.
     identity_version: int
     #: The installed versions of the distributions between a node and its
@@ -240,8 +239,8 @@ class RunProvenance(BaseModel):
     #: The checkout the sweep ran from: the commit, with ``-dirty`` when the
     #: working tree differed from it, or empty for an artifact written before
     #: this was recorded. The installed versions above name a release; a sweep
-    #: runs from a checkout, and two same-day merges once made an archive
-    #: unreadable with nothing on disk saying which tree produced it (#657).
+    #: runs from a checkout. Two merges on one day share a release, so only the
+    #: commit names the tree (#657).
     tree: str = ""
     sampling_config_version: int
     tiers_config_version: int

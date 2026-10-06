@@ -69,10 +69,9 @@ function railRow(row) {
   icon.setAttribute("aria-hidden", "true");
   const name = row.number + "  " + row.title;
   const label = el("span", "label", name);
-  // A row that will not press has to say why in the row. The reason lived in
-  // the tooltip alone, and a tooltip is read by neither a keyboard, a touch
-  // screen nor a screen reader — so the one row nobody can open was the one
-  // row that explained itself to nobody.
+  // A row that will not press has to say why in the row, and not only in the
+  // tooltip. A keyboard, a touch screen or a screen reader cannot read a
+  // tooltip.
   if (row.review.state === ERROR && row.status) {
     label.append(el("span", "reason", row.status));
   }

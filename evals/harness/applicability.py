@@ -272,9 +272,9 @@ def score_applicability(
 
     # Both arrays, because the critic's rejections land in ``rejected_claims``
     # and the report validator forbids one sitting in ``claims``. Reading
-    # ``claims`` alone left the negative cell permanently empty: a requirement
-    # the critic ruled inapplicable reached neither ``rejected`` here nor the
-    # block's ``scope``, so it was missed with nothing saying why.
+    # ``claims`` alone would leave the negative cell permanently empty: a
+    # requirement the critic ruled inapplicable would reach neither ``rejected``
+    # here nor the block's ``scope``, and nothing would say why.
     applied, rejected = applied_requirements(block.all_claims())
     off_catalog = applied - universe
     # A ``needs-other-evidence`` scope entry is the service's other way of

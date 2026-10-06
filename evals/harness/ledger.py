@@ -258,17 +258,17 @@ class Vote:
             except ContentError as exc:
                 raise LedgerError(f"vote {field_name}: {exc}") from exc
         # The key is computed, never stated. A row arrives from a contributor's
-        # pull request, and until this ran nothing recomputed it: the stored
-        # string was taken on the row's word, while `components` -- the fields
-        # the key is *made of* -- went unread. So a row could describe one
-        # finding and key another, and every reader keys on the string: `pool`,
-        # `_standing`, `agreement`.
+        # pull request, so the key is recomputed from `components` -- the
+        # fields the key is *made of* -- and never trusted as stored. A stored
+        # string taken on the row's word could describe one finding and key
+        # another, and every reader keys on the string: `pool`, `_standing`,
+        # `agreement`.
         #
         # A maintainer cannot catch that by reading. A roster edit says
         # `standing = "maintainer"` in a diff; this says sixteen hex characters,
         # and no eye tells a right hash from a wrong one.
         #
-        # It also restores the promise the module opens with. `rekey` recomputes
+        # It also keeps the promise the module opens with. `rekey` recomputes
         # from `components`, so a mismatched row *moves* on a re-key -- the
         # ledger scored one thing before and another after, which is exactly
         # what "a metric computed last month recomputes to the same number
@@ -595,8 +595,8 @@ def load(path: Path | str = DEFAULT_LEDGER_PATH) -> Ledger:
     ``path`` is the ledger *directory*, one ``<login>.jsonl`` per voter. A
     missing directory is an empty ledger rather than an error: before the
     first sitting there are no votes, and that is a starting state and not a
-    fault. A single ledger file is refused outright — the one-file shape was
-    dropped by #322, and reading it as empty would silently discard votes.
+    fault. A single ledger file is refused outright — the ledger is a directory
+    (#322), and reading a file as empty would silently discard votes.
     """
     path = Path(path)
     if path.is_file():
@@ -713,7 +713,7 @@ def rekey(votes: Iterable[Vote]) -> list[Vote]:
     Each row is keyed under :data:`~evals.harness.fingerprint.VERSION_FOR` for **its own** framework rather
     than under one version for the file. One version for the file cannot be
     right once the table holds two: a ledger carrying a STRIDE row and an ASVS
-    row had no value that re-keyed it, because either choice raised on the other
+    row has no single value that re-keys it, because either choice raises on the other
     package's rows. So a rule improves by editing its package's entry in the
     table, and this recomputes what that moved.
     """
@@ -776,10 +776,8 @@ def command_rekey(args: argparse.Namespace) -> int:
     now = sorted({version_of(v.fingerprint) for v in moved})
     print(f"{len(moved)} votes at version {was} -> {now}")
     print(f"{changed} fingerprints move, {len(moved) - changed} unchanged")
-    # Both pools, computed. This printed one number and asserted it held for
-    # the other, which is a post-condition stated rather than evaluated -- and a
-    # re-key that moved a row to a different finding is exactly what it would
-    # have had to catch.
+    # Both pools are computed, not one asserted to hold for the other: a
+    # re-key that moves a row to a different finding is what this must catch.
     # Compared by the votes each finding holds, never by key: a re-key moves
     # every key of a row whose version changed.
     before = set(current.pool_members().values())

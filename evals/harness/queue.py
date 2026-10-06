@@ -32,8 +32,8 @@ run, and re-asking on that would spend a whole sitting on paraphrases.
 
 It is limited to the named reviewer's own answers on purpose. In a queue built
 for nobody, re-offering a re-argued finding would tell this reviewer that
-somebody else had answered the earlier version, and that is the leak the deleted
-``unmatched`` row below was deleted for.
+somebody else had answered the earlier version. That is the same leak a row
+ranked by the reference pool would cause; see the note below the rows.
 """
 
 from __future__ import annotations
@@ -209,22 +209,21 @@ PRIORITIES: tuple[tuple[str, int, str], ...] = (
     ),
 )
 
-# There was a third row between these two, ``unmatched``, weighing whether the
-# reference pool already carried the finding. It is gone because it could not
-# answer that question without answering a different one.
+# Do not rank by whether the reference pool carries the finding. Such a row
+# cannot answer that question without answering a different one.
 #
 # The pool is derived from votes, and this queue skips what is already
 # answered. In an unnamed queue "answered" is every fingerprint anybody voted
-# on, and the pool is a subset of that, so nothing pooled ever survived to be
-# ranked and the row fired on everything. In a queue built for a named voter
-# "answered" is only that voter's, so a pooled finding that survives was pooled
-# by *somebody else* -- and the row's weight, its position in the order and the
-# reason printed beside it then told this reviewer how another reviewer had
-# voted. The second-opinion pass is the one place that must not be told.
+# on, and the pool is a subset of that, so nothing pooled survives to be
+# ranked and such a row would fire on everything. In a queue built for a named
+# voter "answered" is only that voter's, so a pooled finding that survives was
+# pooled by *somebody else* -- and the row's weight, its position in the order
+# and the reason printed beside it would tell this reviewer how another
+# reviewer voted. The second-opinion pass is the one place that must not be
+# told.
 #
-# So the row was dead where it was safe and an oracle where it was live. Ranking
-# by the corpus reference sets would be a different row, honestly answering the
-# question this one's prose claimed; it is not this one.
+# Ranking by the corpus reference sets would be a different row, and would
+# answer the question honestly.
 
 
 def priority_of(finding: Finding, restated: bool = False) -> tuple[int, str]:
@@ -260,9 +259,8 @@ def answered(
 
     ``needs-evidence`` is not an answer about the finding. The reviewer said
     they could not judge it from what they were shown, and the button says
-    "Needs more evidence" -- so treating it as answered took the finding out of
-    their queue for good, which is the opposite of what they asked for. It was
-    the one input that guaranteed they would never see the finding again.
+    "Needs more evidence" -- so treating it as answered would take the finding
+    out of their queue for good, which is the opposite of what they asked for.
 
     So it holds for the sitting it was cast in and no longer: enough to stop the
     finding coming straight back in the same session, and not enough to lose it.
@@ -282,10 +280,10 @@ def answered(
     answered the earlier version.
 
     **Public because the app re-asks the same question per request.** It builds
-    the queue once and filters it again on every serve, and when that filter was
-    a second copy of this rule it was a copy that did not have this paragraph in
-    it: it counted a `needs-evidence` answer as answered, and dropped what this
-    had just re-offered. One rule needs one reader.
+    the queue once and filters it again on every serve. The app calls this
+    function, so one rule applies: a second copy could count a
+    `needs-evidence` answer as answered and drop what this re-offers. One rule
+    needs one reader.
     """
     live = ledger.current()
     skipped = set()
@@ -357,7 +355,7 @@ def build(
     :func:`_keyed` is where a finding gets its fingerprint, under its own
     framework's rule.
 
-    Keyed first and filtered second, because "already answered" now reads the
+    Keyed first and filtered second, because "already answered" reads the
     claim this queue would show: :func:`answered` cannot decide a fingerprint
     until the structural digest beside it exists.
     """

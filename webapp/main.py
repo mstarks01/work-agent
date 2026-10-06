@@ -52,8 +52,8 @@ The security posture is deliberate throughout:
   :func:`render_report`.
 * Untrusted text never reaches ``innerHTML`` on any page. It renders as
   ``textContent``, or as constructed DOM nodes, so there is no escape helper to
-  forget to call. The discipline had already failed once, unnoticed, in the
-  element table's attribute column. This is the primary control, and the CSP
+  forget to call. An escape that a caller forgets fails silently, so no page
+  uses one. This is the primary control, and the CSP
   below is defence in depth behind it. The form page is included: a source label
   and a validator message both carry submitter bytes onto it over SSE, and both
   land as text nodes. Server-side, the two f-string pages escape through
@@ -393,7 +393,7 @@ class Analyses:
 
 #: Builds the engine for one submission's selection. A factory rather than a
 #: built engine, because an engine is built *for* a selection and the selection
-#: is now the submitter's: the options a package needs ride on it, and they are
+#: is the submitter's: the options a package needs ride on it, and they are
 #: known only once a form has been filled in.
 EngineFactory = Callable[[Sequence[FrameworkSelection]], Engine]
 

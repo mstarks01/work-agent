@@ -1,11 +1,8 @@
 """ADR 0035's gate, as one script that asserts every criterion.
 
-The gate decides whether the compact extraction transport promotes. It was
-written before the run that first answered it, and it has been applied four
-times. This module exists because of how the first application went: two
-criteria were checked by hand, ``first-pass validity`` was never asserted at
-all, and the arm passed a gate it had failed. A gate applied by hand is a gate
-whose unchecked criterion is invisible.
+The gate decides whether the compact extraction transport promotes. Code checks
+every criterion, because a criterion applied by hand can go unchecked and no
+one sees it.
 
 **Every criterion here is read off an artifact the sweep already wrote.** The
 primary figure is ``node_usage.extract``; the quality figures are
@@ -15,8 +12,7 @@ so the gate runs offline and a person who did not run the sweep can apply it.
 
 **It refuses before it reports.** Two arms scored against two corpus digests,
 or one arm spanning two prompt digests, make every delta below meaningless —
-so those are errors rather than findings. The three live applications before
-this module existed each had to argue that neither had happened.
+so those are errors rather than findings.
 
 Read ``docs/adr/0035-the-compact-transport-promotes-on-a-predeclared-gate.md``
 for why each threshold is the number it is. This module holds the arithmetic

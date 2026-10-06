@@ -111,7 +111,7 @@ def _severity_parts(severity: Severity) -> tuple[str, ...]:
 #:
 #: ``tests/test_evals_content.py`` checks this against the judgement types
 #: :mod:`analysis_service.claims` defines, in both directions — a table nobody
-#: compares to its registry fails as quietly as the ``if`` it replaced.
+#: compares to its registry fails as quietly as a branch.
 STRUCTURAL_FIELDS: dict[str, Callable[[Any], tuple[str, ...]]] = {
     "verdict": _verdict_parts,
     "severity": _severity_parts,
