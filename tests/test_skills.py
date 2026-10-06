@@ -93,7 +93,7 @@ class TestLoadingSkillFiles:
             MarkdownLoader(package_root).load("lanes/nonexistent/skill")
 
     def test_the_snapshot_is_taken_at_construction(self, tmp_path):
-        """#675 D24: a file edited after startup changed what a job was told.
+        """A file edited after startup does not change what a job is told (#675 D24).
 
         The loader reads every file once when it is built. A file changed,
         added or removed afterwards is the next loader's, so a running
@@ -130,13 +130,11 @@ class TestSectionParsing:
     def test_a_heading_reads_the_same_here_as_it_does_at_the_gate(self):
         """Two readers of a heading, held to one answer.
 
-        It asserted `split_sections` keeps a trailing space, while the package
-        gate's `_heading_issues` compared `line[3:].strip()`. So `## Scope `
-        passed validation at startup and then raised here, and the critic's
-        lane digest -- which is read out of `## Scope` -- was never built.
-
-        Both readers strip now, so the heading a file declares is the heading
-        both of them see.
+        `split_sections` and the package gate's `_heading_issues` both strip a
+        heading, so the heading a file declares is the heading both of them
+        see. If only one stripped, `## Scope ` would pass validation at startup
+        and then raise here, and the critic's lane digest -- which is read out
+        of `## Scope` -- would never be built.
         """
         sections = split_sections("## Scope \n\nbody\n")
 

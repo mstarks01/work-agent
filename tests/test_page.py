@@ -21,8 +21,8 @@ from webapp.page import (
     script_json,
 )
 
-#: What each page shipped before the three copies became one, with the nonce
-#: written as ``N``. Pinned as whole strings rather than as substrings: a
+#: The policy each page ships for each set of grants, with the nonce written
+#: as ``N``. Pinned as whole strings rather than as substrings: a
 #: substring check passes when a refactor *adds* a grant, which is the only
 #: direction that matters here.
 SHIPPED = {

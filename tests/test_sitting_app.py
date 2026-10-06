@@ -114,8 +114,8 @@ class ApiRequest:
 #: One request per ``/api/`` route the sitting app carries, and whether that
 #: route writes. ``TestThePosture`` holds the keys to the app's own route
 #: table, so a route added later stops this module until somebody says which
-#: kind it is — a table nobody compares to its registry fails as quietly as
-#: the hand-written list it replaced.
+#: kind it is. A table nobody compares to its registry fails as quietly as a
+#: hand-written list.
 #:
 #: ``writes`` is the whole of the classification, because the guard pair
 #: follows from it: a handler that changes the draft store takes the origin
@@ -456,10 +456,9 @@ class TestThePosture:
         """A guard table nobody compares to the route list has a hole.
 
         The two guard tests below run off :data:`API_REQUESTS`, and a route
-        the table does not name is a route neither of them reads. That is how
-        ``/api/part-one`` and ``/api/part-two`` came to write a draft with no
-        origin check and no token: both tables listed the POSTs by hand, so a
-        write inside a read was invisible to them. The table is held to the
+        the table does not name is a route neither of them reads. A table that
+        lists the POSTs by hand cannot see a write inside a read, such as
+        ``/api/part-one`` and ``/api/part-two``. The table is held to the
         app's own routes, so a route added tomorrow fails here until somebody
         says which kind it is.
         """
@@ -516,9 +515,9 @@ class TestThePosture:
     def test_every_reading_endpoint_leaves_the_store_alone(self, client):
         """Read-only is a fact about the handler, not a label on the table.
 
-        Checked rather than declared, because the label is what went wrong:
-        ``/api/part-one`` read as a read for as long as nobody asked what it
-        wrote. A route that calls itself a read and then touches the draft
+        Checked rather than declared, because a label can be wrong: a route
+        such as ``/api/part-one`` looks like a read until somebody asks what it
+        writes. A route that calls itself a read and then touches the draft
         store fails here, and the answer is the guard pair rather than a new
         entry in a list.
         """
@@ -1136,10 +1135,9 @@ class TestTheOwnListCarriesThePageToken:
     def test_part_two_takes_the_token_because_it_writes(self, tree):
         """Serving the sets re-pins the draft, so it is not a read.
 
-        It read as one for as long as nobody asked what it wrote. The pin says
-        which bytes the reader was served, and a record signs that — so a
-        request nobody read the page for can make a file that moved under the
-        reader read as one they were shown.
+        The pin says which bytes the reader was served, and a record signs
+        that — so a request nobody read the page for can make a file that moved
+        under the reader read as one they were shown.
         """
         session = session_for(tree, "ada")
         app = browser(session)
@@ -2303,14 +2301,12 @@ class TestTheStandardsOwnWordsRideOnTheRecord:
 class TestTheRailAndTheGateAgree:
     """One reader for "is this case read", asked from both ends.
 
-    The defect this exists for: the app wrote a submission under
-    ``evals/review/submissions`` and ``tests/test_case_review.py`` read
-    ``case.json``. A reader saw the row go grey, the case left ``--list``, and
-    the gate never learned the case was read — so it stayed on the unreviewed
-    list for good, and nothing failed to say so.
-
-    Both ends now ask :func:`evals.review_submission.current_reviews`. These
-    hold them to it over a tree where a submission really is merged.
+    Both the app and the gate ask
+    :func:`evals.review_submission.current_reviews`. If the two ends read
+    different files, a reader would see the row go grey while the gate kept
+    the case on the unreviewed list, and nothing would fail. These tests hold
+    both ends to the one reader over a tree where a submission really is
+    merged.
     """
 
     def rows(self, tree):
@@ -2484,7 +2480,7 @@ class TestAFrameworkArrivingOnAReadCase:
         """The app's own warning reads the draft's digests, never a blank one.
 
         A required file the draft never pinned is a set the case gained since,
-        and a blank digest read as a drifted one.
+        and a blank digest does not count as a moved one.
         """
         meta, later = self.one_framework(tree)
         app = browser(session_for(tree, "ada"))
@@ -2627,10 +2623,9 @@ class TestARecordSignsWhatWasServed:
     """The draft's digests follow what the surface hands the reader.
 
     Part one pins the shared files and part two the reference sets, each when
-    served. Before this, a draft pinned every file once at the own list and
-    never again, so a reader whose draft outlived a corpus edit recorded a
-    digest CI refused, with no way to a record it would take short of dropping
-    the case. That is the shape the case 01 re-sit of 2026-09-09 hit.
+    served. A draft that pinned every file only once, at the own list, would
+    record a digest CI refuses whenever the draft outlives a corpus edit, and
+    the reader could only drop the case.
     """
 
     def move_claims(self, tree, case=CASE):
@@ -2667,10 +2662,10 @@ class TestARecordSignsWhatWasServed:
     def test_a_request_that_never_read_the_page_re_pins_nothing(self, tree):
         """The pin is a claim about what the reader saw, so only they move it.
 
-        A foreign page cannot read this response, but it could reach the route,
-        and reaching it was enough: the digests moved to the current bytes and
-        the finish then accepted a record signed over a file nobody had read.
-        Both parts pin, so both are asked.
+        A foreign page cannot read this response, but it can reach the route.
+        If reaching it moved the digests to the current bytes, the finish would
+        accept a record signed over a file nobody read. Both parts pin, so both
+        are asked.
         """
         session = session_for(tree, "ada")
         app = browser(session)

@@ -234,8 +234,8 @@ class TestHostileInput:
         assert "SYSTEM:" not in outside
 
     def test_a_hostile_label_cannot_break_the_block(self):
-        # The envelope this replaced used an attribute, which these bytes broke;
-        # inside a fence they are just characters.
+        # These bytes would break an attribute; inside a fence they are just
+        # characters.
         label = 'weird" > label ``` end'
         document = render_sources([Source(kind="description", label=label, text="hi")])
         assert label in document
@@ -286,9 +286,9 @@ class TestComposedPromptFencing:
             assert not escaped, f"{compose.__name__} let caller text escape"
 
     def test_a_lane_prompt_leaves_no_block_open(self):
-        """`analyze.md` carries `{input_text}` too, and was not in the loop
-        above -- so the one prompt that also interpolates a model-written table
-        beside the caller's sources was the one this never composed.
+        """`analyze.md` carries `{input_text}` too, and is not in the loop
+        above. It is the one prompt that also interpolates a model-written
+        table beside the caller's sources, so this test composes it.
 
         `lines_outside_fences` asserts no block is left open, which is the
         property that matters here: an unfenced value that opens a longer run

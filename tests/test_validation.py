@@ -156,14 +156,13 @@ class TestAssumptionsRecordAnInference:
             assert extra == {"assets"}
 
     def test_every_field_naming_an_attribute_states_the_closed_set(self):
-        """Four fields name an attribute; the enum was on one of them.
+        """Four fields name an attribute, and each one states the enum.
 
-        A model asked for a bounded string writes prose into it: one wrote a
-        100-character sentence into ``Assumption.attribute``, which
-        ``max_length=100`` admits and the gate refuses a layer later. The four
+        A model asked for a bounded string writes prose into it: a
+        100-character sentence in ``Assumption.attribute`` passes
+        ``max_length=100``, and the gate refuses it a layer later. The four
         are tested against the two registry functions rather than against a
-        list here, so a field added to an element type reaches every schema the
-        day it lands.
+        list here, so a field added to an element type reaches every schema.
 
         ``Ground`` carries the empty string and an assumption does not, because
         a ground's attribute is optional and an assumption's names the whole
@@ -320,12 +319,11 @@ class TestNormalizeIds:
     def test_an_id_two_elements_arrived_with_is_refused_under_each_of_them(self):
         """A duplicate emitted ID is an explicit issue, never a silent binding (#961).
 
-        Before this, normalization rewrote both elements, kept the last
-        rewrite in its table, and the flow ``A calls B`` came out of the gate
-        as ``B calls B`` with no issue at all. Now each element that carried
-        the shared ID is reported under its derived ID, so the repair is
-        scoped to the two elements and the references, and the references
-        arrive dangling rather than bound.
+        A normalization that rewrote both elements and kept the last rewrite
+        would turn the flow ``A calls B`` into ``B calls B`` with no issue.
+        Each element that carries the shared ID is reported under its derived
+        ID, so the repair is scoped to the two elements and the references,
+        and the references arrive dangling rather than bound.
         """
         model = valid_model()
         first, second = model.processes[0], model.processes[0].model_copy(deep=True)

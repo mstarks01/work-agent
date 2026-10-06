@@ -273,10 +273,10 @@ def test_two_marks_the_current_rule_folds_into_one_finding_must_agree(tmp_path):
 
 def test_an_older_key_two_findings_share_names_neither():
     """Version 1 reads no verb and no scope, so two claims of one case that
-    differ only by verb carried one key under it. Six corpus cases hold such a
+    differ only by verb carry one key under it. Six corpus cases hold such a
     pair whose claims key to two findings today. Read as an alias of both, the
-    fold kept whichever target was listed last, and a mark under that key
-    would have answered for the wrong finding. The key belongs to no target,
+    fold would keep whichever target is listed last, and a mark under that key
+    would answer for the wrong finding. The key belongs to no target,
     so :func:`evals.harness.sitting.check_marks` refuses it by name; a key two claims share that
     key to one finding today stays that finding's alias."""
     from collections import Counter

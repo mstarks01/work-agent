@@ -401,7 +401,7 @@ class TestReadingSeveralSweeps:
     def test_an_artifact_the_loader_refuses_stops_the_queue(self, tmp_path):
         """The app names a sweep, so a file that is not one is refused here.
 
-        It read only the reports directory beside the path before, which let an
+        A reader of only the reports directory beside the path would let an
         unreadable artifact build a queue whose votes could name nothing.
         """
         artifact = self._sweep(tmp_path, "one.json", self._stride())

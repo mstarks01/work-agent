@@ -1,21 +1,19 @@
 """Every fact this service reads off a provider, driven from the wire.
 
-## The gap this closes
+## Why the facts come from the wire
 
 The executor reads five things off an ADK event and the retry driver reads four
-off a response or an exception. Nine facts, and every other offline test
-supplies them **itself**: ``tests/factories.ScriptedLlm`` constructs an
+off a response or an exception. Every other offline test supplies these nine
+facts **itself**: ``tests/factories.ScriptedLlm`` constructs an
 ``LlmResponse`` with a ``model_version`` and a ``usage_metadata`` written by
 hand, and ``tests/test_retry.py`` builds a ``RateLimitError`` with the headers
-it wants to read back. Each reader was therefore held against a shape the test
-had written, which is the two-readers-agreeing failure ``AGENTS.md`` names —
-except that here the second reader is a stand-in for a third party, and the
-third party disagrees.
+it wants to read back. Such a test holds a reader against a shape the test
+wrote, which is the two-readers-agreeing failure ``AGENTS.md`` names. Here the
+second reader stands in for a third party, and the third party can disagree.
 
-It disagreed. ``_retry_after_seconds`` read ``exc.headers``, which litellm
-deliberately leaves empty on a vendor failure, so the provider's own
-``Retry-After`` reached nothing on any real 429 and the ceiling #830 added
-guarded a value that never arrived.
+For example, litellm leaves ``exc.headers`` empty on a vendor failure, so a
+reader of ``exc.headers`` alone would find no ``Retry-After`` on any real 429,
+and the ceiling from #830 would guard a value that never arrives.
 
 ## What these tests drive
 
@@ -398,11 +396,11 @@ class TestWhatTheRetryDriverReadsOffAnException:
         assert _clears_with_time(exc)
 
     def test_the_provider_s_retry_after_reaches_the_reader(self):
-        """**The one that was broken.** litellm files a vendor's response
-        headers under ``litellm_response_headers`` and leaves ``exc.headers``
-        empty on purpose, so a reader of ``headers`` alone found nothing on
-        every real failure — while the unit test that built the exception with
-        ``headers={...}`` agreed with it."""
+        """litellm files a vendor's response headers under
+        ``litellm_response_headers`` and leaves ``exc.headers`` empty on
+        purpose, so a reader of ``headers`` alone would find nothing on every
+        real failure, while a unit test that builds the exception with
+        ``headers={...}`` would agree with it."""
         exc = raised_by("openai", declining(429, {"retry-after": "7"}))
 
         assert _retry_after_seconds(exc) == 7.0
@@ -467,8 +465,8 @@ class TestTheAttemptCountMeansRequests:
 class TestTheMetadataKeysAreTheOnesTheReadersUse:
     """The stamp and the read are two readers of one key, so hold them together.
 
-    Cheap, and it is the shape that went wrong twice in this area: a key spelled
-    in two modules agrees with itself until one of them is edited.
+    A key spelled in two modules agrees with itself until one of them is
+    edited.
     """
 
     def test_the_gateway_stamps_exactly_the_keys_the_executor_reads(self):

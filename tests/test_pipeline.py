@@ -344,7 +344,7 @@ def test_a_description_citing_a_missing_element_is_marked_on_the_report():
 
 
 def test_a_composed_evidence_reference_is_marked_rather_than_fatal():
-    """The policy #138 narrowed, end to end.
+    """The policy from #138, end to end.
 
     A reference the catalog does not hold does not fail the job, because
     agents compose well-formed ones — 2 of 12 jobs on a live sweep. The threat
@@ -507,12 +507,9 @@ def test_a_tier_running_a_reasoning_effort_still_produces_a_report():
 
     ``thinking`` is an offered param: the file documents it, the env overrides
     reach it, the build-time gate checks it, and it enters the fingerprint. It
-    is also the only one whose resolved value is a string — and the block was
-    typed to numbers, so setting it produced reports that could not be
-    assembled. The cost of that shape is what makes this a regression test
-    rather than a schema nicety: nothing failed at startup, and nothing failed
-    at the gate. The job ran the whole graph, paid for every node, and died at
-    assembly.
+    is also the only one whose resolved value is a string. A block typed to
+    numbers would pass startup and the gate, run the whole graph, pay for every
+    node, and then fail at assembly.
     """
     sampling = load_sampling(
         PROJECT_ROOT / "config" / "sampling.toml",
@@ -893,9 +890,9 @@ def test_pipeline_error_names_the_job_when_the_graph_produces_nothing():
 def test_the_report_records_what_informed_the_analysis():
     """Context, beside the run rather than inside a finding.
 
-    The report already carried the two ends — what each node ran on, and what
-    each finding rests on — and nothing in between. A pack selection that
-    flipped or a skill that was edited changed the analysis invisibly.
+    The report records what each node ran on and what each finding rests on.
+    This block records what lies between: without it, a pack selection that
+    flips or a skill edit would change the analysis invisibly.
     """
     pipeline, _ = build(happy_replies())
     outcome, _ = run(pipeline, job())
@@ -1053,8 +1050,8 @@ def test_one_framework_finishing_first_does_not_fail_the_other(first, held, wind
 def test_a_lane_with_no_unit_left_calls_no_model():
     """A closed lane with nothing to rule on emits an empty batch for free.
 
-    At ASVS level 1, two chapters carry no requirement. Their lane agents once
-    ran anyway, with a scope line that listed no unit, and could only file a
+    At ASVS level 1, two chapters carry no requirement. A lane agent that ran
+    for them would get a scope line that lists no unit, and could only file a
     claim on a requirement above the level.
     """
     fixture = SCRIPTED_FRAMEWORKS["asvs"]
@@ -1085,8 +1082,8 @@ def test_a_lane_with_no_unit_left_calls_no_model():
 def test_both_review_passes_read_the_submitted_sources(role):
     """A source can state what extraction left out, so each pass reads it whole.
 
-    The critic's model view carries no element excerpts, and before #1295 the
-    critic had no other way to see the text a draft argues against.
+    The critic's model view carries no element excerpts, so the sources are
+    the critic's only view of the text a draft argues against (#1295).
     """
     fixture = SCRIPTED_FRAMEWORKS["stride"]
     nodes = graph.FrameworkNodes("stride")

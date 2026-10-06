@@ -255,10 +255,10 @@ def test_the_offline_lanes_tables_cover_the_whole_registry():
     """``CARRIED`` and ``COMPLETE_OPTIONS`` are checked against ``PACKAGES``.
 
     Both are tables keyed by framework, and a table nobody compares to the
-    registry fails as quietly as the branch it replaced: a package registered
-    later would leave this lane testing the picker against a set that no longer
-    matches what an install can carry. Comparing here is what makes that a
-    failure at the next run rather than a gap nobody sees.
+    registry fails as quietly as a branch: a new package would leave this
+    lane testing the picker against a set that does not match what an install
+    can carry. Comparing here is what makes that a failure at the next run
+    rather than a gap nobody sees.
     """
     from analysis_service.frameworks import PACKAGES
 
@@ -586,16 +586,15 @@ def test_the_diagnostic_reports_the_client_library_a_vendor_needs():
 def test_the_diagnostic_reports_the_vendors_the_build_actually_binds():
     """The page and the build, tested against each other.
 
-    Each was right about its own question and they were not the same question.
-    ``build_tier_adapters`` walks bound tiers; this section walked every tier,
-    so an unused ``review`` tier naming a second vendor put that vendor on the
-    page with its variables marked NOT SET and its client library named to
-    install — none of which a run needs. The one surface whose value is being
-    right about what is missing was the one telling an operator to set a key
-    for a provider no request reaches.
+    ``build_tier_adapters`` walks bound tiers, and this section must walk the
+    same tiers. A section that walked every tier would put an unused
+    ``review`` tier's vendor on the page, with its variables marked NOT SET
+    and its client library named to install, none of which a run needs. The
+    diagnostic would then tell an operator to set a key for a provider no
+    request reaches.
 
-    The assertion is the agreement rather than either answer, because either
-    answer alone is what each of them already had.
+    The assertion is the agreement rather than either answer, because each
+    answer alone agrees with its own code.
     """
     from analysis_service.binding import build_tier_adapters
     from analysis_service.model_tiers import load_model_tiers
@@ -717,11 +716,8 @@ def test_the_viewer_has_no_html_string_sink(sink):
 def test_the_viewer_reads_every_service_mark_the_report_carries():
     """A mark computed and never rendered is half a check.
 
-    Written after exactly that happened: ``unresolved_mentions`` and
-    ``missing_mitigations`` shipped on the report — validated, threaded through
-    graph state, in the payload — while the viewer named only
-    ``unverified_grounds``, the mark they were both modelled on. The service
-    had done the work and the reader was never told.
+    A mark can be validated, threaded through graph state and present in the
+    payload, and still reach no reader if the viewer does not name it.
 
     The field list is *derived* rather than written down, so the next mark is
     caught by existing: a service mark is a list on an analysis block whose
@@ -764,10 +760,9 @@ def test_the_viewer_reads_every_service_mark_the_report_carries():
 def test_the_viewer_carries_no_escape_helper():
     """The corollary. An escape helper would mean a sink somewhere to use it on.
 
-    #78's evidence for decision 1 was that "remember to call esc()" had already
-    failed once, unnoticed, in the element table's attribute column. The helper
-    going away is what makes that class of bug unwritable rather than merely
-    fixed.
+    A rule of "remember to call esc()" fails when one call site forgets
+    (#78, decision 1). Without the helper, that class of bug cannot be
+    written.
     """
     assert "esc(" not in viewer_javascript()
 
@@ -1122,10 +1117,9 @@ def test_the_viewer_has_no_inline_style_attribute():
 
 # --- the other two pages (#114) ---------------------------------------------
 #
-# The report page had both controls and the form and diagnostic pages had
-# neither, which read as an oversight rather than a decision. These hold the
-# same two rules over all three: untrusted text reaches the DOM as text, and
-# every page carries a policy that authorises its own blocks and nothing else.
+# These hold the same two rules over all three pages: untrusted text reaches
+# the DOM as text, and every page carries a policy that authorises its own
+# blocks and nothing else.
 
 
 def form_javascript() -> str:
@@ -1203,9 +1197,8 @@ def test_an_options_value_is_parsed_as_json_not_read_as_text():
 def test_the_form_page_carries_no_escape_helper():
     """The corollary, the viewer's rule applied here.
 
-    The page had one and every call site remembered it. That is the arrangement
-    that had already failed once elsewhere, which is why the helper going away
-    is the fix rather than a fourth call site being added to it.
+    A helper works only while every call site remembers it, so the page
+    carries none.
     """
     assert "escape(" not in form_javascript()
 
@@ -1348,8 +1341,8 @@ PAGE_SCRIPTS = {
 #: of ``const NAME = <!--field-->;`` lines is a page's injected values. A block
 #: that is one placeholder and nothing else is a payload
 #: (``<!--report-->``, ``<!--units-->``) or the code slot (``<!--script-->``).
-#: Named individually, this table grew an entry per payload and the next one
-#: failed a check that had nothing to say about it.
+#: A table of individual names would need an entry per payload, and a new
+#: payload would fail a check that has nothing to say about it.
 _VALUE_BLOCK = re.compile(r"^\s*(?:const \w+ = <!--\w+-->;\s*)+$")
 _PAYLOAD_BLOCK = re.compile(r"^\s*<!--\w+-->\s*$")
 

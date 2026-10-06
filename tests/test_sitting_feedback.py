@@ -465,10 +465,10 @@ def test_a_record_whose_set_moved_is_sent_back_to_the_case(tmp_path: Path, monke
 def test_the_way_out_sits_above_the_file_preview():
     """The link that opens the pull request is what the reader came for.
 
-    Show files renders the whole JSON, and a reader who then pressed
-    Contribute found the link below it, off the screen. The steps and the
-    result now sit above the preview, the preview scrolls inside its own
-    box, and the page hides it on Contribute and scrolls the steps into view.
+    Show files renders the whole JSON, so a link below it would sit off the
+    screen. The steps and the result sit above the preview, the preview
+    scrolls inside its own box, and the page hides it on Contribute and
+    scrolls the steps into view.
     """
     page = sitting._PAGE
     assert page.index('id="submit"') < page.index('id="browserSteps"')

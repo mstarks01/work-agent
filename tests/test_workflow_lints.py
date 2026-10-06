@@ -27,7 +27,7 @@ WORKFLOW = REPO_ROOT / ".github" / "workflows" / "evals-live.yml"
 PACKAGE_GLOB = "src/analysis_service/**"
 
 #: Every workflow whose ``pull_request`` trigger is path-filtered to the agentic
-#: surface. Both name the same text trees, and both went wrong the same way, so
+#: surface. Both name the same text trees and can go wrong the same way, so
 #: the lint below reads them as a list rather than naming one.
 FILTERED_WORKFLOWS = (
     WORKFLOW,
@@ -147,17 +147,14 @@ def test_the_walk_follows_a_subpackage():
 def test_every_swept_path_still_exists(workflow):
     """A filter naming a directory the repo no longer has sweeps nothing.
 
-    **This is what the frameworks cutover left behind.** Both filters named
-    ``skills/**`` until #280. That tree became ``frameworks/<name>/lanes/`` and
-    ``domains/`` (ADR 0011), so every lane skill, exemplar file, output
-    contract, critic text, severity rubric, note and case stopped matching any
-    path — the text an agent actually reasons from, on a lane whose entire job
-    is to check what happens when that text changes.
+    The agent text lives under ``frameworks/<name>/lanes/`` and ``domains/``
+    (ADR 0011, #280). A filter that names a missing tree matches no lane
+    skill, exemplar file, output contract, critic text, severity rubric, note
+    or case: the text an agent actually reasons from, on a lane whose entire
+    job is to check what happens when that text changes.
 
-    Nothing was missed, because no commit has yet touched those trees without
-    also touching ``src/``, which matched on its own. A glob that resolves to
-    nothing does not fail; it quietly narrows what fires, and it stays quiet
-    until the one PR that needed it.
+    A glob that resolves to nothing does not fail; it quietly narrows what
+    fires, and it stays quiet until the one PR that needs it.
 
     The negations are not checked. ``!src/analysis_service/token_caps.py``
     subtracts a real file today, and the test above already holds the exclusion
@@ -240,7 +237,7 @@ _OIDC_GRANT = "id-token: write"
 #: Both ways a workflow names a secret. ``secrets.NAME`` is the common one and
 #: ``secrets[expr]`` is how a matrix leg reads its own, which is the form a
 #: workflow reaches for precisely when it is being careful -- so a scan that saw
-#: only the first went blind on the file that had just been tightened.
+#: only the first would miss the most carefully scoped file.
 _SECRET_REFERENCES = ("secrets.", "secrets[")
 
 
@@ -300,7 +297,7 @@ def _credential_bearing() -> list[Path]:
 def test_no_credential_bearing_workflow_runs_on_a_contributor_ref(workflow):
     """The invariant #508 was filed for, checked against every workflow.
 
-    ``pull_request`` skips forks, which is what made it look sufficient. It does
+    ``pull_request`` skips forks, so it can look sufficient. It does
     not skip a collaborator: someone who can push a branch and open a pull
     request can edit the application code a live lane imports, or edit the
     workflow file itself, and have the edit execute while the job holds an OIDC

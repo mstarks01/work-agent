@@ -3,11 +3,10 @@
 A defect class this repository keeps meeting is **a fact with no reader**: an
 answer an endpoint gives that the page never reads, a field a model carries
 that no code reads, and a string a test asserts that the served page holds
-only inside a comment. Each one passes every test that shipped with it,
-because the thing that should read the fact is the thing that was never
-written. Found by hand in the review of ``reviewed/2026-09-09...main`` and by
-script in the sweep that followed it, this module is those sweeps made a
-check, so the class does not accumulate again.
+only inside a comment. Each one passes every test that ships with it,
+because the missing reader is the thing that should read the fact. This module
+checks for the class, so it does not accumulate (see the
+``reviewed/2026-09-09`` round).
 
 Each lint reads the tree rather than a list somebody remembered, in the shape
 ``test_dead_code_lints.py`` uses: a reader is anything under
@@ -19,9 +18,7 @@ and a declaration that stops being needed fails too.
 **The limit worth stating.** The answer-key lint holds a key read *anywhere*
 in the page's script as read, because a grep cannot tell which response a
 ``d.state`` came from. A key one endpoint answers and another endpoint's
-handler reads passes here. That is a smaller net than a per-endpoint one, and
-still the net that caught ``written``, ``command``, ``paste``, ``carried`` and
-``warnings``.
+handler reads passes here. A per-endpoint check would be stricter.
 """
 
 from __future__ import annotations
@@ -114,10 +111,8 @@ def _read_by_script(key: str, script: str) -> bool:
 def test_every_answer_the_sitting_app_gives_is_read_by_its_page(module):
     """A key the page never reads is an answer nobody hears.
 
-    ``written``, ``command`` and ``paste`` rode on ``/api/stage`` for a month
-    after the page stopped reading them, naming a command that did not exist.
-    A draft that would not delete rode on ``/api/contribute`` as ``warnings``
-    and reached no screen.
+    Every key a route answers must appear in the page's script. A key the
+    script does not read reaches no screen.
     """
     script = client_script(ANSWERED_BY[module])
     unread = {
@@ -175,9 +170,8 @@ def _asserted_spellings() -> list[tuple[str, int, str]]:
 def test_no_page_assertion_is_satisfied_by_a_comment():
     """A string the served page holds only in a comment implements nothing.
 
-    ``_PAGE`` once ended with two HTML comments after ``</html>`` that existed
-    so three assertions would keep passing after the page stopped saying those
-    words. The assertion passed; the reader got a different page.
+    An assertion that finds its string only inside an HTML comment passes,
+    while the reader sees a page without those words.
     """
     served = "\n".join(PAGES) + "\n".join(client_script(name) for name in SCRIPTS)
     clean = _without_comments(PAGES, SCRIPTS)
@@ -252,10 +246,8 @@ def _unread_fields() -> dict[str, str]:
 def test_every_model_field_has_a_reader():
     """A field the code sets and never reads records a promise nobody keeps.
 
-    ``Draft.clone``'s own comment promised a warning nothing raised.
-    ``Draft.recorded`` and ``Draft.unreviewed_entry`` were the removed record's
-    fields, still accepted from every draft file. ``Store.held`` named a surface
-    in a document nothing wrote.
+    Every field the code sets must have a reader somewhere under
+    :data:`SEARCHED`, or a declaration in :data:`DECLARED_FIELDS`.
     """
     unread = {
         qualified: where
@@ -310,10 +302,8 @@ def _tier_comparisons(path: Path) -> list[int]:
 def test_the_must_find_tier_is_compared_through_one_name():
     """A rule with a reader per module is how the readers come to disagree.
 
-    ``reference.MUST_FIND`` is the one spelling. Ten sites compared the literal
-    before this: the corpus lint, the claim scorer, the loss instruments, the
-    trigger recall, the verb pricing and the critic yield. Each was right, and
-    each would have stayed right only for as long as nobody renamed a tier.
+    ``reference.MUST_FIND`` is the one spelling. A site that compares the
+    literal stays right only for as long as nobody renames a tier.
 
     A **label** is not a comparison and is not in scope: three sites in
     ``pairing.py`` print the words as a column, driven by the ``must_find``
@@ -357,13 +347,12 @@ def test_the_tier_comparison_scan_finds_one_when_there_is_one(tmp_path):
 
 # --- A message that tells its reader a word it already knew ------------------
 #
-# The fourth shape of the same class, found in the round over #917-#990: a
-# refusal message interpolating the very expression its own branch pinned to a
-# literal. `_resolve_row` printed `predicate.value` inside
-# `if predicate.value == "reference":`, so every refused reference read "names
-# no reference this predicate takes" whatever the predicate pointed at. The
-# fact the message carries is a constant, and the repair pass that reads it
-# learns nothing from it.
+# The fourth shape of the same class (the round over #917-#990): a refusal
+# message that interpolates the very expression its own branch pinned to a
+# literal. A message that prints `predicate.value` inside
+# `if predicate.value == "reference":` always prints the same word. The fact
+# the message carries is a constant, and the repair pass that reads it learns
+# nothing from it.
 
 #: Where a message is production output. Tests are excluded: a test may
 #: deliberately build such a string to drive a scan.
@@ -438,7 +427,7 @@ def test_no_message_interpolates_a_value_its_own_branch_pinned():
 
 
 def test_the_constant_interpolation_scan_finds_one_when_there_is_one(tmp_path):
-    """Positive control, spelled as the defect was: the #991 refusal message."""
+    """Positive control, in the shape of the #991 refusal message."""
     probe = tmp_path / "probe.py"
     probe.write_text(
         "def drop(predicate, value):\n"
@@ -461,11 +450,9 @@ def test_the_constant_interpolation_scan_finds_one_when_there_is_one(tmp_path):
 #: module's class: not a fact with no reader, but a rule with two, where each
 #: reader's own test agrees with it and neither moves when the rule does.
 #:
-#: Found in the checkpoint round over ``reviewed/2026-09-16b...main``.
-#: ``factbundle.LANDED`` said "Derived nowhere else" while
-#: ``patch.apply_patch`` and ``oracle._stage`` each wrote
-#: ``("consumed", "preserved")`` again, so a sixth landing disposition would
-#: have reached one of the three.
+#: See the checkpoint round over ``reviewed/2026-09-16b...main``. A module
+#: that writes ``("consumed", "preserved")`` again beside
+#: ``factbundle.LANDED`` would miss a sixth landing disposition.
 #: Read from the owner rather than written out here, so this table is not
 #: itself the second spelling it exists to forbid.
 OWNED_VOCABULARIES: dict[str, frozenset[str]] = {
@@ -550,7 +537,7 @@ def test_every_declared_respelling_is_still_one():
 
 
 def test_the_respelling_scan_finds_one_when_there_is_one(tmp_path):
-    """Positive control, spelled as the defect was: patch.py before the fix."""
+    """Positive control: a module that spells the landed set out again."""
     probe = tmp_path / "probe.py"
     probe.write_text(
         'def landed(row):\n    return row.disposition in ("consumed", "preserved")\n',
@@ -564,11 +551,10 @@ def test_the_respelling_scan_finds_one_when_there_is_one(tmp_path):
 
 # --- One reader of "is this attribute unknown" -------------------------------
 #
-# The questions audit (#1289, Q4) found the early questions asking about an
-# attribute only where it held exactly ``unknown``, while the evidence catalog
-# read it through ``control_state``. A qualified value such as
-# ``unknown; the sources are silent`` was open to the analysis and never asked.
-# Each reader's own test agreed with it.
+# Every reader asks whether an attribute is unknown through ``control_state``
+# (#1289, Q4). A reader that compares with exactly ``unknown`` misses a
+# qualified value such as ``unknown; the sources are silent``, which the
+# analysis treats as open. Each reader's own test would agree with it.
 
 
 def _qualifiable_attributes() -> frozenset[str]:
@@ -646,7 +632,7 @@ def test_the_qualifiable_set_is_the_free_text_fields():
 
 
 def test_the_unknown_comparison_scan_finds_one_when_there_is_one(tmp_path):
-    """Positive control, spelled as the defect was, and what is not one."""
+    """Positive control: an exact comparison with ``unknown``, and what is not one."""
     probe = tmp_path / "probe.py"
     probe.write_text(
         "UNKNOWN = 'unknown'\n"

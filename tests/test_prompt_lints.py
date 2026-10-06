@@ -122,12 +122,11 @@ PACKAGE_LOADERS = {name: MarkdownLoader(FRAMEWORKS_DIR / name) for name in PACKA
 #: Every ``(framework, lane)`` pair whose exemplar file ships. The parametrize
 #: argument for every lint below that reads a worked draft.
 #:
-#: **This is what #280 was.** These lints ran over ``STRIDE_CATEGORIES`` against
-#: one package's loader, so ASVS's 17 exemplar files — the text 17 lane agents
-#: learn their record's shape from — were checked by none of them. A lint that
-#: names a package is the shape ``docs/agents/framework-parity.md`` exists to
-#: catch, and ``tests/test_framework_neutrality.py`` cannot catch this one
-#: because it puts test files out of scope on purpose.
+#: The pairs come from every package, so each package's exemplar files are
+#: checked (#280). A lint that names a package is the shape
+#: ``docs/agents/framework-parity.md`` exists to catch, and
+#: ``tests/test_framework_neutrality.py`` cannot catch it here because it puts
+#: test files out of scope on purpose.
 EXEMPLAR_LANES = [
     (name, lane) for name, package in PACKAGES.items() for lane in package.lanes
 ]
@@ -470,8 +469,8 @@ def test_every_exemplar_block_parses_as_its_packages_proposal(framework, lane):
 
     **Against its own package's record**, resolved through ``schemas_for``. A
     worked draft is written in one framework's record shape (ADR 0011), so
-    parsing ASVS's against STRIDE's would fail on every file and parsing it
-    against nothing is what shipped until #280.
+    parsing ASVS's against STRIDE's would fail on every file, and parsing it
+    against nothing checks nothing (#280).
 
     ``extra="forbid"`` is doing real work here: an exemplar spelling out an
     ``id`` or a ``category`` would be teaching an agent to emit two fields the
@@ -796,8 +795,8 @@ def test_the_verb_menu_in_the_output_contract_is_the_vocabulary():
 # `extract.md` states as its **controlling rule** that "`unknown` is the
 # default, not the fallback", and repeats the word a dozen times. It then hands
 # the model `assets`, a closed vocabulary of eight tags that does not contain it
-# and cannot — and, before #295, said nothing about that anywhere. A model
-# following the prompt faithfully writes `unknown` into `assets`, which is
+# and cannot. The prompt must say so (#295). A model that follows a prompt
+# without that warning writes `unknown` into `assets`, which is
 # `illegal-asset-tag`: a Tier 1 failure that kills the job and spends its one
 # repair pass.
 #
@@ -1062,9 +1061,7 @@ def test_every_computed_key_the_critic_is_shown_is_named_in_its_prompt(key):
 
     These are the fields no agent wrote: what the service found out and is
     handing the critic. A critic that meets one the prompt never mentions has
-    to guess what it means, and #1082 found two of them shipped that way --
-    ``unverified_quotes`` did not exist, and the prompt asserted the opposite
-    of what the service did about quotes.
+    to guess what it means (#1082).
 
     Self-completing: the keys come from the function, so the next one added
     fails here rather than arriving undocumented.
@@ -1138,10 +1135,9 @@ def test_a_lane_skill_does_not_invite_a_verb_its_lane_refuses(lane, verb):
 #: applies to its drafts, keyed by the phrase a reader has to find.
 #:
 #: The twin of :data:`EXTRACTION_FAILURE_RULES`, for the seam after extraction.
-#: Both contracts said a duplicate ID "fails the job" while
-#: :func:`~analysis_service.fan_in._drop_duplicate_ids` kept the first draft
-#: and recorded the rest, so a lane agent was told the wrong consequence of
-#: its own mistake (#1082).
+#: :func:`~analysis_service.fan_in._drop_duplicate_ids` keeps the first draft
+#: and records the rest, so a contract that says a duplicate ID "fails the
+#: job" tells a lane agent the wrong consequence of its own mistake (#1082).
 OUTPUT_CONTRACT_RULES: dict[str, tuple[str, ...]] = {
     "stride": ("lose the second",),
     "asvs": ("loses the second draft",),
@@ -1176,9 +1172,8 @@ def test_the_output_contract_states_what_the_service_does(framework, phrase):
 #: strings: the placeholders take real endpoint IDs and a real label slug, and
 #: what comes out either is a flow ID of the shipped version or is not.
 #:
-#: ADR 0037 replaced version 1, whose shape dropped the endpoints' type prefixes
-#: so an entity and a process of one name derived one ID (#989). The prompt went
-#: on stating version 1 for as long as nothing here read it.
+#: The shipped version keeps the endpoints' type prefixes, so an entity and a
+#: process of one name derive two IDs (ADR 0037, #989).
 _FLOW_PATTERN = re.compile(r"flows are `([^`]+)`")
 _FLOW_PARTS = {
     "<source-id>": "entity:customer",
@@ -1258,15 +1253,14 @@ def _version_or_none(flow_id: str) -> int | None:
 # An exemplar has to demonstrate what the prompt asks for.
 #
 # Everything above checks that an exemplar is well formed: it parses as its
-# package's proposal, its references resolve, its quotes verify. All of that
-# passed while six ASVS lanes demonstrated the one thing ``analyze.md`` forbids
-# in as many words — "Do not reach for an unrelated quote to justify a claim
-# about something the system does not have."
+# package's proposal, its references resolve, its quotes verify. A well-formed
+# exemplar can still demonstrate what ``analyze.md`` forbids: "Do not reach for
+# an unrelated quote to justify a claim about something the system does not
+# have."
 #
-# `absent-element` arrived in #463, which updated the prompt and the output
-# contract and left the worked drafts alone. Nothing could see that, because no
-# lint reads an exemplar for whether it teaches the behaviour the instruction
-# demands. Instruction and demonstration disagreed, and a model reads both.
+# The lints below read an exemplar for whether it teaches the behaviour the
+# instruction demands, such as `absent-element` (#463). A model reads both the
+# instruction and the demonstration, so the two must agree.
 
 
 #: How a draft says the requirement has nothing to rule on in this system. It is
@@ -1319,9 +1313,8 @@ def test_an_exemplar_grounds_an_absence_in_absent_elements(framework, lane):
 def test_some_exemplar_exercises_absent_elements():
     """The other half: a rule no shipped draft demonstrates teaches nobody.
 
-    ``absent_elements`` was reachable and unexercised by all 23 exemplar files
-    for the life of the field. A check that only forbids the wrong shape would
-    pass just as happily on that state.
+    A check that only forbids the wrong shape would pass just as happily if no
+    exemplar file used ``absent_elements`` at all.
     """
     exercised = [
         f"{framework}/{lane}"

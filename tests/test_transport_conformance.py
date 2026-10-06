@@ -8,10 +8,10 @@ one ``build_tier_adapters`` builds, the sampling is the one
 
 **Why the wire and not the kwargs.** ``tests/test_translator_seam.py`` holds
 what crosses into the translator, and ``analysis_service.model_gate`` holds what
-LiteLLM says it would map. Neither says what the provider receives, and the
-distance between those three is where #259 lives: the capability lookup and the
-mapped params disagreed for one model, and only the request settles which was
-right. A claim about the wire that nothing drives is prose.
+LiteLLM says it would map. Neither says what the provider receives. The
+capability lookup and the mapped params can disagree for a model, and only the
+request settles which is right (#259). A claim about the wire that nothing
+drives is prose.
 
 Each test here pins a sentence this repository states somewhere else, so the
 sentence fails when it stops being true.
@@ -78,8 +78,8 @@ UNDECLARED_KEY = "not-a-real-undeclared-openrouter-key"
 #: file is about the bytes rather than about coverage, and
 #: ``tests/test_conformance.py`` is what walks the matrix. The pair comes from
 #: the reference matrix rather than from two strings here, so the build-time
-#: gate that refuses an over-ceiling tier has nothing to refuse — it already
-#: caught a hand-picked pair while this file was being written.
+#: gate that refuses an over-ceiling tier has nothing to refuse, as it would
+#: for a hand-picked pair.
 VENDOR: VendorName = "openai"
 MODEL = REFERENCE_MODELS[VENDOR][0]
 
@@ -309,8 +309,8 @@ class TestWhichKeyAuthenticates:
         """Drive one gateway call built under ``env``, and return its request.
 
         ``drop_credential`` takes the resolved key back off the built translator,
-        which is the shape of a regression that stopped passing one — the point
-        being what litellm then does, rather than how the kwarg went missing.
+        as a build that passes none would — the point being what litellm then
+        does, rather than how the kwarg goes missing.
         """
         sampling = load_sampling(CONFIG / "sampling.toml", env={})
         adapters = build_tier_adapters(

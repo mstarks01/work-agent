@@ -61,9 +61,9 @@ def test_the_callers_order_is_preserved():
 def test_a_bare_name_passes_the_name_rule_whatever_its_options_require():
     """Stated as a property of the package: one whose options model requires a
     field is accepted by :func:`resolve_names` from its name alone — the
-    reader a seam that holds names and no options calls. Before the split, the
-    deployment read the full rule over bare names and refused every such
-    package on every job; the test above holds the options half."""
+    reader a seam that holds names and no options calls. The full rule over
+    bare names would refuse every such package on every job; the test above
+    holds the options half."""
     demanding = [
         name
         for name in CARRIED

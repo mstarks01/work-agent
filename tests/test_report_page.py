@@ -159,7 +159,7 @@ def test_the_next_step_follows_whether_the_report_is_final():
 
 
 def test_a_corrected_finding_is_marked_on_its_card():
-    """The mark #1355 added had no test that reached the cards."""
+    """The correction mark (#1355) reaches the finding's card."""
     report = sample_report([asking_threat(ASKED)])
     html = render_report(
         report,
@@ -245,7 +245,7 @@ def test_the_page_rules_out_a_unit_where_the_claim_rules_on_it(step):
 
 
 def test_a_description_names_an_element_by_its_name():
-    """A finding showed `flow:entity:customer>process:web-app>login` (#561).
+    """A finding never shows `flow:entity:customer>process:web-app>login` (#561).
 
     An element ID in backticks reads as the element's name, and a flow as its
     two endpoints. A span that names no element, such as an attribute, stays
@@ -366,7 +366,7 @@ def test_a_finding_shows_its_summary_and_hides_its_provenance():
 
 
 def test_a_follow_up_says_how_each_finding_moved():
-    """A follow-up's reader saw its findings and nothing of what the answers did."""
+    """A follow-up shows its reader what the answers did to each finding."""
     from tests.factories import sample_threat
 
     before = sample_report(
@@ -409,8 +409,8 @@ def test_the_page_reads_each_lane_from_the_service_s_table():
 def test_every_ground_kind_renders_its_label_and_its_reference():
     """A ground of each kind shows a label and what it cites, never ``undefined``.
 
-    The page listed four kinds, and rendered every kind it did not name as a
-    flow, so an assertion row or an absent term showed ``undefined``.
+    A page that names only some kinds and renders the rest as a flow would
+    show ``undefined`` for an assertion row or an absent term.
     """
     from typing import get_args
 
@@ -477,8 +477,7 @@ def _scope_states():
 def test_each_page_table_answers_for_its_whole_vocabulary(table, vocabulary):
     """A page table keyed by a closed vocabulary holds every value of it.
 
-    A value the table lacks renders as a raw key or as nothing: the ground
-    table once lacked three kinds.
+    A value the table lacks renders as a raw key or as nothing.
     """
     import importlib
     from typing import get_args

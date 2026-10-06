@@ -1,7 +1,6 @@
 """Every reference claim carries an action verb, and a new one must too.
 
-This started as a list of what was missing. Nothing is missing now: all 244
-claims across all 13 cases carry a verb, so what is left is the guard that stops it coming back. A
+All 244 claims across all 13 cases carry a verb, and this guard keeps it so. A
 case that arrives without verbs fails here rather than quietly weakening
 :class:`~evals.harness.identity.SubsetVerbIdentity` on the case nobody checked.
 

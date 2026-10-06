@@ -92,10 +92,9 @@ def rate_limited(**headers) -> RateLimitError:
 def response(text: str, finish_reason: str | None = None) -> LlmResponse:
     """One answer, in **ADK's own type** rather than a stand-in for it.
 
-    A bare string stood in for a response until the truncation check needed to
-    read a ``finish_reason``, and that substitution was the same shape as the
-    bug it hid: what a provider says about *how* a completion ended is part of
-    the answer rather than metadata around it. The real type is what the seam
+    A bare string would hide the ``finish_reason`` the truncation check reads:
+    what a provider says about *how* a completion ended is part of the answer
+    rather than metadata around it. The real type is what the seam
     reduces to a :class:`~analysis_service.provider.GenerationResult`, so using
     it here means every field the projection reads is a field that exists.
     """
@@ -322,11 +321,11 @@ class TestRetryAfter:
         assert _retry_after_seconds(ValueError("nothing")) is None
 
     def test_a_mapping_that_is_not_a_dict_is_still_read(self):
-        """The shape a real failure arrives in, and the one that was refused.
+        """The shape a real failure arrives in, which a ``dict`` test refuses.
 
         litellm attaches a vendor's response headers as ``httpx.Headers``,
         which is a ``Mapping`` and not a ``dict`` — so an ``isinstance(...,
-        dict)`` test discarded every real hint. Written as a plain ``Mapping``
+        dict)`` test would discard every real hint. Written as a plain ``Mapping``
         rather than as ``httpx.Headers`` because the rule is about the shape,
         and ``tests/test_provider_contract.py`` is what drives the library's
         own object up to this function.
@@ -389,7 +388,7 @@ class TestRetryAfter:
         )
 
     def test_a_full_token_window_is_still_retried(self):
-        """What the ceiling was raised for, named as the case rather than as a
+        """What the ceiling allows, named as the case rather than as a
         number: a tokens-per-minute window is 60 seconds wide, so a provider
         asking for 45 names a limit that really does reopen."""
         assert (
@@ -496,13 +495,13 @@ class TestRefuseRetry:
         )
 
     def test_a_long_wait_is_named_as_such_even_on_an_empty_budget(self):
-        """The regression: four conditions overlap, and only one fired.
+        """Four conditions overlap here, and the refusal names the one that fired.
 
         A ``give_up`` that re-derived why the loop stopped, from ``attempt``,
         ``retryable`` and ``budget.tokens``, would find all three holding here
-        while the rule that actually refused is the ``Retry-After``, and raise
-        ``RetryBudgetExhausted`` in place of the provider's own exception and
-        logged that the service was failing. The refusal is one value now.
+        while the rule that actually refused is the ``Retry-After``. It would
+        raise ``RetryBudgetExhausted`` in place of the provider's own exception
+        and log that the service is failing. The refusal is one value.
         """
         pol = policy(attempts=3, capacity=0.5)
         long_wait = classify(rate_limited(**{"retry-after": "120"}))
@@ -603,9 +602,9 @@ class TestTheLadderIsVendorNeutral:
     #: 500 on the vendors whose providers it maps that way, so a rejected
     #: permission is retried on those and refused on the rest.
     #:
-    #: **That asymmetry is litellm's and predates this rule**, which cannot see
-    #: past the number the library hands it. Keying on the class did not fix it
-    #: either: ``APIConnectionError`` is retryable under both rules. It is
+    #: **That asymmetry is litellm's and lies outside this rule**, which cannot
+    #: see past the number the library hands it. Keying on the class would not
+    #: fix it either: ``APIConnectionError`` is retryable under both rules. It is
     #: written down here because a reader who trusts the neutrality claim above
     #: needs to know exactly how far it reaches.
     FLATTENED: ClassVar[dict[int, set[int]]] = {
@@ -703,15 +702,14 @@ class TestRetryingAdapter:
         assert texts(drive(base, policy())) == ["ok"]
 
     def test_a_streaming_call_is_refused_rather_than_passed_through(self):
-        """A change of behaviour, and a deliberate one.
+        """A deliberate refusal.
 
-        A streamed call gets no retry, because a replayed half-stream is worse
-        than no retry at all, and no truncation check, because a chunk carries
-        no finish reason until the caller has already seen the text. It crosses
-        no seam either,
-        which is one silent skip too many. Every node here binds an output
-        schema and so never streams, so this branch was untravelled under both
-        rules — and an untravelled branch that refuses is found by whoever
+        A streamed call would get no retry, because a replayed half-stream is
+        worse than no retry at all, and no truncation check, because a chunk
+        carries no finish reason until the caller has already seen the text. It
+        would cross no seam either, which is one silent skip too many. Every
+        node here binds an output schema and so never streams, so this branch
+        is untravelled. An untravelled branch that refuses is found by whoever
         first turns streaming on, while one that succeeds quietly is not.
         """
         base = FakeExecutor(outcomes=["ok"])
@@ -859,15 +857,14 @@ class TestTheStormItself:
 
     def test_a_correlated_outage_costs_far_less_than_every_lane_retrying(self):
         # Six lanes x three attempts is eighteen requests if each lane keeps its
-        # own allowance — and thirty under the amplification this replaced. The
-        # shared budget caps the whole fan-out near one round plus what the cold
-        # bucket allows.
+        # own allowance. The shared budget caps the whole fan-out near one round
+        # plus what the cold bucket allows.
         requests = self.fan_out(policy(attempts=3, capacity=4), lanes=6)
         assert requests <= 6 + 4
 
     def test_an_isolated_failure_in_a_healthy_process_is_still_retried(self):
         # The budget must not make the service brittle: with capacity to spare,
-        # one unlucky lane retries exactly as it always did.
+        # one unlucky lane retries up to its attempt limit.
         pol = policy(attempts=3, capacity=10)
         base = FakeExecutor(outcomes=[rate_limited(), "ok"])
         assert texts(drive(base, pol)) == ["ok"]

@@ -6,7 +6,7 @@ A module declares a closed set twice. Once as a ``Literal``, which is what the
 type checker reads, and once as a constant the code iterates, because a type is
 not a value. ``Outcome`` and ``OUTCOMES``, ``Cause`` and ``CAUSES``, ``Verdict``
 and the exit codes keyed by it. The second spelling is annotated with the first,
-which is the author saying *this enumerates that* — and nothing compared them.
+which is the author saying *this enumerates that*, and this lint compares them.
 
 A member added to the type and not to the constant is silent. Whatever iterates
 the constant then answers for fewer members, and every test of that constant
