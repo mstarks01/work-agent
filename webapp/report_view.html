@@ -226,10 +226,16 @@
      goes through element.style.* instead, which CSP does not govern. */
   .mixwrap { margin-top: 18px; }
   .belowtable { margin-top: 12px; }
+  .workspace-return {display:flex;gap:24px;align-items:center;padding:18px 28px;border-bottom:1px solid var(--hairline);font:14px/1.5 system-ui,sans-serif}
+  .workspace-return a {color:var(--ink);text-decoration:none}
+  .workspace-return a:hover {text-decoration:underline}
+  .workspace-return a:focus-visible {outline:2px solid currentColor;outline-offset:4px}
+  @media(max-width:580px){.workspace-return{padding:16px;flex-wrap:wrap;gap:16px}}
 </style>
 </head>
 <body>
 <div class="viz-root">
+  <nav class="workspace-return" aria-label="Workspace"><a href="/">Work Agent</a><a href="/?view=analyses">Analyses</a><span>Report</span></nav>
   <div class="wrap">
     <div class="topbar">
       <div>

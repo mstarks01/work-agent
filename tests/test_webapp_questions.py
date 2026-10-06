@@ -1584,7 +1584,7 @@ const groups = ids.questions.querySelectorAll("details");
 const rowsOf = g => g.children.filter(r => r.tag === "p");
 const child = (r, tag) => r.children.find(c => typeof c === "object" && c.tag === tag);
 calls.push({{ groups: groups.map(g => ({{
-  title: g.children[0].textContent,
+  title: g.children[0].children.map(n => n.textContent).join(""),
   rows: rowsOf(g).map(r => child(r, "b").textContent),
   open: g.open }})) }});
 child(rowsOf(groups[0])[0], "select").value = "no";

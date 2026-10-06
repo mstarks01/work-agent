@@ -308,3 +308,45 @@ def test_the_offline_sitting_page_runs_its_script(browser, tmp_path):
     page.close()
     assert errors == [], f"the offline sitting page raised: {errors}"
     assert case_title(corpus) in text
+
+
+def test_workspace_reopens_grouped_questions_and_renders_names_as_text(page):
+    page.fill("#analysis-name", '<img src=x onerror="alert(1)">')
+    pause(page)
+    page.wait_for_selector("#question-index a")
+    original_url = page.url
+    assert page.locator("#analysis-title img").count() == 0
+    page.reload()
+    page.wait_for_selector("#asked", state="visible")
+    assert page.url == original_url
+    assert page.locator("#question-index a").count() > 0
+    page.locator("#question-index a").first.click()
+    assert page.is_visible("#asked")
+    page.click("#reports-nav")
+    assert page.is_visible("#reports-panel")
+    page.click("#library-nav")
+    page.wait_for_selector("#analysis-list a")
+    assert page.locator("#analysis-list img").count() == 0
+    page.locator("#analysis-list a").click()
+    page.wait_for_selector("#asked", state="visible")
+
+
+def test_workspace_mobile_has_no_page_overflow(page):
+    page.set_viewport_size({"width": 390, "height": 844})
+    pause(page)
+    assert page.evaluate("document.documentElement.scrollWidth <= window.innerWidth")
+    page.click("#description-nav")
+    assert page.is_visible("#description-panel")
+    assert page.evaluate("document.documentElement.scrollWidth <= window.innerWidth")
+
+
+def test_workspace_reopens_selected_framework_options(page):
+    page.uncheck('input[name="framework"][value="stride"]')
+    page.select_option('select[data-option="level"]', "2")
+    pause(page)
+    page.reload()
+    page.wait_for_selector("#asked", state="visible")
+    page.click("#description-nav")
+    assert not page.is_checked('input[name="framework"][value="stride"]')
+    assert page.is_checked('input[name="framework"][value="asvs"]')
+    assert page.input_value('select[data-option="level"]') == "2"

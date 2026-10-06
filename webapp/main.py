@@ -7,24 +7,9 @@ Start it from a clone, with model auth already configured::
 It embeds :class:`~analysis_service.Engine` in process. It does not go through
 the ``/v1`` HTTP surface, so it needs no bearer token and no CORS, and it runs
 real models against real prose, because there is no credential-free path here.
-Its whole job is to show a first-time integrator that the engine works, and then
-get out of the way. The library is what they actually embed.
-
-Two pages, three data endpoints:
-
-======================  ========================================================
-``GET  /``              form page: the tiers, the framework picker, a textarea
-``GET  /report/{run}``  ``report_view.html`` with this run's JSON injected
-``GET  /example``       ``examples/orders.md``, for **Load example**
-``POST /analyze``       start a run on a selection, return its id
-``POST /answer/{run}``  answer a run's questions, start the resumed run
-``GET  /events/{run}``  server-sent per-node progress
-======================  ========================================================
-
-It is deliberately unbloated: one module, no template engine, no JS framework,
-no build step, no CSS framework, no bundler. HTML comes from f-strings, and the
-only client-side JavaScript is the SSE listener, the Load-example fill, the
-picker's show-and-hide, and the redirect.
+The local workspace provides description entry, grouped questions, and a bounded
+session library of analyses and reports. Templates and native JavaScript keep
+the frontend dependency-free; the engine remains the reader of answer rules.
 
 The security posture is deliberate throughout:
 
@@ -251,6 +236,8 @@ class Run:
     """
 
     id: str
+    name: str = "Your system"
+    analysis_id: str = ""
     events: asyncio.Queue[tuple[str, str]] = field(default_factory=asyncio.Queue)
     report: Report | None = None
     task: asyncio.Task | None = None
@@ -275,6 +262,11 @@ class Run:
     #: The report this run's answers came from, for a follow-up: what its own
     #: report is compared with.
     previous: Report | None = None
+
+    @property
+    def workspace_id(self) -> str:
+        """The analysis this run belongs to, including runs made by older callers."""
+        return self.analysis_id or self.id
 
     @property
     def waiting(self) -> bool:
@@ -383,6 +375,44 @@ class Analyses:
         run = Run(id=secrets.token_urlsafe(16))
         self._runs[run.id] = run
         return run
+
+    def snapshots(self) -> list[dict[str, object]]:
+        """Latest retained run per analysis, with its retained reports."""
+        grouped: dict[str, list[Run]] = {}
+        for run in self._runs.values():
+            grouped.setdefault(run.workspace_id, []).append(run)
+        return [
+            self.snapshot(
+                next(
+                    (run for run in reversed(runs) if run.waiting and not run.resumed),
+                    runs[-1],
+                ),
+                runs,
+            )
+            for runs in reversed(list(grouped.values()))
+        ]
+
+    def snapshot(self, run: Run, related: list[Run] | None = None) -> dict[str, object]:
+        """Public workspace metadata; descriptions only on the detail route."""
+        if related is None:
+            related = [
+                item
+                for item in self._runs.values()
+                if item.workspace_id == run.workspace_id
+            ]
+        return {
+            "run": run.id,
+            "name": run.name,
+            "status": run.status,
+            "frameworks": []
+            if run.engine is None
+            else list(run.engine.framework_options),
+            "reports": [
+                {"run": item.id, "url": f"/report/{item.id}"}
+                for item in related
+                if item.report is not None
+            ],
+        }
 
     def release(self) -> None:
         self._busy = False
@@ -702,7 +732,7 @@ def create_app(
     """
     state = build_startup() if startup is None else startup
     analyses = Analyses() if analyses is None else analyses
-    app = FastAPI(title="First run", docs_url=None, redoc_url=None, openapi_url=None)
+    app = FastAPI(title="Work Agent", docs_url=None, redoc_url=None, openapi_url=None)
     app.add_middleware(TrustedHostMiddleware, allowed_hosts=LOOPBACK_HOSTS)
     app.add_middleware(SecurityHeaders)
 
@@ -714,7 +744,12 @@ def create_app(
             render(
                 _FORM_PAGE,
                 _FORM_GRANTS,
-                script=client_script("first_run.js"),
+                script=client_script("workspace.js")
+                + "\n"
+                + client_script("first_run.js"),
+                workspace_style=(
+                    Path(__file__).parent / "static" / "workspace.css"
+                ).read_text(encoding="utf-8"),
                 tiers=_tier_lines(state.tiers),
                 frameworks=_framework_fields(state.frameworks),
                 questions=_QUESTIONS_FIELD,
@@ -725,6 +760,36 @@ def create_app(
     async def example() -> Response:
         """The sample description, read from the file the examples also run."""
         return PlainTextResponse(SAMPLE.read_text(encoding="utf-8"))
+
+    @app.get("/workspace/runs")
+    async def workspace_runs() -> Response:
+        return JSONResponse(analyses.snapshots())
+
+    @app.get("/workspace/runs/{run_id}")
+    async def workspace_run(run_id: str) -> Response:
+        run = analyses.get(run_id)
+        if run is None:
+            return JSONResponse(
+                {
+                    "message": "This analysis is no longer available in this server session."
+                },
+                status_code=404,
+            )
+        while run.holding is not None:
+            run = run.holding
+        payload = analyses.snapshot(run)
+        payload["selection"] = (
+            []
+            if run.engine is None
+            else [
+                {"name": name, "options": dict(options)}
+                for name, options in run.engine.framework_options.items()
+            ]
+        )
+        payload["description"] = "\n\n".join(source.text for source in run.sources)
+        if run.status == "awaiting-answers":
+            payload["questions"] = paused_payload(run, run.state().questions)
+        return JSONResponse(payload)
 
     @app.post("/analyze")
     async def analyze(request: Request) -> Response:
@@ -742,6 +807,13 @@ def create_app(
             sources = [Source.model_validate(source) for source in body["sources"]]
             selection = _selection(state.frameworks, body["frameworks"])
             ask_questions = body.get("questions") is True
+            name = body.get("name", "Your system")
+            if not isinstance(name, str) or not 1 <= len(name.strip()) <= 120:
+                return JSONResponse(
+                    {"message": "Use an analysis name between 1 and 120 characters."},
+                    status_code=400,
+                )
+            name = name.strip()
         except SelectionError as exc:
             # Names the framework and the field it wanted, or the name the
             # install does not carry, and nothing about this deployment. Safe
@@ -785,11 +857,12 @@ def create_app(
                 {"message": "An analysis is already running. Wait for it to finish."},
                 status_code=409,
             )
+        run.name, run.analysis_id = name, run.id
         run.engine, run.sources = engine, sources
         start = partial(
             engine.analyze,
             sources,
-            system_name="Your system",
+            system_name=run.name,
             ask_questions=ask_questions,
         )
         # Held on the run so the task is not garbage-collected mid-flight.
@@ -895,12 +968,13 @@ def create_app(
                 status_code=409,
             )
         parent.resumed_by = run
+        run.name, run.analysis_id = parent.name, parent.workspace_id
         run.previous = parent.report
         run.engine, run.sources = parent.engine, parent.sources
         run.links, run.facts = outcome.links, outcome.facts
         run.final = outcome.follow_up
         run.shown = list(outcome.shown)
-        start = partial(parent.engine.resume, outcome, system_name="Your system")
+        start = partial(parent.engine.resume, outcome, system_name=run.name)
         run.task = asyncio.create_task(_drive(analyses, run, start))
         return JSONResponse({"run": run.id})
 
@@ -1426,73 +1500,13 @@ _STYLE = """
   table { display: block; max-width: 100%; overflow-x: auto; }
 """
 
-_FORM_PAGE = (
-    """<!doctype html>
-<html lang="en"><head><meta charset="utf-8">
-<title>Analyze a system — first run</title><style nonce="__CSP_NONCE__">"""
-    + _STYLE
-    + """</style></head>
-<body>
-<h1>Analyze a system</h1>
-<p class="sub">Running in process, on real models.</p>
-<!--tiers-->
-<form id="analyze">
-  <fieldset id="frameworks">
-    <legend>Frameworks</legend>
-    <!--frameworks-->
-  </fieldset>
-  <p><textarea id="description" name="description"
-     placeholder="Describe your system..."></textarea></p>
-  <!--questions-->
-  <p>
-    <button type="submit" id="go">Analyze</button>
-    <button type="button" id="load">Load example</button>
-  </p>
-</form>
-<div id="problem" class="problem" hidden></div>
-<p id="status" hidden><span class="spinner" aria-hidden="true"></span>
-  <span id="status-text" role="status"></span></p>
-<ul id="ticks" hidden></ul>
-<div id="asked" hidden>
-  <h2>Your system model is ready. The threat analysis has not started.</h2>
-  <p class="sub">The service read your description, built a model of your system
-  and checked it. It stopped before the threat analysis so that you can add
-  facts your description does not state. These rounds are free: no analysis
-  runs until you start it. The questions come a few at a time,
-  the most useful first. Answer what you can. <b>Save and show more</b> keeps
-  your answers, and a question you left blank comes back.
-  <b>Skip the rest and show more</b> sets the blank ones aside, under
-  <b>Skipped for now</b>, where you can still answer them. A skipped question
-  is not an answer: the analysis treats it as open. Choose <b>Start the
-  analysis</b> at any time. A save never starts the analysis: only the start
-  button does. The analysis reads your answers. After it, the report may offer
-  one optional follow-up.</p>
-  <div id="questions"></div>
-  <details id="earlier" hidden></details>
-  <details id="skipped" hidden></details>
-  <p><button type="button" id="save">Save and show more</button>
-  <button type="button" id="skip">Skip the rest and show more</button>
-  <button type="button" id="continue">Start the analysis</button></p>
-  <div id="answer-problem" class="problem" role="alert" hidden></div>
-</div>
-<script nonce="__CSP_NONCE__"><!--script--></script>
-</body></html>
-"""
-)
+_FORM_PAGE = (Path(__file__).parent / "workspace.html").read_text(encoding="utf-8")
 
 #: The question toggle. Every install can pause: one with no catalog asks its
 #: early questions and no link question.
-_QUESTIONS_FIELD = """<p><label><input type="checkbox" id="ask" name="ask">
-    Ask me questions before the analysis runs, and wait for my answers</label></p>
-<ol class="sub">
-  <li><b>Facts.</b> With the box ticked, the app asks what your description
-  leaves out, a few questions at a time. These rounds are free: no analysis runs until you
-  start it.</li>
-  <li><b>Analysis.</b> The threat analysis runs once, in a few minutes.</li>
-  <li><b>Follow-up, optional.</b> The report may ask about facts its findings
-  depend on. Answering runs the analysis once more, and that report is
-  final.</li>
-</ol>"""
+_QUESTIONS_FIELD = """<p class="ask-option"><label><input type="checkbox" id="ask" name="ask" checked>
+    Ask questions before starting the analysis</label><br>
+    <span class="hint">Review missing details in groups, then start when you are ready.</span></p>"""
 
 _DIAGNOSTIC_PAGE = (
     """<!doctype html>
