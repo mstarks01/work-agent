@@ -49,6 +49,10 @@ never leaves the table: archived reports and archived emissions hold earlier
 spellings and are still read. `evals/harness/flow_ids.py` moves a corpus from
 one version to another, and ADR 0037 is the decision.
 
+Read a flow's label with `flow_label`, never by splitting the ID. Two
+instruments split on the last colon, and both gave wrong labels when the
+endpoints gained their types.
+
 ## Why the verb, and what it is worth
 
 Elements alone cannot separate a read from a write against one store. The
@@ -242,6 +246,9 @@ its first finding, which is the question its author has to answer.
 `evals/harness/ledger.py` is the only place in this repository where a **human**
 judgement is the datum. Append-only JSONL; a correction is a new event, never an
 edit.
+
+There is no model judge. The rule decides every match, and a human vote is the
+only ground truth on whether an unmatched finding is real.
 
 **The reason code is the control for personal preference.** A reviewer who
 dislikes a finding's writing and a reviewer who says it is not a threat report

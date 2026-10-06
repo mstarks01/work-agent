@@ -6,6 +6,9 @@ Named for the cross-tool `AGENTS.md` convention, so every coding agent reads
 one file. Claude Code reads `CLAUDE.md` and not this, so `CLAUDE.md` beside it
 is a one-line import of this file and carries no instructions of its own.
 
+Each section below states the rule and points to the doc that holds the detail
+and the evidence. Read that doc before you work in its area.
+
 ## Agent skills
 
 ### Issue tracker
@@ -16,295 +19,81 @@ maps under `.wayfinder/` are archived history, not live. See `docs/agents/issue-
 
 ### Code review checkpoints
 
-Review runs at two scales. A **pre-merge review** reads one pull request's diff
-and asks whether the change is correct; a **checkpoint round** reads a range of
-merged commits and asks what the tree holds that no single diff showed. Run both:
-a defect in a recent fix is the dominant class and sits inside one diff, and the
-rest needs the whole tree.
+Run a **pre-merge review** on each pull request's diff, and a **checkpoint
+round** over a range of merged commits. Read your own fix diff against the five
+defect classes, because a fix is the riskiest code in the tree.
 
-**A fix is the riskiest code in the tree.** Across the audit rounds, most findings in
-a round came from the previous round's fixes, and every one of those passed the tests
-that shipped with it. So read your own fix diff against the five defect classes in
-`docs/agents/code-review.md` — two readers, a table with a hole, a shape not listed, a
-bound not measured, a fact with no reader — prefer
-one shared reader over a guard copied into a second, and make the harness that proved
-the defect the regression test.
-
-A finished checkpoint round ends in an annotated `reviewed/<date>` tag on the commit
-it covered. Start the next one from `git tag -l 'reviewed/*' --sort=-creatordate
-| head -1` rather than asking for a fixed point. The tag message carries what the
-diff cannot: which axes ran, where each finding was fixed, and **what was left
-open by decision** — read that before reporting a finding, so a settled question
-is not re-raised as a new one. See `docs/agents/code-review.md`.
+A round starts from `git tag -l 'reviewed/*' --sort=-creatordate | head -1` and
+ends in a new annotated `reviewed/<date>` tag. Read that tag's message before
+you report a finding: it lists what was left open by decision. See
+`docs/agents/code-review.md`.
 
 ### Triage labels
 
 The five canonical roles, each label string equal to its name: `needs-triage`, `needs-info`,
-`ready-for-agent`, `ready-for-human`, `wontfix`. The `wayfinder:*` and GitHub stock labels are
-orthogonal to these. So is `needs-sweep`: apply it only when the next necessary step needs fresh
-paid model output, and keep the triage label beside it. Offline work left on the issue does not
-earn the label. See `docs/agents/triage-labels.md`.
+`ready-for-agent`, `ready-for-human`, `wontfix`. Apply `needs-sweep` beside them only when
+the next necessary step needs fresh paid model output. See `docs/agents/triage-labels.md`.
 
 ### Framework parity
 
-Any fix, enhancement, eval or test for one **Framework Package** needs an explicit answer
-in the PR body for **every other package in `PACKAGES`** — "nothing changes, because a
-framework whose claims carry a catalog identifier needs no equivalence judgement" is a
-fine answer; silence is not. State the reason as a property of the framework, never as its
-name, so it answers for packages nobody has written yet. It runs every way, not outward
-from STRIDE.
-
-**Prefer a table keyed by framework over a constant or a branch.** Every gap ASVS exposed
-was a name or an `if`; every table was already correct, because a missing key raises.
-The rule generalises past frameworks: the eval sweep grew one entry per *measurement* and
-paid the same tax until `evals/harness/instruments.py` made that a table too. When
-machinery grows an entry per anything, key it — then check the table against its registry,
-because a table nobody compares to `PACKAGES` fails as quietly as the branch it replaced.
-`tests/test_framework_neutrality.py` holds the decidable half of both. See
-`docs/agents/framework-parity.md` for the post-mortem this is derived from.
+A change to one **Framework Package** needs an answer in the PR body for every
+other package in `PACKAGES`. State the reason as a property of the framework,
+never as its name. Prefer a table keyed by framework over a constant or a
+branch, and check the table against its registry. See
+`docs/agents/framework-parity.md`.
 
 ### Vendor parity
 
-A **Vendor** row is the second axis with the same failure mode as a **Framework
-Package**, and it went unguarded for longer. Six defects were found in the
-`vertex` row by sessions that were looking at something else, and the audit that
-answered them found five more. Every one was a constant, a branch, or a table
-entry that was absent or short — and not one of them raised.
-
-**A one-vendor assumption is vacuously correct when it is written and silently
-wrong afterwards.** `SERVED_TRUST = "provider_reported"` was true with one
-vendor and still true-looking with two.
-
-`tests/test_vendor_neutrality.py` is the mechanism, in three layers, and each
-catches what the others cannot:
-
-- **Completeness.** Every module-level table keyed by a vendor vocabulary is
-  found by reading the modules, not by listing the tables, and must answer for
-  every vendor — *including a table added tomorrow*. A `Vendor` field may carry
-  no default, because a default is how a new row stays silent about a fact.
-- **Declaration.** A vendor named outside the registry must say why, as a
-  property of the vendor rather than as its name.
-- **Property.** Completeness cannot see a wrong value: `_FORM_RULES["openai"]`
-  had its key and the wrong entry. Those tests sit beside the rules they check.
-
-**Keep the guards runnable on a half-built registry.** A collection-time
-`CREDENTIAL_MODES[name]` once made a partly-added row an import error, so the
-suite could not reach the module whose message names the missing entry. Use
-`.get`. A guard that cannot run when the tree is half-built helps nobody.
-
-**A vendor row makes claims about a third party, which a framework never does.**
-`served_trust` is a claim about what litellm reads; whether `gpt-4o` is an alias
-is a claim about OpenAI's catalogue. Drive the real dependency where CI can
-(`test_identity.py` drives the installed translator), and where it cannot,
-record the measurement beside the code rather than asserting it in prose.
+A **Vendor** row has the same failure mode: a constant, a branch or a short
+table entry that does not raise. `tests/test_vendor_neutrality.py` checks it.
+See `docs/agents/vendor-parity.md`.
 
 ### Quality audits
 
-"Run a quality audit" invokes `.claude/skills/quality-audit/`. It diagnoses what
-is hurting report quality, attributes each loss to one of six phases, prices a
-fix before anybody pays for a run, and records the result.
-
-Two of its rules are code rather than prose, in `evals/harness/audit.py`. The
-**phase table** says which phase owns each graph node, and
-`tests/test_evals_audit.py` compares it against the graph's own names, so a node
-added tomorrow lands in exactly one phase or fails. The **experiment ledger**
-under `evals/experiments/` is append-only, one JSONL file per audit, with a
-closed outcome vocabulary a row outside raises against.
-
-**Read the ledger before proposing a fix.** `run.py experiments --signature`
-returns what an earlier audit already tested, and says whether the tree has
-moved under it. A refuted row that still reads `current` is an answer, not a
-starting point. Record every experiment, including the ones that lost: a
-refuted row is what stops the next audit paying for the same answer.
-
-The default audit is offline and its budget is zero. A paid run needs the
-user's explicit permission every time.
-
-**Report quality** work starts from `docs/agents/report-quality.md`: the
-current figures, the mechanisms, the open work and the evidence index.
+"Run a quality audit" invokes `.claude/skills/quality-audit/`. Before you
+propose a fix, read the experiment ledger with `run.py experiments
+--signature`. Record every experiment, including the ones that lost. **Report
+quality** work starts from `docs/agents/report-quality.md`.
 
 ### Offline completion and paid runs
 
-**Offline evidence can finish engineering work.** A paid run is not the
-automatic last step of a fix, a prompt edit, a schema change or an audit. The
-detailed procedure is `.claude/skills/quality-audit/references/experiment-protocol.md`.
+**The paid-inference budget is $0.** Only an explicit amount from the user
+authorises spend. "Validate", "finish", "audit", a prompt or schema edit, and
+the `needs-sweep` label do not.
 
-1. **The paid-inference budget is $0.** "Validate", "finish", "audit", "ensure
-   quality", a prompt or schema edit, and the `needs-sweep` label do not
-   authorise spend. Only an explicit amount from the user does.
-2. **State the claim before you choose the test.** Each claim is one of four
-   kinds: implementation correctness, behaviour on archived outputs, fresh
-   model behaviour, or end-to-end quality and generalisation.
-3. **Use the cheapest evidence that is sufficient for the claim.** Regression
-   tests through production functions, graph runs on scripted or recorded
-   responses, archive replay and invariants can complete a correctness claim.
-   They are not only a step before a live run.
-4. **Reproduce the defect, then verify the fix.** Show the defect on the code
-   before the fix and the correct result after it. Exercise the affected
-   readers and the relevant negative cases. Take the expected value from the
-   product contract or from evidence a person reviewed, never from the
-   implementation.
-5. **Read the existing evidence first.** Read the experiment ledger and the
-   archived artifacts. A different `HEAD` alone does not make evidence stale:
-   name the dependency that changed. Record the limits of each reuse. A replay
-   of old outputs is not a new sample and does not measure a new prompt.
-6. **Spend only for a decision.** A paid experiment answers one open question
-   that needs fresh model output, and names the decision each result changes.
-   "More confidence" or "confirmation" alone does not justify a run.
-7. **Finish the separable offline work first.** Report correctness and
-   empirical uncertainty apart. Do not ask again for a deferred experiment
-   unless the decision, the evidence or the budget changed, and name that
-   change.
-8. **Do not weaken a gate.** If an acceptance criterion needs live evidence,
-   it stays unmet. Split implementation completion from empirical acceptance.
-   Do not close the whole issue or claim that quality improved.
-9. **Do not escalate by habit.** Ordinary engineering validation needs no
-   corpus sweep and no fixed count of five runs. For real empirical work,
-   choose the cases, the repeats, the metric and the stopping rule from the
-   decision.
-10. **Keep the references intact.** Do not edit a human ruling, show a holdout
-    answer to tuning, use your own labels as independent truth, or call an
-    intermediate figure report quality.
+Use the cheapest evidence that is sufficient for the claim. Reproduce the
+defect on the code before the fix, then verify the fix. Never weaken a gate:
+if an acceptance criterion needs live evidence, it stays unmet. Set
+`ANALYSIS_OFFLINE` for every offline validation.
 
 The completion statement for a fix is: "The fix is verified by the listed
-offline evidence; its live quality effect remains unmeasured."
-
-**Price a must-find fix before a run.** Where the hypothesis is that a fix
-recovers must-finds, read the archived misses and state the ceiling:
-`losses` charges each STRIDE miss to a cause in its `CAUSES` table, and
-`attribution` charges each ASVS miss to a stage. A ceiling inside the spread
-gets no run; batch it. A scorer change is priced offline with `run.py
-price-verbs`. A must-find ceiling is not the gate for any other claim:
-applicability, false certainty, question effort and provider compatibility
-each need their own outcome. See `evals/TUNING.md` step 3.
-
-**`ANALYSIS_OFFLINE` refuses a live provider call before it leaves the
-process.** The test suite sets it for every test. Set it for any offline
-validation. It is a guard against an accident, not consent, and it does not
-replace the spend gate in `evals/harness/consent.py`.
+offline evidence; its live quality effect remains unmeasured." See
+`.claude/skills/quality-audit/references/experiment-protocol.md`.
 
 ### One rule, one reader
 
-When two pieces of code answer the same question, they will eventually answer it
-differently, and the disagreement is invisible because each one's test agrees
-with it. **Give a rule one reader and let every other site call it.**
-
-Where a second reader is unavoidable — an app and an offline gate, a harness
-check and a corpus lint — test the two **against each other**, never each
-against its own expectation.
-
-Six instances in two audits, and every one survived because the readers were
-tested separately: what an UNREVIEWED key is (substring vs `ast`); whether a
-finding is answered (`queue.build` vs `Session.remaining`); which UNREVIEWED
-table is the table (first assignment vs last); which version keys a ledger row
-(`__post_init__` vs `rekey` vs `VERSION_FOR`); what a filled reading document is
-(two copies of one line); when an element ID is checked (the rule and the
-deriver disagreed about the empty-slug case).
-
-Five corollaries, the first two from the same audits:
-
-- **A self-sized fence is safe only while its neighbours are fenced too.** Ask
-  what sits beside the value, not only what wraps it.
-- **A bound that predicts a cost from its inputs is wrong whenever the cost
-  turns on which inputs survive a filter.** Spend a budget where the work
-  happens.
-- **A rule that re-derives a value must compare it against the material it
-  derives from, never against a value something else derived earlier.** The two
-  are readers of one rule separated by *time* rather than by place, so they
-  agree until the rule moves and there is no site to read side by side. Three
-  instances in #1041's sweep, all in the alignment and the archive: an element
-  alias re-slugged today against an **Element ID** slugged when the run wrote
-  it; a flow alias against a label baked into a flow ID; a signed reference's
-  subject ID against an archived catalog's. Each broke a ruling that was still
-  right about the words.
-
-  The repair is one of three, in this order. Derive both sides from the
-  authoritative material now — a **name** is authoritative and an ID follows,
-  which is what `normalize_element_ids` already states. Where one side is
-  frozen, store the components beside the derived key, as a `Vote` stores
-  `components` beside `fingerprint`, so a rule change re-keys by recomputation.
-  Where neither is possible, version the rule and keep every version's decoder,
-  as `FLOW_ID_RULES` does.
-
-  **Before changing any slug, identity or digest rule, replay the archive
-  first.** `run.py replay` over `evals/emissions/` costs nothing, and the diff
-  is the only thing that says whether a rule change moved a figure. A fixture
-  that sets an ID without its name hides this whole class, and three did.
-- **A check before admission runs the writer it guards, and discards the
-  result.** `check_answers` writes the link answers with `apply_answers`, and
-  the attribute check builds the answered model and asks the validity gate. A
-  check that restates the writer's rules admits what the writer then refuses
-  (#1289, Q5).
-- **Two writers of one fact need a stated precedence and a test that asks
-  every reader.** An answer and the catalog's projection both wrote an
-  attribute, and the projection ran second (#1289, Q1).
-  `tests/test_answer_invariants.py` drives the resume graph once for each
-  `PROJECTION_EFFECT` reason and asks the model, the catalog and a later
-  reader's view for the same fact.
+Give a rule one reader and let every other site call it. Where a second reader
+is unavoidable, test the two against each other. Before you change any slug,
+identity or digest rule, run `run.py replay` over `evals/emissions/`. See
+`docs/agents/one-rule-one-reader.md`.
 
 ### Name the shapes before you read the value
 
-New code that reads a value fails on the shape its author never listed.
-`unfence` split on `"\n"` and missed U+2028, U+2029 and U+0085, so a payload
-carrying one round-tripped corrupted. The roster note called `.get` on an entry
-TOML does not require to be a table, and `ada = "contributor"` — the line a
-first-timer writes — raised `AttributeError` through a whole preflight.
-
-**Write down every shape the value can take, then handle each one.** The
-question is what the *producer* can emit, not what it usually emits: `str` has
-more line terminators than `"\n"`, `tomllib` returns a scalar where you expect a
-table, and a model emits a name that slugs to empty. Ask the parser's
-documentation rather than the sample input.
-
-Two audits, three defects, and each one a shape that was legal all along.
-
-**A shape the producer is a model has a second half: the set.** Where a gate
-checks a field against a computed set, the provider-facing schema has to state
-that set, because a model asked for a string of 1 to 100 characters will
-eventually write prose into it. `Assumption.attribute` carried a length bound
-and no enum, and a live sweep lost a case to a 100-character sentence in it —
-the same failure the `Ground` comment beside it already recorded from the
-critic, 132 times in six runs. Grep `validation.py` for `not in`: each one is a
-gate check whose schema may say only `max_length`.
-
-**Prefer the enum in `json_schema_extra` to a validator.** A value outside the
-set then stays an `invalid-reference` that names its element, so `repair_scope`
-keeps the repair to that element; a validator makes it a schema fault with no
-element to name, and the scope widens to the whole object. Validating harder
-enlarges the blast radius.
-
-**The rule stops where the set is configurable.** `assets` has the identical
-shape and takes no enum, because `extra_asset_tags` lets a deployment extend
-the vocabulary and the output schema is static. A configurable set is stated in
-the prompt, as `extract.md` rule 6 states it. Which of the two a field is
-decides where its set belongs.
+Write down every shape the producer can emit, then handle each one. Where a
+model produces a field from a closed set, state the set as an enum in the
+schema. See `docs/agents/value-shapes.md`.
 
 ### Provenance
 
-A fact about how an artifact was made belongs in a **field the code reads**, never a
-sentence in a guide: `bootstrap` on `case.json`, a required field, stayed true for a year, while the same
-file's prose about a reviewer drifted the moment nobody was one. When a design names a
-role, ship the field and the list of what nobody has done before the artifact. Write guides in the
-imperative, never the past tense. See `docs/agents/provenance.md`.
+A fact about how an artifact was made belongs in a **field the code reads**,
+never in a sentence in a guide. Write guides in the imperative. See
+`docs/agents/provenance.md`.
 
 ### Claim identity
 
-A **Claim**'s identity is a value code computes from its fields — framework,
-lane, endpoint-resolved **Element** IDs, and an action verb from the closed set
-in `analysis_service.actions` — never from its prose. Which rule keys a package is
-a **table**, `VERSION_FOR`, not a default: an open claim set composes an identity
-from an action and a place, and a claim naming a catalog requirement composes
-one from that requirement and the place it was ruled in. It is **versioned**, and a vote stores its components rather than its hash,
-so improving the rule re-keys the whole ledger by recomputation and costs no
-re-vote. A **Data Flow**'s own identity is versioned apart from it: the ID
-carries both endpoints' full IDs and its label, `FLOW_ID_RULES` holds every
-version's shape, builder and decoder, and no version's decoder ever leaves the
-table because archived reports hold earlier spellings. Read a flow's label with
-`flow_label`, never by splitting the ID — two instruments split on the last
-colon and both stopped being right the day the endpoints gained their types. There is **no model judge**: the rule decides every match, and a
-human vote is the only ground truth on whether an unmatched finding is real —
-its reason code decides whether it moves an analysis number or a writing one.
-See `docs/agents/claim-identity.md`.
+A **Claim**'s identity is a versioned value that code computes from its fields,
+never from its prose. Read a flow's label with `flow_label`, never by splitting
+the ID. See `docs/agents/claim-identity.md`.
 
 ### No AI attribution
 
@@ -322,21 +111,10 @@ request's commits and body and each push to `main`.
 
 ### Licensing
 
-Apache-2.0 covers the code. It does not cover the **ASVS** package's text:
-`catalog.json` and the 17 lane skill files reproduce ASVS 5.0.0, which OWASP
-publishes under CC BY-SA 4.0, so those 18 files carry ShareAlike.
-
-**Never copy a sentence out of a governed file into a file that is not governed.**
-Write the point in your own words. A requirement sentence reads like ordinary
-prompt text, which is exactly why this is easy to do and invisible in review;
-`tests/test_license_lints.py` fingerprints the upstream words and finds them
-whatever formatting they arrive in. Citing a standard by identifier carries no
-obligation — a short identifier is not the expression it points at.
-
-A package that quotes a published standard inherits that standard's licence, so
-it needs a `CONTENT_LICENSE` entry, a `THIRD_PARTY` entry and a `NOTICE`
-section. A corpus case converted from somebody else's model records the source
-**and the licence** in `provenance`. See `docs/agents/licensing.md`.
+Apache-2.0 covers the code. The **ASVS** package's 18 governed files carry
+CC BY-SA 4.0. **Never copy a sentence out of a governed file into a file that
+is not governed**; write the point in your own words. See
+`docs/agents/licensing.md`.
 
 ### Domain docs
 
