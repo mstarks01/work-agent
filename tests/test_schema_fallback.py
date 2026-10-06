@@ -2,8 +2,8 @@
 
 Under ``structured_output = "auto"``, a provider 400 that refuses the native
 schema moves the tier to the forced tool call, and the same request is sent
-again. These tests drive the built Bedrock adapter, whose pinned map marks
-Claude 5 native while the AWS model card says Bedrock does not support it.
+again. These tests drive the built Bedrock adapter on a model that the pinned
+map marks native, and the provider double refuses it.
 """
 
 from __future__ import annotations
@@ -30,7 +30,7 @@ from analysis_service.retry import classify
 from analysis_service.sampling import load_sampling
 from analysis_service.system_model import SystemModel
 from tests.factories import collected, rungs_of, tiers_for
-from tests.test_schema_rules import CONFIG, FAKE_ENV, SCHEMA
+from tests.test_schema_rules import BEDROCK_SONNET_4_6, CONFIG, FAKE_ENV, SCHEMA
 from tests.test_tool_path import tool_call_message
 
 pytestmark = pytest.mark.usefixtures("supplied_transport")
@@ -73,7 +73,7 @@ class _Provider:
 
 def _strong_adapter(sampling_env: dict[str, str] | None = None):
     adapters = build_tier_adapters(
-        tiers_for("bedrock"),
+        tiers_for("bedrock", models=(BEDROCK_SONNET_4_6, BEDROCK_SONNET_4_6)),
         load_sampling(CONFIG / "sampling.toml", env=sampling_env or {}),
         load_resilience(CONFIG / "resilience.toml", env={}),
         env=FAKE_ENV,

@@ -25,6 +25,7 @@ no other vendor sends.
 
 from __future__ import annotations
 
+from datetime import UTC, datetime
 from typing import Any
 
 import pytest
@@ -77,7 +78,7 @@ def _transform(status_code: int, body: dict[str, Any]) -> Any:
         messages=[],
         stream=False,
         call_type="completion",
-        start_time=0,
+        start_time=datetime.now(UTC),
         litellm_call_id="offline",
         function_id="offline",
     )
@@ -181,7 +182,7 @@ class TestTheSchemaPathIsNativeHere:
         lookup has not caught up with still binds.
         """
         vendor = vendor_for(VENDOR)
-        unlisted = "anthropic/claude-sonnet-4.6"
+        unlisted = "anthropic/claude-3.7-sonnet"
         assert native_structured_output(vendor, unlisted) is None
         assert not library_sends_no_native_schema(vendor, unlisted)
 
@@ -251,11 +252,11 @@ def test_the_gate_probe_the_spec_asked_for():
             native_structured_output(vendor, model),
             emulates_structured_output(vendor, model),
         )
-        for model in ("anthropic/claude-sonnet-4.6", MODEL)
+        for model in ("anthropic/claude-3.7-sonnet", MODEL)
     }
     assert profile == {
         # The map is silent, which is not a no — the distinction the reader
         # exists to draw, and the one litellm's own boolean lookup collapses.
-        "anthropic/claude-sonnet-4.6": (None, False),
+        "anthropic/claude-3.7-sonnet": (None, False),
         MODEL: (True, False),
     }

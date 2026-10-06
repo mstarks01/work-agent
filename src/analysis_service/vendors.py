@@ -66,12 +66,11 @@ VENDOR_NAMES: tuple[VendorName, ...] = (
 #: **A claim about the value, not about the code path that filled it.** Two
 #: values and not three: the reader asks one question — does the served build
 #: add evidence the requested build did not — and an echo answers no whatever
-#: the reason for it. There are three reasons here and they all answer no. A
-#: Gemini response body carries ``modelVersion`` and the pinned translator
-#: never reads it. A Bedrock Converse response carries no model identifier at
-#: all. And OpenRouter's body carries one that repeats the request, which is
-#: the reason that separates this field from its mechanism: litellm reads that
-#: field faithfully and what it reads is the request (#806).
+#: the reason for it. There are two reasons here and they both answer no. A
+#: Bedrock Converse response carries no model identifier at all. OpenRouter's
+#: body carries one that repeats the request, which is the reason that
+#: separates this field from its mechanism: litellm reads that field
+#: faithfully and what it reads is the request (#806).
 ServedTrust = Literal["provider_reported", "requested_echo"]
 
 #: What a node's output schema becomes before it reaches this vendor.
@@ -852,11 +851,10 @@ class Vendor:
     #: This is a property of the vendor **and** of the translator that reads it,
     #: which is why ``tests/test_identity.py`` drives each vendor's installed
     #: transformation with a canned response rather than restating the value. A
-    #: litellm bump that started reading ``modelVersion`` would make the
-    #: ``vertex`` entry wrong, and every fingerprint would move on that bump
-    #: anyway — ``litellm`` sits in ``BUILD_DISTRIBUTIONS`` — so the hashes
-    #: would move for an unrelated reason and the stale entry would stay
-    #: invisible.
+    #: litellm bump that changes which field a translator reads makes an entry
+    #: wrong, and every fingerprint moves on that bump anyway — ``litellm``
+    #: sits in ``BUILD_DISTRIBUTIONS`` — so the hashes move for an unrelated
+    #: reason and the stale entry stays invisible.
     served_trust: ServedTrust
     #: Whether one route on this vendor reaches one upstream provider.
     #:
@@ -1251,10 +1249,9 @@ VENDORS: dict[VendorName, Vendor] = {
         # the cloud account's own reporting and never beside the response.
         charges={},
         prefix="vertex_ai/",
-        # litellm fills ``model_response.model`` from the request in its Gemini
-        # transformation. The response body carries ``modelVersion`` and litellm
-        # never reads it.
-        served_trust="requested_echo",
+        # litellm's Gemini transformation fills ``model_response.model`` from
+        # the response body's ``modelVersion``, cut at its ``@``.
+        served_trust="provider_reported",
         routes_to_one_provider=True,
         upstream_pin=None,
         prompt_cache=None,
@@ -1392,8 +1389,8 @@ VENDORS: dict[VendorName, Vendor] = {
         prefix="gemini/",
         # litellm's Developer API config inherits the Vertex Gemini
         # transformation, which fills ``model_response.model`` from the
-        # request and never reads the body's ``modelVersion``.
-        served_trust="requested_echo",
+        # body's ``modelVersion``.
+        served_trust="provider_reported",
         routes_to_one_provider=True,
         upstream_pin=None,
         prompt_cache=None,

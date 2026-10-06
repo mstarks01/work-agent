@@ -25,7 +25,11 @@ from google.genai import types
 from analysis_service.binding import build_tier_adapters
 from analysis_service.conformance import REFERENCE_MODELS
 from analysis_service.frameworks import schemas_for
-from analysis_service.model_gate import _litellm, schema_support
+from analysis_service.model_gate import (
+    _litellm,
+    emulates_structured_output,
+    schema_support,
+)
 from analysis_service.provider import InProcessExecutor
 from analysis_service.resilience import load_resilience
 from analysis_service.sampling import load_sampling
@@ -61,6 +65,11 @@ CLAUDE_ON: dict[VendorName, str] = {
     "openrouter": "anthropic/claude-sonnet-4.6",
     "vertex": "claude-sonnet-4-6",
 }
+
+#: A Bedrock Claude that the pinned litellm sends on the native path and that
+#: takes a forced tool. The pinned litellm sends Claude 5 on the tool path there,
+#: and Opus 5.5 refuses a forced tool, so a test of either path names this one.
+BEDROCK_SONNET_4_6 = CLAUDE_ON["bedrock"]
 
 FAKE_ENV = {
     var: f"not-a-real-{var.lower()}"
@@ -155,9 +164,20 @@ def _nodes(schema: Any) -> Iterator[Mapping[str, Any]]:
 
 
 def _bedrock_schema(response_format: Any) -> dict[str, Any]:
-    mapped = _mapped("bedrock", response_format)
+    mapped = _mapped("bedrock", response_format, BEDROCK_SONNET_4_6)
     text = mapped["outputConfig"]["textFormat"]["structure"]["jsonSchema"]["schema"]
     return json.loads(text)
+
+
+def test_the_bedrock_test_model_takes_both_paths_under_the_pin():
+    """Without this, a test of one path could pass on another."""
+    from analysis_service.ladder import _PROBE_TOOL, RUNG_KWARGS, _accepts
+
+    forced_tool = {"tools": [_PROBE_TOOL], **RUNG_KWARGS["forced_tool"]}
+    bedrock = vendor_for("bedrock")
+
+    assert not emulates_structured_output(bedrock, BEDROCK_SONNET_4_6)
+    assert _accepts(bedrock, BEDROCK_SONNET_4_6, forced_tool)
 
 
 def test_the_node_schema_carries_bounds():
@@ -167,7 +187,7 @@ def test_the_node_schema_carries_bounds():
 
 
 def test_bedrock_receives_no_bound_it_refuses():
-    schema = _bedrock_schema(_response_format("bedrock"))
+    schema = _bedrock_schema(_response_format("bedrock", model=BEDROCK_SONNET_4_6))
 
     refused = sorted(
         key for node in _nodes(schema) for key in node if key in BEDROCK_REFUSED
@@ -183,7 +203,7 @@ def test_bedrock_receives_no_bound_it_refuses():
 
 def test_bedrock_still_states_each_bound_to_the_model():
     """A bound moves into the field's description; it does not disappear."""
-    schema = _bedrock_schema(_response_format("bedrock"))
+    schema = _bedrock_schema(_response_format("bedrock", model=BEDROCK_SONNET_4_6))
 
     descriptions = " ".join(
         node["description"]
@@ -195,7 +215,9 @@ def test_bedrock_still_states_each_bound_to_the_model():
 
 def test_bedrock_receives_a_refused_bound_as_built():
     """Under ``as_built``, Bedrock receives a bound it refuses."""
-    schema = _bedrock_schema(_response_format("bedrock", rewrite=False))
+    schema = _bedrock_schema(
+        _response_format("bedrock", rewrite=False, model=BEDROCK_SONNET_4_6)
+    )
 
     assert {key for node in _nodes(schema) for key in node} & BEDROCK_REFUSED
 

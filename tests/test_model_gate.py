@@ -401,18 +401,25 @@ class TestOutputCeiling:
         # a model the pinned map has not caught up with is the worse failure.
         assert output_ceiling(vendor_for("openai"), "gpt-6-unreleased") is None
 
-    def test_an_unmapped_model_raises_a_bare_exception(self):
-        # Why output_ceiling catches `Exception` rather than something narrower.
-        # If a version bump starts raising a real type, this fails and the catch
-        # can be tightened.
+    def test_an_unmapped_model_raises_the_type_model_info_catches(self):
         from analysis_service.model_gate import _litellm
 
-        with pytest.raises(Exception) as excinfo:
+        with pytest.raises(_litellm.exceptions.ModelNotMappedError):
             _litellm.get_model_info(
-                model="gpt-6-unreleased", custom_llm_provider="openai"
+                model="zz-unreleased-9", custom_llm_provider="openai"
             )
 
-        assert type(excinfo.value) is Exception
+    def test_an_entry_guessed_from_a_family_rule_is_unmapped(self):
+        # The second shape: litellm answers from a rule instead of raising, so
+        # without the key check the conformance matrix calls the model known.
+        from analysis_service.model_gate import _litellm, model_info
+
+        guessed = _litellm.get_model_info(
+            model="gpt-6-unreleased", custom_llm_provider="openai"
+        )
+
+        assert guessed["key"] not in _litellm.model_cost
+        assert model_info(vendor_for("openai"), "gpt-6-unreleased") is None
 
 
 class TestRetryLayering:
@@ -556,12 +563,12 @@ def test_every_local_only_switch_litellm_defines_is_set():
     """The pin does not pin this, so the suite has to.
 
     Each `LITELLM_LOCAL_*` variable turns off a remote config fetch. The
-    repository set one of the four, and 1.97.0 fetches the Anthropic beta
+    repository once set one of them, and 1.97.0 fetches the Anthropic beta
     headers behind another of them -- at request time, from a URL whose content
     chooses an outgoing header, checked only for being a non-empty dict.
 
     Read out of litellm's own source rather than restated here, so a version
-    bump that adds a fifth switch fails this test instead of opening an egress
+    bump that adds a switch fails this test instead of opening an egress
     nobody looked for.
     """
     import litellm
