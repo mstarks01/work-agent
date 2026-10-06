@@ -351,25 +351,25 @@ class Analyses:
     def claim(self, answering: Run | None = None) -> Run | None:
         """Start a run, or ``None`` if one is already going.
 
-        A full registry removes its oldest run that waits for no answers, and
-        ``answering``, the run these answers resume from, only where nothing
-        else can go. Where every run waits for answers, it raises
-        :class:`RegistryFull` rather than remove one.
+        A full registry removes its oldest runs that wait for no answers. Where
+        every run waits for answers, it raises :class:`RegistryFull` rather
+        than remove one. A run that resumes ``answering`` may hold one place
+        over the bound: ``answering`` stays the place to retry from until that
+        run has a report, and a resumed run never pauses, so at most one such
+        place is held.
         """
         if self._busy:
             return None
-        removable = [
-            key
-            for key, held in self._runs.items()
-            if not held.waiting or held is answering
-        ]
-        if len(self._runs) >= self._max_runs:
-            if not removable:
+        limit = self._max_runs + (answering is not None)
+        removable = iter([key for key, held in self._runs.items() if not held.waiting])
+        while len(self._runs) >= limit:
+            key = next(removable, None)
+            if key is None:
                 raise RegistryFull(
                     f"{len(self._runs)} analyses wait for answers. Answer or"
                     " continue one of them before you start another."
                 )
-            self._runs.pop(min(removable, key=lambda key: self._runs[key] is answering))
+            del self._runs[key]
         self._busy = True
         run = Run(id=secrets.token_urlsafe(16))
         self._runs[run.id] = run
