@@ -382,7 +382,9 @@ The app can ask you questions before the analysis, and after the report.
   these?**. Under **Earlier answers**, the follow-up lists the answers this
   report read. Click **Change** beside one to give a new answer, and the
   follow-up reads it. A known answer cannot change back to "I don't know"
-  there.
+  there, and a known part of a question with parts cannot either. Where you
+  answered only some parts of such a question, the follow-up asks it again
+  and shows the parts you answered.
 
 - **The report's open facts.** Most findings are conditional: they rest on
   facts your description never states, such as how a flow is protected. Under

@@ -84,11 +84,13 @@ def check_fact_answers(
     ``unknown`` answer to a fact an earlier round settled reopens the fact, so
     it is refused unless ``reopen``: a job waiting at its pause lets a
     submitter take back an answer they guessed, and a report's follow-up does
-    not.
+    not. **The rule holds for each facet:** a facet answered ``unknown`` is
+    refused where an earlier answer gave it a known answer, whatever the other
+    facets say.
     """
     prepared = prepared_model(model, catalog)
     answered_before = {answer.key for answer in earlier}
-    settled_before = {answer.key for answer in earlier if answer.known}
+    settled_before = {answer.key: answer for answer in earlier if answer.known}
     stated = prepared.capability_facts()
     for answer in answers:
         element_id, attribute, assertion, subject, question, capability = answer.key
@@ -133,11 +135,9 @@ def check_fact_answers(
                 f"an answer's line may hold {MAX_QUOTE_CHARS} characters; shorten"
                 f' the answer to "{fact_label(answer.key, model)}"'
             )
+        if not reopen and answer.key in settled_before:
+            _refuse_reopening(answer, settled_before[answer.key])
         if not answer.known:
-            if answer.key in settled_before and not reopen:
-                raise ValueError(
-                    "an earlier answer settled this fact; send a value to change it"
-                )
             continue
         choices = answer_choices(answer.key, model, catalog)
         if choices and answer.value not in choices:
@@ -147,6 +147,23 @@ def check_fact_answers(
             )
     _check_attribute_values(answers, model)
     _check_capability_lineage(answers, prepared, earlier)
+
+
+def _refuse_reopening(answer: FactAnswer, before: FactAnswer) -> None:
+    """Refuse an ``unknown`` answer to a fact, or to a facet, ``before`` settled."""
+    if answer.facets is None or before.facets is None:
+        if not answer.known:
+            raise ValueError(
+                "an earlier answer settled this fact; send a value to change it"
+            )
+        return
+    for facet in answer_facets(answer.key):
+        reopened = answer.facets.get(facet.id) == UNKNOWN
+        if reopened and before.facets.get(facet.id, UNKNOWN) != UNKNOWN:
+            raise ValueError(
+                f"an earlier answer settled {facet.question!r}; send a value to"
+                " change it"
+            )
 
 
 def _check_capability_lineage(

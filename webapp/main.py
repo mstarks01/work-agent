@@ -669,13 +669,16 @@ def _earlier_payload(
     (:func:`~analysis_service.links.check_answers`), so the page offers it.
     A fact the follow-up still ``asked``, such as a facet answer with facets
     left out, is left to its question, because one submission answers a fact
-    once.
+    once. Its answer is ``retained``, so that question starts from it.
     """
     options = list(components(report.system_model))
     return {
         "answers": _answer_rows(
             report, [answer for answer in answered if answer.key not in asked]
         ),
+        "retained": [
+            answer.model_dump(mode="json") for answer in answered if answer.key in asked
+        ],
         "links": [
             {
                 "principal": link.principal,
