@@ -18,7 +18,7 @@ names='claude|anthropic|copilot|chatgpt|openai|gemini|cursor|codeium|devin'
 # An author or committer name is a person's name too, so it is read against
 # the products only: "cursor" and "devin" are ordinary words and names.
 agents='claude|anthropic|copilot|chatgpt|openai|gemini|codeium'
-pattern="co-authored-by:.*(${names})|(generated|written|created|authored) (with|by|using) \[?(${names})|claude-session:|claude\.ai/code/session|@anthropic\.com|@openai\.com|(^|	)(author|committer) .*(${agents})"
+pattern="co-authored-by:.*(${names})|(generated|written|created|authored) (with|by|using) \[?(${names})|(this|it) (was|has been) (generated|written|created|authored|drafted|produced) (with|by|using) (an? )?(ai|llm)\b|claude-session:|claude\.ai/code/session|@anthropic\.com|@openai\.com|(^|	)(author|committer) .*(${agents})"
 
 # Cyrillic and Greek letters that look like Latin ones, read as the Latin
 # letter, so "Сlaude" with a Cyrillic С reads as "Claude".
