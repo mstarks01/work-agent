@@ -377,9 +377,9 @@ name that matches it is allowed to proceed to the capability checks. Passing
 the name check does not prove that the provider still serves the model.
 
 A loose rule is the right one for the rest because it runs against every
-registered vendor's catalog at once, and its predecessor — an allowlist of numbered
-Gemini builds — broke outright when Google retired them. Claude's half avoids
-that trap by matching a shape rather than enumerating builds: a model released
+registered vendor's catalog at once. An allowlist of numbered builds breaks each
+time a vendor retires one. Claude's half matches a shape rather than
+enumerating builds, so a model released
 tomorrow already satisfies it. The name check is only a proxy either way.
 Stronger evidence comes from the **served build read back from each response**,
 when the provider supplies it, and recorded for that node execution, described
@@ -413,12 +413,12 @@ framework does not move `model_tiers.toml`'s version, because adding a node key
 is a data edit under the same schema.
 
 One knob per framework rather than one per lane. Every lane of one framework
-runs the same judgement on the same tier, so six `analyze/<category>` keys that
-always held one value had no reader; an operator choosing to run one framework
-cheaper than another is the choice that has a purpose. The loader **checks that
-a framework's `recritic` key resolves to the same tier as its `critic`** — a
-re-ask on a cheaper model than the pass it corrects is the failure a comment
-used to warn about, and at 2N keys a comment drifts.
+runs the same judgement on the same tier, so one key per lane would hold one
+value that nothing reads; an operator choosing to run one framework cheaper
+than another is the choice that has a purpose. The loader **checks that a
+framework's `recritic` key resolves to the same tier as its `critic`** — a
+re-ask on a cheaper model than the pass it corrects is the failure this check
+refuses. A comment cannot hold 2N keys to that rule.
 
 **What the extra keys cost.** ASVS runs one lane per chapter of its standard, so
 an ASVS job makes 17 `strong`-tier lane calls against STRIDE's 6, and a job
@@ -456,7 +456,7 @@ loader rejects, never a silent fallback.
 | `thinking` | **unset** | Leaves the model's own preset. |
 
 `thinking` is a uniform `"low"` / `"medium"` / `"high"` enum. It reaches every
-registered vendor, which is why there are no longer per-tier legal ranges: LiteLLM
+registered vendor, which is why no tier has its own legal range: LiteLLM
 maps it to adaptive `thinking` plus `output_config.effort` on Anthropic,
 `thinkingConfig` on Gemini, and passes it through on OpenAI o-series. `"auto"`
 and `"off"` are **not** accepted —
@@ -469,7 +469,7 @@ things, and they are **sized against measured output rather than chosen round**.
 corpus cases, max 2,565. The critic emits one *ruling* per draft — an ID, a
 verdict, a confidence, and a replacement severity only where it corrected one —
 rather than the draft re-transcribed, which is roughly 60–90 tokens per ruled
-threat against the ~400 the old whole-draft shape measured at. Its 32,768 is
+threat against about 400 for a re-transcribed draft. Its 32,768 is
 therefore generous rather than tight: reasoning tokens are spent against this
 same cap, and on the strong tier that is where nearly all of it goes.
 
@@ -480,15 +480,16 @@ next deterministic node fails to bind its parameter. Sizing these two values is
 what prevents that; the graph routing a missing critic ruling into its re-ask is
 what makes it legible when it happens anyway.
 
-A tier asking for more than its model will serve now **fails the build**: every
+A tier asking for more than its model will serve **fails the build**: every
 provider accepts `max_output_tokens`, so the supported-param gate cannot see an
 over-ceiling value and the serving model rejects it at request time instead. The
 ceiling is read from the pinned model map per `(vendor, model)` — 16,384 on
 `gpt-4o`, 64,000 on Claude 4.6+, 65,535 on Gemini 2.5 — and a model the map does
 not know is not gated.
 
-> **`top_k` is gone from the surface** (it was removed in version 3). It is the
-> one parameter the build-time check provably cannot cover — LiteLLM re-injects
+> **`top_k` is not a setting.** A file that sets it fails at startup with
+> `not overridable`. It is the one parameter the build-time check provably
+> cannot cover — LiteLLM re-injects
 > it into the request *after* validation — so a wrong value would be silent while
 > the fingerprint attested to it.
 
@@ -496,9 +497,9 @@ Parameters that break the structured-output contract are **never** in the file
 and never overridable: `response_schema` (the SDK *raises*), `response_mime_type`
 (silently discarded), and `stop_sequences` (would truncate mid-token).
 
-The service sets no `http_options` either. That field carried the per-request
-timeout until the timeout changed unit on the way to the provider library, so
-`timeout_ms` now reaches the library as its own parameter. See
+The service sets no `http_options` either. `timeout_ms` reaches the provider
+library as its own parameter, because `http_options.timeout` changes unit on
+the way. See
 [resilience.toml](#resiliencetoml).
 
 ### The startup parameter check
@@ -523,8 +524,8 @@ answer never depends on a network fetch during startup.
 inheriting the limits of the library's model data: a model released after the
 pinned copy is unknown to it and falls back to the provider's *base* config,
 where anything the provider generally accepts passes. That is usually harmless
-— it is a name check, not an existence check — but one case is not. Anthropic
-removed `temperature` from **Claude 4.7 onward**: only the model's own default
+— it is a name check, not an existence check — but one case is not.
+**Claude 4.7 and later** take no `temperature`: only the model's own default
 is accepted, and a request carrying the parameter is rejected. A tier that
 states a temperature on a Claude newer than the pinned library would sail
 through startup and die on the first node of a paid job.
@@ -538,14 +539,14 @@ hold the value. Three deliberate limits on it:
   one. Every Claude generation runs here; what a generation decides is which
   parameters it accepts.
 - It keys on the **model**, not the vendor. Vertex-hosted Claude is the same
-  model under the same removal, and `vendor = "vertex"` must not be a way around
+  model under the same rule, and `vendor = "vertex"` must not be a way around
   it.
 - The floor is **4.7, not 4.6**. Claude 4.6 still accepts `temperature`, so a
   stated value survives there rather than being swept up by a vendor-wide ban.
 
 Unset the parameter for that tier and the model runs on its own default, which
-is the only value these generations serve. This is a floor, not a re-introduced
-support table: when the pinned library's model data catches up, the first check
+is the only value these generations serve. This is a floor, not a support
+table: when the pinned library's model data catches up, the first check
 starts catching the same case and this one becomes redundant rather than
 contradictory.
 
@@ -594,9 +595,9 @@ and a refusal on the last rung, still fails the call.
 its schema goes back to the same model once, with the validation errors. A
 second failure still fails the node. How often the lower rungs need the
 re-ask, and whether report quality matches the native rung, is not measured yet
-(#1413). The `prompt` rung is the weakest: it is the format the
-`constrain_output = false` measurement below found fenced and incomplete, with
-the schema now stated, the fence removed and the re-ask added.
+(#1413). The `prompt` rung is the weakest. It sends the format the
+`constrain_output = false` measurement below found fenced and incomplete, but
+it states the schema in the prompt, strips a fence and relies on the re-ask.
 
 The ladder is decided as a **call**, not a table: the check asks the installed
 library what it would send for this pair. Under the
@@ -630,9 +631,7 @@ the schema stops going on the wire. It is **per tier, not per vendor**, because
 it is not a fact about the vendor: the same provider takes a smaller schema
 happily, and the same schema goes to another provider fine.
 
-**Setting it `false` is not currently a working configuration.** An earlier
-version of this page said it gives up constrained *generation* only, leaving
-validation and the repair loop to cover the difference. Measured live against
+**Setting it `false` is not currently a working configuration.** Measured live against
 `claude-sonnet-4-6` with the extraction schema suppressed, that is not what
 happens: the model fences its JSON in a ```` ```json ```` block, which ADK hands
 to validation unstripped so it fails before anything reads the content, and it
@@ -670,12 +669,10 @@ itself independently ends up not doing so, and reporting nothing unusual.
 | `distinct_model` | Every framework's critic runs a different model from its own analysis. |
 | `distinct_provider` | The serving organisation must differ too. |
 
-**A label is not the thing it names, and a gateway made that matter.** Both
-values used to compare what you wrote — the vendor key, and the
-`(vendor, model)` pair — and an aggregator's vendor key says nothing about which
-provider or which build answered.
+**A label is not the thing it names.** An aggregator's vendor key says nothing
+about which provider or which build answered.
 
-`distinct_model` now compares the model identifiers with any gateway segment
+`distinct_model` compares the model identifiers with any gateway segment
 stripped, so `openai/gpt-5.6` through OpenRouter and `gpt-5.6` direct are one
 model and not two. A family a vendor spells its own way is still two —
 Bedrock's `anthropic.claude-opus-5` beside `claude-opus-5` — because nothing
@@ -914,9 +911,8 @@ selections you offer, never against the shipped numbers.
 knobs cannot substitute for it. `timeout_ms` bounds one request at 300 s,
 `attempts` allows 3 of them per node, and the graph runs five LLM stages in
 series on its longest path — 75 minutes, with every individual bound respected
-the whole way. It was over two hours before the retry amplification below was
-removed, which is the point: the product moves whenever any factor does, and
-only a deadline states the answer directly. 900 s is a **backstop, not an
+the whole way. The product moves whenever any factor does, and only a deadline
+states the answer directly. 900 s is a **backstop, not an
 SLO**: one observed clean run is ~119 s, the longest legitimate path with a
 repair pass and a critic re-ask is ~200 s, and one transient retry on the
 slowest node puts it near 260 s. It fires on runs that are wedged, not merely
@@ -947,14 +943,13 @@ row states both bounds or is refused, so a long request is never cut by a
 shorter deadline the row did not raise. `ANALYSIS_TIMEOUT_MS` and
 `ANALYSIS_JOB_DEADLINE_MS` set the base values alone and never a row.
 
-`attempts` is a **total** count, and it is now literally the request count per
-node. It did not used to be, and that gap was the 429 storm. On the OpenAI/Azure
-path LiteLLM sets the provider SDK's own `max_retries` from the retry count it
-is given, so the first attempt retried at the SDK level too and the worst case
-per node was `2 * attempts - 1` requests — five at the shipped `3`, and up to
-thirty in the seconds a framework's lane agents run in parallel. Passing `max_retries` on
-the adapter did not close it, because the retry count LiteLLM is given overwrites
-it.
+`attempts` is a **total** count: the request count per node. On the
+OpenAI/Azure path LiteLLM sets the provider SDK's own `max_retries` from the
+retry count it is given, so a library retry layer would retry each attempt at
+the SDK level too. The worst case per node would be `2 * attempts - 1`
+requests — five at the shipped `3`, and up to thirty in the seconds a
+framework's lane agents run in parallel. A `max_retries` on the adapter does not
+prevent it, because the retry count LiteLLM is given overwrites it.
 
 So the library's retry layer is **off** (`num_retries = 0`, one request per call)
 and the loop runs a level up, above the provider seam, where it can be bounded.
@@ -968,8 +963,7 @@ that could not exist below the adapter:
   count per node is precisely the wrong response to a provider-wide failure,
   since it hands every node its full allowance regardless of what the other
   lanes are seeing. Correlated failure empties the bucket once for everyone and the
-  service stops retrying; an isolated failure finds it full and is retried
-  exactly as before.
+  service stops retrying; an isolated failure finds it full and is retried.
 - **Decorrelated timing.** Lane agents that start together fail together, and
   on any fixed curve retry together, reconverging on the quota they just
   tripped. Retries use full jitter — a uniform draw across the whole interval,
@@ -989,12 +983,10 @@ forbid only shapes the total already permits. Both bounds are in UTF-8 bytes
 rather than tokens, so the public contract does not change when a deployment
 changes vendor.
 
-Version 3 **added** the two input bounds. Version 2 **removed** version 1's four
-backoff knobs (`initial_delay`, `max_delay`, `exp_base`, `jitter`): the adapter
-picks its backoff curve internally from the exception type, so as configuration
-they read as a knob and connected to nothing. Both are hard cutovers — a file on
-an older version fails to load, so every deployment edits its file rather than
-inheriting a default for a contract its callers can see.
+The file is version 3, and a file on an older version fails to load, so every
+deployment edits its file rather than inheriting a default for a contract its
+callers can see. There are no backoff knobs: the adapter picks its backoff
+curve internally from the exception type, so a knob would connect to nothing.
 
 ## Environment variables
 
@@ -1019,8 +1011,8 @@ what one claim is and which fields carry it, which is why it is the package's an
 not the shared `analyze.md`'s: a record that grades nothing cannot read a field
 list naming `severity`. `domains/` holds the shared domain packs,
 which stay the service's because their retrieval key reads the neutral system
-model rather than any package's rules. `ANALYSIS_KNOWLEDGE_DIR` is **gone**: the
-corpus it pointed at moved into the package whose rules select it. See
+model rather than any package's rules. No variable relocates the knowledge
+corpus: it lives in the package whose rules select it. See
 [ADR 0011](adr/0011-package-text-follows-its-retrieval-key.md).
 
 A variable **picks which file is read**; it never layers a second file over the
@@ -1052,7 +1044,7 @@ Set the variable in whatever starts the process: the shell profile, the
 service unit, the container environment. Outside the checkout rather than an
 ignored file inside it, because a `git clean` deletes an ignored file and a
 `.gitignore` line for one machine does not belong in a shared file. The cost
-is that an upstream change to the tracked file no longer reaches the copy:
+is that an upstream change to the tracked file does not reach the copy:
 after a pull, diff the tracked file against the copy and carry over what you
 want. The same pattern covers `sampling.toml` and `resilience.toml`.
 
@@ -1090,7 +1082,7 @@ validated **identically** to a file value. `{TIER}` is `BASE` or `STRONG`.
 | `ANALYSIS_SAMPLING_{TIER}_STRUCTURED_OUTPUT` | Overrides the tier's `structured_output` (`auto`/`native`/`tool`). |
 
 Only these are overridable. A variable naming a reserved (`candidate_count`),
-removed (`top_k`) or forbidden param raises `not overridable`. Treat this as a
+unsupported (`top_k`) or forbidden param raises `not overridable`. Treat this as a
 temporary escape hatch: an override changes the run's fingerprint, so a run using
 one reads as **uncertified**. To change sampling for real, edit the file and back
 it with a measurement — see [Tuning the models](../evals/TUNING.md).
@@ -1122,7 +1114,7 @@ no effect.
 | `ANALYSIS_MODEL_BASE_MODLE` (typo) | **Startup fails**: `unrecognised model override(s)` |
 | `ANALYSIS_MODEL_FLASH` (stale v2 name) | **Startup fails**: same check |
 | `ANALYSIS_SAMPLING_BSAE_SEED` (typo'd tier) | **Startup fails**: `unknown tier 'BSAE'` |
-| `ANALYSIS_SAMPLING_BASE_TOP_K` (removed param) | **Startup fails**: `TOP_K is not overridable` |
+| `ANALYSIS_SAMPLING_BASE_TOP_K` (unsupported param) | **Startup fails**: `TOP_K is not overridable` |
 | `ANALYSIS_RETRY_ATEMPTS` (typo) | **Silently ignored** — the file's value stands |
 | `ANALYSIS_TIMEOUT_MSEC` (typo) | **Silently ignored** — the file's value stands |
 

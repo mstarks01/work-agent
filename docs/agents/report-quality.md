@@ -93,7 +93,7 @@ references (02/6, 05/6, 05/7, 12/8) name a read grant or a compromised reader.
 Every run, with or without the completeness instruction, writes a
 storage-copy threat there instead (`QA-2026-09-26-01-E3`). The cause is the
 only store lead, whose question asks who reaches the storage layer. The
-`information-disclosure-store-readers` rule now leads the lane to the elements
+`information-disclosure-store-readers` rule leads the lane to the elements
 that read such a store. In a blind ruling it stated the access-path threat at
 4 of 8 reference places over two passes, against 1 of 8 without it
 (`QA-2026-10-05-02-E3`). It recovers the two read-grant references (02/6,
@@ -111,7 +111,7 @@ of such rows, and a signed ruling in `rulings.json` records the answer.
 
 **Earlier classes.** `QA-2026-09-25-01-E5` classes the 36 misses of Baseline
 `6bff717`: absent (9), a different attack (9), another verb or place (8),
-joined facts (4), critic kills (3, now recovered by merged code) and one
+joined facts (4), critic kills (3, which merged code recovers) and one
 fan-in loss.
 
 ## Open work
