@@ -8,6 +8,7 @@ questions a finished report asks and run it again.
 
 from __future__ import annotations
 
+import asyncio
 import json
 import re
 import shutil
@@ -1099,14 +1100,75 @@ def test_a_full_registry_of_waiting_runs_refuses_a_new_one():
     assert analyses.claim(answering=held[1]) is not None, "the refusal held the gate"
 
 
-def test_answers_to_a_waiting_run_may_take_its_place():
+def test_answers_to_a_full_registry_of_waiting_runs_still_start():
     analyses, (first, second) = _waiting_registry()
 
     run = analyses.claim(answering=first)
 
+    assert [analyses.get(held.id) for held in (first, second, run)] == [
+        first,
+        second,
+        run,
+    ]
+
+
+async def _deadline(on_node):
+    from analysis_service.engine import EngineDeadlineError
+
+    raise EngineDeadlineError("the deadline")
+
+
+async def _bad_config(on_node):
+    from analysis_service.errors import ConfigError
+
+    raise ConfigError("a setting")
+
+
+async def _rejected(on_node):
+    from analysis_service.jobs import PipelineRejected
+
+    return PipelineRejected(issues=[], nodes=[])
+
+
+async def _cancelled(on_node):
+    raise asyncio.CancelledError
+
+
+@pytest.mark.parametrize("start", [_deadline, _bad_config, _rejected, _cancelled])
+def test_a_failed_resumed_run_leaves_its_paused_run_to_answer_again(start):
+    """A full registry removed the paused run its answers resumed from, and
+    the resumed run then failed with no checkpoint (#1289, F1)."""
+    from webapp.main import _drive
+
+    analyses, (first, _) = _waiting_registry()
+    first.facts = [FactAnswer(key=FACT["key"], value="TLS")]
+    run = analyses.claim(answering=first)
+    first.resumed_by = run
+
+    async def drive():
+        run.task = asyncio.create_task(_drive(analyses, run, start))
+        await asyncio.wait([run.task])
+
+    asyncio.run(drive())
+
+    assert run.status == "failed"
+    assert analyses.get(first.id) is first
+    assert first.waiting and not first.resumed
+    assert first.facts[0].value == "TLS"
+    assert analyses.claim(answering=first) is not None
+
+
+def test_a_paused_run_goes_once_its_resumed_run_has_a_report():
+    analyses, (first, second) = _waiting_registry()
+    run = analyses.claim(answering=first)
+    first.resumed_by = run
+    run.report = sample_report([])
+    analyses.release()
+
+    analyses.claim()
+
     assert analyses.get(first.id) is None
     assert analyses.get(second.id) is second
-    assert analyses.get(run.id) is run
 
 
 def test_a_run_waits_until_the_run_its_answers_started_has_a_report():
