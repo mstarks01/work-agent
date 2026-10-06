@@ -1,4 +1,8 @@
-"""The first-run pages in a real browser: headless Chromium through Playwright.
+"""Every page script in a real browser: headless Chromium through Playwright.
+
+The first-run pages are driven through each step that sends answers. The review
+and sitting pages are loaded once each, and fail on a script error or on a page
+that draws nothing from its data.
 
 The other page tests run the scripts under ``node`` with a stand-in DOM. These
 serve the app over HTTP and drive its pages as a person would, so they also
@@ -13,6 +17,7 @@ rather than lets the check pass without running.
 
 from __future__ import annotations
 
+import json
 import os
 import socket
 import threading
@@ -51,11 +56,16 @@ def browser():
 @pytest.fixture
 def served(tiers):
     """The first-run app over a pausing stub run, served on a free local port."""
+    app = web.app_for(tiers, web.PausingRunner(catalog=False), catalog=False)
+    yield from serve(app)
+
+
+def serve(app):
+    """Serve ``app`` on a free local port; yields its base URL."""
     try:
         import uvicorn
     except ImportError:
         _unavailable("uvicorn is not installed: uv sync --group browser")
-    app = web.app_for(tiers, web.PausingRunner(catalog=False), catalog=False)
     with socket.socket() as probe:
         probe.bind(("127.0.0.1", 0))
         port = probe.getsockname()[1]
@@ -171,12 +181,7 @@ def test_a_phone_sized_owner_answers_skips_corrects_and_starts(browser, served):
 def test_a_first_report_offers_no_way_to_reopen_a_known_answer(page):
     """The follow-up refuses "I don't know" for a known earlier answer, and
     the page offered it (#1289, F2)."""
-    pause(page)
-    page.locator('#questions select:has(option[value="no"])').first.select_option("no")
-    page.click("#save")
-    page.wait_for_selector("#earlier", state="visible")
-    page.click("#continue")
-    page.wait_for_url("**/report/**")
+    first_report(page)
     followup = page.locator("details.followup")
     followup.locator("summary").click()
     earlier = followup.locator("p", has=page.locator("button", has_text="Change"))
@@ -186,3 +191,120 @@ def test_a_first_report_offers_no_way_to_reopen_a_known_answer(page):
     assert "no" in offered
     assert "unknown" not in offered
     assert earlier.locator("label", has_text="I don't know").count() == 0
+
+
+def first_report(page) -> None:
+    """Answer "no" to the first question, start, and wait for the report."""
+    pause(page)
+    page.locator('#questions select:has(option[value="no"])').first.select_option("no")
+    page.click("#save")
+    page.wait_for_selector("#earlier", state="visible")
+    page.click("#continue")
+    page.wait_for_url("**/report/**")
+
+
+def final_report(page) -> str:
+    """Change the earlier answer to "yes" on a first report, and send the
+    follow-up. Returns the final report's path."""
+    first_report(page)
+    first = page.url
+    followup = page.locator("details.followup")
+    followup.locator("summary").click()
+    row = followup.locator("p", has=page.locator("button", has_text="Change")).first
+    row.locator("button").click()
+    row.locator("select").select_option("yes")
+    with page.expect_request("**/answer/*") as sent:
+        page.click("text=Run the follow-up with these answers")
+    assert any(
+        fact.get("value") == "yes" for fact in sent.value.post_data_json["facts"]
+    )
+    page.wait_for_url(lambda url: "/report/" in url and url != first)
+    return page.url
+
+
+def test_a_first_report_sends_a_changed_answer_and_reaches_the_final_report(page):
+    final_report(page)
+    assert page.locator("summary", has_text="Correct an answer").count() == 1
+    assert page.locator("text=Run the follow-up with these answers").count() == 0
+
+
+def test_a_final_report_saves_a_correction(page):
+    final_report(page)
+    corrections = page.locator("details.followup", has_text="Correct an answer")
+    corrections.locator("summary").click()
+    row = corrections.locator("p", has=page.locator("button", has_text="Change")).first
+    row.locator("button").click()
+    row.locator("select").select_option("unknown")
+    with page.expect_request("**/correct/*") as sent:
+        page.click("text=Save the corrections")
+    assert sent.value.post_data_json["facts"][0]["value"] == "unknown"
+    page.wait_for_selector("text=(corrected after this report)", state="attached")
+
+
+def opened(browser, url: str):
+    """A page at ``url``, and the script errors it raises."""
+    page = browser.new_page()
+    errors: list[str] = []
+    page.on("pageerror", lambda error: errors.append(str(error)))
+    page.goto(url)
+    return page, errors
+
+
+def case_title(corpus) -> str:
+    """The first sitting case's title, which each sitting page's rail draws."""
+    from tests.test_sitting_app import CASE
+
+    return json.loads((corpus / CASE / "case.json").read_text())["title"]
+
+
+def test_the_review_pages_run_their_scripts(browser, tmp_path):
+    from tests import test_review_app as review
+    from webapp.review import build_session, create_app
+
+    session = build_session(
+        [[review.STEADY, review.SOMETIMES], [review.STEADY]],
+        voter="ada",
+        ledger_path=tmp_path / "votes",
+        configs={review.STEADY.case: "engine-1.2.3"},
+    )
+    # Text each page's script draws from the API, so a script that never ran
+    # fails here as well as one that raised.
+    drawn = {"/": "findings in the reference pool", "/review": review.SOMETIMES.title}
+    for url in serve(create_app(session)):
+        for path, expected in drawn.items():
+            page, errors = opened(browser, url + path)
+            page.wait_for_load_state("networkidle")
+            text = page.inner_text("body")
+            page.close()
+            assert errors == [], f"{path} raised: {errors}"
+            assert expected in text, f"{path} drew nothing from the API"
+
+
+def test_the_sitting_page_runs_its_script(browser, tmp_path):
+    from tests import test_sitting_app as sitting
+    from webapp.sitting import create_app
+
+    tree = sitting.build_tree(tmp_path)
+    title = case_title(tree / "evals" / "corpus")
+    for url in serve(create_app(sitting.session_for(tree, "ada", sitting.CASE))):
+        page, errors = opened(browser, url)
+        page.wait_for_load_state("networkidle")
+        text = page.inner_text("body")
+        page.close()
+    assert errors == [], f"the sitting page raised: {errors}"
+    assert title in text
+
+
+def test_the_offline_sitting_page_runs_its_script(browser, tmp_path):
+    from evals.harness.reference import ANONYMOUS
+    from tests import test_sitting_app as sitting
+    from webapp.offline_sitting import build
+
+    corpus = sitting.build_tree(tmp_path) / "evals" / "corpus"
+    written = tmp_path / "sitting.html"
+    written.write_text(build(corpus, "ada", ANONYMOUS), encoding="utf-8")
+    page, errors = opened(browser, written.as_uri())
+    text = page.inner_text("body")
+    page.close()
+    assert errors == [], f"the offline sitting page raised: {errors}"
+    assert case_title(corpus) in text
