@@ -60,8 +60,8 @@ class TestShape:
 
     def test_the_identity_carries_its_own_version(self):
         identity = execution_identity(
-            requested_route="anthropic/claude-opus-5",
-            served_route="anthropic/claude-opus-5",
+            requested_route="anthropic/claude-opus-5-5",
+            served_route="anthropic/claude-opus-5-5",
             sampling={},
             instruction_sha256=INSTRUCTIONS,
             build=BUILD,
@@ -73,8 +73,8 @@ class TestShape:
         # verify a served build must hash differently from one that only
         # repeated the provider's claim.
         identity = execution_identity(
-            requested_route="anthropic/claude-opus-5",
-            served_route="anthropic/claude-opus-5",
+            requested_route="anthropic/claude-opus-5-5",
+            served_route="anthropic/claude-opus-5-5",
             sampling={},
             instruction_sha256=INSTRUCTIONS,
             build=BUILD,
@@ -86,8 +86,8 @@ class TestShape:
         request, and the payload must not say a provider named it (#606).
         """
         identity = execution_identity(
-            requested_route="bedrock/global.anthropic.claude-opus-5",
-            served_route="bedrock/global.anthropic.claude-opus-5",
+            requested_route="bedrock/global.anthropic.claude-opus-5-5",
+            served_route="bedrock/global.anthropic.claude-opus-5-5",
             sampling={},
             instruction_sha256=INSTRUCTIONS,
             build=BUILD,
@@ -98,11 +98,11 @@ class TestShape:
         # The value is in the payload, so the same routes under two vendors
         # cannot collide on one fingerprint.
         assert fp(
-            requested_route="vertex_ai/claude-opus-5",
-            served_route="vertex_ai/claude-opus-5",
+            requested_route="vertex_ai/claude-opus-5-5",
+            served_route="vertex_ai/claude-opus-5-5",
         ) != fp(
-            requested_route="anthropic/claude-opus-5",
-            served_route="anthropic/claude-opus-5",
+            requested_route="anthropic/claude-opus-5-5",
+            served_route="anthropic/claude-opus-5-5",
         )
 
     def test_a_route_naming_no_vendor_raises_rather_than_guessing(self):
@@ -150,11 +150,11 @@ class TestEveryPartMoves:
         # A served identifier carries no vendor, and Vertex-hosted Claude and
         # Anthropic-direct return through an identical transformation.
         assert fp(
-            requested_route="vertex_ai/claude-opus-5",
-            served_route="vertex_ai/claude-opus-5",
+            requested_route="vertex_ai/claude-opus-5-5",
+            served_route="vertex_ai/claude-opus-5-5",
         ) != fp(
-            requested_route="anthropic/claude-opus-5",
-            served_route="anthropic/claude-opus-5",
+            requested_route="anthropic/claude-opus-5-5",
+            served_route="anthropic/claude-opus-5-5",
         )
 
     def test_a_changed_sampling_param(self):

@@ -74,7 +74,7 @@ model = "gemini-2.5-flash"
 
 [tiers.strong]
 vendor = "anthropic"
-model = "claude-opus-5"
+model = "claude-opus-5-5"
 ```
 
 <!-- every-vendor -->
@@ -707,7 +707,7 @@ review_independence = "distinct_provider"
 
 [tiers.review]
 vendor = "anthropic"
-model = "claude-opus-5"
+model = "claude-opus-5-5"
 
 [nodes]
 "critic/stride" = "review"

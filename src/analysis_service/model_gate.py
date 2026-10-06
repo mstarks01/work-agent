@@ -49,14 +49,14 @@ class ModelGateError(ConfigError):
 
 
 #: Every ``LITELLM_LOCAL_*`` switch litellm defines, set together rather than
-#: chosen between. Each one turns off a remote config fetch, and the repository
-#: set one of them: 1.97.0 also fetches the Anthropic beta headers, at request
-#: time, from a different URL behind a differently-named variable. Whoever
-#: serves that JSON chooses the outgoing ``anthropic-beta`` header, and the only
-#: integrity check is a non-empty dict with a known provider key.
+#: chosen between. Each one turns off a remote config fetch. One of them guards
+#: the Anthropic beta headers, which litellm fetches at request time from its
+#: own URL. Whoever serves that JSON chooses the outgoing ``anthropic-beta``
+#: header, and the only integrity check is a non-empty dict with a known
+#: provider key.
 #:
-#: Setting a switch for a feature this service does not use costs nothing, and
-#: deciding which ones matter is the judgement that failed. ``test_model_gate``
+#: Setting a switch for a feature this service does not use costs nothing, so
+#: no switch is left to a judgement of which ones matter. ``test_model_gate``
 #: compares this tuple against litellm's own source, so a bump that adds another
 #: fails the offline suite rather than opening a quiet egress.
 LITELLM_LOCAL_SWITCHES = (
@@ -90,13 +90,12 @@ def _import_litellm_hermetically() -> Any:
         )
     for switch in LITELLM_LOCAL_SWITCHES:
         os.environ[switch] = "True"
-    # The set is plural, and the names do not rhyme. 1.97.0 fetches a SECOND
-    # config -- the Anthropic beta headers -- from a different URL behind a
-    # different variable, at request time rather than at import, and the repo
-    # set only the first. Whoever serves that JSON chooses the outgoing
-    # `anthropic-beta` header verbatim, and litellm's only integrity check is
-    # that the response is a non-empty dict with a known provider key: no
-    # signature and no digest.
+    # The set is plural, and the names do not rhyme. The Anthropic beta
+    # headers, for one, come from a different URL behind a different variable,
+    # at request time rather than at import. Whoever serves that JSON chooses
+    # the outgoing `anthropic-beta` header verbatim, and litellm's only
+    # integrity check is that the response is a non-empty dict with a known
+    # provider key: no signature and no digest.
     #
     # A version bump must re-check this list against litellm's own source. It
     # is not derivable from the pin, which is the whole reason the pin is not
@@ -247,6 +246,11 @@ def model_info(vendor: Vendor, model: str) -> dict[str, Any] | None:
     returns an entry built from that rule, with no price and a ``key`` that is
     not in ``litellm.model_cost``. Both are unmapped here, so a report never
     calls a guessed entry known.
+
+    A third shape is an internal LiteLLM error while it builds the entry. It
+    raises a bare ``Exception`` that carries the not-mapped message, and that
+    error propagates. It is a fault in the map or in LiteLLM, not a model
+    nobody knows, so it fails closed rather than reading as unmapped.
     """
     try:
         info = _litellm.get_model_info(

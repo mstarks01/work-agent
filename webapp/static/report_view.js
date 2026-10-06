@@ -117,6 +117,7 @@
   // is an answer to start from, and `changed` runs on every edit. With
   // `reopen` false, a known value offers no "I don't know", because the
   // follow-up refuses to reopen a settled fact or a settled facet.
+  const offersDontKnow = (before, reopen) => reopen || !before || before === DONT_KNOW;
   let suggestLists = 0;
   const editorFor = (q, prefill, changed, reopen = true) => {
     if (q.form === "facets") {
@@ -129,7 +130,7 @@
         const select = el("select");
         if (!before) select.append(option("(leave unanswered)", ""));
         FACET_CHOICES
-          .filter(([, value]) => value !== DONT_KNOW || reopen || !before || before === DONT_KNOW)
+          .filter(([, value]) => value !== DONT_KNOW || offersDontKnow(before, reopen))
           .forEach(([label, value]) => select.append(option(label, value)));
         select.dataset.key = JSON.stringify(q.key);
         select.dataset.facet = facet.id;
@@ -154,7 +155,7 @@
       };
     }
     const value = (prefill && prefill.value) || "";
-    const offersDontKnow = reopen || !value || value === DONT_KNOW;
+    const dontKnowOffered = offersDontKnow(value, reopen);
     let input;
     // "unknown" is the answer that says you do not know: the fact stays
     // open, and it covers no finding.
@@ -165,7 +166,7 @@
       input = el("select");
       input.append(option("(leave unanswered)", ""));
       q.choices.forEach(choice => input.append(option(NAMES[choice] ? `${NAMES[choice]} (${choice})` : choice, choice)));
-      if (offersDontKnow) input.append(option("I don't know", DONT_KNOW));
+      if (dontKnowOffered) input.append(option("I don't know", DONT_KNOW));
       input.value = value;
       input.addEventListener("change", changed);
       nodes = [input];
@@ -182,7 +183,7 @@
       input.setAttribute("list", list.id);
       const state = el("select");
       state.append(option("(leave unanswered)", ""), option("There is none", "none"));
-      if (offersDontKnow) state.append(option("I don't know", DONT_KNOW));
+      if (dontKnowOffered) state.append(option("I don't know", DONT_KNOW));
       state.append(option("A mechanism, in my own words:", "mechanism"));
       // The state is the answer: blank sends nothing, and the text is read
       // only under "mechanism". Typing a mechanism chooses it.
@@ -217,7 +218,7 @@
       input.addEventListener("input", changed);
       const dontKnow = el("label");
       dontKnow.append(box, " I don't know");
-      nodes = offersDontKnow ? [input, " ", dontKnow] : [input];
+      nodes = dontKnowOffered ? [input, " ", dontKnow] : [input];
     }
     input.dataset.key = JSON.stringify(q.key);
     return {

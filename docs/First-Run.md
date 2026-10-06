@@ -52,7 +52,7 @@ model = "gpt-4o-2024-08-06"
 
 [tiers.strong]
 vendor = "openai"
-model = "gpt-5.6"
+model = "gpt-5.6-sol"
 ```
 
 Then export the credentials for the vendor or vendors you selected.
