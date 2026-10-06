@@ -50,6 +50,9 @@
   const EARLIER = JSON.parse(document.getElementById("earlier").textContent);
   const EARLIER_FACTS = EARLIER.answers || [];
   const EARLIER_LINKS = EARLIER.links || [];
+  // The answers a follow-up question starts from: a facet answer with facets
+  // left out, which the question asks again. Keyed by the fact's key.
+  const RETAINED = new Map((EARLIER.retained || []).map(a => [JSON.stringify(a.key), a]));
   // Where each finding's facts came from, built server-side: the label of the
   // owner's answers Source, the attributes the owner answered, and why each
   // conditional finding's facts are still open.
@@ -113,32 +116,40 @@
   // or null; `known` is whether it says more than "I don't know". `prefill`
   // is an answer to start from, and `changed` runs on every edit. With
   // `reopen` false, a known value offers no "I don't know", because the
-  // follow-up refuses to reopen a settled fact.
+  // follow-up refuses to reopen a settled fact or a settled facet.
   let suggestLists = 0;
   const editorFor = (q, prefill, changed, reopen = true) => {
     if (q.form === "facets") {
-      // One list per facet; a facet left blank is not sent.
+      // One list per facet. Only a facet answered otherwise than `prefill`
+      // is sent: the service keeps the earlier answer to a facet left out,
+      // so a facet answered before offers no blank.
       const list = el("ul");
       const selects = q.facets.map(facet => {
+        const before = (prefill && prefill.facets && prefill.facets[facet.id]) || "";
         const select = el("select");
-        select.append(option("(leave unanswered)", ""));
-        FACET_CHOICES.forEach(([label, value]) => select.append(option(label, value)));
+        if (!before) select.append(option("(leave unanswered)", ""));
+        FACET_CHOICES
+          .filter(([, value]) => value !== DONT_KNOW || reopen || !before || before === DONT_KNOW)
+          .forEach(([label, value]) => select.append(option(label, value)));
         select.dataset.key = JSON.stringify(q.key);
         select.dataset.facet = facet.id;
-        select.value = (prefill && prefill.facets && prefill.facets[facet.id]) || "";
+        select.dataset.before = before;
+        select.value = before;
         select.addEventListener("change", changed);
         const item = el("li", null, `${facet.question} `);
         item.append(select);
         list.append(item);
         return select;
       });
-      const given = () => Object.fromEntries(
-        selects.filter(s => s.value).map(s => [s.dataset.facet, s.value]));
+      const given = () => Object.fromEntries(selects
+        .filter(s => s.value && s.value !== s.dataset.before)
+        .map(s => [s.dataset.facet, s.value]));
       return {
         nodes: [list],
         read: () => Object.keys(given()).length ? { key: q.key, facets: given() } : null,
         // The critic names the kind, not a facet, so a finding waiting on it
         // is covered only once every facet says more than "I don't know".
+        // A facet kept from `prefill` counts, as the service merges it.
         known: () => selects.every(s => s.value && s.value !== DONT_KNOW),
       };
     }
@@ -1118,7 +1129,7 @@
       ordered.forEach((q, index) => {
         const into = !q.findings.length ? unwaited : index < SHOWN ? box : more;
         const row = el("p");
-        const editor = editorFor(q, null, recount);
+        const editor = editorFor(q, RETAINED.get(JSON.stringify(q.key)) || null, recount, false);
         factAnswers.push({ read: editor.read, known: editor.known });
         const lead = [el("b", null, q.label), why(q),
           ` \u2014 ${q.cited_by} finding(s) wait on it; answering down to here covers ${q.covered_so_far}`];
@@ -1139,7 +1150,8 @@
       box.append(el("h2", null, "Earlier answers"), el("div", "meta",
         "This report read these answers. If one is wrong, or you now know what was " +
         "\"I don't know\", change it, and the follow-up reads the new answer. A " +
-        "known answer cannot change back to \"I don't know\" here."));
+        "known answer, or a known part of one, cannot change back to " +
+        "\"I don't know\" here."));
       const changer = (row, shown, open) => {
         const change = el("button", null, "Change");
         change.type = "button";

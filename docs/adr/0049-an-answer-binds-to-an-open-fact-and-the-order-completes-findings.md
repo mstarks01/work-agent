@@ -44,7 +44,9 @@ it as a line of the answers Source. An `unknown` answer to a fact that an
 earlier round settled reopens the fact. A job waiting at its pause takes it,
 so a submitter can take back an answer they guessed, and every later round is
 read off the model without the old answer (#1289). A report's follow-up
-refuses it.
+refuses it. The follow-up applies the rule to each facet of a facet answer: it
+refuses `unknown` for a facet that an earlier answer gave a known answer, and
+it takes `unknown` for a facet that no earlier answer made known.
 
 **A rejected draft ranks the questions and is not counted.** Its facts still
 rank the evidence section, which keeps ADR 0046's stable order. No answer

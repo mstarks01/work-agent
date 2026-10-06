@@ -21,7 +21,8 @@ from fastapi.testclient import TestClient
 from analysis_service import Engine, StubPipelineRunner
 from analysis_service.assertions import AssertionRecord
 from analysis_service.claims import UnknownRef
-from analysis_service.fact_answers import FACET_ANSWERS, FactAnswer
+from analysis_service.fact_answers import FACET_ANSWERS, FactAnswer, merged_facts
+from analysis_service.fact_writes import check_fact_answers
 from analysis_service.frameworks import PACKAGES
 from analysis_service.jobs import Checkpoint, PipelineAwaiting, PipelineCompleted
 from analysis_service.question_kinds import QUESTION_KINDS
@@ -2692,3 +2693,155 @@ await buttons[buttons.length - 1].listeners.click();
         "links": [{"principal": "customer accounts", "element": "none"}],
         "facts": [],
     }
+
+
+class TestCompoundAnswers:
+    """The page's facet editors, held against admission and the merge.
+
+    The page sent a facet answer the follow-up refuses (F2a), and showed a
+    retained facet blank and counted it unanswered (F2b, #1289). Each test
+    serializes answers with the shipped script and hands them to production
+    code.
+    """
+
+    report = sample_report([])
+    store = valid_model().data_stores[0]
+    key = (store.id, "", "", "", "audit-evidence", "")
+    facets = tuple(f.id for f in QUESTION_KINDS["audit-evidence"].facets)
+
+    def earlier(self, facets):
+        return FactAnswer.model_validate({"key": self.key, "facets": facets})
+
+    def question(self):
+        return {
+            **facet_fact(self.store, "audit-evidence"),
+            "basis": "evidence",
+            "cited_by": 1,
+            "covered_so_far": 1,
+            "findings": ["stride/R-01"],
+        }
+
+    def payloads(self, answer, *, asked):
+        from webapp.main import _earlier_payload
+
+        earlier = _earlier_payload(
+            self.report, [answer], [], {self.key} if asked else set()
+        )
+        return {
+            "report": {
+                "system_model": self.report.system_model.model_dump(mode="json")
+            },
+            "link_questions": [],
+            "fact_questions": [self.question()] if asked else [],
+            "earlier": json.loads(json.dumps(earlier)),
+        }
+
+    # Every choice each list offers, set in turn: the lists, the line that
+    # counts coverage, and the body the follow-up button sends.
+    STEPS = """
+const send = () => { const b = box.all("button"); return b[b.length - 1]; };
+if (OPEN) await box.all("button")[0].listeners.click();
+const selects = box.all("select");
+const offered = selects.map(s => s.children.map(o => o.value));
+calls.push({ offered, shown: selects.map(s => s.value) });
+const combos = offered.reduce((all, values) =>
+  all.flatMap(c => values.map(v => [...c, v])), [[]]);
+for (const combo of combos) {
+  combo.forEach((v, i) => { selects[i].value = v; selects[i].listeners.change(); });
+  const tally = box.all("div").map(d => d.textContent).filter(t => t.startsWith("Your"))[0];
+  await send().listeners.click();
+  calls.push({ combo, tally: tally || null });
+}
+"""
+
+    def drive(self, answer, *, asked):
+        steps = self.STEPS.replace("OPEN", "false" if asked else "true")
+        seen = _run_answer_block(self.payloads(answer, asked=asked), steps)["calls"]
+        lists, rows = seen[0], seen[1:]
+        # Each click pushes the fetch body before its own row.
+        return lists, list(zip(rows[1::2], rows[0::2], strict=True))
+
+    def admitted(self, answer, body):
+        facts = [FactAnswer.model_validate(f) for f in body["body"]["facts"]]
+        check_fact_answers(facts, self.report.system_model, None, [answer])
+        return facts
+
+    @pytest.mark.parametrize(
+        "before",
+        [
+            {"records-actor": "yes", "record-protected": "no"},
+            {"records-actor": "yes", "record-protected": "unknown"},
+            {"records-actor": "unknown", "record-protected": "unknown"},
+        ],
+    )
+    def test_every_change_the_editor_offers_is_admitted(self, before):
+        """F2a: complete-known to all-unknown was offered and refused."""
+        answer = self.earlier(before)
+        lists, rows = self.drive(answer, asked=False)
+
+        assert lists["shown"] == [before[f] for f in self.facets]
+        for facet, offered in zip(self.facets, lists["offered"], strict=True):
+            assert "" not in offered, "a facet answered before keeps its answer"
+            assert ("unknown" in offered) is (before[facet] == "unknown")
+        for row, body in rows:
+            facts = self.admitted(answer, body)
+            changed = {
+                f: v
+                for f, v in zip(self.facets, row["combo"], strict=True)
+                if v != before[f]
+            }
+            assert [f.facets for f in facts] == ([changed] if changed else [])
+
+    def test_a_retained_facet_is_shown_and_counted_as_the_merge_reads_it(self):
+        """F2b: a saved facet showed blank, and the count read only new lists."""
+        answer = self.earlier({"records-actor": "yes"})
+        lists, rows = self.drive(answer, asked=True)
+
+        assert lists["shown"] == ["yes", ""]
+        assert lists["offered"][0] == ["yes", "no", "not applicable"]
+        assert lists["offered"][1] == ["", *FACET_ANSWERS, "unknown"]
+        for row, body in rows:
+            facts = self.admitted(answer, body)
+            (merged,) = merged_facts([answer], facts)
+            assert merged.facets == {
+                f: v for f, v in zip(self.facets, row["combo"], strict=True) if v
+            }
+            covered = row["tally"].startswith("Your answers cover every question for 1")
+            assert covered is merged.settles, row["combo"]
+            assert len(facts) <= 1, "one editor, one answer a key"
+
+    def test_a_refused_follow_up_keeps_what_was_entered(self):
+        """A refusal re-enables the button and leaves every list as it was."""
+        answer = self.earlier({"records-actor": "yes"})
+        steps = """
+const [, protectedList] = box.all("select");
+protectedList.value = "no"; protectedList.listeners.change();
+const send = box.all("button")[box.all("button").length - 1];
+globalThis.fetch = async (url, init) => {
+  calls.push({ body: JSON.parse(init.body) });
+  return { ok: false, json: async () => ({ message: "refused here" }) };
+};
+await send.listeners.click();
+calls.push({ note: box.all("div").map(d => d.textContent).includes("refused here"),
+  disabled: send.disabled, shown: box.all("select").map(s => s.value) });
+await send.listeners.click();
+"""
+        payloads = self.payloads(answer, asked=True)
+        first, after, second = _run_answer_block(payloads, steps)["calls"]
+
+        assert after == {"note": True, "disabled": False, "shown": ["yes", "no"]}
+        assert first == second
+        assert first["body"]["facts"] == [
+            {"key": list(self.key), "facets": {"record-protected": "no"}}
+        ]
+
+
+def test_the_follow_up_starts_a_question_from_its_retained_answer():
+    from webapp.main import _earlier_payload
+
+    key = TestCompoundAnswers.key
+    answer = FactAnswer.model_validate({"key": key, "facets": {"records-actor": "yes"}})
+    payload = _earlier_payload(sample_report([]), [answer], [], {key})
+
+    assert payload["answers"] == []
+    assert payload["retained"] == [answer.model_dump(mode="json")]

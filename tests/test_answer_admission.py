@@ -1275,3 +1275,55 @@ class TestTheFrameworksTakeTurns:
             ("s",),
             ("shared",),
         ]
+
+
+AUDIT = (valid_model().data_stores[0].id, "", "", "", "audit-evidence", "")
+
+
+@pytest.mark.parametrize(
+    ("before", "after", "refused"),
+    [
+        # A known facet sent back to "I don't know", alone or beside a known one.
+        (
+            {"records-actor": "yes", "record-protected": "no"},
+            dict.fromkeys(("records-actor", "record-protected"), "unknown"),
+            True,
+        ),
+        (
+            {"records-actor": "yes", "record-protected": "no"},
+            {"records-actor": "unknown", "record-protected": "yes"},
+            True,
+        ),
+        ({"records-actor": "yes"}, {"records-actor": "unknown"}, True),
+        # "I don't know" for a facet no earlier answer made known.
+        ({"records-actor": "yes"}, {"record-protected": "unknown"}, False),
+        (
+            {"records-actor": "yes", "record-protected": "unknown"},
+            {"record-protected": "unknown"},
+            False,
+        ),
+        # A known answer, whatever was before.
+        (
+            {"records-actor": "yes", "record-protected": "no"},
+            {"records-actor": "no"},
+            False,
+        ),
+        (
+            dict.fromkeys(("records-actor", "record-protected"), "unknown"),
+            {"records-actor": "yes", "record-protected": "not applicable"},
+            False,
+        ),
+        ({"records-actor": "yes"}, {"record-protected": "no"}, False),
+    ],
+)
+def test_a_follow_up_refuses_to_reopen_each_known_facet(before, after, refused):
+    """The follow-up refused an all-"I don't know" facet answer and took a
+    mixed one that reopened a facet (#1289, F2a)."""
+    earlier = [FactAnswer(key=AUDIT, facets=before)]
+    answer = FactAnswer(key=AUDIT, facets=after)
+    check_fact_answers([answer], valid_model(), None, earlier, reopen=True)
+    if refused:
+        with pytest.raises(ValueError, match="earlier answer settled '"):
+            check_fact_answers([answer], valid_model(), None, earlier)
+    else:
+        check_fact_answers([answer], valid_model(), None, earlier)
