@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Work Agent</title>
+<style nonce="__CSP_NONCE__"><!--workspace_style--></style>
+</head>
+<body>
+<a class="skip-link" href="#main">Skip to content</a>
+<div class="workspace">
+  <aside class="sidebar">
+    <a class="brand" href="/" aria-label="Work Agent home"><svg aria-hidden="true" viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="m12 3 9 5-9 5-9-5 9-5Zm-9 9 9 5 9-5M3 16l9 5 9-5"/></svg>Work Agent</a>
+    <nav aria-label="Workspace"><a class="new-analysis" href="/">New analysis</a><button id="library-nav" type="button">Analyses</button></nav>
+    <div class="recent"><p class="muted">Recent analyses</p><div id="recent-analyses"></div></div>
+    <div class="workspace-identity"><span class="avatar" aria-hidden="true">ME</span><span>Personal workspace<small>Only you · this server session</small></span></div>
+  </aside>
+  <div class="workspace-body">
+    <header class="breadcrumb">Personal workspace <span aria-hidden="true">/</span> <span id="breadcrumb-title">New analysis</span></header>
+    <main id="main">
+      <div id="analysis-header" hidden><div class="heading-row"><h1 id="analysis-title">Your system</h1><span id="analysis-state" class="badge"></span></div><p id="analysis-frameworks" class="muted"></p><nav class="section-nav" aria-label="Analysis"><button id="description-nav" type="button">Description</button><button id="questions-nav" type="button">Questions</button><button id="reports-nav" type="button">Reports</button></nav></div>
+      <section id="description-panel" aria-label="System description">
+        <form id="analyze" class="entry">
+          <div id="entry-heading"><h1>Start with your system.</h1><p class="muted">Describe it once. Examine it from different perspectives.</p></div>
+          <label class="field-label" for="analysis-name">Analysis name</label><input id="analysis-name" name="name" maxlength="120" placeholder="For example, Customer portal" autocomplete="off">
+          <label class="field-label" for="description">What are you building?</label><textarea id="description" name="description" placeholder="Describe the people, components, data, and connections in your system." required></textarea>
+          <div class="description-help"><p class="hint">Include what you know. Questions can help fill the gaps.</p><button type="button" id="load" class="quiet">Load example</button></div>
+          <fieldset id="frameworks"><legend>Analysis frameworks</legend><!--frameworks--></fieldset>
+          <!--questions-->
+          <div class="entry-actions"><p class="hint">One description for every selected framework.</p><button type="submit" id="go" class="primary">Prepare analysis</button></div>
+          <details class="configuration"><summary>Run configuration</summary><!--tiers--><p class="hint">Models are configured on the server. Selecting frameworks does not change the models.</p></details>
+        </form>
+      </section>
+      <div id="problem" class="problem" role="alert" hidden></div>
+      <section id="progress-panel" hidden aria-label="Analysis progress"><h2>Analysis in progress</h2><p id="status" hidden><span class="spinner" aria-hidden="true"></span> <span id="status-text" role="status"></span></p><details><summary>Processing details</summary><ul id="ticks" hidden></ul></details><p class="hint">You can return from Analyses while this server is running.</p></section>
+      <section id="asked" hidden aria-label="Questions">
+        <div class="question-intro"><div><h2>A few details will help.</h2><p class="muted">Answer what you can. Saving never starts the analysis.</p></div><span id="question-progress" class="hint"></span></div>
+        <div class="question-layout"><nav id="question-index" aria-label="Question groups"></nav><div class="question-body"><div id="questions"></div><details id="earlier" hidden></details><details id="skipped" hidden></details><div class="answer-actions"><button type="button" id="skip" class="quiet">Skip the rest and show more</button><button type="button" id="save" class="primary">Save and show more</button></div><div id="answer-problem" class="problem" role="alert" hidden></div></div></div>
+        <div class="start-actions"><p class="hint">Skipped and unanswered questions stay open. More questions may appear as you answer.</p><button type="button" id="continue">Start the analysis</button></div>
+        <details class="question-help"><summary>How questions work</summary><p>Questions arrive in rounds. Save keeps your answers; blank questions may return. Skip sets unanswered questions aside, where you can answer them later. “None,” “I don’t know,” and a blank answer have different meanings. Only Start the analysis runs the analysis. The report may offer one optional follow-up.</p></details>
+      </section>
+      <section id="reports-panel" hidden aria-label="Reports"><h2>Reports</h2><div id="report-list"></div><p class="hint">Reports are held in memory for this server session. They are not saved permanently.</p></section>
+      <section id="library-panel" hidden aria-label="Analyses"><div class="heading-row"><div><h1>Your analyses</h1><p class="muted">A home for each system and its reports.</p></div><a class="button primary" href="/">New analysis</a></div><label class="field-label" for="analysis-search">Find an analysis</label><input type="search" id="analysis-search" placeholder="Search by name"><div id="analysis-list" aria-live="polite"></div><p class="hint session-note">This server session only. Restarting clears analyses; older completed runs may be removed as space is needed.</p></section>
+      <p id="workspace-message" class="hint" role="status"></p>
+    </main>
+  </div>
+</div>
+<script nonce="__CSP_NONCE__"><!--script--></script>
+</body>
+</html>

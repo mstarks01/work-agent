@@ -1,8 +1,8 @@
 # The web app
 
-A lite, local, single-purpose front end for the engine. It exists to answer
-"show me what this does" on a first run — [First-Run](First-Run.md) step 3 — and
-nothing else. It is not a product surface, and it is not how you deploy this.
+A local, single-user workspace for the analysis engine. Start with one system
+description, select the installed frameworks, answer grouped questions, and
+review the associated reports. See [First-Run](First-Run.md) for model setup.
 
 ```sh
 uv run python webapp/main.py
@@ -23,8 +23,8 @@ outside `src/analysis_service`, the same as `examples/`, so no packaging
 mechanism names it; that's independent of what the wheel bundles for the
 *engine* itself (skills, prompts, config all ship with it — see
 [Configuration](Configuration.md#config-paths-override-where-files-are-read-from)).
-The app is clone-only because it's a demonstration script, not because the
-engine it embeds would be missing anything if installed elsewhere.
+Run the workspace from the repository checkout; the engine remains separately
+installable without frontend dependencies.
 
 Its server, `uvicorn`, is in a `web` dependency group that `uv sync` installs by
 default. Dependency groups never enter the built distribution, so if you embed
@@ -181,9 +181,9 @@ credential case, which is the common one at this point.
 - **Nothing is persisted.** Runs are held in memory, capped, oldest evicted
   first, and lost on restart. A run that waits for your answers is never
   evicted. When every held run waits for answers, a new submission is refused
-  until you answer or continue one. This is a demo surface, not a job store —
+  until you answer or continue one. This is an in-memory workspace, not a persistent job store —
   `/v1` already is one.
-- **No history, no export, no accounts.** If you want the JSON, take it from the
+- **Session history only; no permanent storage or accounts.** If you want the JSON, take it from the
   engine directly; [`examples/embed.py`](../examples/embed.py) is four lines from
   `report.model_dump_json()`.
 
@@ -240,3 +240,40 @@ which is why they are not part of the CSP.
 Loopback binding is the first of these and not the whole of them: a page you visit can reach a loopback port, and DNS rebinding is how it tries. Three controls stop it, and each refuses something the others do not — the `Host` check refuses a rebound name, the `Sec-Fetch-Site` check refuses a write that did not come from this page, and `frame-ancestors 'none'` refuses a page that would frame this one to borrow its origin. `webapp/page.py` holds all three. On
 `127.0.0.1` the submitter is both attacker and victim. These are the controls
 that keep that from being the only thing standing between the two.
+
+## Grouped workspace
+
+Use **New analysis** to enter a name and a system description. The framework
+picker is generated from installed packages, including their declared options.
+Questions are enabled by default. The group index jumps to a group without
+changing its answers or the engine's question order. Shared answers, row
+exceptions, earlier answers, skipped questions and follow-up rules use the
+existing answer-round service.
+
+**Description**, **Questions** and **Reports** belong to the same analysis.
+Use **Analyses** to reopen a paused analysis or review its retained reports.
+Reopening a running analysis polls a read-only snapshot, leaving its original
+progress stream alone. Names are limited to 120 characters. Search filters
+the current server session by name.
+
+The registry's existing retention limit still applies. Restarting the server
+clears everything. The UI does not write descriptions or answers to browser
+storage. Persistent reports, accounts and authorization between users require
+separate backend work; the workspace is still bound to loopback.
+
+## Frontend security controls
+
+Keep untrusted names, descriptions, question text and messages in text nodes.
+The workspace uses native DOM construction, no HTML-string rendering or
+external scripts. Keep nonce-based CSP, frame protection, no-store responses,
+host validation and same-origin checks on all write routes. These follow the
+[OWASP XSS prevention](https://cheatsheetseries.owasp.org/cheatsheets/Cross_Site_Scripting_Prevention_Cheat_Sheet.html),
+[CSP](https://cheatsheetseries.owasp.org/cheatsheets/Content_Security_Policy_Cheat_Sheet.html)
+and [CSRF prevention](https://cheatsheetseries.owasp.org/cheatsheets/Cross-Site_Request_Forgery_Prevention_Cheat_Sheet.html)
+guidance. CSP supplements text-only rendering; it does not replace it.
+
+Run the offline workspace and browser tests to cover hostile names, same-origin
+write refusal, question revisions, reopening runs and responsive layouts.
+Treat this as a set of tested controls, not an OWASP certification. Do not
+expose this unauthenticated app to a network; introduce authenticated ownership
+checks for every analysis and report before adding multi-user access.

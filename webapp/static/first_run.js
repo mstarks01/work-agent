@@ -9,6 +9,7 @@
   // What the service is doing now, beside a spinner, from the moment a run
   // starts until it stops for answers, ends, or fails.
   const working = (message) => {
+    if (typeof workspace !== "undefined") workspace.show("progress-panel");
     statusText.textContent = message;
     status.hidden = false;
   };
@@ -49,7 +50,13 @@
       }));
 
   document.getElementById("load").addEventListener("click", async () => {
-    box.value = await (await fetch("/example")).text();
+    try {
+      const response = await fetch("/example");
+      if (!response.ok) throw new Error();
+      box.value = await response.text();
+    } catch {
+      fail("Could not load the example. Try again.");
+    }
   });
 
   // Nodes and strings, never markup. replaceChildren() inserts a string as a
@@ -80,29 +87,34 @@
     ticks.replaceChildren();
     go.disabled = true;
 
-    const started = await fetch("/analyze", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        sources: [
-          { kind: "description", label: "Pasted description", text: box.value },
-        ],
-        frameworks: selection(),
-        questions: Boolean(ask && ask.checked),
-      }),
-    });
-    if (!started.ok) {
-      fail((await started.json()).message);
-      return;
+    try {
+      const started = await fetch("/analyze", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          sources: [
+            { kind: "description", label: "Pasted description", text: box.value },
+          ],
+          name: document.getElementById("analysis-name")?.value.trim() || "Your system",
+          frameworks: selection(),
+          questions: Boolean(ask && ask.checked),
+        }),
+      });
+      if (!started.ok) {
+        fail((await started.json()).message);
+        return;
+      }
+      follow(
+        (await started.json()).run,
+        ask && ask.checked
+          ? "Reading your description and building the system model. The service"
+            + " stops for your answers before the threat analysis starts."
+          : "Reading your description and running the threat analysis. This takes"
+            + " a few minutes.",
+      );
+    } catch {
+      fail("The connection was interrupted. Check Analyses before starting again.");
     }
-    follow(
-      (await started.json()).run,
-      ask && ask.checked
-        ? "Reading your description and building the system model. The service"
-          + " stops for your answers before the threat analysis starts."
-        : "Reading your description and running the threat analysis. This takes"
-          + " a few minutes.",
-    );
   });
 
   // A paused run's questions: one select per principal. "" leaves a question
@@ -320,10 +332,7 @@
     // many choices it asks.
     if (data.facts.length) {
       heading("Facts your description does not state",
-        "The questions take turns between the analyses you selected, so the"
-        + " first ones help each of them. Questions of one kind that come"
-        + " together share a box, with a row for each part of your system, so a"
-        + " heading can come back. Leave any row blank that you cannot answer.");
+        "Answer each group below. Leave a question blank if you cannot answer it.");
     }
     // Each question's box: a new one each time the group changes.
     const runOf = new Map();
@@ -539,10 +548,15 @@
         hint.className = "hint";
         hint.textContent = "Untick a row the answer does not fit. Each row is sent as its"
           + " own answer, and you can still change it.";
+        group.top.className = "shared-controls";
         group.top.append(line, hint);
       }
-      group.title.textContent = `${group.heading} (${group.count} question(s),`
-        + ` ${group.choices} choice(s))`;
+      const groupHeading = document.createElement("span");
+      groupHeading.className = "group-heading";
+      groupHeading.textContent = group.heading;
+      const groupCount = document.createElement("small");
+      groupCount.textContent = ` (${group.count} question(s), ${group.choices} choice(s))`;
+      group.title.replaceChildren(groupHeading, groupCount);
       questions.append(group.box);
     }
     // Every earlier answer, each with a button that opens it again. An
@@ -657,6 +671,7 @@
       skippedBox.append(row);
     }
     asked.hidden = false;
+    if (typeof workspace !== "undefined") workspace.grouped(data);
   };
 
   // The round's answers, as the service takes them.
@@ -693,9 +708,22 @@
     );
   };
 
+  let answerBusy = false;
+  const answerAction = async (action) => {
+    if (answerBusy) return;
+    answerBusy = true;
+    const controls = [saveButton, skipButton, document.getElementById("continue")];
+    controls.forEach((control) => { control.disabled = true; });
+    try { await action(); }
+    catch { refuse("The connection was interrupted. Reload this analysis to check whether your answers were saved."); }
+    finally {
+      answerBusy = false;
+      controls.forEach((control) => { control.disabled = false; });
+    }
+  };
   document.getElementById("continue").addEventListener("click", () => {
     const { links, facts } = roundAnswers();
-    startAnalysis(links, facts);
+    answerAction(() => startAnalysis(links, facts));
   });
 
   // Save the round and show the next one. A save never starts the analysis;
@@ -722,16 +750,21 @@
     showQuestions(body);
     window.scrollTo(0, 0);
   };
-  saveButton.addEventListener("click", () => saveRound(false));
-  skipButton.addEventListener("click", () => saveRound(true));
+  saveButton.addEventListener("click", () => answerAction(() => saveRound(false)));
+  skipButton.addEventListener("click", () => answerAction(() => saveRound(true)));
 
   // Follow one run's progress to its end: a report, questions, or a failure.
   const follow = (runId, message) => {
     go.disabled = true;
+    if (typeof workspace !== "undefined") workspace.track(runId);
     working(message);
     ticks.replaceChildren();
     ticks.hidden = false;
-    const stream = new EventSource("/events/" + runId);
+    const stream = new EventSource("/events/" + encodeURIComponent(runId));
+    stream.addEventListener("error", () => {
+      stream.close();
+      fail("The progress connection was interrupted. Open Analyses to check this run before starting another.");
+    });
     stream.addEventListener("questions", (event) => {
       stream.close();
       ticks.hidden = true;
@@ -745,7 +778,7 @@
     });
     stream.addEventListener("done", (event) => {
       stream.close();
-      location.href = JSON.parse(event.data).url;
+      location.href = "/report/" + encodeURIComponent(runId);
     });
     stream.addEventListener("rejected", (event) => {
       stream.close();
