@@ -143,14 +143,10 @@ spread — against 3.3%, 4.8% and 4.5% for the three versions before it. `uv run
 python -m evals.bench.deterministic transport` prints 5.6% of *characters*,
 which is an upper bound.
 
-`compact-v4` is the first version whose safety fix raises the saving rather than
-spending it. Version 3 failed the gate on two flow refs the model derived from
-the flow's endpoints, so two flows between one pair collided; version 4 names a
-flow's ref after its label. A label slug runs 17.4 characters over the blessed
-corpus against 33.2 for an endpoint pair, worth a further 1.04% of the full
-emission — and it is also what the bench has priced all along, so part of the
-gap between 5.6% offline and 3.3% live was the bench pricing a ref the model was
-not writing.
+`compact-v4` names a flow's ref after its label, because a ref derived from the
+flow's endpoints collides for two flows between one pair. A label slug runs 17.4
+characters over the blessed corpus against 33.2 for an endpoint pair, worth a
+further 1.04% of the full emission.
 
 The input side is close to free: the first live run measured 6,116 prompt tokens
 against the full route's 6,098 on the same case, because the compact schema is

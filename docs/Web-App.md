@@ -213,8 +213,7 @@ influence renders as `textContent` or as a constructed node, never by assigning
 a string of markup. That includes the form page, which is not obvious: a source
 label and a validator message both travel back to it over SSE, and neither is
 escaped for markup on the way. There is no escape helper on any page, which is
-what makes forgetting one impossible rather than merely unlikely — the same
-discipline had already failed once, silently, in the report's element table.
+what makes forgetting one impossible rather than merely unlikely.
 
 **Every page carries a strict nonce CSP,** `default-src 'none'` with a fresh
 per-response nonce on each inline block and no `'unsafe-inline'` anywhere. A

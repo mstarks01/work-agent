@@ -25,14 +25,12 @@ once.
 | 9 | 2 | 1 |
 
 A defect in a recent fix is the dominant class, and it sits inside one diff, so
-a reader of that diff before the merge is the instrument that fits it. Run-9's
-HIGH is the plainest case: the bound sat on a scan where the caller runs a body,
-and `AGENTS.md` named that mistake two days before the fix shipped.
+a reader of that diff before the merge is the instrument that fits it.
 
-The rest of the table is the argument for the round. Run-9's LOW was a
-`RuntimeError` that `Path.resolve` raises on a symlink loop. It was legal in
-every diff that touched it, and it became reachable only when a later pull
-request made the gate resolve a path. No diff carries that fact; the tree does.
+The rest of the table is the argument for the round. A defect can be legal in
+every diff that touches it and become reachable only through a later pull
+request. No diff carries that fact; the tree does. The `reviewed/2026-09-08`
+tag message records one case of each kind.
 
 ### What a pre-merge review reads
 
@@ -55,8 +53,8 @@ and its own repair.
 | 5 | **A fact with no reader** | an answer the page never reads; a field nothing reads; prose naming a removed thing; content placed only to satisfy a check; a refusal the page swallows | Give the fact one reader the code follows, or delete it | Mostly: `test_dead_code_lints.py`, `test_reader_lints.py` |
 
 Class 5 is the largest by count and the cheapest to find, because most of it is
-a grep. Class 1 is the largest by damage: it is where the fix that passed its
-tests sat in runs 5 to 9, and where #640 sat. Measured on 2026-09-06, a
+a grep. Class 1 is the largest by damage: it holds the fixes that passed their
+tests in runs 5 to 9, and #640. Measured on 2026-09-06, a
 whole-tree sweep of the decidable classes over code older than the last round
 found nothing that breaks a flow; the findings that mattered sat in code
 younger than the round. Spend attention on `git diff reviewed/<last>...HEAD`
@@ -90,10 +88,10 @@ one-line entry there is worth more than the finding it replaces.
 
 The rest is judgement and is this axis's real work. Read every shipped example
 against the rule above it, and every reference label against the policy the
-prompt states. The #1082 audit found eleven of those and no lint could have
-seen one: an exemplar that placed a component from a sentence about what
-reaches it, a lane skill inviting an action its own table refuses, a corpus
-label routing a question the output contract routes the other way.
+prompt states. No lint sees this kind of defect. The #1082 audit lists eleven,
+for example an exemplar that places a component from a sentence about what
+reaches it, a lane skill that invites an action its own table refuses, and a
+corpus label that routes a question the other way from the output contract.
 
 ## Find the last checkpoint
 
@@ -133,17 +131,12 @@ git push origin reviewed/<date>
 name collides; a second round that day takes a letter, `reviewed/2026-08-27b`,
 and a third takes `c`.
 
-That rule went unwritten, and the names drifted six days ahead of the clock.
-The first rounds used the letter. From `reviewed/2026-09-04` the letter was
-dropped and each round took the next unused *date* instead, so six rounds cut
-on 2026-09-03 are named 09-04 through 09-09, and `reviewed/2026-09-22` was cut
-on 2026-09-14. Tags 04 through 22 keep those names: they are pushed, each tag
-message carries the true dates, and nothing reads the name. Take the letter
-from here on — today's plain name may already be spent.
+Tags `reviewed/2026-09-04` to `reviewed/2026-09-22` carry names that are not
+their dates. Each tag message carries the true date, and nothing reads the
+name. Today's plain name may already be spent, so take the letter.
 
-Sort by `creatordate` and never by name. The two orders agreed while the names
-drifted and stop agreeing once the letter comes back, and `creatordate` is the
-one that answers "since when".
+Sort by `creatordate`, never by name. `creatordate` is the order that answers
+"since when".
 
 The message carries what a later reader cannot recover from the diff:
 
@@ -168,11 +161,10 @@ record.
 
 ## Habits that fixes need
 
-All five come from the audit runs that found defects in the previous run's
-fixes. Run 4 found 4 of its 6 findings in run 3's fixes, run 5 found 4 of 6 in
-run 4's, and all 3 of run 8's came from two fix pull requests. Every one of
-those defects passed the tests that shipped with it, so these are rules about
-the fix itself, not about testing harder.
+Each habit answers a defect that an audit round found in the previous round's
+fixes. Every one of those defects passed the tests that shipped with it, so
+these are rules about the fix itself, not about testing harder. The tag
+messages from `reviewed/2026-09-03` to `reviewed/2026-09-09` record them.
 
 A fix is the riskiest code in the tree. It is new, it lands fast, and the
 attention that found the defect is spent by the time the repair is written.
@@ -181,12 +173,10 @@ attention that found the defect is spent by the time the repair is written.
 
 Read the fix diff against the five defect classes above, the same way a
 pre-merge review reads anybody else's diff. This includes the fix that closes a
-finding you reported an hour ago. Run 9 shipped a bound with no per-body limit,
-and `AGENTS.md` carried that corollary two days before the fix merged.
+finding you reported an hour ago.
 
-Let a fix to a hot path sit long enough to read it once more. Minutes between
-the last keystroke and the merge is how the previous rounds shipped their
-defects.
+Let a fix to a hot path sit long enough to read it once more. Do not merge a
+fix minutes after the last keystroke.
 
 **Read it a second time for idiom, not only for the five classes.** The class
 read asks whether the fix is correct; this one asks whether it reads like the
@@ -197,8 +187,7 @@ loop of asserts where the file beside it parametrizes, a block spelled twice
 where the class already holds the helper.
 
 None of that changes behaviour, which is exactly why the class read walks past
-it and why it survives into the tree. PR #991 passed its own five-class read
-and carried five of them; PR #992 is that second read.
+it and why it survives into the tree. PR #992 is that second read over PR #991.
 
 ### Prefer deleting a reader over adding a guard
 
@@ -206,11 +195,9 @@ When the defect is a rule with two readers, make one reader call the other. A
 guard copied into the second reader contains this defect and leaves the class
 open; one shared helper removes the class.
 
-Run 10 fixed a corpus loader that followed a symlink out of a case directory. It
-inlined the resolve-and-bound rule a third time rather than exporting the one
-`sitting.moved` already held. The two readers are tested against each other, so
-they cannot drift in silence — but that is the fallback, not the fix to reach
-for first.
+Where two readers must stay, test them against each other, so they cannot
+disagree in silence. That is the fallback, not the fix to reach for first. The
+`reviewed/2026-09-09` tag message records a case.
 
 ### Make the harness that proved the bug the regression test
 
@@ -223,27 +210,26 @@ for a reason the author chose.
 A constant that bounds work needs a measured case it **must admit** and a
 measured case it **must refuse**, and the commit message carries both numbers.
 
-The repair rung took three attempts because the first two bounds computed a
-cost from the input sizes. Measurement showed the metric ordered two real cases
-backwards: English prose at 288M ran 0.39 s, and a repetitive source at 112M
+A cost computed from the input sizes can order real cases backwards. On the
+repair rung, English prose at 288M ran 0.39 s, and a repetitive source at 112M
 ran 5.95 s. No reading of the code produces that; only running it does.
 
 If you cannot produce both numbers, the bound is a guess. Say so, or measure.
 
 Then name what sits beside the new bound. A ceiling makes the next unbounded
 value the weak one, so the pull request body lists the neighbours and says which
-of them are bounded. Run 9's finding was a bound on one scan beside an unbounded
-count of scans.
+of them are bounded. A bound on one scan beside an unbounded count of scans
+bounds nothing.
 
 ### When a fix breaks an existing test, suspect the fix
 
 The default assumption is that the test is right and the fix is wrong. Read the
 test and find out what it protects before you touch its premise.
 
-`test_rekey_refuses_a_move_the_components_cannot_satisfy` caught a fix that
-would have made `rekey` impossible to run: it asked a ledger row to prove itself
-against the *current* rule, and a ledger written before a rule change is exactly
-what `rekey` reads. The test failed for that reason and no other.
+`test_rekey_refuses_a_move_the_components_cannot_satisfy` protects one such
+premise. `rekey` reads a ledger written before a rule change, so a fix that asks
+a ledger row to prove itself against the *current* rule makes `rekey`
+impossible to run.
 
 A test that fails on a correct change is a real thing, and pinned lists move
 that way. It is the second explanation to reach for, not the first.

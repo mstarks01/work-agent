@@ -16,56 +16,26 @@ below is written that way on purpose: a note that said "the other framework"
 would be wrong the day a third one lands, and would have to be rewritten by
 whoever was least likely to notice.
 
-## How the asymmetry happened, once, in detail
-
-Worth reading before the rules, because the rules are derived from it rather than
-from principle.
-
-**The cutover stopped at the service boundary.**
-[#172](https://github.com/mstarks01/work-agent/issues/172) made the service
-framework-neutral: one extraction, one **Valid System Model**, N packages. It
-worked — `src/` is clean today, and every `stride` in it is a module path.
-Everything that *grades* the service was outside that scope and kept its
-one-package shape. ASVS landed four days later
-([#176](https://github.com/mstarks01/work-agent/issues/176)) and **nothing
-failed**.
+## Prefer a table keyed by framework
 
 **A one-package assumption is vacuously correct when written and silently wrong
-afterwards.** It does not raise; it reports a smaller, plausible number.
-`EVAL_FRAMEWORKS = ("stride",)` was right when there was one package.
-`aggregate_coverage` keyed by lane name was right while no two packages shared a
-slug. `summarize()` pooling every framework was right with one — and once ASVS
-records reached it, it returned 70%, which cleared STRIDE's floor while hiding
-that ASVS sat at 32%. None of these broke on the day the second package arrived.
-They kept answering about half the system, which is why an audit found them and a
-test suite did not.
+once a second package lands.** It does not raise; it reports a smaller,
+plausible number about part of the system. A test suite does not find it,
+because nothing fails.
 
-**Eight PRs to find them one at a time:**
-[#214](https://github.com/mstarks01/work-agent/pull/214) (nothing scored 63 ASVS
-records), [#215](https://github.com/mstarks01/work-agent/pull/215) (coverage,
-grounds), [#221](https://github.com/mstarks01/work-agent/pull/221) (the knowledge
-lint read one directory), [#222](https://github.com/mstarks01/work-agent/pull/222)
-(stability, exemplar delta, promotion feed),
-[#223](https://github.com/mstarks01/work-agent/pull/223) (trigger recall),
-[#224](https://github.com/mstarks01/work-agent/pull/224) (the tuning guide),
-[#225](https://github.com/mstarks01/work-agent/pull/225) (critic yield), and
-[#210](https://github.com/mstarks01/work-agent/pull/210), which fixed a review
-check *I had shipped an hour earlier* that let a sign-off naming one package's
-reference set clear a case holding another's unread. The rule does not exempt
-whoever is applying it.
+The two shapes behave differently when a package lands:
 
-### The one usable rule this gives
-
-Sorting those fixes by what they touched separates two shapes cleanly:
-
-| shape | what happened when ASVS landed |
+| shape | when a package lands |
 |---|---|
-| **a table keyed by framework** — `PACKAGES`, `SCHEMAS`, `REFERENCE_TYPES`, the five maps in `verify_corpus.py` | **already correct, no change needed.** A missing key raises `KeyError` at the first call, so the edit is forced. |
-| **a constant or a branch naming one framework** — the eval framework list, `stride_block` call sites, the grounds fold, stability, the exemplar delta, trigger recall, the knowledge lint | **every one of them was a gap.** |
+| **a table keyed by framework** — `PACKAGES`, `SCHEMAS`, `REFERENCE_TYPES`, the five maps in `verify_corpus.py` | A missing key raises `KeyError` at the first call, so the edit is forced. |
+| **a constant or a branch naming one framework** | Nothing raises, and the code keeps answering for one package. |
 
 **So: prefer a table keyed by framework over a constant or a branch.** The table
-is self-completing; the branch needs somebody to remember, and this document
-exists because somebody did not.
+is self-completing; the branch needs somebody to remember. The framework cutover
+([#172](https://github.com/mstarks01/work-agent/issues/172)), the ASVS package
+([#176](https://github.com/mstarks01/work-agent/issues/176)) and the first
+scoring of its records ([#214](https://github.com/mstarks01/work-agent/pull/214))
+record the cases behind this rule.
 
 `tests/test_framework_neutrality.py` enforces the decidable half: every framework
 literal outside a package root is declared with the reason it is allowed, and a
@@ -73,8 +43,7 @@ new one fails until it is. Its `DECLARED` map is also the checklist to re-read
 when a package lands — every entry reading *"this code is that framework's"* is a
 dispatch a third package may need adding to.
 
-**A literal is not the only way to name a framework, and two of the other ways
-shipped.** A scan that reads `.py` files under `src/` and `evals/` and matches
+**A literal is not the only way to name a framework.** A scan that reads `.py` files under `src/` and `evals/` and matches
 the string `"stride"` is blind to both of these:
 
 - **A framework's name inside a word.** A class, a function or a default value
@@ -82,12 +51,11 @@ the string `"stride"` is blind to both of these:
   those is a string literal. Public surface is where this shape survives
   longest, because renaming it is a larger change than the pull request that
   finds it.
-- **Text a person reads.** `webapp/` went unsearched, so an app served a heading
-  naming one framework over a form that offers every framework the install
-  carries. A job naming ASVS alone got its answer under another framework's
-  name.
+- **Text a person reads.** A page heading can name one framework over a form
+  that offers every framework the install carries, so a job naming ASVS alone
+  gets its answer under another framework's name.
 
-The scan now covers `webapp/` too, and two further checks close those gaps. A
+The scan covers `webapp/` too, and two further checks close those gaps. A
 framework-named class, function or value outside a package must be in a
 `DECLARED` file or in `OPEN_BY_DECISION`, which records a name somebody chose to
 keep and why. A page may not name a framework at all: the name reaches a person
@@ -99,60 +67,36 @@ one heading could not ask both.
 ### The rule has a second axis
 
 The shape above is about **which framework** a piece of code reads. The same
-shape turned up on a second axis, and it is worth naming because the axis is not
-obvious until somebody trips over it: **which measurement the eval sweep
-reports.**
+shape holds on a second axis, which is not obvious: **which measurement the eval
+sweep reports.**
 
 An **instrument** is one reading over a finished sweep — a per-case row, a fold
-over those rows, a rendering, and the artifact keys it owns. Seven exist. Each
-one already had all four parts, and nothing named the shape, so each was wired by
-hand into four places in `evals/harness/run.py`. Adding ASVS's two instruments
-cost six artifact keys and two renderers, written one at a time. Nothing raised;
-a sweep missing an instrument simply printed one measurement fewer.
+over those rows, a rendering, and the artifact keys it owns. Seven exist.
+Without a table, each instrument is wired by hand into several places, and a
+sweep missing one prints one measurement fewer and raises nothing.
 
-`evals/harness/instruments.py` holds that table now, and it carries the framework
-axis inside it: every entry declares the packages whose record it reads, so a
-sweep of one package skips another package's scorer rather than failing in it.
-That declaration closed a one-package assumption the harness still carried —
-the STRIDE scorer asked **every** case in a sweep for a STRIDE block, so a sweep
-of a package producing no such block died inside a scorer that had nothing to say
-about it. No corpus case declared one framework without STRIDE, so nothing caught
-it: correct when written, silent afterwards, exactly the shape above.
+`evals/harness/instruments.py` holds one entry per instrument, and each entry
+declares its packages: the packages whose record it reads. A sweep of one
+package skips another package's scorer rather than failing in it, so a sweep of
+a package with no STRIDE block never reaches the STRIDE scorer.
 
 **So the question to ask a new axis is the same one.** When a piece of machinery
 grows an entry per framework, per measurement, per mode or per anything else,
 prefer a table keyed by that thing. Then ask what forces the table to stay
 complete, because a table nobody checks against the registry has the same silent
-failure as the branch it replaced — an entry missing from
+failure as a branch — an entry missing from
 `evals.harness.instruments.INSTRUMENTS` would be a package measured by nothing at
 all.
 
 ## Why this rule exists
 
-The repo name, the service name, the package root and most of the history all
-say STRIDE, so STRIDE is the default the eye falls on. Any package that lands
-later inherits none of that gravity — ASVS did not
-([#176](https://github.com/mstarks01/work-agent/issues/176), 2026-08-14), and a
-third will not either.
-
-Three defects in the tree came from exactly that, and none of them was a
-decision:
-
-- [#199](https://github.com/mstarks01/work-agent/issues/199) — the concurrency
-  ceiling comment sized the barrier fan-out against STRIDE's 6 lanes. ASVS
-  declares 17, so a two-framework job is 23 concurrent `strong` requests and the
-  documented arithmetic was wrong by a factor of four. **A third package moves
-  that number again.**
-- [#200](https://github.com/mstarks01/work-agent/issues/200) — the eval sweep
-  grades the STRIDE block and raises if it is absent. The corpus's 63 ASVS
-  records are shape-checked by `verify_corpus.py` and then read by nothing.
-- PR #209 — a step 6 review check asked only whether a sign-off block existed,
-  so a `read` list naming one package's reference set would have cleared a case
-  holding another's unread. Fixed in #210 by deriving the requirement from the
-  case's own declaration.
-
-Notice the shape all three share: **a number, a code path or a check that was
-correct when one package existed, and silently wrong afterwards.**
+The repo name, the service name and the package root say STRIDE, so STRIDE is
+the default the eye falls on. A package that lands later is easy to miss.
+[#199](https://github.com/mstarks01/work-agent/issues/199) and
+[#200](https://github.com/mstarks01/work-agent/issues/200) record two defects of
+this shape: **a number, a code path or a check that is correct with one package
+and silently wrong with two.** A third package moves the fan-out arithmetic of
+#199 again.
 
 ## The answers, and how to write each
 
@@ -178,7 +122,7 @@ framework that ever ships, including ones nobody has thought of. #201's exemptio
 holds for the second form and not the first.
 
 **"It applies to all of them and I am doing one."** Name every missing half and
-file them. #200 is this answer, written down after the fact.
+file them. #200 is an example of this answer.
 
 ## Where the asymmetry bites hardest
 
@@ -189,11 +133,9 @@ A less-exercised package makes a gap quieter, not smaller:
   blessed list and never a claim about quality, and this is the seam where the
   two read alike.
 - A reference record nothing grades is a defect that survives until somebody
-  reads it, and becomes a wrong number the day a matrix over it ships. The
-  corpus's 63 ASVS records sat in exactly that state until
-  [#214](https://github.com/mstarks01/work-agent/pull/214) scored them. **A
-  package registered without an instrument that reads its record inherits the
-  same silence**, which is why `test_every_package_has_an_instrument` exists.
+  reads it, and becomes a wrong number the day a matrix over it ships. **A
+  package registered without an instrument that reads its record is in that
+  state**, which is why `test_every_package_has_an_instrument` exists.
 
 ## When a new package lands, the question runs backwards
 
@@ -201,13 +143,12 @@ Registering a package is a table edit and an import, so it is small to do and
 wide in what it invalidates. Every framework-shaped decision already in the tree
 needs re-asking against the newcomer, not only the change in front of you.
 
-Start where the three defects above were found, because each is a place a
-one-package assumption survived:
+Start at the places where a one-package assumption survives:
 
 - **Fan-out arithmetic.** `config/resilience.toml`'s ceiling and every count in
   `docs/Configuration.md` are stated as one `strong` request per lane of every
   framework a job runs. A new lane count changes the product.
-- **The eval sweep.** Mechanical now: `test_every_package_has_an_instrument`
+- **The eval sweep.** Mechanical: `test_every_package_has_an_instrument`
   and `test_every_package_declares_a_scorer` both fail until the new package is
   named. What they cannot decide is whether the instrument it was attached to
   *fits* — an instrument that reads a category and two rated severity axes says
@@ -227,8 +168,8 @@ one-package assumption survived:
   something in the **System Model**? Every ground kind and every element-spelled
   `related_unknowns` entry points at a thing that exists — an element, one of its
   attributes, a flow, a quotable span. A package ruling on documents, coding
-  practices or absent components has claims that are about none of those. Two
-  defects came from exactly this, one at each surface: #410 and #412.
+  practices or absent components has claims that are about none of those.
+  #410 and #412 record one defect at each surface.
 - **Every required field on a claim, one at a time.** For each, ask what this
   package will put there **when it has nothing true to say**. A field it can
   always satisfy honestly is fine. A field whose legal values all name something
@@ -238,12 +179,10 @@ one-package assumption survived:
 
 - **Which class the service asks for.** A package overriding a neutral hook has
   to put it on the class the *caller* reaches, not merely on one of its own.
-  ASVS put `partition_proposals` on its analysis block while the fan-in asks its
-  record; Python resolved the neutral default and two live runs deferred nothing
-  while reading as a model that would not answer. This one *is* mechanical —
-  `test_no_package_override_is_orphaned` — and the tests that missed it did so
-  by calling the override on the same wrong class. **A test that names a class
-  the caller never reaches proves the method works, not that it runs.**
+  An override on a class the caller does not reach resolves to the neutral
+  default, silently. This one *is* mechanical —
+  `test_no_package_override_is_orphaned`. **A test that names a class the
+  caller never reaches proves the method works, not that it runs.**
 
 The second is the general form of the first, and neither is decidable in
 advance. `evals/harness/filler.py` measures the symptom *after* a run, which is
@@ -266,7 +205,7 @@ Seven mechanical instances, each for a narrow question:
 
 - **`tests/test_framework_neutrality.py`** — every framework literal outside a
   package root is declared with a reason, so a new one fails until somebody says
-  why it is not a table. This is the check derived from the root cause above.
+  why it is not a table. This is the check for the constant-or-branch shape.
 - **The identifier and page checks in the same module** — a framework's name
   inside a word is declared or recorded as open, and no text an app puts in
   front of a person names a framework. These cover the two ways of naming one

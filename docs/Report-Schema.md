@@ -56,11 +56,11 @@ class Report:
 ```
 
 **A field sits where the thing it describes sits.** Ten fields describe the job
-or the shared model and stayed on the envelope. Eight describe one framework's
-output and moved onto the block. `analysis_context` split on the same rule: the
+or the shared model and sit on the envelope. Eight describe one framework's
+output and sit on the block. `analysis_context` follows the same rule: the
 instruction digest describes the built graph and the domain packs describe the
-model, so both stayed, while `fired_rules` and `knowledge_docs` name *one
-package's* rules and what they retrieved, so both moved.
+model, so both sit on the envelope, while `fired_rules` and `knowledge_docs`
+name *one package's* rules and what they retrieved, so both sit on the block.
 
 **`analyses` is an ordered list, not a map.** It is ordered by the job's own
 selection, and the envelope re-checks that the blocks answer exactly the
@@ -162,9 +162,8 @@ Category letters: `S` spoofing, `T` tampering, `R` repudiation,
 `I` information-disclosure, `D` denial-of-service, `E` elevation-of-privilege.
 A threat's `id` carries its category letter — **composed by the service** from
 the package's own ID rule, and stamped with the lane in the same call, so the
-letter and the lane cannot disagree. Nothing re-validates the composed string:
-there is no longer a pattern to check it against, because a check would hide a
-bad composition rather than catch it.
+letter and the lane cannot disagree. Nothing re-validates the composed string,
+because a check would hide a bad composition rather than catch it.
 
 `StrideAnalysis` adds `missing_mitigations` to the block, and its `summary` adds
 `by_category`, `by_severity` and `by_severity_confirmed` to the neutral three
@@ -236,9 +235,9 @@ looked". The complement is not derived — every unit appears.
   refused the model, or the package's own rules ruled the unit out before its
   lane ran. A draft the lane files on such a unit anyway is refused at the
   fan-in and listed in `dropped_claims`. **No shipped package rules a unit out
-  this way.** ASVS did, from vocabulary, and stopped: absence of a word is not
-  absence of the thing (ADR 0027). The hook remains for a package that can
-  refute a unit from a *stated* fact.
+  this way.** A package may not rule a unit out from vocabulary, because
+  absence of a word is not absence of the thing (ADR 0027). The hook is for a
+  package that can refute a unit from a *stated* fact.
 - `undecidable` — the framework's **Precondition** could not tell whether the
   framework applies to this system at all, so no lane ran. The remedy is more
   input, which is why it is not folded into `not-applicable`.
@@ -287,16 +286,12 @@ carries guarantees it was never written under. So an old report is readable by
 the version that wrote it and by nothing else, and a reader who needs both keeps
 both.
 
-That is also the whole answer for the assertion layer. It arrived inside 3.0,
-3.0 has never shipped, and so no report exists that predates it — `assertions:
+That is also the whole answer for the assertion layer. It is part of 3.0, 3.0
+has never shipped, and so no report exists that predates it — `assertions:
 null` means a deployment that ran no pass, never a file older than the field.
 
-> **`schema_version` 2.0** added [`grounds`](#grounds--why-the-finding-was-raised)
-> on every threat and `unverified_grounds` on the report — both additive, and
-> minor on their own. What earns the major is that `nodes[].node` changed the
-> *values* it carries: the six category nodes are now `analyze_<category>`, not
-> `analyst_<category>`. A consumer keying on `analyst_spoofing` does not error;
-> it matches nothing, silently.
+[Schema versions](#schema-versions), at the end of this page, states what each
+version holds.
 
 ## What ties a report to its submission
 
@@ -468,14 +463,14 @@ this schema refuses to represent. A dropped claim gets no entry here: this list
 names a claim the block carries, and the groundless mark names the references
 instead.
 
-This narrowed a whole-job failure in 2.9. Agents compose well-formed references
-— correct grammar, plausible element IDs, absent from the set — and a live sweep
-lost 2 of 12 jobs to it. Discarding six lanes of analysis because one threat
-named one fact that does not exist is the trade `unresolved_mentions` already
-refused to make. See [ADR 0009](adr/0009-a-bad-reference-costs-its-entry.md).
+An unresolved reference costs its own entry, never the job. Agents compose
+well-formed references — correct grammar, plausible element IDs, absent from the
+set — and discarding six lanes of analysis because one threat named one fact
+that does not exist is the trade `unresolved_mentions` refuses to make. See
+[ADR 0009](adr/0009-a-bad-reference-costs-its-entry.md).
 
-A consumer that read "the job returned" as "every citation resolved" was relying
-on an absence; this list is where that guarantee now lives.
+A returned job does not mean that every citation resolved. Read this list for
+the references that did not.
 
 ## `repaired_quotes` — quotes rewritten to the source's own span
 
@@ -534,7 +529,7 @@ Like `unknown_claim_identities`, the `claim_id` is deliberately absent from
 `claims` and `rejected_claims`, and `title` is the only trace of what was found.
 A proposal whose ID key was unreadable is keyed `<framework>:<lane>:proposal-<n>`.
 
-Each of these used to fail the whole job. See
+None of these fails the job. See
 [ADR 0017](adr/0017-a-groundless-claim-costs-its-entry.md) and
 [ADR 0019](adr/0019-one-entry-never-costs-the-job.md).
 
@@ -584,7 +579,7 @@ The mark is worth more than typo-catching. The analyze prompt is built around a
 single worked exemplar system and spends a section telling the agent never to
 cite that system's IDs. A description arguing about `process:web-api` in a job
 whose model has no such element is that contamination reaching the one field a
-reader reads as ordinary analysis — and nothing checked it before 2.2.
+reader reads as ordinary analysis.
 
 Detection is deliberately narrow: a token has to open with one of the five real
 type prefixes and a colon, a shape ordinary English does not produce
@@ -810,21 +805,21 @@ ordinary case for a claim about a specific element.
 
 **The `subject` spelling** carries the question itself, for a fact the System
 Model holds no slot for — whether a policy is documented, or what code does.
-A framework ruling on requirements answers mostly that kind, so with only the
-first spelling available its commonest verdict was inexpressible.
+A framework ruling on requirements answers mostly that kind, so without this
+spelling its commonest verdict has no field to point at.
 
 A reader should treat an entry pointing at an attribute that exists on every
-element type — `notes`, say — with suspicion. Before the second spelling
-existed, that was the only legal way to express a question about something the
-model does not describe, and it passes every check while saying nothing.
+element type — `notes`, say — with suspicion. Such an entry often hides a
+question about something the model does not describe, and it passes every check
+while saying nothing.
 
 ### `unreconciled_rulings`
 
 How the *first* critic pass failed to reconcile with its drafts, one entry per
 problem, before the bounded re-ask repaired it. **Empty means the first pass
 was clean**, which is the reading that matters: a run that repaired itself is a
-successful run but not a clean one, and the two were previously
-indistinguishable in every artifact the service keeps.
+successful run but not a clean one, and this list is the only artifact that
+tells the two apart.
 
 A framework whose first pass never reconciles is running on its single retry.
 That is worth knowing from a report rather than from a live run.
@@ -1069,139 +1064,6 @@ class TokenUsage:
   ladder of formats, on the call where the provider refused the format above. It holds the rule's name and never the provider's message,
   which can quote the prompt back.
 
-> **`schema_version` 1.1** added `requested_model` and redefined `model` as the
-> served build rather than the configured string. A consumer keying on `model`
-> now reads what answered.
-
-> **`schema_version` 2.1** added `nodes[].usage`. Purely additive; a 2.0
-> consumer that ignores unknown fields is unaffected.
-
-> **`schema_version` 2.2** added `unresolved_mentions`. Purely additive — a new
-> optional top-level list of the same shape `unverified_grounds` already had —
-> so a 2.1 consumer that ignores unknown fields is unaffected.
-
-> **`schema_version` 2.3** added `missing_mitigations`, a third optional
-> top-level list of service-owned marks. Additive on the same argument.
-
-> **`schema_version` 2.4** added `coverage`. Additive again: a fourth optional
-> top-level list, service-owned and computed in code.
-
-> **`schema_version` 2.5** added `shared_element_names`, a fifth optional
-> top-level list of service-owned marks. Additive on the same argument — minor
-> although it is the first mark describing the model rather than the threats,
-> since what a consumer must do with an unknown field does not depend on what
-> the field describes.
-
-> **`schema_version` 2.6** widened the *values* the `sampling` block can carry
-> to every type a resolved decoding param holds, which includes `thinking`'s
-> enum string. No field was added, removed or renamed, and nothing a 2.5
-> consumer already parses changed meaning — the block was typed to numbers, so a
-> report carrying a string here could never be produced. The first entry in this
-> list that is a fix rather than an addition: a deployment that set `thinking`
-> ran its whole graph and then failed to assemble a report.
-
-> **`schema_version` 2.7** added `analysis_context`: the instruction digest, the
-> domain packs the job's model earned, and the deterministic rules that fired.
-> Optional, service-owned and computed in code — additive on the same argument
-> as the four lists before it, and the first block describing what *informed*
-> the analysis rather than what it found.
-
-> **`schema_version` 2.9** added `unresolved_evidence`, a sixth optional list of
-> service-owned marks. Additive by the same rule as the marks before it. What
-> moved beside it is a *behaviour*: an evidence reference the catalog does not
-> hold used to fail the whole job, and is now dropped and marked, with only a
-> groundless threat still failing.
-
-> **`schema_version` 2.8** added `knowledge_docs` to that block: the local-corpus
-> notes and cases the fired rules retrieved for the agents. Additive and
-> service-owned like the rest of it, and under the same rule — a document
-> informed the analysis and grounds nothing.
-
-> **`schema_version` 3.0** is the framework cutover, and it is major on every
-> count the rule names: fields move, a field changes its spelling, and one
-> changes what it carries.
->
-> - `threats` and seven other top-level fields became `analyses[].claims` and
->   their per-framework siblings. A consumer reading `report.threats` reads
->   nothing.
-> - The four mark classes renamed `threat_id` to `claim_id`.
-> - `coverage[].category` became `coverage[].lane`, and `CategoryCoverage`
->   became `LaneCoverage`.
-> - Every claim gained the required `(framework, framework_version)` pair, and
->   `Summary` split into a neutral `BlockSummary` per block with
->   `elements_analyzed` left on the envelope.
-> - The `StrideReport` type is now `Report`, and `analyses` is an ordered list
->   rather than a map.
-> - Each block carries `unknown_claim_identities` and `dropped_claims`, two
->   further lists of service-owned marks. Each records a claim the service
->   *dropped*, so unlike the marks before them their `claim_id` names no claim
->   in the block. What moved beside `dropped_claims` is a behaviour: a claim
->   that lost every ground, every element, its ID to an earlier draft, or its
->   own schema used to fail the job. `unresolved_references` records an
->   element ID dropped from `affected_element_ids`.
-> - Each block carries `repaired_quotes`. A quote ground's `text` is no longer
->   always what the agent wrote: where the ladder refused it and the source
->   held a near span, the text is that span and this list carries the agent's.
-> - The envelope carries `model_repair`: what the repair pass was allowed to
->   change and which elements it changed anyway and had put back. `None`
->   where no repair ran, and on archived runs that did.
-> - `repaired_quotes[]` carries `moved`, what the substitution changed in the
->   claim's own terms, and `scan_complete`, whether the rung ranked every
->   window. `moved` is required and was filled in on the 18 archived
->   repairs by recomputation; `scan_complete` is `None` on them.
-> - `coverage[].unknown_controls_cited` counts a control only where a draft's
->   attribute ground names that element and that attribute, and
->   `coverage[].candidates_cited` counts a lead only where one draft cites
->   every element it names. Both used to be credited from a union of what the
->   lane's drafts cited, and archived rows carry those larger numbers.
->
-> **There is no version gate and none is needed.** `Report` forbids unknown
-> fields, so a 2.10 payload carrying `threats` at the top level is refused by
-> this model, and a 3.0 payload carrying `analyses` is refused by the old one.
-> The no-shim behaviour falls out of the shapes rather than out of anything
-> reading `schema_version`.
-
-> **`schema_version` 3.0** also carries a seventh `Ground` kind,
-> `unknown-assertion`: a row of the assertion catalog whose value is the unknown
-> sentinel, for a predicate the model has no field for. It is the assertion
-> layer's `unknown-attribute`, and it exists for the same reason — an element
-> attribute nobody stated is offered as a fact an agent may raise a
-> *conditional* claim on, and a predicate with no graph field had no such offer,
-> so a question the sources explicitly left open reached nobody. A separate kind
-> rather than a flag on `assertion`, because a settled row is a fact in hand and
-> an open row is a question: the fields are identical and the fact is not.
-> `CONDITIONAL_GROUNDS` is the one reader of which kinds make a claim
-> conditional, and both `unknown` kinds are in it.
-
-> **`schema_version` 3.0** also carries `assertions[].projection_version`: which
-> rules turned the catalog's rows into graph attributes. Its own number rather
-> than the catalog's `registry_version`, because the projection's loss rules live
-> in `project` and have already changed once with no registry change beside them.
-> It is what lets a loaded report be re-checked for contradictions against the
-> rules that produced it, and a record from another version is left alone rather
-> than re-read under rules it never ran. The same release adds a sixth thing
-> `assertions.issues` can say, `graph-contradiction`: the one code there that
-> refuses no row — it reports that a graph attribute and the rows authoritative
-> for it state opposite things, which is the defect the layer was built to make
-> visible.
-
-> **`schema_version` 3.0** also carries `assertions` on the envelope: the
-> assertion catalog the job's lanes selected from, with each row's basis and
-> assessment, and the rows the resolver and the gate refused. `None` on a job
-> that ran no assertion pass, which is every job on a deployment that has not
-> set `ANALYSIS_ASSERTIONS`. A sixth `Ground` kind, `assertion`, references a row in it.
-> Additive on the same argument as `model_repair`, and it rides 3.0 for the
-> reason `absent-attribute` does: 3.0 has never shipped.
-
-> **`schema_version` 2.10** corrected what `coverage[].elements_cited` counts,
-> and holds every `*_cited` half to the total beside it. The definition above is
-> unchanged; the computation counted prose citations raw, so an ID a description
-> named that the model does not contain was counted as a cited element and the
-> numerator could exceed its denominator. Minor by the rule above — no field is
-> added, removed or renamed, and none changes meaning. Read it anyway if you
-> stored rows: one carrying more cited than offered no longer validates, and a
-> citation rate you computed off such a row was above 1.0 and is now correct.
-
 The report records both model fields and **compares neither**. It doesn't need
 to: if the build moves, the fingerprint moves with it, and the run stops
 matching any list of blessed fingerprints — so the drift surfaces there rather
@@ -1262,3 +1124,99 @@ An input that cannot be modelled yields no report — the engine returns a
 `PipelineRejected` carrying `list[ValidationIssue]` instead (see
 [Integration-Guide](Integration-Guide.md)). Each issue has a `code`, a human `message`, and
 optionally the `element_id` / `field` it concerns.
+
+## Schema versions
+
+Each entry states what a report of that `schema_version` holds beyond the
+version before it. Read it when you load an archived report.
+
+- **Version 1.1:** `requested_model` holds the configured route, and `model`
+  holds the served build.
+- **Version 2.0:** every threat carries
+  [`grounds`](#grounds--why-the-finding-was-raised), and the report carries
+  `unverified_grounds`. The six category nodes in `nodes[].node` are
+  `analyze_<category>`, not `analyst_<category>`. That change of value makes the
+  version major: a consumer that keys on `analyst_spoofing` matches nothing and
+  raises no error.
+- **Version 2.1:** `nodes[].usage`. Additive.
+- **Version 2.2:** `unresolved_mentions`, an optional top-level list with the
+  shape of `unverified_grounds`. Additive.
+- **Version 2.3:** `missing_mitigations`, an optional top-level list of
+  service-owned marks. Additive.
+- **Version 2.4:** `coverage`, an optional top-level list that code computes.
+  Additive.
+- **Version 2.5:** `shared_element_names`, an optional top-level list of marks
+  about the model. Additive, because what a consumer does with an unknown field
+  does not depend on what the field describes.
+- **Version 2.6:** the `sampling` block holds every type a resolved decoding
+  param can hold, including the enum string of `thinking`. No field changes. In
+  2.5 the block holds numbers only, so a 2.5 deployment that sets `thinking`
+  runs its graph and then cannot assemble a report.
+- **Version 2.7:** `analysis_context`: the instruction digest, the domain packs
+  the job's model earned, and the deterministic rules that fired. Additive.
+- **Version 2.8:** `analysis_context.knowledge_docs`: the local-corpus notes and
+  cases the fired rules retrieved. Additive.
+- **Version 2.9:** `unresolved_evidence`, an optional list of service-owned
+  marks. A 2.9 job drops and marks an evidence reference the catalog does not
+  hold, and only a groundless threat fails the job. A job under an earlier
+  version fails on such a reference.
+- **Version 2.10:** `coverage[].elements_cited` counts only IDs the model
+  contains, and every `*_cited` half is at most the total beside it. No field
+  changes. A stored 2.9 row with more cited than offered does not validate
+  under 2.10, and a citation rate computed from such a row is above 1.0.
+- **Version 3.0:** the framework cutover. It is major on every count the rule
+  names: fields sit in new places, a field has a new spelling, and a field
+  holds new content.
+  - `analyses[].claims` and its per-framework siblings hold what `threats` and
+    seven other top-level fields hold in 2.x. A consumer that reads
+    `report.threats` reads nothing.
+  - The four mark classes key on `claim_id`, not `threat_id`.
+  - `coverage[].lane` and `LaneCoverage` hold what `coverage[].category` and
+    `CategoryCoverage` hold in 2.x.
+  - Every claim carries the required `(framework, framework_version)` pair.
+    Each block carries a neutral `BlockSummary`, and `elements_analyzed` sits on
+    the envelope.
+  - The top-level type is `Report`, not `StrideReport`, and `analyses` is an
+    ordered list, not a map.
+  - Each block carries `unknown_claim_identities` and `dropped_claims`. Each
+    records a claim the service dropped, so its `claim_id` names no claim in the
+    block. A 3.0 job drops a claim that loses every ground, every element, its
+    ID to an earlier draft, or its own schema; a 2.x job fails on it.
+    `unresolved_references` records an element ID dropped from
+    `affected_element_ids`.
+  - Each block carries `repaired_quotes`. A quote ground's `text` can be the
+    near span the source holds, and this list carries what the agent wrote.
+  - The envelope carries `model_repair`. It is `None` where no repair ran, and
+    on archived runs that ran one.
+  - `repaired_quotes[]` carries `moved` and `scan_complete`. The 18 archived
+    repairs carry a recomputed `moved` and `scan_complete: None`.
+  - `coverage[].unknown_controls_cited` and `coverage[].candidates_cited` count
+    at the grain [`coverage`](#coverage--what-each-lane-was-offered) defines.
+    Archived rows carry larger numbers, credited from a union of what the
+    lane's drafts cited.
+  - The envelope carries `assertions`: the assertion catalog the job's lanes
+    selected from, with each row's basis and assessment, and the rows the
+    resolver and the gate refused. It is `None` on a job that ran no assertion
+    pass, which is every job on a deployment that does not set
+    `ANALYSIS_ASSERTIONS`. The `Ground` kind `assertion` references a row in it.
+  - The `Ground` kind `unknown-assertion` references a catalog row whose value
+    is the unknown sentinel, for a predicate the model has no field for. It is
+    the assertion layer's `unknown-attribute`: a question the sources leave open
+    reaches an agent as a fact it may raise a *conditional* claim on. It is a
+    separate kind rather than a flag on `assertion`, because a settled row is a
+    fact in hand and an open row is a question. `CONDITIONAL_GROUNDS` is the one
+    reader of which kinds make a claim conditional, and both `unknown` kinds
+    are in it.
+  - `assertions[].projection_version` names the rules that turn the catalog's
+    rows into graph attributes. It has its own number, not the catalog's
+    `registry_version`, because the projection's loss rules live in `project`
+    and can change with no registry change. It lets a loaded report be
+    re-checked for contradictions against the rules that produced it, and a
+    record from another version is left alone. `assertions.issues` can say
+    `graph-contradiction`: the one code that refuses no row. It reports that a
+    graph attribute and the rows authoritative for it state opposite things.
+
+  **There is no version gate and none is needed.** `Report` forbids unknown
+  fields, so this model refuses a 2.10 payload that carries `threats` at the
+  top level, and the 2.10 model refuses a 3.0 payload that carries `analyses`.
+  The refusal comes from the shapes, not from a reader of `schema_version`.

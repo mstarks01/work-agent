@@ -49,9 +49,8 @@ never leaves the table: archived reports and archived emissions hold earlier
 spellings and are still read. `evals/harness/flow_ids.py` moves a corpus from
 one version to another, and ADR 0037 is the decision.
 
-Read a flow's label with `flow_label`, never by splitting the ID. Two
-instruments split on the last colon, and both gave wrong labels when the
-endpoints gained their types.
+Read a flow's label with `flow_label`, never by splitting the ID. A split on
+the last colon gives a wrong label for a typed endpoint.
 
 ## Why the verb, and what it is worth
 
@@ -76,11 +75,10 @@ destroys 178 findings. **The verb row is the first one that is.**
 `endpoint subset` merges 41 of 354 and looks survivable. On the candidate
 paraphrases a live run actually emits it merges **69 of 92** — it is barely a
 rule. The verb takes that to 2, and it costs one split to do it — 12 becomes 13,
-which is the whole price in the first column. That column did not exist
-until [#511](https://github.com/mstarks01/work-agent/issues/511) assigned the
-negative half its elements and verbs; before it, every candidate merge count
-was structurally zero and the argument for the verb rested on the weaker
-number.
+which is the whole price in the first column. The candidate column rests on
+the element and verb assignments that
+[#511](https://github.com/mstarks01/work-agent/issues/511) gives the negative
+half.
 
 ### What each column is measured over, and what none of them is
 
@@ -121,18 +119,15 @@ and a rule cannot rot downwards inside the bar's slack.
 
 Read the ratio the way `evals/README.md` reads every agreement figure here: the
 labels are agent-authored, so it measures reproduction and not correctness. It
-is the number the judge's retirement rested on — #201's third bullet asked that
-the rule not be obviously worse than the judge before the judge could go, and
-this is the measurement that answered it. It is not a claim about accuracy, and
+is the measurement #201's third bullet asks for: that the rule is not obviously
+worse than a model judge. It is not a claim about accuracy, and
 nothing downstream should quote it as one.
 
 **The two merges the verb does not break** are in `verbs.UNSEPARATED`, each
 with the reason. Neither is a gap in the vocabulary: one is a repudiation lane
-where no attacker acts so no verb applies, and one is a corpus wording gap. A
-third, two spellings of one DMZ-to-core pivot in case 01, left the table when
-the Case Sitting of 2026-09-21 ruled both claims one finding written twice. Review 02 moved the disputed
-case-13 "writes"/"alters" pair to `unclear` rather than forcing it to move
-either the rule or the score.
+where no attacker acts so no verb applies, and one is a corpus wording gap.
+Review 02 labels the disputed case-13 "writes"/"alters" pair `unclear` rather
+than forcing it to move either the rule or the score.
 
 ### Why no direction enters the identity
 
@@ -148,11 +143,7 @@ direction, through that flow's endpoints. 184 of the 272 corpus claims name
 exactly one flow; 8 name several and 80 name none, and neither of those yields
 the single direction a comparison needs.
 
-**The merge that raised the question is gone, and the answer is not.** Case
-01's two `escalate` claims both named the DMZ-to-core pivot, and the Case
-Sitting of 2026-09-21 ruled them one finding written twice, so both left the
-corpus. The surviving merges are priced the same way below, and the reading
-below is what decided #652 rather than that one pair.
+#652's ruling rests on the priced reading below, not on one pair.
 
 **Neither reading of an absent direction is usable.** Both are priced over the
 labelled pairs the shipped rule merges today:
@@ -212,16 +203,16 @@ its hash — so **a vote stores its components**, and `ledger.rekey` recomputes
 the whole file under a new version with no re-vote, no provider and no
 credentials.
 
-This is the property the retired judge design could not offer — a judge
-upgrade silently re-scored every historical number, with no way to recompute
-the old ones. Here the re-score is explicit, total, offline and free.
+A model judge cannot offer this property, because a judge upgrade silently
+re-scores every historical number, with no way to recompute the old ones. Here
+the re-score is explicit, total, offline and free.
 
 A sitting's marks are keyed the same way and store only the key, and a
 merged sitting is a record a person signed, so no file moves when a version
 does. The reader maps instead: each mark target carries every key its claim
 ever had under a version this build computes, recomputed from the corpus, and
 `sitting.current_marks` reads an older key to the current one at read time.
-A version moved without that mapping read every merged sitting as unread.
+Without that mapping, a version change reads every merged sitting as unread.
 
 **The version is not one global default.** It is `VERSION_FOR`, a table keyed by
 framework, checked against `PACKAGES` and declared in
@@ -232,9 +223,8 @@ framework, checked against `PACKAGES` and declared in
 | `stride` | 6 | an open claim set, so the action is half of what makes two claims one finding; read through the equivalence table, so two verbs the labels cannot separate are one key; with the scope |
 | `asvs` | 5 | its claims name a requirement in a catalog, so the identifier and the place it was ruled in are the key; with the scope |
 
-Version 1 — place alone — keys nothing today. ASVS sat there until the collapse
-it caused was named: two requirements ruled on one element in one chapter shared
-a fingerprint, so one vote answered for both.
+Version 1 — place alone — keys nothing. Under it, two requirements ruled on one
+element in one chapter share a fingerprint, so one vote answers for both.
 
 Those entries follow from what a package's claims *are*, not from preference —
 a rule that reads an action is wrong for a claim that names a requirement, and
@@ -277,7 +267,7 @@ controls its grounds say are unstated or missing, and two claims under one key
 are two findings where both mechanisms name something and do not overlap
 (`critic.distinct_mechanisms`, ADR 0060). `Ledger.verdicts_for` is the one
 reader of which vote answers a finding, and the review queue asks one question
-per key and mechanism. A vote stored without a mechanism binds as before.
+per key and mechanism. A vote stored without a mechanism binds by its key alone.
 
 The mechanism also holds the sibling flows a claim cites: two flows between one
 pair of elements fold to one place, so the cited flow is what tells a claim on
@@ -325,15 +315,11 @@ than move it.
 When a blessing pass drops a claim its fingerprint is free again, and a later
 addition can land on it. A **Case Sitting** mark stores only a key, so
 `current_marks` re-keys the reader's old ruling onto the new text and the gate
-reads as affirmed by a person who never saw it. That is what #1134 did to case
-12's compromised-vendor claim, at `must-find`, and #1135 repaired by moving the
-claim to the place its own sentence names.
+reads as affirmed by a person who never saw it (#1134).
 
 **No check over the tree alone can see it.** The discriminator is which claims
-are *new*, and the tree does not carry that. At the commit that shipped the
-defect every case was unread and 304 claims legitimately carried a mark, so a
-rule reading only the corpus and the merged submissions names 305 findings where
-there is one.
+are *new*, and the tree does not carry that. A rule that reads only the corpus
+and the merged submissions cannot tell an inherited mark from an earned one.
 
 So it is a preflight against a base revision, not a gate:
 
@@ -343,12 +329,10 @@ uv run python -m evals.harness.run corpus-preflight --base <revision>
 
 **Run it before the addition lands, because the evidence expires.** Once the next
 sitting merges, every claim carries a mark and an inherited one is
-indistinguishable from an earned one. #1136 marked all 331, and after it nothing
-in the tree could have found #1134's defect.
+indistinguishable from an earned one.
 
 A hit is a ruling for the maintainer and never automatically a duplicate: the
-reader's reasoning may be about a mechanism the new claim does not use, which is
-exactly how #1135 was settled.
+reader's reasoning may be about a mechanism the new claim does not use (#1135).
 
 ## What this buys, in reviewer minutes
 
@@ -376,7 +360,7 @@ about a framework.
 `PACKAGE_SCORERS` in `evals/harness/instruments.py` is the table this follows,
 and it is checked against `PACKAGES`. A fingerprint rule keyed by framework must
 be checked the same way: a table nobody compares to its registry fails as
-quietly as the `if` it replaced.
+quietly as an `if`.
 
 **Identity validation is keyed too**, by `IDENTITY_VALIDATION` in
 `evals/harness/calibration.py`, checked against `PACKAGES` in
