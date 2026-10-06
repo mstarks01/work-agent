@@ -71,8 +71,8 @@ class TestValueConstraintsAreCaught:
     """
 
     def test_o_series_rejects_greedy_decoding(self):
-        # Both tiers pin temperature = 0.0, so this is how "o-series cannot
-        # judge" failed closed rather than surprising a sweep, back when one ran.
+        # A deployment that states temperature = 0.0 fails closed here, so
+        # "o-series cannot judge" stops the build rather than surprising a sweep.
         with pytest.raises(ModelGateError):
             gate("openai", "o3", temperature=0.0)
 
@@ -177,8 +177,8 @@ class TestReasoningReachesEveryVendor:
 
     def test_gemini_accepts_none_which_is_why_off_was_dropped(self):
         # PASSES the gate as thinkingBudget: 0, then 400s at request time. The
-        # gate cannot catch it and no per-(vendor, model) data remains to, so
-        # "off" was removed from the config surface instead of managed.
+        # gate cannot catch it and no per-(vendor, model) data exists to, so
+        # the config surface offers no "off" value.
         gate("vertex", GEMINI, temperature=0.0, reasoning_effort="none")
 
 
@@ -196,7 +196,7 @@ class TestKwargAssertion:
 
 
 class TestAModelThatRefusesTheParameterAtAll:
-    """The third shape a schema probe meets, and the one nobody listed.
+    """The third shape a schema probe meets.
 
     :func:`emulates_structured_output` asks LiteLLM what it would map
     ``response_format`` to. For a model that does not take the parameter at all
@@ -204,10 +204,10 @@ class TestAModelThatRefusesTheParameterAtAll:
     ``False`` — it is an exception. 33 of the 445 mapped models under a
     registered vendor prefix behave this way.
 
-    It stayed hidden while ``_probe_structured_output`` asked LiteLLM's
-    capability lookup first and short-circuited on it, so the raising call was
-    never reached for these. Reading the map's own key made it reachable, and a
-    report that raises answers nothing at all.
+    ``_probe_structured_output`` reads the map's own key, so it reaches the
+    raising call for these models. A probe that asked LiteLLM's capability
+    lookup first would short-circuit and hide it. A report that raises answers
+    nothing at all.
     """
 
     #: A published Bedrock identifier that does not take ``response_format``.
@@ -273,10 +273,9 @@ class TestAModelThatRefusesTheParameterAtAll:
     def test_native_refuses_it_rather_than_raising(self):
         """The other reader of the same probe, held against the first.
 
-        #821 taught the matrix that the probe has a third answer, and a
-        deployment naming one of these models once got ``UnsupportedParamsError``
-        out of the library where the answer was a plain refusal. Under
-        ``native`` the answer is still a refusal.
+        The probe has a third answer (#821). A deployment that names one of
+        these models gets a plain refusal, not ``UnsupportedParamsError`` out
+        of the library. Under ``native`` the answer is a refusal too.
         """
         from analysis_service.ladder import rungs_for
         from analysis_service.model_gate import ModelGateError
@@ -308,12 +307,11 @@ class TestAModelThatRefusesTheParameterAtAll:
     def test_a_map_that_says_no_does_not_stop_a_build_on_its_own(self):
         """The guard on the fix, not on the defect.
 
-        The first attempt at the reader above pointed the gate at
-        ``native_structured_output``, which consults the map after the probe.
-        That refused four ``responses``-mode OpenAI models whose entry states
-        ``supports_response_schema: False`` while the library emulates nothing
-        for them — a build stopped on a claim in a data file, which is the
-        thing #819 measured wrong once already.
+        A gate that reads ``native_structured_output``, which consults the
+        map after the probe, would refuse four ``responses``-mode OpenAI
+        models whose entry states ``supports_response_schema: False`` while
+        the library emulates nothing for them. That stops a build on a claim
+        in a data file, and #819 measured such a claim wrong.
 
         The matrix may print what the map says. The gate may not act on it.
         """
@@ -548,12 +546,9 @@ def test_every_documented_vendor_passes_the_gate_on_shipped_sampling(
     down: shipped sampling has to survive whichever of them they pick, and a
     param one vendor rejects must not reach a reader as a working example.
 
-    **Driven from `REFERENCE_MODELS`, because the hand-written list drifted.**
-    It said `openai` was `gpt-4.1-mini` / `gpt-4.1` while the table it names
-    said `gpt-4o` / `gpt-5.6`, and it carried no `bedrock` row at all — so the
-    vendor added most recently was the one this check never made. A list that
-    mirrors a table by hand is a second reader of it, and the two disagreed for
-    as long as nobody read them side by side.
+    **Driven from `REFERENCE_MODELS`, not a hand-written list.** A list that
+    mirrors a table by hand is a second reader of it. It can name other models
+    than the table names, and it misses each vendor added after it.
     """
     from pathlib import Path
 

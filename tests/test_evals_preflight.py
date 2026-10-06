@@ -133,10 +133,9 @@ class TestABaseItCannotRead:
     def test_a_base_it_can_read_still_answers(self, capsys):
         """``HEAD``, never ``HEAD~1``.
 
-        CI checks out one commit, so a clone here may carry no parent — and
-        this test first named ``HEAD~1``, which the refusal above then caught
-        for exactly the right reason and failed the suite. The base a readable
-        case needs is a revision that exists, and ``HEAD`` is the one every
+        CI checks out one commit, so a clone here may carry no parent, and the
+        refusal above would then reject ``HEAD~1``. The base a readable case
+        needs is a revision that exists, and ``HEAD`` is the one every
         checkout has. What separates the two paths is the count line, which the
         refusal never prints, so that is what this reads rather than an exit
         code a dirty tree can move.

@@ -154,9 +154,8 @@ def test_an_empty_source_is_rejected_before_it_becomes_a_job(text):
 
 
 def test_a_bare_string_is_refused_with_the_call_to_write_instead():
-    # The removed contract's analyze(text). A string satisfies Sequence, so
-    # without this it would iterate characters and report a nonsense count —
-    # and this is the first call an integrator port makes.
+    # A string satisfies Sequence, so without this check analyze(text) would
+    # iterate characters and report a nonsense count.
     engine = engine_for(StubPipelineRunner())
 
     with pytest.raises(EngineInputError, match="Source.description"):
@@ -164,7 +163,7 @@ def test_a_bare_string_is_refused_with_the_call_to_write_instead():
 
 
 def test_a_repeated_framework_is_refused_at_the_engine_too():
-    """#675 D23: the engine did not look for a repeat the route refused."""
+    """The engine refuses a repeated framework, as the route does (#675 D23)."""
     twice = [sample_selection()[0], sample_selection()[0]]
     with pytest.raises(EngineInputError, match="repeats"):
         engine_for(StubPipelineRunner(), frameworks=twice)

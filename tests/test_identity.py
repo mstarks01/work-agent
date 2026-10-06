@@ -212,10 +212,9 @@ class TestBuildIdentity:
 def test_every_distribution_the_package_imports_is_declared():
     """A dependency you rely on but do not declare is one a bump can remove.
 
-    `pyproject.toml` already records this happening once, to `cryptography`.
-    It had happened twice more by the time an audit looked: `anyio`, `starlette`
-    and `google-genai` were all imported by name and all arrived only
-    transitively.
+    `pyproject.toml` records this case for `cryptography`. `anyio`,
+    `starlette` and `google-genai` are each imported by name, so each is
+    declared rather than left to arrive transitively.
 
     The import name is not the distribution name -- `jwt` is PyJWT, `google` is
     three separate distributions -- so this asks `packages_distributions()`

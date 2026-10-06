@@ -228,7 +228,7 @@ class TestTheTablesAnswerForEveryPackage:
 
     def test_no_row_names_a_field_no_record_carries(self):
         """The other direction: a table nobody compares to its registry fails
-        as quietly as the branch it replaced."""
+        as quietly as a branch."""
         carried = {name for record in _ruled_records() for name in record.model_fields}
 
         assert set(STRUCTURAL_FIELDS) | set(PROSE_FIELDS) <= carried
@@ -310,12 +310,11 @@ def test_every_ground_branch_is_named_here():
 def test_a_ground_digests_the_referent_its_own_record_reads(kind: str):
     """``Ground.referent`` is the one reader of "what does this ground name".
 
-    The digest once re-spelled ``place``'s ``or`` chain and added ``term`` to
-    the end of it, and the sixth branch would have done to that chain what
-    ``term`` did to ``place``: a ground naming an assertion digested as an
-    empty string, so two grounds naming two rows shared a structural digest
-    and a re-argued claim read live. The record answers once now, and this
-    fails the moment a branch is added and this table names it.
+    A digest that re-spells ``place``'s ``or`` chain misses each new branch: a
+    ground that names an assertion would digest as an empty string, so two
+    grounds that name two rows would share a structural digest and a re-argued
+    claim would read live. The record answers in one place, and this fails the
+    moment a branch is added and this table names it.
     """
     ground = GROUNDS[kind]
 

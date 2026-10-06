@@ -113,7 +113,7 @@ def test_the_simulation_asks_in_the_rounds_a_pause_serves():
     assert run.rounds > 1
     assert run.asked <= EARLY_RULES["capability"].limit
     # #1468: a question that settles nothing only opens the parts under it.
-    # The code flow once sat under no role, and was asked beside two "no"s.
+    # The code flow sits under a role, so it is not asked beside two "no"s.
     parents = {capability.parent for capability in CAPABILITIES.values()}
     moot = [key for key, count in zip(run.keys, run.settled) if not count]
     assert set(moot) <= parents

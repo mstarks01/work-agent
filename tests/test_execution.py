@@ -423,10 +423,10 @@ def test_an_llm_nodes_latency_is_charged_to_that_node():
     ADK builds an LlmAgent's response event *before* the request goes out, and
     ``_finalize_model_response_event`` copies that timestamp onto the event it
     yields — so ``event.timestamp`` marks when the call was issued, not when it
-    came back. Stamping from it charged every model's latency to whichever node
-    ran next: a 58-second critic was reported as 19 ms on ``critic`` and 58,035
-    ms on the ``router`` FunctionNode after it. The executor stamps observation
-    time instead.
+    came back. Stamping from it charges every model's latency to whichever node
+    runs next: a 58-second critic reads as 19 ms on ``critic`` and 58,035 ms on
+    the ``router`` FunctionNode after it. The executor stamps observation time
+    instead.
 
     This is the only test that can see the difference. Every other stand-in
     answers in ~0 ms, which reads identically under both rules.

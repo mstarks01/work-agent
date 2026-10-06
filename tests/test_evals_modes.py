@@ -186,8 +186,8 @@ def lane_of(instruction: str, lanes) -> str | None:
     mentioned first and silently scripts the wrong emission.
 
     Shared with :mod:`tests.test_evals_run_grounds`, which needs the same
-    discrimination for the same reason — one ``analyze/stride`` tier key now
-    serves every lane, so a tier node no longer identifies one.
+    discrimination for the same reason: one ``analyze/stride`` tier key
+    serves every lane, so a tier node does not identify one.
     """
     for lane in lanes:
         heading = f"# {lane.replace('-', ' ').title()}"
@@ -199,11 +199,11 @@ def lane_of(instruction: str, lanes) -> str | None:
 class LaneAwareLlm(ScriptedLlm):
     """One adapter serving every lane, replying by the lane it was asked about.
 
-    All six STRIDE lanes run on one ``analyze/stride`` tier key since
-    ``model_tiers.toml`` v5, so a tier node no longer identifies a lane and a
+    All six STRIDE lanes run on one ``analyze/stride`` tier key
+    (``model_tiers.toml`` v5), so a tier node does not identify a lane and a
     resolver keyed on one cannot script six different emissions. The lane is
-    recoverable from the instruction the lane agent was actually built with,
-    which is the only place it still distinguishes itself.
+    recoverable from the instruction the lane agent was built with, which is
+    the only place it distinguishes itself.
     """
 
     replies: dict[str, str] = Field(default_factory=dict)
@@ -361,8 +361,8 @@ def test_an_eval_report_carries_every_field_production_stamps(case):
     )
     shared = analysis_fields & Report.model_fields.keys()
     # Only what the envelope itself carries. The eight per-framework fields
-    # moved onto the block at schema 3.0, so a field this set still named would
-    # be one the envelope no longer has.
+    # sit on the block from schema 3.0, so a field named here must be one the
+    # envelope has.
     assert shared == {
         "system_model",
         "boundary_crossings",
@@ -877,13 +877,13 @@ def test_the_sweep_aggregate_splits_by_element_type_and_attribute(case):
 def test_the_two_attributes_the_asvs_precondition_reads_are_scored(case):
     """A non-web process must stay non-web, and a silent protocol silent.
 
-    Both decide whether ASVS runs at all, and neither was compared before
-    (#659). The protocol is compared by state rather than wording: two correct
+    Both decide whether ASVS runs at all, so both are compared (#659). The
+    protocol is compared by state rather than wording: two correct
     readings of "over gRPC" spell it differently, and neither is an invention.
     """
-    # Found rather than indexed: the case's first flow states no protocol once
-    # the reference stops inferring one (#925), and a test pinned to a corpus
-    # position reads a different fact after every corpus edit.
+    # Found rather than indexed: the case's first flow states no protocol,
+    # because the reference does not infer one (#925), and a test pinned to a
+    # corpus position reads a different fact after every corpus edit.
     stated = next(
         index
         for index, flow in enumerate(case.model.data_flows)
@@ -1001,7 +1001,7 @@ def test_an_eval_report_stamps_the_nodes_that_actually_ran(case):
     assert EXTRACT_NODE in stamped
     assert "critic_stride" in stamped
     assert stamped <= {node.name for node in pipeline.workflow.graph.nodes}
-    # The placeholder this replaced.
+    # No placeholder node name.
     assert "eval" not in stamped
 
 
@@ -1071,18 +1071,15 @@ def test_every_mode_maps_to_a_graph_entry():
 
 
 class TestTheHarnessSeedsFrameworkOptions:
-    """The driver's half of the options contract, which #290 found missing.
+    """The driver's half of the options contract (#290).
 
     ``prepare_analysis`` validates every selected framework's options and raises
     when one is absent, since no package field carries a default.
-    ``AdkPipelineRunner`` seeds them from the job; the harness has to seed them
-    from the case, and did not.
+    ``AdkPipelineRunner`` seeds them from the job; the harness seeds them from
+    the case.
 
-    **Why no offline test caught it.** ``tests/test_graph.py`` seeds
-    ``ASVS_OPTIONS`` by hand, so every test of the graph supplied what the
-    harness omits. The gap lived in the one seam nothing drove end to end, and a
-    live sweep found it on the first case — for no money, because
-    ``prepare_analysis`` is a deterministic node ahead of the fan-out.
+    ``tests/test_graph.py`` seeds ``ASVS_OPTIONS`` by hand, so a test of the
+    graph cannot see a harness that omits them. These tests drive that seam.
     """
 
     def test_a_declared_option_reaches_the_seeded_state(self):
@@ -1109,8 +1106,7 @@ class TestTheHarnessSeedsFrameworkOptions:
     def test_the_options_satisfy_every_packages_own_model(self):
         """The check ``prepare_analysis`` runs, run here where it costs nothing.
 
-        This is the assertion that would have failed before the fix, and it
-        fails for any package that later declares a required option its corpus
+        It fails for any package that declares a required option its corpus
         cases do not carry.
         """
         for path in sorted(p for p in CORPUS.iterdir() if p.is_dir()):
@@ -1814,8 +1810,8 @@ def test_a_plural_in_the_source_covers_a_singular_name(case):
     """The source's "game servers" sources a model's `game server`.
 
     Which form to write is the naming rule's question and is already measured
-    as recall. Charging it here as invention counts one disagreement twice, and
-    it read three ordinary plurals as invented components before this.
+    as recall. Charging it here as invention would count one disagreement
+    twice, and would read ordinary plurals as invented components.
     """
     raw = case.model.model_dump()
     first = raw["processes"][0]
@@ -1841,13 +1837,13 @@ def _extraction_of(case, model) -> modes.ExtractionResult:
 
 
 def test_extraction_mode_checks_excerpts_against_the_sources(case):
-    """The gate rule production runs, which this mode ran without its input.
+    """The gate rule production runs, with its input.
 
-    ``run_extraction`` called ``parse_and_validate`` with no ``sources``, and
+    ``run_extraction`` passes the sources to ``parse_and_validate``, because
     :func:`analysis_service.validation._citation_issues` returns early when
-    there are none. So an invented quote passed here and failed inside a job,
-    and the mode graded extractions against a weaker gate than the one that
-    ships.
+    there are none. Without them, an invented quote would pass here and fail
+    inside a job, and the mode would grade extractions against a weaker gate
+    than the one that ships.
     """
     invented = edited(
         case.model,
@@ -2134,10 +2130,10 @@ class TestTheFalsificationFixtures:
     def test_renaming_the_hard_elements_no_longer_buys_agreement(self):
         """Agreement cannot be bought by renaming the facts that are hard to get right.
 
-        ``_check_attributes`` joins on the alignment. Renaming case 01's
-        five flows once took all 25 of their scored fields out of the
-        numerator *and* the denominator, and agreement read perfect over the
-        22 left. Rule 6 pairs each renamed flow as the sole flow between its
+        ``_check_attributes`` joins on the alignment. Without rule 6,
+        renaming case 01's five flows takes all 25 of their scored fields out
+        of the numerator *and* the denominator, and agreement reads perfect over
+        the 22 left. Rule 6 pairs each renamed flow as the sole flow between its
         found endpoints, so the nonsense on it is compared and charged.
         """
         case = self.case_01()

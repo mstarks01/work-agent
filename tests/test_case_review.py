@@ -145,10 +145,9 @@ class TestAReadRecordNamesAFileInsideItsCase:
 class TestAReadRecordCannotLeaveItsCaseBySymlink:
     """`CORPUS_RELATIVE_PATH` bounds the name; a symlink needs no bad name.
 
-    Run-6 closed the string half of this and the docstring, the test and the
-    fix all said it was closed. `source.md` matches the pattern perfectly and
-    can point anywhere, so the digest oracle, the unbounded read and the
-    uncaught `PermissionError` all came back.
+    A pattern check on the string is not enough. `source.md` matches the
+    pattern and can point anywhere, so a read that follows it reopens the
+    digest oracle, the unbounded read and the uncaught `PermissionError`.
     """
 
     def _case(self, tmp_path):

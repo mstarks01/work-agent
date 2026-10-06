@@ -1,35 +1,24 @@
 """Nothing outside a package states the fan-out as a fixed number.
 
-## What went wrong
-
-How wide a job fans out stopped being a constant the day a second package
-registered. It is one ``strong``-tier request per lane of every framework the
-job names — :func:`~analysis_service.frameworks.widest_fan_out`, 23 today — and it
-was 6 for as long as STRIDE was the only package.
-
-[#199](https://github.com/mstarks01/work-agent/issues/199) corrected the
-arithmetic behind the concurrency ceiling and stopped at the file it was looking
-at. Nine other places went on reasoning from six: the retry budget, the jitter
-policy, the per-tier budget argument, the admission cap, and the module
-docstrings above three of them. None of it was arithmetic a computer ran — no
-bound in the package is *computed* from six — so nothing failed. It was the
-reasoning a maintainer reads before turning one of those knobs, and it said
-sixty where the truth was 230.
+A job fans out to one ``strong``-tier request per lane of every framework the
+job names: :func:`~analysis_service.frameworks.widest_fan_out`, 23 today. No
+bound in the package is *computed* from a fixed count, so a stale count in prose
+fails nothing. But a maintainer reads that prose before turning a knob such as
+the retry budget, the jitter policy or the admission cap.
+[#286](https://github.com/mstarks01/work-agent/issues/286) records the case.
 
 ## Why a lint rather than care
 
-The prose is right today because #286 rewrote it. The lint is what stops the
-third package putting it back: **the fan-out has no correct fixed number**, so
-outside a package's own tree, any fixed count of lane agents is wrong on its
-face and needs no judgement to reject.
+**The fan-out has no correct fixed number**, so outside a package's own tree,
+any fixed count of lane agents is wrong on its face and needs no judgement to
+reject.
 
 ## Two exclusions, and the reason for each
 
 ``frameworks/<name>/`` is a package talking about itself, where "six categories"
 is a fact rather than a fan-out claim. ``docs/adr/`` is a dated record of what
-was decided when it was decided; ADR 0007 was written when six was the whole
-fan-out, and it carries an amendment note rather than a rewrite, the way ADRs
-0004, 0006, 0008 and 0012 do.
+was decided when it was decided; ADR 0007 carries an amendment note rather than
+a rewrite, the way ADRs 0004, 0006, 0008 and 0012 do.
 """
 
 from __future__ import annotations
@@ -143,8 +132,7 @@ def test_the_widest_fan_out_is_every_packages_lanes():
 def test_no_single_package_accounts_for_the_fan_out(framework):
     """The property that makes a per-package number wrong.
 
-    One package's lane count was the whole fan-out once. This is the assertion
-    that says it is not any more, so a number sized against any single package
-    understates the burst — which is what #199 found and #286 finished.
+    No single package's lane count is the whole fan-out, so a number sized
+    against any single package understates the burst (#199, #286).
     """
     assert len(PACKAGES[framework].lanes) < widest_fan_out()

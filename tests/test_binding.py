@@ -102,11 +102,9 @@ def test_resolve_model_stays_the_callers(tiers, sampling):
 def test_the_binding_carries_no_resilience_config(tiers, sampling):
     """The graph reads no operational bound, so the binding carries none.
 
-    It carried one, to put the per-request timeout on each node's
-    ``http_options``. That carrier changed the unit and the timeout moved to the
-    adapter, which left this field with no reader in ``src/``. A field nothing
-    reads is the shape that goes stale without anything noticing, so it went
-    too.
+    The adapter puts the per-request timeout on each call, so no reader in
+    ``src/`` needs a resilience field here. A field that nothing reads goes
+    stale and no check notices.
     """
     assert "resilience" not in {f.name for f in dataclasses.fields(NodeBinding)}
 

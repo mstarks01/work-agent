@@ -128,10 +128,10 @@ def pins_scalar(text: str, value: str) -> bool:
 # that only ran where one existed, which is the imbalance this file exists to
 # remove.
 #
-# Derived from the registry rather than written down. A hand-kept copy was a
-# second reader of the credential sources, and it answered for four vendors on
-# the day a fifth arrived: the binding check raised on the one variable this
-# mapping had never heard of. The loader checks that a variable is declared,
+# Derived from the registry rather than written down. A hand-kept copy is a
+# second reader of the credential sources, and it does not answer for a vendor
+# added after it: the binding check raises on a variable the copy does not
+# name. The loader checks that a variable is declared,
 # never that its value has a shape, so one placeholder serves every variable.
 FAKE_ENV = {
     var: f"not-a-real-{var.lower()}"
@@ -241,7 +241,7 @@ class TestTheMatrixItself:
         assert set(self.UNANSWERED) <= set(reference_pairs())
 
     def test_a_silent_capability_is_unknown_rather_than_unsupported(self):
-        """The narrower half of the same rule, and the one that was wrong.
+        """The narrower half of the same rule.
 
         ``model_info`` answers per *entry*, so ``known`` cannot see this: the
         pinned map carries this slug and says nothing about response schemas.
@@ -372,9 +372,9 @@ class TestTheMatrixItself:
 def _shipped_sampling():
     """The shipped sampling, unadjusted, on every vendor.
 
-    It takes no argument, and that is the finding: while the file pinned a
-    temperature this had to be a per-vendor fixture that stripped the line for
-    reasoning families, because no one value was legal everywhere.
+    It takes no argument, because the file states no temperature. A stated
+    temperature would need a per-vendor fixture that strips the line for
+    reasoning families, because no one value is legal everywhere.
     """
     return load_sampling(CONFIG / "sampling.toml", env={})
 
@@ -392,11 +392,11 @@ class TestModelsCanBeBound:
         supported in any useful sense, however many code paths mention it.
 
         **It is the shipped sampling on every vendor, unadjusted.** That holds
-        because the file states no ``temperature``: the pin was per *tier* while
-        the model it must suit is per *deployment*, so no single value satisfied
-        every vendor — Claude 4.7 and later reject the param and OpenAI's
-        reasoning families take only their own default. Leaving it unset is what
-        lets one shipped file bind all three. The test below keeps the
+        because the file states no ``temperature``. A pin is per *tier*, while
+        the model it must suit is per *deployment*, so no single value satisfies
+        every vendor: Claude 4.7 and later reject the param, and OpenAI's
+        reasoning families take only their own default. With the value unset,
+        one shipped file binds all three. The test below keeps the
         incompatibility itself pinned, as the cost of *stating* a value.
         """
         adapters = build_tier_adapters(
@@ -701,8 +701,7 @@ class TestTheLiveLanesSweepWhatWasProfiled:
         # appetite. A sweep names a **Baseline**, and a Baseline may not be
         # named after a route whose served build does not name the weights
         # that answered — see ``evals/harness/baseline.py``. Measured on
-        # 2026-09-11 and no longer an open question: the response repeats the
-        # requested slug, and one slug is fronted by many upstream providers
+        # 2026-09-11: the response repeats the requested slug, and one slug is fronted by many upstream providers
         # (``docs/research/openrouter-served-model.md``). The smoke lane covers
         # this vendor; the corpus sweep does not.
         "openrouter": None,
@@ -902,16 +901,15 @@ class TestProfileShape:
 
 
 def test_a_stated_temperature_cannot_bind_openais_strong_reference_model(tmp_path):
-    """The incompatibility, pinned so it stays known — now as an opt-in cost.
+    """The incompatibility, pinned so it stays known, as an opt-in cost.
 
     OpenAI's reference strong model serves ``temperature`` only at its own
-    default of 1, so a deployment that states 0.0 cannot run it. Before this
-    gate existed such a configuration bound cleanly and died on the first live
+    default of 1, so a deployment that states 0.0 cannot run it. Without this
+    gate, such a configuration would bind cleanly and fail on the first live
     request, which is the shape the build-time gates exist to prevent.
 
-    What changed is who pays: the shipped file states nothing, so this is the
-    price of a deployment stating a value rather than a wall every OpenAI
-    deployment meets. Asserted rather than fixed, because the choice between
+    The shipped file states nothing, so only a deployment that states a value
+    meets this refusal, not every OpenAI deployment. Asserted rather than fixed, because the choice between
     greedy decoding and this model belongs to whoever states the value.
     """
     stated = tmp_path / "sampling.toml"
@@ -996,7 +994,7 @@ class TestTheDocumentedPairsAreTheProfiledPairs:
         )
 
     def test_the_issue_tracker_guide_names_the_bedrock_pair(self):
-        """A fourth file, and the one that had no reader when it drifted.
+        """A fourth file that copies the table, so it needs a reader.
 
         The guide states outright which pair the Bedrock rulings settled, and
         an agent reading it acts on that sentence — so it is a copy of the
@@ -1174,11 +1172,10 @@ def test_no_reference_model_fronts_a_build():
 
 def test_the_alias_rule_finds_both_aliases_it_was_written_for():
     """Guards the guard, once per shape. A rule that matches nothing passes
-    vacuously, and half of this one did: while the tail had to be a date,
-    ``gpt-5.6`` was all-clear in the table for as long as it sat there.
+    vacuously. A rule that requires a date tail does not match ``gpt-5.6``.
 
-    ``gpt-4o`` is the identifier that motivated the rule and still fronts three
-    dated builds. ``gpt-5.6`` is the one that escaped it, and the map prices it
+    ``gpt-4o`` is the identifier that motivated the rule and fronts three
+    dated builds. ``gpt-5.6`` has no date tail, and the map prices it
     and ``gpt-5.6-sol`` identically — which is what OpenAI's own model page
     says in words: "The ``gpt-5.6`` alias routes requests to GPT-5.6 Sol".
     """

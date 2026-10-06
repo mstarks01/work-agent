@@ -348,10 +348,11 @@ def test_a_dead_case_is_counted_and_the_sweep_continues(monkeypatch, case):
 
 
 def test_a_case_that_fails_at_report_validation_is_still_metered(monkeypatch, case):
-    """The provider billed every node before the report was built. The sweep
-    read a case's node runs off its finished report, so a case that failed
-    there priced at zero: the second ASVS pre-flight of 2026-09-08 ran for
-    3.5 minutes and its artifact said nothing was metered (#707)."""
+    """The provider bills every node before the report is built, so the sweep
+    meters a case that fails at report validation. A sweep that read node runs
+    off the finished report would price that case at zero: the second ASVS
+    pre-flight of 2026-09-08 ran for 3.5 minutes and its artifact metered
+    nothing (#707)."""
     real_into_report = graph_module.Analysis.into_report
     dead_once = {"pending": True}
 

@@ -197,10 +197,10 @@ def test_each_lane_skill_publishes_its_chapters_whole_requirement_set(lane):
 def test_each_lane_skill_carries_the_roster_the_catalog_composes(lane):
     """The roster on disk is what ``roster.py`` builds, byte for byte.
 
-    The two checks below this one each caught a *wrong* roster: a missing
-    requirement, a drifted level, a paraphrased description. This makes a
-    divergent roster unrepresentable instead, which is the difference between
-    policing a second copy of the standard and not having one.
+    The two checks below this one each find a *wrong* roster: a missing
+    requirement, a wrong level, a paraphrased description. This check makes a
+    divergent roster impossible, so no second copy of the standard exists to
+    check.
 
     What it does not touch is the rest of the skill. Scope, applicability,
     threat patterns, guardrails and mitigations are judgement, none of it is
@@ -237,11 +237,11 @@ def test_regenerating_a_skill_would_change_nothing(lane):
 def test_each_lane_skill_quotes_the_catalogs_own_requirement_text(lane):
     """The roster is the catalog's words, not a paraphrase of them.
 
-    The identifier and the level were already checked. The *text* was not, and
-    it is the part the agent actually rules against: a skill carrying the right
-    number beside drifted wording asks for a ruling on something the standard
-    does not say, and every catalog-derived check downstream still passes,
-    because they all key on the identifier.
+    Other checks read the identifier and the level. This one reads the *text*,
+    which is the part the agent rules against. A skill that carries the right
+    number beside different wording asks for a ruling on something the standard
+    does not say. Every catalog-derived check downstream still passes, because
+    they all key on the identifier.
 
     One copy of the standard's prose would be better than two. Until the skills
     are generated from the catalog, this is what keeps the second copy honest.
@@ -385,16 +385,14 @@ def test_the_corpus_covers_every_rule_and_names_no_other():
 
 
 def test_which_lanes_carry_no_candidate_rule_is_pinned():
-    """Every lane carries a rule, and losing one is a decision, not a drift.
+    """Every lane carries a rule, and losing one is a decision.
 
-    Six lanes had none while the rules were authored against the level 1
-    requirements first. #193 settled that this was allowed — a **Candidate** is
-    a lead and not a gate, and a lane agent analyses its chapter either way —
-    but the six were not harmless: retrieval is keyed by *fired rule*, so a lane
-    with no rule also received no reference note and no worked case, whatever
-    the knowledge tables held.
+    #193 allows a lane with no rule: a **Candidate** is a lead and not a gate,
+    and a lane agent analyses its chapter either way. But retrieval is keyed by
+    *fired rule*, so a lane with no rule also receives no reference note and no
+    worked case, whatever the knowledge tables hold.
 
-    Closing the set is what makes the corpus reach every chapter. The assertion
+    A rule on every lane makes the corpus reach every chapter. The assertion
     stays as an empty list rather than being deleted, so a lane that loses its
     last rule fails here instead of quietly going dark.
     """
@@ -663,11 +661,11 @@ def test_the_extract_prompt_still_teaches_the_shape_this_test_pins():
 
 
 def test_a_flow_that_never_said_no_longer_holds_a_decided_model_open():
-    """The defect #219 reported, as a test.
+    """An unstated transport does not hold a decided model open (#219).
 
     Every process states a non-web interface and no flow states anything. The
     model has answered the question; the unstated transport is a different fact
-    and no longer overrides it.
+    and does not override it.
     """
     model = valid_model()
     decided = [
@@ -1062,7 +1060,7 @@ class TestScopeEntryNamesWhatWouldSettleIt:
 
 
 def test_the_fan_in_reaches_this_packages_own_partition():
-    """The seam itself, because naming the wrong class is what went wrong.
+    """The seam itself, because an override on the wrong class fails silently.
 
     ``merge_drafts`` calls ``package.record.partition_proposals``. An override
     written on any other class of this package resolves to the neutral default,
@@ -1143,13 +1141,11 @@ def test_the_unit_of_a_draft_is_its_requirement():
 
 
 class TestNothingIsRuledOutByVocabulary:
-    """#659: the exclusions are gone, and this is the guard that keeps them gone.
+    """No word list removes a requirement from the analysis (#659).
 
-    A word list decided which requirements left the analysis. Absence of a
-    word is not absence of the thing, so every miss was a requirement silently
-    dropped, and every fix was a word added after somebody noticed. The lists
-    remain as candidate rules, where a miss costs a lead the agent can still
-    find for itself.
+    Absence of a word is not absence of the thing, so a word list that removes
+    requirements drops one silently on each miss. The lists are candidate rules,
+    where a miss costs a lead the agent can still find for itself.
     """
 
     def test_no_corpus_model_loses_a_requirement_to_code(self):
@@ -1385,7 +1381,7 @@ class TestABlockWrittenBeforeTheCauseWasReadStillLoads:
 
 
 class TestTheCatalogCarriesItsOwnProvenance:
-    """#659: the loader's version was a constant nothing compared to the payload."""
+    """The loader compares its pinned version and digest to the payload (#659)."""
 
     def test_the_shipped_catalog_matches_both_pins(self):
         from analysis_service.frameworks.asvs import catalog

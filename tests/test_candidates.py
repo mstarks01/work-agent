@@ -50,8 +50,7 @@ def candidates(model, catalog=None) -> dict:
     """Every STRIDE lane's candidate set for one model.
 
     The one place this suite binds the neutral engine to STRIDE's own lanes and
-    rules, so a test below reads the way it did before the engine stopped
-    knowing which framework it was firing for.
+    rules, so a test below need not name the framework.
 
     ``catalog`` defaults to none, which is a job whose deployment ran no
     assertion pass — the shape almost every test here is about.
@@ -661,7 +660,7 @@ class TestAPrincipalReachesAnElementOnlyWhenTheSourcesSaySo:
         assert hits[0].facts["second_factor_subject"] == "principal"
 
     def test_without_the_identification_it_reaches_nothing(self, model):
-        """The measured state before this: 15 of 18 rows reached no candidate."""
+        """Without the identification, the rule fires for no row."""
         held = self.catalog(self.absence(), identified=False)
         assert fired(model, RULE, held) == []
 

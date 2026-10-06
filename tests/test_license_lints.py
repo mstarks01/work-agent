@@ -337,10 +337,9 @@ def test_the_scan_catches_a_sentence_pasted_in_another_format(tmp_path):
 
     Every other assertion here passes when :func:`leaks` returns nothing, so a
     scan that always returned nothing would leave the suite green and the
-    obligation unmet. An earlier version of this module did exactly that -- it
-    compared punctuation, and the planted sentence went unnoticed because the
-    file that took it wrote a markdown bullet where the catalog wrote a JSON
-    string. So the plant here is deliberately reformatted.
+    obligation unmet. A scan that compares punctuation misses a sentence that
+    a file writes as a markdown bullet where the catalog writes a JSON string.
+    So the plant here is deliberately reformatted.
     """
     borrowed = (
         "Verify that the application encodes every value it writes into a"

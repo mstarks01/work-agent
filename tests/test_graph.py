@@ -359,8 +359,8 @@ def routed_fan_out(pipeline, source: str) -> dict[Any, set[str]]:
 # One deployment flag puts ``read`` and ``assert`` between the validity gate and
 # ``prepare``. What these check is that every valid model goes through the pass
 # when it is built in, that ``prepare`` resolves the proposal once and parks the
-# record every later node reads, and that a graph built without it is the graph
-# it always was.
+# record every later node reads, and that a graph built without it has no
+# assertion pass.
 
 
 @pytest.fixture
@@ -1010,11 +1010,11 @@ def test_category_placeholder_is_filled_at_build_time(prompt_loader, package_loa
 def _adk_substitution_pattern() -> str:
     r"""ADK's own placeholder regex, read out of ADK rather than restated.
 
-    The lint below used `\{([A-Za-z_][A-Za-z0-9_]*)\}` while ADK templates
-    `{+[^{}]*}+` and then strips the name -- so `{ candidates_stride_tampering }`
-    with spaces was invisible to the lint and substituted by ADK. Six spellings
-    passed. Reading the pattern from the installed package means a version bump
-    that widens it fails here instead of opening the same gap again.
+    ADK templates `{+[^{}]*}+` and then strips the name, so a narrower lint
+    pattern such as `\{([A-Za-z_][A-Za-z0-9_]*)\}` cannot see
+    `{ candidates_stride_tampering }` with spaces, which ADK substitutes.
+    Reading the pattern from the installed package means a version bump that
+    widens it fails here instead of opening a gap.
     """
     source = Path(instructions_utils.__file__).read_text(encoding="utf-8")
     found = re.search(r"_async_sub\(\s*r'([^']+)'", source)
@@ -1458,8 +1458,7 @@ def test_prepare_marks_an_undecidable_crossing_in_the_block_the_agents_read(
     ctx = FakeContext()
     output = prepare(ctx, model, domain_loader, package_loaders)
 
-    # Two now: the login flow still crosses, and the store's flow can no longer
-    # be compared. Eligibility for analysis is what the second one confers.
+    # Two: the login flow crosses, and the store's flow cannot be compared. Eligibility for analysis is what the second one confers.
     assert output["crossing_count"] == 2
     block = ctx.state[graph.STATE_BOUNDARY_CROSSINGS]
     assert '"decided": false' in block
@@ -1580,9 +1579,9 @@ def test_merge_parks_every_mark_kind_under_one_key():
 def test_a_mark_never_outlives_the_draft_it_annotates():
     """A draft naming one element the model lacks and one its grounds do not
     reach is marked by the reference pass and dropped by the bound pass. The
-    block refuses a mark on a claim it does not carry, so left as it was the
-    whole job failed on a claim the service itself removed — which is how the
-    2026-09-08 ASVS pre-flight on case 01 ended. The drop stays on record."""
+    block refuses a mark on a claim it does not carry, so a mark left behind
+    would fail the whole job on a claim the service itself removed (the
+    2026-09-08 ASVS pre-flight on case 01). The drop stays on record."""
     ctx = FakeContext(
         **analyze_state(
             spoofing=[
@@ -1849,9 +1848,9 @@ def _reviewed_verdicts(ctx) -> dict[str, str]:
 
 def test_a_re_ask_may_change_only_the_rulings_the_problems_named():
     """The retry prompt says to carry every other ruling across byte-identical,
-    and nothing enforced it: the two passes wrote one key and the check read
-    the drafts, never the first pass. A re-ask that repaired the dropped draft
-    and also flipped a confirmed ruling to rejected was accepted whole (#659)."""
+    and the check enforces it against the first pass. A re-ask that repairs the
+    dropped draft and also flips a confirmed ruling to rejected is refused
+    (#659)."""
     drafts = [sample_draft("S-01"), sample_draft("T-01", category="tampering")]
     ctx = FakeContext()
     first = route(
@@ -1962,7 +1961,7 @@ def test_a_re_ask_that_respells_a_ruling_is_not_drift():
 
 def test_an_invented_ruling_in_the_re_ask_still_fails_the_second_look():
     """The merge resolves what the first pass got right; it does not excuse a
-    re-ask that invents. That stays the loud failure it always was."""
+    re-ask that invents. That is a loud failure."""
     drafts = [sample_draft("S-01"), sample_draft("T-01", category="tampering")]
     ctx = FakeContext()
     route(
@@ -2579,9 +2578,8 @@ def test_the_two_refusing_states_state_different_reasons(monkeypatch):
 
 # --- Two frameworks, one of them refused -------------------------------------
 #
-# The tests above swap STRIDE's precondition for one that can refuse, because
-# until ASVS landed there was no shipped package that could. These run the real
-# pair: ASVS refuses a system whose flows carry no web protocol, STRIDE's is
+# The tests above swap STRIDE's precondition for one that can refuse. These run
+# the real pair: ASVS refuses a system whose flows carry no web protocol, STRIDE's is
 # total, and one job asks for both.
 
 BOTH: tuple[FrameworkName, ...] = ("asvs", "stride")
@@ -2617,12 +2615,11 @@ def non_web_model():
 
 
 def test_a_two_framework_graph_builds(prompt_loader, domain_loader):
-    """The topology holds for two, and the refusal route is what made it not.
+    """The topology holds for two, including the refusal route.
 
     Every framework's ``skip`` reaches ``assemble``, so a route per framework
-    declared N copies of one ``prepare -> assemble`` edge — which ADK refuses
-    outright. A build carrying one framework could never hit it, which is why the
-    second framework is what found it.
+    would declare N copies of one ``prepare -> assemble`` edge, which ADK
+    refuses outright. A build that carries one framework cannot hit it.
     """
     tiers = repo_tiers()
     sampling = load_sampling(PROJECT_ROOT / "config" / "sampling.toml", env={})
@@ -3002,8 +2999,8 @@ def test_a_driver_that_seeds_no_options_is_told_which_framework_needs_what():
     Options are job data, so a driver seeds them per run. A framework whose
     package declares a required option cannot have its block built without one,
     because no package field carries a default. Without this check the failure
-    arrived from inside a scope helper naming a model rather than the framework,
-    the option or the key to seed.
+    would come from inside a scope helper that names a model rather than the
+    framework, the option or the key to seed.
     """
     with pytest.raises(graph.MissingFrameworkOptions) as caught:
         graph.assemble_report(
@@ -3310,8 +3307,8 @@ class TestTheFunctionNodesStayOffTheEventLoop:
     """
 
     def test_every_function_node_body_is_awaited(self, pipeline):
-        """Checked over the whole built graph rather than the four nodes named
-        in the fix, so a node added later is covered by construction."""
+        """Checked over the whole built graph rather than a named list of
+        nodes, so a node added later is covered by construction."""
         import inspect
 
         bodies = {
@@ -3422,12 +3419,11 @@ class TestNoPromptWritesItsOwnFence:
 
 
 class TestTheReviseCount:
-    """`Job.revise_rounds` named a real thing and nothing ever filled it.
+    """`Job.revise_rounds` counts the re-asks the graph makes.
 
     The graph has the edge -- a critic whose rulings do not reconcile with the
-    drafts is re-asked once -- so the number was a measurement the pipeline
-    could produce and did not, and every report the service ever wrote said
-    zero whatever happened.
+    drafts is re-asked once -- so the count is a measurement the pipeline
+    produces, not a constant zero.
     """
 
     def test_a_job_that_reconciled_first_time_reports_none(self):
@@ -3511,8 +3507,8 @@ def test_a_fenced_value_and_a_fenced_source_share_one_layout():
     """One spelling of the block a prompt cannot close.
 
     ``render_fenced`` and ``render_sources`` both wrap a body in the shortest
-    fence it cannot close. The layout was written in both; it is read from
-    :func:`analysis_service.sources.fenced` now, and this holds the two to it.
+    fence it cannot close. Both read the layout from
+    :func:`analysis_service.sources.fenced`, and this holds the two to it.
     """
     from analysis_service.sources import Source, fenced, render_sources
 
@@ -3610,11 +3606,10 @@ def test_merge_drops_a_gap_that_rests_on_absence_alone():
 
 
 class TestThePerFrameworkRoles:
-    """``ROLES`` is the set, so nothing states a count that a seventh role broke.
+    """``ROLES`` is the set, so nothing states a count that a new role breaks.
 
-    ``FrameworkNodes.node`` said "one of the six per-framework roles" while
-    seven role constants stood beside it. A count in a docstring is a fact
-    nothing reads; a tuple is one this reads.
+    A count in a docstring is a fact nothing reads, and it goes wrong when a
+    role is added; a tuple is one this reads.
     """
 
     def test_it_holds_every_role_constant_the_module_declares(self):

@@ -817,7 +817,7 @@ SDK_CLIENT_KEY = "not-a-real-sdk-client-key"
 #: one. Written down rather than derived from the vendor's name, because
 #: litellm's spelling is not this registry's: Bedrock's bearer token is
 #: ``AWS_BEARER_TOKEN_BEDROCK``, and the Gemini Developer API reads two names. A
-#: derived ``{NAME}_API_KEY`` matched none of those.
+#: derived ``{NAME}_API_KEY`` matches none of those.
 #:
 #: One table for two readers. ``tests/test_vendors.py`` asks whether the
 #: registry refuses such a variable, and ``tests/test_transport_conformance.py``
@@ -1127,7 +1127,7 @@ class UpstreamNamingLlm(ScriptedLlm):
 
 #: The tier keys the *base* tier serves. Spelled as tier node names rather than
 #: graph node names because that is what the resolver is handed, and because the
-#: two are no longer the same thing: six lane agents share one ``analyze/<F>``.
+#: two are not the same thing: six lane agents share one ``analyze/<F>``.
 _BASE_TIER_NODES = frozenset({"extract", "repair", "assert"})
 
 

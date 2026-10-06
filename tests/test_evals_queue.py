@@ -482,8 +482,8 @@ class TestARewrittenFindingIsAskedAgain:
 
     def test_an_unnamed_queue_stays_blind(self):
         """Re-offering here would tell this reviewer that somebody else had
-        answered the earlier version. That is the leak the deleted `unmatched`
-        row was deleted for."""
+        answered the earlier version. That leak is why the queue has no
+        `unmatched` row."""
         answered_before = finding()
         led = self._ledger(answered_before)
         reargued = finding(content=other_content())

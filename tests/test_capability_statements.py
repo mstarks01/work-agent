@@ -112,7 +112,7 @@ def test_no_extraction_transport_admits_a_capability_statement():
 
 
 def test_the_schema_a_provider_reads_names_the_model_and_no_reason():
-    """The extraction schema's head is the System Model's, as before #1395."""
+    """The extraction schema's head is the System Model's (#1395)."""
     emitted = EmittedSystemModel.model_json_schema()
     full = SystemModel.model_json_schema()
     assert (emitted["title"], emitted["description"]) == (

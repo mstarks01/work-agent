@@ -446,13 +446,13 @@ def test_an_empty_ledger_answers_every_question(tmp_path):
 
 
 def test_every_package_keys_its_own_votes(tmp_path):
-    """``cast`` took its version from a default, which is a single rule for a
-    table that holds one row per package.
+    """``cast`` takes each package's version from the table, never a default.
 
-    So an ASVS claim was keyed under STRIDE's rule, which reads an action verb
-    an ASVS claim does not carry, and every ASVS vote raised instead of
-    recording. Checked against the registry rather than a fixed pair: a package
-    added to ``VERSION_FOR`` is covered here the day it is added.
+    A default is a single rule for a table that holds one row per package. It
+    would key an ASVS claim under STRIDE's rule, which reads an action verb an
+    ASVS claim does not carry, so every ASVS vote would raise. Checked against
+    the registry rather than a fixed pair: a package added to ``VERSION_FOR`` is
+    covered here the day it is added.
     """
     from evals.harness.fingerprint import VERSION_FOR
 
@@ -572,12 +572,12 @@ class TestTheScopeIsTheCase:
 
 
 class TestTheKeyIsComputedNeverStated:
-    """A row arrives from a contributor's pull request, and until this ran
-    nothing recomputed its fingerprint.
+    """A row arrives from a contributor's pull request, so the ledger
+    recomputes its fingerprint.
 
-    The stored string was taken on the row's word while `components` -- the
-    fields the key is made of -- went unread, so a row could describe one
-    finding and key another. Every reader keys on the string: `pool`,
+    If the stored string were taken on the row's word, with `components` --
+    the fields the key is made of -- unread, a row could describe one finding
+    and key another. Every reader keys on the string: `pool`,
     `_standing`, `agreement`. A maintainer cannot catch it by reading: a roster
     edit says `standing = "maintainer"` in a diff, and this says sixteen hex
     characters.
@@ -616,8 +616,8 @@ class TestTheKeyIsComputedNeverStated:
         assert recorded.fingerprint.startswith(f"v{version_for('stride')}:")
 
     def test_a_framework_no_rule_keys_is_refused_at_the_row(self):
-        """Before, it loaded and pooled, and then refused the maintainer's
-        re-key over everybody's data with a message naming no file and no row."""
+        """The refusal names the row, not a later re-key over everybody's data
+        with a message that names no file and no row."""
         with pytest.raises(LedgerError):
             Vote(
                 fingerprint="v2:0000000000000000",

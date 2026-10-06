@@ -273,8 +273,7 @@ class TestArtifactSerialization:
         proves the record round-trips but not that a sweep produces one. This
         drives the real graph over a real case with scripted models, so the
         served build in the artifact is one the executor read back off a
-        response — the step that was missing when a promotion had nothing to
-        read.
+        response. Without that step, a promotion has nothing to read.
         """
         run = drive_sweep(monkeypatch, load_case(CASE_DIR), None)
 

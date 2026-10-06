@@ -1,7 +1,6 @@
 """ADR 0035's gate, applied to arms built in the test rather than paid for.
 
-The gate exists because it was once applied by hand and one criterion went
-unchecked. So the property that matters here is not that a good arm passes: it
+A gate applied by hand can leave one criterion unchecked. So the property that matters here is not that a good arm passes: it
 is that **each criterion can fail on its own**, and that an arm which is
 missing the evidence for a criterion is refused rather than passed.
 """

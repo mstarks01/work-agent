@@ -294,8 +294,8 @@ def test_the_gate_and_the_corpus_lint_refuse_the_same_citation_shapes(
     :func:`~analysis_service.validation.validate`: a check that would weaken
     the moment somebody relaxed the shipped gate is not a check. That decision
     buys independence and costs agreement, and agreement is what this pays for.
-    Both readers once passed an element carrying no excerpt at all, each with a
-    test that agreed with it (#925).
+    Two readers can each pass an element that carries no excerpt, each with a
+    test that agrees with it (#925).
     """
     sources = {"Doc": "a quote lives here"}
     model = valid_model()
@@ -538,23 +538,22 @@ def test_the_readme_table_names_the_case_s_own_domain(case_dir):
 def test_the_reading_document_is_what_its_generator_writes(case_dir):
     """The committed ``REVIEW.md`` is what ``build_review_docs.py`` writes now.
 
-    Nothing compared the two before, and both halves of the document drifted
-    away from the code that writes them: the mark vocabulary moved underneath
-    it, and every ``sha256`` in the pasteable ``reviews`` entry went stale
-    against the bytes it signs. Neither was visible in a diff, because a
-    derived file nobody re-derives looks exactly like a current one.
+    Without this check, both halves of the document can differ from the code
+    that writes them: the mark vocabulary can change, and each ``sha256`` in the
+    pasteable ``reviews`` entry can go stale against the bytes it signs. A diff
+    does not show either, because a derived file nobody re-derives looks
+    exactly like a current one.
 
     It matters because the document is what a reader takes away. A person
     holding a sitting offline works from this file alone, so a stale copy is
     wrong in their hands rather than merely untidy in the tree — they mark
-    with words the app refuses, and follow steps the contribution path no
-    longer takes.
+    with words the app refuses, and follow steps the contribution path does
+    not take.
 
     **A case that records a sitting is covered too.** A sitting does not retire
-    a case, and the generator no longer skips one — so this covers every case
-    it writes. The skip that stood here was the one hole left in the guard: a
-    derived file leaves the submission delta, so a case neither the generator
-    nor this check reached would be pinned by nothing at all.
+    a case, and the generator does not skip one, so this covers every case it
+    writes. A derived file leaves the submission delta, so a case that neither
+    the generator nor this check reaches would be pinned by nothing at all.
     """
     if case_dir.name in build_review_docs.HAND_WRITTEN:
         pytest.skip("hand-written; regenerating it would overwrite the record")
@@ -680,9 +679,8 @@ class TestTheReviewedAliases:
     def test_the_document_store_alias_keeps_the_store_type(self):
         """The reader's one qualification on this case, and the ruling that bounds it.
 
-        Naming the store after the platform once had no alias, because the
-        model wrote the store as `boundary:vendor-platform`, the zone that
-        contains it, in four runs of six. The maintainer ruled on 2026-09-16
+        In four runs of six, the model wrote the store as
+        `boundary:vendor-platform`, the zone that contains it. The maintainer ruled on 2026-09-16
         that `vendor platform` stands for the storage role the source states
         (#961 step 6), and the alias keeps the store's type: it derives
         `store:vendor-platform`, which is not the zone, so a model that wrote
@@ -904,9 +902,9 @@ def test_a_claim_that_does_not_place_the_attacker_at_the_source_is_left_alone():
 def test_a_declaration_answers_a_lead_and_a_spent_one_is_caught(monkeypatch):
     """The escape hatch, and the guard that stops it rotting.
 
-    A table nobody compares against what it answers for fails as quietly as the
-    branch it replaced, so a declaration whose claim no longer raises is itself
-    a failure.
+    A table that nobody compares against what it answers for fails as quietly
+    as a branch, so a declaration whose claim no longer raises is itself a
+    failure.
     """
     key = (
         "05-cookbook-queue-webapp",

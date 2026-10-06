@@ -448,12 +448,11 @@ class TestCauseStability:
         """The shape of the first merged Baseline: a sweep taken before #729,
         which carries this version and omits a key the version declares.
 
-        The two readers are driven against each other here, because that is how
-        the defect survived: ``block`` was tested for raising and ``_causes``
-        for returning ``None``, and the second was driven by a ``losses`` value
-        of ``None`` rather than by an artifact with no such key. Between them
-        sat a handler for an exception nobody raises, so the whole comparison
-        died on the one artifact that has this shape.
+        The two readers are driven against each other here. A test of
+        ``block`` for raising and a test of ``_causes`` for returning ``None``
+        each pass alone, but a ``losses`` value of ``None`` is not an artifact
+        with no such key. A handler for an exception nobody raises would let
+        the whole comparison fail on the one artifact that has this shape.
         """
         record = provenance(sampling)
         a = write_run(
@@ -748,12 +747,11 @@ class TestTheBandIsReadOffTheFates:
     def test_a_case_one_run_skipped_is_left_out(self, tmp_path, sampling):  # noqa: F811
         """The rule ``compare_runs`` states, applied here for its own reason.
 
-        Reproduced from the shape that found it: three runs where the third
-        skipped case 02, which the other two agree on completely. Folding it in
-        read the third as a run that found nothing there, so the totals went
-        4, 3, 2 instead of 2, 1, 2 — an observed variance of 1.0 against a
-        floor of 0.33, an inflation of **3.0** where the truth is 1.0, and a
-        band of 1.00 where it is 0.58.
+        Three runs, where the third skips case 02 and the other two agree on
+        it completely. A fold that keeps the case reads the third as a run that
+        found nothing there, so the totals read 4, 3, 2 instead of 2, 1, 2: an
+        observed variance of 1.0 against a floor of 0.33, an inflation of
+        **3.0** where the truth is 1.0, and a band of 1.00 where it is 0.58.
         """
         record = provenance(sampling)
 

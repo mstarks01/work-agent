@@ -1,9 +1,8 @@
 """The instrument that gives a style objection somewhere to land.
 
 ``STYLE_REASONS`` exists so that a reviewer who dislikes a sentence cannot move
-recall. That guarantee is worth nothing if the objection then evaporates, which
-is what happened before this module: the ledger stored the reason and no
-command read it.
+recall. That guarantee is worth nothing if the ledger stores the reason and no
+command reads it. This module reads it.
 
 So these tests are mostly about the split holding in both directions — a style
 down-vote counts here and nowhere else, a substance down-vote counts everywhere
@@ -326,9 +325,10 @@ def test_two_asvs_rulings_in_one_chapter_are_not_one_finding():
 class TestAnObjectionIsAboutWordsThatStillExist:
     """A style vote judges prose. A rewrite leaves it judging nothing.
 
-    The 2026-09-09 audit replaced every retained case 01 title and explanation
-    and no fingerprint moved, so before this the instrument counted a verdict
-    on text that no longer existed.
+    A rewrite of a title or an explanation does not move a fingerprint: the
+    2026-09-09 audit rewrote every retained case 01 title and explanation. So
+    the instrument checks that the judged words still exist before it counts a
+    verdict.
     """
 
     def test_a_vote_on_other_words_is_carried_and_not_answered(self):

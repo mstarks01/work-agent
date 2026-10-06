@@ -113,13 +113,11 @@ def test_a_precondition_error_is_a_package_error():
 def test_the_gate_and_the_loader_answer_the_same_question(tmp_path):
     """The two readers of "is this file mine to read", asked together.
 
-    They have now disagreed in both directions. The gate first asked
-    `is_file()`, which follows a symlink out of the package root that
-    `MarkdownLoader.load` refuses — so a package passed startup and failed on
-    its first job. Sharing the loader's rule fixed that and introduced the
-    mirror image: the gate was handed `path.parent` as its root, so a lane
-    skill symlinked to another file inside the same package was accepted by the
-    loader and refused by the gate.
+    They can disagree in both directions. A gate that asks `is_file()`
+    follows a symlink out of the package root that `MarkdownLoader.load`
+    refuses, so a package passes startup and fails on its first job. A gate
+    that takes `path.parent` as its root refuses a lane skill symlinked to
+    another file inside the same package, which the loader accepts.
 
     Asked of both readers over the same paths, which is the only way this pair
     stays honest.

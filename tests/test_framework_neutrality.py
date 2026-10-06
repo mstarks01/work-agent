@@ -1,38 +1,12 @@
 """Every place outside a package that names a framework, and why.
 
-## What went wrong, and why nothing caught it
+## The rule
 
-The frameworks cutover ([#172](https://github.com/mstarks01/work-agent/issues/172))
-made the **service** framework-neutral and stopped at the service boundary.
-``src/`` came out clean — every ``stride`` in it today is a module path. Everything
-that *grades* the service kept its one-package shape, and when ASVS landed four
-days later nothing failed. Eight PRs (#214, #215, #221, #222, #223, #224, #225 and
-#210) were needed afterwards to find and fix them one at a time.
-
-**A one-package assumption is vacuously correct when it is written and silently
-wrong afterwards.** It does not raise; it reports a smaller, plausible number.
-``EVAL_FRAMEWORKS = ("stride",)`` was right when there was one package.
-``aggregate_coverage`` keyed by lane name was right while no two packages shared
-a lane slug. ``summarize()`` pooling every framework was right with one. None of
-them broke on the day a second package arrived — they just kept answering about
-half the system, which is why an audit found them and a test suite did not.
-
-## The shape that survived, and the shape that did not
-
-Sorting the fixes by what they touched gives one usable rule:
-
-* **A table keyed by framework was always already correct.**
-  :data:`~analysis_service.frameworks.PACKAGES`, ``SCHEMAS``,
-  ``REFERENCE_TYPES``, and the five maps in ``evals/verify_corpus.py`` all
-  needed no change when ASVS landed. A missing key raises ``KeyError`` at the
-  first call, so the edit is forced.
-* **A constant or a branch naming one framework was always wrong.** Every gap
-  found — the eval framework list, ``stride_block`` call sites, the grounds
-  fold, stability, the exemplar delta, trigger recall, the knowledge lint — was
-  a name or an ``if`` rather than a lookup.
-
-So: **prefer a table keyed by framework over a constant or a branch.** The table
-is self-completing; the branch needs somebody to remember.
+**A one-package assumption reports a smaller, plausible number.** It does not
+raise. A table keyed by framework raises ``KeyError`` at the first call for a
+missing package; a constant or a branch does not. So: **prefer a table keyed by
+framework over a constant or a branch.** The table is self-completing; the
+branch needs somebody to remember. #172 records the case.
 
 ## What this module does
 
@@ -48,8 +22,8 @@ list longer than the thing it protects.
 **One kind of test is in scope**, and the second half of this module is where.
 A *lint* asserts a property of shipped text or config, and those properties are
 almost always claims about what an artifact is rather than about which framework
-wrote it. #276 and #280 were both a lint scoped to one package, and both passed
-while checking half the tree. That set is seven files with an empty exemption
+wrote it. A lint scoped to one package checks half the tree and passes (#276,
+#280). That set is seven files with an empty exemption
 list, so the reasoning above does not reach it.
 """
 
@@ -81,11 +55,10 @@ SEARCHED = ("src", "evals", "webapp")
 #: **The name may sit anywhere inside the string, and in any case.** A pattern
 #: of ``"(?:stride|asvs)"`` — the exact quoted token — matches a framework
 #: selection and nothing else. That reads past every framework name embedded in
-#: a sentence, and one of them is served:
-#: ``FastAPI(title="STRIDE Threat-Modeling Service")`` put a package's name in
-#: the OpenAPI document every caller reads, on an install carrying two. This is
-#: the third blind spot in this scan, after the two #284 found, and each one was
-#: a way of naming a framework the pattern could not spell.
+#: a sentence, and such a sentence can be served: a ``FastAPI`` title that
+#: names one package puts that name in the OpenAPI document every caller reads,
+#: on an install that carries two. #284 records two more spellings a narrower
+#: pattern cannot see.
 LITERAL = re.compile(r'"[^"]*\b(?:stride|asvs)\b[^"]*"', re.IGNORECASE)
 
 #: A framework's name anywhere inside a word, which is what :data:`LITERAL`
@@ -391,12 +364,11 @@ PAGE_COMMENT = re.compile(r"^\s*(?://|/\*|\*)")
 def page_text() -> dict[str, list[tuple[int, str]]]:
     """Every line of text an app puts in front of a person, by file.
 
-    **The surface the literal scan could not reach, and the one that was
-    wrong.** ``webapp/`` served a heading reading "STRIDE threat model" over a
-    form that offers every carried framework, so a job naming ASVS alone got its
-    answer under another framework's name. No check could see it: the heading is
-    prose inside a longer string, not a ``"stride"`` literal, and ``webapp/`` was
-    not searched at all.
+    **The surface the literal scan cannot reach.** A heading that names one
+    framework over a form that offers every carried framework gives a job that
+    names another framework its answer under the wrong name. The heading is
+    prose inside a longer string, not a ``"stride"`` literal, so only a scan of
+    the page text finds it.
 
     A framework's name reaches a page through the report, never through a
     constant. Anything a package's records rule on differently — the question a
@@ -466,9 +438,8 @@ def package_importers() -> dict[str, list[str]]:
 
     **The other half of the signal**, and the half `LITERAL` cannot see. A
     module reaches one framework either by naming it or by importing its
-    record, and three modules did the second with no literal at all —
-    `identity.py`, `calibration.py` and `critic_yield.py` were correct and
-    undeclared, which is a reason nobody had written down.
+    record, and the second needs no literal at all. A module that imports one
+    package's record must declare the reason, like a module that names one.
 
     It is the same signal `test_a_lint_reads_no_single_packages_module` reads
     over the lints, asked here of the code the sweep already covers. Parsed
@@ -762,15 +733,13 @@ def test_no_scorer_names_a_package_this_build_does_not_carry():
 # artifact *is* rather than about which framework wrote it — so a lint scoped to
 # one package checks half the tree and reports a smaller, plausible pass.
 #
-# Two bugs made the case. #276: the token-cap lints walked ``frameworks/stride``,
-# so ASVS's 17 lane skills and 17 exemplar files had no token lint at all. #280:
-# twelve exemplar lints parametrized over ``STRIDE_CATEGORIES``, so the same 17
-# exemplar files were checked for nothing else either — no reference resolution,
-# no quote verification, no catalog membership. Neither raised. Both passed.
+# #276 and #280 record the case: a lint that walks one package's directory, or
+# that is parametrized over one package's categories, leaves every other
+# package's files unchecked, and it passes.
 #
-# **The signal is an import, not a literal.** Both bugs reached one package
-# through ``from analysis_service.frameworks.stride...``, and the literal scan
-# above would have caught only the directory half of the first one. So this asks
+# **The signal is an import, not a literal.** A lint reaches one package
+# through ``from analysis_service.frameworks.<name>...``, and the literal scan
+# above sees only a directory path. So this asks
 # a different question of a smaller set of files, and asks it of the syntax tree
 # rather than the text, because a docstring naming a framework is prose.
 LINT_MODULES = sorted((REPO_ROOT / "tests").glob("test_*lints*.py"))
@@ -778,9 +747,9 @@ LINT_MODULES = sorted((REPO_ROOT / "tests").glob("test_*lints*.py"))
 #: A lint importing one package's own module, and why that is right.
 #:
 #: **Empty, and that is the finding rather than an accident.** Every rule these
-#: files assert turned out to be a rule about what an artifact is: a skill has
-#: five non-empty sections, an exemplar's quotes verify, a cap alarms on drift.
-#: None of them needed a package's own module once asked.
+#: files assert is a rule about what an artifact is: a skill has five non-empty
+#: sections, an exemplar's quotes verify, a cap alarms on drift. None of them
+#: needs a package's own module.
 #:
 #: An entry here is legitimate when the *rule itself* is one framework's — say,
 #: a check over a field only one package's record declares. Write the reason as
@@ -908,8 +877,7 @@ def test_there_are_pages_to_check():
 def test_no_page_names_a_framework():
     """What a person reads is the report's word, never the template's.
 
-    This is the check that was missing. Every app here serves whatever
-    frameworks the install carries, so a framework's name baked into a heading,
+    Every app here serves whatever frameworks the install carries, so a framework's name baked into a heading,
     a title or a button is wrong for every job that did not name it.
     """
     named = {
@@ -970,11 +938,10 @@ def orphaned_overrides() -> dict[str, list[str]]:
     package's intent is dropped with no error, no warning and no test failure.
     It shows up only as behaviour that never happens.
 
-    That is not hypothetical. ASVS's ``partition_proposals`` sat on its
-    *analysis block* while the fan-in asks its *record*, so two live runs
-    deferred nothing and read as a model that would not answer. The tests missed
-    it by calling the override on the same wrong class: a test that names a
-    class the caller never reaches proves the method works, not that it runs.
+    For example, a ``partition_proposals`` on a package's *analysis block* is
+    never reached, because the fan-in asks the *record*; the package then defers
+    nothing. A test that calls the override on the same wrong class proves the
+    method works, not that it runs.
     """
     found: dict[str, list[str]] = {}
     for name in sorted(PACKAGES):
@@ -1024,11 +991,10 @@ def test_the_hook_table_names_only_real_hooks():
 # ---------------------------------------------------------------------------
 # The shared instruction surface.
 #
-# Everything above reads ``*.py``. That left 93,546 tokens of prompt and skill
-# text unscanned — the one surface where naming a framework does not merely
-# mislead a reader but instructs a model. ``prompts/critic.md`` told every
-# package's critic it was reviewing "Six category agents" and ruling on "draft
-# threats" for the life of the ASVS package, and nothing here could see it.
+# Everything above reads ``*.py``. Prompt and skill text is the one surface
+# where naming a framework does not merely mislead a reader but instructs a
+# model: a shared prompt that says "Six category agents" or "draft threats"
+# tells every package's critic about one package's shape.
 #
 # ``prompts/`` and ``domains/`` are shared: one copy reaches every framework, so
 # neither may name one. ``frameworks/<name>/`` is that package's own text and is
@@ -1143,9 +1109,8 @@ def test_no_shared_instruction_file_files_a_finding_under_a_lane():
 def test_no_shared_instruction_file_counts_a_packages_lanes():
     """A lane count in shared text is one package's shape stated as everyone's.
 
-    This is the check that would have caught the defect: ``prompts/critic.md``
-    said "Six category agents worked in parallel" to a package that runs 17
-    chapters. A count is derived from ``PACKAGES``, so it moves when a package's
+    A shared prompt that says "Six category agents worked in parallel" is
+    wrong for a package that runs 17 chapters. A count is derived from ``PACKAGES``, so it moves when a package's
     lane list does.
     """
     pattern = re.compile(
@@ -1232,9 +1197,9 @@ def test_every_output_contract_counts_the_fields_its_schema_emits():
 
     ``analyze.md`` describes the fields every framework shares, and each
     package's ``output.md`` opens ``## Your fields`` with a count and the rest.
-    Both are prose beside a schema, and the prose drifted: the shared prompt
-    said four and listed five, and one package counted seven where its schema
-    emitted eight. The schema is the reader; this holds the sentences to it.
+    Both are prose beside a schema, and prose can disagree with its schema:
+    a count of four over a list of five, or seven fields where the schema
+    emits eight. The schema is the reader; this holds the sentences to it.
     """
     shared_section = _section(
         REPO_ROOT / "prompts" / "analyze.md", SHARED_FIELDS_HEADING

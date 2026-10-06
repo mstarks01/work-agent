@@ -58,14 +58,14 @@ ARMS = REPO_ROOT / "evals" / "emissions" / "20260917T-arms-luna-pro"
 #: ``cause`` is which of the three readings the loss belongs to, and ``met``
 #: says whether every wanted fact reached a graph attribute a rule reads.
 #:
-#: **ADR 0041 moved four.** A facts-first graph starts every attribute at
-#: ``unknown``, and an unchecked row no longer closes a lead, so a fact that
-#: reached the attribute before now reaches the lane as a cited unchecked row
-#: beside the open question: ``catalog`` rather than ``structural``. Each is
-#: still kept; none reaches a rule as a control until a reviewer supports it.
+#: **ADR 0041 sets four to ``catalog``.** A facts-first graph starts every
+#: attribute at ``unknown``, and an unchecked row does not close a lead, so the
+#: fact reaches the lane as a cited unchecked row beside the open question:
+#: ``catalog`` rather than ``structural``. Each is kept; none reaches a rule as
+#: a control until a reviewer supports it.
 OBSERVED: dict[str, tuple[str, bool]] = {
-    # The adapter kept this shape once ADR 0039 rule 1 let a component enter
-    # the graph unplaced: nothing has to choose a zone, so the licence server
+    # The adapter keeps this shape because ADR 0039 rule 1 lets a component
+    # enter the graph unplaced: nothing has to choose a zone, so the licence server
     # and every fact about it survive an unstated placement. The transport fact
     # is unchecked, so it is cited rather than written (ADR 0041).
     "unknown-placement": ("consumer", False),
@@ -148,10 +148,10 @@ class TestTheShapesTheAdapterLoses:
     ) -> None:
         """ADR 0039 rule 1: nothing has to choose a zone, so nothing is dropped.
 
-        This shape cost three rows at once — the component, the interaction
-        whose endpoint it was, and the fact on that interaction — because the
-        graph required a zone the sources never stated. The component now enters
-        unplaced and all three survive.
+        A graph that requires a zone the sources never state loses three rows
+        here: the component, the interaction whose endpoint it is, and the fact
+        on that interaction. The component enters unplaced and all three
+        survive.
         """
         found = diagnose(fixture_of("unknown-placement"))
 
@@ -331,10 +331,9 @@ class TestOneRelaxedConstraint:
 class TestTheMatcherDoesNotReadTheReferenceInOrder:
     """The one qualification item nothing else drives: order invariance.
 
-    The audit under #1003 found the strict matcher's score turning on the order
-    the reference happened to list its rows, and
-    :func:`~evals.harness.replay._assigned` was written to answer it. This is
-    the property rather than the mechanism: shuffle the reference and the fates
+    The strict matcher's score must not turn on the order in which the
+    reference lists its rows (#1003). :func:`~evals.harness.replay._assigned`
+    is the mechanism; this test pins the property: shuffle the reference and the fates
     must not move.
     """
 

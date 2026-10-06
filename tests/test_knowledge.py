@@ -113,13 +113,13 @@ class TestSelection:
         )
 
     def test_a_tie_goes_to_material_the_job_has_not_sent(self):
-        """The whole of what ``seen`` buys, and the defect it repairs.
+        """The whole of what ``seen`` buys.
 
-        Over the blessed corpus every selection was a tie at one matched rule,
-        so declaration order alone chose all 39 and sent every one to the
-        first-declared document — leaving two registered worked cases that no
-        lane of any case ever received. They were not less relevant; they were
-        later in the file.
+        Over the blessed corpus every selection is a tie at one matched rule.
+        Declaration order alone would choose all 39 and send every one to the
+        first-declared document, so two registered worked cases would reach no
+        lane of any case. They are not less relevant; they are later in the
+        file.
         """
         tied = {"spoofing-unverified-boundary-auth"}
         first = select_documents(CASES, tied, MAX_CASES)

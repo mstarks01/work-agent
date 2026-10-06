@@ -172,10 +172,10 @@ class TestTheRepairRung:
         one the threshold already gives and the caller leaves the quote
         unverified.
 
-        The quote must not be a span of the source. An earlier version of this
-        test reversed the source's own words, which for a repeated word is the
-        source's own text -- so the scan found an exact match, and the test
-        passed only because the budget was throwing that match away.
+        The quote must not be a span of the source. The source's own words
+        reversed are, for a repeated word, the source's own text, so the scan
+        would find an exact match and the test would pass only because the
+        budget throws that match away.
         """
         width = 40
         words = ["word"] * (MAX_REPAIR_WORK // (width * width) + 1)
@@ -226,15 +226,14 @@ class TestTheRepairRung:
         "kind", ["transposition", "dropped word", "removed punctuation"]
     )
     def test_every_error_the_rung_exists_for_is_still_repaired(self, kind):
-        """Three mutations, because measuring one of them hid a regression.
+        """Three mutations, because one of them alone can hide a regression.
 
-        `autojunk=True` was tried as the bound and reverted. It drops elements
-        appearing in more than 1% of a sequence of 200 or more, so on a quote
-        past that length a match can only anchor on a rare character. A
-        transposition keeps an anchor and lost 0.0% of repairs; a stripped
-        comma does not and lost 12.4%. The test written with that fix used a
-        transposition, so it measured the one mutation the change could not
-        break.
+        `autojunk=True` is not the bound. It drops elements appearing in more
+        than 1% of a sequence of 200 or more, so on a quote past that length a
+        match can only anchor on a rare character. Measured with it, a
+        transposition keeps an anchor and loses 0.0% of repairs; a stripped
+        comma does not and loses 12.4%. A test with only a transposition
+        measures the one mutation that change cannot break.
 
         `REPAIR_THRESHOLD`'s own docstring names the errors this rung is for:
         a dropped article, a changed preposition, a tidied plural.
@@ -257,7 +256,7 @@ class TestTheRepairRung:
         assert repair[1] >= REPAIR_THRESHOLD
 
     def test_a_quote_too_long_to_bound_is_refused_rather_than_run(self):
-        """The bound that works, after five that did not.
+        """The bound that works: a cap on the input.
 
         A single `difflib` comparison of two 1,000-character strings measured
         6.44 seconds on an inverted phase, and no statistic computable from the
