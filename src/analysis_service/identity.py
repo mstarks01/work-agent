@@ -55,10 +55,9 @@ from analysis_service.vendors import ServedTrust, vendor_for_route
 #: field, because every fingerprint moves when it does. Certification refuses a
 #: manifest written for a different one rather than comparing across them.
 #:
-#: Version 2 makes ``served_trust`` vary by vendor. It was the constant
-#: ``"provider_reported"``, which was false for ``vertex``: litellm fills the
-#: served identifier from the request there, so every vertex fingerprint stated
-#: that a provider named the build and no provider did.
+#: Version 2 makes ``served_trust`` vary by vendor. Where litellm fills the
+#: served identifier from the request, a constant ``"provider_reported"`` would
+#: state that a provider named the build when no provider did.
 IDENTITY_VERSION: Final = 2
 
 #: Every distribution whose code sits between a node's request and the

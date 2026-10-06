@@ -16,8 +16,8 @@ question went unanswered.
 
 **A pair can be in the map and a capability still be unanswered.** The map
 carries an entry per model and each entry answers the questions it happens to
-carry, so a mapped pair can be silent about response schemas — 2029 of the
-pinned map's entries are. Coverage is therefore per capability and not per
+carry, so a mapped pair can be silent about response schemas, and more than
+half of the pinned map's entries are. Coverage is therefore per capability and not per
 entry, which is why :attr:`ProviderProfile.known` is reported beside the cells
 rather than standing in for them. Vendor neutrality is equivalent application behaviour
 given equivalent provider capabilities, and nobody can check that claim without
@@ -104,14 +104,15 @@ PROBED_PARAMS: dict[str, Any] = {
 # vendors is alphabetical, deliberately: any other order here is a ranking, and
 # the vendors are alphabetical everywhere a reader might infer one.
 REFERENCE_MODELS: dict[str, tuple[str, ...]] = {
-    "anthropic": ("claude-sonnet-5", "claude-opus-5"),
-    # Claude in its Bedrock spelling, and only Claude: Nova and Llama get
-    # *emulated* structured output there, so a tier on either starts below the
-    # native rung of :func:`~analysis_service.ladder.rungs_for`, and this pair
-    # profiles the native rung.
+    "anthropic": ("claude-sonnet-5", "claude-opus-5-5"),
+    # Claude in its Bedrock spelling, and only Claude. The pinned map sends
+    # ``claude-sonnet-4-6`` on the native rung of
+    # :func:`~analysis_service.ladder.rungs_for` and Claude 5 on the tool rung,
+    # as the AWS model card for Opus 5.5 lists structured outputs unsupported
+    # on ``bedrock-runtime``. So this pair profiles both rungs.
     #
-    # **The ``global.`` inference profile, because the plain identifier does not
-    # invoke.** AWS serves recent Claude generations through cross-Region
+    # **The ``global.`` inference profile, because a plain identifier does not
+    # always invoke.** AWS serves recent Claude generations through cross-Region
     # inference profiles, and a profile ID is a model identifier rather than a
     # region field — so this names which build is addressed and leaves
     # [#496](https://github.com/mstarks01/work-agent/issues/496) intact. A
@@ -124,23 +125,26 @@ REFERENCE_MODELS: dict[str, tuple[str, ...]] = {
     # live answer this substitutes for. Both cards carry an "Availability using
     # the ``bedrock-runtime`` endpoint" table with an In-Region column:
     #
-    #     anthropic.claude-opus-5      In-Region endpoint URL "N/A";
-    #                                  In-Region unsupported in all 32 Regions
     #     anthropic.claude-sonnet-4-6  In-Region supported in eu-west-2 alone,
     #                                  of 31 Regions
     #
-    # and AWS's own sample code for both asks for ``global.anthropic.<name>``.
-    # So the plain pair would have raised a ValidationException on the first
-    # live request from the smoke leg, and on the first run of an operator
-    # following ``docs/First-Run.md``.
+    # and AWS's own sample code asks for ``global.anthropic.<name>``. So the
+    # plain identifier would raise a ValidationException on the first live
+    # request from the smoke leg, and on the first run of an operator
+    # following ``docs/First-Run.md``. The Opus 5.5 card (read 2026-10-06)
+    # lists an In-Region endpoint and the same ``global.`` profile, and the
+    # pair names one spelling for both tiers.
     #
-    #   https://docs.aws.amazon.com/bedrock/latest/userguide/model-card-anthropic-claude-opus-5.html
+    #   https://docs.aws.amazon.com/bedrock/latest/userguide/model-card-anthropic-claude-opus-5-5.html
     #   https://docs.aws.amazon.com/bedrock/latest/userguide/model-card-anthropic-claude-sonnet-4-6.html
     #
     # The pinned cost map prices the profile keys and the plain keys alike, and
     # all six spellings profile identically, so this moves what a request can
     # reach and no cell of the matrix.
-    "bedrock": ("global.anthropic.claude-sonnet-4-6", "global.anthropic.claude-opus-5"),
+    "bedrock": (
+        "global.anthropic.claude-sonnet-4-6",
+        "global.anthropic.claude-opus-5-5",
+    ),
     # The weights the ``vertex`` pair names, behind the Developer API. The
     # same identifiers on purpose: the matrix is where the two routes to one
     # family show their one difference, and a different pair would hide it.

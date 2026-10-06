@@ -16,7 +16,7 @@ from google.adk.models.llm_request import LlmRequest
 from google.adk.models.llm_response import LlmResponse
 from google.genai import types
 
-from analysis_service.conformance import REFERENCE_MODELS
+from analysis_service.binding import build_tier_adapters
 from analysis_service.ladder import OUTPUT_TOOL_NAME
 from analysis_service.model_gate import _litellm
 from analysis_service.provider import (
@@ -27,8 +27,18 @@ from analysis_service.provider import (
     schema_as_tool,
     schema_in_prompt,
 )
+from analysis_service.resilience import load_resilience
+from analysis_service.sampling import load_sampling
 from analysis_service.vendors import vendor_for
-from tests.test_schema_rules import SCHEMA, Capturing, drive_strong_tier
+from tests.factories import rungs_of, tiers_for
+from tests.test_schema_rules import (
+    BEDROCK_SONNET_4_6,
+    CONFIG,
+    FAKE_ENV,
+    SCHEMA,
+    Capturing,
+    drive_strong_tier,
+)
 
 pytestmark = pytest.mark.usefixtures("supplied_transport")
 
@@ -58,7 +68,7 @@ def tool_call_message() -> dict[str, Any]:
 def _bedrock_mapped(kwargs: dict[str, Any]) -> dict[str, Any]:
     """What the pinned litellm maps the captured tool arguments to on Bedrock."""
     return _litellm.utils.get_optional_params(
-        model=REFERENCE_MODELS["bedrock"][1],
+        model=BEDROCK_SONNET_4_6,
         custom_llm_provider=vendor_for("bedrock").litellm_provider,
         tools=kwargs["tools"],
         tool_choice=kwargs["tool_choice"],
@@ -68,7 +78,9 @@ def _bedrock_mapped(kwargs: dict[str, Any]) -> dict[str, Any]:
 def test_a_tool_tier_sends_the_schema_as_a_forced_tool():
     client = Capturing(tool_call_message())
 
-    drive_strong_tier("bedrock", client, sampling_env=TOOL_TIER)
+    drive_strong_tier(
+        "bedrock", client, sampling_env=TOOL_TIER, model=BEDROCK_SONNET_4_6
+    )
 
     kwargs = client.kwargs
     assert kwargs["response_format"] is None
@@ -81,7 +93,9 @@ def test_a_tool_tier_sends_the_schema_as_a_forced_tool():
 def test_bedrock_receives_a_tool_config_and_no_output_config():
     client = Capturing(tool_call_message())
 
-    drive_strong_tier("bedrock", client, sampling_env=TOOL_TIER)
+    drive_strong_tier(
+        "bedrock", client, sampling_env=TOOL_TIER, model=BEDROCK_SONNET_4_6
+    )
 
     mapped = _bedrock_mapped(client.kwargs)
     assert "outputConfig" not in mapped
@@ -110,10 +124,24 @@ def test_the_tool_call_reaches_the_node_as_json_text():
     assert SCHEMA.model_validate_json(part.text).claims == []
 
 
+def test_a_model_with_thinking_always_on_is_offered_the_tool():
+    """Opus 5.5 refuses a forced tool, so its tier offers the tool instead."""
+    adapter = build_tier_adapters(
+        tiers_for(
+            "bedrock", models=(BEDROCK_SONNET_4_6, "global.anthropic.claude-opus-5-5")
+        ),
+        load_sampling(CONFIG / "sampling.toml", env={}),
+        load_resilience(CONFIG / "resilience.toml", env={}),
+        env=FAKE_ENV,
+    )["strong"]
+
+    assert rungs_of(adapter) == ["offered_tool", "prompt"]
+
+
 def test_the_native_tier_sends_no_tool():
     client = Capturing()
 
-    drive_strong_tier("bedrock", client)
+    drive_strong_tier("bedrock", client, model=BEDROCK_SONNET_4_6)
 
     assert client.kwargs["tools"] is None
     assert client.kwargs["response_format"] is not None
@@ -151,7 +179,7 @@ def test_the_node_records_which_path_its_schema_took():
     tool = drive_strong_tier(
         "bedrock", Capturing(tool_call_message()), sampling_env=TOOL_TIER
     )
-    native = drive_strong_tier("bedrock", Capturing())
+    native = drive_strong_tier("bedrock", Capturing(), model=BEDROCK_SONNET_4_6)
 
     assert tool[0].custom_metadata[SCHEMA_PATH_METADATA_KEY] == "tool"
     assert native[-1].custom_metadata[SCHEMA_PATH_METADATA_KEY] == "native"

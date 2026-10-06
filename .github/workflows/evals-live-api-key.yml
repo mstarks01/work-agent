@@ -139,7 +139,7 @@ jobs:
           - vendor: anthropic
             secret_name: ANALYSIS_ANTHROPIC_API_KEY
             base_model: claude-sonnet-5
-            strong_model: claude-opus-5
+            strong_model: claude-opus-5-5
           - vendor: openai
             secret_name: ANALYSIS_OPENAI_API_KEY
             base_model: gpt-4o-2024-08-06

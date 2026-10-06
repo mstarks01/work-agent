@@ -57,10 +57,11 @@ class ModelGateError(ConfigError):
 #:
 #: Setting a switch for a feature this service does not use costs nothing, and
 #: deciding which ones matter is the judgement that failed. ``test_model_gate``
-#: compares this tuple against litellm's own source, so a bump that adds a fifth
+#: compares this tuple against litellm's own source, so a bump that adds another
 #: fails the offline suite rather than opening a quiet egress.
 LITELLM_LOCAL_SWITCHES = (
     "LITELLM_LOCAL_ANTHROPIC_BETA_HEADERS",
+    "LITELLM_LOCAL_AUTOROUTER_PRESETS",
     "LITELLM_LOCAL_BLOG_POSTS",
     "LITELLM_LOCAL_MODEL_COST_MAP",
     "LITELLM_LOCAL_POLICY_TEMPLATES",
@@ -240,17 +241,20 @@ def model_info(vendor: Vendor, model: str) -> dict[str, Any] | None:
     Returned whole rather than as a bool, since the only two callers both want a
     field out of it and a second lookup would ask LiteLLM the same question
     twice.
+
+    LiteLLM answers an unmapped model in two shapes. It raises
+    ``ModelNotMappedError``, or, where a family rule matches the name, it
+    returns an entry built from that rule, with no price and a ``key`` that is
+    not in ``litellm.model_cost``. Both are unmapped here, so a report never
+    calls a guessed entry known.
     """
     try:
-        return _litellm.get_model_info(
+        info = _litellm.get_model_info(
             model=model, custom_llm_provider=vendor.litellm_provider
         )
-    except Exception:  # noqa: BLE001 -- litellm raises a bare Exception here
-        # Narrowing is not available: an unmapped model raises ``Exception``
-        # itself, so the type carries nothing to match on. Probed in
-        # ``tests/test_model_gate.py`` so a version that starts raising
-        # something meaningful shows up as a test to tighten.
+    except _litellm.exceptions.ModelNotMappedError:
         return None
+    return info if info["key"] in _litellm.model_cost else None
 
 
 #: Each :data:`~analysis_service.vendors.SchemaRule`, as the function that

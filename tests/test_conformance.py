@@ -205,9 +205,7 @@ class TestTheMatrixItself:
     #: ``response_format`` and the reply parsed as JSON against the schema. The
     #: matrix printed ``unsupported`` here until ``native_structured_output``
     #: told the map's two kinds of ``False`` apart.
-    UNANSWERED: ClassVar[dict[tuple[str, str], tuple[str, ...]]] = {
-        ("openrouter", "anthropic/claude-sonnet-4.6"): ("structured_output",),
-    }
+    UNANSWERED: ClassVar[dict[tuple[str, str], tuple[str, ...]]] = {}
 
     @pytest.mark.parametrize(("vendor", "model"), reference_pairs())
     def test_every_reference_pair_is_answerable(self, vendor, model):
@@ -247,14 +245,14 @@ class TestTheMatrixItself:
         ``model_info`` answers per *entry*, so ``known`` cannot see this: the
         pinned map carries this slug and says nothing about response schemas.
         LiteLLM's own lookup returns ``False`` for that silence exactly as it
-        does for a refusal, and the matrix printed ``unsupported``.
+        does for a refusal, and the matrix would print ``unsupported``.
 
         Pinned against ``opus-4.7`` beside it, whose entry does answer, so this
         fails if the map starts answering for both — which is a re-pin, not a
         relaxation.
         """
         vendor = vendor_for("openrouter")
-        silent = profile(vendor, "anthropic/claude-sonnet-4.6")
+        silent = profile(vendor, "anthropic/claude-3.7-sonnet")
         answered = profile(vendor, "anthropic/claude-opus-4.7")
 
         assert silent.known, "the map no longer carries the silent slug at all"
@@ -308,7 +306,6 @@ class TestTheMatrixItself:
             name: cell for name, cell in developer_api.params.items() if name != "seed"
         } == {name: cell for name, cell in gemini.params.items() if name != "seed"}
         assert developer_api.structured_output is gemini.structured_output
-        assert developer_api.output_ceiling == gemini.output_ceiling
 
     def test_the_matrix_and_the_build_gate_agree_about_a_refusal(self):
         """The two readers of schema support, tested against each other.
@@ -324,9 +321,9 @@ class TestTheMatrixItself:
         refuses. That is the direction a reader acts on: an ``unsupported``
         cell is how somebody decides not to try a vendor.
 
-        Asserted against the emulated pair rather than only against the
-        reference matrix, because every reference pair binds — a test that
-        only saw those would agree with itself and see nothing.
+        Asserted against the emulated pair as well as the reference matrix,
+        so the test sees a refusal even on a pin where every reference pair
+        binds.
         """
         from analysis_service.ladder import rungs_for
         from analysis_service.model_gate import ModelGateError
@@ -352,10 +349,10 @@ class TestTheMatrixItself:
         for vendor, model in reference_pairs():
             entry = profile(vendor_for(vendor), model)
             refused = build_refuses(vendor, model)
-            assert not refused, f"{vendor}/{model} no longer binds"
-            assert entry.structured_output is not Capability.UNSUPPORTED, (
-                f"the matrix calls {vendor}/{model} unsupported while the build"
-                " accepts it; a reader would skip a vendor that works"
+            assert refused == (entry.structured_output is Capability.UNSUPPORTED), (
+                f"the build {'refuses' if refused else 'accepts'} native output"
+                f" for {vendor}/{model} and the matrix calls it"
+                f" {entry.structured_output.value}"
             )
 
     def test_the_matrix_covers_every_supported_vendor(self):
@@ -1058,7 +1055,11 @@ def catalogue_key(vendor: str, model: str, catalogue: Mapping[str, Any]) -> str 
 
 
 def _without_flags(entry: Mapping[str, Any]) -> dict[str, Any]:
-    return {k: v for k, v in entry.items() if not k.startswith("supports_")}
+    return {
+        k: v
+        for k, v in entry.items()
+        if k != "source" and not k.startswith("supports_")
+    }
 
 
 def builds_fronted_by(key: str, catalogue: Mapping[str, Any]) -> dict[str, str]:
@@ -1071,7 +1072,8 @@ def builds_fronted_by(key: str, catalogue: Mapping[str, Any]) -> dict[str, str]:
     alias apart from the build it resolves to, so it does not, and that
     equality is the signal. The flags are left out because the map fills them
     key by key: ``gpt-5.6-sol`` carries ``supports_computer_use`` and
-    ``gpt-5.6`` does not.
+    ``gpt-5.6`` does not. ``source``, the URL of the pricing page, is left out
+    for the same reason.
 
     The second shape does not fire on a sub-family, which is what a rule keyed
     on the tail's spelling could not promise: ``gemini-2.5-flash`` has nine

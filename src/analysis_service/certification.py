@@ -32,10 +32,9 @@ do is verify a served build, which is why every report states what that build is
 worth rather than leaving a reader to assume better. The label is
 :data:`analysis_service.vendors.ServedTrust`, read per vendor: it says
 ``provider_reported`` where the value names what answered, and
-``requested_echo`` where it repeats the request and adds nothing. More rows read
-the weaker one than the stronger, so a gate that assumed ``provider_reported``
-would be wrong more often than right. Which rows those are is the registry's
-answer and never this module's.
+``requested_echo`` where it repeats the request and adds nothing. Rows read
+both, so a gate that assumed ``provider_reported`` would be wrong on some of
+them. Which rows those are is the registry's answer and never this module's.
 
 There are three states, and the third is a separate field. ``certified`` keeps
 its narrow meaning, that every observed fingerprint is blessed, because callers

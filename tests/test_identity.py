@@ -81,15 +81,12 @@ class TestShape:
         assert identity["served_trust"] == "provider_reported"
 
     def test_a_vendor_that_echoes_the_request_says_so(self):
-        """The #606 defect. Every vertex fingerprint claimed evidence it had.
-
-        ``SERVED_TRUST`` was the constant ``"provider_reported"``, and litellm
-        fills the served identifier from the request on vertex — so the payload
-        stated that a provider named the build, and none had.
+        """A Converse response names no build, so litellm fills it from the
+        request, and the payload must not say a provider named it (#606).
         """
         identity = execution_identity(
-            requested_route="vertex_ai/gemini-2.5-pro",
-            served_route="vertex_ai/gemini-2.5-pro",
+            requested_route="bedrock/global.anthropic.claude-opus-5",
+            served_route="bedrock/global.anthropic.claude-opus-5",
             sampling={},
             instruction_sha256=INSTRUCTIONS,
             build=BUILD,
@@ -262,10 +259,10 @@ def test_every_distribution_the_package_imports_is_declared():
 class TestTheTableMatchesWhatTheTranslatorDoes:
     """``served_trust`` is a property of the vendor **and** of the translator.
 
-    A litellm bump that started reading Gemini's ``modelVersion`` would make the
-    ``vertex`` entry wrong, and every fingerprint would move on that bump anyway
-    — ``litellm`` sits in ``BUILD_DISTRIBUTIONS`` — so the hashes would move for
-    an unrelated reason and the stale entry would stay invisible.
+    A litellm bump that changes which field a translator reads makes an entry
+    wrong, and every fingerprint moves on that bump anyway — ``litellm`` sits
+    in ``BUILD_DISTRIBUTIONS`` — so the hashes move for an unrelated reason and
+    the stale entry stays invisible.
 
     So the table is checked against what the installed translator does, rather
     than against a second copy of the same claim. Each vendor's own
