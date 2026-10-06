@@ -175,39 +175,27 @@ __all__ = [
 #:
 #: Version 3 adds ``represented-by``.
 #:
-#: Version 4 adds ``data-classification``. A store's classification is a
-#: fact the sources state and a framework rule reads, and no predicate
-#: carried it — so a route that builds its own graph left the attribute at
-#: ``unknown`` and ASVS's classified-store rule had nothing to fire on.
+#: Version 4 adds ``data-classification``: a store's classification, which the
+#: sources state and ASVS's classified-store rule reads.
 #:
-#: Version 5 adds ``origin-verification``. A maintainer sitting read a drafted
-#: row as recording a fact no predicate could carry — a receiver that does not
-#: check who supplied what it took — and the row was deleted rather than forced
-#: into ``destination-verification``, which asks the opposite question, or into
-#: ``signature-verification``, which names a signature the source never
-#: mentions (#1053).
+#: Version 5 adds ``origin-verification``: whether a receiver checks who
+#: supplied what it took. ``destination-verification`` asks the opposite
+#: question, and ``signature-verification`` names a signature (#1053).
 #:
-#: Version 6 adds ``credential-revocation`` and ``credential-lifetime``. Case
-#: 08's source says a token is "good for twelve hours and there is no way to
-#: pull one back before it expires". ``credential-expiry`` is a closed term and
-#: recorded only ``expires``, which reads as a control being present while the
-#: two facts that matter — how long the window is, and that nobody can shorten
-#: it — had nowhere to go. A maintainer sitting asked for both to be preserved
-#: separately rather than folded into the categorical value (#1054).
+#: Version 6 adds ``credential-revocation`` and ``credential-lifetime``, so a
+#: row records how long a credential's window is and whether anyone can
+#: shorten it, apart from the closed ``credential-expiry`` value (#1054).
 #:
 #: Version 7 makes ``data-classification`` a closed term: ``public``,
 #: ``internal`` or ``confidential``, the tiers ``prompts/extract.md`` gives the
-#: graph field it projects into. As free text meaning "what kind of data this
-#: component holds" it drew a list of contents on every row a reviewer read,
-#: which the signed reference, the extraction contract and ASVS's
-#: classified-store rule all read as no classification (#926). The same version
-#: gives ``network-membership`` the placement rule its graph field already has.
+#: graph field it projects into. A list of contents reads as no classification
+#: to the signed reference, the extraction contract and ASVS's
+#: classified-store rule (#926). The same version gives ``network-membership``
+#: the placement rule its graph field already has.
 #:
-#: Version 8 adds ``record-attribution`` and ``content-validation`` (#1242).
-#: Case 01's source says the receipt "records which order was written and that
-#: the order service wrote it", and case 03's that "nothing validates the row
-#: contents beyond the schema". Each is a stated fact a must-find rests on, and
-#: no predicate could carry either.
+#: Version 8 adds ``record-attribution`` and ``content-validation`` (#1242):
+#: which writer a record names, and whether anything validates content beyond
+#: its schema. A must-find in cases 01 and 03 rests on each.
 REGISTRY_VERSION = 8
 
 #: The projection's version: which graph attribute each predicate is
@@ -217,11 +205,8 @@ REGISTRY_VERSION = 8
 #: **Its own number, because the projection's rules are not in the registry.**
 #: :func:`projection_fields` is read off :data:`REGISTRY`, so a predicate's
 #: target moves with a registry bump — but the loss rules live in :func:`project`
-#: and have already changed once on their own: version 2 stopped picking between
-#: two values and started writing ``unknown`` with a
-#: :data:`ProjectionReason` (#937), with no registry change beside it. One
-#: number for both would have called that release identical to the one before
-#: it.
+#: and can change with no registry change beside them. One number for both
+#: would call two different projections identical.
 #:
 #: Bumped whenever a predicate's ``projects_into`` moves, or when :func:`project`
 #: changes which rows reach an attribute or what it writes when they do not fit.
@@ -230,27 +215,29 @@ REGISTRY_VERSION = 8
 #: nothing, and a version recorded for a projection that never ran is a fact
 #: with no consequence.
 #:
-#: Version 3 stops a declining projection from leaving a definite attribute
+#: Version 2: two conflicting values write ``unknown`` with a
+#: :data:`ProjectionReason` rather than one of the two (#937).
+#:
+#: Version 3: a declining projection does not leave a definite attribute
 #: authoritative (#926). A conflict, a scoped value and a row a reviewer set
-#: aside now write a qualified ``unknown`` into the attribute; a ``legacy`` row
-#: no longer projects as ``stated``; and two compatible values keep the
+#: aside write a qualified ``unknown`` into the attribute; a ``legacy`` row
+#: does not project as ``stated``; and two compatible values keep the
 #: attribute and are cited as rows instead. :data:`PROJECTION_EFFECT` is the
 #: table.
 #:
-#: Version 5 keeps an unchecked row from closing a lead: where the attribute
-#: reads unknown or absent, a stated value from rows nobody marked
-#: ``supported`` writes a qualified ``unknown`` rather than the control
+#: Version 4: a hedge differs from silence. A source that *said* it was unsure
+#: writes a qualified ``unknown`` over a definite extracted value, and silence
+#: does not (#926).
+#:
+#: Version 5: an unchecked row does not close a lead. Where the attribute reads
+#: unknown or absent, a stated value from rows nobody marked ``supported``
+#: writes a qualified ``unknown`` rather than the control
 #: (:func:`_unchecked_over_lead`).
 #:
-#: Version 6 lets a submitter's answer settle an attribute beside scoped rows:
-#: an unscoped row that quotes the answers Source outranks every other row
+#: Version 6: a submitter's answer settles an attribute beside scoped rows. An
+#: unscoped row that quotes the answers Source outranks every other row
 #: (:func:`answered`), and the scoped rows stay in the catalog as the scoped
 #: facts they state (#1289, F5).
-#:
-#: Version 4 separates a hedge from silence. Rows that all read ``unknown``
-#: left the attribute alone whatever their reason; a source that *said* it was
-#: unsure now writes a qualified ``unknown`` over a definite extracted value,
-#: and silence still does not (#926).
 PROJECTION_VERSION = 6
 
 #: The value that says a source stated this fact is **not there**. A positive
@@ -781,7 +768,7 @@ CatalogIssueCode = Literal[
     "inference-refused",
     # Not a refused row. The row stands and stays citable; this says the graph
     # attribute beside it states the opposite, which is the defect this layer
-    # was built to make visible rather than one to drop a fact over.
+    # exists to make visible rather than one to drop a fact over.
     "graph-contradiction",
     # Not a refused row either. Rows merged into one identity cited more
     # passages between them than a row carries, and the row kept the first
@@ -967,7 +954,7 @@ class AssertionRecord(BaseModel):
         **The way a catalog nobody resolved here still answers the gate.** The
         patch applicator merges rows into a catalog and #1003's review route
         hands one to ``prepare``; each reaches a lane through this, so a catalog
-        an agent selects from answered the same rules whichever code built it.
+        an agent selects from answers the same rules whichever code built it.
 
         ``issues`` is what its builder already refused, kept in front of what
         the gate says now, so a reader sees a row lost in construction apart
@@ -976,9 +963,8 @@ class AssertionRecord(BaseModel):
 
         **A refusal quarantines, it does not only report.** The catalog on the
         record is what every consumer reads, so a row the gate refuses leaves
-        it here, through :func:`quarantine`, before any reader sees it. Before
-        this, a row whose source text had moved under its span was recorded
-        ``stale-digest`` and still projected into the graph and cited (#926).
+        it here, through :func:`quarantine`, before any reader sees it. A
+        ``stale-digest`` row is not projected into the graph or cited (#926).
         Dropping a row can strand another — an inference whose premise went —
         so the rows are gated again until the gate refuses nothing. The graph
         comparison runs once, over what survives, because it is not a refusal.
@@ -1591,9 +1577,7 @@ def admissible(entry: Assertion) -> bool:
     :func:`settled` asks it before looking for disagreement, and
     :func:`project` asks it before a row may supply a graph attribute, so the
     evidence a lane cites and the attribute a rule reads cannot disagree about
-    which rows count. Before this, :func:`project` filtered on the assessment
-    alone and wrote a ``legacy`` row into the graph as ``stated`` while
-    :func:`settled` refused the same row (#926).
+    which rows count (#926).
 
     A row is admissible when its predicate is registered, its basis is support
     of some kind — ``legacy`` never is (ADR 0034 rule 6) — and its assessment is
@@ -2160,9 +2144,7 @@ def resolve_catalog(
     name, and a ``stated`` row left with no span drops rather than take a
     fabricated one. **The built row is then put through the gate's own per-row
     rules**, and one the gate would refuse drops with the gate's reasons — so
-    the contract above holds by construction, where a copy of the rules here
-    once let a grant with no scope through to be counted and refused later
-    (#961). Its identity is computed, and two rows that share one are **one
+    the contract above holds by construction (#961). Its identity is computed, and two rows that share one are **one
     row carrying both spans** — which is how two sources for one fact keep
     both provenances, rather than becoming a duplicate the gate refuses.
 
@@ -2346,14 +2328,11 @@ def referent_type(predicate: Predicate) -> SubjectType | None:
     One, never two: ``tests/test_assertions.py`` holds the registry to it, so
     this reads the single member rather than choosing between members.
 
-    ``None`` for a predicate that takes no reference, which is 12 of the 16 and
-    the shape a second reader missed. ``evals.harness.replay`` asked
-    ``next(iter(refers_to))`` of every row the gate refused as
-    ``illegal-value``, and a term predicate carrying a term outside its
-    vocabulary draws exactly that code — so an archived catalog holding one
-    would have ended the replay with a bare ``StopIteration`` naming nothing.
-    Public, and the one reader, because the two sites that spelled it again
-    could not call it while it was private.
+    ``None`` for a predicate that takes no reference, which is 12 of the 16. A
+    term predicate carrying a term outside its vocabulary draws
+    ``illegal-value``, so a caller that reads ``next(iter(refers_to))`` of such
+    a row would raise a bare ``StopIteration``. Public, so every caller reads
+    this one.
     """
     return next(iter(predicate.refers_to), None)
 
@@ -2469,15 +2448,13 @@ def _merge(held: Assertion, found: Assertion) -> Assertion:
     complete states it for the merged row. Everything else — basis,
     explanation, reason — comes from **one** of the two rows, the one that
     ranks first: by :data:`BASIS_RANK`, and on a tie by the row's own
-    serialized form, so two orderings of one proposal build one catalog.
-    Before this rule the first row's basis stood, and one pair of rows read
-    ``inferred`` or ``stated`` by arrival order (#961).
+    serialized form, so two orderings of one proposal build one catalog and
+    the result does not depend on arrival order (#961).
 
     **The joined spans are not cut here.** :data:`MAX_SPANS` is the one bound a
-    merge can cross, since each row passed it alone, and a cut made here was
-    silent: nine rows citing nine passages became one row citing eight and no
-    issue said so (#926). Every caller cuts what it merged through
-    :func:`_bounded`, which records ``support-truncated``. The first row's
+    merge can cross, since each row passed it alone. A cut here would be
+    silent, so every caller cuts what it merged through :func:`_bounded`, which
+    records ``support-truncated`` (#926). The first row's
     spans come first, so a cut keeps them.
     """
     first, second = sorted((held, found), key=_merge_rank)
@@ -2625,8 +2602,8 @@ def contradictions(
     attribute are compared through
     :func:`~analysis_service.analysis.control_state`, and a pair is reported
     only when one reads ``stated`` and the other ``absent``. That is the defect
-    this layer was built for: the audit found an explicit lack of MFA standing
-    in the graph as a control, and nothing in the report said the two disagreed.
+    this layer exists for: an explicit lack of MFA must not stand in the graph
+    as a control with nothing in the report to say the two disagree.
 
     **Not an agreement check, and it must not become one.** Two mechanisms
     worded differently are one answer spelled twice, and the catalog is
@@ -2955,7 +2932,7 @@ def _unchecked_over_lead(
     reads as a lead — never stated, or stated absent — and the projection
     would make it a stated control, it is written as a qualified ``unknown``
     naming the value instead. The lead stays in the Evidence Catalog, and the
-    row, no longer carried by the attribute, is cited as itself with its
+    row, not carried by the attribute, is cited as itself with its
     review status in the gloss (:func:`offered`).
 
     A row a reviewer marked ``supported`` may close the lead; that is what a
@@ -3023,8 +3000,8 @@ def projected_attribute(predicate: str, subject: str) -> str:
     property of the row, never of the predicate alone: ``authentication-mechanism``
     reaches ``authentication`` on a **Data Flow** and nothing on a **Process**,
     and a credential a principal presents reaches nothing at all. Routing by
-    predicate once left a legal row on a Process with neither a projection nor
-    an evidence entry (#926). :func:`project` and :func:`offered` both ask this.
+    predicate would leave a legal row on a Process with neither a projection
+    nor an evidence entry (#926). :func:`project` and :func:`offered` both ask this.
     """
     attribute = projection_fields().get(predicate, "")
     return attribute if attribute and attribute in _attributes_of(subject) else ""

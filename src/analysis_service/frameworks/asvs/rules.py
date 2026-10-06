@@ -9,8 +9,8 @@ requirement for a system unless this repository writes it.
 Most rules are presence tests. The #160 research derived 16 predicates across
 the 70 level 1 requirements, and all 16 ask whether the application has a thing:
 a browser frontend, cookies, a database, OAuth, a file upload, a session. Six
-more were added afterwards, to reach the six chapters that had none, and they
-ask the same shape of question. Five more, in ``STRUCTURAL_RULES``, read what the
+more cover the chapters the #160 predicates do not reach, and they ask the same
+shape of question. Five more, in ``STRUCTURAL_RULES``, read what the
 corpus's own reference claims read: a stated credential on one attribute, a
 classification, a write with no record named anywhere, a crossing from an
 external entity, and a channel with no stated protection. Those are the leads a
@@ -29,13 +29,12 @@ first, so a requirement at level 2 or 3 with no rule reaches its lane agent
 without a candidate. That is a weaker lead rather than an absent one.
 
 Every lane carries at least one rule, and that is load-bearing beyond the lead.
-Retrieval is keyed by fired rule, so a lane with no rule received no reference
-note and no worked case either, whatever the knowledge tables held. The six
-chapters that had no rule were therefore the six the corpus could not reach.
+Retrieval is keyed by fired rule, so a lane with no rule would receive no
+reference note and no worked case, whatever the knowledge tables hold.
 
 A term is chosen against what a submitter writes, and checked for what it also
-matches. #189 found the OAuth terms were product names where submitters write
-"SSO". The opposite failure is as easy: bare ``log`` matches ``login``, bare
+matches. An OAuth product name misses a submitter who writes "SSO" (#189). The
+opposite failure is as easy: bare ``log`` matches ``login``, bare
 ``audit`` matches a food safety audit, and bare ``build`` matches building a
 weekly rota. Where a single word is ambiguous, the term here is the phrase.
 
@@ -147,8 +146,8 @@ def _rule_of(test: PresenceTest) -> Rule:
 # 23 rules over 17 lanes. The first 17 are the #160 research's 16 predicates —
 # ``tech:browser frontend`` appears twice because it leads requirements in two
 # chapters, and a rule belongs to exactly one lane, so the two carry the same
-# terms and put a different question. The last six close the chapters that had
-# no rule, and so no retrieval either.
+# terms and put a different question. The last six give each remaining
+# chapter a rule, and so retrieval.
 #: The submitter's words for an upload, not the protocol's: a supplier "sends
 #: documents", a user "imports a CSV", a member "sets an avatar". **These raise
 #: a candidate and rule nothing out** (#659): a word nobody listed is a lead
@@ -791,14 +790,12 @@ def asvs_precondition(model: SystemModel) -> PreconditionResult:
     total, so ASVS is the first framework here that can answer no.
 
     **The read is what the processes say they present**, not what the flows say
-    they carry. Those are different facts, and reading the second for the first
-    is what
-    [#219](https://github.com/mstarks01/work-agent/issues/219) found: six corpus
-    cases answered ``undecidable`` — among them a process named ``scheduling web
-    app`` and another named ``supplier portal`` — because every flow's
-    ``protocol`` was ``unknown``. The transport was genuinely unstated, and
-    ``unknown`` was the correct value for it. The applicability question was
-    simply not a question about transport.
+    they carry. Those are different facts. An unstated protocol must not make a
+    web interface undecidable
+    ([#219](https://github.com/mstarks01/work-agent/issues/219)): a flow's
+    ``protocol`` can correctly read ``unknown`` while a process states that it
+    presents a web interface. The applicability question is not a question
+    about transport.
 
     **A protocol answers only where no process states an interface.** A flow
     that says HTTPS says the same thing by another route, but it says it more
@@ -808,13 +805,13 @@ def asvs_precondition(model: SystemModel) -> PreconditionResult:
     write exactly that pair, so a transport that outranked the interface would
     read every such model as a web application and open 17 lanes on a system
     the same repository had just called non-web. The two readers of "is this a
-    web application" now agree, and ``tests/test_asvs.py`` drives them against
+    web application" agree, and ``tests/test_asvs.py`` drives them against
     each other over that sentence.
 
     So the protocol is consulted only where the interfaces leave the question
     open — no process at all, or a process whose ``interface_kind`` is
-    ``unknown``. A transport can still satisfy and can still refuse on its own;
-    what it can no longer do is contradict a process that answered.
+    ``unknown``. A transport can still satisfy and can still refuse on its own,
+    but it never contradicts a process that answered.
 
     * ``satisfied`` — a process presents a web interface; or the interfaces
       never settled it and a flow speaks a web protocol.

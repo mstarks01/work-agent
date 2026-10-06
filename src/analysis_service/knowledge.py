@@ -72,8 +72,8 @@ __all__ = [
 #
 # **The service's, and identical for every package.** A cap a package set would
 # be the same cost knob by another route, and it would let one framework spend
-# more of a shared budget than another. The per-job corpus cost is now paid per
-# (framework, lane), and nobody has measured it: no live sweep ever ran here.
+# more of a shared budget than another. The per-job corpus cost is paid per
+# (framework, lane), and nobody has measured it: no live sweep ran here.
 MAX_NOTES = 2
 MAX_CASES = 1
 
@@ -97,13 +97,11 @@ def select_documents(
     accumulates it over the package's own declared lane order.
 
     **Match count still decides first, and the tie-break is why ``seen``
-    exists.** Over the whole corpus every single selection was a tie at one
-    matched rule, so declaration order alone chose all 39 of them and sent every
-    one to the first-declared document — leaving two registered worked cases
-    that no lane of any case ever received. They were not less relevant; they
-    were later in the file. Breaking a tie toward material this job has not sent
-    spends the same budget on more of the corpus, and a better-matched document
-    still wins outright.
+    exists.** Ties are common: over the whole corpus, all 39 selections tie at
+    one matched rule. Declaration order alone would send every one to the
+    first-declared document, so ``seen`` breaks a tie toward material this job
+    has not sent. That spends the same budget on more of the corpus, and a
+    better-matched document still wins outright.
 
     ``seen`` is per job and per table, never global: a note and a worked case
     are different material under different caps, and a document one job sent

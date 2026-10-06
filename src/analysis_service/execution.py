@@ -115,12 +115,11 @@ class _NodeFinish:
     (``base_llm_flow`` builds it, then calls the model) and
     ``_finalize_model_response_event`` copies that timestamp onto the event it
     yields, so ``event.timestamp`` marks when a node's request was *issued*.
-    Measuring from it charged every LLM node's latency to its successor: a
-    21-second extraction was reported as 5 ms on ``extract`` and 21,757 ms on
-    the ``validate`` FunctionNode that ran after it. Observation time is the
+    Measuring from it would charge every LLM node's latency to its successor,
+    so this reads observation time. Observation time is the
     completion time by construction — the event does not reach this loop until
     the node is done — and it is read from the same clock as ``started_at``,
-    which ``event.timestamp`` was not.
+    which ``event.timestamp`` is not.
 
     ``served_model`` is the build the provider says actually ran, read off the
     event rather than assumed from the configured string. It is ``None`` when
@@ -239,8 +238,8 @@ class GraphRun:
     def proposals_of(self, framework: FrameworkName) -> dict[str, Any]:
         """Each lane's emission as its node dumped it, before the fan-in.
 
-        A draft no longer carries the lane's own answer to *what would settle
-        this*; the fan-in strips it once it has routed the proposal. A lane
+        A draft after the fan-in does not carry the lane's own answer to *what
+        would settle this*; the fan-in strips it once it has routed the proposal. A lane
         that wrote no key contributes nothing here rather than failing, because
         that absence is the fan-in's to refuse.
         """

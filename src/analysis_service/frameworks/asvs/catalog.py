@@ -138,9 +138,7 @@ def provenance_issues(version: str, digest: str) -> list[str]:
 
     Two checks, and they catch different edits. The version check catches a
     payload regenerated from another release under the same loader; the digest
-    catches any edit at all, including one that keeps the version string. The
-    loader's own version was a constant nothing compared to the payload, so a
-    stale or hand-edited file loaded silently.
+    catches any edit at all, including one that keeps the version string.
     """
     issues = []
     if version != ASVS_VERSION:

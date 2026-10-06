@@ -700,7 +700,7 @@ class AsvsAnalysis(FrameworkAnalysis):
             # Indexed rather than fetched with a default: `chapter` is a
             # closed Literal, and this module refuses to import unless it names
             # exactly the catalog's lanes, so a miss here is impossible and a
-            # branch for one was unreachable.
+            # branch for one would be unreachable.
             expected = CHAPTER_NUMBERS[claim.chapter]
             if requirement.split(".")[0] != f"V{expected}":
                 issues.append(

@@ -343,11 +343,10 @@ def flow_id_version(flow_id: str) -> int:
 def flow_label(flow_id: str) -> str:
     """The describing half of one flow ID, under whichever rule wrote it.
 
-    **The one reader of "what does a flow call itself".** Splitting the ID on
-    its last colon answered this while a flow ID ended in ``:<label>``, and
-    two instruments did exactly that; under version 2 the same split returns
-    the destination's slug glued to the label, and every alignment that turns on
-    a label would have silently stopped matching.
+    **The one reader of "what does a flow call itself".** Do not split the ID
+    on its last colon: under version 2 that split returns the destination's
+    slug glued to the label, and every alignment that turns on a label would
+    silently stop matching.
     """
     return parse_flow_id(flow_id, flow_id_version(flow_id)).label
 

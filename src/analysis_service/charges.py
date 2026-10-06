@@ -51,8 +51,7 @@ separate upstream charge — which is what ``ChargeMode.DIRECT`` claims.
 the operator's own, OpenRouter reports the routing fee it charged and the
 upstream provider charges the operator elsewhere, so the reported figure is
 about a twentieth of the spend. Recording it would put a number on the record
-that reads as a cost and is not one, and the arithmetic it displaced was at
-least honest about what it counted.
+that reads as a cost and is not one.
 """
 
 from __future__ import annotations
@@ -128,9 +127,8 @@ _UPSTREAM_FIELD = "provider"
 #:
 #: Public, and imported by the two models that store the value —
 #: :class:`analysis_service.report.NodeRun` and
-#: :class:`evals.harness.provenance.NodeExecution`. It was spelled here and as
-#: a literal in both of those, so widening the producer's bound would have made
-#: the readers refuse what it writes.
+#: :class:`evals.harness.provenance.NodeExecution`. Both readers import it, so
+#: widening the producer's bound cannot make the readers refuse what it writes.
 UPSTREAM_MAX_CHARS = 100
 
 #: The largest charge one call may report, in USD, and the bound that
@@ -282,8 +280,8 @@ def reported_charge_of(response: Any) -> float | None:
     Every step of the path can be absent and two of them can be the wrong shape,
     so each is checked rather than assumed: a streamed wrapper carries no
     ``_hidden_params`` at all, a provider that reports nothing carries the
-    mapping without the key, and the value has been a string in litellm's header
-    dictionaries before it was a float here.
+    mapping without the key, and the value can be a string in litellm's header
+    dictionaries rather than a float.
 
     A value that is negative, infinite, not a number or above
     :data:`MAX_CALL_CHARGE_USD` is refused and logged, and so is a boolean or a
