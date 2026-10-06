@@ -166,3 +166,23 @@ def test_a_phone_sized_owner_answers_skips_corrects_and_starts(browser, served):
     assert errors == [], f"the page raised: {errors}"
     assert any("yes" in str(fact) for fact in facts)
     assert wide <= 0, f"the page scrolls sideways by {wide}px on a phone"
+
+
+def test_a_first_report_offers_no_way_to_reopen_a_known_answer(page):
+    """The follow-up refuses "I don't know" for a known earlier answer, and
+    the page offered it (#1289, F2)."""
+    pause(page)
+    page.locator('#questions select:has(option[value="no"])').first.select_option("no")
+    page.click("#save")
+    page.wait_for_selector("#earlier", state="visible")
+    page.click("#continue")
+    page.wait_for_url("**/report/**")
+    followup = page.locator("details.followup")
+    followup.locator("summary").click()
+    earlier = followup.locator("p", has=page.locator("button", has_text="Change"))
+    for index in range(earlier.count()):
+        earlier.nth(index).locator("button").click()
+    offered = earlier.locator("option").evaluate_all("o => o.map(n => n.value)")
+    assert "no" in offered
+    assert "unknown" not in offered
+    assert earlier.locator("label", has_text="I don't know").count() == 0

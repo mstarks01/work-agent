@@ -98,13 +98,24 @@
     return n;
   };
   const code = (text) => el("code", null, text);
+  const option = (label, value) => Object.assign(el("option", null, label), { value });
+  // An answer as one line of text.
+  const said = a => a.facets
+    ? Object.entries(a.facets).map(([facet, value]) => `${facet}: ${value}`).join("; ")
+    : (a.value === DONT_KNOW ? "I don't know" : a.value);
+  // A link question's choices: each element it may be, then "None of these".
+  const linkOptions = (select, ids) => {
+    ids.forEach(id => select.append(option(NAMES[id] ? `${NAMES[id]} (${id})` : id, id)));
+    select.append(option("None of these", "none"));
+  };
   // One answer's editor, as the follow-up and a correction both show it.
   // `nodes` follow the label; `read` is the answer as the service takes it,
   // or null; `known` is whether it says more than "I don't know". `prefill`
-  // is an answer to start from, and `changed` runs on every edit.
+  // is an answer to start from, and `changed` runs on every edit. With
+  // `reopen` false, a known value offers no "I don't know", because the
+  // follow-up refuses to reopen a settled fact.
   let suggestLists = 0;
-  const editorFor = (q, prefill, changed) => {
-    const option = (label, value) => Object.assign(el("option", null, label), { value });
+  const editorFor = (q, prefill, changed, reopen = true) => {
     if (q.form === "facets") {
       // One list per facet; a facet left blank is not sent.
       const list = el("ul");
@@ -132,6 +143,7 @@
       };
     }
     const value = (prefill && prefill.value) || "";
+    const offersDontKnow = reopen || !value || value === DONT_KNOW;
     let input;
     // "unknown" is the answer that says you do not know: the fact stays
     // open, and it covers no finding.
@@ -142,7 +154,7 @@
       input = el("select");
       input.append(option("(leave unanswered)", ""));
       q.choices.forEach(choice => input.append(option(NAMES[choice] ? `${NAMES[choice]} (${choice})` : choice, choice)));
-      input.append(option("I don't know", DONT_KNOW));
+      if (offersDontKnow) input.append(option("I don't know", DONT_KNOW));
       input.value = value;
       input.addEventListener("change", changed);
       nodes = [input];
@@ -158,8 +170,9 @@
       q.suggestions.forEach(s => list.append(option(s, s)));
       input.setAttribute("list", list.id);
       const state = el("select");
-      state.append(option("(leave unanswered)", ""), option("There is none", "none"),
-        option("I don't know", DONT_KNOW), option("A mechanism, in my own words:", "mechanism"));
+      state.append(option("(leave unanswered)", ""), option("There is none", "none"));
+      if (offersDontKnow) state.append(option("I don't know", DONT_KNOW));
+      state.append(option("A mechanism, in my own words:", "mechanism"));
       // The state is the answer: blank sends nothing, and the text is read
       // only under "mechanism". Typing a mechanism chooses it.
       const fixed = value === "none" || value === DONT_KNOW;
@@ -193,7 +206,7 @@
       input.addEventListener("input", changed);
       const dontKnow = el("label");
       dontKnow.append(box, " I don't know");
-      nodes = [input, " ", dontKnow];
+      nodes = offersDontKnow ? [input, " ", dontKnow] : [input];
     }
     input.dataset.key = JSON.stringify(q.key);
     return {
@@ -991,7 +1004,6 @@
       ". Answer what you can, and the analysis runs once more, which takes a " +
       "few minutes. After that, the report is final."));
     $("links").append(box);
-    const option = (label, value) => Object.assign(el("option", null, label), { value });
     const linkSelects = [];
     // One reader per fact question: `read` is its answer as the service takes
     // it, or null; `known` is whether that answer says more than "I don't know".
@@ -1030,8 +1042,7 @@
         const select = el("select");
         select.dataset.principal = q.principal;
         select.append(option("(leave unanswered)", ""));
-        q.options.forEach(id => select.append(option(NAMES[id] ? `${NAMES[id]} (${id})` : id, id)));
-        select.append(option("None of these", "none"));
+        linkOptions(select, q.options);
         row.append(el("b", null, q.principal),
           ` \u2014 an answer places ${q.rows} stated fact(s) `, select);
         box.append(row);
@@ -1125,9 +1136,6 @@
     // "Change" button opens it, so the follow-up reads only what changed.
     const earlierFacts = [];
     if (earlierCount) {
-      const said = a => a.facets
-        ? Object.entries(a.facets).map(([facet, value]) => `${facet}: ${value}`).join("; ")
-        : (a.value === DONT_KNOW ? "I don't know" : a.value);
       box.append(el("h2", null, "Earlier answers"), el("div", "meta",
         "This report read these answers. If one is wrong, or you now know what was " +
         "\"I don't know\", change it, and the follow-up reads the new answer. A " +
@@ -1149,8 +1157,7 @@
           ? "none of these" : NAMES[element] || element}`), () => {
           const select = el("select");
           select.dataset.principal = a.principal;
-          a.options.forEach(id => select.append(option(NAMES[id] ? `${NAMES[id]} (${id})` : id, id)));
-          select.append(option("None of these", "none"));
+          linkOptions(select, a.options);
           select.value = element;
           linkSelects.push(select);
           return [select];
@@ -1161,7 +1168,7 @@
         const row = el("p");
         row.append(el("b", null, a.label));
         changer(row, el("span", null, ` \u2014 ${said(a.answer)}`), () => {
-          const editor = editorFor(a, a.answer, () => {});
+          const editor = editorFor(a, a.answer, () => {}, false);
           earlierFacts.push(editor.read);
           return editor.nodes;
         });
@@ -1203,9 +1210,6 @@
   // "I don't know" where an answer was a guess. A correction is kept beside
   // the report and marks the findings that rest on it; nothing runs again.
   if (FINAL && (CORRECTIONS.answers || []).length) {
-    const said = a => a.facets
-      ? Object.entries(a.facets).map(([facet, value]) => `${facet}: ${value}`).join("; ")
-      : (a.value === DONT_KNOW ? "I don't know" : a.value);
     const box = el("details", "followup");
     box.append(el("summary", null, `Correct an answer (${CORRECTIONS.answers.length})`),
       el("div", "meta",

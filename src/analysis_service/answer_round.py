@@ -598,11 +598,7 @@ def by_turn(questions: Sequence[EarlyQuestion]) -> list[EarlyQuestion]:
     The list ranks a field question that two frameworks share by the sum of
     their scores, so one framework's prior scale can move that question in
     another framework's turn (ADR 0053, ``QA-2026-10-06-01-E1``).
-
-    Summing the frameworks' scores put every capability question first, and
-    an owner who stopped after ten choices completed no STRIDE finding with
-    ASVS selected, where STRIDE alone completed 517 (``QA-2026-09-26-03-E29``).
-    With one framework selected the order does not change.
+    With one framework selected the order is the list's order.
     """
     charged: Counter[str] = Counter()
     left = list(questions)
