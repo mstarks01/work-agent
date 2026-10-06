@@ -5,8 +5,8 @@ Everything here is deterministic and credential-free by construction, and
 
 This module is also the merge bar. A deployment cannot read ``evals/``, because
 ``pyproject.toml`` packages ``src/analysis_service`` alone, so no load-time gate
-can check that a framework was ever measured. A package that asserted it had
-been would be the shape Promotion already rejects. The floor sits here instead,
+can check that a framework was ever measured. A package that asserted such a
+measurement would be the shape Promotion already rejects. The floor sits here instead,
 and it draws the same line the package gate does: the gate checks what the code
 reads, and CI checks what the budget allows. Three checks, in
 :func:`framework_issues` and :func:`lane_coverage_issues`, say a framework is

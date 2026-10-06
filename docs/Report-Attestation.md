@@ -148,7 +148,7 @@ its id, and those are different incidents.
    report, or a log.
 2. Add the new public key to every verifier's keyring as `active`.
 3. Switch the signer to the new key.
-4. Mark the old key `retired` with the moment step 3 happened.
+4. Mark the earlier key `retired` with the moment step 3 happened.
 
 To revoke, set `status = "revoked"` instead and re-issue anything that mattered
 under a key you still trust.

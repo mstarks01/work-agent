@@ -80,8 +80,8 @@ CORPUS_DIR = REPO_ROOT / "evals" / "corpus"
 # * Version 7 renames the claim scorer's coverage metrics inside ``scores``:
 #   ``recall`` to ``reference_coverage``, ``must_find_recall`` to
 #   ``must_find_coverage``, ``expected_recall`` to ``expected_coverage`` and
-#   ``element_accuracy`` to ``element_agreement`` (#890). No value moves. The
-#   old names read as detection quality and the numbers are not that: the
+#   ``element_accuracy`` to ``element_agreement`` (#890). No value moves. An
+#   ``_accuracy`` name reads as detection quality and the numbers are not that: the
 #   matcher compares lane, action and endpoint-resolved targets and reads no
 #   prose, so a report whose every finding says "no security problem exists"
 #   scores what it scored before.

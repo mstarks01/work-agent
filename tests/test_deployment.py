@@ -1084,9 +1084,9 @@ def test_require_certified_is_off_unless_explicitly_affirmative():
 def test_config_paths_are_repo_relative_by_default():
     paths = ConfigPaths.from_env({})
 
-    # Three text roots, not four: ANALYSIS_KNOWLEDGE_DIR is gone, the old
-    # ANALYSIS_SKILLS_DIR is now the shared domains root, and each package's own
-    # text hangs under ANALYSIS_FRAMEWORKS_DIR.
+    # Three text roots: the prompts, the shared domains root, and each
+    # package's own text under ANALYSIS_FRAMEWORKS_DIR. The knowledge corpus
+    # lives in its package and has no root of its own.
     assert paths.prompts == PROJECT_ROOT / "prompts"
     assert paths.domains == PROJECT_ROOT / "domains"
     assert paths.frameworks == PROJECT_ROOT / "frameworks"
