@@ -974,6 +974,31 @@ class TestTheDocumentedPairsAreTheProfiledPairs:
             vendor: tuple(models) for vendor, models in REFERENCE_MODELS.items()
         }
 
+    def test_the_first_run_credentials_are_one_mode_of_the_registry(self):
+        """The credentials cell lists every variable one of the vendor's
+        credential modes reads, in the order the registry checks them. The row
+        reader above keys a row on the first variable alone, so a second
+        variable in the cell needs this check.
+        """
+        cells = {
+            match["vendor"].lower(): tuple(
+                re.findall(r"`(ANALYSIS_[A-Z_]+)`", line.rsplit("|", 2)[1])
+            )
+            for line in self.FIRST_RUN.read_text(encoding="utf-8").splitlines()
+            if (match := self._ROW.match(line))
+        }
+
+        assert cells.keys() == REFERENCE_MODELS.keys()
+        for name, documented in cells.items():
+            vendor = vendor_for(name)
+            modes = {
+                mode: vendor.required_env_vars(mode) for mode in vendor.credentials
+            }
+            assert documented in modes.values(), (
+                f"First-Run.md lists {documented} for {name}; the registry reads"
+                f" {modes}"
+            )
+
     def test_the_tier_template_names_every_profiled_model(self):
         """``config/model_tiers.toml``'s header lists the pairs as a comment and
         claims each "is a real pair the offline conformance suite profiles".

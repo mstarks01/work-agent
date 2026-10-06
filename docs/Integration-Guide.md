@@ -124,9 +124,9 @@ async def analyze(
 - `sources` — an ordered, non-empty sequence of untrusted `Source` values, each
   `{kind, label, text}`. Build them with `Source.description(text)` or
   `Source.transcript(text)`, both of which default the label, or name one
-  yourself with `label=`. Bounded by this deployment's config — 100 KiB total
-  across all sources and 10 sources as shipped — and counted in UTF-8 bytes
-  rather than tokens. Every source enters the pipeline as data inside its own
+  yourself with `label=`. Bounded by this deployment's config, which
+  [Input limits](Configuration.md#input-limits) lists, and counted in UTF-8
+  bytes rather than tokens. Every source enters the pipeline as data inside its own
   fenced block, never as an instruction.
 
   Order is presentation only: **sources carry equal weight**, so listing a

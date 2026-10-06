@@ -469,7 +469,7 @@ things, and they are **sized against measured output rather than chosen round**.
 corpus cases, max 2,565. The critic emits one *ruling* per draft — an ID, a
 verdict, a confidence, and a replacement severity only where it corrected one —
 rather than the draft re-transcribed, which is roughly 60–90 tokens per ruled
-threat against about 400 for a re-transcribed draft. Its 32,768 is
+threat against about 400 for a re-transcribed draft. Its cap is
 therefore generous rather than tight: reasoning tokens are spent against this
 same cap, and on the strong tier that is where nearly all of it goes.
 
@@ -830,11 +830,12 @@ in time.
 than per job, and the others are why it has to exist: a caller who respects every one of
 them and simply keeps submitting is inside the contract while spending the
 deployment's whole provider quota. Each accepted job fans out one lane
-agent per lane of every framework it runs, in parallel on the `strong` tier:
-six for STRIDE, seventeen for ASVS, twenty-three for a job that names both. The
-shipped `3` is therefore sixty-nine concurrent `strong`-tier requests on that
-selection — the burst a per-minute quota actually sees, and the arithmetic to
-redo before raising the ceiling or carrying another framework. A submission past
+agent per lane of every framework it runs, in parallel on the `strong` tier.
+So one caller can hold `max_active_jobs` times that lane count in concurrent
+`strong`-tier requests — the burst a per-minute quota actually sees, and the
+arithmetic to redo before raising the ceiling or carrying another framework.
+`analysis_service.frameworks.widest_fan_out` gives the widest lane count a job
+can name. A submission past
 the ceiling is refused with `429`, never queued: a queued job holds the caller's
 place in the quota anyway, so only a refusal sheds load. It counts jobs **in
 flight** (`queued` plus `running`), not submissions per interval, so it is
@@ -854,15 +855,15 @@ this is the backstop behind it, not a duplicate of it. See
 #### The per-window budgets
 
 A ceiling bounds how many jobs run **at once** and is self-clearing, which is
-exactly why it bounds no spend: a caller who submits serially stays inside a
-ceiling of 3 forever while running an unbounded number of paid jobs. Three
+exactly why it bounds no spend: a caller who submits serially stays inside any
+ceiling forever while running an unbounded number of paid jobs. Three
 further bounds close that over a rolling window:
 
 | Knob | What it bounds |
 | --- | --- |
 | `budget_window_seconds` | The width of the window all three are measured over. Rolling, not aligned to a clock boundary — a fixed hourly window lets a caller spend a full allowance at 10:59 and another at 11:00. |
 | `max_jobs_per_window` | Jobs one token subject may **start** per window, whether or not they finished. The rate the ceiling is not. |
-| `max_tokens_per_window` | Tokens one token subject may commit per window. One very large submission can cost more than thirty small ones, and a count admits it. |
+| `max_tokens_per_window` | Tokens one token subject may commit per window. One very large submission can cost more than a window's whole count of small ones, and a count admits it. |
 | `global_max_tokens_per_window` | The same across **every** subject. Not the sum of theirs — this is the provider quota's share, which a deployment with ten subjects divides rather than multiplies. |
 
 **Tokens, not currency.** A price is vendor data with an expiry date. `evals/`
@@ -947,8 +948,8 @@ shorter deadline the row did not raise. `ANALYSIS_TIMEOUT_MS` and
 OpenAI/Azure path LiteLLM sets the provider SDK's own `max_retries` from the
 retry count it is given, so a library retry layer would retry each attempt at
 the SDK level too. The worst case per node would be `2 * attempts - 1`
-requests — five at the shipped `3`, and up to thirty in the seconds a
-framework's lane agents run in parallel. A `max_retries` on the adapter does not
+requests for each lane agent, and the lane agents run in parallel. A
+`max_retries` on the adapter does not
 prevent it, because the retry count LiteLLM is given overwrites it.
 
 So the library's retry layer is **off** (`num_retries = 0`, one request per call)
@@ -958,7 +959,7 @@ and the loop runs a level up, above the provider seam, where it can be bounded.
 that could not exist below the adapter:
 
 - **A shared budget.** `retry_budget_ratio` is one process-wide token bucket: a
-  retry costs a token, a successful request credits `0.1` of one. Retries are
+  retry costs a token, a successful request credits that ratio of one. Retries are
   capped at a share of *working traffic* rather than at a count per node — and a
   count per node is precisely the wrong response to a provider-wide failure,
   since it hands every node its full allowance regardless of what the other
@@ -983,10 +984,10 @@ forbid only shapes the total already permits. Both bounds are in UTF-8 bytes
 rather than tokens, so the public contract does not change when a deployment
 changes vendor.
 
-The file is version 3, and a file on an older version fails to load, so every
-deployment edits its file rather than inheriting a default for a contract its
-callers can see. There are no backoff knobs: the adapter picks its backoff
-curve internally from the exception type, so a knob would connect to nothing.
+A file on any version other than the one the loader supports fails to load, so
+every deployment edits its file rather than inheriting a default for a contract
+its callers can see. There are no backoff knobs: `analysis_service.retry` pins
+the curve, because it does not vary by deployment.
 
 ## Environment variables
 
@@ -1069,7 +1070,7 @@ model.
 ### Sampling overrides
 
 `ANALYSIS_SAMPLING_{TIER}_{PARAM}` retunes one tier's decoding at deploy time,
-validated **identically** to a file value. `{TIER}` is `BASE` or `STRONG`.
+validated **identically** to a file value. `{TIER}` is `BASE`, `STRONG` or `REVIEW`.
 
 | Variable | Effect |
 | --- | --- |

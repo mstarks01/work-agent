@@ -53,7 +53,12 @@ MODULE = "evals.harness.run"
 #: An invocation runs to the end of its line, or to the backtick that closes an
 #: inline span. Both shapes are read: a command in running prose is one a reader
 #: types just as readily as one in a fenced block, and most of them are inline.
-_INVOCATION = re.compile(rf"python -m {re.escape(MODULE)}\s+([^\n`]*)")
+#: The guides also print the short form `` `run.py <command>` `` for the same
+#: module. The short form is read only where a backtick opens the span, so a
+#: path such as ``evals/harness/run.py`` in a sentence is not a command.
+_INVOCATION = re.compile(
+    rf"(?:python -m {re.escape(MODULE)}|(?<=`)run\.py)\s+([^\n`]*)"
+)
 
 
 def _parsers() -> dict[str, argparse.ArgumentParser]:
@@ -73,7 +78,7 @@ def _options(parser: argparse.ArgumentParser) -> set[str]:
 
 def _documented() -> list[tuple[Path, int, str]]:
     """Every ``python -m evals.harness.run`` invocation the prose prints."""
-    found = []
+    found: list[tuple[Path, int, str]] = []
     for entry in SEARCHED:
         base = REPO_ROOT / entry
         paths = [base] if base.is_file() else sorted(base.rglob("*.md"))
@@ -81,9 +86,10 @@ def _documented() -> list[tuple[Path, int, str]]:
             for number, line in enumerate(
                 path.read_text(encoding="utf-8").splitlines(), start=1
             ):
-                match = _INVOCATION.search(line)
-                if match:
-                    found.append((path, number, match.group(1)))
+                found.extend(
+                    (path, number, match.group(1))
+                    for match in _INVOCATION.finditer(line)
+                )
     return found
 
 
@@ -157,6 +163,20 @@ def test_the_lint_reads_a_real_population():
         f"only {len(documented)} documented invocations found -- the"
         " invocation pattern has stopped matching"
     )
+
+
+@pytest.mark.parametrize(
+    ("line", "read"),
+    [
+        ("`run.py lane-replay --fresh-leads` rebuilds", ["lane-replay --fresh-leads"]),
+        ("`run.py score` and `run.py replay`", ["score", "replay"]),
+        ("uv run python -m evals.harness.run rekey --yes", ["rekey --yes"]),
+        ("see evals/harness/run.py for the parser", []),
+    ],
+)
+def test_the_reader_reads_both_spellings_of_a_command(line, read):
+    """The short form and the module form are each read, and a path is not."""
+    assert [match.group(1) for match in _INVOCATION.finditer(line)] == read
 
 
 @pytest.mark.parametrize(

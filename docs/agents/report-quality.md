@@ -26,10 +26,10 @@ them. A gain that the tuned cases show and the holdout cases do not was shaped
 by the cases it was read on. See **Holdout Case** in `GLOSSARY.md`.
 
 **Instruments for one lane or one critic call.** `run.py lane-replay` sends one
-captured lane request again, and `--append` adds a user part after the captured
-input. `run.py critic-replay` does the same for a critic call. `lane-replay
---fresh-leads` rebuilds a lane's leads with today's rules through the function
-the prepare node calls. A replay costs one
+captured lane request again, and `run.py lane-replay --append` adds a user part
+after the captured input. `run.py critic-replay` does the same for a critic
+call. `run.py lane-replay --fresh-leads` rebuilds a lane's leads with the
+current rules through the function the prepare node calls. A replay costs one
 model call, about $0.03 to $0.06 on the strong tier, and `ANALYSIS_OFFLINE`
 refuses it.
 

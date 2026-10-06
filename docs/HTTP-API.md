@@ -423,9 +423,8 @@ Then `GET /v1/jobs/job-ab12...` until `status` is terminal, or subscribe to
 
 ### What a submission is rejected for
 
-Bounds are this deployment's (see [Configuration](Configuration.md)); the
-shipped values are 100 KiB total across all sources and 10 sources. They are
-counted in **UTF-8 bytes**, not tokens, so what you may submit does not change
+Bounds are this deployment's; [Input limits](Configuration.md#input-limits)
+lists the shipped values. They are counted in **UTF-8 bytes**, not tokens, so what you may submit does not change
 when a deployment changes vendor. Shape is checked before size:
 
 | Status | Cause |
@@ -451,8 +450,8 @@ over-sized body is refused whether or not it carries a token.
 ### How many jobs you may run at once
 
 Every rejection above is about the submission. One is about **you**: a token may
-hold only `max_active_jobs` jobs in flight — `queued` plus `running` — and the
-shipped value is 3.
+hold only `max_active_jobs` jobs in flight — `queued` plus `running`.
+[Input limits](Configuration.md#input-limits) gives the shipped value.
 
 | Status | Cause |
 | --- | --- |
@@ -487,7 +486,8 @@ its job to end, and open the next one.
 The count is not a rate, so the ceiling bounds no spend: one token that submits
 serially, letting each job finish before the next, stays under it forever. Three
 further bounds close that, over a rolling window the deployment sets
-(`budget_window_seconds`, one hour as shipped):
+(`budget_window_seconds`; [Resilience](Configuration.md#resilience) gives
+the shipped value):
 
 | Status | Cause |
 | --- | --- |

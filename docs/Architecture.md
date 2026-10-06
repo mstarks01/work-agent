@@ -436,7 +436,7 @@ carrying a zero.
 Retry, timeout and the per-job deadline are configured in [`config/resilience.toml`](Configuration.md)
 and attached to the adapter itself, so a retry is invisible to the graph and the
 report's `nodes` array is unchanged by one. A per-request timeout turns a hang
-into an error the retry can act on. Three attempts by default.
+into an error the retry can act on.
 
 The retry loop sits **above** the provider seam described below, and the
 translator sits beneath it. That is where the loop's two bounds are
