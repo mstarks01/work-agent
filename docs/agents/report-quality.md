@@ -27,9 +27,9 @@ by the cases it was read on. See **Holdout Case** in `GLOSSARY.md`.
 
 **Instruments for one lane or one critic call.** `run.py lane-replay` sends one
 captured lane request again, and `--append` adds a user part after the captured
-input. `run.py critic-replay` does the same for a critic call. The pattern A
-branch (see open work) adds `--fresh-leads`, which rebuilds a lane's leads with
-today's rules through the function the prepare node calls. A replay costs one
+input. `run.py critic-replay` does the same for a critic call. `lane-replay
+--fresh-leads` rebuilds a lane's leads with today's rules through the function
+the prepare node calls. A replay costs one
 model call, about $0.03 to $0.06 on the strong tier, and `ANALYSIS_OFFLINE`
 refuses it.
 

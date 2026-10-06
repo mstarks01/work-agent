@@ -27,6 +27,7 @@ from analysis_service.fact_answers import (
     answered_row,
     fact_kind,
     fact_line,
+    key_ref,
 )
 from analysis_service.question_kinds import QUESTION_KINDS, Facet
 from analysis_service.system_model import SystemModel
@@ -161,13 +162,17 @@ def answer_form(
         return "facets"
     if answer_choices(key, model, catalog):
         return "choice"
-    control = fact_kind(key) == "attribute" and key[1] in CONTROL_SUGGESTIONS
+    control = (
+        fact_kind(key) == "attribute" and key_ref(key).attribute in CONTROL_SUGGESTIONS
+    )
     return "control" if control else "text"
 
 
 def answer_suggestions(key: UnknownKey) -> tuple[str, ...]:
     """Common mechanisms for a control answered in free text, or empty."""
-    return CONTROL_SUGGESTIONS.get(key[1], ()) if fact_kind(key) == "attribute" else ()
+    if fact_kind(key) != "attribute":
+        return ()
+    return CONTROL_SUGGESTIONS.get(key_ref(key).attribute, ())
 
 
 def answer_limit(key: UnknownKey, model: SystemModel) -> int:
@@ -183,9 +188,10 @@ def answer_limit(key: UnknownKey, model: SystemModel) -> int:
         _max_length(FactAnswer, "value"),
         MAX_QUOTE_CHARS - (len(fact_line(FactAnswer(key=key, value="x"))) - 1),
     ]
-    element = model.get(key[0]) if fact_kind(key) == "attribute" else None
-    if element is not None and key[1] in type(element).model_fields:
-        bounds.append(_max_length(type(element), key[1]))
+    ref = key_ref(key)
+    element = model.get(ref.element_id) if fact_kind(key) == "attribute" else None
+    if element is not None and ref.attribute in type(element).model_fields:
+        bounds.append(_max_length(type(element), ref.attribute))
     return min(bound for bound in bounds if bound is not None)
 
 

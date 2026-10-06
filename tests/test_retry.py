@@ -223,7 +223,7 @@ class TestRetryBudget:
 class TestNotEveryRateLimitIsAMoment:
     """A 429 conflates a window that reopens with a ceiling that does not.
 
-    The pinned translator states which. Measured on litellm 1.97.0: every
+    The pinned translator states which. Measured on litellm 1.104.0: every
     ``RateLimitError`` carries ``category``, defaulting to
     ``vendor_rate_limit``, and ``rate_limit_type``, which is ``None`` unless the
     limiter that fired named a dimension.
@@ -567,9 +567,9 @@ class TestTheLadderIsVendorNeutral:
     Which exception *class* a provider failure becomes is decided per provider
     by litellm, and it differs: an upstream 500 is ``InternalServerError`` on
     ``anthropic`` and ``APIError`` on ``openrouter``, and an upstream 502 is
-    ``BadGatewayError`` on both. A ladder keyed on the class therefore retried
-    an upstream 500 on five vendors and not on the sixth, and an upstream 502 on
-    none of them.
+    ``BadGatewayError`` on ``anthropic`` and ``APIError`` on ``openrouter``. A
+    ladder keyed on the class would retry an upstream 500 on five vendors and
+    not on the sixth.
 
     Keying on the status code removes the difference rather than tabulating it,
     so what this asserts is **agreement across the registry**, one row per

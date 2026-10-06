@@ -147,7 +147,7 @@ _CHARGE_TEXT = re.compile(r"\d+(?:\.\d*)?(?:[eE][+-]?\d+)?", re.ASCII)
 #: Where litellm files a charge a provider reported. Its OpenRouter config sets
 #: ``usage.include`` on every request and copies ``usage.cost`` out of the
 #: response body into this header slot, in the ``transform_response`` of its
-#: OpenRouter chat config (measured on litellm 1.97.0). It is a pinned
+#: OpenRouter chat config (measured on litellm 1.104.0). It is a pinned
 #: dependency's
 #: internal spelling, which is why :func:`reported_charge_of` treats every part
 #: of the path as absent-able rather than asserting the shape.

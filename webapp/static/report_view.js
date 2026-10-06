@@ -296,10 +296,13 @@
   // requirement, so it belongs on the requirement's own row and not in the
   // list of drafts that argued badly. Only a block with unit rows reads it so:
   // for a framework whose claims are an open set, an `evidence` rejection is a
-  // draft that failed on its own substance, and it stays dismissed.
+  // draft that failed on its own substance, and it stays dismissed. A
+  // rejection with no cause, from a report read back, is a ruling too, as
+  // `RuledClaim.rules_on_unit` reads it.
   const answersInUnits = (block) => (UNITS[block.framework] || []).length > 0;
   const rulesOut = (block, c) =>
-    answersInUnits(block) && c.verdict.status === "rejected" && c.verdict.rejected_because === "evidence";
+    answersInUnits(block) && c.verdict.status === "rejected"
+    && (c.verdict.rejected_because ?? "evidence") === "evidence";
 
   // Each kind named in its own words, so they read as different *kinds* of
   // justification rather than formattings of one. The two attribute kinds

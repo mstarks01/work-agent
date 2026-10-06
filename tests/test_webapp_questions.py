@@ -19,12 +19,14 @@ import pytest
 from fastapi.testclient import TestClient
 
 from analysis_service import Engine, StubPipelineRunner
+from analysis_service.analysis import ABSENT_WORD
 from analysis_service.assertions import AssertionRecord
 from analysis_service.claims import UnknownRef
 from analysis_service.fact_answers import FACET_ANSWERS, FactAnswer, merged_facts
 from analysis_service.fact_writes import check_fact_answers
 from analysis_service.frameworks import PACKAGES
 from analysis_service.jobs import Checkpoint, PipelineAwaiting, PipelineCompleted
+from analysis_service.links import NONE_OF_THESE
 from analysis_service.question_kinds import QUESTION_KINDS
 from tests import test_open_facts, test_questions, test_webapp
 from tests.factories import (
@@ -570,6 +572,25 @@ await ids.continue.listeners.click(); await settle();
         "links": [],
         "facts": [{"key": key, "value": "TLS 1.3"}],
     }
+
+
+def test_every_key_part_a_page_reads_is_the_part_it_means():
+    """A page reads a fact key by position, and ``key_ref`` is the server's one
+    reader of which part is which, so each position a page reads is held to
+    the field it means."""
+    from analysis_service.fact_answers import _KEY_FIELDS
+
+    means = {0: "element_id", 1: "attribute", 4: "question"}
+    read = {
+        int(index)
+        for name in ("first_run.js", "report_view.js")
+        for index in re.findall(r"\bkey\[(\d)\]", test_webapp.page_javascript(name))
+    }
+
+    assert read, "no page reads a key part to check"
+    assert read <= set(means), f"a page reads key parts {sorted(read - set(means))}"
+    for index in read:
+        assert _KEY_FIELDS[index] == means[index]
 
 
 def test_the_form_script_follows_a_run_the_report_page_started():
@@ -1261,7 +1282,9 @@ def control_answer(steps: str) -> list:
     return seen["calls"][0]["body"]["facts"]
 
 
-@pytest.mark.parametrize(("state", "sent"), [("none", "none"), ("unknown", "unknown")])
+@pytest.mark.parametrize(
+    ("state", "sent"), [("none", ABSENT_WORD), ("unknown", "unknown")]
+)
 def test_a_control_says_there_is_none_or_that_nobody_knows(state, sent):
     facts = control_answer(
         f"""
@@ -2690,7 +2713,7 @@ await buttons[buttons.length - 1].listeners.click();
     (sent,) = _run_answer_block(payloads, steps)["calls"]
 
     assert sent["body"] == {
-        "links": [{"principal": "customer accounts", "element": "none"}],
+        "links": [{"principal": "customer accounts", "element": NONE_OF_THESE}],
         "facts": [],
     }
 

@@ -289,12 +289,12 @@ def _probe_param(vendor: Vendor, model: str, name: str, value: Any) -> Capabilit
     ``SUPPORTED`` for a combination the build refuses, which is the failure this
     module is least able to afford.
 
-    **Narrowed to the one type it raises.** ``check_supported`` wraps
-    litellm's bare raise in a :class:`~analysis_service.model_gate.ModelGateError`
-    and lets nothing else out — swept over every mapped pair under a registered
-    prefix at six params, 4,182 probes produced 1,362 raises and one type. A
-    bare ``except`` here would read an unrelated failure as ``UNSUPPORTED``,
-    which is the fact this module's own header forbids inventing.
+    **Narrowed to the one type that means a refusal.** ``check_supported``
+    wraps litellm's ``UnsupportedParamsError`` in a
+    :class:`~analysis_service.model_gate.ModelGateError` and lets every other
+    error propagate. A bare ``except`` here would read an unrelated failure as
+    ``UNSUPPORTED``, which is the fact this module's own header forbids
+    inventing. ``tests/test_conformance.py`` sweeps the map for any other type.
     """
     try:
         check_supported(vendor, model, {name: value}, source="conformance probe")

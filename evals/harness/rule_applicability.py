@@ -41,7 +41,7 @@ from analysis_service.answer_round import next_round
 from analysis_service.capabilities import CAPABILITIES
 from analysis_service.claims import FrameworkName, UnknownKey, UnknownRef
 from analysis_service.early_questions import capability_questions
-from analysis_service.fact_answers import FactAnswer
+from analysis_service.fact_answers import FactAnswer, key_ref
 from analysis_service.fact_writes import answered_model
 from analysis_service.frameworks import PACKAGES
 from analysis_service.system_model import CapabilityStatement, SystemModel
@@ -294,7 +294,7 @@ def simulate_questions(fixture: Fixture) -> QuestionRun:
         asked = {question.key for question in shown}
         given: dict[UnknownKey, str] = {}
         for question in shown:
-            key = question.key[5]
+            key = key_ref(question.key).capability
             if key not in CAPABILITIES:
                 conformance += 1
                 held[question.key] = FactAnswer(key=question.key, value="unknown")

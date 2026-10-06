@@ -181,7 +181,7 @@ def _check_capability_lineage(
     settle.
     """
     answering = {
-        answer.key[5]
+        key_ref(answer.key).capability
         for answer in answers
         if answer.kind == "capability" and answer.known
     }
@@ -221,7 +221,8 @@ def _check_attribute_values(answers: Sequence[FactAnswer], model: SystemModel) -
         raise ValueError(
             f"an answer does not fit {first['loc'][-1]!r}: {first['msg']}"
         ) from None
-    asked = {(answer.key[0], answer.key[1]) for answer in attributes}
+    refs = [key_ref(answer.key) for answer in attributes]
+    asked = {(ref.element_id, ref.attribute) for ref in refs}
     for issue in validate(answered):
         if (issue.element_id, issue.field) in asked:
             raise ValueError(issue.message)
@@ -279,7 +280,7 @@ def answered_model(model: SystemModel, answers: Sequence[FactAnswer]) -> SystemM
         if (assumption["element_id"], assumption["attribute"]) not in answered
     ]
     capabilities = {
-        answer.key[5]: answer
+        key_ref(answer.key).capability: answer
         for answer in answers
         if answer.kind == "capability" and answer.known
     }
@@ -371,12 +372,13 @@ def fact_rows(
     for answer, span in zip(answers, spans, strict=True):
         if answer.kind != "assertion" or not answer.known:
             continue
-        row = answered_row(catalog, answer.key[2])
+        assertion = key_ref(answer.key).assertion
+        row = answered_row(catalog, assertion)
         if row is None:
             issues.append(
                 CatalogIssue(
                     code="unmatched-answer",
-                    message=f"no open row {answer.key[2]!r} in this catalog, so"
+                    message=f"no open row {assertion!r} in this catalog, so"
                     " the answer placed nothing",
                 )
             )

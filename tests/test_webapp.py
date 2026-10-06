@@ -1503,7 +1503,7 @@ def test_a_ruling_that_a_unit_does_not_apply_sits_on_the_units_row():
     from webapp.main import client_script
 
     script = client_script("report_view.js")
-    assert 'c.verdict.rejected_because === "evidence"' in script
+    assert '(c.verdict.rejected_because ?? "evidence") === "evidence"' in script
     assert "answersInUnits(block) &&" in script, "gated on the block answering in units"
     assert (
         'SCOPE_STATE["not-applicable"]'
