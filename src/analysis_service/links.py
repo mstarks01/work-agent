@@ -243,7 +243,8 @@ class LinkQuestion:
         }
 
 
-def _components(model: SystemModel) -> tuple[str, ...]:
+def components(model: SystemModel) -> tuple[str, ...]:
+    """Every element ID a link answer may name, in model order."""
     prefixes = SUBJECT_PREFIXES["component"]
     return tuple(
         element.id
@@ -277,7 +278,7 @@ def link_questions(
         if facts:
             rows[key] += facts
             first.setdefault(key, subject.label)
-    options = _components(model)
+    options = components(model)
     return tuple(
         LinkQuestion(key=key, principal=first[key], rows=count, options=options)
         for key, count in sorted(rows.items(), key=lambda item: (-item[1], item[0]))
@@ -383,7 +384,7 @@ def _link_rows(
     """
     if not links:
         return catalog, []
-    held = set(_components(model))
+    held = set(components(model))
     subjects = list(catalog.subjects)
     known = {subject.id for subject in subjects}
     principals = defaultdict(list)

@@ -379,7 +379,10 @@ The app can ask you questions before the analysis, and after the report.
   corrections**. The report marks each finding that rests on a corrected
   answer. The analysis does not run again. Where your install builds an assertion catalog, the
   follow-up also lists the group questions under **Which element is each of
-  these?**.
+  these?**. Under **Earlier answers**, the follow-up lists the answers this
+  report read. Click **Change** beside one to give a new answer, and the
+  follow-up reads it. A known answer cannot change back to "I don't know"
+  there.
 
 - **The report's open facts.** Most findings are conditional: they rest on
   facts your description never states, such as how a flow is protected. Under

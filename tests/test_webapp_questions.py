@@ -679,7 +679,9 @@ globalThis.fetch = async (url, init) => {
 };
 """
 
-ANSWER_BLOCK_START = "  if (LINK_QUESTIONS.length || FACT_QUESTIONS.length) {"
+ANSWER_BLOCK_START = (
+    "  const earlierCount = EARLIER_FACTS.length + EARLIER_LINKS.length;\n"
+)
 ANSWER_BLOCK_END = "    box.append(actions, note);\n  }\n"
 
 
@@ -2490,3 +2492,153 @@ calls.push({{ shown: shown.length }});
 
     assert seen[-1]["shown"] == len(counted)
     assert len(counted) < len(capabilities), "a control: the round holds a part"
+
+
+class TestEarlierAnswers:
+    """A first report takes a new answer to a fact the pause answered (#1289, F2)."""
+
+    def first_report(self, tiers, value, links=()):
+        """A client, the runner, and the report the pause's answers started."""
+        runner = PausingRunner()
+        client = client_for(tiers, runner)
+        paused = start(client, questions=True)
+        shown = event(client.get(f"/events/{paused}").text, "questions")
+        key = shown["facts"][0]["key"]
+        started = client.post(
+            f"/answer/{paused}",
+            json={
+                "links": list(links),
+                "facts": [{"key": key, "value": value}],
+                "revision": 0,
+            },
+            headers=SAME_ORIGIN,
+        )
+        assert started.status_code == 200, started.text
+        report = started.json()["run"]
+        client.get(f"/events/{report}")
+        return client, runner, report, key
+
+    def earlier(self, client, run):
+        page = client.get(f"/report/{run}").text
+        match = re.search(r'id="earlier"[^>]*>(.*?)</script>', page, re.DOTALL)
+        return json.loads(match.group(1))
+
+    def follow_up(self, client, run, links=(), facts=()):
+        return client.post(
+            f"/answer/{run}",
+            json={"links": list(links), "facts": list(facts)},
+            headers=SAME_ORIGIN,
+        )
+
+    @pytest.mark.parametrize(("before", "after"), [("yes", "no"), ("unknown", "yes")])
+    def test_the_page_carries_an_earlier_answer_and_its_follow_up_reads_a_new_one(
+        self, tiers, before, after
+    ):
+        client, runner, report, key = self.first_report(tiers, before)
+
+        (row,) = self.earlier(client, report)["answers"]
+        assert row["key"] == key
+        assert row["answer"]["value"] == before
+
+        response = self.follow_up(client, report, facts=[{"key": key, "value": after}])
+        assert response.status_code == 200, response.text
+        client.get(f"/events/{response.json()['run']}")
+        assert [fact.value for fact in runner.resumed_facts[-1]] == [after]
+
+    def test_the_follow_up_reads_a_new_link_answer(self, tiers):
+        client, runner, report, _ = self.first_report(tiers, "yes", links=[LINK])
+
+        (row,) = self.earlier(client, report)["links"]
+        assert row["principal"] == LINK["principal"]
+        assert row["answer"]["element"] == LINK["element"]
+        assert LINK["element"] in row["options"]
+
+        moved = {"principal": LINK["principal"], "element": "none"}
+        response = self.follow_up(client, report, links=[moved])
+        assert response.status_code == 200, response.text
+        client.get(f"/events/{response.json()['run']}")
+        assert [link.element for link in runner.resumed_links[-1]] == ["none"]
+
+    def test_a_final_report_and_a_held_one_carry_none(self, tiers):
+        client, _, report, key = self.first_report(tiers, "yes")
+        final = self.follow_up(client, report, facts=[{"key": key, "value": "no"}])
+        final = final.json()["run"]
+        client.get(f"/events/{final}")
+
+        assert self.earlier(client, report) == {}
+        assert self.earlier(client, final) == {}
+
+
+def test_a_fact_the_follow_up_still_asks_is_not_an_earlier_answer():
+    from webapp.main import _earlier_payload
+
+    report = sample_report([])
+    answer = FactAnswer(key=FACT["key"], value="TLS")
+
+    assert _earlier_payload(report, [answer], [], {FACT["key"]})["answers"] == []
+    assert _earlier_payload(report, [answer], [], set())["answers"]
+
+
+EARLIER_ROW = {
+    "key": list(FACT["key"]),
+    "label": "login: encryption in transit",
+    "form": "control",
+    "choices": [],
+    "facets": [],
+    "suggestions": [],
+    "max_length": 200,
+    "answer": dict(FACT) | {"key": list(FACT["key"])},
+}
+EARLIER_LINK = {
+    "principal": "customer accounts",
+    "options": ["entity:customer"],
+    "answer": LINK,
+}
+
+
+def test_the_report_page_sends_a_changed_earlier_answer_with_the_follow_up():
+    payloads = {
+        "report": {"system_model": valid_model().model_dump(mode="json")},
+        "link_questions": [],
+        "fact_questions": [],
+        "earlier": {"answers": [EARLIER_ROW], "links": [EARLIER_LINK]},
+    }
+    steps = """
+calls.push(box.all("summary").map(node => node.textContent));
+const buttons = box.all("button");
+await buttons[1].listeners.click();
+const [state] = box.all("select");
+state.value = "none"; state.listeners.change();
+await buttons[buttons.length - 1].listeners.click();
+"""
+    summaries, sent = _run_answer_block(payloads, steps)["calls"]
+
+    assert summaries[0].startswith("Optional follow-up: 0 question(s)")
+    assert "2 earlier answer(s)" in summaries[0]
+    assert sent["url"] == "/answer/r1"
+    assert sent["body"] == {
+        "links": [],
+        "facts": [{"key": list(FACT["key"]), "value": "none"}],
+    }
+
+
+def test_the_report_page_sends_a_changed_earlier_link():
+    payloads = {
+        "report": {"system_model": valid_model().model_dump(mode="json")},
+        "link_questions": [],
+        "fact_questions": [],
+        "earlier": {"answers": [], "links": [EARLIER_LINK]},
+    }
+    steps = """
+const buttons = box.all("button");
+await buttons[0].listeners.click();
+const [select] = box.all("select");
+select.value = "none";
+await buttons[buttons.length - 1].listeners.click();
+"""
+    (sent,) = _run_answer_block(payloads, steps)["calls"]
+
+    assert sent["body"] == {
+        "links": [{"principal": "customer accounts", "element": "none"}],
+        "facts": [],
+    }

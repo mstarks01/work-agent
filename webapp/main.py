@@ -104,7 +104,14 @@ import json
 import logging
 import os
 import secrets
-from collections.abc import AsyncIterator, Awaitable, Callable, Mapping, Sequence
+from collections.abc import (
+    AsyncIterator,
+    Awaitable,
+    Callable,
+    Collection,
+    Mapping,
+    Sequence,
+)
 from dataclasses import dataclass, field
 from functools import partial
 from pathlib import Path
@@ -172,6 +179,7 @@ from analysis_service.links import (
     MAX_LINK_ANSWERS,
     LinkAnswer,
     LinkQuestion,
+    components,
 )
 from analysis_service.model_tiers import ModelTierConfig
 from analysis_service.open_facts import open_facts_by_framework, reference_labels
@@ -558,6 +566,11 @@ def render_report(
             if state.final
             else {}
         ),
+        earlier=script_json(
+            _earlier_payload(report, state.facts, state.links, state.questions.asked)
+            if not state.final and state.resumed_by is None
+            else {}
+        ),
         provenance=script_json(_provenance_payload(report, state.facts, state.shown)),
         changes=script_json(
             {
@@ -601,36 +614,75 @@ def _provenance_payload(
     }
 
 
+def _answer_rows(
+    report: Report, answers: Sequence[FactAnswer]
+) -> list[dict[str, object]]:
+    """Each answer with its label and the form, choices and limit it is changed in.
+
+    Read by the same helpers that build a question.
+    """
+    model = report.system_model
+    catalog = report.assertions.catalog if report.assertions else None
+    return [
+        {
+            "key": list(answer.key),
+            "label": fact_label(answer.key, model),
+            "form": answer_form(answer.key, model, catalog),
+            "choices": list(answer_choices(answer.key, model, catalog)),
+            "facets": facets_json(answer_facets(answer.key)),
+            "suggestions": list(answer_suggestions(answer.key)),
+            "max_length": answer_limit(answer.key, model),
+            "answer": answer.model_dump(mode="json"),
+        }
+        for answer in answers
+    ]
+
+
 def _corrections_payload(
     report: Report, answered: Sequence[FactAnswer], corrections: Sequence[FactAnswer]
 ) -> dict[str, object]:
     """A final report's answers as it is corrected in, and what corrections reach.
 
-    Each answer carries its label, its current value with every correction
-    in, and the form, choices and limit it is changed in, read by the same
-    helpers that build a question.
+    Each answer carries its current value with every correction in.
     """
-    model = report.system_model
-    catalog = report.assertions.catalog if report.assertions else None
     corrected = {fact.key for fact in corrections}
-    rows = []
-    for answer in merged_facts(answered, corrections):
-        rows.append(
-            {
-                "key": list(answer.key),
-                "label": fact_label(answer.key, model),
-                "form": answer_form(answer.key, model, catalog),
-                "choices": list(answer_choices(answer.key, model, catalog)),
-                "facets": facets_json(answer_facets(answer.key)),
-                "suggestions": list(answer_suggestions(answer.key)),
-                "max_length": answer_limit(answer.key, model),
-                "answer": answer.model_dump(mode="json"),
-                "corrected": answer.key in corrected,
-            }
-        )
+    answers = merged_facts(answered, corrections)
+    rows = _answer_rows(report, answers)
     return {
-        "answers": rows,
+        "answers": [
+            row | {"corrected": answer.key in corrected}
+            for row, answer in zip(rows, answers, strict=True)
+        ],
         "findings": list(corrected_findings(report.analyses, answered, corrections)),
+    }
+
+
+def _earlier_payload(
+    report: Report,
+    answered: Sequence[FactAnswer],
+    links: Sequence[LinkAnswer],
+    asked: Collection[UnknownKey],
+) -> dict[str, object]:
+    """The answers a first report read, so its follow-up can take new ones.
+
+    The follow-up admits a new answer to an earlier fact or link
+    (:func:`~analysis_service.links.check_answers`), so the page offers it.
+    A fact the follow-up still ``asked``, such as a facet answer with facets
+    left out, is left to its question, because one submission answers a fact
+    once.
+    """
+    return {
+        "answers": _answer_rows(
+            report, [answer for answer in answered if answer.key not in asked]
+        ),
+        "links": [
+            {
+                "principal": link.principal,
+                "options": list(components(report.system_model)),
+                "answer": link.model_dump(mode="json"),
+            }
+            for link in links
+        ],
     }
 
 
