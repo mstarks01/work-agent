@@ -1,0 +1,145 @@
+diff --git a/src/analysis_service/answer_round.py b/src/analysis_service/answer_round.py
+index 833eb659..5c72c2df 100644
+--- a/src/analysis_service/answer_round.py
++++ b/src/analysis_service/answer_round.py
+@@ -42,7 +42,7 @@ from __future__ import annotations
+ from collections import Counter
+ from collections.abc import Mapping, Sequence
+ from dataclasses import dataclass, replace
+-from functools import cached_property
++from functools import cached_property, partial
+ from typing import TYPE_CHECKING, Annotated, Any
+ 
+ from pydantic import StringConstraints
+@@ -589,32 +589,59 @@ def by_turn(questions: Sequence[EarlyQuestion]) -> list[EarlyQuestion]:
+     """The questions with the selected frameworks taken in turn.
+ 
+     **The one reader of whose turn it is.** The next question is the first
+-    one left that serves the framework charged the fewest choices so far, the
+-    first by name on a tie, and every framework it serves is charged its
++    one left in the queue of the framework charged the fewest choices so far,
++    the first by name on a tie, and every framework it serves is charged its
+     choices (:attr:`~analysis_service.early_questions.EarlyQuestion.frameworks`).
+     So a question two frameworks share costs each of them, and asks once.
+-    Within one framework the list's order holds, so a parent still comes
+-    before its parts: a part serves no framework its parent does not.
++
++    **Each framework's queue reads only its own scores** (:func:`_own_rank`).
++    Its capability questions keep the list's order, so a parent still comes
++    before its parts: a part serves no framework its parent does not. Its
++    field questions follow, ranked by its own part of each score per choice,
++    so no framework's scale orders another's turn. With one framework
++    selected, that is the list's order.
+ 
+     Summing the frameworks' scores put every capability question first, and
+     an owner who stopped after ten choices completed no STRIDE finding with
+     ASVS selected, where STRIDE alone completed 517 (``QA-2026-09-26-03-E29``).
+-    With one framework selected the order does not change.
+     """
++    served = sorted({name for question in questions for name in question.frameworks})
++    queues = {
++        name: sorted(
++            (question for question in questions if name in question.frameworks),
++            key=partial(_own_rank, name),
++        )
++        for name in served
++    }
+     charged: Counter[str] = Counter()
+-    left = list(questions)
++    taken: set[int] = set()
+     order: list[EarlyQuestion] = []
+-    while left:
+-        served = {name for question in left for name in question.frameworks}
+-        if not served:
+-            return order + left
+-        name = min(served, key=lambda each: (charged[each], each))
+-        question = next(question for question in left if name in question.frameworks)
+-        left.remove(question)
++    while True:
++        for queue in queues.values():
++            while queue and id(queue[0]) in taken:
++                queue.pop(0)
++        waiting = [name for name, queue in queues.items() if queue]
++        if not waiting:
++            break
++        name = min(waiting, key=lambda each: (charged[each], each))
++        question = queues[name].pop(0)
++        taken.add(id(question))
+         order.append(question)
+         for holder in question.frameworks:
+             charged[holder] += question.decisions
+-    return order
++    return order + [question for question in questions if id(question) not in taken]
++
++
++def _own_rank(name: FrameworkName, question: EarlyQuestion) -> tuple[int, float]:
++    """Where a question stands in framework ``name``'s queue (:func:`by_turn`).
++
++    A sort keeps the list's order between equal ranks. So a question with no
++    shares, a capability, keeps its place ahead of every field question, and
++    field questions with equal parts per choice keep theirs.
++    """
++    if not question.shares:
++        return (0, 0.0)
++    return (1, -dict(question.shares).get(name, 0.0) / question.decisions)
+ 
+ 
+ def _take(candidates: Sequence[EarlyQuestion], per_round: int) -> list[EarlyQuestion]:
+diff --git a/src/analysis_service/early_questions.py b/src/analysis_service/early_questions.py
+index 0c15ca70..176e19c6 100644
+--- a/src/analysis_service/early_questions.py
++++ b/src/analysis_service/early_questions.py
+@@ -195,6 +195,10 @@ class EarlyQuestion:
+     #: first; a round reorders its own questions with the
+     #: frameworks in turn (:func:`~analysis_service.answer_round.by_turn`).
+     score: float = 0.0
++    #: For a field, each framework's own part of :attr:`score`, by name. A
++    #: framework's turn ranks its field questions by its own part only, so no
++    #: framework's scale orders another's turn. Empty for a capability.
++    shares: tuple[tuple[FrameworkName, float], ...] = ()
+     #: For a capability, the band of the most important unit it could settle,
+     #: as its framework ranks units (level 1 highest for ASVS); 0 for every
+     #: other question. :func:`~analysis_service.answer_round.passes_floor`
+@@ -252,8 +256,7 @@ def early_questions(
+     come first (:func:`capability_questions`).
+     """
+     model = prepared_model(model, catalog)
+-    score: dict[UnknownKey, float] = {}
+-    helps: dict[UnknownKey, list[FrameworkName]] = {}
++    shares: dict[UnknownKey, dict[FrameworkName, float]] = {}
+     reasons: dict[tuple[str, str], list[str]] = {}
+     for name in sorted(frameworks):
+         package = PACKAGES[name]
+@@ -276,11 +279,10 @@ def early_questions(
+             for field, rate in rates.items():
+                 key = _open_key(model, element, field)
+                 if key is not None:
+-                    score[key] = score.get(key, 0.0) + rate * (1 + named[element.id])
+-                    helps.setdefault(key, []).append(name)
++                    shares.setdefault(key, {})[name] = rate * (1 + named[element.id])
+     names = element_names(model)
+     asked = []
+-    for key, value in score.items():
++    for key, given in shares.items():
+         ref = UnknownRef(element_id=key[0], attribute=key[1], question=key[4])
+         group, heading = group_of(ref)
+         asked.append(
+@@ -289,7 +291,7 @@ def early_questions(
+                 kind=fact_kind(key),
+                 label=label_of(ref, names),
+                 reasons=tuple(reasons.get((key[0], key[1]), ()) or (PRIOR_REASON,)),
+-                frameworks=tuple(helps[key]),
++                frameworks=tuple(given),
+                 choices=answer_choices(key, model, catalog),
+                 form=answer_form(key, model, catalog),
+                 suggestions=answer_suggestions(key),
+@@ -298,7 +300,8 @@ def early_questions(
+                 group=group,
+                 group_heading=heading,
+                 element=names.get(key[0], key[0]),
+-                score=value,
++                score=sum(given.values()),
++                shares=tuple(given.items()),
+             )
+         )
+     asked.sort(
