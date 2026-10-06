@@ -7,10 +7,8 @@
 # 429 on any node kills a paid-for job on first contact, and a stalled call
 # parks a job in `running` forever. `attempts` and `timeout_ms` fix both.
 #
-# Unlike config/sampling.toml, every value here IS env-overridable
-# (ANALYSIS_RETRY_ATTEMPTS, ANALYSIS_TIMEOUT_MS, ANALYSIS_MAX_SOURCE_BYTES,
-# ANALYSIS_MAX_SOURCES, ANALYSIS_JOB_DEADLINE_MS, ANALYSIS_RETRY_BUDGET_RATIO,
-# ANALYSIS_MAX_ACTIVE_JOBS).
+# Unlike config/sampling.toml, every value here IS env-overridable, each by an
+# ANALYSIS_* variable that docs/Configuration.md lists.
 # Sampling decides WHAT the model produces; nothing in this file can. Attempts, timeout and the budget change only HOW
 # HARD we try; the input bounds and the concurrency ceiling decide only whether
 # a submission is accepted at all, and the deadline only whether an answer

@@ -293,8 +293,8 @@ not for any vendor's product line:
 
 [`config/model_tiers.toml`](Configuration.md) maps nodes to tiers and each tier
 to a `(vendor, model)` pair. Deterministic `FunctionNode`s carry no model. The
-`strong` tier does most of a job's model work — the six-way category fan-out
-plus the critic and its re-ask.
+`strong` tier does most of a job's model work — the lane fan-out of every
+carried framework, plus the critic and its re-ask.
 
 The tiers choose their vendor **independently**, so they can run different
 vendors at the same time. A third tier, `review`, exists so criticism can be

@@ -35,10 +35,10 @@ Gemini Developer API and OpenRouter.
 <!-- /every-vendor -->
 
 It reaches all of them through ADK's LiteLLM adapter. `model_tiers.toml` selects **nothing**:
-all three tier tables are absent, so startup fails until `base`, `strong` and
-`review` each name a vendor and a model. `review` is required even though the
-shipped node map points criticism at `strong`, because a tier a file may omit is
-a tier nobody has chosen a model for.
+all three tier tables are absent, so startup fails until each tier the node map
+runs something on names a vendor and a model. The shipped node map runs nodes on
+`base` and `strong` only, so `review` needs no selection until you move a node
+onto it.
 
 “Supported vendor” does not mean every model from that vendor is usable. The
 selected model must also pass the model-name, sampling, output-capacity, native
@@ -49,7 +49,7 @@ may run different vendors at once:
 
 | Tier | What runs on it |
 | --- | --- |
-| `base` | extraction and repair |
+| `base` | extraction, repair and the assertion pass |
 | `strong` | every framework's lane agents, and by default its critic and re-ask |
 | `review` | nothing, until you move criticism onto it |
 
@@ -59,9 +59,9 @@ critic can run on a model other than the one it is checking, which two tiers
 could not express: the only other place to put criticism was `base`, and a
 re-ask on a cheaper model than the pass it corrects is refused.
 
-Every tier must select a pair, including one nothing runs on. Only a tier the
-node map **binds** builds an adapter, so selecting `review` costs no credential
-until something runs on it. See
+Every tier the node map **binds** must select a pair. A tier nothing runs on
+needs no selection, and if you select one anyway it builds no adapter and needs
+no credential. See
 [Review independence](#review-independence).
 
 ```toml
@@ -389,12 +389,13 @@ under
 ### Node keys, and the frameworks this deployment carries
 
 `model_tiers.toml`'s `[nodes]` table carries **three keys per framework** beside
-the two neutral ones:
+the three neutral ones:
 
 ```toml
 [nodes]
 extract = "base"
 repair = "base"
+assert = "base"
 "analyze/asvs" = "strong"
 "critic/asvs" = "strong"
 "recritic/asvs" = "strong"
@@ -433,9 +434,9 @@ rather than failing on the first job. A deployment missing an
 
 ### Sampling
 
-`config/sampling.toml` (`version = 4`) pins decoding parameters **per tier**, in
-`[tiers.base]` and `[tiers.strong]` tables that reuse the node→tier map from
-`model_tiers.toml`. The eval harness and production read this same file, on
+`config/sampling.toml` (`version = 5`) pins decoding parameters **per tier**, in
+`[tiers.base]`, `[tiers.strong]` and `[tiers.review]` tables that reuse the
+node→tier map from `model_tiers.toml`. The eval harness and production read this same file, on
 purpose: grading a configuration you don't actually ship is how a test suite
 stays green while production quietly drifts.
 
@@ -446,7 +447,7 @@ loader rejects, never a silent fallback.
 | Param | Shipped state | Notes |
 | --- | --- | --- |
 | `temperature` | **unset** | No value is legal on every model: Claude 4.7+ rejects the parameter, and OpenAI's reasoning families take only their own default of `1`. Set one per tier if you want a stated value — see below. |
-| `max_output_tokens` | pinned `16384` base / `64000` strong | Must be pinned: silence means a *vendor-derived* cap. Sized against measured output — see below. |
+| `max_output_tokens` | pinned `16384` base / `64000` strong and review | Must be pinned: silence means a *vendor-derived* cap. Sized against measured output — see below. |
 | `candidate_count` | pinned `1` | Reserved; the loader **rejects any value ≠ 1**. |
 | `constrain_output` | pinned `true` | Send this tier's node schema to the provider. Set `false` where the provider's schema compiler won't take it — see below. |
 | `structured_output` | pinned `auto` | How the schema travels: native output, or a forced tool call. See [How a tier sends its schema](#how-a-tier-sends-its-schema). |

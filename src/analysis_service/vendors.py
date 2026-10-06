@@ -890,7 +890,7 @@ class Vendor:
     #: OpenRouter takes ``provider.only`` with ``provider.allow_fallbacks``
     #: (its provider routing reference, read 2026-09-12), and litellm merges an
     #: ``extra_body`` kwarg into the request body it sends there — measured on
-    #: 1.97.0 by ``tests/test_model_gate.py``.
+    #: 1.104.0 by ``tests/test_model_gate.py``.
     #:
     #: Stated per vendor rather than assumed from the flag, because two
     #: gateways would spell the fields two ways, and a row that names none
@@ -935,7 +935,7 @@ class Vendor:
     #: needs both halves. It states its charge in ``usage.cost``, which litellm
     #: asks for on every request and keeps in ``_hidden_params``
     #: (in the ``transform_response`` of its OpenRouter chat config, measured
-    #: on 1.97.0). Under
+    #: on 1.104.0). Under
     #: a key of the operator's own the same field carries the routing fee
     #: alone, about a twentieth of the spend, and the upstream half sits in
     #: ``cost_details.upstream_inference_cost`` — a field litellm never reads.
@@ -1444,7 +1444,7 @@ VENDORS: dict[VendorName, Vendor] = {
         # with ``usage.cost`` when a request asks for it, and litellm asks on
         # every request: its OpenRouter config sets ``usage.include`` and files
         # the figure under ``_hidden_params["additional_headers"]``
-        # ("llm_provider-x-litellm-response-cost"), measured on litellm 1.97.0
+        # ("llm_provider-x-litellm-response-cost"), measured on litellm 1.104.0
         # in the `transform_response` of its OpenRouter chat config.
         #
         # Which arrangement the account runs under decides what that figure

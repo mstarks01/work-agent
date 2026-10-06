@@ -39,7 +39,7 @@ from typing import Any
 from analysis_service.answer_round import passes_floor, question_set
 from analysis_service.claims import FrameworkName, UnknownKey
 from analysis_service.early_questions import EarlyQuestion, early_questions
-from analysis_service.fact_answers import FactAnswer
+from analysis_service.fact_answers import FactAnswer, key_ref
 from analysis_service.frameworks import PACKAGES
 from analysis_service.questions import fact_questions
 from analysis_service.report import Report
@@ -228,7 +228,7 @@ def readings(
             order = build(report.system_model, frameworks)
             for budget in (*BUDGETS, None):
                 answered = _prefix(order, budget)
-                capabilities = {key[5] for key in answered if key[5]}
+                capabilities = {key_ref(key).capability for key in answered} - {""}
                 done = [
                     band for band, keys in needs.findings.values() if keys <= answered
                 ]

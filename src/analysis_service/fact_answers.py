@@ -121,7 +121,9 @@ class FactAnswer(BaseModel):
         if not isinstance(data, dict) or data.get("facets") is None:
             return data
         facets, key = data["facets"], data.get("key")
-        question = key[4] if isinstance(key, list | tuple) and len(key) == 6 else ""
+        question = ""
+        if isinstance(key, list | tuple) and len(key) == len(_KEY_FIELDS):
+            question = dict(zip(_KEY_FIELDS, key, strict=True))["question"]
         kind = QUESTION_KINDS.get(question)
         if kind is None or kind.answer != "facets":
             raise ValueError("facets answer only a question kind that has facets")
@@ -259,7 +261,11 @@ def fact_line(fact: FactAnswer) -> str:
 
 def answer_facets(key: UnknownKey) -> tuple[Facet, ...]:
     """The facets a question kind is answered in, or empty."""
-    kind = QUESTION_KINDS.get(key[4]) if fact_kind(key) == "question" else None
+    kind = (
+        QUESTION_KINDS.get(key_ref(key).question)
+        if fact_kind(key) == "question"
+        else None
+    )
     return () if kind is None else kind.facets
 
 

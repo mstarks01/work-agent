@@ -219,9 +219,8 @@ _RATE_LIMITED_STATUS = 429
 #: failed, including the gateway range (``502``, ``504``), Anthropic's overload
 #: code (``529``) and the ``52x`` codes an edge network in front of an
 #: aggregator can emit. ``501`` and ``505`` are permanent in HTTP's own terms
-#: and are still admitted here, because litellm flattens them to ``500`` on four
-#: of the six vendors and a rule that can only be obeyed on two is worse than a
-#: rule that retries a code no model endpoint sends.
+#: and are still admitted here: no model endpoint sends them, and one lower
+#: bound reads the same on every vendor where a list of exceptions would not.
 _TRANSIENT_CLIENT_STATUS_CODES = frozenset({408, _RATE_LIMITED_STATUS})
 _LOWEST_SERVER_STATUS_CODE = 500
 
@@ -231,7 +230,7 @@ _LOWEST_SERVER_STATUS_CODE = 500
 #: having spent an attempt, a budget token and the wall-clock of a paid job.
 #:
 #: The pinned translator states the dimension on the exception. Measured on
-#: litellm 1.97.0: every ``RateLimitError`` carries ``category`` (defaulting to
+#: litellm 1.104.0: every ``RateLimitError`` carries ``category`` (defaulting to
 #: ``vendor_rate_limit``) and ``rate_limit_type``, which is ``None`` unless the
 #: limiter that fired named one. ``litellm.exceptions.RateLimitType`` is the
 #: closed set this keys on.
@@ -261,8 +260,8 @@ def _is_transient(exc: BaseException) -> bool:
     litellm's mapper chooses, and it chooses differently per provider: on the
     pinned library an upstream ``500`` becomes ``InternalServerError`` on
     ``anthropic`` and ``APIError`` on ``openrouter``, and an upstream ``502``
-    becomes ``BadGatewayError`` on both — a class no tuple of transient types
-    ever named. The status code is the one part of the exchange every provider
+    becomes ``BadGatewayError`` on ``anthropic``, ``APIError`` on
+    ``openrouter`` and ``APIConnectionError`` with a ``500`` on ``vertex``. The status code is the one part of the exchange every provider
     spells the same way, and every litellm exception carries it, including as a
     constructor default when nothing mapped it (``Timeout`` is ``408``,
     ``APIConnectionError`` is ``500``).

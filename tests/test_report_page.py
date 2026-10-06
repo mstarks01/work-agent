@@ -205,6 +205,45 @@ def test_every_reason_a_fact_is_open_has_a_line_on_the_page():
         assert keys == set(get_args(FactStatus)), name
 
 
+@pytest.mark.parametrize("step", [None, "evidence", "reasoning", "lane", "duplicate"])
+def test_the_page_rules_out_a_unit_where_the_claim_rules_on_it(step):
+    """The page's ``rulesOut`` and ``RuledClaim.rules_on_unit`` are two readers of
+    one rule, so each rejection cause is put to both."""
+    from types import SimpleNamespace
+    from typing import get_args
+
+    from analysis_service.claims import RejectionStep, RuledClaim
+    from tests.test_webapp import viewer_javascript
+
+    assert set(get_args(RejectionStep)) == {
+        "evidence",
+        "reasoning",
+        "lane",
+        "duplicate",
+    }
+    node = shutil.which("node")
+    if node is None:
+        pytest.skip("no node on PATH to run the report page's script")
+    javascript = viewer_javascript()
+    rule = "\n".join(
+        re.search(rf"const {name} = .*?;\n", javascript, re.DOTALL)[0]
+        for name in ("answersInUnits", "rulesOut")
+    )
+    verdict = {"status": "rejected", "rejected_because": step}
+    program = (
+        f"const UNITS = {{asvs: ['1.1.1']}};\n{rule}\n"
+        f"console.log(JSON.stringify(rulesOut("
+        f"{{framework: 'asvs'}}, {{verdict: {json.dumps(verdict)}}})));"
+    )
+    done = subprocess.run(
+        [node, "-e", program], capture_output=True, text=True, timeout=30, check=False
+    )
+    assert done.returncode == 0, done.stderr
+
+    claim = SimpleNamespace(verdict=SimpleNamespace(**verdict))
+    assert json.loads(done.stdout) is RuledClaim.rules_on_unit(claim)
+
+
 def test_a_description_names_an_element_by_its_name():
     """A finding showed `flow:entity:customer>process:web-app>login` (#561).
 

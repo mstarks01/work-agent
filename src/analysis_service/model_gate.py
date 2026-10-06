@@ -118,19 +118,17 @@ def library_sends_no_native_schema(vendor: Vendor, model: str) -> bool:
     * it returns ``True`` where LiteLLM would satisfy the constraint with a
       synthesised tool, so the model is asked to follow the schema and nothing
       makes it;
-    * it *raises* where LiteLLM will not map ``response_format`` at all — 79 of
-      the pinned map's rows under a registered prefix, Bedrock's Cohere text
-      models among them. A schema does not reach a model that refuses the
-      parameter carrying it.
+    * it *raises* where LiteLLM will not map ``response_format`` at all, as
+      for Bedrock's Cohere text models. A schema does not reach a model that
+      refuses the parameter carrying it.
 
     **Narrowed, because the set was measured.** Swept over every row of the
     pinned map under a registered prefix, plus an unmapped probe per vendor,
-    this call raises ``UnsupportedParamsError`` and nothing else — 80 times.
-    So a different exception is a fact nobody here has met, and it propagates
-    rather than being read as a refusal. That is the opposite of
-    :func:`model_info` one function down, where litellm raises ``Exception``
-    itself and there is no type to match on; the two look alike and are not the
-    same case.
+    this call raises ``UnsupportedParamsError`` and nothing else, and
+    ``tests/test_model_gate.py`` repeats that sweep. So a different exception
+    is a fact nobody here has met, and it propagates rather than being read as
+    a refusal. :func:`model_info` narrows the same way, to
+    ``ModelNotMappedError``.
 
     Both are facts about what the installed library does with a request, which
     is why they belong together and why this is what a **gate** reads.
@@ -164,8 +162,7 @@ def native_structured_output(vendor: Vendor, model: str) -> bool | None:
 
     The tri-state a boolean cannot express. ``None``
     means the pinned map carries an entry for this pair and that entry says
-    nothing about response schemas — 2029 of its entries are silent, against
-    881 that say yes and 72 that say no.
+    nothing about response schemas, and most of its entries are silent.
 
     **A report may not turn that silence into a no.** LiteLLM's lookup returns
     ``False`` for a silent entry, so a matrix built on it printed
@@ -187,8 +184,7 @@ def native_structured_output(vendor: Vendor, model: str) -> bool | None:
     than hides.
 
     **A model that refuses ``response_format`` outright is a third shape, and
-    it raises.** 33 of the 445 mapped models under a registered prefix do —
-    Bedrock's Cohere text models among them — because
+    it raises.** Bedrock's Cohere text models do, because
     :func:`emulates_structured_output` asks what LiteLLM would map the param
     to, and for those it maps nothing and raises ``UnsupportedParamsError``.
     That is a definitive ``False``: a schema does not reach a model that will
@@ -398,6 +394,9 @@ def check_supported(
     ``source`` names the tier whose config is being checked so the error points
     at the knob to turn. The return value of the underlying call is deliberately
     discarded: the gate is the raise, not the mapped parameter set.
+
+    Only ``UnsupportedParamsError`` is a refusal. Any other error is a fault in
+    LiteLLM, and it propagates, so no caller reads it as a refusal.
     """
     try:
         _litellm.utils.get_optional_params(
@@ -405,7 +404,7 @@ def check_supported(
             custom_llm_provider=vendor.litellm_provider,
             **params,
         )
-    except Exception as exc:
+    except _litellm.exceptions.UnsupportedParamsError as exc:
         raise ModelGateError(
             f"{source}: {vendor.name} cannot serve {model!r} with the configured"
             f" sampling — {exc}"

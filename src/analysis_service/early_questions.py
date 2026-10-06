@@ -74,7 +74,7 @@ from analysis_service.claims import (
     UnknownKey,
     UnknownRef,
 )
-from analysis_service.fact_answers import FactKind, answer_facets, fact_kind
+from analysis_service.fact_answers import FactKind, answer_facets, fact_kind, key_ref
 from analysis_service.frameworks import PACKAGES
 from analysis_service.open_facts import (
     element_names,
@@ -281,14 +281,16 @@ def early_questions(
     names = element_names(model)
     asked = []
     for key, value in score.items():
-        ref = UnknownRef(element_id=key[0], attribute=key[1], question=key[4])
+        ref = key_ref(key)
         group, heading = group_of(ref)
         asked.append(
             EarlyQuestion(
                 key=key,
                 kind=fact_kind(key),
                 label=label_of(ref, names),
-                reasons=tuple(reasons.get((key[0], key[1]), ()) or (PRIOR_REASON,)),
+                reasons=tuple(
+                    reasons.get((ref.element_id, ref.attribute), ()) or (PRIOR_REASON,)
+                ),
                 frameworks=tuple(helps[key]),
                 choices=answer_choices(key, model, catalog),
                 form=answer_form(key, model, catalog),
@@ -297,7 +299,7 @@ def early_questions(
                 max_length=answer_limit(key, model),
                 group=group,
                 group_heading=heading,
-                element=names.get(key[0], key[0]),
+                element=names.get(ref.element_id, ref.element_id),
                 score=value,
             )
         )

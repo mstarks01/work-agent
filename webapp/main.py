@@ -165,6 +165,7 @@ from analysis_service.fact_answers import (
     FactAnswer,
     answer_facets,
     fact_label,
+    key_ref,
     merged_facts,
 )
 from analysis_service.frameworks import PACKAGES, package_for
@@ -1146,7 +1147,7 @@ def _link_row(question: LinkQuestion, names: Mapping[str, str]) -> dict[str, obj
 def _early_row(question: EarlyQuestion, model: SystemModel) -> dict[str, object]:
     """The question as the form page shows it: each choice's element name, and
     the words of the description the question's element was read from."""
-    element = model.get(question.key[0])
+    element = model.get(key_ref(question.key).element_id)
     return {
         **question.to_json(),
         "choices": [

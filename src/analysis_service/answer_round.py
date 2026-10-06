@@ -55,6 +55,7 @@ from analysis_service.fact_answers import (
     FactAnswer,
     answered_keys,
     fact_label,
+    key_ref,
     merged_facts,
     refuse_repeated_facts,
 )
@@ -568,7 +569,9 @@ def next_round(
     remaining = {}
     withheld = 0
     for kind, rule in EARLY_RULES.items():
-        asked = sum(1 for key in held if (kind == "capability") == bool(key[5]))
+        asked = sum(
+            1 for key in held if (kind == "capability") == bool(key_ref(key).capability)
+        )
         left = max(rule.limit - asked, 0)
         eligible = [
             question

@@ -59,7 +59,7 @@
 # it broke outright when Google retired them; matching a shape rather than
 # enumerating builds is what keeps the Claude half from repeating that.
 #
-# ENV OVERRIDES are two vars per tier: ANALYSIS_MODEL_{BASE,STRONG}_VENDOR and
+# ENV OVERRIDES are two vars per tier: ANALYSIS_MODEL_{BASE,STRONG,REVIEW}_VENDOR and
 # _MODEL, plus ANALYSIS_MODEL_CREDENTIALS_{VENDOR}, ANALYSIS_MODEL_CHARGES_{VENDOR}
 # and ANALYSIS_MODEL_UPSTREAMS_{VENDOR} for the three vendor tables below. `_MODEL` alone is the ops case (retune on a deployed revision without
 # an image rebuild). `_VENDOR` alone is a build-time error — a cross-vendor pair
