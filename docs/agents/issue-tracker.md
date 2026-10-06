@@ -55,8 +55,9 @@ gh api --method POST repos/mstarks01/work-agent/issues/<child>/dependencies/bloc
 
 ### The live map
 
-**None.** The last map, [#491](https://github.com/mstarks01/work-agent/issues/491), is under
-Completed maps. Chart a new one only against the bar at the end of this file.
+[#1522](https://github.com/mstarks01/work-agent/issues/1522) — persistent storage for jobs,
+reports and sources. PostgreSQL or SQLite holds job state and principals; an S3-API store or the
+filesystem holds reports and sources. Read the map's Decisions so far before you take a ticket.
 
 ### Completed maps
 
