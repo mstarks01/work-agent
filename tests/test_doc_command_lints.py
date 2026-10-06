@@ -78,7 +78,7 @@ def _options(parser: argparse.ArgumentParser) -> set[str]:
 
 def _documented() -> list[tuple[Path, int, str]]:
     """Every ``python -m evals.harness.run`` invocation the prose prints."""
-    found = []
+    found: list[tuple[Path, int, str]] = []
     for entry in SEARCHED:
         base = REPO_ROOT / entry
         paths = [base] if base.is_file() else sorted(base.rglob("*.md"))

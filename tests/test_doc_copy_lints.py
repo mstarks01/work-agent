@@ -114,7 +114,7 @@ def pinned_values(cell: str) -> dict[str, str]:
     """Each tier's value in a pinned cell, such as
     ``pinned `16384` base / `64000` strong and review``. A segment that names
     no tier states the value for every tier."""
-    stated = {}
+    stated: dict[str, str] = {}
     for segment in cell.removeprefix("pinned ").split(" / "):
         value, _, words = segment.partition("` ")
         named = tuple(tier for tier in TIER_NAMES if re.search(rf"\b{tier}\b", words))
