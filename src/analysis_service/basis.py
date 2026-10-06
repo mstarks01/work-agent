@@ -67,9 +67,8 @@ reaches ``encrypted`` and ``tls`` reaches ``TLSv1.2``.
 :data:`FUNCTION_WORDS` is an ordinary English closed-class list: articles,
 conjunctions, prepositions, pronouns and auxiliaries. It was written from that
 rule and not from the values it went on to flag, and it is frozen there. That
-matters, because #465's first pass grew its list after seeing which values
-failed, which fits the list to the sample and makes the rate it reports mean
-nothing. So the list is ordinary rather than complete — a word it omits reads
+matters, because a list grown after seeing which values fail fits the list to
+the sample and makes the rate it reports mean nothing (#465). So the list is ordinary rather than complete — a word it omits reads
 as content, which costs a diagnostic line and never a rejection.
 
 The measurement
@@ -95,24 +94,13 @@ same thing in other words. Sixteen of the 38 fail that way. So the rule is the
 weak rung, and the strict one is recorded here to say it was measured rather
 than assumed.
 
-**This table supersedes the one in #470, which read 12 of 22 on the strict
-rung.** That figure came from #465's first pass, whose function-word list grew
-after seeing which values failed — fitted to the sample, which is why #470 made
-freezing the list an acceptance criterion. The list here was written from the
-closed-class rule before the run. The two figures are not a difference to take:
-the corpus itself has changed since, and ``tests/test_basis.py`` re-derives
-every number in this table from the corpus it ships beside. The weak rung reads
-0 either way.
+The function-word list is frozen (#470). ``tests/test_basis.py`` re-derives
+every number in this table from the corpus it ships beside.
 
 **The denominator moves when the corpus is corrected, which is the point of
-re-deriving it.** Case 09's fax leg stated a destination-verification gap in its
-``authentication`` field, so a missing safeguard sat in this measurement as a
-stated control; ruling it to ``unknown`` (#925) took it out. The #961 step 3
-rulings reworded case 04's API-key value to what the source reports, and one
-strict flag left with the word the source never used. Case 07 carried the
-same family of fact as ``none`` and was never in here at all — one pair of
-inconsistent values, visible from this side as a denominator of 22 that should
-always have been 21.
+re-deriving it** (#925, #961). A value ruled to ``unknown`` leaves the
+measurement, and a value reworded to the source's own words can drop a strict
+flag.
 
 :func:`~evals.harness.modes.score_extraction` measures the same failure from the
 other side, as ``unverified -> stated``: it asks whether an extraction invented
@@ -304,9 +292,9 @@ class Coverage(BaseModel):
     there were no stated values to read, or the scan budget ran out before
     the values were searched. A caller holding only :func:`unbased_controls`
     cannot tell those apart; the second is the shape an erased citation or a
-    function-word value arrives in (#925), and the last was counted as
-    ``measured`` until #961 — a budget set to zero read as five controls
-    measured and none flagged.
+    function-word value arrives in (#925), and the last reads as not
+    measured (#961), so a budget set to zero does not read as controls measured
+    and none flagged.
 
     ``flagged`` is a subset of ``measured``, so ``measured - flagged`` is what
     the diagnostic looked at and let through. ``uncited``, ``tokenless`` and

@@ -225,10 +225,9 @@ DispositionCode = Literal[
 #: The dispositions that reached an output. **The one reader of "did this row
 #: land"**: :attr:`Resolution.gaps` is its complement, and both the patch
 #: applicator and the oracle ask the same question of a row this resolver
-#: returned. Each spelled the pair again until ``tests/test_reader_lints.py``
-#: held them to it — a sixth disposition that lands would have reached one
-#: caller and not the other two, and each caller's own test would have agreed
-#: with it.
+#: returned. Every caller reads this set, and ``tests/test_reader_lints.py``
+#: holds them to it: a second spelling would let a sixth disposition that lands
+#: reach one caller and not the others.
 LANDED: frozenset[str] = frozenset({"consumed", "preserved"})
 
 #: Which table a disposition row is about. ``bundle`` is the whole submission,

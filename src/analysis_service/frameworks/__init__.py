@@ -574,13 +574,8 @@ def widest_fan_out() -> int:
     ``config/resilience.toml`` is sized against: one ``strong``-tier request per
     lane of every framework a job selects, all fired together at the barrier.
 
-    Derived rather than written down, because it was written down once and went
-    wrong. Six was the whole fan-out while STRIDE was the only package, and
-    stayed in the prose behind the concurrency ceiling, the retry budget and the
-    jitter policy after ASVS made it 23
-    ([#199](https://github.com/mstarks01/work-agent/issues/199) fixed the
-    ceiling's own comment and not the four modules reasoning from the same
-    number). A function over ``PACKAGES`` cannot go stale that way: a package
+    Derived from ``PACKAGES``, because a written count goes stale
+    ([#199](https://github.com/mstarks01/work-agent/issues/199)). A package
     registered tomorrow moves it with no edit anywhere.
 
     Every framework, not the widest single one, because a job may name them all
@@ -909,16 +904,14 @@ def _readable(root: Path, path: Path) -> bool:
     """The loader's question, asked by the gate that runs before it.
 
     `is_file()` follows a symlink out of the package root; `MarkdownLoader.load`
-    resolves and refuses one. So a symlinked lane skill passed startup
-    validation and failed on the first job of that selection. One rule, and the
-    loader owns it.
+    resolves and refuses one. This asks the loader's question, so startup and
+    the first job agree. One rule, and the loader owns it.
 
     **The root is the package's text root**, which is the root the loader uses.
-    An earlier version passed `path.parent`, which made this gate stricter than
-    the loader in the other direction: a lane skill symlinked to another file
-    inside the same package resolves outside its own directory but inside the
-    root, so `load` accepted it and this refused it. A shared reader is only one
-    reader if every caller asks it the same question.
+    `path.parent` would make this gate stricter than the loader: a lane skill
+    symlinked to another file inside the same package resolves outside its own
+    directory but inside the root, so `load` accepts it. A shared reader is
+    only one reader if every caller asks it the same question.
     """
     return _inside(root, path)
 

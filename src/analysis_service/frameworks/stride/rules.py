@@ -166,9 +166,9 @@ def _second_factor_stated_absent(
     ``mfa-requirement`` takes a principal as well as an interaction, and over
     15 archived proposal/graph pairs 15 of 18 rows sat on the principal
     ``shopper accounts`` against 3 on a flow. A candidate names elements, so
-    such a row reached nothing until the catalog could say which element the
-    principal *is*: a settled ``represented-by``, which the sources must state
-    rather than this service infer. The lead then lands on every flow out of
+    such a row reaches a flow only through a settled ``represented-by``: which
+    element the principal *is*, which the sources must state rather than this
+    service infer. The lead then lands on every flow out of
     that element, because that is where a single factor is presented.
     """
     for flow in model.data_flows:
@@ -466,9 +466,8 @@ def _unprotected_sensitive_transit(
             {
                 "encryption_in_transit": _clip(flow.encryption_in_transit),
                 "encryption_state": control_state(flow.encryption_in_transit),
-                # Named for the union it now holds. It was `endpoint_assets`
-                # while the endpoints were the only side read, and a fact key
-                # that says where a value came from has to keep saying it.
+                # Named for the union it holds: a fact key that says where a
+                # value came from has to keep saying it.
                 "assets_in_transit": ", ".join(assets),
             },
         )
@@ -557,8 +556,8 @@ def _shared_dependency(
     carry the count, and ``assets`` reports the element's tags through
     :func:`~analysis_service.analysis.comparable_asset_tags`, which the
     extraction scorer reads too. Every shipped tag names what the element
-    holds, because #877 retired the two that did not; what stops here is a
-    guess being handed to the agent as a lead.
+    holds (#877); what stops here is a guess being handed to the agent as a
+    lead.
     """
     for element in model.elements():
         flows = inbound_flows(model, element.id)

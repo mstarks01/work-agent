@@ -212,7 +212,7 @@ class DraftThreat(Claim):
         :data:`~analysis_service.claims.CONDITIONAL_GROUNDS`, read rather than
         spelled here: an assertion row the sources left open licenses the empty
         for the same reason an unstated attribute does, and a set written out
-        at this seam would have answered for one and not the other.
+        at this seam would answer for one and not the other.
 
         ``absent-attribute`` is deliberately outside that set, though it names
         the same two fields. A control the submitter said is *not there* is a
@@ -313,9 +313,9 @@ class RecommendationReading(BaseModel):
     critic's text says the same thing in the words a model reads.
 
     **Absence is a third answer, not a synonym for sound.** ``None`` on a
-    surviving threat says the critic did not read the advice, which is exactly
-    what could not be told from a critic that read it and approved — the gap
-    the fixture set could not measure. A rejected threat's recommendations need
+    surviving threat says the critic did not read the advice, which a bare
+    boolean cannot tell apart from a critic that read it and approved. A
+    rejected threat's recommendations need
     no reading, so ``None`` is the ordinary answer there.
 
     One reading per ruling rather than one per mitigation. A threat's

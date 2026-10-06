@@ -235,11 +235,10 @@ class Mitigation(BaseModel):
 def _bare_attribute(value: str) -> str:
     """An attribute name with any JSON-pointer prefix a model wrapped it in cut.
 
-    Providers reach for pointer syntax unprompted: a run against
-    ``gpt-5.6-sol`` grounded a threat on ``"/exposure"`` where the prompt and
-    every exemplar spell it ``exposure``. The referent was right — ``Process``
-    has that field — and the job died at :func:`~analysis_service.critic.
-    join_drafts` on the slash alone, taking all six lanes' work with it.
+    Providers reach for pointer syntax unprompted: ``gpt-5.6-sol`` can ground
+    a threat on ``"/exposure"`` where the prompt and every exemplar spell it
+    ``exposure``. A pointer prefix on a correct name must not fail the job at
+    :func:`~analysis_service.fan_in.join_drafts`.
 
     Which spelling of a field name arrives is mechanical, so it is settled
     here rather than argued with in a prompt. The check itself does not
@@ -316,11 +315,9 @@ class UnknownRef(BaseModel):
     #:
     #: **Why it exists.** ``unknown-attribute`` and ``unknown-assertion`` are
     #: one question asked at two seams — :data:`CONDITIONAL_GROUNDS` says so —
-    #: and this record could name only the first. So a ``confirmed`` resting on
-    #: an open assertion had no pair to dismiss and passed the review seam
-    #: silently, while the identical claim resting on an open attribute was
-    #: refused. Moving a fact from a model field to the catalog weakened the
-    #: safeguard, which is the defect rather than the spelling (#1082).
+    #: so this record names either. Without it, a ``confirmed`` claim on an
+    #: open assertion would pass the review seam, while the same claim on an
+    #: open attribute is refused (#1082).
     #:
     #: The identity is 600 characters at its source and this field holds 300:
     #: a reference longer than that names no row here, and the review seam
@@ -387,13 +384,10 @@ class UnknownRef(BaseModel):
     def key(self) -> UnknownKey:
         """The reference fields as one comparable value.
 
-        **The one reader of "are these two references the same".** The pair
-        was the whole of it while a reference could only name an element, and
-        a set of pairs read every assertion reference as the empty pair — so
-        two dismissals of two different open rows compared equal and one
-        dismissal answered both. The subject is part of it for the same
-        reason: without it every free-text question read as one, and a report
-        grouped every one of them under the first.
+        **The one reader of "are these two references the same".** The key
+        includes the subject and the assertion. Without the assertion, two
+        dismissals of two different open rows would compare equal. Without the
+        subject, every free-text question would read as one.
         """
         return (
             self.element_id,
@@ -518,7 +512,7 @@ class Ground(BaseModel):
       requirement about LDAP injection does not apply to a system that never
       mentions a directory service, and the fact that rules it out is the
       absence itself; the four branches above can each only name something
-      present, so a claim about an absence had no honest ground to cite.
+      present, so a claim about an absence has no other honest ground to cite.
       Verified like a quote rather than trusted like prose: the service checks
       the term against every element's text
       (:func:`~analysis_service.analysis.names_term`) and drops the ground where
@@ -548,9 +542,9 @@ class Ground(BaseModel):
       another row disputes it (:func:`~analysis_service.assertions.disputed`). **The assertion layer's
       ``unknown-attribute``**, and it exists for the same reason that kind
       does. An element attribute nobody stated is offered as a fact an agent
-      may raise a *conditional* claim on; a predicate with no graph field had
-      no such offer, so a second factor the sources explicitly left open
-      reached nobody at all.
+      may raise a *conditional* claim on. This kind offers the same for a
+      predicate with no graph field, such as a second factor the sources left
+      open.
       It is a separate kind rather than a flag on ``assertion`` because the two
       readings differ: a settled row is a fact in hand, and an unknown row is a
       question. The fields are identical and the fact is not, which is the
@@ -563,9 +557,8 @@ class Ground(BaseModel):
     text: str = Field(default="", max_length=1000)  # quote
     source_label: str = Field(default="", max_length=200)  # quote
     element_id: str = Field(default="", max_length=300)  # both attribute branches
-    # The same enum its sibling above carries. This one went without it, so the
-    # rule that a critic cannot spell ``description`` here held on one Ground
-    # shape and not on the other.
+    # The same enum its sibling above carries. Both Ground shapes carry the
+    # enum, so a critic cannot spell ``description`` on either.
     attribute: AttributeName = Field(
         default="",
         max_length=100,
@@ -751,10 +744,8 @@ class Verdict(VerdictFields):
     **``rejected_because`` is required of the critic and not of this record**,
     and the asymmetry is deliberate. :func:`~analysis_service.critic.review_issues`
     refuses a rejection that names no check, so nothing this service builds ever
-    lacks one. A report *read back* is a different thing: one written before the
-    field existed carries no answer, and ``None`` says so truthfully. Requiring
-    it here would assert that every rejection ever recorded named its check,
-    which is false, and the only way to make it true is to invent a
+    lacks one. A report *read back* can carry no cause, and ``None`` says so
+    truthfully. Requiring it here would force the reader to invent a
     classification the critic never made. So the archive stays readable and the
     live path stays checked.
 
@@ -1038,11 +1029,9 @@ class Claim(BaseModel):
 
         Every ground whose kind is in
         :data:`CONDITIONAL_GROUNDS` is one, which is the set that already
-        declares itself the reader of "is this claim conditional". It was
-        spelled here as ``unknown-attribute`` alone, and the two therefore
-        disagreed about an open assertion: the mitigation seam licensed a
-        threat to name no countermeasure on one, and the review seam let a
-        ``confirmed`` stand on it with nothing dismissed (#1082).
+        declares itself the reader of "is this claim conditional". This reads
+        :data:`CONDITIONAL_GROUNDS`, so the mitigation seam and the review seam
+        agree about an open assertion (#1082).
 
         An unstated attribute becomes the element spelling and an open
         assertion row the assertion spelling, so a reference resolves by
@@ -1206,15 +1195,14 @@ class RuledClaim(Claim):
         open (#659). Rejected for ``lane`` or ``duplicate``, the critic says the
         draft was in the wrong place or was a second copy, and again says
         nothing about the unit. All three leave it unruled, exactly as if no
-        lane had drafted it. A rejection recorded before the cause was a field
-        carries ``None`` and reads as a ruling, because that is what every
-        reader made of it at the time.
+        lane had drafted it. A rejection with no cause, from a report read
+        back, carries ``None`` and reads as a ruling.
 
         **One reader.** The scope builder that decides which units a block
         still has to list, the coverage check that audits it, and the eval
         scorer that counts a rejection all ask this rather than reading the
-        status, because reading the status alone is how a misfiled draft came to
-        mark its requirement "does not apply" (#657).
+        status, because the status alone would let a misfiled draft mark its
+        requirement "does not apply" (#657).
         """
         if self.verdict.status != "rejected":
             return True
@@ -1257,16 +1245,14 @@ class Proposal(BaseModel):
     having no shared grammar: a package supplies the ``id_format`` and the
     per-lane prefix, and the resolver composes the ID from its own key.
 
-    THE FIELD A MODEL NO LONGER SERIALIZES. A :class:`Ground` is a flat object
+    THE FIELD A MODEL DOES NOT SERIALIZE. A :class:`Ground` is a flat object
     whose legal field combination depends on its own ``kind``, and that
     relationship is unrepresentable in the JSON schema a provider compiles —
-    the reasons are :class:`Ground`'s own docstring's. It was therefore carried
-    by prompt instruction, which makes a mis-shaped ground an expected
-    stochastic outcome rather than a defect: an agent that picked the right
-    fact and spelled it into the wrong branch killed the node, and with it all
-    six lanes.
+    the reasons are :class:`Ground`'s own docstring's. A prompt instruction
+    alone would make a mis-shaped ground an expected stochastic outcome. So the
+    agent selects catalog entries and the service builds the ground.
 
-    So the agent stops spelling it. ``evidence_refs`` holds IDs copied from the
+    ``evidence_refs`` holds IDs copied from the
     evidence catalog the service derived from the validated System Model,
     ``quotes`` holds spans plus the source each came from, and
     ``absent_elements`` holds terms the model names nowhere. All three are flat
@@ -1279,9 +1265,9 @@ class Proposal(BaseModel):
     enumerate what a model holds and never what it lacks. It is checked rather
     than trusted: the service drops a term the model does in fact name.
 
-    What is given up: the branch is no longer the agent's to state. That is the
-    point — the branch was always dictated by the trigger, so an agent choosing
-    it was an agent given a mechanical job to get wrong. The catalog entry
+    What is given up: the agent does not state the branch. That is the
+    point — the trigger dictates the branch, so an agent choosing it would be
+    an agent given a mechanical job to get wrong. The catalog entry
     carries the branch, and picking the entry picks it.
 
     At least one entry across the three lists, which is ``grounds``'
@@ -1475,16 +1461,12 @@ class Ruling(BaseModel):
     fields on top — STRIDE's ``confidence`` and its severity override are on
     :class:`~analysis_service.frameworks.stride.record.ThreatRuling`.
 
-    WHY THE CRITIC NO LONGER RE-EMITS THE DRAFT. Its output was every draft
-    transcribed whole plus a verdict, which made the single longest call in the
-    graph proportional to the category agents' combined prose rather than to the
-    judgement it was asked for. The service already holds those drafts — they
-    are the same bytes it put in the critic's prompt — so the transcription
-    bought nothing and cost the run's largest block of output tokens. It also
-    cost correctness: re-emitting a description is a chance to alter it, and
-    a critic told "do not rewrite descriptions" could still do so silently.
-    Under this schema it cannot, and a ruling carries no element references to
-    check.
+    WHY THE CRITIC DOES NOT RE-EMIT THE DRAFT. The service holds the drafts —
+    they are the same bytes it put in the critic's prompt — so a transcription
+    would buy nothing and cost the run's largest block of output tokens. It
+    would also cost correctness: re-emitting a description is a chance to alter
+    it. Under this schema the critic cannot, and a ruling carries no element
+    references to check.
 
     No ruling field replaces a field the agent wrote.
     """
@@ -1500,7 +1482,7 @@ class Ruling(BaseModel):
     # service from its package's own ``id_format``.
     #
     # So a pattern here could only ever fire on an ID the reconciliation was
-    # about to reject anyway — and it fired earlier and fatally, at the node
+    # about to reject anyway — and it would fire fatally, at the node
     # boundary, where a raise kills the critic's single pass over every draft
     # and the bounded re-ask never runs. Without it, ``"S-1"`` arrives as two
     # precise re-askable problems: one draft dropped, one claim returned that
@@ -1708,9 +1690,9 @@ class UnresolvedEvidence(BaseModel):
     :class:`DroppedClaim`, because a finding with no grounds is the one
     thing this schema does not permit.
 
-    This replaced a whole-job failure (#138). Agents compose well-formed
-    references — correct grammar, plausible element IDs, absent from the set —
-    and a live sweep lost 2 of 12 jobs that way. Discarding six lanes of
+    A dropped claim is marked and the job continues (#138). Agents compose
+    well-formed references — correct grammar, plausible element IDs, absent
+    from the set. Discarding six lanes of
     analysis because one threat named one fact that did not exist trades a
     report for a citation error, which is the trade
     :class:`UnresolvedMention` already refused to make.
@@ -1935,13 +1917,11 @@ ARCHIVED_UNRECONCILED_KINDS: frozenset[UnreconciledKind] = frozenset(
 class UnreconciledRuling(BaseModel):
     """One way a critic pass failed to reconcile: the claim, the kind, the words.
 
-    **The typed half is what a reader counts by.** This list carried bare
-    sentences once, and the only way to say what caused a re-ask was a regular
-    expression over prose: six archived runs of one case carried 238 of them,
-    and no consumer could count distinct rulings at all, because one ruling
-    produces more than one sentence. ``claim_id`` and ``kind`` answer both
-    questions off the record, and the wording of an error string stops being
-    load-bearing for anything but the prompt.
+    **The typed half is what a reader counts by.** Each entry carries
+    ``claim_id`` and ``kind``, so a reader counts what caused a re-ask and how
+    many distinct rulings there are off the record. One ruling produces more
+    than one sentence, so a count over prose would be wrong. The wording of an
+    error string matters only to the prompt.
 
     ``message`` stays, and it is the half the re-ask reads: the sentences are
     what the bounded re-ask is asked to fix, in the words a model can act on.
@@ -2416,12 +2396,10 @@ def build_block_summary(
 class FrameworkAnalysis(BaseModel):
     """What one framework produced, against the envelope's shared model.
 
-    **A field sits where the thing it describes sits**, and that one rule sorted
-    every field of the flat schema this replaced. Nine described the job or the
-    shared model and stayed on the envelope; the eight here describe one
-    framework's output and moved. ``analysis_context`` split on the same rule —
-    the instruction digest describes the built graph and the domain packs
-    describe the model, so both stayed, while ``fired_rules`` names *this*
+    **A field sits where the thing it describes sits.** Job-level fields sit on
+    the envelope; per-framework fields sit here. ``analysis_context`` splits on
+    the same rule — the instruction digest describes the built graph and the
+    domain packs describe the model, so both sit on the envelope, while ``fired_rules`` names *this*
     package's **Candidate** rules and ``knowledge_docs`` names what those rules
     retrieved, so both are here.
 

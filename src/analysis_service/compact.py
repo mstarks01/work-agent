@@ -13,11 +13,9 @@ evals.bench.deterministic transport`` prints 5.0% of *characters*, which is an
 upper bound: the corpus models are hand-corrected, and characters are not
 tokens.
 
-Both numbers were nearly double this until the third live sweep. The bench
-priced against a six-character ref; five sweeps put the mean ref a model
-actually writes at 20.8 characters, because a model names a ref after the thing
-it points at. The bench now uses a name-slug ref and the earlier 10.1% figure
-is gone from this tree.
+The bench prices a name-slug ref, which matches the mean ref of 20.8
+characters that five sweeps measured. A model names a ref after the thing it
+points at.
 
 **The input side is close to free.** The delta prompt is about 500 coarse
 tokens, and the compact schema is smaller than ``SystemModel``'s because six
@@ -43,11 +41,9 @@ is exactly where the saving comes from. The remedy, if the mechanism holds, is
 to restate rule 3's discipline in the delta where the ref is introduced.
 
 Whether the output saving is worth having is #938 stage 4, a paired live
-comparison. The first one could not resolve it: the emitted-token difference was
-under half the full route's own run-to-run spread on one case.
+comparison.
 ``docs/adr/0035-the-compact-transport-promotes-on-a-predeclared-gate.md`` fixes
-what the next run has to show, and it was written before that run. Until it
-passes, this route is off.
+what a run has to show. Until a run passes that gate, this route is off.
 
 **This is a transport, not an ontology.** The compact model carries exactly the
 facts a :class:`~analysis_service.system_model.SystemModel` carries, under the
@@ -78,9 +74,9 @@ Three properties make the expansion safe to put in front of the gate:
   the gate with a message naming a real element.
 - **A reference resolves inside the scope of the field that reads it.** That is
   what gives the transport back the type a full-model ID carries in its prefix,
-  and it is the correction the first live run bought: a model gave
-  ``card-processor`` to an external entity and to its own trust zone, which the
-  full model spells as two IDs and a flat namespace could not tell apart. A ref
+  because a model can give ``card-processor`` to an external entity and to its
+  own trust zone, which the full model spells as two IDs and a flat namespace
+  cannot tell apart. A ref
   several elements of one scope claim resolves to none of them, and the adapter
   reports ``duplicate-ref`` rather than picking — picking would be a silent
   wrong binding, which is the failure this transport has to be incapable of.
@@ -128,28 +124,20 @@ ExtractionFormat = Literal["full", "compact-v4"]
 #: The full-model route: the model writes a :class:`SystemModel` itself.
 FULL_FORMAT: ExtractionFormat = "full"
 
-#: The compact route, version 4. Each earlier version is out of the tree, and
-#: each was retired by a measurement rather than an argument — nothing persisted
-#: is in this format, so every change is a cutover rather than a migration.
+#: The compact route, version 4. Nothing persisted is in this format, so a
+#: version change is a cutover rather than a migration. A reader of an archived
+#: report reads the version off this string:
 #:
-#: Version 1 wrote an untyped ref, so an element and its own trust zone sharing
-#: a name made every use of that ref ambiguous. Version 2 kept the untyped ref
-#: and moved the assumption inside its element to dodge the one reference no
-#: scope could decide; that removed the `duplicate-ref` it was aimed at and
-#: **caused nine failures of a kind neither the full route nor version 1 ever
-#: produced** — an inference written on the flow carrying the data rather than
-#: the store holding it. Version 3 put the type back in the ref, which is what
-#: a full-model ID's prefix always was, and put the assumption back where it
-#: never failed; it failed the gate on two flow refs the model had derived from
-#: the flow's *endpoints*, so two flows between one pair collided.
+#: * Version 1: an untyped ref, with each assumption naming its element.
+#: * Version 2: an untyped ref, with each assumption inside its element.
+#: * Version 3: a typed ref, with each assumption naming its element.
+#: * Version 4: version 3, with a flow's ref named after its label.
 #:
-#: **Version 4 says what a flow's ref is named after, and nothing else changes.**
-#: The schema, the adapter and every other rule are version 3's. A flow's ref is
-#: its label, because a label is what tells two flows between one pair apart,
-#: and ``prompts/extract-compact.md`` says so where it introduces the ref. This
-#: is the only version whose safety fix also *increased* the saving: a label
-#: slug runs 17.4 characters against 33.2 for an endpoint pair over the blessed
-#: corpus, worth 1.04% of the full emission on top of the transport's own.
+#: A flow's ref is its label, because a label is what tells two flows between
+#: one pair apart, and ``prompts/extract-compact.md`` says so where it
+#: introduces the ref. A label slug runs 17.4 characters against 33.2 for an
+#: endpoint pair over the blessed corpus, worth 1.04% of the full emission on
+#: top of the transport's own.
 #:
 #: **Versioned in its name**, because a reader of
 #: an archived report has to be able to tell which wire form produced it, and
@@ -325,15 +313,12 @@ class CompactAssumption(BaseModel):
     because it holds one: a reader who sees ``element_id`` beside a value of
     ``"p:api"`` has to guess which naming scheme is in play.
 
-    **Naming the subject is what keeps the pairing honest.** Version 2 wrote
-    this entry inside its element instead, so the subject was where the entry
-    sat and no reference could dangle. It cost more than it saved: across five
-    corpus sweeps the model wrote nine ``data_classification`` inferences on a
-    flow or a process — an attribute only a Data Store declares — where the full
-    route and version 1 wrote none in five sweeps each. Naming the element
-    beside the attribute is the moment the model checks that the two go
-    together, and removing it moved the inference to whatever the model was
-    thinking about rather than what the fact is true of.
+    **Naming the subject is what keeps the pairing honest.** Naming the
+    element beside the attribute makes the model check that the two go
+    together. An entry written inside its element instead put nine
+    ``data_classification`` inferences on a flow or a process across five
+    corpus sweeps — an attribute only a Data Store declares — where the full
+    route wrote none.
     """
 
     model_config = ConfigDict(extra="forbid")
@@ -411,12 +396,9 @@ OMITTABLE_FIELDS: tuple[str, ...] = tuple(
 
 #: Every field that holds a ref.
 #:
-#: **There is no scope table any more, and that is the point of version 3.** A
-#: typed ref names exactly one element, so resolution is a lookup rather than a
-#: search narrowed by which field is reading. Version 1 had no way to tell an
-#: entity from its own trust zone; version 2 gave the three endpoint types one
-#: namespace still, so a process and a store both called ``orders-db`` remained
-#: ambiguous for a flow endpoint. The tag settles all of it.
+#: **A typed ref names exactly one element**, so resolution is a lookup rather
+#: than a search narrowed by which field is reading. The tag tells an entity
+#: from its own trust zone, and a process from a store with the same name.
 #:
 #: Reference *typing* stays the gate's rule, and the good diagnostic survives: a
 #: ``trust_zone`` written ``p:api`` resolves to ``process:api`` and fails the

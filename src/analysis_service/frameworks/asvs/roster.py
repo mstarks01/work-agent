@@ -29,9 +29,7 @@ __all__ = ["ROSTER_HEADING", "replace_roster", "roster_block", "write_rosters"]
 ROSTER_HEADING = "### The requirements of this chapter"
 
 #: How to read the block, stated once at the top of every chapter's roster. The
-#: counts are computed rather than written, which is the third copy of the
-#: catalog this module removes: they were correct in all 17 skills and nothing
-#: checked them.
+#: counts are computed from the catalog.
 _PREAMBLE = (
     "{total} requirements across {sections} sections: {level_1} at level 1,"
     " {level_2} at level 2, {level_3} at level 3. Rule on every one at or below"

@@ -191,9 +191,9 @@ def control_state(value: str) -> ControlState:
     Nothing upstream rules a blank out: the free-text control fields carry a
     maximum length and no minimum, so an empty ``authentication`` passes
     :func:`~analysis_service.validation.validate`. Read as ``stated`` it would make
-    :func:`is_unverified` false, which suppressed every candidate rule that asks
-    about a missing control and the evidence row beside it. The gate now reports
-    a blank field to the repair pass as well (``blank-control``), and this is
+    :func:`is_unverified` false, which would suppress every candidate rule that
+    asks about a missing control and the evidence row beside it. The gate
+    reports a blank field to the repair pass as well (``blank-control``), and this is
     the reading that holds if one arrives anyway: silence about a control is the
     same fact as a control nobody knew.
     """
@@ -278,10 +278,8 @@ def comparable_asset_tags(tags: Iterable[str]) -> tuple[str, ...]:
     """``tags`` as a comparable value: sorted, and each one once.
 
     **It normalises and it selects nothing.** Every shipped tag names what an
-    element holds, so there is no half to drop: #877 retired the two that named
-    a consequence, and a tag a deployment adds through ``extra_asset_tags``
-    names what that deployment models. The selection this once made went with
-    those two tags.
+    element holds, so there is no half to drop (#877). A tag a deployment adds
+    through ``extra_asset_tags`` names what that deployment models.
 
     The one reader, so the places that compare an element's tags cannot
     disagree about what they are comparing. An extraction is scored on the

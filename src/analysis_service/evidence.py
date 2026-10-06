@@ -11,7 +11,7 @@ agent a list of IDs.
 The LLM decides which evidence supports a finding, and this module decides how
 that evidence is represented. An agent answers with ``evidence_refs``, which are
 IDs copied out of the catalog, and :func:`resolve_proposals` turns each back
-into the ground it came from. An agent that picks the right fact can no longer
+into the ground it came from. An agent that picks the right fact cannot
 file it under the wrong branch, omit the field that branch requires, or invent
 an element ID, because it supplies none of those things. It supplies a choice
 from a closed set.
@@ -284,8 +284,8 @@ def evidence_catalog(
         )
         # The open questions, after the settled rows and never merged with
         # them. A row reaches here when its value is the unknown sentinel and
-        # it reaches no graph field: the one class of fact that had no offer
-        # of any kind, because the attribute enumeration above walks elements
+        # it reaches no graph field: the one class of fact that no other offer
+        # reaches, because the attribute enumeration above walks elements
         # and this row's subject may be a principal.
         # A row in a conflict is a question too, and one with no graph field
         # reaches a lane nowhere else: the model shows a disputed attribute as
@@ -632,17 +632,13 @@ def render_rows(catalog: AssertionCatalog) -> str:
 def render_element_roster(model: SystemModel) -> str:
     """Every element ID a claim may name, as a table to select from.
 
-    **The same fix as :func:`render_catalog`, at the seam it was never applied
-    to.** That docstring records why: rendered as a specimen of the format, a
-    reference set invites an agent to *compose* a well-formed member instead of
-    copying one, and a composed reference that resolves to nothing fails its
-    whole job (#138, ADR 0012).
-
-    ``affected_element_ids`` had only the constraint — "every one of them
-    present in the System Model" — and the model as fenced JSON to read it out
-    of. On a live end-to-end sweep a lane agent produced a flow ID with its own
-    label concatenated twice: well-formed, plausible, absent from the set. It never appears in ``analysis`` mode, whose
-    seeded blessed model has clean IDs to copy (#306).
+    **Rendered as a table, for the reason :func:`render_catalog` gives:**
+    rendered as a specimen of the format, a reference set invites an agent to
+    *compose* a well-formed member instead of copying one (#138, ADR 0012). A
+    lane agent given only the model as fenced JSON can compose a flow ID with
+    its own label concatenated twice: well-formed, plausible, absent from the
+    set. ``analysis`` mode does not show it, because its seeded blessed model
+    has clean IDs to copy (#306).
 
     **The gloss is type and place, never the attributes.** Those are in the
     System Model already and this table is paid for on every lane agent of every
@@ -806,7 +802,7 @@ ASSERTION_GLOSSES: Mapping[str, Callable[[Assertion, Mapping[str, Subject]], str
 class Resolution(NamedTuple):
     """One lane's drafts, and every reference of theirs that named nothing.
 
-    Two values because the second is no longer fatal on its own: a dropped
+    Two values because the second is not fatal on its own: a dropped
     reference is recorded and the analysis continues, so the caller needs both
     halves. Shaped like :class:`~analysis_service.fan_in.JoinedDrafts` — marks
     beside drafts — and carrying the same

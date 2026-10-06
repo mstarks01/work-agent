@@ -147,16 +147,14 @@ class BodyLimitMiddleware:
     Every POST route is capped, not a named one. FastAPI reads and parses a
     body before it resolves the route's dependencies, and authentication is a
     dependency, so an uncapped route buffers whatever an anonymous caller sends
-    before it answers 401. A cap keyed to one path left the answers route open
-    in exactly that way.
+    before it answers 401. A cap keyed to one path would leave the other routes
+    open in exactly that way.
 
     Pure ASGI rather than a ``@app.middleware("http")`` function because the
-    bound has to sit on the **receive channel**: the header-only version of this
-    check read ``Content-Length`` and let anything without one through, so a
-    chunked request — which carries no ``Content-Length`` at all — bypassed it
-    entirely and was buffered and parsed in full before the source budget was
-    ever consulted. A declared length is a claim; counting what arrives is the
-    check (OWASP LLM10).
+    bound has to sit on the **receive channel**: a ``Content-Length`` check
+    alone would let a chunked request through, because it carries no
+    ``Content-Length`` at all, so this counts what arrives. A declared length is
+    a claim; counting what arrives is the check (OWASP LLM10).
 
     Both halves are kept. The declared length is answered before a single byte
     is read, which is what lets an honest client be refused cheaply; the running
@@ -168,7 +166,7 @@ class BodyLimitMiddleware:
     write the response: FastAPI wraps any exception escaping its body parse in a
     400 ``There was an error parsing the body``, so the refusal would arrive as
     the wrong status with the cap unmentioned. Draining costs nothing a POST route
-    was not already paying — the JSON body is buffered whole to be parsed — and
+    does not already pay — the JSON body is buffered whole to be parsed — and
     the buffer is bounded by the cap it enforces.
 
     The cap is the deployment's byte budget with slack, not the budget itself:
@@ -208,9 +206,9 @@ class BodyLimitMiddleware:
     def _declared_over_cap(self, scope) -> bool:
         for name, value in scope.get("headers", ()):
             if name == b"content-length":
-                # ``str.isdigit`` was this test and was wrong twice over: it
-                # passes shapes ``int`` refuses, so a header a client controls
-                # reached a 500 instead of a decision.
+                # Not ``str.isdigit``: it passes shapes ``int`` refuses, so a
+                # header a client controls would reach a 500 instead of a
+                # decision.
                 declared = ascii_int(
                     value.decode("latin-1").strip(),
                     max_digits=_CONTENT_LENGTH_DIGITS,
@@ -776,7 +774,7 @@ def _sse_frame(event) -> str:
 # every subject is activity a caller has no business reading. The operator's log
 # carries it instead.
 #
-# A table because the machinery grew one entry per bound, which is what
+# A table because the machinery has one entry per bound, which is what
 # ``AGENTS.md`` says to key — and because a missing key raises here rather than
 # falling through to a message about the wrong bound. Each entry carries its
 # status: a bound that clears with time is a 429, and a job that already has
@@ -1005,12 +1003,12 @@ def create_app(
             raise HTTPException(
                 status_code=_STATUS_BY_RUNG[breach.rung], detail=breach.message
             )
-        # The ladder runs first because the ceiling is now enforced by the same
+        # The ladder runs first because the ceiling is enforced by the same
         # call that inserts the record, and that call needs the record. The
         # ordering is the price of the atomicity: a count taken before the
         # ladder is a count another submission can land behind, which is the
         # race this seam exists to close. What the caller loses is that a
-        # submission which breaches a rung *and* sits on the ceiling now hears
+        # submission which breaches a rung *and* sits on the ceiling hears
         # about the rung; both answers refuse it, and neither runs a model.
         record = JobRecord.create(
             owner_subject=subject,

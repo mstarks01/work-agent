@@ -113,9 +113,9 @@ class MarkdownLoader:
             raise FileNotFoundError(f"markdown root is not a directory: {root}")
         # Read once, at construction, and never again. A loader is held by a
         # built graph for the life of a deployment, and it reads knowledge and
-        # domain packs during jobs; reading the disk on each call let a file
-        # edited after startup change what a job was told without any identity
-        # moving (#675 D24). A file added, changed or removed after this line
+        # domain packs during jobs. A per-call read would let a file edited
+        # after startup change what a job is told without any identity moving
+        # (#675 D24). A file added, changed or removed after this line
         # is not this loader's; an intentional reload builds a new one.
         self._texts = self._snapshot()
 

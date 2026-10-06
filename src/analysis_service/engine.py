@@ -228,7 +228,7 @@ class Engine:
         is individually respected. A provider ``Retry-After`` is deliberately
         uncapped (:mod:`analysis_service.retry`) precisely because a deadline
         above it is what bounds the wait — without one here, an in-process run
-        had no bound at all.
+        has no bound.
 
         Usage::
 
@@ -370,7 +370,7 @@ class Engine:
         questions left are about the list as a whole.
         """
         if isinstance(sources, str | bytes):
-            # A string satisfies Sequence, so the removed contract's
+            # A string satisfies Sequence, so a call shaped
             # ``analyze(text)`` would otherwise iterate characters and report
             # a nonsense source count. This is the call an integrator port
             # makes first, so it says what to write instead.

@@ -259,13 +259,13 @@ def _blank_control_issues(element: Element) -> list[ValidationIssue]:
     empty ``authentication`` passes the shape gate. Read as ``stated`` by
     :func:`~analysis_service.analysis.control_state`, it would suppress the
     candidate rules that ask about a missing control and the evidence row
-    beside them. A model whose gate said *ready*
-    was quietly asserting a control nobody described.
+    beside them. A model whose gate said *ready* would assert a control nobody
+    described.
 
     ``unknown`` is the value ``prompts/extract.md`` asks for, and it is not the
     same fact as an empty string, so this reports rather than rewrites: the
     repair pass writes the sentinel and the source of the blank stays visible.
-    ``control_state`` now reads a blank as ``unverified`` whatever happens here,
+    ``control_state`` reads a blank as ``unverified`` whatever happens here,
     so the two answers agree if one arrives anyway.
 
     Walks :data:`~analysis_service.analysis.CONTROL_ATTRIBUTES` — the one

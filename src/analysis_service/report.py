@@ -64,237 +64,123 @@ from analysis_service.vendors import ServedTrust, vendor_for_route
 # **additive fields are a minor bump; changing the meaning or the spelling of
 # an existing value is major.**
 #
-# 2.0 is that rule applied to the finding-attribution cutover. ``grounds``
-# becoming required on every threat is additive and would have been minor on
-# its own; what earns the major is that ``nodes[].node`` changed the *values*
-# it carries, from ``analyst_<category>`` to ``analyze_<category>``. A consumer
-# keying on ``analyst_spoofing`` does not error — it matches nothing, silently.
+# What each version holds, for a reader of an archived report:
 #
-# 2.1 adds ``nodes[].usage``. Purely additive — an optional object on a record
-# that already existed, no field changing meaning or spelling — so it is minor
-# by the rule above, and a 2.0 consumer that ignores unknown fields reads a 2.1
-# report unchanged.
+# Version 2.0: ``grounds`` is required on every threat, and ``nodes[].node``
+# carries ``analyze_<category>``. A consumer keying on ``analyst_spoofing``
+# matches nothing, silently, which is why the bump is major.
 #
-# 2.2 adds ``unresolved_mentions``, the marks for element IDs a description
-# cites in prose that the model does not contain. A new optional top-level
-# list, exactly the shape ``unverified_grounds`` already had, so it is minor by
-# the same rule: a 2.1 consumer that ignores unknown fields reads a 2.2 report
-# unchanged, and one that renders the marks gains a signal it never had.
+# Version 2.1: adds ``nodes[].usage``, an optional object.
 #
-# 2.3 adds ``missing_mitigations``, on the same argument again: a third
-# optional top-level list of service-owned marks, no existing field changing
-# meaning or spelling.
+# Version 2.2: adds ``unresolved_mentions``, the marks for element IDs a
+# description cites in prose that the model does not contain.
 #
-# 2.4 adds ``coverage``, the per-category account of what deterministic
-# analysis put in front of each agent and how much of it the drafts came back
-# citing. Optional, additive, service-owned and computed in code, so the same
-# rule applies a fourth time.
+# Version 2.3: adds ``missing_mitigations``, a list of service-owned marks.
 #
-# 2.5 adds ``shared_element_names``, the marks for elements of different types
-# whose names normalize to one slug. A fifth optional top-level list of
-# service-owned marks, no existing field changing meaning or spelling, so the
-# rule holds a fifth time. Minor rather than major although it is the first
-# mark about the *model* rather than the threats: what a consumer must do with
-# an unknown field does not depend on what the field describes.
+# Version 2.4: adds ``coverage``, the per-category account of what
+# deterministic analysis put in front of each agent and how much of it the
+# drafts cite.
 #
-# 2.6 widens the *values* the ``sampling`` clear block can carry to every type
-# a resolved sampling param holds — which now includes the reasoning effort's
-# enum string. No field is added, removed or renamed. It is the first entry
-# here that is a fix rather than an addition: the block was typed to numbers
-# only, so a deployment that set ``thinking`` — an offered, documented,
-# build-gated param — produced reports that could not be assembled at all, and
-# failed at the end of a paid-for run rather than at startup. No report with
-# such a value has ever existed, so nothing a 2.5 consumer already parses
-# changes meaning; what changes is that a value it never could have seen is now
-# reachable, and a consumer reading the block as numbers must widen with it.
+# Version 2.5: adds ``shared_element_names``, the marks for elements of
+# different types whose names normalize to one slug. It is minor although the
+# mark is about the *model*: what a consumer must do with an unknown field does
+# not depend on what the field describes.
 #
-# 2.7 adds ``analysis_context``: the instruction digest, the domain packs this
-# job's model earned, and the deterministic rules that fired. Optional,
-# service-owned and computed in code, so the additive rule holds again — and it
-# is the first block recording what *informed* the analysis rather than what
-# the analysis found. It is not evidence and cannot become any: nothing here
-# supports a threat, and the ``grounds`` that do are untouched.
+# Version 2.6: the ``sampling`` clear block carries every type a resolved
+# sampling param holds, including the reasoning effort's enum string. A
+# consumer that reads the block as numbers must widen.
 #
-# 2.8 adds ``knowledge_docs`` to that same block: the local-corpus documents
-# the fired rules retrieved for the agents. Additive and service-owned like the
-# rest of the block, and under the same rule — a document informed the
-# analysis, and no consumer may read one as support for a threat.
+# Version 2.7: adds ``analysis_context``: the instruction digest, the domain
+# packs this job's model earned, and the deterministic rules that fired. It
+# records what *informed* the analysis. It is not evidence, and nothing in it
+# supports a threat.
 #
-# 2.9 adds ``unresolved_evidence``, a sixth optional list of service-owned
-# marks: evidence references a threat cited that its job's catalog did not
-# hold. Additive by the same rule as the four mark lists before it.
+# Version 2.8: adds ``knowledge_docs`` to ``analysis_context``: the
+# local-corpus documents the fired rules retrieved for the agents. No consumer
+# may read one as support for a threat.
 #
-# What sits beside it is a *behaviour*, not a field. Such a reference is
-# dropped and marked, and only a threat left with no grounds at all fails
-# (#138). No existing field changes meaning or
-# spelling, so this stays minor — but a consumer that treated a returned report
-# as "every citation resolved" was relying on an absence rather than on a
-# field, and this list is where that guarantee now lives.
-# 2.10 corrects what ``coverage[].elements_cited`` counts, and holds every
-# ``*_cited`` half to the total beside it. The field's *definition* is unchanged
-# — the docs always read it as "of the elements in the model, how many the
-# drafts cite" — but the computation counted prose citations raw, so an ID a
-# description named that the model does not contain was counted as a cited
-# element. That put the numerator above its denominator, and it did so hardest
-# on the runs ``unresolved_mentions`` exists to flag.
+# Version 2.9: adds ``unresolved_evidence``: evidence references a threat cited
+# that its job's catalog did not hold. Such a reference is dropped and marked,
+# and only a threat left with no grounds at all fails (#138). A consumer reads
+# "every citation resolved" off this list, never off an absence.
 #
-# The second entry here that is a fix rather than an addition, and unlike 2.6 a
-# value this schema *did* emit is now refused: a stored row with more cited than
-# offered no longer re-validates. Minor by the rule above, because no field is
-# added, removed or renamed and none changes meaning — what changes is that the
-# number finally means what the field always said it did. A consumer that
-# computed a citation rate off an affected row read a rate over 1.0 and will now
-# read a smaller, correct one.
+# Version 2.10: ``coverage[].elements_cited`` counts only elements in the
+# model, and every ``*_cited`` half is at most the total beside it. A stored
+# row with more cited than offered does not re-validate.
 #
-# 3.0 is the framework cutover, and it is major on every count the rule names:
-# fields move, a field changes its spelling, and one changes what it carries.
-# ``threats`` and seven other top-level fields become ``analyses[].claims`` and
-# their per-framework siblings; the four mark classes rename ``threat_id`` to
-# ``claim_id``; ``coverage[].category`` becomes ``coverage[].lane``; and every
-# claim gains the required ``(framework, framework_version)`` pair.
+# Version 3.0: the framework cutover, major on every count the rule names.
 #
-# **There is no version gate and none is needed.** ``Report`` keeps
-# ``extra="forbid"``, so a 2.10 payload carrying ``threats`` at the top level is
-# refused by this model, and a 3.0 payload carrying ``analyses`` is refused by
-# a 2.10 model. The no-shim behaviour falls out of the shapes rather than out of
-# anything reading ``schema_version``.
+# * ``threats`` and seven other top-level fields are ``analyses[].claims`` and
+#   their per-framework siblings; the mark classes name ``claim_id``;
+#   ``coverage[].lane`` names the lane; and every claim carries the required
+#   ``(framework, framework_version)`` pair.
+# * ``GroundKind`` holds ``absent-attribute`` (#171) and ``absent-element``: a
+#   term no element of the model names, whose ``element_id`` and ``flow_id``
+#   are both empty. **A framework may need to justify a claim by the absence of
+#   a thing from the model, and every other branch can only name something
+#   present.**
+# * ``nodes[]`` carries ``attempts`` (default 1), the provider-call count the
+#   retry driver stamps; ``reasks`` (0 or 1, default 0), the schema re-ask
+#   count the adapter stamps (ADR 0058); and ``schema_path`` and
+#   ``schema_fallback`` (default ``None``).
+# * ``unknown_claim_identities``: a claim naming an identifier its framework's
+#   own catalog does not hold, dropped and marked. Only a framework carrying a
+#   catalog it did not author can produce one, so the list is empty for STRIDE
+#   by construction.
+# * ``dropped_claims``: a claim that lost every ground it cited, at evidence
+#   resolution or at the quote check. A proposal that fails its own schema, or
+#   a claim that lost every ground, every element it named, or its ID to an
+#   earlier draft, is dropped and marked with its reason.
+# * ``unresolved_references``: an element ID dropped from
+#   ``affected_element_ids``, the way ``unresolved_mentions`` records one
+#   dropped from prose.
+# * ``repaired_quotes``: a quote ground the ladder refused and the service
+#   rewrote to the source's own nearest span. The ground carries the
+#   submitter's words and the mark carries the agent's, so a consumer reading a
+#   quote as "what the agent wrote" must read this list too. Each entry carries
+#   ``moved``, what the substitution changed in the claim's own terms,
+#   required and checked on load; and ``scan_complete``, whether the rung
+#   ranked every window, ``None`` on an archived repair (#675).
+# * ``unreconciled_rulings``: how the *first* critic pass failed to reconcile
+#   with its drafts, before the bounded re-ask. Each entry is a record — the
+#   claim, a closed ``kind``, and the sentence (#710).
+# * ``rejected_because`` on a verdict: which of the critic's checks ended a
+#   rejected draft. ``None`` is the answer for a rejection with no recorded
+#   cause. The substance check answers in two values, ``evidence`` and
+#   ``reasoning``, because only the first rules on the draft's unit (#659).
+# * A ``needs-info`` verdict names what has to be answered as an element and
+#   one of its attributes, or as a ``subject`` with both halves empty. **A
+#   framework may need a fact the system model has no slot for.**
+# * ``scope[].state`` holds ``not-raised``, where no lane raised a claim on the
+#   unit, and ``undecidable``, for a framework whose precondition cannot tell
+#   whether it applies at all (#659).
+# * ``model_repair`` on the envelope: what the repair pass may change and which
+#   elements it changed anyway and had put back (#675). ``None`` where no
+#   repair ran, and on archived runs that did.
+# * ``coverage[]`` (#675): a control is ``unknown_controls_cited`` only where a
+#   draft's attribute ground names that element *and* that attribute; a
+#   candidate is ``candidates_cited`` only where one draft cites every element
+#   it names. Archived rows written under 2.x carry larger numbers.
+# * ``immaterial_unknowns`` on a verdict: the unknown grounds a claim cites and
+#   does not rest on. It makes a ``confirmed`` reachable on a draft naming an
+#   open fact its argument never uses, and a confirmation that lists none is
+#   refused. ``UnreconciledKind`` carries ``dismissal-off-grounds``.
+# * ``recommendation`` on a STRIDE threat: what the critic made of the advice
+#   the finding carries, as ``sound`` and a ``note``. It sits beside the
+#   verdict, because a recommendation never decides a claim. ``None`` says the
+#   critic read no advice here, which is a different fact from advice it
+#   approved.
+# * ``assertion`` on an ``UnknownRef``: one row of the job's fact catalog the
+#   sources left open, so a ``confirmed`` claim on an open assertion has a
+#   dismissal to name (#1082).
 #
-# 3.0 also carries a fourth ``GroundKind``, ``absent-attribute`` (#171), which
-# would have earned a major bump of its own had it arrived separately: a
-# consumer switching over the three kinds it knew now meets a fourth. It rides
-# this one instead because 3.0 has never shipped, and two hard cutovers for one
-# release is a cost paid twice for nothing.
-# 3.0 also carries ``nodes[].attempts``, the provider-call count the retry
-# driver stamps on each LLM node. Optional with a default of 1, and it rides
-# the unshipped major for the same reason.
-# 3.0 also carries ``nodes[].reasks``, the schema re-ask count (0 or 1) that
-# the adapter stamps (ADR 0058). Optional with a default of 0, for the same
-# reason. ``nodes[].schema_path`` and ``nodes[].schema_fallback`` ride with
-# it: optional, default ``None``.
-# 3.0 also carries ``unknown_claim_identities``, a seventh list of
-# service-owned marks: a claim naming an identifier its framework's own catalog
-# does not hold. It rides 3.0 for the same reason ``absent-attribute`` does —
-# 3.0 has never shipped — and it would have been additive and minor on its own.
-#
-# What sits beside it is again a *behaviour*. Such a claim is dropped and
-# marked rather than reaching the report with a version-safe citation of a
-# requirement the standard does not contain, on the rule 2.9 already set for a
-# citation that resolves to nothing. Only a
-# framework carrying a catalog it did not author can produce one, so the list
-# is empty for STRIDE by construction rather than by accident.
-#
-# 3.0 also carries ``dropped_claims``, an eighth list of service-owned
-# marks: a claim that lost every ground it cited, at evidence resolution or at
-# the quote check. It rides 3.0 for the same reason the two before it do.
-#
-# What moves beside it is every whole-job failure one entry of one claim could
-# cause: a proposal that fails its own schema, a claim that lost every ground,
-# every element it named, or its ID to an earlier draft. Each is now dropped
-# and marked with its reason. ``unresolved_references``, a tenth list, records
-# an element ID dropped from ``affected_element_ids`` the way
-# ``unresolved_mentions`` records one dropped from prose.
-#
-# 3.0 also carries ``repaired_quotes``, a ninth list: a quote ground the
-# ladder refused and the service rewrote to the source's own nearest span. The
-# ground carries the submitter's words after that, and the mark carries the
-# agent's, so a consumer reading a quote as "what the agent wrote" must read
-# this list too.
-# 3.0 also carries ``unreconciled_rulings``, an eleventh list: how the *first*
-# critic pass failed to reconcile with its drafts, before the bounded re-ask
-# repaired it. Each entry is a record — the claim, a closed ``kind``, and the
-# sentence — rather than the sentence alone (#710). A consumer reading the
-# list as strings meets objects, which would be major on its own; it rides
-# 3.0 for the reason every change above does, and because the only way to
-# count a cause before it was a regular expression over prose. Archived runs
-# carry the kind as a field too, read out of the sentence once so nothing
-# downstream ever does.
-#
-# 3.0 also carries a fifth ``GroundKind``, ``absent-element``: a term no element
-# of the model names, which is the only branch whose referent is the whole model
-# rather than a part of it. A consumer switching over the four kinds it knew now
-# meets a fifth whose ``element_id`` and ``flow_id`` are both empty. It rides 3.0
-# for the reason ``absent-attribute`` does — 3.0 has never shipped — and it would
-# have been major on its own. The reason is a property rather than a package's
-# name: **a framework may need to justify a claim by the absence of a thing from
-# the model, and every other branch can only name something present.**
-#
-# 3.0 also carries ``rejected_because`` on a verdict: which of the critic's
-# checks — the draft's own substance, the lane it was filed in, or another
-# draft already covering it — ended a rejected draft. A consumer reading the
-# rejected array as an audit trail had to parse the reason prose for this and can
-# now read a field. It rides 3.0 because 3.0 has never shipped, and it is
-# additive: ``None`` is the honest answer for a rejection recorded before the
-# field, so a report written then still validates and still reads. The
-# substance check answers in two values, ``evidence`` and ``reasoning``, because
-# only the first rules on the draft's unit (#659); a consumer switching over the
-# three it knew meets a fourth, which also rides the unshipped 3.0.
-#
-# A ``needs-info`` verdict names what has to be answered in one of two
-# spellings: an element and one of its attributes, or a ``subject`` — a question
-# with no place in the System Model at all. A consumer switching on the element
-# pair alone meets an entry where both halves are empty and ``subject`` carries
-# the whole of the question, which is why the second spelling is a 3.0 change
-# rather than a minor one. The reason is a property rather than a package's
-# name: **a framework may need a fact the system model has no slot for.**
-#
-# 3.0 also respells one ``scope[].state`` value and adds a fourth (#659).
-# ``not-raised`` replaces ``applicable``, a word that read as a verdict that
-# the unit applies, where the fact is only that no lane raised a claim on it.
-# ``undecidable`` is new, for a framework whose precondition could not tell
-# whether it applies at all; it was folded into ``not-applicable`` before,
-# which told a reader the unit was ruled out when the input had never said.
-# Both would be major on their own, and both ride 3.0 because it has never
-# shipped.
-#
-# 3.0 also adds ``model_repair`` to the envelope (#675): what the repair pass
-# was allowed to change and which elements it changed anyway and had put
-# back. ``None`` where no repair ran, and on archived runs that did.
-#
-# 3.0 also adds two fields to ``repaired_quotes[]`` (#675): ``moved``, what
-# the substitution changed in the claim's own terms (a negation, a number),
-# required and checked on load against the two texts it is computed from; and
-# ``scan_complete``, whether the rung ranked every window, ``None`` where the
-# run predates the field. An archived repair carries ``moved`` recomputed from
-# the texts and no ``scan_complete``.
-#
-# 3.0 also tightens what two ``coverage[]`` halves count (#675). A control is
-# ``unknown_controls_cited`` only where a draft's attribute ground names that
-# element *and* that attribute, never for every control on any element a draft
-# cited; a candidate is ``candidates_cited`` only where one draft cites every
-# element it names, never by a union across the lane's drafts. Both are a
-# meaning change to an existing field and would be major on their own.
-# Archived rows written under 2.x carry larger numbers.
-# 3.0 also carries ``immaterial_unknowns`` on a verdict: the unknown grounds a
-# claim cites and does not rest on. Neutral rather than a package's, because an
-# unknown ground is a fact about what any package's draft cites. It is what
-# makes a ``confirmed`` reachable on a draft naming an open fact its argument
-# never uses — 78% of the corpus's drafts name one — and a confirmation that
-# lists none is still refused, so silence cannot confirm. The review seam
-# checks that field against the draft's own grounds, so ``UnreconciledKind``
-# carries a ninth value, ``dismissal-off-grounds``. Widening a closed set is a
-# major change on the rule above, and it rides 3.0 for the reason
-# ``absent-attribute`` does: 3.0 has never shipped.
-#
-# 3.0 also carries ``recommendation`` on a STRIDE threat: what the critic made
-# of the advice the finding carries, as ``sound`` and a ``note``. It is the
-# package's field because ``mitigations`` is, and it sits beside the verdict
-# rather than inside it, because a recommendation never decides a claim — a
-# plausible one does not make an unsupported threat hold, and a flawed one does
-# not make a sound threat go away. ``None`` says the critic read no advice
-# here, which on a surviving threat is a different fact from advice it approved
-# and is why the field is not a bare boolean defaulting to true.
-# 3.0 also carries a third spelling on an ``UnknownRef``: ``assertion``, one
-# row of the job's fact catalog the sources left open. ``unknown-attribute``
-# and ``unknown-assertion`` are one question at two seams — ``CONDITIONAL_
-# GROUNDS`` is the set that says so — and the record could name only the
-# first, so a ``confirmed`` resting on an open assertion had nothing to
-# dismiss and passed the review seam while the same claim resting on an open
-# attribute was refused (#1082). Additive, and it rides 3.0 for the reason
-# everything above does: 3.0 has never shipped.
+# **There is no version gate.** ``Report`` keeps ``extra="forbid"``, so a 2.10
+# payload carrying ``threats`` at the top level is refused by this model, and a
+# 3.0 payload carrying ``analyses`` is refused by a 2.10 model.
 SCHEMA_VERSION = "3.0"
 
 # The envelope's disclaimer, which is about the *service* rather than about any
-# one framework. It no longer says "threat model": that is false of a report
+# one framework. It does not say "threat model": that is false of a report
 # whose blocks include a framework that rules on requirement applicability
 # rather than on attacks, and a sentence that is false of half a payload is
 # worse than a general one. Each package carries its own, from
@@ -371,7 +257,7 @@ class TokenUsage(BaseModel):
     rule NodeRun already applies to ``model`` and ``requested_model``: record
     both, compute neither.
 
-    ``reasoning_tokens`` is the field this record was added for. It is spent
+    ``reasoning_tokens`` is the field this record exists for. It is spent
     against the tier's ``max_output_tokens`` and it is invisible in the
     output, so a node can be the run's largest consumer while looking small.
     ``cached_prompt_tokens`` is the other one: it is the only direct evidence
@@ -455,8 +341,8 @@ class NodeRun(BaseModel):
     in USD, and it sits **beside** ``usage`` rather than replacing it. The two
     answer different questions: the token counts multiplied by published rates
     are reproducible from this record, and the reported charge is what the
-    account was charged. A row carrying one number could not say which of the
-    two it held. ``None`` is the common answer — most providers state token
+    account was charged. A row carrying one number cannot say which of the
+    two it holds. ``None`` is the common answer — most providers state token
     counts and nothing else — and it is also the answer where a provider states
     a figure that covers part of a call. See :mod:`analysis_service.charges`.
 
@@ -467,9 +353,8 @@ class NodeRun(BaseModel):
     strings would move every blessed hash for a cosmetic reason. It is also
     never invented — a direct vendor names no upstream and carries ``None``
     here rather than the vendor copied out of the route, because attribution
-    derived from the request is what this field exists to replace. Only a route
-    that reaches more than one provider has anything to say, and until this
-    field there was nowhere for it to say it.
+    derived from the request is what this field exists to avoid. Only a route
+    that reaches more than one provider has anything to say.
 
     ``attempts`` is how many provider calls the execution took, counted by the
     retry driver. ``usage`` meters the one that answered; a failed attempt
@@ -591,13 +476,12 @@ class ExecutionEnvelope(BaseModel):
     it, and certification refuses a manifest written for a different one rather
     than comparing across them.
 
-    What a served build is *worth* is **not** here. It was
-    ``served_model_trust``, a constant reading ``provider_reported`` for the
-    whole report, and it was wrong twice over: a translator that fills the
-    served identifier from the request confirms nothing, and a deployment may
-    select a different vendor per tier, so one report can hold rows with
-    different answers. It moved to :attr:`NodeRun.served_trust`, where the
-    vendor is known and one reader answers for every caller.
+    What a served build is *worth* is **not** here. Trust is per node, on
+    :attr:`NodeRun.served_trust`, where the vendor is known and one reader
+    answers for every caller. A report-wide constant would be wrong: a
+    translator that fills the served identifier from the request confirms
+    nothing, and a deployment may select a different vendor per tier, so one
+    report can hold rows with different answers.
 
     ``build`` is the installed version of every distribution whose code sits
     between a node and its provider — this service, the agent runtime and the
@@ -682,9 +566,9 @@ class AnalysisContext(BaseModel):
     sampling each node ran on (:class:`NodeRun`), and the facts each finding
     rests on (``grounds``). Between them sits everything the service *put in
     front of* the lane agents — the instruction text they were given and the
-    reference packs this model earned — and none of it was recorded anywhere. Two runs of the same model on the same
-    input could differ because a pack selection flipped or a skill was edited,
-    and the report showed nothing.
+    reference packs this model earned. This block records it. Two runs of the
+    same model on the same input can differ because a pack selection flipped or
+    a skill was edited.
 
     **This is context, never evidence, and the separation is the whole design.**
     A pack named here did not ground anything; a rule named here did not find
@@ -708,13 +592,12 @@ class AnalysisContext(BaseModel):
     same service gives two submissions different reference material, and the
     names are the only record of which.
 
-    **``fired_rules`` and ``knowledge_docs`` are not here**, and the rule that
-    moved them is the one that sorted every field of the flat schema this
-    replaced: a field sits where the thing it describes sits. A candidate rule
-    belongs to the package that declared it and a retrieved document to the
-    package that selected it, so both name *one framework's* material and both
-    sit on :class:`FrameworkAnalysis`. The two that stayed describe the built
-    graph and the shared model, of which a report has one each.
+    **``fired_rules`` and ``knowledge_docs`` are not here**, because a field
+    sits where the thing it describes sits. A candidate rule belongs to the
+    package that declared it and a retrieved document to the package that
+    selected it, so both name *one framework's* material and both sit on
+    :class:`FrameworkAnalysis`. The two here describe the built graph and the
+    shared model, of which a report has one each.
     """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
@@ -1038,7 +921,7 @@ class Report(BaseModel):
     shared_element_names: list[SharedElementName] = Field(default_factory=list)
     # A fact about the shared model, so it is a scalar here rather than a field
     # each block copies: N copies would be N chances to disagree about one
-    # number. It left ``Summary`` in this cutover for exactly that reason.
+    # number. So ``Summary`` does not carry it.
     elements_analyzed: int = Field(default=0, ge=0)
     # How the model was repaired, where it was. ``None`` where no repair pass
     # ran; a report whose ``nodes`` name the repair node and carry ``None``
