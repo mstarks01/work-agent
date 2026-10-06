@@ -595,6 +595,9 @@ def by_turn(questions: Sequence[EarlyQuestion]) -> list[EarlyQuestion]:
     So a question two frameworks share costs each of them, and asks once.
     Within one framework the list's order holds, so a parent still comes
     before its parts: a part serves no framework its parent does not.
+    The list ranks a field question that two frameworks share by the sum of
+    their scores, so one framework's prior scale can move that question in
+    another framework's turn (ADR 0053, ``QA-2026-10-06-01-E1``).
 
     Summing the frameworks' scores put every capability question first, and
     an owner who stopped after ten choices completed no STRIDE finding with
