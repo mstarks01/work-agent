@@ -105,11 +105,12 @@ PROBED_PARAMS: dict[str, Any] = {
 # the vendors are alphabetical everywhere a reader might infer one.
 REFERENCE_MODELS: dict[str, tuple[str, ...]] = {
     "anthropic": ("claude-sonnet-5", "claude-opus-5-5"),
-    # Claude in its Bedrock spelling, and only Claude. The pinned map sends
-    # ``claude-sonnet-4-6`` on the native rung of
-    # :func:`~analysis_service.ladder.rungs_for` and Claude 5 on the tool rung,
-    # as the AWS model card for Opus 5.5 lists structured outputs unsupported
-    # on ``bedrock-runtime``. So this pair profiles both rungs.
+    # Claude in its Bedrock spelling, and only Claude, because the pair must
+    # profile both rungs of :func:`~analysis_service.ladder.rungs_for`. Nova
+    # and Llama get emulated structured output, so they reach only the tool
+    # rung. The pinned map sends ``claude-sonnet-4-6`` on the native rung and
+    # Claude 5 on the tool rung, as the AWS model card for Opus 5.5 lists
+    # structured outputs unsupported on ``bedrock-runtime``.
     #
     # **The ``global.`` inference profile, because a plain identifier does not
     # always invoke.** AWS serves recent Claude generations through cross-Region
@@ -154,7 +155,7 @@ REFERENCE_MODELS: dict[str, tuple[str, ...]] = {
     # matrix naming the bare name would be a claim about whichever build OpenAI
     # points it at next, and nothing offline would say the claim had moved.
     #
-    # **Both tiers were the bare name once, and the family spells an alias two
+    # **Neither tier is the bare name, because the family spells an alias two
     # ways.** ``gpt-4o`` fronts a date. ``gpt-5.6`` fronts a capability tier:
     # OpenAI's model page for it documents "The ``gpt-5.6`` alias routes
     # requests to GPT-5.6 Sol", and its model list carries ``gpt-5.6-sol``,

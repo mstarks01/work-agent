@@ -31,6 +31,7 @@ requires the live lanes, and they remain unprovisioned — see
 from __future__ import annotations
 
 import re
+import tomllib
 from collections.abc import Mapping
 from dataclasses import FrozenInstanceError
 from pathlib import Path
@@ -931,18 +932,21 @@ def test_a_stated_temperature_cannot_bind_openais_strong_reference_model(tmp_pat
 
 
 class TestTheDocumentedPairsAreTheProfiledPairs:
-    """Three files tell a reader what the reference pairs are, and one table
-    decides. Each of the three names ``conformance.REFERENCE_MODELS`` in its own
-    prose, and until these checks existed nothing held any of them to it.
-
-    They drifted, which is why the checks are here rather than in a habit. The
-    parametrize list in ``tests/test_model_gate.py`` said ``openai`` was
-    ``gpt-4.1-mini`` / ``gpt-4.1`` while ``docs/First-Run.md`` — the table its
-    own docstring named — said something else, and it carried no ``bedrock``
-    row at all. That list now reads the registry; these three read the files.
+    """Several files tell a reader what the reference pairs are, and one table
+    decides. Each check here holds one of those files to
+    ``conformance.REFERENCE_MODELS``, so a pair that changes in the table and
+    not in a doc fails the offline suite rather than a reader's first run.
     """
 
     FIRST_RUN: ClassVar[Path] = PROJECT_ROOT / "docs" / "First-Run.md"
+    #: The guides a reader copies a tier selection from. ``docs/research/``,
+    #: ``docs/history/`` and ``docs/adr/`` are records of a past state, so an
+    #: old model there is correct.
+    GUIDES: ClassVar[tuple[Path, ...]] = (
+        PROJECT_ROOT / "README.md",
+        *sorted((PROJECT_ROOT / "docs").glob("*.md")),
+        *sorted((PROJECT_ROOT / "docs" / "agents").glob("*.md")),
+    )
     TIERS_TEMPLATE: ClassVar[Path] = PROJECT_ROOT / "config" / "model_tiers.toml"
     WEB_APP: ClassVar[Path] = PROJECT_ROOT / "docs" / "Web-App.md"
     ISSUE_TRACKER: ClassVar[Path] = (
@@ -1011,6 +1015,28 @@ class TestTheDocumentedPairsAreTheProfiledPairs:
             f"these Bedrock reference models are named nowhere in"
             f" {self.ISSUE_TRACKER.name}: {sorted(pair - quoted)}"
         )
+
+    _TOML_FENCE = re.compile(r"^```toml\n(.*?)^```", re.DOTALL | re.MULTILINE)
+
+    def test_every_tier_example_in_a_guide_selects_a_profiled_model(self):
+        """A reader copies a ``[tiers.<name>]`` block out of a guide into
+        ``config/model_tiers.toml``, so its model must be one the matrix
+        profiles for its vendor. Every tier, ``review`` included, since each
+        one is a selection a reader can copy."""
+        shown = [
+            (path.name, name, tier["vendor"], tier["model"])
+            for path in self.GUIDES
+            for block in self._TOML_FENCE.findall(path.read_text(encoding="utf-8"))
+            for name, tier in tomllib.loads(block).get("tiers", {}).items()
+            if "model" in tier
+        ]
+
+        assert shown, "no guide shows a tier example to check"
+        for doc, name, vendor, model in shown:
+            assert model in REFERENCE_MODELS[vendor], (
+                f"{doc} shows tiers.{name} as {vendor}/{model}, which is not"
+                f" a model the matrix profiles for {vendor}"
+            )
 
     def test_the_web_app_example_selects_a_profiled_pair(self):
         """``docs/Web-App.md`` shows what the page prints for "whichever pair

@@ -2792,6 +2792,51 @@ for (const combo of combos) {
             }
             assert [f.facets for f in facts] == ([changed] if changed else [])
 
+    @pytest.mark.parametrize("reopen", [True, False])
+    @pytest.mark.parametrize("before", ["", "unknown", "yes"])
+    def test_the_page_offers_i_don_t_know_where_admission_takes_it(
+        self, before, reopen
+    ):
+        """The page's ``offersDontKnow`` and admission's reopen rule are two
+        readers of one rule, so each state is put to both."""
+        node = shutil.which("node")
+        if node is None:
+            pytest.skip("no node on PATH to run the report page's script")
+        javascript = test_webapp.viewer_javascript()
+        rule = "\n".join(
+            re.search(rf"const {name} = .*;", javascript)[0]
+            for name in ("DONT_KNOW", "offersDontKnow")
+        )
+        program = (
+            f"{rule}\nconsole.log(JSON.stringify("
+            f"offersDontKnow({json.dumps(before)}, {json.dumps(reopen)})));"
+        )
+        done = subprocess.run(
+            [node, "-e", program],
+            capture_output=True,
+            text=True,
+            timeout=30,
+            check=False,
+        )
+        assert done.returncode == 0, done.stderr
+        offered = json.loads(done.stdout)
+
+        settled = {"record-protected": "yes"}
+        earlier = self.earlier(
+            {**settled, "records-actor": before} if before else settled
+        )
+        answer = self.earlier({"records-actor": "unknown"})
+        try:
+            check_fact_answers(
+                [answer], self.report.system_model, None, [earlier], reopen=reopen
+            )
+        except ValueError:
+            admitted = False
+        else:
+            admitted = True
+
+        assert offered is admitted
+
     def test_a_retained_facet_is_shown_and_counted_as_the_merge_reads_it(self):
         """F2b: a saved facet showed blank, and the count read only new lists."""
         answer = self.earlier({"records-actor": "yes"})

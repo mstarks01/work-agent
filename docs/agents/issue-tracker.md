@@ -101,10 +101,10 @@ Completed on GitHub Issues (canonical):
   state where the request ran, and would be wrong exactly when a cross-region profile is in use.
   **The conformance pair is `global.anthropic.claude-sonnet-4-6` and `global.anthropic.claude-opus-5-5`**
   ([#497](https://github.com/mstarks01/work-agent/issues/497),
-  [#626](https://github.com/mstarks01/work-agent/issues/626)). Only Claude can be the pair: Nova and
-  Llama get emulated structured output, so a tier on either runs the forced tool path (ADR 0058).
-  The pinned litellm sends Sonnet 4.6 on the native path and Opus 5.5 on the tool path, so the pair
-  profiles both. The `global.` prefix names a cross-Region inference profile, which AWS serves both
+  [#626](https://github.com/mstarks01/work-agent/issues/626)). The pair must profile both paths, and
+  only Claude can: Nova and Llama get emulated structured output, so a tier on either runs only the
+  forced tool path (ADR 0058). The pinned litellm sends Sonnet 4.6 on the native path and Opus 5.5
+  on the tool path. The `global.` prefix names a cross-Region inference profile, which AWS serves both
   models under, and it names no geography, so #496 still holds.
   **A floating marker is a whole word, never a fragment of one**
   ([#605](https://github.com/mstarks01/work-agent/issues/605)). One table of `word -> message`

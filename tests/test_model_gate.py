@@ -421,6 +421,24 @@ class TestOutputCeiling:
         assert guessed["key"] not in _litellm.model_cost
         assert model_info(vendor_for("openai"), "gpt-6-unreleased") is None
 
+    def test_an_internal_litellm_error_propagates(self, monkeypatch):
+        # The third shape: litellm turns any internal error into a bare
+        # Exception with the not-mapped message, which model_info must not
+        # read as an unmapped model.
+        from analysis_service.model_gate import _litellm, model_info
+
+        def broken(*args, **kwargs):
+            raise RuntimeError("corrupt map entry")
+
+        monkeypatch.setattr(_litellm.utils, "_get_model_cost_key", broken)
+        # litellm caches each answer, so an earlier lookup of this model
+        # would answer without reaching the patched helper.
+        _litellm.utils._cached_get_model_info.cache_clear()
+
+        with pytest.raises(Exception, match="model isn't mapped") as raised:
+            model_info(vendor_for("openai"), "gpt-4o")
+        assert type(raised.value) is Exception
+
 
 class TestRetryLayering:
     """What one ``attempt`` actually costs in HTTP requests.
@@ -562,10 +580,10 @@ def test_every_documented_vendor_passes_the_gate_on_shipped_sampling(
 def test_every_local_only_switch_litellm_defines_is_set():
     """The pin does not pin this, so the suite has to.
 
-    Each `LITELLM_LOCAL_*` variable turns off a remote config fetch. The
-    repository once set one of them, and 1.97.0 fetches the Anthropic beta
-    headers behind another of them -- at request time, from a URL whose content
-    chooses an outgoing header, checked only for being a non-empty dict.
+    Each `LITELLM_LOCAL_*` variable turns off a remote config fetch. One of
+    them guards the Anthropic beta headers, which litellm fetches at request
+    time from a URL whose content chooses an outgoing header, checked only for
+    being a non-empty dict.
 
     Read out of litellm's own source rather than restated here, so a version
     bump that adds a switch fails this test instead of opening an egress
