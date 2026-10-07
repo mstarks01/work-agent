@@ -26,10 +26,10 @@
     ...checkbox.closest(".pick").querySelectorAll("select"),
   ];
 
-  // An unticked framework's options are hidden rather than removed, so
-  // re-ticking it restores what was chosen instead of resetting it.
+  // Keep each framework's options visible so its choices are discoverable.
+  // Unticking disables them without resetting what was chosen.
   const sync = (checkbox) => {
-    checkbox.closest(".pick").querySelector(".opts").hidden = !checkbox.checked;
+    for (const control of optionsOf(checkbox)) control.disabled = !checkbox.checked;
   };
   for (const checkbox of boxes) {
     checkbox.addEventListener("change", () => sync(checkbox));
