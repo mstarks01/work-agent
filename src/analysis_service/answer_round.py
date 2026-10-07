@@ -51,6 +51,8 @@ from typing import TYPE_CHECKING, Annotated, Any
 from pydantic import StringConstraints
 
 from analysis_service.assertions import UNKNOWN, AssertionCatalog
+from analysis_service.bands import UNRANKED
+from analysis_service.capabilities import lineage
 from analysis_service.claims import FrameworkAnalysis, FrameworkName, UnknownKey
 from analysis_service.early_questions import (
     EarlyQuestion,
@@ -60,6 +62,7 @@ from analysis_service.early_questions import (
 from analysis_service.fact_answers import (
     MAX_FACT_ANSWERS,
     FactAnswer,
+    answer_facets,
     answered_keys,
     fact_label,
     key_ref,
@@ -67,7 +70,7 @@ from analysis_service.fact_answers import (
     refuse_repeated_facts,
 )
 from analysis_service.fact_writes import answered_model, check_fact_answers
-from analysis_service.frameworks import PreconditionResult
+from analysis_service.frameworks import PACKAGES, PreconditionResult
 from analysis_service.links import (
     MAX_LINK_ANSWERS,
     LinkAnswer,
@@ -78,6 +81,7 @@ from analysis_service.links import (
     link_questions,
     resumed_sources,
 )
+from analysis_service.open_facts import prepared_model
 from analysis_service.questions import FactQuestion, fact_questions
 from analysis_service.sources import LimitBreach, Source, SourceLimits
 from analysis_service.system_model import SystemModel
@@ -93,8 +97,10 @@ __all__ = [
     "AlreadyResumed",
     "AnswerState",
     "Answers",
+    "BandApplicability",
     "EarlyRule",
     "MissingRevision",
+    "PauseSummary",
     "QuestionSet",
     "ResumedJob",
     "SavedRound",
@@ -189,6 +195,75 @@ class AdmittedRound:
 
 
 @dataclass(frozen=True)
+class BandApplicability:
+    """How many of one framework's units in one band apply, by what the pause knows.
+
+    ``states`` counts the units in each state the framework's applicability
+    rule gives them. ``unaskable`` counts the ``unknown`` units that no open
+    question can settle any more: every capability that would settle one was
+    answered "I don't know", or is asked by no question.
+    """
+
+    band: str
+    states: Mapping[str, int]
+    unaskable: int
+
+    def to_json(self) -> dict[str, object]:
+        return {
+            "band": self.band,
+            "states": dict(self.states),
+            "unaskable": self.unaskable,
+        }
+
+
+@dataclass(frozen=True)
+class PauseSummary:
+    """What a waiting job asked, and what it leaves open (#1542 F2, F5).
+
+    **No count here says a fact is settled that is not.** A stop of
+    :attr:`QuestionSet.stop` says why no round asks more; this says what
+    remains. The counts are of different things, kept apart:
+
+    * ``introduced`` is the distinct early questions the rounds showed, this
+      one's included, and ``choices`` the choices they ask: one a facet, else
+      one. Neither is bounded by a limit, which counts answers.
+    * ``settled``, ``partial`` and ``unknown`` count the saved early answers:
+      every facet known, some facets known, or "I don't know".
+    * ``skipped``, ``held_back`` and ``below_floor`` count the open questions
+      no round shows: skipped for now, held back by a limit, or under a floor.
+    * ``applicability`` counts each runnable framework's units by state and
+      band, where its units apply by a rule over capabilities. These are
+      units, not findings.
+    """
+
+    introduced: int
+    choices: int
+    settled: int
+    partial: int
+    unknown: int
+    skipped: int
+    held_back: int
+    below_floor: int
+    applicability: Mapping[FrameworkName, tuple[BandApplicability, ...]]
+
+    def to_json(self) -> dict[str, object]:
+        return {
+            "introduced": self.introduced,
+            "choices": self.choices,
+            "settled": self.settled,
+            "partial": self.partial,
+            "unknown": self.unknown,
+            "skipped": self.skipped,
+            "held_back": self.held_back,
+            "below_floor": self.below_floor,
+            "applicability": {
+                name: [band.to_json() for band in bands]
+                for name, bands in self.applicability.items()
+            },
+        }
+
+
+@dataclass(frozen=True)
 class QuestionSet:
     """Every question one job asks, and the model and catalog they ask about."""
 
@@ -211,9 +286,10 @@ class QuestionSet:
     #: its answer, so a page can show it and take a new answer.
     answered_early: tuple[tuple[EarlyQuestion, FactAnswer], ...]
     answered_links: tuple[tuple[LinkQuestion, LinkAnswer], ...]
-    #: For a waiting job, how many questions the limits of :data:`EARLY_RULES`
-    #: hold back from every round.
-    withheld: int
+    #: For a waiting job, each question the limits of :data:`EARLY_RULES`
+    #: hold back from every round. No round shows it, and an answer to it is
+    #: still admitted, so a submitter can choose to answer it.
+    held_back: tuple[EarlyQuestion, ...]
     #: For a waiting job, each early question the submitter skipped for now.
     #: A skip is not an answer: the fact stays open, no round shows it again,
     #: and an answer to it is still admitted.
@@ -229,22 +305,50 @@ class QuestionSet:
     #: refuted one asks nothing, and an undecidable one asks only what decides
     #: it (:func:`~analysis_service.early_questions.framework_gates`).
     gates: Mapping[FrameworkName, PreconditionResult] = field(default_factory=dict)
+    #: For a waiting job, each open question under its kind's floor
+    #: (:func:`passes_floor`). No round shows it, and an answer to it is still
+    #: admitted, so a submitter can choose to answer it.
+    below_floor: tuple[EarlyQuestion, ...] = ()
+    #: For a waiting job, what the pause asked and what it leaves open; ``None``
+    #: for a report's set.
+    summary: PauseSummary | None = None
+
+    @property
+    def withheld(self) -> int:
+        """How many questions the limits hold back from every round."""
+        return len(self.held_back)
 
     @property
     def stop(self) -> str | None:
         """Why a waiting job asks nothing more, or ``None`` while it asks.
 
-        ``budget-exhausted`` where the limits hold questions back, and
-        ``nothing-left`` where no question is left to ask.
+        **No stop says every fact is settled.** ``budget-exhausted`` where the
+        limits hold questions back, ``below-floor`` where only questions under
+        a floor are left, and ``nothing-left`` where no open question is left
+        to ask. In each case :attr:`summary` says what stays open.
         """
         if not self.done:
             return None
-        return "budget-exhausted" if self.withheld else "nothing-left"
+        if self.held_back:
+            return "budget-exhausted"
+        return "below-floor" if self.below_floor else "nothing-left"
 
     @property
     def asked(self) -> frozenset[UnknownKey]:
-        """Every fact the questions name, which is every fact that takes an answer."""
-        early = frozenset(question.key for question in (*self.early, *self.skipped))
+        """Every fact the questions name, which is every fact that takes an answer.
+
+        A question the limits hold back, or one under its floor, is named
+        too: no round shows it, but a submitter may choose to answer it.
+        """
+        early = frozenset(
+            question.key
+            for question in (
+                *self.early,
+                *self.skipped,
+                *self.held_back,
+                *self.below_floor,
+            )
+        )
         return early | frozenset(question.key for question in self.facts)
 
     def to_json(self) -> dict[str, object]:
@@ -257,6 +361,9 @@ class QuestionSet:
             "early_remaining": dict(self.remaining),
             "early_withheld": self.withheld,
             "early_stop": self.stop,
+            "early_held_back": [question.to_json() for question in self.held_back],
+            "early_below_floor": [question.to_json() for question in self.below_floor],
+            "early_summary": None if self.summary is None else self.summary.to_json(),
             "framework_gates": dict(self.gates),
             "skipped_early": [question.to_json() for question in self.skipped],
             "skipped_links": [question.to_json() for question in self.skipped_links],
@@ -474,7 +581,7 @@ def question_set(
             remaining={},
             answered_early=(),
             answered_links=(),
-            withheld=0,
+            held_back=(),
             skipped=(),
             skipped_links=(),
             resumed_by=resumed_by,
@@ -492,7 +599,7 @@ def question_set(
             remaining={},
             answered_early=(),
             answered_links=(),
-            withheld=0,
+            held_back=(),
             skipped=(),
             skipped_links=(),
         )
@@ -513,7 +620,7 @@ def question_set(
             remaining={},
             answered_early=(),
             answered_links=(),
-            withheld=0,
+            held_back=(),
             skipped=(),
             skipped_links=(),
         )
@@ -531,7 +638,15 @@ def question_set(
     gated = {question.key for question in (*first, *listed) if question.gates}
     held = {answer.key: answer for answer in answered if answer.key not in gated}
     aside: frozenset[SkipKey] = frozenset(skipped)
-    this_round, remaining, withheld = next_round(listed, aside | done, held)
+    gates = framework_gates(view, frameworks, catalog)
+    this_round, remaining, held_back = next_round(listed, aside | done, held)
+    below_floor = tuple(
+        question
+        for question in listed
+        if not question.gates
+        and question.key not in aside | done
+        and not passes_floor(question, listed)
+    )
     linked = {fold(link.principal): link for link in answered_links}
     open_links = link_questions(catalog, view)
     return QuestionSet(
@@ -554,7 +669,7 @@ def question_set(
             for question in asked_links
             if question.key in linked
         ),
-        withheld=withheld,
+        held_back=held_back,
         skipped=tuple(
             question
             for question in listed
@@ -563,7 +678,93 @@ def question_set(
         skipped_links=tuple(
             question for question in open_links if question.key in aside
         ),
-        gates=framework_gates(view, frameworks, catalog),
+        gates=gates,
+        below_floor=below_floor,
+        summary=_summary(
+            prepared_model(view, catalog),
+            frameworks,
+            gates,
+            listed,
+            done,
+            answered,
+            [*shown, *(question.key for question in this_round)],
+            skipped=len(aside),
+            held_back=len(held_back),
+            below_floor=len(below_floor),
+        ),
+    )
+
+
+def _summary(
+    prepared: SystemModel,
+    frameworks: Mapping[FrameworkName, Mapping[str, Any]],
+    gates: Mapping[FrameworkName, PreconditionResult],
+    listed: Sequence[EarlyQuestion],
+    done: frozenset[UnknownKey],
+    answered: Sequence[FactAnswer],
+    introduced: Sequence[UnknownKey],
+    *,
+    skipped: int,
+    held_back: int,
+    below_floor: int,
+) -> PauseSummary:
+    """What a waiting job asked and what it leaves open (:class:`PauseSummary`).
+
+    ``prepared`` is the model the lanes read, with the saved answers in.
+    ``done`` is every fact a saved answer names, "I don't know" included, and
+    ``introduced`` every early question the rounds showed, this one's
+    included.
+    """
+    askable = {
+        key_ref(question.key).capability
+        for question in listed
+        if question.kind == "capability" and question.key not in done
+    }
+    applicability: dict[FrameworkName, tuple[BandApplicability, ...]] = {}
+    for name in sorted(frameworks):
+        if gates.get(name) != "satisfied":
+            continue
+        record = PACKAGES[name].record
+        counts: dict[tuple[int, str], Counter[str]] = {}
+        for entry in record.applicability(prepared, frameworks[name]):
+            band = record.unit_band(entry.unit) or UNRANKED
+            held = counts.setdefault((-band.order, band.label), Counter())
+            held[entry.state] += 1
+            reachable = {
+                key for missing in entry.missing for key in (missing, *lineage(missing))
+            }
+            if entry.state == "unknown" and not reachable & askable:
+                held["unaskable"] += 1
+        if counts:
+            applicability[name] = tuple(
+                BandApplicability(
+                    band=label,
+                    states={
+                        state: count
+                        for state, count in held.items()
+                        if state != "unaskable"
+                    },
+                    unaskable=held["unaskable"],
+                )
+                for (_, label), held in sorted(counts.items())
+            )
+    shown = tuple(dict.fromkeys(introduced))
+    content = [_known_content(answer) for answer in answered]
+    settles = [answer.settles for answer in answered]
+    return PauseSummary(
+        introduced=len(shown),
+        choices=sum(len(answer_facets(key)) or 1 for key in shown),
+        settled=sum(settles),
+        partial=sum(
+            1
+            for known, full in zip(content, settles, strict=True)
+            if known and not full
+        ),
+        unknown=sum(1 for known in content if not known),
+        skipped=skipped,
+        held_back=held_back,
+        below_floor=below_floor,
+        applicability=applicability,
     )
 
 
@@ -571,8 +772,8 @@ def next_round(
     listed: Sequence[EarlyQuestion],
     done: frozenset[SkipKey],
     held: Mapping[UnknownKey, FactAnswer],
-) -> tuple[tuple[EarlyQuestion, ...], dict[str, int], int]:
-    """This round's questions, how many each kind has left, and how many the limits hold back.
+) -> tuple[tuple[EarlyQuestion, ...], dict[str, int], tuple[EarlyQuestion, ...]]:
+    """This round's questions, how many each kind has left, and the questions the limits hold back.
 
     A question an earlier round answered in full is not asked again. One it
     answered in part is taken first, and takes no place under the limit, which
@@ -596,7 +797,7 @@ def next_round(
     ]
     shown: list[EarlyQuestion] = []
     remaining = {"gate": len(gates)}
-    withheld = 0
+    held_back: list[EarlyQuestion] = []
     for kind, rule in EARLY_RULES.items():
         asked = sum(
             1 for key in held if (kind == "capability") == bool(key_ref(key).capability)
@@ -613,9 +814,10 @@ def next_round(
         started = [question for question in eligible if question.key in held]
         fresh = [question for question in eligible if question.key not in held]
         remaining[kind] = len(started) + min(len(fresh), left)
-        withheld += max(len(fresh) - left, 0)
-        shown += _take([*started, *by_turn(fresh)[:left]], rule.per_round)
-    return (*gates, *by_turn(shown)), remaining, withheld
+        turns = by_turn(fresh)
+        held_back += turns[left:]
+        shown += _take([*started, *turns[:left]], rule.per_round)
+    return (*gates, *by_turn(shown)), remaining, tuple(held_back)
 
 
 def by_turn(questions: Sequence[EarlyQuestion]) -> list[EarlyQuestion]:
