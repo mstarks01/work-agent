@@ -218,12 +218,20 @@ def final_report(page) -> str:
     row = followup.locator("p", has=page.locator("button", has_text="Change")).first
     row.locator("button").click()
     row.locator("select").select_option("yes")
+    snapshots = []
+    page.on(
+        "request",
+        lambda request: (
+            snapshots.append(request.url) if "/workspace/runs/" in request.url else None
+        ),
+    )
     with page.expect_request("**/answer/*") as sent:
         page.click("text=Run the follow-up with these answers")
     assert any(
         fact.get("value") == "yes" for fact in sent.value.post_data_json["facts"]
     )
     page.wait_for_url(lambda url: "/report/" in url and url != first)
+    assert len(snapshots) == 1, "Live progress must not also start reopening the run"
     return page.url
 
 

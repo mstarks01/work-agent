@@ -178,8 +178,9 @@ const workspace = (() => {
     el("question-progress").textContent = visible ? visible + " question groups" : "Review your answers";
   };
   el("questions").addEventListener("change", indexGroups);
+  // Capture the entry route before live progress changes it to ?run=.
+  const params = new URLSearchParams(location.search);
   queueMicrotask(() => {
-    const params = new URLSearchParams(location.search);
     if (params.get("run")) open(params.get("run"));
     else if (params.get("view") === "analyses") library();
     fetch("/workspace/runs").then((response) => response.ok ? response.json() : []).then((runs) => {
