@@ -63,6 +63,7 @@ from analysis_service.analysis import (
 )
 from analysis_service.assertions import AssertionCatalog
 from analysis_service.candidates import Match, Rule, clip_fact
+from analysis_service.claims import UnknownRef
 from analysis_service.frameworks import NoRule, PreconditionResult, PredicateReader
 from analysis_service.system_model import SystemModel
 
@@ -73,6 +74,7 @@ __all__ = [
     "STRUCTURAL_RULES",
     "WEB_PROTOCOL_TERMS",
     "asvs_precondition",
+    "asvs_precondition_facts",
 ]
 
 
@@ -862,6 +864,29 @@ def asvs_precondition(model: SystemModel) -> PreconditionResult:
         return "undecidable" if silent or not model.data_flows else "refuted"
 
     return "undecidable"
+
+
+def asvs_precondition_facts(model: SystemModel) -> tuple[UnknownRef, ...]:
+    """The facts whose answers decide :func:`asvs_precondition` where it is undecidable.
+
+    **The precondition reads a process's interface first**, so each process
+    that never stated one is asked: one "web" answer satisfies it, and "non-web"
+    from every process refutes it. A model with no process is read off its
+    flows alone, so there each flow that states no protocol is asked. Every
+    fact is a field the precondition reads, so the answer the resumed job
+    writes onto the model is the one the gate reads.
+    """
+    if model.processes:
+        return tuple(
+            UnknownRef(element_id=process.id, attribute="interface_kind")
+            for process in model.processes
+            if process.interface_kind == "unknown"
+        )
+    return tuple(
+        UnknownRef(element_id=flow.id, attribute="protocol")
+        for flow in model.data_flows
+        if not states_a_protocol(flow.protocol)
+    )
 
 
 #: Why no ASVS candidate rule reads an assertion predicate. The rules here find

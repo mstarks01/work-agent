@@ -1,6 +1,6 @@
 """The STRIDE framework package: this repo's original analysis, as a package.
 
-Twelve members and a text root at ``frameworks/stride/``. Everything here is
+Thirteen members and a text root at ``frameworks/stride/``. Everything here is
 *profile* — the tailoring this service applies — and nothing declares a catalog:
 STRIDE is a method rather than a published requirement set, so there is no
 external artifact to carry or to check a declaration against.
@@ -14,7 +14,12 @@ from typing import cast, get_args
 from pydantic import BaseModel, ConfigDict
 
 from analysis_service.bands import Band, band_of
-from analysis_service.claims import Claim, SeverityLevel, derive_severity_level
+from analysis_service.claims import (
+    Claim,
+    SeverityLevel,
+    UnknownRef,
+    derive_severity_level,
+)
 from analysis_service.frameworks import (
     FrameworkPackage,
     IdRule,
@@ -59,6 +64,12 @@ def stride_precondition(model: SystemModel) -> PreconditionResult:
     """
     del model  # every valid model satisfies STRIDE
     return "satisfied"
+
+
+def stride_precondition_facts(model: SystemModel) -> tuple[UnknownRef, ...]:
+    """No fact decides STRIDE's precondition: it is total, so never undecidable."""
+    del model
+    return ()
 
 
 # Document -> the candidate rules that select it. The direction is
@@ -198,6 +209,7 @@ STRIDE = FrameworkPackage(
     ),
     options=StrideOptions,
     precondition=stride_precondition,
+    precondition_facts=stride_precondition_facts,
     knowledge=KnowledgeTables(
         notes=MappingProxyType(NOTES), cases=MappingProxyType(CASES)
     ),

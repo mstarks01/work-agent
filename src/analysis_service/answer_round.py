@@ -22,7 +22,10 @@ its limit in all: :data:`EARLY_RULES` is the table. Where a job selects
 more than one framework, the frameworks take turns, both for the places in a
 round and for the order it is shown in (:func:`by_turn`). A question answered in
 part is taken before any new question, outside the limit, and where the limits hold questions
-back the job says so (:attr:`QuestionSet.stop`). A submitter saves a round's answers, which writes
+back the job says so (:attr:`QuestionSet.stop`). A question that decides whether a
+selected framework runs at all comes first in every round, outside the limits
+(ADR 0067), and the set says what each framework's precondition reads now
+(:attr:`QuestionSet.gates`). A submitter saves a round's answers, which writes
 them onto the job and runs no model, and the next round is read off the model
 with them in. So an
 answer can hide the parts of a capability it rules out, and a named mechanism
@@ -41,7 +44,7 @@ from __future__ import annotations
 
 from collections import Counter
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass, replace
+from dataclasses import dataclass, field, replace
 from functools import cached_property
 from typing import TYPE_CHECKING, Annotated, Any
 
@@ -49,7 +52,11 @@ from pydantic import StringConstraints
 
 from analysis_service.assertions import UNKNOWN, AssertionCatalog
 from analysis_service.claims import FrameworkAnalysis, FrameworkName, UnknownKey
-from analysis_service.early_questions import EarlyQuestion, early_questions
+from analysis_service.early_questions import (
+    EarlyQuestion,
+    early_questions,
+    framework_gates,
+)
 from analysis_service.fact_answers import (
     MAX_FACT_ANSWERS,
     FactAnswer,
@@ -60,6 +67,7 @@ from analysis_service.fact_answers import (
     refuse_repeated_facts,
 )
 from analysis_service.fact_writes import answered_model, check_fact_answers
+from analysis_service.frameworks import PreconditionResult
 from analysis_service.links import (
     MAX_LINK_ANSWERS,
     LinkAnswer,
@@ -216,6 +224,11 @@ class QuestionSet:
     #: The job this one's answers started, which holds it: it asks nothing
     #: and admits no answer while that job is in flight or has its report.
     resumed_by: str | None = None
+    #: For a waiting job, what each selected framework's precondition reads
+    #: with the saved answers in. Only a ``satisfied`` framework will run; a
+    #: refuted one asks nothing, and an undecidable one asks only what decides
+    #: it (:func:`~analysis_service.early_questions.framework_gates`).
+    gates: Mapping[FrameworkName, PreconditionResult] = field(default_factory=dict)
 
     @property
     def stop(self) -> str | None:
@@ -244,6 +257,7 @@ class QuestionSet:
             "early_remaining": dict(self.remaining),
             "early_withheld": self.withheld,
             "early_stop": self.stop,
+            "framework_gates": dict(self.gates),
             "skipped_early": [question.to_json() for question in self.skipped],
             "skipped_links": [question.to_json() for question in self.skipped_links],
             "answered_early": [
@@ -504,13 +518,18 @@ def question_set(
             skipped_links=(),
         )
     done = answered_keys(answered)
-    held = {answer.key: answer for answer in answered}
     first = early_questions(model, frameworks, catalog)
     asked_links = link_questions(catalog, model)
     view = answered_model(model, answered)
     if catalog is not None:
         catalog = apply_answers(catalog, view, answered_links, answered)[0]
     listed = early_questions(view, frameworks, catalog)
+    # An answer to a gate question counts toward no kind's limit, so the key
+    # stays exempt once its answer has decided the gate and it is no longer
+    # listed as one.
+    given = {answer.key: answer for answer in answered}
+    gated = {question.key for question in (*first, *listed) if question.gates}
+    held = {answer.key: answer for answer in answered if answer.key not in gated}
     aside: frozenset[SkipKey] = frozenset(skipped)
     this_round, remaining, withheld = next_round(listed, aside | done, held)
     linked = {fold(link.principal): link for link in answered_links}
@@ -526,7 +545,9 @@ def question_set(
         shown=tuple(shown),
         remaining=remaining,
         answered_early=tuple(
-            (question, held[question.key]) for question in first if question.key in held
+            (question, given[question.key])
+            for question in first
+            if question.key in given
         ),
         answered_links=tuple(
             (question, linked[question.key])
@@ -542,6 +563,7 @@ def question_set(
         skipped_links=tuple(
             question for question in open_links if question.key in aside
         ),
+        gates=framework_gates(view, frameworks, catalog),
     )
 
 
@@ -564,9 +586,16 @@ def next_round(
     and the whole round is shown in that order too (:func:`by_turn`). So a
     question answered in part is shown where its framework's turn puts it,
     which is not always first.
+
+    **A question that decides a framework's precondition is taken first**, every
+    one still open, outside the limits and the floor (ADR 0067). Its count is
+    the ``gate`` entry of the remaining counts.
     """
+    gates = [
+        question for question in listed if question.gates and question.key not in done
+    ]
     shown: list[EarlyQuestion] = []
-    remaining = {}
+    remaining = {"gate": len(gates)}
     withheld = 0
     for kind, rule in EARLY_RULES.items():
         asked = sum(
@@ -577,6 +606,7 @@ def next_round(
             question
             for question in listed
             if _early_kind(question) == kind
+            and not question.gates
             and passes_floor(question, listed)
             and question.key not in done
         ]
@@ -585,7 +615,7 @@ def next_round(
         remaining[kind] = len(started) + min(len(fresh), left)
         withheld += max(len(fresh) - left, 0)
         shown += _take([*started, *by_turn(fresh)[:left]], rule.per_round)
-    return tuple(by_turn(shown)), remaining, withheld
+    return (*gates, *by_turn(shown)), remaining, withheld
 
 
 def by_turn(questions: Sequence[EarlyQuestion]) -> list[EarlyQuestion]:

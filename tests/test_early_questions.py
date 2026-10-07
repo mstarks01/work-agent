@@ -401,3 +401,165 @@ def test_a_field_question_ranks_by_its_score_per_choice():
     per_choice = [q.score / q.decisions for q in fields]
     assert per_choice == sorted(per_choice, reverse=True)
     assert len({q.decisions for q in fields}) > 1, "the fixture mixes costs"
+
+
+def _with_interfaces(kind, *, protocols=None):
+    """The shared model with every process presenting ``kind``, and every
+    flow carrying ``protocols`` where it is given."""
+    model = valid_model()
+    for process in model.processes:
+        process.interface_kind = kind
+    if protocols is not None:
+        for flow in model.data_flows:
+            flow.protocol = protocols
+    return model
+
+
+def _paused(model, selection, answers=()):
+    from analysis_service.answer_round import question_set
+
+    return question_set(
+        model,
+        None,
+        selection,
+        (),
+        waiting=True,
+        answered=list(answers),
+        answered_links=(),
+        final=False,
+        shown=(),
+    )
+
+
+LEVEL_2 = {"asvs": {"level": 2}}
+
+
+class TestTheFrameworkGates:
+    """A paused job reads each framework's precondition before it asks for it
+    (#1542 F1, ADR 0067). At 2fae7d3 a model whose processes are all
+    ``non-web`` refutes ASVS, and a level 2 pause still asked 15 questions; a
+    model whose interfaces and protocols are unknown is undecidable, and no
+    question asked its ``interface_kind``."""
+
+    def test_a_refuted_framework_asks_nothing(self):
+        asked = _paused(_with_interfaces("non-web"), LEVEL_2)
+        assert dict(asked.gates) == {"asvs": "refuted"}
+        assert asked.early == () and asked.withheld == 0
+        assert asked.to_json()["framework_gates"] == {"asvs": "refuted"}
+
+    def test_a_refuted_framework_leaves_the_other_frameworks_questions_as_they_are(
+        self,
+    ):
+        model = _with_interfaces("non-web")
+        both = _paused(model, {**LEVEL_2, "stride": {}})
+        alone = _paused(model, {"stride": {}})
+        assert [q.key for q in both.early] == [q.key for q in alone.early]
+        assert all(q.frameworks == ("stride",) for q in both.early)
+        assert dict(both.gates) == {"asvs": "refuted", "stride": "satisfied"}
+
+    def test_an_undecidable_framework_asks_only_what_decides_it(self):
+        model = _with_interfaces("unknown", protocols="unknown")
+        asked = _paused(model, LEVEL_2)
+        assert dict(asked.gates) == {"asvs": "undecidable"}
+        assert [(q.key, q.gates) for q in asked.early] == [
+            (
+                UnknownRef(element_id=process.id, attribute="interface_kind").key,
+                ("asvs",),
+            )
+            for process in model.processes
+        ]
+        assert asked.remaining == {"gate": 1, "capability": 0, "field": 0}
+        [gate] = asked.early
+        assert gate.choices == ("web", "non-web")
+        assert gate.reasons == ("Whether the asvs analysis runs depends on this fact.",)
+
+    def test_the_questions_that_decide_a_framework_come_before_the_others(self):
+        model = _with_interfaces("unknown", protocols="unknown")
+        asked = _paused(model, {**LEVEL_2, "stride": {}})
+        gated = [bool(q.gates) for q in asked.early]
+        assert gated[0] and not any(gated[1:]), "a control: stride asks after it"
+
+    @pytest.mark.parametrize(
+        ("answer", "state"), [("web", "satisfied"), ("non-web", "refuted")]
+    )
+    def test_the_offered_question_decides_the_gate_prepare_reads(self, answer, state):
+        """The answer is written where the precondition reads, as the resumed
+        job's ``prepare`` reads it: through the one writer of answers into a
+        run, and the gate it runs."""
+        from analysis_service.frameworks import PACKAGES, run_precondition
+        from analysis_service.graph import STATE_VALID_MODEL
+        from analysis_service.pipeline import answered_state
+
+        model = _with_interfaces("unknown", protocols="unknown")
+        asked = _paused(model, LEVEL_2)
+        facts = [FactAnswer(key=q.key, value=answer) for q in asked.early]
+        admitted = asked.admit(
+            sources=(),
+            earlier_links=(),
+            earlier_facts=(),
+            links=(),
+            facts=facts,
+            save=True,
+        )
+        after = _paused(model, LEVEL_2, admitted.facts)
+        seeded = SystemModel.model_validate(
+            answered_state(model, [], admitted.facts)[STATE_VALID_MODEL]
+        )
+        assert run_precondition(PACKAGES["asvs"], seeded) == state
+        assert dict(after.gates) == {"asvs": state}
+        capabilities = [q for q in after.early if q.kind == "capability"]
+        assert bool(capabilities) == (state == "satisfied")
+        assert [q.key for q, _ in after.answered_early] == [q.key for q in asked.early]
+
+    def test_an_unknown_answer_leaves_the_framework_undecidable_and_asks_no_more(
+        self,
+    ):
+        model = _with_interfaces("unknown", protocols="unknown")
+        asked = _paused(model, LEVEL_2)
+        unknown = [FactAnswer(key=q.key, value="unknown") for q in asked.early]
+        after = _paused(model, LEVEL_2, unknown)
+        assert dict(after.gates) == {"asvs": "undecidable"}
+        assert after.early == () and after.done
+
+    def test_a_gate_answer_counts_toward_no_kinds_limit(self):
+        """Once an answer satisfies the gate, the rounds hold the questions a
+        model that stated the interface would hold. Twenty-nine earlier field
+        answers leave one place, which a counted gate answer would take."""
+        from analysis_service.answer_round import EARLY_RULES
+
+        selection = {**LEVEL_2, "stride": {}}
+        model = _with_interfaces("unknown", protocols="unknown")
+        filler = [
+            FactAnswer(key=("", "", "", f"subject {n}", "", ""), value="unknown")
+            for n in range(EARLY_RULES["field"].limit - 1)
+        ]
+        gates = [
+            FactAnswer(key=q.key, value="web")
+            for q in _paused(model, selection).early
+            if q.gates
+        ]
+        after = _paused(model, selection, [*filler, *gates])
+        stated = _paused(
+            _with_interfaces("web", protocols="unknown"), selection, filler
+        )
+        assert after.remaining == stated.remaining
+        assert after.remaining["field"] == 1, "a control: one place is left"
+        assert [q.key for q in after.early] == [q.key for q in stated.early]
+
+    def test_a_framework_whose_precondition_is_total_asks_no_gate_question(self):
+        for case in sorted(Path("evals/corpus").iterdir()):
+            model = SystemModel.model_validate_json((case / "model.json").read_text())
+            asked = early_questions(model, {"stride": {}}, None)
+            assert not any(q.gates for q in asked), case.name
+
+    def test_a_model_with_no_process_asks_each_flow_that_states_no_protocol(self):
+        from analysis_service.frameworks.asvs.rules import asvs_precondition_facts
+
+        model = valid_model()
+        flows = model.model_copy(update={"processes": []})
+        for flow in flows.data_flows:
+            flow.protocol = "unknown"
+        assert asvs_precondition_facts(flows) == tuple(
+            UnknownRef(element_id=flow.id, attribute="protocol")
+            for flow in flows.data_flows
+        )

@@ -2556,6 +2556,11 @@ def test_the_page_opens_a_round_with_the_questions_the_service_counts(case):
         q for q in asked.early if q.kind == "capability" and q.parent not in keys
     ]
     capabilities = [list(q.key) for q in asked.early if q.kind == "capability"]
+    if asked.gates["asvs"] != "satisfied":
+        # A framework that will not run as the model reads now asks no
+        # capability (ADR 0067), so the round holds no part to hide.
+        assert not capabilities
+        return
     steps = f"""
 await ids.analyze.listeners.submit({{ preventDefault() {{}} }}); await settle();
 streams[0].listeners.questions({{ data: JSON.stringify({{ run: "r1", questions: [],
@@ -2920,3 +2925,48 @@ def test_the_follow_up_starts_a_question_from_its_retained_answer():
 
     assert payload["answers"] == []
     assert payload["retained"] == [answer.model_dump(mode="json")]
+
+
+def test_a_pause_whose_framework_will_not_run_explains_it_and_waits():
+    """A selected framework the model rules out asks nothing, and the page
+    says why instead of starting the analysis unseen (#1542 F1, ADR 0067)."""
+    steps = """
+await ids.analyze.listeners.submit({ preventDefault() {} }); await settle();
+streams[0].listeners.questions({ data: JSON.stringify({ run: "r1", questions: [],
+  facts: [], remaining: {gate: 0, capability: 0, field: 0}, stop: "nothing-left",
+  gates: {asvs: "refuted"}, answered: [], answered_links: [], revision: 0 }) });
+await settle();
+const text = (n) => typeof n === "string" ? n
+  : [n.textContent || "", ...(n.children || []).map(text)].join("");
+calls.push({ said: text(ids.questions) });
+"""
+    seen = _run_form_script(steps)
+
+    assert seen["streams"] == ["/events/r1"], "nothing started"
+    assert seen["asked"]
+    said = seen["calls"][-1]["said"]
+    assert "rules out the asvs analysis, so it will not run" in said
+
+
+def test_a_question_that_decides_a_framework_says_so():
+    row = _text_row(["process:web", "interface_kind", "", "", "", ""], "Web app") | {
+        "kind": "attribute",
+        "form": "choice",
+        "choices": [{"id": "web", "name": ""}, {"id": "non-web", "name": ""}],
+        "frameworks": ["asvs"],
+        "gates": ["asvs"],
+    }
+    steps = f"""
+await ids.analyze.listeners.submit({{ preventDefault() {{}} }}); await settle();
+streams[0].listeners.questions({{ data: JSON.stringify({{ run: "r1", questions: [],
+  facts: [{json.dumps(row)}], remaining: {{gate: 1, capability: 0, field: 0}},
+  gates: {{asvs: "undecidable"}}, answered: [], answered_links: [], revision: 0 }}) }});
+const text = (n) => typeof n === "string" ? n
+  : [n.textContent || "", ...(n.children || []).map(text)].join("");
+calls.push({{ said: text(ids.questions) }});
+"""
+    said = _run_form_script(steps)["calls"][-1]["said"]
+
+    assert "Decides whether the asvs analysis runs" in said
+    assert "The asvs analysis runs only once the system model shows" in said
+    assert "1 question(s) that decide whether an analysis runs" in said

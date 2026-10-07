@@ -42,6 +42,14 @@ row. A framework whose row counted no run asks nothing ranked by it.
 rule over capabilities counts how many units each unknown capability could
 settle, and those questions come first (:func:`capability_questions`).
 
+**A framework that will not run asks nothing** (ADR 0067). Each selected
+framework's precondition is read first, through the gate ``prepare`` runs
+(:func:`framework_gates`). A refuted framework adds no question and no score.
+An undecidable one asks only the facts its package says decide it
+(``precondition_facts``), ahead of every other question; its own questions
+wait until an answer satisfies it. A question another framework asks is still
+asked for that framework.
+
 An answer takes the path a fact answer after the report takes: a
 :class:`~analysis_service.answer_round.QuestionSet` admits it, and the resumed
 job writes it (#1252).
@@ -75,7 +83,7 @@ from analysis_service.claims import (
     UnknownRef,
 )
 from analysis_service.fact_answers import FactKind, answer_facets, fact_kind, key_ref
-from analysis_service.frameworks import PACKAGES
+from analysis_service.frameworks import PACKAGES, PreconditionResult, run_precondition
 from analysis_service.open_facts import (
     element_names,
     group_of,
@@ -87,6 +95,7 @@ from analysis_service.question_kinds import QUESTION_KINDS, Facet
 from analysis_service.system_model import Element, SystemModel
 
 __all__ = [
+    "GATE_REASON",
     "PRIOR_REASON",
     "QUESTION_PRIOR",
     "QUESTION_PRIOR_PATH",
@@ -95,6 +104,7 @@ __all__ = [
     "capability_questions",
     "early_questions",
     "element_type",
+    "framework_gates",
     "load_prior",
 ]
 
@@ -103,6 +113,9 @@ QUESTION_PRIOR_PATH = Path(__file__).with_name("question_prior.json")
 #: The reason a field question gives where no rule reads its fact: the prior,
 #: which is why it is asked at all.
 PRIOR_REASON = "Findings in earlier analyses often depend on this fact."
+
+#: The reason a gate question gives, once for each framework it decides.
+GATE_REASON = "Whether the {framework} analysis runs depends on this fact."
 
 
 @dataclass(frozen=True)
@@ -203,6 +216,11 @@ class EarlyQuestion:
     #: The key of the question this one depends on: a capability's parent,
     #: whose "no" makes this one moot. ``None`` for every other question.
     parent: UnknownKey | None = None
+    #: The selected frameworks whose undecidable precondition this fact can
+    #: decide, by name. A round asks every such question first, outside the
+    #: limits (:func:`~analysis_service.answer_round.next_round`). Empty for
+    #: every other question.
+    gates: tuple[FrameworkName, ...] = ()
 
     @property
     def decisions(self) -> int:
@@ -226,6 +244,7 @@ class EarlyQuestion:
             "group_heading": self.group_heading,
             "element": self.element,
             "parent": None if self.parent is None else list(self.parent),
+            "gates": list(self.gates),
         }
 
 
@@ -238,6 +257,29 @@ def _open_key(model: SystemModel, element: Element, field: str) -> UnknownKey | 
     return None
 
 
+def framework_gates(
+    model: SystemModel,
+    frameworks: Mapping[FrameworkName, Mapping[str, Any]],
+    catalog: AssertionCatalog | None,
+) -> Mapping[FrameworkName, PreconditionResult]:
+    """Each selected framework's precondition, read off the model the lanes will read.
+
+    **The gate ``prepare`` runs**, through the same
+    :func:`~analysis_service.frameworks.run_precondition`, over the model with
+    the answers written in and the catalog applied, which is the model a
+    resumed job's ``prepare`` reads.
+    """
+    return _gates(prepared_model(model, catalog), frameworks)
+
+
+def _gates(
+    prepared: SystemModel, frameworks: Mapping[FrameworkName, Mapping[str, Any]]
+) -> dict[FrameworkName, PreconditionResult]:
+    return {
+        name: run_precondition(PACKAGES[name], prepared) for name in sorted(frameworks)
+    }
+
+
 def early_questions(
     model: SystemModel,
     frameworks: Mapping[FrameworkName, Mapping[str, Any]],
@@ -248,14 +290,23 @@ def early_questions(
 
     ``frameworks`` maps each framework the job selected to its options. Read
     off the model with the catalog applied, which is the model the lanes will
-    read, so a fact the catalog states is not asked. The capability questions
-    come first (:func:`capability_questions`).
+    read, so a fact the catalog states is not asked. The questions that decide
+    an undecidable framework come first (:func:`framework_gates`), then the
+    capability questions (:func:`capability_questions`). Only a framework
+    whose precondition is satisfied ranks the capability and field questions.
     """
     model = prepared_model(model, catalog)
+    gates = _gates(model, frameworks)
+    runnable = {
+        name: frameworks[name] for name, state in gates.items() if state == "satisfied"
+    }
+    names = element_names(model)
+    deciding = _gate_questions(model, gates, catalog, names)
+    decided = {question.key for question in deciding}
     score: dict[UnknownKey, float] = {}
     helps: dict[UnknownKey, list[FrameworkName]] = {}
     reasons: dict[tuple[str, str], list[str]] = {}
-    for name in sorted(frameworks):
+    for name in runnable:
         package = PACKAGES[name]
         asks = {rule.rule_id: rule.question for rule in package.rules}
         named: Counter[str] = Counter()
@@ -275,38 +326,99 @@ def early_questions(
             rates = prior[name].rates.get(element_type(element), {})
             for field, rate in rates.items():
                 key = _open_key(model, element, field)
-                if key is not None:
+                if key is not None and key not in decided:
                     score[key] = score.get(key, 0.0) + rate * (1 + named[element.id])
                     helps.setdefault(key, []).append(name)
-    names = element_names(model)
     asked = []
     for key, value in score.items():
         ref = key_ref(key)
-        group, heading = group_of(ref)
         asked.append(
-            EarlyQuestion(
-                key=key,
-                kind=fact_kind(key),
-                label=label_of(ref, names),
+            _question(
+                key,
+                model,
+                catalog,
+                names,
                 reasons=tuple(
                     reasons.get((ref.element_id, ref.attribute), ()) or (PRIOR_REASON,)
                 ),
                 frameworks=tuple(helps[key]),
-                choices=answer_choices(key, model, catalog),
-                form=answer_form(key, model, catalog),
-                suggestions=answer_suggestions(key),
-                facets=answer_facets(key),
-                max_length=answer_limit(key, model),
-                group=group,
-                group_heading=heading,
-                element=names.get(ref.element_id, ref.element_id),
                 score=value,
             )
         )
     asked.sort(
         key=lambda question: (-question.score / question.decisions, question.key)
     )
-    return (*capability_questions(model, frameworks), *asked)
+    return (*deciding, *capability_questions(model, runnable), *asked)
+
+
+def _question(
+    key: UnknownKey,
+    model: SystemModel,
+    catalog: AssertionCatalog | None,
+    names: Mapping[str, str],
+    *,
+    reasons: tuple[str, ...],
+    frameworks: tuple[FrameworkName, ...],
+    score: float = 0.0,
+    gates: tuple[FrameworkName, ...] = (),
+) -> EarlyQuestion:
+    """One early question about an element's fact, with the form its answer takes."""
+    ref = key_ref(key)
+    group, heading = group_of(ref)
+    return EarlyQuestion(
+        key=key,
+        kind=fact_kind(key),
+        label=label_of(ref, names),
+        reasons=reasons,
+        frameworks=frameworks,
+        choices=answer_choices(key, model, catalog),
+        form=answer_form(key, model, catalog),
+        suggestions=answer_suggestions(key),
+        facets=answer_facets(key),
+        max_length=answer_limit(key, model),
+        group=group,
+        group_heading=heading,
+        element=names.get(ref.element_id, ref.element_id),
+        score=score,
+        gates=gates,
+    )
+
+
+def _gate_questions(
+    model: SystemModel,
+    gates: Mapping[FrameworkName, PreconditionResult],
+    catalog: AssertionCatalog | None,
+    names: Mapping[str, str],
+) -> tuple[EarlyQuestion, ...]:
+    """The open facts that can decide each undecidable framework, in its package's order.
+
+    **No prior and no floor decide these.** The framework runs only once one
+    of them is answered, so each is asked whatever its rank would be. An
+    attribute is asked only where :func:`~analysis_service.open_facts.open_attribute`
+    says it is open, the rule the answer check reads too.
+    """
+    deciding: dict[UnknownKey, list[FrameworkName]] = {}
+    for name, state in gates.items():
+        if state != "undecidable":
+            continue
+        for ref in PACKAGES[name].precondition_facts(model):
+            if ref.attribute and not open_attribute(
+                model, ref.element_id, ref.attribute
+            ):
+                continue
+            deciding.setdefault(ref.key, []).append(name)
+    return tuple(
+        _question(
+            key,
+            model,
+            catalog,
+            names,
+            reasons=tuple(GATE_REASON.format(framework=name) for name in held),
+            frameworks=tuple(held),
+            gates=tuple(held),
+        )
+        for key, held in deciding.items()
+    )
 
 
 def capability_questions(

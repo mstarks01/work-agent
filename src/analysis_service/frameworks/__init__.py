@@ -46,6 +46,7 @@ from analysis_service.claims import (
     ProposalBatch,
     RuledClaim,
     RulingBatch,
+    UnknownRef,
 )
 from analysis_service.errors import ConfigError
 from analysis_service.markdown_loader import _inside
@@ -63,6 +64,7 @@ __all__ = [
     "KnowledgeTables",
     "NoRule",
     "PreconditionError",
+    "PreconditionFacts",
     "PreconditionResult",
     "PredicateReader",
     "lane_of",
@@ -91,6 +93,10 @@ PreconditionResult = Literal["satisfied", "refuted", "undecidable"]
 PRECONDITION_RESULTS: tuple[PreconditionResult, ...] = get_args(PreconditionResult)
 
 Precondition = Callable[[SystemModel], PreconditionResult]
+
+#: The open facts whose answers could decide a package's precondition, read
+#: where the precondition answers ``undecidable``.
+PreconditionFacts = Callable[[SystemModel], tuple[UnknownRef, ...]]
 
 #: The five fixed H2 sections of a lane skill, in order. ``Scope`` must be first
 #: and must be present in every lane: the critic's lane digest is assembled from
@@ -290,7 +296,7 @@ class IdRule:
 class FrameworkPackage:
     """One security framework as an object the service can run.
 
-    Twelve members, plus text under one root by convention.
+    Thirteen members, plus text under one root by convention.
 
     ``name``
         The closed :data:`~analysis_service.claims.FrameworkName`. A package
@@ -323,6 +329,14 @@ class FrameworkPackage:
         before the fan-out, through :func:`run_precondition`. Only ``satisfied``
         runs the lanes; a refused framework still produces a block that states
         the reason.
+    ``precondition_facts``
+        The facts a person can answer to decide ``precondition`` where it
+        answers ``undecidable``: each one a field the precondition reads, so
+        an answer written onto the model is what the gate then reads. A paused
+        job asks these before any other question for this framework (ADR
+        0067). A package whose precondition is total declares an empty answer
+        rather than omitting the member, so a package that can be undecidable
+        cannot be registered with no way for its owner to decide it.
     ``knowledge``
         This package's **Reference Note** and **Worked Case** tables. They live
         here because their retrieval key does: selection is a set intersection
@@ -357,6 +371,7 @@ class FrameworkPackage:
     id_rule: IdRule
     options: type[BaseModel]
     precondition: Precondition
+    precondition_facts: PreconditionFacts
     knowledge: KnowledgeTables
     predicate_readers: Mapping[str, PredicateReader]
     bands: tuple[str, ...]
@@ -726,6 +741,11 @@ def _declaration_issues(package: FrameworkPackage) -> list[str]:
         issues.append(
             f"precondition is {package.precondition!r}, which is not callable,"
             " so nothing can ask this framework whether it applies"
+        )
+    if not callable(package.precondition_facts):
+        issues.append(
+            f"precondition_facts is {package.precondition_facts!r}, which is not"
+            " callable, so a paused job cannot ask what decides this framework"
         )
     lane_field = package.id_rule.lane_field
     if lane_field and lane_field not in package.record.model_fields:

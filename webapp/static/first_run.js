@@ -235,10 +235,13 @@
     revision = data.revision;
     const saved = (data.answered || []).length || (data.answered_links || []).length
       || (data.skipped || []).length || (data.skipped_links || []).length;
-    // A pause with nothing to ask and nothing answered or skipped starts the
-    // analysis, with no page between. After a save, only the start button
-    // starts it: a round of skips is a save too.
-    if (!left && !saved) {
+    // Each selected analysis whose precondition does not hold yet
+    // (QuestionSet.gates): it will not run as the model reads now.
+    const gates = Object.entries(data.gates || {}).filter(([, state]) => state !== "satisfied");
+    // A pause with nothing to ask, nothing answered or skipped, and no
+    // analysis to explain starts the analysis, with no page between. After a
+    // save, only the start button starts it: a round of skips is a save too.
+    if (!left && !saved && !gates.length) {
       pausedRun = data.run;
       startAnalysis([], []);
       return;
@@ -265,6 +268,9 @@
     // questions (ADR 0053).
     const remaining = data.remaining || {};
     const parts = [];
+    if (remaining.gate) {
+      parts.push(`${remaining.gate} question(s) that decide whether an analysis runs`);
+    }
     if (remaining.capability) {
       parts.push(`about ${remaining.capability} yes/no question(s) about the application`);
     }
@@ -273,6 +279,19 @@
     }
     if (data.questions.length) {
       parts.push(`${data.questions.length} question(s) about which part of your system a name is`);
+    }
+    // Why an analysis will not run, or what it waits on, from the service's
+    // own reading of its precondition.
+    for (const [name, state] of gates) {
+      const note = document.createElement("p");
+      note.className = "hint gate-note";
+      note.textContent = state === "refuted"
+        ? `The system model rules out the ${name} analysis, so it will not run and`
+          + " none of its questions are asked."
+        : `The ${name} analysis runs only once the system model shows that it applies.`
+          + " The questions that decide this come first; its other questions follow"
+          + " once an answer settles it.";
+      questions.append(note);
     }
     if (!left) {
       const ready = document.createElement("p");
@@ -441,6 +460,7 @@
       const names = q.frameworks || [];
       if (!names.length) return null;
       const which = `the ${names.join(" and ")} ${names.length > 1 ? "analyses" : "analysis"}`;
+      if ((q.gates || []).length) return `Decides whether ${which} runs`;
       return q.kind === "capability" ? `Decides what ${which} covers` : `Used by ${which}`;
     };
     // Why a question is asked, which analysis it serves, and the words of the
