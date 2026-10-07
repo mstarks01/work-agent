@@ -52,6 +52,20 @@
   // The answers a follow-up question starts from: a facet answer with facets
   // left out, which the question asks again. Keyed by the fact's key.
   const RETAINED = new Map((EARLIER.retained || []).map(a => [JSON.stringify(a.key), a]));
+  // The follow-up's saved draft (ADR 0070): answers saved in batches that no
+  // run has read yet. Every editor starts from its draft answer.
+  const DRAFT = EARLIER.draft || { links: [], facts: [] };
+  const DRAFT_FACTS = new Map(DRAFT.facts.map(a => [JSON.stringify(a.key), a]));
+  const DRAFT_LINKS = new Map(DRAFT.links.map(a => [a.principal, a.element]));
+  // How many answers one request carries, as the service publishes them.
+  const LIMITS = EARLIER.limits || { facts: 200, links: 50 };
+  // An answer to start an editor from: the draft's, over a kept answer's.
+  const startFrom = (kept, key) => {
+    const drafted = DRAFT_FACTS.get(JSON.stringify(key));
+    if (!drafted) return kept || null;
+    if (!drafted.facets) return drafted;
+    return { ...drafted, facets: { ...((kept && kept.facets) || {}), ...drafted.facets } };
+  };
   // Where each finding's facts came from, built server-side: the label of the
   // owner's answers Source, the attributes the owner answered, and why each
   // conditional finding's facts are still open.
@@ -1079,6 +1093,7 @@
         select.dataset.principal = q.principal;
         select.append(option("(leave unanswered)", ""));
         linkOptions(select, q.options);
+        select.value = DRAFT_LINKS.get(q.principal) || "";
         row.append(el("b", null, q.principal),
           ` \u2014 an answer places ${q.rows} stated fact(s) `, select);
         box.append(row);
@@ -1154,7 +1169,7 @@
       ordered.forEach((q, index) => {
         const into = !q.findings.length ? unwaited : index < SHOWN ? box : more;
         const row = el("p");
-        const editor = editorFor(q, RETAINED.get(JSON.stringify(q.key)) || null, recount, false);
+        const editor = editorFor(q, startFrom(RETAINED.get(JSON.stringify(q.key)), q.key), recount, false);
         factAnswers.push({ read: editor.read, known: editor.known });
         const lead = [el("b", null, q.label), why(q),
           ` \u2014 ${q.cited_by} finding(s) wait on it; answering down to here covers ${q.covered_so_far}`];
@@ -1177,14 +1192,18 @@
         "\"I don't know\", change it, and the follow-up reads the new answer. A " +
         "known answer, or a known part of one, cannot change back to " +
         "\"I don't know\" here."));
-      const changer = (row, shown, open) => {
+      // A row whose answer the draft changed opens at once, with the draft's
+      // answer in it.
+      const changer = (row, shown, open, drafted) => {
         const change = el("button", null, "Change");
         change.type = "button";
-        change.addEventListener("click", () => {
+        const opened = () => {
           change.hidden = true;
           shown.replaceChildren(" \u2014 ", ...open());
-        });
+        };
+        change.addEventListener("click", opened);
         row.append(shown, " ", change);
+        if (drafted) opened();
       };
       EARLIER_LINKS.forEach(a => {
         const row = el("p");
@@ -1195,52 +1214,121 @@
           const select = el("select");
           select.dataset.principal = a.principal;
           linkOptions(select, a.options);
-          select.value = element;
+          select.value = DRAFT_LINKS.get(a.principal) || element;
           linkSelects.push(select);
           return [select];
-        });
+        }, DRAFT_LINKS.has(a.principal));
         box.append(row);
       });
       EARLIER_FACTS.forEach(a => {
         const row = el("p");
         row.append(el("b", null, a.label));
         changer(row, el("span", null, ` \u2014 ${said(a.answer)}`), () => {
-          const editor = editorFor(a, a.answer, () => {}, false);
+          const editor = editorFor(a, startFrom(a.answer, a.key), () => {}, false);
           earlierFacts.push(editor.read);
           return editor.nodes;
-        });
+        }, DRAFT_FACTS.has(JSON.stringify(a.key)));
         box.append(row);
       });
     }
 
+    // Saving keeps the answers as a draft and runs nothing; only the run
+    // button spends the follow-up (ADR 0070). Every answer entered stays on
+    // the page whatever a request returns.
+    const keep = el("button", null, "Save progress");
     const again = el("button", null, "Run the follow-up with these answers");
     const note = el("div", "meta");
-    again.addEventListener("click", async () => {
-      const links = linkSelects
+    const savedNote = el("div", "meta");
+    let revision = EARLIER.revision || 0;
+    const showSaved = () => {
+      const count = DRAFT_FACTS.size + DRAFT_LINKS.size;
+      savedNote.textContent = count
+        ? `Saved and not yet run: ${count} answer(s). The follow-up reads them when it runs.`
+        : "";
+    };
+    // The run id is this page's own path: /report/{run}.
+    const run = location.pathname.split("/").pop();
+    const post = async (body) => {
+      let response;
+      let reply;
+      try {
+        response = await fetch("/answer/" + encodeURIComponent(run), {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        });
+        reply = await response.json();
+      } catch {
+        throw new Error("The connection was interrupted. Your answers are still on this page;"
+          + " reload it to check what was saved, or try again.");
+      }
+      if (!response.ok) throw new Error(reply.message);
+      return reply;
+    };
+    const entered = () => ({
+      links: linkSelects
         .filter(s => s.value)
-        .map(s => ({ principal: s.dataset.principal, element: s.value }));
-      const facts = [...factAnswers.map(answer => answer.read()),
-        ...earlierFacts.map(read => read())].filter(Boolean);
-      again.disabled = true;
-      // The run id is this page's own path: /report/{run}.
-      const run = location.pathname.split("/").pop();
-      const resumed = await fetch("/answer/" + encodeURIComponent(run), {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ links, facts }),
-      });
-      const body = await resumed.json();
-      if (!resumed.ok) {
-        note.textContent = body.message;
-        again.disabled = false;
+        .map(s => ({ principal: s.dataset.principal, element: s.value })),
+      facts: [...factAnswers.map(answer => answer.read()),
+        ...earlierFacts.map(read => read())].filter(Boolean),
+    });
+    // Save the answers in as many requests as the limits need, each naming
+    // the revision the last one returned.
+    const saveInParts = async ({ links, facts }) => {
+      const parts = Math.max(Math.ceil(facts.length / LIMITS.facts),
+        Math.ceil(links.length / LIMITS.links), 1);
+      for (let part = 0; part < parts; part += 1) {
+        const reply = await post({
+          links: links.slice(part * LIMITS.links, (part + 1) * LIMITS.links),
+          facts: facts.slice(part * LIMITS.facts, (part + 1) * LIMITS.facts),
+          save: true,
+          revision,
+        });
+        revision = reply.revision;
+      }
+      links.forEach(a => DRAFT_LINKS.set(a.principal, a.element));
+      facts.forEach(a => DRAFT_FACTS.set(JSON.stringify(a.key), a));
+      showSaved();
+    };
+    const busy = (on) => { keep.disabled = again.disabled = on; };
+    keep.addEventListener("click", async () => {
+      const answers = entered();
+      if (!answers.links.length && !answers.facts.length) {
+        note.textContent = "No answer to save yet.";
         return;
       }
-      // The form page follows a run's progress; this page shows one report.
-      location.href = "/?follow=" + encodeURIComponent(body.run);
+      busy(true);
+      try {
+        await saveInParts(answers);
+        note.textContent = "Saved. Nothing runs until you choose to run the follow-up.";
+      } catch (error) {
+        note.textContent = error.message;
+      } finally {
+        busy(false);
+      }
+    });
+    again.addEventListener("click", async () => {
+      busy(true);
+      try {
+        let answers = entered();
+        if (answers.links.length > LIMITS.links || answers.facts.length > LIMITS.facts) {
+          // More than one request carries: save them all first, then run on
+          // the draft.
+          await saveInParts(answers);
+          answers = { links: [], facts: [] };
+        }
+        const reply = await post({ ...answers, revision });
+        // The form page follows a run's progress; this page shows one report.
+        location.href = "/?follow=" + encodeURIComponent(reply.run);
+      } catch (error) {
+        note.textContent = error.message;
+        busy(false);
+      }
     });
     const actions = el("p");
-    actions.append(again);
-    box.append(actions, note);
+    actions.append(keep, " ", again);
+    showSaved();
+    box.append(actions, savedNote, note);
   }
 
   // A final report's answers can be corrected (ADR 0054): a changed value, or

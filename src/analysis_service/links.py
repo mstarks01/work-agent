@@ -59,6 +59,7 @@ from analysis_service.system_model import PLAIN_ID_RE, SystemModel
 
 __all__ = [
     "ANSWERS_LABEL",
+    "MAX_HELD_LINKS",
     "MAX_LINK_ANSWERS",
     "NONE_OF_THESE",
     "LinkAnswer",
@@ -82,6 +83,10 @@ NONE_OF_THESE = "none"
 #: How many answers one submission carries. The archive asks at most five link
 #: questions a report, so this bounds the body far above any real use.
 MAX_LINK_ANSWERS = 50
+
+#: How many link answers one job holds across every save, as
+#: :data:`~analysis_service.fact_answers.MAX_HELD_FACTS` is for facts.
+MAX_HELD_LINKS = 5 * MAX_LINK_ANSWERS
 
 _WORD = re.compile(r"[a-z0-9]+")
 

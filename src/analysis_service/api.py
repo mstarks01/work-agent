@@ -47,10 +47,12 @@ from starlette.types import Receive, Scope, Send
 
 from analysis_service import budgets
 from analysis_service.answer_round import (
+    ANSWER_LIMITS,
     MAX_SKIPS,
     AlreadyResumed,
     Answers,
     AnswerState,
+    SavedDraft,
     SavedRound,
     SkipKey,
     SourcesOverLimit,
@@ -348,12 +350,15 @@ class AnswersSubmission(BaseModel):
     ``links`` answers which element a principal is, and ``facts`` answers the
     open facts a report's conditional findings rest on. Both empty is legal
     only for a job waiting on answers, where it means "continue without
-    answers"; against a finished report it answers nothing. ``save`` keeps a
-    waiting job's round without starting the analysis (ADR 0053), and
-    ``skip`` names questions of that round the submitter skips for now: a
-    fact by its key, a link question by its ``key`` (:data:`SkipKey`).
-    ``revision`` is the waiting job's round revision the answers were read
-    against, which a waiting job requires.
+    answers"; against a finished report it runs the follow-up on the saved
+    draft alone. ``save`` keeps a waiting job's round without starting the
+    analysis (ADR 0053), or a finished report's draft without starting its
+    follow-up (ADR 0070), and ``skip`` names questions of a waiting job's
+    round the submitter skips for now: a fact by its key, a link question by
+    its ``key`` (:data:`SkipKey`). ``revision`` is the revision the answers
+    were read against, which a waiting job and every save require. One
+    request carries at most the ``answer_limits`` the questions route
+    publishes; a follow-up larger than that saves its draft in batches.
     """
 
     model_config = ConfigDict(extra="forbid")
@@ -722,6 +727,8 @@ def _answer_state(
         corrections=record.corrections,
         revision=record.round_revision,
         resumed_by=resumed_by,
+        draft_links=record.draft_links,
+        draft_facts=record.draft_facts,
     )
 
 
@@ -737,6 +744,9 @@ def _questions_payload(
     return questions.to_json() | {
         "fallback": question_fallback(analyses).to_json(),
         "revision": record.round_revision,
+        "draft_links": [link.model_dump(mode="json") for link in record.draft_links],
+        "draft_facts": [fact.model_dump(mode="json") for fact in record.draft_facts],
+        "answer_limits": dict(ANSWER_LIMITS),
         "corrections": [fact.model_dump(mode="json") for fact in record.corrections],
         "corrected_findings": list(
             corrected_findings(analyses, record.facts, record.corrections)
@@ -1037,10 +1047,12 @@ def create_app(
         is admitted as a new job, against the ceiling and the token budget,
         because its lanes and critics spend model calls.
 
-        With ``save``, a waiting job keeps the round's answers and answers
-        ``200`` with its own ID; no model runs, and a save never starts the
-        analysis. A waiting job takes answers only against its current round
-        revision: ``400`` where none is sent, ``409`` where it has moved.
+        With ``save``, a waiting job keeps the round's answers, and a finished
+        report keeps them as a draft; either answers ``200`` with its own ID,
+        no model runs, and a save never starts the analysis. A report's run
+        composes its draft with what it is sent (ADR 0070). A waiting job,
+        and every save, takes answers only against the current revision:
+        ``400`` where none is sent, ``409`` where it has moved.
         """
         if answers.links and not request.app.state.carries_catalog:
             raise HTTPException(
@@ -1082,6 +1094,19 @@ def create_app(
             ) from exc
         except ValueError as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
+        if isinstance(outcome, SavedDraft):
+            if not await request.app.state.store.save_draft(
+                parent.id, subject, outcome.links, outcome.facts, outcome.revision
+            ):
+                raise HTTPException(
+                    status_code=409,
+                    detail="the report's follow-up has started, or another save"
+                    " landed first; read the questions again",
+                )
+            # A draft runs nothing and spends no follow-up (ADR 0070).
+            return JSONResponse(
+                {"job_id": parent.id, "saved": True, "revision": outcome.revision + 1}
+            )
         if isinstance(outcome, SavedRound):
             store: JobStore = request.app.state.store
             if not await store.save_round(

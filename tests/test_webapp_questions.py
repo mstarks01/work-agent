@@ -22,7 +22,12 @@ from analysis_service import Engine, StubPipelineRunner
 from analysis_service.analysis import ABSENT_WORD
 from analysis_service.assertions import AssertionRecord
 from analysis_service.claims import UnknownRef
-from analysis_service.fact_answers import FACET_ANSWERS, FactAnswer, merged_facts
+from analysis_service.fact_answers import (
+    FACET_ANSWERS,
+    MAX_FACT_ANSWERS,
+    FactAnswer,
+    merged_facts,
+)
 from analysis_service.fact_writes import check_fact_answers
 from analysis_service.frameworks import PACKAGES
 from analysis_service.jobs import Checkpoint, PipelineAwaiting, PipelineCompleted
@@ -711,12 +716,15 @@ globalThis.fetch = async (url, init) => {
   calls.push({ url, body: JSON.parse(init.body) });
   return { ok: true, json: async () => ({ run: "r2" }) };
 };
+// The button that runs the follow-up, beside "Save progress".
+const followUp = () => box.all("button")
+  .find(b => b.textContent === "Run the follow-up with these answers");
 """
 
 ANSWER_BLOCK_START = (
     "  const earlierCount = EARLIER_FACTS.length + EARLIER_LINKS.length;\n"
 )
-ANSWER_BLOCK_END = "    box.append(actions, note);\n  }\n"
+ANSWER_BLOCK_END = "    box.append(actions, savedNote, note);\n  }\n"
 
 
 def _run_answer_block(
@@ -862,7 +870,7 @@ calls.push(box.all("details").map(d => ({
 })));
 const inputs = box.all("input").filter(i => i.type === "text");
 inputs.forEach(i => { i.value = "the release team"; });
-await box.all("button")[0].listeners.click();
+await followUp().listeners.click();
 """
     sections, sent = _run_answer_block(payloads, steps)["calls"]
     (followup,) = [s for s in sections if s["summary"].startswith("Optional follow-up")]
@@ -913,7 +921,7 @@ const [link] = box.all("select");
 link.value = "entity:customer";
 const [first, second] = box.all("input");
 first.value = "  TLS 1.3 ";
-const button = box.all("button")[0];
+const button = followUp();
 await button.listeners.click();
 """
     seen = _run_answer_block(payloads, steps)
@@ -926,6 +934,7 @@ await button.listeners.click();
                     {"principal": "customer accounts", "element": "entity:customer"}
                 ],
                 "facts": [{"key": list(FACT["key"]), "value": "TLS 1.3"}],
+                "revision": 0,
             },
         }
     ]
@@ -1289,7 +1298,7 @@ def control_answer(steps: str) -> list:
         "link_questions": [],
         "fact_questions": [CONTROL],
     }
-    click = "\nawait box.all('button')[0].listeners.click();\n"
+    click = "\nawait followUp().listeners.click();\n"
     seen = _run_answer_block(payloads, steps + click)
     return seen["calls"][0]["body"]["facts"]
 
@@ -1748,7 +1757,7 @@ calls.push({ one_unknown: tally() });
 first.value = "yes";
 first.listeners.change();
 calls.push({ both_known: tally() });
-await box.all("button")[0].listeners.click();
+await followUp().listeners.click();
 """
     seen = _run_answer_block(payloads, steps)["calls"]
 
@@ -2662,6 +2671,59 @@ class TestEarlierAnswers:
         client.get(f"/events/{response.json()['run']}")
         assert [link.element for link in runner.resumed_links[-1]] == ["none"]
 
+    def test_a_draft_is_saved_on_the_report_and_its_run_reads_it(self, tiers):
+        """The first-run app keeps a follow-up's draft as the API does (ADR 0070):
+        a save runs nothing, a save that read an old revision is refused, and
+        the run composes the draft with what it is sent."""
+        client, runner, report, key = self.first_report(tiers, "yes")
+        assert self.earlier(client, report)["revision"] == 0
+        saved = client.post(
+            f"/answer/{report}",
+            json={
+                "links": [],
+                "facts": [{"key": key, "value": "no"}],
+                "save": True,
+                "revision": 0,
+            },
+            headers=SAME_ORIGIN,
+        )
+        assert saved.json() == {"saved": True, "revision": 1}
+        stale = client.post(
+            f"/answer/{report}",
+            json={
+                "links": [],
+                "facts": [{"key": key, "value": "yes"}],
+                "save": True,
+                "revision": 0,
+            },
+            headers=SAME_ORIGIN,
+        )
+        assert stale.status_code == 409
+        earlier = self.earlier(client, report)
+        assert earlier["draft"]["facts"] == [
+            {"key": key, "value": "no", "facets": None}
+        ]
+        assert earlier["limits"]["facts"] == MAX_FACT_ANSWERS
+
+        started = client.post(
+            f"/answer/{report}",
+            json={"links": [], "facts": [], "revision": 1},
+            headers=SAME_ORIGIN,
+        )
+        assert started.status_code == 200, started.text
+        client.get(f"/events/{started.json()['run']}")
+        assert [fact.value for fact in runner.resumed_facts[-1]] == ["no"]
+
+    def test_a_request_over_the_limit_says_to_save_in_parts(self, tiers):
+        client, _, report, _ = self.first_report(tiers, "yes")
+        facts = [
+            {"key": ["", "", "", f"fact {n}", "", ""], "value": "x"}
+            for n in range(MAX_FACT_ANSWERS + 1)
+        ]
+        response = self.follow_up(client, report, facts=facts)
+        assert response.status_code == 400
+        assert "Save your answers in parts" in response.json()["message"]
+
     def test_a_final_report_and_a_held_one_carry_none(self, tiers):
         client, _, report, key = self.first_report(tiers, "yes")
         final = self.follow_up(client, report, facts=[{"key": key, "value": "no"}])
@@ -2712,7 +2774,7 @@ const buttons = box.all("button");
 await buttons[1].listeners.click();
 const [state] = box.all("select");
 state.value = "none"; state.listeners.change();
-await buttons[buttons.length - 1].listeners.click();
+await followUp().listeners.click();
 """
     summaries, sent = _run_answer_block(payloads, steps)["calls"]
 
@@ -2722,6 +2784,7 @@ await buttons[buttons.length - 1].listeners.click();
     assert sent["body"] == {
         "links": [],
         "facts": [{"key": list(FACT["key"]), "value": "none"}],
+        "revision": 0,
     }
 
 
@@ -2737,13 +2800,14 @@ const buttons = box.all("button");
 await buttons[0].listeners.click();
 const [select] = box.all("select");
 select.value = "none";
-await buttons[buttons.length - 1].listeners.click();
+await followUp().listeners.click();
 """
     (sent,) = _run_answer_block(payloads, steps)["calls"]
 
     assert sent["body"] == {
         "links": [{"principal": "customer accounts", "element": NONE_OF_THESE}],
         "facts": [],
+        "revision": 0,
     }
 
 
@@ -3060,3 +3124,146 @@ await ids.save.listeners.click(); await settle();
     )
     assert not page["hidden"] and "More questions (1," in page["more"]
     assert sent["facts"] == [{"key": low["key"], "value": "the finance lead"}]
+
+
+def _draft_payloads(count, *, draft=(), revision=0, limits=None):
+    """A report page whose follow-up asks ``count`` free-text questions."""
+    return {
+        "report": {"system_model": valid_model().model_dump(mode="json")},
+        "link_questions": [],
+        "fact_questions": [
+            _subject_question(f"fact {n}", [f"stride/S-{n:03}"]) for n in range(count)
+        ],
+        "final": False,
+        "earlier": {
+            "answers": [],
+            "links": [],
+            "draft": {"links": [], "facts": list(draft)},
+            "revision": revision,
+            "limits": limits or {"facts": 2, "links": 1},
+        },
+    }
+
+
+# Every input filled, then each request recorded and answered as the service
+# answers a save (the next revision) or a run (the run's ID).
+_FILL_AND_SERVE = """
+for (const input of box.all("input").filter(i => i.type === "text")) input.value = "known";
+let revision = 0;
+globalThis.fetch = async (url, init) => {
+  const body = JSON.parse(init.body);
+  calls.push({ url, body });
+  if (body.save) revision += 1;
+  return { ok: true, json: async () => (body.save ? { saved: true, revision } : { run: "r2" }) };
+};
+const button = (text) => box.all("button").find(b => b.textContent === text);
+const text = (n) => typeof n === "string" ? n
+  : [n.textContent || "", ...(n.children || []).map(text)].join("");
+"""
+
+
+class TestTheFollowUpSavesInBatches:
+    """The page keeps to the limits the service publishes (#1542 F3, ADR 0070)."""
+
+    def test_save_progress_sends_each_batch_with_the_revision_the_last_returned(self):
+        steps = (
+            _FILL_AND_SERVE
+            + """
+await button("Save progress").listeners.click();
+calls.push({ said: text(box) });
+"""
+        )
+        calls = _run_answer_block(_draft_payloads(5), steps)["calls"]
+        saves, page = calls[:-1], calls[-1]
+        assert [(len(c["body"]["facts"]), c["body"]["revision"]) for c in saves] == [
+            (2, 0),
+            (2, 1),
+            (1, 2),
+        ]
+        assert all(c["body"]["save"] for c in saves)
+        assert "Saved and not yet run: 5 answer(s)" in page["said"]
+
+    def test_a_run_larger_than_one_request_saves_first_and_runs_on_the_draft(self):
+        steps = (
+            _FILL_AND_SERVE
+            + """
+await button("Run the follow-up with these answers").listeners.click();
+"""
+        )
+        seen = _run_answer_block(_draft_payloads(3), steps)
+        *saves, run = seen["calls"]
+        assert [len(c["body"]["facts"]) for c in saves] == [2, 1]
+        assert run["body"] == {"links": [], "facts": [], "revision": 2}
+        assert seen["href"] == "/?follow=r2"
+
+    def test_a_run_within_one_request_sends_its_answers_at_once(self):
+        steps = (
+            _FILL_AND_SERVE
+            + """
+await button("Run the follow-up with these answers").listeners.click();
+"""
+        )
+        (run,) = _run_answer_block(_draft_payloads(2), steps)["calls"]
+        assert len(run["body"]["facts"]) == 2 and "save" not in run["body"]
+
+    @pytest.mark.parametrize(
+        "failure",
+        [
+            "globalThis.fetch = async () => { throw new TypeError('offline'); };",
+            (
+                "globalThis.fetch = async () => ({ ok: true, json: async () => {"
+                " throw new SyntaxError('not JSON'); } });"
+            ),
+        ],
+        ids=["interrupted", "unreadable"],
+    )
+    @pytest.mark.parametrize(
+        "pressed", ["Save progress", "Run the follow-up with these answers"]
+    )
+    def test_a_failed_request_keeps_the_answers_and_the_buttons(self, failure, pressed):
+        steps = (
+            _FILL_AND_SERVE
+            + failure
+            + f"""
+await button({json.dumps(pressed)}).listeners.click();
+calls.push({{
+  said: text(box),
+  values: box.all("input").filter(i => i.type === "text").map(i => i.value),
+  disabled: box.all("button").some(b => b.disabled),
+}});
+"""
+        )
+        seen = _run_answer_block(_draft_payloads(2), steps)
+        [after] = seen["calls"]
+        assert "The connection was interrupted" in after["said"]
+        assert after["values"] == ["known", "known"]
+        assert not after["disabled"]
+        assert seen["href"] == ""
+
+    def test_a_refused_request_shows_the_service_s_reason(self):
+        steps = (
+            _FILL_AND_SERVE
+            + """
+globalThis.fetch = async () => ({ ok: false, json: async () => ({ message: "stale" }) });
+await button("Save progress").listeners.click();
+calls.push({ said: text(box) });
+"""
+        )
+        [after] = _run_answer_block(_draft_payloads(2), steps)["calls"]
+        assert "stale" in after["said"]
+
+    def test_a_saved_draft_fills_its_question_and_is_counted(self):
+        draft = [{"key": ["", "", "", "fact 1", "", ""], "value": "from the draft"}]
+        steps = """
+const text = (n) => typeof n === "string" ? n
+  : [n.textContent || "", ...(n.children || []).map(text)].join("");
+calls.push({
+  values: box.all("input").filter(i => i.type === "text").map(i => i.value),
+  said: text(box),
+});
+"""
+        [page] = _run_answer_block(_draft_payloads(2, draft=draft, revision=3), steps)[
+            "calls"
+        ]
+        assert page["values"] == ["", "from the draft"]
+        assert "Saved and not yet run: 1 answer(s)" in page["said"]

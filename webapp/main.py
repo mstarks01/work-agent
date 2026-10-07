@@ -132,11 +132,13 @@ from analysis_service.answer_forms import (
     facets_json,
 )
 from analysis_service.answer_round import (
+    ANSWER_LIMITS,
     MAX_SKIPS,
     AlreadyResumed,
     Answers,
     AnswerState,
     QuestionSet,
+    SavedDraft,
     SavedRound,
     SkipKey,
     SourcesOverLimit,
@@ -256,9 +258,14 @@ class Run:
     corrections: list[FactAnswer] = field(default_factory=list)
     #: Every early question and link question the submitter skipped for now.
     skipped: list[SkipKey] = field(default_factory=list)
-    #: How many rounds a paused run has saved. A page sends the revision it
-    #: read, so a page left open on an earlier round cannot write over a later one.
+    #: How many rounds a paused run, or drafts a finished one, has saved. A page
+    #: sends the revision it read, so a page left open on an earlier save cannot
+    #: write over a later one.
     revision: int = 0
+    #: A finished run's draft answers: what its report's follow-up saved in
+    #: batches and has not run (ADR 0070).
+    draft_links: list[LinkAnswer] = field(default_factory=list)
+    draft_facts: list[FactAnswer] = field(default_factory=list)
     #: The run a submitter's answers started from this one, if any.
     resumed_by: Run | None = None
     #: The report this run's answers came from, for a follow-up: what its own
@@ -330,6 +337,8 @@ class Run:
             corrections=self.corrections,
             revision=self.revision,
             resumed_by=None if holding is None else holding.id,
+            draft_links=self.draft_links,
+            draft_facts=self.draft_facts,
         )
 
 
@@ -606,6 +615,7 @@ def render_report(
         ),
         earlier=script_json(
             _earlier_payload(report, state.facts, state.links, state.questions.asked)
+            | _draft_payload(state)
             if not state.final and state.resumed_by is None
             else {}
         ),
@@ -698,6 +708,19 @@ def _corrections_payload(
             for row, answer in zip(rows, answers, strict=True)
         ],
         "findings": list(corrected_findings(report.analyses, answered, corrections)),
+    }
+
+
+def _draft_payload(state: AnswerState) -> dict[str, object]:
+    """A report's follow-up draft, the revision a save names, and the limits a
+    batch keeps to (ADR 0070)."""
+    return {
+        "draft": {
+            "links": [link.model_dump(mode="json") for link in state.draft_links],
+            "facts": [fact.model_dump(mode="json") for fact in state.draft_facts],
+        },
+        "revision": state.revision,
+        "limits": dict(ANSWER_LIMITS),
     }
 
 
@@ -908,11 +931,24 @@ def create_app(
         try:
             body = await request.json()
             raw = body["links"]
-            if not isinstance(raw, list) or len(raw) > MAX_LINK_ANSWERS:
-                raise ValueError
-            links = [LinkAnswer.model_validate(link) for link in raw]
             raw_facts = body.get("facts", [])
-            if not isinstance(raw_facts, list) or len(raw_facts) > MAX_FACT_ANSWERS:
+            if (
+                isinstance(raw, list)
+                and isinstance(raw_facts, list)
+                and (len(raw) > MAX_LINK_ANSWERS or len(raw_facts) > MAX_FACT_ANSWERS)
+            ):
+                return JSONResponse(
+                    {
+                        "message": f"One request takes at most {MAX_FACT_ANSWERS}"
+                        f" answers and {MAX_LINK_ANSWERS} element choices. Save"
+                        " your answers in parts, then run the follow-up."
+                    },
+                    status_code=400,
+                )
+            if not isinstance(raw, list):
+                raise TypeError
+            links = [LinkAnswer.model_validate(link) for link in raw]
+            if not isinstance(raw_facts, list):
                 raise TypeError
             facts = [_fact_answer(fact, state.questions) for fact in raw_facts]
             save = body.get("save", False)
@@ -963,6 +999,20 @@ def create_app(
             # The answer rules' own refusals name the submitter's choices, so
             # they are safe to show.
             return JSONResponse({"message": str(exc)}, status_code=400)
+        if isinstance(outcome, SavedDraft):
+            # A draft runs nothing and spends no follow-up (ADR 0070). The
+            # revision check and the write are one step: nothing awaits here.
+            if parent.revision != outcome.revision or parent.resumed_by is not None:
+                return JSONResponse(
+                    {
+                        "message": "Your saved answers changed in another tab or"
+                        " window. Reload this page to see them."
+                    },
+                    status_code=409,
+                )
+            parent.draft_links, parent.draft_facts = outcome.links, outcome.facts
+            parent.revision += 1
+            return JSONResponse({"saved": True, "revision": parent.revision})
         if isinstance(outcome, SavedRound):
             # A saved round runs no model: the answers go onto the paused run,
             # and the next round is read off the model with them in. Where

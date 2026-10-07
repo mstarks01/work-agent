@@ -527,13 +527,15 @@ class TestTheBoundedRounds:
         assert asked.links, "a control: the link questions still stand"
         assert asked.stop is None, "a job that still asks a link has not stopped"
 
-    def test_a_saved_round_must_answer_something_and_only_a_waiting_job_saves(self):
+    def test_a_saved_round_must_answer_something_and_a_final_report_saves_nothing(
+        self,
+    ):
         with pytest.raises(ValueError, match="answers or skips at least one"):
             admit(_asked_after([]), facts=[], save=True)
-        finished = _asked_after([], waiting=False)
+        final = _asked_after([], waiting=False, final=True)
         answer = FactAnswer(key=CAPACITY, value="unknown")
-        with pytest.raises(ValueError, match="only a job waiting"):
-            admit(finished, facts=[answer], save=True)
+        with pytest.raises(ValueError, match="this report is final"):
+            admit(final, facts=[answer], save=True)
 
     def test_the_route_saves_every_round_and_only_a_continue_starts(self):
         """The last save started the analysis by itself (#1289, item 7)."""
