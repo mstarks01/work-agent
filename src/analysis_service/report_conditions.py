@@ -8,26 +8,24 @@ each finding that rests on a corrected fact (ADR 0054). Both are read here.
 from __future__ import annotations
 
 from collections.abc import Sequence
-from typing import Any, Literal
+from typing import Any
 
 from analysis_service.claims import FrameworkAnalysis, UnknownKey
-from analysis_service.fact_answers import FactAnswer, fact_kind, fact_line
+from analysis_service.fact_answers import (
+    FactAnswer,
+    FactStatus,
+    fact_kind,
+    fact_line,
+    fact_status,
+)
 from analysis_service.open_facts import element_names, label_of
 from analysis_service.sources import ANSWERS_LABEL
 from analysis_service.system_model import SystemModel
 
 __all__ = [
-    "FactStatus",
     "conditions",
     "corrected_findings",
 ]
-
-
-#: Why an open fact a conditional finding waits on is still open: an answer
-#: said "I don't know", an answer gave some facets and left the rest open, the
-#: pause showed it and got no answer, an answer was given and the analysis
-#: still found the finding open, or nobody was asked.
-FactStatus = Literal["unknown", "partial", "skipped", "answered", "open"]
 
 
 def conditions(
@@ -35,12 +33,14 @@ def conditions(
     model: SystemModel,
     answered: Sequence[FactAnswer],
     shown: Sequence[UnknownKey],
+    skipped: Sequence[object] = (),
 ) -> dict[str, list[tuple[UnknownKey, str, FactStatus]]]:
     """Each conditional finding's open facts, as ``framework/claim``: key, label and status.
 
     **The one reader of "why is this finding still conditional"**, which a
-    report shows beside it. ``answered`` is what the run read and ``shown``
-    what its pause showed. An answer that does not settle its fact
+    report shows beside it. ``answered`` is what the run read, ``shown`` what
+    its pause presented and ``skipped`` what its submitter skipped
+    (:func:`fact_status`). An answer that does not settle its fact
     (:attr:`~analysis_service.fact_answers.FactAnswer.settles`) is
     ``unknown`` where it says "I don't know", and ``partial`` where it answers
     some facets: the finding is neither confirmed nor cleared, and nothing
@@ -48,15 +48,10 @@ def conditions(
     """
     names = element_names(model)
     said = {answer.key: answer for answer in answered}
-    showed = set(shown)
+    showed, aside = set(shown), set(skipped)
 
     def status(key: UnknownKey) -> FactStatus:
-        answer = said.get(key)
-        if answer is None:
-            return "skipped" if key in showed else "open"
-        if answer.settles:
-            return "answered"
-        return "partial" if answer.known else "unknown"
+        return fact_status(key, said, showed, aside)
 
     found: dict[str, list[tuple[UnknownKey, str, FactStatus]]] = {}
     for block in analyses:

@@ -65,6 +65,7 @@ from analysis_service.fact_answers import (
     answer_facets,
     answered_keys,
     fact_label,
+    fact_status,
     key_ref,
     merged_facts,
     refuse_repeated_facts,
@@ -415,10 +416,12 @@ class QuestionSet:
             raise ValueError("only a job waiting on answers saves a round")
         if save and not (links or facts or skips):
             raise ValueError("a saved round answers or skips at least one question")
-        complete: frozenset[SkipKey] = answered_keys(
-            merged_facts(earlier_facts, facts)
-        ) & {fact.key for fact in facts} | {fold(link.principal) for link in links}
-        self._check_skips(skips, complete, save)
+        merged = merged_facts(earlier_facts, facts)
+        complete: frozenset[SkipKey] = answered_keys(merged) & {
+            fact.key for fact in facts
+        } | {fold(link.principal) for link in links}
+        presented = self.presented(merged)
+        self._check_skips(skips, complete, save, presented)
         if self.final:
             raise ValueError(
                 "this report is final: its follow-up has run, so it takes no answers"
@@ -451,9 +454,7 @@ class QuestionSet:
             )
         return AdmittedRound(
             *resumed_sources(sources, earlier_links, links, earlier_facts, facts),
-            shown=tuple(
-                dict.fromkeys([*self.shown, *(question.key for question in self.early)])
-            ),
+            shown=tuple(dict.fromkeys([*self.shown, *presented])),
             skipped=tuple(
                 dict.fromkeys(
                     key
@@ -465,6 +466,29 @@ class QuestionSet:
                     if key not in complete
                 )
             ),
+        )
+
+    def presented(self, answers: Sequence[FactAnswer]) -> tuple[UnknownKey, ...]:
+        """This round's early questions a page shows once ``answers`` are given.
+
+        **The one reader of which part is hidden** (#1542 F4). A part whose
+        parent this round also asks shows only once the parent is answered
+        "yes", and a part of a hidden part stays hidden, as the page hides
+        them. A hidden part was not presented: no history records it as shown,
+        and a skip of it is refused. ``answers`` is every answer the job holds
+        with this submission's in.
+        """
+        said = {answer.key: answer.value for answer in answers}
+        asked = {question.key for question in self.early}
+        hidden: set[UnknownKey] = set()
+        # A parent comes before its parts in a round (by_turn keeps each
+        # framework's order), so one pass reaches a part of a part.
+        for question in self.early:
+            parent = question.parent
+            if parent in asked and (parent in hidden or said.get(parent) != "yes"):
+                hidden.add(question.key)
+        return tuple(
+            question.key for question in self.early if question.key not in hidden
         )
 
     def correct(
@@ -506,10 +530,15 @@ class QuestionSet:
         return merged_facts(corrections, facts)
 
     def _check_skips(
-        self, skips: Sequence[SkipKey], complete: frozenset[SkipKey], save: bool
+        self,
+        skips: Sequence[SkipKey],
+        complete: frozenset[SkipKey],
+        save: bool,
+        presented: Sequence[UnknownKey],
     ) -> None:
         """Refuse a skip outside a saved round, of a question it does not show,
-        or of a question the same submission answers in full.
+        of a part hidden under its parent's answer, or of a question the same
+        submission answers in full.
 
         A question with facets answered in part may be skipped with it: the
         facets given are kept, and the rest are set aside for now, so a
@@ -532,6 +561,11 @@ class QuestionSet:
                 named = key if isinstance(key, str) else fact_label(key, self.model)
                 raise ValueError(
                     f'only a question this round shows is skipped: "{named}"'
+                )
+            if not isinstance(key, str) and key not in presented:
+                raise ValueError(
+                    f'"{shown[key]}" is hidden until its parent is answered "yes",'
+                    " so it is not skipped; it is asked once it shows"
                 )
             if key in complete:
                 raise ValueError(
@@ -560,8 +594,10 @@ def question_set(
     no analyses, and a finished one's frameworks go unread. ``answered`` and
     ``answered_links`` are the answers of the earlier rounds, which are not
     asked again. ``final`` marks a report the follow-up wrote, and ``shown``
-    is every early question the pause showed. ``skipped`` is every early
-    question and link question a waiting job's submitter skipped for now. A waiting
+    is every early question the pause presented. ``skipped`` is every early
+    question and link question the pause's submitter skipped for now; a
+    report's list reads both to say what became of each question before the
+    analysis (:func:`~analysis_service.fact_answers.fact_status`). A waiting
     job's ``model`` and ``catalog`` are its checkpoint's, and the saved answers
     are written in here, as the resumed run writes them. ``resumed_by`` is the
     job this one's answers started and that holds it, which a store reads
@@ -604,14 +640,18 @@ def question_set(
             skipped_links=(),
         )
     if not waiting:
-        showed = frozenset(shown)
+        said = {answer.key: answer for answer in answered}
+        showed, set_aside = frozenset(shown), frozenset(skipped)
         return QuestionSet(
             model=model,
             catalog=catalog,
             waiting=False,
             early=(),
             facts=tuple(
-                replace(question, asked_before=question.key in showed)
+                replace(
+                    question,
+                    history=fact_status(question.key, said, showed, set_aside),
+                )
                 for question in fact_questions(analyses, model, catalog, answered)
             ),
             links=link_questions(catalog, model),
@@ -974,6 +1014,9 @@ class ResumedJob:
     links: list[LinkAnswer]
     facts: list[FactAnswer]
     shown: tuple[UnknownKey, ...]
+    #: Every question the pause's submitter skipped and did not answer since,
+    #: which the report reads to tell a skip from a blank.
+    skipped: tuple[SkipKey, ...]
     checkpoint: Checkpoint
     follow_up: bool
 
@@ -1080,6 +1123,7 @@ class AnswerState:
             links=admitted.links,
             facts=admitted.facts,
             shown=admitted.shown,
+            skipped=admitted.skipped,
             checkpoint=self.checkpoint,
             follow_up=not self.waiting,
         )

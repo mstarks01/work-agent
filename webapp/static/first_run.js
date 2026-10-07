@@ -599,7 +599,7 @@
         return value && !row.hidden ? { key: q.key, value } : null;
       };
       answers.push(answer);
-      roundRows.push({ key: q.key, read: answer });
+      roundRows.push({ key: q.key, read: answer, hidden: () => row.hidden });
       row.append(label, " ", ...beside);
       if (about) row.append(about);
       group.box.append(row);
@@ -840,9 +840,14 @@
   const saveRound = async (skipAll) => {
     const { links, facts } = roundAnswers();
     // A blank row is skipped, and so is a row with facets answered in part:
-    // its facets given are kept, and the rest are set aside for now.
+    // its facets given are kept, and the rest are set aside for now. A part
+    // hidden under its parent's answer was never shown, so it is not skipped:
+    // the service asks it once it shows (QuestionSet.presented).
     const skip = skipAll
-      ? roundRows.filter((row) => !row.read() || (row.open && row.open())).map((row) => row.key)
+      ? roundRows
+        .filter((row) => !(row.hidden && row.hidden()))
+        .filter((row) => !row.read() || (row.open && row.open()))
+        .map((row) => row.key)
       : [];
     const saved = await fetch("/answer/" + pausedRun, {
       method: "POST",

@@ -251,7 +251,7 @@ class TestTheRounds:
         client = client_for(tiers, PausingRunner(catalog=False), catalog=False)
         paused = start(client, questions=True)
         shown = event(client.get(f"/events/{paused}").text, "questions")
-        keys = [q["key"] for q in shown["facts"]]
+        keys = _presented(shown["facts"])
         saved = client.post(
             f"/answer/{paused}",
             json={"links": [], "facts": [], "save": True, "skip": keys, "revision": 0},
@@ -292,7 +292,7 @@ class TestTheRounds:
                 "links": [],
                 "facts": [],
                 "save": True,
-                "skip": [q["key"] for q in shown["facts"]],
+                "skip": _presented(shown["facts"]),
                 "revision": 0,
             },
             headers=SAME_ORIGIN,
@@ -485,6 +485,13 @@ globalThis.EventSource = class { constructor(url) { this.url = url;
   addEventListener(name, fn) { this.listeners[name] = fn; } close() {} };
 const settle = () => new Promise((r) => setTimeout(r, 0));
 """
+
+
+def _presented(rows: list[dict]) -> list[list[str]]:
+    """The keys of a round a page shows before any answer: every row but a
+    part whose parent the round also asks (QuestionSet.presented)."""
+    keys = [row["key"] for row in rows]
+    return [row["key"] for row in rows if row.get("parent") not in keys]
 
 
 def _run_form_script(steps: str, search: str = "") -> dict:
@@ -764,7 +771,7 @@ def _subject_question(name, findings):
         "facets": [],
         "max_length": 500,
         "findings": findings,
-        "asked_before": False,
+        "history": "open",
     }
 
 
@@ -2232,14 +2239,15 @@ await ids.continue.listeners.click(); await settle();
 
 
 def test_a_follow_up_question_says_why_it_is_asked():
-    """Skipped before the analysis, or new from it (ADR 0054)."""
+    """What became of it before the analysis, or new from it (ADR 0054). A
+    skip is told apart from a blank and from a part answer (#1542 F4)."""
 
-    def fact(label, basis, asked_before):
+    def fact(label, basis, history):
         return {
             "key": ["", "", "", label, "", ""],
             "kind": "subject",
             "basis": basis,
-            "asked_before": asked_before,
+            "history": history,
             "label": label,
             "cited_by": 1,
             "covered_so_far": 1,
@@ -2251,9 +2259,11 @@ def test_a_follow_up_question_says_why_it_is_asked():
         "report": {"system_model": valid_model().model_dump(mode="json")},
         "link_questions": [],
         "fact_questions": [
-            fact("skipped", "evidence", True),
-            fact("new", "evidence", False),
-            fact("reviewer", "critic", False),
+            fact("skipped", "evidence", "skipped"),
+            fact("new", "evidence", "open"),
+            fact("reviewer", "critic", "open"),
+            fact("blank", "evidence", "unanswered"),
+            fact("part", "critic", "partial"),
         ],
         "final": False,
     }
@@ -2266,6 +2276,8 @@ calls.push(box.all("p").map(p => p.children.filter(c => typeof c === "string")
     assert "(new from the analysis)" in lines[1]
     assert "skipped" not in lines[2] and "new from" not in lines[2]
     assert "(raised by the reviewer;" in lines[2]
+    assert "(shown before the analysis and left blank)" in lines[3]
+    assert "(you answered part of this before the analysis)" in lines[4]
 
 
 CORRECTIONS_BLOCK_START = "  if (FINAL && (CORRECTIONS.answers || []).length) {"

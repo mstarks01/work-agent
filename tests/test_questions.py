@@ -1062,13 +1062,14 @@ class TestTheControlForm:
         assert bool(answer_suggestions(key)) == (form == "control")
 
 
-def test_a_report_question_the_pause_showed_is_marked_asked_before(report):
-    """The report labels a question the pause showed and got no answer to."""
+def test_a_report_question_says_what_became_of_it_at_the_pause(report):
+    """The report tells a skip from a blank, and a question never shown from
+    both (#1542 F4): only a skip is the submitter's act."""
     catalog = report.assertions.catalog if report.assertions else None
     listed = ask(report)
-    if not listed:
-        pytest.skip("this report asks nothing")
-    first = listed[0].key
+    if len(listed) < 3:
+        pytest.skip("this report asks too little")
+    skipped, blank = listed[0].key, listed[1].key
     asked = question_set(
         report.system_model,
         catalog,
@@ -1078,11 +1079,13 @@ def test_a_report_question_the_pause_showed_is_marked_asked_before(report):
         answered=[],
         answered_links=[],
         final=False,
-        shown=[first],
+        shown=[skipped, blank],
+        skipped=[skipped],
     )
-    marks = {question.key: question.asked_before for question in asked.facts}
-    assert marks[first] is True
-    assert not any(marks[key] for key in marks if key != first)
+    history = {question.key: question.history for question in asked.facts}
+    assert history[skipped] == "skipped"
+    assert history[blank] == "unanswered"
+    assert {history[key] for key in history if key not in {skipped, blank}} == {"open"}
 
 
 @pytest.mark.parametrize(
