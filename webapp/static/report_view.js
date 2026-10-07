@@ -391,6 +391,13 @@
   const VERDICT = { confirmed: ["Confirmed","✓"], "needs-info": ["Needs info","?"], rejected: ["Rejected","✕"] };
   const svar = (lvl) => `var(${SEV[lvl][1]})`;
 
+  // The served report can return to its analysis's named report history.
+  const reportRoute = location.pathname?.match(/^\/report\/([A-Za-z0-9_-]+)$/);
+  if (reportRoute) {
+    const historyLink = $("analysis-reports");
+    historyLink.href = "/?run=" + encodeURIComponent(reportRoute[1]) + "&view=reports";
+    historyLink.hidden = false;
+  }
   // header
   $("sysname").textContent = R.input.system_name;
   // The static title names no system and no framework. The report names
@@ -398,7 +405,7 @@
   document.title = R.input.system_name + " — report";
   const fmt = (t) => new Date(t).toISOString().replace("T"," ").replace(".000Z"," UTC");
   $("jobmeta").append(
-    "Job ", code(R.job.id), ` · ${R.job.status} · ${fmt(R.job.completed_at)} · schema ${R.schema_version}`
+    `Generated ${fmt(R.job.completed_at)}`
   );
   // The envelope's disclaimer says what the *service* is. Each block carries
   // its own, saying what that framework's claims assert — a different sentence

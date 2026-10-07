@@ -245,7 +245,7 @@ that keep that from being the only thing standing between the two.
 
 Use **New analysis** to enter a name and a system description. The framework
 picker is generated from installed packages, including their declared options.
-Questions are enabled by default. The group index jumps to a group without
+Frameworks start unselected; questions are enabled by default. Read **How questions work** on the description page before preparing an analysis. The group index jumps to a group without
 changing its answers or the engine's question order. Shared answers, row
 exceptions, earlier answers, skipped questions and follow-up rules use the
 existing answer-round service.
@@ -277,3 +277,26 @@ write refusal, question revisions, reopening runs and responsive layouts.
 Treat this as a set of tested controls, not an OWASP certification. Do not
 expose this unauthenticated app to a network; introduce authenticated ownership
 checks for every analysis and report before adding multi-user access.
+
+
+### Question progress and reports
+
+The progress bar counts filled answers in the current round, including individual
+parts of multi-part questions. Saved and skipped totals appear separately. The
+estimated number of remaining questions includes the current round and may
+change when an answer opens or removes a follow-up. It is not a fixed percentage
+or an estimate of elapsed time. **How this round is counted** gives more detail.
+
+When no further round remains, **Save and show more** stays visible but disabled
+until an earlier answer changes. **Start the analysis** becomes the primary
+action. Skipped questions remain open facts, not negative answers.
+
+Reopening a running analysis shows completed processing steps from its session
+snapshot, without consuming its live progress stream. Until the first step
+finishes, the page explains that it is waiting. A completed analysis opens its
+report directly. Report entries use the analysis name and generation timestamp;
+the report header labels its generation time in UTC.
+
+Question headings use sentence case. Keep original component names and acronyms
+in question text; do not title-case model data. Encryption questions use the
+model's structured flow endpoints rather than parsing arrow labels or IDs.

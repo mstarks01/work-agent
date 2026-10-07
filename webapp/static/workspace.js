@@ -34,8 +34,11 @@ const workspace = (() => {
     el("analysis-frameworks").textContent = data.frameworks.join(" · ");
     el("questions-nav").disabled = data.status !== "awaiting-answers";
     el("report-list").replaceChildren();
-    data.reports.forEach((report, index) => {
-      const link = node("a", "Report " + (index + 1), "analysis-row");
+    data.reports.forEach((report) => {
+      const link = node("a", "", "analysis-row");
+      const generated = node("time", "Generated " + new Date(report.generated_at).toLocaleString(undefined, {dateStyle: "medium", timeStyle: "short"}));
+      generated.dateTime = report.generated_at;
+      link.append(node("strong", report.name), generated);
       link.href = "/report/" + encodeURIComponent(report.run);
       el("report-list").append(link);
     });
@@ -79,7 +82,8 @@ const workspace = (() => {
       const data = await fetchRun(id);
       if (ticket !== generation) return;
       metadata(data);
-      history.replaceState(null, "", "/?run=" + encodeURIComponent(data.run));
+      const reportView = new URLSearchParams(location.search).get("view") === "reports";
+      history.replaceState(null, "", "/?run=" + encodeURIComponent(data.run) + (reportView ? "&view=reports" : ""));
       el("description").value = data.description;
       el("analysis-name").value = data.name;
       for (const checkbox of boxes) {
@@ -93,9 +97,12 @@ const workspace = (() => {
       if (data.questions) showQuestions(data.questions);
       else if (data.status === "running") {
         show("progress-panel");
+        processing(data.completed_steps);
         el("status").hidden = false;
         el("status-text").textContent = "The analysis is running. This page updates automatically.";
         setTimeout(() => { if (ticket === generation) open(data.run); }, 1500);
+      } else if (data.status === "completed" && new URLSearchParams(location.search).get("view") !== "reports") {
+        location.replace("/report/" + encodeURIComponent(data.run));
       } else {
         show("reports-panel");
         if (data.status === "failed") message("The analysis stopped. Open an earlier paused run to retry, or start a new analysis.");
@@ -114,6 +121,24 @@ const workspace = (() => {
       if (ticket === generation) metadata(data);
     } catch (error) { message(error.message); }
   };
+  const processing = (steps) => {
+    if (steps) el("ticks").replaceChildren(...steps.map((step) => node("li", step)));
+    const any = el("ticks").children.length > 0;
+    el("ticks").hidden = !any;
+    el("processing-empty").hidden = any;
+  };
+  const progress = (data, filled, total) => {
+    const saved = (data.answered || []).length + (data.answered_links || []).length;
+    const skipped = (data.skipped || []).length + (data.skipped_links || []).length;
+    const remaining = Object.values(data.remaining || {}).reduce((sum, n) => sum + n, 0) + data.questions.length;
+    const done = data.stop != null;
+    el("round-progress-bar").max = total || 1;
+    el("round-progress-bar").value = total ? filled : done ? 1 : 0;
+    el("round-progress-label").textContent = done ? "Question review complete" : `This round: ${filled} of ${total} answers filled in`;
+    el("round-progress-detail").textContent = `${saved} questions saved · ${skipped} skipped. ` + (done
+      ? "You can start the analysis, or change an earlier answer."
+      : `About ${remaining} questions remain, including this round. Answers can add or remove questions. You can start the analysis at any time.`);
+  };
   const grouped = () => {
     show("asked");
     if (current) metadata({...current, status: "awaiting-answers"});
@@ -131,7 +156,7 @@ const workspace = (() => {
   };
   const indexGroups = () => {
     el("question-index").replaceChildren();
-    const groups = [...el("questions").children].filter((item) => item.tagName === "DETAILS");
+    const groups = [...el("questions").children].filter((item) => item.tagName === "DETAILS" && !item.classList.contains("round-estimate"));
     let visible = 0;
     groups.forEach((group, index) => {
       // Read the renderer's row visibility; do not repeat its dependency rules.
@@ -165,5 +190,5 @@ const workspace = (() => {
       });
     }).catch(() => message("Recent analyses are unavailable. You can still start a new analysis."));
   });
-  return {show, track, grouped};
+  return {show, track, grouped, progress, processing};
 })();

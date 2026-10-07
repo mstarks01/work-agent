@@ -100,6 +100,9 @@ def pause(page) -> None:
     """Submit a description that asks questions, and wait for the first round."""
     page.fill("#description", "A web app talks to a database.")
     page.check("#ask")
+    if not page.locator('input[name="framework"]:checked').count():
+        for framework in page.locator('input[name="framework"]').all():
+            framework.check()
     page.click("#go")
     page.wait_for_selector("#asked", state="visible")
 
@@ -122,7 +125,7 @@ def test_an_owner_who_skips_every_round_reaches_a_report_that_says_what_is_open(
     """Skip, the ready state, the start button and the report, end to end."""
     pause(page)
     for _ in range(20):
-        if page.is_hidden("#save"):
+        if page.is_disabled("#save"):
             break
         before = page.inner_text("#questions")
         page.click("#skip")
@@ -136,6 +139,8 @@ def test_an_owner_who_skips_every_round_reaches_a_report_that_says_what_is_open(
     assert "Nothing runs until you choose Start the analysis" in page.inner_text(
         "#questions"
     )
+    assert page.is_disabled("#save")
+    assert "primary" in page.get_attribute("#continue", "class")
     page.click("#continue")
     page.wait_for_url("**/report/**")
     report = page.inner_text("body")
@@ -341,7 +346,7 @@ def test_workspace_mobile_has_no_page_overflow(page):
 
 
 def test_workspace_reopens_selected_framework_options(page):
-    page.uncheck('input[name="framework"][value="stride"]')
+    page.check('input[name="framework"][value="asvs"]')
     page.select_option('select[data-option="level"]', "2")
     pause(page)
     page.reload()
@@ -350,3 +355,41 @@ def test_workspace_reopens_selected_framework_options(page):
     assert not page.is_checked('input[name="framework"][value="stride"]')
     assert page.is_checked('input[name="framework"][value="asvs"]')
     assert page.input_value('select[data-option="level"]') == "2"
+
+
+def test_question_progress_and_entry_guidance(page):
+    assert page.locator('input[name="framework"]:checked').count() == 0
+    assert (
+        page.locator("#description-panel summary")
+        .filter(has_text="How questions work")
+        .count()
+        == 1
+    )
+    assert page.get_by_label("Ask me questions to make the report better.").is_checked()
+    pause(page)
+    assert page.locator("#round-progress-bar").get_attribute("value") == "0"
+    control = page.locator('#questions select:has(option[value="yes"])').first
+    control.select_option("yes")
+    assert float(page.locator("#round-progress-bar").get_attribute("value")) >= 1
+    assert "Answers can add or remove questions" in page.inner_text(
+        "#round-progress-detail"
+    )
+    assert "Is the connection from Web App to Orders DB encrypted?" in page.inner_text(
+        "#questions"
+    )
+
+
+def test_reopening_a_completed_analysis_displays_its_report(page):
+    pause(page)
+    analysis_url = page.url
+    page.click("#continue")
+    page.wait_for_url("**/report/**")
+    report_url = page.url
+    assert "Generated " in page.inner_text("#jobmeta")
+    page.goto(analysis_url)
+    page.wait_for_url(report_url)
+    assert page.locator("#sysname").is_visible()
+    page.get_by_role("link", name="All reports", exact=True).click()
+    page.wait_for_selector("#report-list a")
+    assert page.locator("#report-list a").inner_text().startswith("Your system")
+    assert "Generated " in page.locator("#report-list a").inner_text()

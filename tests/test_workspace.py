@@ -50,7 +50,11 @@ def test_reopen_keeps_questions_revision_and_related_report(tiers):
         rows = client.get("/workspace/runs").json()
         assert len(rows) == 1
         assert rows[0]["name"] == BREAKOUT
-        assert rows[0]["reports"] == [{"run": child, "url": f"/report/{child}"}]
+        report = rows[0]["reports"][0]
+        assert report["run"] == child
+        assert report["url"] == f"/report/{child}"
+        assert report["name"] == BREAKOUT
+        assert report["generated_at"]
         assert client.get(f"/workspace/runs/{run}").json()["run"] == child
 
 
@@ -64,3 +68,24 @@ def test_workspace_missing_run_and_cross_origin_write(tiers):
             == 403
         )
         assert client.get("/workspace/runs").json() == []
+
+
+def test_completed_processing_steps_survive_snapshot_reads(tiers):
+    import asyncio
+
+    from fastapi.testclient import TestClient
+
+    from tests.test_webapp import LOOPBACK
+    from webapp.main import Analyses, _ticker
+
+    analyses = Analyses()
+    run = analyses.claim()
+    assert run is not None
+    asyncio.run(_ticker(run)("extract"))
+    asyncio.run(_ticker(run)("prepare"))
+    with TestClient(
+        web.app_for(tiers, web.PausingRunner(), analyses=analyses), base_url=LOOPBACK
+    ) as client:
+        detail = client.get(f"/workspace/runs/{run.id}").json()
+        assert detail["completed_steps"] == ["extract", "prepare"]
+        assert run.events.qsize() == 2, "Snapshot reads must not consume live progress"
