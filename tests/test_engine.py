@@ -213,6 +213,7 @@ def test_a_resumed_job_is_held_to_the_source_limits_too():
         links=[],
         facts=[],
         shown=(),
+        skipped=(),
         checkpoint=Checkpoint(system_model=valid_model(), assertions=None),
         follow_up=False,
     )

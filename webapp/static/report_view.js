@@ -81,6 +81,7 @@
     unknown: "nobody knew: an answer said \"I don't know\"",
     partial: "you answered part of it, and the parts left open keep it conditional",
     skipped: "skipped before the analysis",
+    unanswered: "shown before the analysis and left blank",
     answered: "you answered it, and the analysis still did not find it settled",
     open: "not asked yet",
   };
@@ -89,6 +90,7 @@
     unknown: (n) => `${n} wait on a fact nobody knew`,
     partial: (n) => `${n} on a fact you answered in part`,
     skipped: (n) => `${n} on a fact skipped before the analysis`,
+    unanswered: (n) => `${n} on a fact left blank before the analysis`,
     answered: (n) => `${n} on a fact you answered that the analysis did not find settled`,
     open: (n) => `${n} on a fact nobody was asked`,
   };
@@ -1037,12 +1039,17 @@
     // One reader per fact question: `read` is its answer as the service takes
     // it, or null; `known` is whether that answer says more than "I don't know".
     const factAnswers = [];
-    // Why a question is here: skipped before the analysis, new from it, or
-    // raised by the reviewer. The list puts the most important findings'
-    // questions first, so the reviewer's questions sit among the others and
-    // each one says so.
-    const why = q => q.asked_before
-      ? " (you skipped this before the analysis)"
+    // Why a question is here: what became of it before the analysis
+    // (fact_status), new from the analysis, or raised by the reviewer. The
+    // list puts the most important findings' questions first, so the
+    // reviewer's questions sit among the others and each one says so.
+    const BEFORE = {
+      skipped: " (you skipped this before the analysis)",
+      unanswered: " (shown before the analysis and left blank)",
+      partial: " (you answered part of this before the analysis)",
+    };
+    const why = q => BEFORE[q.history]
+      ? BEFORE[q.history]
       : q.basis === "evidence"
         ? " (new from the analysis)"
         : " (raised by the reviewer; it can change when the analysis runs again)";

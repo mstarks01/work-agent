@@ -297,6 +297,7 @@ class Engine:
             links=resumed.links,
             facts=resumed.facts,
             shown_early=resumed.shown,
+            skipped_early=list(resumed.skipped),
             resumption=Resumption(
                 parent_id="in-process",
                 checkpoint=resumed.checkpoint,

@@ -1108,6 +1108,7 @@ def create_app(
             links=outcome.links,
             facts=outcome.facts,
             shown_early=outcome.shown,
+            skipped_early=list(outcome.skipped),
             resumption=Resumption(
                 parent_id=parent.id,
                 checkpoint=outcome.checkpoint,

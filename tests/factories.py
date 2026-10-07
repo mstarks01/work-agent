@@ -951,6 +951,7 @@ def report_state(
     answered: Sequence[FactAnswer] = (),
     final: bool = False,
     shown: Sequence[UnknownKey] = (),
+    skipped: Sequence[UnknownKey] = (),
     corrections: Sequence[FactAnswer] = (),
 ) -> AnswerState:
     """The Answer State of a finished run whose report is ``report``."""
@@ -966,7 +967,7 @@ def report_state(
         links=(),
         facts=answered,
         shown=shown,
-        skipped=(),
+        skipped=skipped,
         corrections=corrections,
         revision=0,
         resumed_by=None,

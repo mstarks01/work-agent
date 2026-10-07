@@ -37,7 +37,7 @@ sources (the maintainer's decision of 2026-09-25 on #1225).
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Collection, Mapping, Sequence
 from typing import Any, Literal
 
 from pydantic import (
@@ -67,12 +67,14 @@ __all__ = [
     "MAX_FACT_ANSWERS",
     "FactAnswer",
     "FactKind",
+    "FactStatus",
     "answer_facets",
     "answered_keys",
     "answered_row",
     "fact_kind",
     "fact_label",
     "fact_line",
+    "fact_status",
     "key_ref",
     "merged_facts",
     "refuse_repeated_facts",
@@ -337,3 +339,36 @@ def answered_keys(answers: Sequence[FactAnswer]) -> frozenset[UnknownKey]:
         if answer.facets is None
         or {facet.id for facet in answer_facets(answer.key)} <= answer.facets.keys()
     )
+
+
+#: What became of one fact before the analysis: an answer said "I don't
+#: know", an answer gave some facets and left the rest open, the submitter
+#: skipped it, the pause showed it and it was left blank, an answer was given
+#: and the analysis still found the finding open, or it was never shown.
+FactStatus = Literal["unknown", "partial", "skipped", "unanswered", "answered", "open"]
+
+
+def fact_status(
+    key: UnknownKey,
+    said: Mapping[UnknownKey, FactAnswer],
+    shown: Collection[UnknownKey],
+    skipped: Collection[object],
+) -> FactStatus:
+    """What became of one fact before the analysis (#1542 F4).
+
+    **The one reader of a fact's history**, which a report's conditions and
+    its follow-up questions both read. ``said`` is every answer the run read,
+    by key, ``shown`` every early question a page presented, and ``skipped``
+    every question the submitter skipped and did not answer since. A skip is
+    the submitter's act and is told apart from a question left blank, and a
+    part hidden under its parent's answer was never presented, so it reads
+    ``open``.
+    """
+    answer = said.get(key)
+    if answer is None:
+        if key in skipped:
+            return "skipped"
+        return "unanswered" if key in shown else "open"
+    if answer.settles:
+        return "answered"
+    return "partial" if answer.known else "unknown"

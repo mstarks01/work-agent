@@ -609,7 +609,9 @@ def render_report(
             if not state.final and state.resumed_by is None
             else {}
         ),
-        provenance=script_json(_provenance_payload(report, state.facts, state.shown)),
+        provenance=script_json(
+            _provenance_payload(report, state.facts, state.shown, state.skipped)
+        ),
         changes=script_json(
             {
                 "findings": [
@@ -633,7 +635,10 @@ def render_report(
 
 
 def _provenance_payload(
-    report: Report, answered: Sequence[FactAnswer], shown: Sequence[UnknownKey]
+    report: Report,
+    answered: Sequence[FactAnswer],
+    shown: Sequence[UnknownKey],
+    skipped: Sequence[SkipKey],
 ) -> dict[str, object]:
     """What the page needs to tell the owner's answers from the sources, and to
     say why each conditional finding is still open (#1289, PR 4)."""
@@ -647,7 +652,7 @@ def _provenance_payload(
         "conditions": {
             finding: [{"label": label, "status": status} for _, label, status in rows]
             for finding, rows in conditions(
-                report.analyses, report.system_model, answered, shown
+                report.analyses, report.system_model, answered, shown, skipped
             ).items()
         },
     }
@@ -983,6 +988,7 @@ def create_app(
         run.links, run.facts = outcome.links, outcome.facts
         run.final = outcome.follow_up
         run.shown = list(outcome.shown)
+        run.skipped = list(outcome.skipped)
         start = partial(parent.engine.resume, outcome, system_name=run.name)
         run.task = asyncio.create_task(_drive(analyses, run, start))
         return JSONResponse({"run": run.id})

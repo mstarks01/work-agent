@@ -100,10 +100,13 @@ ASKED = UnknownRef(
 )
 
 
-def page(answered=(), shown=(), final=False):
+def page(answered=(), shown=(), final=False, skipped=()):
     report = sample_report([asking_threat(ASKED)])
     return render_report(
-        report, report_state(report, answered=answered, final=final, shown=shown)
+        report,
+        report_state(
+            report, answered=answered, final=final, shown=shown, skipped=skipped
+        ),
     ).html
 
 
@@ -124,7 +127,12 @@ def waits_line(parts):
     ("answered", "shown", "why", "summary"),
     [
         ([], [], "not asked yet", "1 on a fact nobody was asked"),
-        ([], [ASKED.key], "skipped before the analysis", "1 on a fact skipped"),
+        (
+            [],
+            [ASKED.key],
+            "shown before the analysis and left blank",
+            "1 on a fact left blank",
+        ),
         (
             [FactAnswer(key=ASKED.key, value="unknown")],
             [],
@@ -138,7 +146,7 @@ def waits_line(parts):
             "1 on a fact you answered",
         ),
     ],
-    ids=["open", "skipped", "unknown", "answered"],
+    ids=["open", "unanswered", "unknown", "answered"],
 )
 def test_a_conditional_finding_says_why_each_fact_is_still_open(
     answered, shown, why, summary
@@ -149,6 +157,13 @@ def test_a_conditional_finding_says_why_each_fact_is_still_open(
     assert "neither confirmed nor cleared" in parts["analyses"]
     assert "What remains open: 1 finding(s) are conditional." in parts["analyses"]
     assert summary in parts["analyses"]
+
+
+def test_a_skipped_fact_is_told_apart_from_a_blank_one():
+    """Only the submitter's own skip reads as skipped (#1542 F4)."""
+    parts = run_report_page(page(shown=[ASKED.key], skipped=[ASKED.key]))
+    assert waits_line(parts) == "skipped before the analysis"
+    assert "1 on a fact skipped before the analysis" in parts["analyses"]
 
 
 def test_the_next_step_follows_whether_the_report_is_final():
