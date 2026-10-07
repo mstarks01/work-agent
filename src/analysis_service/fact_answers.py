@@ -65,6 +65,7 @@ from analysis_service.system_model import SystemModel
 __all__ = [
     "FACET_ANSWERS",
     "MAX_FACT_ANSWERS",
+    "MAX_HELD_FACTS",
     "FactAnswer",
     "FactKind",
     "FactStatus",
@@ -82,8 +83,18 @@ __all__ = [
 
 
 #: How many fact answers one submission carries. The largest report measured
-#: raised 85 open facts, so this bounds the body above any real use.
+#: raised 85 open facts, so this bounds the body above any real use. A report
+#: can ask more than this, so its follow-up saves its answers in batches
+#: (ADR 0070).
 MAX_FACT_ANSWERS = 200
+
+#: How many fact answers one job holds across every save: the answers the
+#: pause and the report's follow-up gathered, and the facts its pause showed.
+#: No schema bound limits how many facts a model or a report can leave open,
+#: so this is a ceiling the answer check refuses at, not a measured maximum;
+#: the deployment's source limits bound the answers' text as well, because
+#: every answer is a line of the answers Source.
+MAX_HELD_FACTS = 5 * MAX_FACT_ANSWERS
 
 
 FactKind = Literal["attribute", "assertion", "question", "subject", "capability"]

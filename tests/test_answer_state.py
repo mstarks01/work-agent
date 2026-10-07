@@ -63,11 +63,21 @@ class TestTheRevision:
         with pytest.raises(StaleRevision):
             waiting().answer(Answers(revision=2), limits=ROOMY)
 
-    def test_a_finished_job_reads_none(self):
+    def test_a_finished_job_checks_a_revision_where_one_is_sent(self):
+        """A finished report's saves carry a revision (ADR 0070), so a run that
+        sends one is checked against it, and a run that sends none is not."""
         finished = waiting(waiting=False, revision=0)
 
-        with pytest.raises(ValueError, match="no answers were sent"):
+        with pytest.raises(StaleRevision):
             finished.answer(Answers(revision=7), limits=ROOMY)
+        with pytest.raises(ValueError, match="no answers were sent"):
+            finished.answer(Answers(), limits=ROOMY)
+
+    def test_a_finished_job_s_save_requires_a_revision(self):
+        finished = waiting(waiting=False, revision=0)
+
+        with pytest.raises(MissingRevision):
+            finished.answer(Answers(save=True), limits=ROOMY)
 
 
 class TestTheOutcome:

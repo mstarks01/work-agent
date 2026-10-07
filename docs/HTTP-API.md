@@ -41,8 +41,8 @@ logged, never returned.
 | `GET` | `/v1/jobs/{id}/report` | The full [report](Report-Schema.md) once completed; `409` before, and `409` if the report is withheld (below). |
 | `GET` | `/v1/jobs/{id}/changes` | For a follow-up, how each finding moved since the report its answers came from: `new`, `unchanged`, `changed` (with the verdict before and after) or `gone`. Matched by claim identity, never by prose. `409` where the job is not a follow-up, where the earlier report is no longer held, or where either report is withheld. |
 | `POST` | `/v1/jobs/{id}/corrections` | Correct a final report's answers, as `{"facts": [...]}`: a changed value, or `unknown`. `200` with `{"job_id", "corrections", "corrected_findings"}`. No job starts, and the report is not rewritten. `400` where the report is not final, a correction names no answer the report read, or changes none. |
-| `POST` | `/v1/jobs/{id}/answers` | Answer the questions of a completed job or a job in `awaiting-answers`. Starts a **new** job that resumes from this one's model and catalog; `201` with its `job_id`. With `"save": true`, a waiting job keeps the round and answers `200` with its own `job_id`; a save never starts a job. |
-| `GET` | `/v1/jobs/{id}/questions` | What the job asks you, as `{"job_id", "link_questions", "fact_questions", "early_questions", "fallback", "final", "early_remaining", "early_withheld", "early_stop", "skipped_early", "skipped_links", "answered_early", "answered_links", "revision", "resumed_by"}`: a finished report's questions, or a waiting job's link and early questions. `resumed_by` names the job this job's answers started while that job is in flight or has its report; the job then asks nothing until that job fails. Derived from the report when you ask, under the report's own rules: `409` before completion and `409` when the report is withheld. |
+| `POST` | `/v1/jobs/{id}/answers` | Answer the questions of a completed job or a job in `awaiting-answers`. Starts a **new** job that resumes from this one's model and catalog; `201` with its `job_id`. With `"save": true`, a waiting job keeps the round, and a completed job keeps a draft of its follow-up; either answers `200` with its own `job_id`, and a save never starts a job. |
+| `GET` | `/v1/jobs/{id}/questions` | What the job asks you, as `{"job_id", "link_questions", "fact_questions", "early_questions", "fallback", "final", "early_remaining", "early_withheld", "early_stop", "early_held_back", "early_below_floor", "early_summary", "framework_gates", "skipped_early", "skipped_links", "answered_early", "answered_links", "revision", "resumed_by", "draft_links", "draft_facts", "answer_limits"}`: a finished report's questions, or a waiting job's link and early questions. `resumed_by` names the job this job's answers started while that job is in flight or has its report; the job then asks nothing until that job fails. Derived from the report when you ask, under the report's own rules: `409` before completion and `409` when the report is withheld. |
 | `GET` | `/healthz` | Unauthenticated liveness probe. |
 
 Errors are RFC 9457 `application/problem+json`.
@@ -202,21 +202,48 @@ to one is still taken. A question with facets may be skipped beside a part answe
 facets sent are kept, and the rest are set aside. A skip beside a complete
 answer is refused. A saved round must answer or skip at least one question.
 
-**Send the revision you read.** `revision` counts a waiting job's saved rounds.
-Every answer to a waiting job, a save or a continue, carries the `revision` its
-questions were read with: `400` where it is missing, and `409` where another
-save landed first. Of two saves that read one revision, only the first lands,
-so a page left open on an earlier round cannot write over a later one. Read the
-questions again after a `409`. A finished report's follow-up takes no
-revision. A save never starts
+**Send the revision you read.** `revision` counts a job's saves: a waiting
+job's saved rounds, or a finished report's saved drafts. Every answer to a
+waiting job, and every save, carries the `revision` its questions were read
+with: `400` where it is missing, and `409` where another save landed first. Of
+two saves that read one revision, only the first lands, so a page left open on
+an earlier round cannot write over a later one. Read the questions again after
+a `409`. A finished report's run may send its `revision`, and is checked
+against it where it does. A save never starts
 the analysis: when the saved answers leave nothing to ask, the questions say
 so in `early_stop`, and a send without `"save"` starts it. `answered_early` and `answered_links` list each saved answer
 with its question, and you can send a new answer to any of them. A question
 with facets comes back while a facet has no answer, and it takes no place
-under the limit of 30. `early_withheld` counts the questions the limits hold
-back. `early_stop` is `null` while the job asks something, `budget-exhausted`
-when it asks nothing because the limits hold questions back, and
-`nothing-left` otherwise.
+under the limit of 30.
+
+**A stop does not say every fact is settled**
+([ADR 0068](adr/0068-a-pause-says-what-it-leaves-open.md)). `early_stop` is
+`null` while the job asks something. It is `budget-exhausted` when the limits
+hold questions back, `below-floor` when only questions under a floor are left,
+and `nothing-left` when no open question is left. `early_held_back` lists the
+questions the limits hold back, and `early_below_floor` the open questions
+under a floor; no round shows them, and an answer to one is still taken.
+`early_withheld` counts `early_held_back`. `early_summary` says what the
+pause leaves open: the questions the rounds showed (`introduced`) and their
+`choices`; the saved answers that are `settled`, `partial` or `unknown`; the
+questions `skipped`, `held_back` and `below_floor`; and, for each framework
+that will run and whose units apply by a rule over capabilities, its units by
+state and band (`applicability`), with the unknown units that no open question
+can settle (`unaskable`). These are units, not findings.
+
+**A framework that will not run asks nothing**
+([ADR 0067](adr/0067-a-paused-job-asks-what-decides-a-framework-first.md)).
+`framework_gates` maps each selected framework to its precondition, read with
+the saved answers in: `satisfied`, `refuted` or `undecidable`. A refuted
+framework asks no question. An undecidable one asks only the facts that
+decide it, first and outside the limits; each such question lists the
+framework in `gates`, and `early_remaining` counts them under `gate`.
+
+**A skip is of a question you saw**
+([ADR 0069](adr/0069-a-skip-is-of-a-question-the-page-presented.md)). A
+capability question whose `parent` the round also asks is not presented until
+the parent's answer is "yes". A skip of it is refused with `400`; it is asked
+once it shows.
 **Limit:** a waiting job is held in the service's memory. A restart of the
 service loses it, with its extraction; submit it again.
 
@@ -361,11 +388,26 @@ with `400`. A later round does not ask a fact that an earlier round answered,
 and an "I don't know" answer counts. A question with facets is asked again
 only for the facets that no round answered. You can still send a new answer
 to a fact that an earlier round answered, to change it. Each fact question
-carries `asked_before`: `true` where the pause showed it and got no answer.
+carries `history`, what became of it at the pause: `skipped` (you skipped
+it), `unanswered` (it was shown and left blank), `partial` (some facets were
+answered), or `open` (it was never shown).
 A follow-up must add information: a new or moved link, or an answer whose
 known content changes. Where every answer is `unknown` or repeats an earlier
 answer, it is refused with `400`, no job starts, and the follow-up is still
 available.
+
+**A follow-up larger than one request saves a draft**
+([ADR 0070](adr/0070-a-follow-up-saves-a-draft-in-batches.md)). One request
+carries at most the `answer_limits` the questions route publishes: `facts` and
+`links` for one request, `held_facts` and `held_links` for every answer a job
+holds. A report can ask more than one request carries. Send `"save": true`
+with your `revision` to keep a batch as a draft: no job starts, the follow-up
+is not spent, and the response is `200` with `{"job_id", "saved": true,
+"revision"}`. `draft_facts` and `draft_links` list the draft. A later batch
+replaces an earlier draft answer to the same fact or principal. A send
+without `"save"` runs the follow-up on the draft and the answers it carries,
+and an empty send runs it on the draft alone. Changes to earlier answers count
+in the batch that sends them.
 
 **A final report takes corrections.** Send them to
 `/v1/jobs/{id}/corrections`: a new value for an answer the report's run read,

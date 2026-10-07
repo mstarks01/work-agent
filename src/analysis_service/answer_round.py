@@ -46,6 +46,7 @@ from collections import Counter
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field, replace
 from functools import cached_property
+from types import MappingProxyType
 from typing import TYPE_CHECKING, Annotated, Any
 
 from pydantic import StringConstraints
@@ -61,6 +62,7 @@ from analysis_service.early_questions import (
 )
 from analysis_service.fact_answers import (
     MAX_FACT_ANSWERS,
+    MAX_HELD_FACTS,
     FactAnswer,
     answer_facets,
     answered_keys,
@@ -73,6 +75,7 @@ from analysis_service.fact_answers import (
 from analysis_service.fact_writes import answered_model, check_fact_answers
 from analysis_service.frameworks import PACKAGES, PreconditionResult
 from analysis_service.links import (
+    MAX_HELD_LINKS,
     MAX_LINK_ANSWERS,
     LinkAnswer,
     LinkQuestion,
@@ -80,6 +83,7 @@ from analysis_service.links import (
     check_answers,
     fold,
     link_questions,
+    merged_links,
     resumed_sources,
 )
 from analysis_service.open_facts import prepared_model
@@ -92,6 +96,7 @@ if TYPE_CHECKING:
     from analysis_service.jobs import Checkpoint
 
 __all__ = [
+    "ANSWER_LIMITS",
     "EARLY_RULES",
     "MAX_SKIPS",
     "AdmittedRound",
@@ -104,6 +109,7 @@ __all__ = [
     "PauseSummary",
     "QuestionSet",
     "ResumedJob",
+    "SavedDraft",
     "SavedRound",
     "SkipKey",
     "SourcesOverLimit",
@@ -153,6 +159,18 @@ SkipKey = UnknownKey | Annotated[str, StringConstraints(min_length=1, max_length
 
 #: The most skips one save names: every fact and link answer it could carry.
 MAX_SKIPS = MAX_FACT_ANSWERS + MAX_LINK_ANSWERS
+
+#: The answer ceilings a client is told, so a page can split its answers into
+#: batches the service admits: one request's facts and links, and every
+#: answer one job holds across its saves (ADR 0070).
+ANSWER_LIMITS: Mapping[str, int] = MappingProxyType(
+    {
+        "facts": MAX_FACT_ANSWERS,
+        "links": MAX_LINK_ANSWERS,
+        "held_facts": MAX_HELD_FACTS,
+        "held_links": MAX_HELD_LINKS,
+    }
+)
 
 
 def _early_kind(question: EarlyQuestion) -> str:
@@ -400,8 +418,8 @@ class QuestionSet:
         answered job was given. A refusal names the submitter's own choices,
         so its message is safe to show. A link answer to a job with no catalog
         raises :class:`~analysis_service.links.NoCatalogError`. ``save`` admits
-        a round a waiting job keeps, which must answer or skip something and
-        starts nothing. ``skips`` names questions of this round the submitter
+        a round a waiting job keeps, or a report's draft (ADR 0070), which must
+        answer or skip something and starts nothing. ``skips`` names questions of this round the submitter
         skips for now; only a saved round skips. A report's one follow-up is
         refused where its answers add no information
         (:func:`_adds_information`), so it is not spent on a run that reads
@@ -412,8 +430,6 @@ class QuestionSet:
                 f"this job's answers already started job {self.resumed_by};"
                 " read that job, and answer here again only if it fails"
             )
-        if save and not self.waiting:
-            raise ValueError("only a job waiting on answers saves a round")
         if save and not (links or facts or skips):
             raise ValueError("a saved round answers or skips at least one question")
         merged = merged_facts(earlier_facts, facts)
@@ -444,8 +460,10 @@ class QuestionSet:
             earlier_links=earlier_links,
             reopen=self.waiting,
         )
-        if not self.waiting and not _adds_information(
-            earlier_links, earlier_facts, links, facts
+        if (
+            not self.waiting
+            and not save
+            and not _adds_information(earlier_links, earlier_facts, links, facts)
         ):
             raise ValueError(
                 "these answers add nothing the analysis can use: each one is"
@@ -972,10 +990,10 @@ class SourcesOverLimit(Exception):
 class Answers:
     """One submission of answers to a job's questions.
 
-    ``save`` keeps a waiting job's round and starts nothing. ``skips`` names
-    questions of this round the submitter skips for now; only a saved round
-    skips. ``revision`` is the round revision the questions were read with,
-    which a waiting job requires.
+    ``save`` keeps a waiting job's round, or a report's draft, and starts
+    nothing. ``skips`` names questions of this round the submitter skips for
+    now; only a waiting job's saved round skips. ``revision`` is the revision
+    the questions were read with, which a waiting job and every save require.
     """
 
     links: Sequence[LinkAnswer] = ()
@@ -998,6 +1016,22 @@ class SavedRound:
     facts: list[FactAnswer]
     shown: tuple[UnknownKey, ...]
     skipped: tuple[SkipKey, ...]
+    revision: int
+
+
+@dataclass(frozen=True)
+class SavedDraft:
+    """What a report keeps after its follow-up saves a batch. No model runs.
+
+    ``links`` and ``facts`` are every draft answer so far, this batch's over
+    the earlier ones. The report and its follow-up are unchanged: the run
+    that answers them composes the draft with what it is sent (ADR 0070).
+    ``revision`` is the revision the save read, which the store checks as it
+    does a saved round's.
+    """
+
+    links: list[LinkAnswer]
+    facts: list[FactAnswer]
     revision: int
 
 
@@ -1056,6 +1090,10 @@ class AnswerState:
     corrections: Sequence[FactAnswer]
     revision: int
     resumed_by: str | None
+    #: A report's draft answers: what its follow-up saved in batches and has
+    #: not yet run. Empty for a waiting job, whose saved rounds are ``facts``.
+    draft_links: Sequence[LinkAnswer] = ()
+    draft_facts: Sequence[FactAnswer] = ()
 
     @cached_property
     def questions(self) -> QuestionSet:
@@ -1077,39 +1115,61 @@ class AnswerState:
 
     def answer(
         self, answers: Answers, *, limits: SourceLimits | None
-    ) -> SavedRound | ResumedJob:
-        """The round a waiting job keeps, or the Resumed Job the answers start.
+    ) -> SavedRound | SavedDraft | ResumedJob:
+        """The round a waiting job keeps, a report's draft, or the Resumed Job the answers start.
+
+        **A report's follow-up saves in batches** (ADR 0070). A save to a
+        report keeps a draft and runs nothing; the run composes every saved
+        draft with what it is sent, so a follow-up can answer more than one
+        request carries, and earlier-answer edits count in the batch that
+        sends them. A save names the revision it read, as a waiting job's
+        every answer does; a run that names one is checked against it.
 
         A refusal raises: :class:`MissingRevision` or :class:`StaleRevision`
-        for a waiting job's revision, :class:`AlreadyResumed` where these
-        answers already started a job that holds this one,
+        for the revision, :class:`AlreadyResumed` where these answers already
+        started a job that holds this one,
         :class:`~analysis_service.links.NoCatalogError` for a link answer to a
         job with no catalog, :class:`SourcesOverLimit` where the composed
         sources break ``limits``, and a ``ValueError`` that names the
         submitter's own choices otherwise. ``limits`` is ``None`` only where
         the job holds no sources to bound, as an eval replay of rounds.
         """
-        if self.waiting:
-            if answers.revision is None:
-                raise MissingRevision("send the revision the questions were read with")
-            if answers.revision != self.revision:
-                raise StaleRevision(
-                    "the saved answers changed since these questions were read"
-                )
+        if (self.waiting or answers.save) and answers.revision is None:
+            raise MissingRevision("send the revision the questions were read with")
+        if answers.revision is not None and answers.revision != self.revision:
+            raise StaleRevision(
+                "the saved answers changed since these questions were read"
+            )
+        links, facts = answers.links, answers.facts
+        if not self.waiting:
+            if answers.save and not (links or facts):
+                raise ValueError("a saved draft answers at least one question")
+            links = merged_links(self.draft_links, links)
+            facts = merged_facts(self.draft_facts, facts)
         admitted = self.questions.admit(
             sources=self.sources,
             earlier_links=self.links,
             earlier_facts=self.facts,
-            links=answers.links,
-            facts=answers.facts,
+            links=links,
+            facts=facts,
             save=answers.save,
             skips=answers.skips,
         )
-        # Checked for a save too: a saved round that no start could run would
-        # hold the job until the submitter shortens an answer.
+        if len(admitted.facts) > MAX_HELD_FACTS or len(admitted.links) > MAX_HELD_LINKS:
+            raise ValueError(
+                f"a job holds at most {MAX_HELD_FACTS} fact answers and"
+                f" {MAX_HELD_LINKS} link answers in all; these answers would"
+                f" make {len(admitted.facts)} and {len(admitted.links)}"
+            )
+        # Checked for a save too: a saved round or draft that no start could
+        # run would hold the job until the submitter shortens an answer.
         breach = None if limits is None else limits.breach(admitted.sources)
         if breach is not None:
             raise SourcesOverLimit(breach)
+        if answers.save and not self.waiting:
+            return SavedDraft(
+                links=list(links), facts=list(facts), revision=self.revision
+            )
         if answers.save:
             return SavedRound(
                 links=admitted.links,
