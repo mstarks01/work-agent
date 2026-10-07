@@ -70,7 +70,7 @@ beside it.
     or the filesystem, holds the sources and the report. Native GCS and Azure backends are a
     separate effort.
   - A principal is one issuer and `sub`, and a random UUIDv4 owner ID stands for it (ADR 0064).
-  - The keys are `<owner-id>/<job-id>/sources.json` and `report.json`. A job has one report,
+  - The keys are `<owner-id>/<job-id>/sources.json` and `<owner-id>/<job-id>/report.json`. A job has one report,
     written once. The row holds a SHA-256 of each object, and the object is written first
     (ADR 0065).
   - A delete or an expiry keeps a usage row, so that the limits still count the job (ADR 0066).
