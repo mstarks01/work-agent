@@ -206,7 +206,12 @@ class TestOnlyAnAskedFactTakesAnAnswer:
         body = client.get(f"/v1/jobs/{job}/questions", headers=auth()).json()
         served = {
             tuple(question["key"])
-            for question in (*body["early_questions"], *body["fact_questions"])
+            for question in (
+                *body["early_questions"],
+                *body["early_held_back"],
+                *body["early_below_floor"],
+                *body["fact_questions"],
+            )
         }
         assert served == self.asked()
         assert served, "a control: the waiting job asks something"
@@ -456,7 +461,7 @@ class TestTheBoundedRounds:
         shown, remaining, withheld = next_round(listed, frozenset(held), held)
         assert not [q for q in shown if q.kind != "capability"]
         assert remaining["field"] == 0
-        assert withheld == len([q for q in listed if q.kind != "capability"])
+        assert len(withheld) == len([q for q in listed if q.kind != "capability"])
 
     def test_a_question_answered_in_part_comes_back_outside_the_limit(self):
         """A question with a partial answer stays outside the limit, so thirty
@@ -488,14 +493,16 @@ class TestTheBoundedRounds:
         per_round = EARLY_RULES["field"].per_round
         assert [q.key for q in shown] == [q.key for q in listed[:per_round]]
         assert remaining["field"] == 30
-        assert withheld == 1
+        assert [q.key for q in withheld] == [listed[-1].key]
 
     def test_a_stop_says_whether_the_limits_held_questions_back(self):
         asked = _asked_after([])
         assert asked.stop is None
-        ended = replace(asked, early=(), links=(), withheld=0)
+        ended = replace(asked, early=(), links=(), held_back=(), below_floor=())
         assert ended.stop == "nothing-left"
-        held_back = replace(ended, withheld=3)
+        low = replace(ended, below_floor=asked.early[:2])
+        assert low.stop == "below-floor"
+        held_back = replace(low, held_back=asked.early[:3])
         assert held_back.stop == "budget-exhausted"
         assert held_back.to_json()["early_stop"] == "budget-exhausted"
         assert held_back.to_json()["early_withheld"] == 3
@@ -562,7 +569,10 @@ class TestTheBoundedRounds:
             assert asyncio.run(store.get(job)).checkpoint is not None
         else:
             pytest.fail("the rounds never ended")
-        assert body["early_stop"] == "nothing-left"
+        # Every answer was "I don't know", so the questions under the floor
+        # are what is left, and the stop says so.
+        assert body["early_stop"] == "below-floor"
+        assert body["early_below_floor"] and not body["early_held_back"]
 
         response = client.post(
             f"/v1/jobs/{job}/answers",

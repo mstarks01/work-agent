@@ -38,6 +38,7 @@ from typing import Any, Literal, Self, get_args
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 from pydantic.json_schema import SkipJsonSchema
 
+from analysis_service.bands import Band
 from analysis_service.capabilities import (
     CAPABILITIES,
     CapabilityFact,
@@ -218,6 +219,11 @@ class DraftRequirementRuling(Claim):
         level = AsvsOptions.model_validate(options).level
         decisions = applicability_for(level, model.capability_facts())
         return [_entry(unit, decision) for unit, decision in decisions.items()]
+
+    @classmethod
+    def unit_band(cls, unit: str) -> Band | None:
+        """A requirement's level, level 1 highest (:func:`requirement_band`)."""
+        return requirement_band(unit)
 
     @classmethod
     def ruled_out(

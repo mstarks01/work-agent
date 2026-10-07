@@ -1332,6 +1332,13 @@ def paused_payload(run: Run, questions: QuestionSet) -> dict[str, object]:
         "stop": questions.stop,
         "withheld": questions.withheld,
         "gates": dict(questions.gates),
+        "summary": None if questions.summary is None else questions.summary.to_json(),
+        "held_back": [
+            _early_row(question, questions.model) for question in questions.held_back
+        ],
+        "below_floor": [
+            _early_row(question, questions.model) for question in questions.below_floor
+        ],
         "skipped": [
             _early_row(question, questions.model) for question in questions.skipped
         ],

@@ -134,9 +134,9 @@ const workspace = (() => {
     const done = data.stop != null;
     el("round-progress-bar").max = total || 1;
     el("round-progress-bar").value = total ? filled : done ? 1 : 0;
-    el("round-progress-label").textContent = done ? "Question review complete" : `This round: ${filled} of ${total} answers filled in`;
+    el("round-progress-label").textContent = done ? "No more questions in a round" : `This round: ${filled} of ${total} answers filled in`;
     el("round-progress-detail").textContent = `${saved} questions saved · ${skipped} skipped. ` + (done
-      ? "You can start the analysis, or change an earlier answer."
+      ? "Some facts can still be open; the list below says which. You can start the analysis, or change an earlier answer."
       : `About ${remaining} questions remain, including this round. Answers can add or remove questions. You can start the analysis at any time.`);
   };
   const grouped = () => {

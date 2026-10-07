@@ -200,11 +200,16 @@ class TestTheRounds:
             assert not before & {tuple(q["key"]) for q in shown["facts"]}
         else:
             pytest.fail("the rounds never ended")
-        # The stop says why truthfully: the limits held questions back
-        # exactly where it says so.
+        # The stop says why truthfully: the limits held questions back, or a
+        # floor left questions out, exactly where it says so.
         assert shown["stop"] == (
-            "budget-exhausted" if shown["withheld"] else "nothing-left"
+            "budget-exhausted"
+            if shown["held_back"]
+            else "below-floor"
+            if shown["below_floor"]
+            else "nothing-left"
         )
+        assert shown["withheld"] == len(shown["held_back"])
 
         started = client.post(
             f"/answer/{paused}",
@@ -460,7 +465,7 @@ class Node {
 const ids = {};
 for (const id of ["analyze","description","ticks","problem","go","load","ask",
                   "asked","questions","earlier","save","continue","status",
-                  "status-text","answer-problem","skip","skipped"])
+                  "status-text","answer-problem","skip","skipped","more"])
   ids[id] = new Node(id);
 ids.ask.checked = true;
 globalThis.document = {
@@ -1785,7 +1790,8 @@ await settle();
 
 
 @pytest.mark.parametrize(
-    ("withheld", "said"), [(0, "No question is left."), (3, "3 more question(s)")]
+    ("withheld", "said"),
+    [(0, "No question is left to ask."), (3, "3 more question(s)")],
 )
 def test_the_last_save_waits_for_the_start_button(withheld, said):
     """A save that leaves nothing to ask waits for the start button (#1289, item 7)."""
@@ -2970,3 +2976,75 @@ calls.push({{ said: text(ids.questions) }});
     assert "Decides whether the asvs analysis runs" in said
     assert "The asvs analysis runs only once the system model shows" in said
     assert "1 question(s) that decide whether an analysis runs" in said
+
+
+def test_a_finished_pause_lists_what_stays_open_and_takes_a_held_back_answer():
+    """No stop says every fact is settled (#1542 F2, ADR 0068): the page lists
+    what stays open, and a question no round asks can still be answered."""
+    low = _text_row(["", "", "", "who signs?", "", ""], "who signs?")
+    summary = {
+        "introduced": 14,
+        "choices": 14,
+        "settled": 14,
+        "partial": 0,
+        "unknown": 2,
+        "skipped": 0,
+        "held_back": 0,
+        "below_floor": 1,
+        "applicability": {
+            "asvs": [
+                {
+                    "band": "level 1",
+                    "states": {"applicable": 48, "unknown": 22},
+                    "unaskable": 3,
+                }
+            ]
+        },
+    }
+    ready = {
+        "run": "r1",
+        "revision": 1,
+        "questions": [],
+        "facts": [],
+        "remaining": {"gate": 0, "capability": 0, "field": 0},
+        "stop": "below-floor",
+        "withheld": 0,
+        "summary": summary,
+        "held_back": [],
+        "below_floor": [low],
+        "answered": [],
+        "answered_links": [],
+        "skipped": [],
+    }
+    steps = f"""
+await ids.analyze.listeners.submit({{ preventDefault() {{}} }}); await settle();
+streams[0].listeners.questions({{ data: JSON.stringify({json.dumps(ready)}) }});
+const text = (n) => typeof n === "string" ? n
+  : [n.textContent || "", ...(n.children || []).map(text)].join("");
+const open = ids.more.querySelectorAll("button")[0];
+await open.listeners.click();
+const input = ids.more.querySelectorAll("input")[0];
+input.value = "the finance lead";
+globalThis.fetch = async (url, init) => {{
+  calls.push({{ url, body: JSON.parse(init.body) }});
+  return {{ ok: false, json: async () => ({{ message: "stop after capture" }}) }};
+}};
+calls.push({{ said: text(ids.questions), more: text(ids.more), hidden: ids.more.hidden }});
+await ids.save.listeners.click(); await settle();
+"""
+    ran = _run_form_script(steps)
+    seen = ran["calls"]
+    page = next(call for call in seen if "said" in call)
+    sent = seen[-1]["body"]
+
+    assert ran["streams"] == ["/events/r1"], "an optional question keeps the page"
+
+    assert "No recommended question is left." in page["said"]
+    assert "1 question(s) ranked below the threshold for a round" in page["said"]
+    assert "2 answer(s) of “I don't know”" in page["said"]
+    assert (
+        "asvs, level 1: whether 22 of 70 unit(s) apply is still unknown, and no"
+        " open question can settle 3 of them" in page["said"]
+    )
+    assert not page["hidden"] and "More questions (1," in page["more"]
+    assert sent["facts"] == [{"key": low["key"], "value": "the finance lead"}]

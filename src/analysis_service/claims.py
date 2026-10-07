@@ -44,6 +44,7 @@ from pydantic import (
 from pydantic.json_schema import SkipJsonSchema
 
 from analysis_service.actions import ActionVerb
+from analysis_service.bands import Band
 from analysis_service.capabilities import CapabilityNeed
 from analysis_service.grounding import MovedKind, meaning_moved
 from analysis_service.question_kinds import QUESTION_KINDS
@@ -971,6 +972,18 @@ class Claim(BaseModel):
         """
         del model, options
         return []
+
+    @classmethod
+    def unit_band(cls, unit: str) -> Band | None:
+        """The band of one unit :meth:`applicability` answers for, as the framework ranks its units.
+
+        A paused job counts the units whose applicability its answers leave
+        open in each band, so a reader can see a level that a higher level's
+        questions leave unsettled. The neutral answer is ``None``: a framework
+        with no applicability rule has no unit to rank.
+        """
+        del unit
+        return None
 
     @classmethod
     def ruled_in(

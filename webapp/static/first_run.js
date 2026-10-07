@@ -79,6 +79,7 @@
   const saveButton = document.getElementById("save");
   const skipButton = document.getElementById("skip");
   const skippedBox = document.getElementById("skipped");
+  const moreBox = document.getElementById("more");
   const earlierBox = document.getElementById("earlier");
 
   form.addEventListener("submit", async (event) => {
@@ -238,10 +239,13 @@
     // Each selected analysis whose precondition does not hold yet
     // (QuestionSet.gates): it will not run as the model reads now.
     const gates = Object.entries(data.gates || {}).filter(([, state]) => state !== "satisfied");
-    // A pause with nothing to ask, nothing answered or skipped, and no
-    // analysis to explain starts the analysis, with no page between. After a
-    // save, only the start button starts it: a round of skips is a save too.
-    if (!left && !saved && !gates.length) {
+    // Questions no round asks, which the submitter may still choose to answer.
+    const optional = (data.held_back || []).length + (data.below_floor || []).length;
+    // A pause with nothing to ask, nothing answered or skipped, no optional
+    // question and no analysis to explain starts the analysis, with no page
+    // between. After a save, only the start button starts it: a round of skips
+    // is a save too.
+    if (!left && !saved && !gates.length && !optional) {
       pausedRun = data.run;
       startAnalysis([], []);
       return;
@@ -254,6 +258,7 @@
     questions.replaceChildren();
     earlierBox.replaceChildren();
     skippedBox.replaceChildren();
+    moreBox.replaceChildren();
     const heading = (title, text) => {
       const lead = document.createElement("p");
       const bold = document.createElement("b");
@@ -297,11 +302,50 @@
       const ready = document.createElement("p");
       ready.className = "hint";
       // The service's own stop reason decides the sentence (QuestionSet.stop).
-      ready.textContent = (data.stop === "budget-exhausted"
-        ? `The question limit is reached, so ${data.withheld} more question(s) will not be asked. `
-        : "No question is left. ")
+      // No stop says every fact is settled, so the page lists what stays open.
+      const stops = {
+        "budget-exhausted": `The question limit is reached, so ${data.withheld} more question(s)`
+          + " are not asked in a round. ",
+        "below-floor": "No recommended question is left. ",
+        "nothing-left": "No question is left to ask. ",
+      };
+      ready.textContent = stops[data.stop]
         + "You can still change an answer below. Nothing runs until you choose Start the analysis.";
       questions.append(ready);
+    }
+    // What the pause leaves open (PauseSummary): never "everything is settled".
+    const summary = data.summary;
+    if (summary) {
+      const open = [];
+      const count = (n, text) => { if (n) open.push(`${n} ${text}`); };
+      count(summary.skipped, "question(s) skipped for now");
+      count(summary.partial, "question(s) answered in part");
+      count(summary.unknown, "answer(s) of \u201cI don't know\u201d");
+      count(summary.held_back, "question(s) held back by the question limit");
+      count(summary.below_floor, "question(s) ranked below the threshold for a round");
+      for (const [name, bands] of Object.entries(summary.applicability || {})) {
+        for (const band of bands) {
+          const unknown = band.states.unknown || 0;
+          if (!unknown) continue;
+          const total = Object.values(band.states).reduce((sum, n) => sum + n, 0);
+          const where = band.band ? `${name}, ${band.band}` : name;
+          open.push(`${where}: whether ${unknown} of ${total} unit(s) apply is still unknown`
+            + (band.unaskable ? `, and no open question can settle ${band.unaskable} of them` : ""));
+        }
+      }
+      if (!left && open.length) {
+        const lead = document.createElement("p");
+        lead.className = "hint";
+        lead.textContent = "Still open:";
+        const list = document.createElement("ul");
+        list.className = "still-open";
+        for (const line of open) {
+          const item = document.createElement("li");
+          item.textContent = line;
+          list.append(item);
+        }
+        questions.append(lead, list);
+      }
     }
     // The round's choices as the page shows them: each link question is one,
     // and a part counts only while it shows, after its parent's "yes". The
@@ -316,7 +360,9 @@
       const later = choicesOf(counted.filter((row) => row.hidden()));
       estimate.textContent = `There are ${parts.join(" and ")} that can change the`
         + ` analysis. This round asks ${shown} choice(s).`
-        + (later ? ` Up to ${later} more appear if you answer \u201cyes\u201d.` : "");
+        + (later ? ` Up to ${later} more appear if you answer \u201cyes\u201d.` : "")
+        + (summary ? ` So far the rounds showed ${summary.introduced} question(s),`
+          + ` ${summary.choices} choice(s).` : "");
     };
     if (parts.length) {
       const explanation = document.createElement("details");
@@ -670,7 +716,10 @@
       row.append(" ", open);
       skippedBox.append(row);
     }
-    for (const q of skipped) {
+    // A question no round shows, which the submitter may still answer: a
+    // skipped one, or one a limit or a floor keeps out of the rounds.
+    // "Answer it" opens it, with any part answered before.
+    const answerLater = (box, q) => {
       const row = document.createElement("p");
       const label = document.createElement("b");
       label.textContent = q.prompt || q.label;
@@ -696,8 +745,25 @@
         answers.push(() => (read() ? { key: q.key, value: read() } : null));
       });
       row.append(" ", open);
-      skippedBox.append(row);
-    }
+      box.append(row);
+    };
+    for (const q of skipped) answerLater(skippedBox, q);
+    // Questions the rounds do not ask: past the question limit, or ranked
+    // under the threshold. Answering one is the submitter's choice.
+    const heldBack = data.held_back || [];
+    const belowFloor = data.below_floor || [];
+    moreBox.hidden = !(heldBack.length || belowFloor.length);
+    const moreTitle = document.createElement("summary");
+    moreTitle.textContent = `More questions (${heldBack.length + belowFloor.length},`
+      + " optional, not asked in a round)";
+    moreBox.append(moreTitle);
+    const moreHint = document.createElement("p");
+    moreHint.className = "hint";
+    moreHint.textContent = "The rounds leave these out: some are past the question limit,"
+      + " and others rank below the threshold for a round. An answer to one still"
+      + " reaches the analysis.";
+    moreBox.append(moreHint);
+    for (const q of [...heldBack, ...belowFloor]) answerLater(moreBox, q);
     updateQuestionProgress = () => {
       const visible = shownChoices();
       const filled = roundRows.reduce((sum, row) => {

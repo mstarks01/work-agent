@@ -43,7 +43,8 @@ def test_an_owner_who_skips_everything_is_asked_each_question_once():
     found = replay("case", open_controls(), valid_model(), STRIDE, "skip-all")
     assert found.repeats == 0
     assert found.skipped == found.asked
-    assert found.stop == "nothing-left"
+    # The skipped questions leave the ones under the floor (ADR 0068).
+    assert found.stop == "below-floor"
 
 
 def test_an_owner_who_answers_in_part_and_skips_the_rest_is_not_asked_again():
