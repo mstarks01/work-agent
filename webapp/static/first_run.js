@@ -228,6 +228,7 @@
   // the service lists them, a box for each run of one kind or attribute, and
   // every earlier answer below them.
   // Every label and option is untrusted and lands as text.
+  let updateQuestionProgress = () => {};
   const showQuestions = (data) => {
     // The service says whether the pause asks anything more (QuestionSet.stop).
     const left = data.stop == null;
@@ -243,7 +244,8 @@
       return;
     }
     pausedRun = data.run;
-    saveButton.hidden = skipButton.hidden = !left;
+    saveButton.hidden = skipButton.hidden = false;
+    skipButton.disabled = !left;
     answers = [];
     roundRows = [];
     questions.replaceChildren();
@@ -289,14 +291,22 @@
     const estimate = document.createElement("p");
     estimate.className = "hint";
     const choicesOf = (rows) => rows.reduce((sum, row) => sum + row.decisions, 0);
+    const shownChoices = () => choicesOf(counted.filter((row) => !row.hidden())) + data.questions.length;
     const tally = () => {
-      const shown = choicesOf(counted.filter((row) => !row.hidden())) + data.questions.length;
+      const shown = shownChoices();
       const later = choicesOf(counted.filter((row) => row.hidden()));
       estimate.textContent = `There are ${parts.join(" and ")} that can change the`
         + ` analysis. This round asks ${shown} choice(s).`
         + (later ? ` Up to ${later} more appear if you answer \u201cyes\u201d.` : "");
     };
-    if (parts.length) questions.append(estimate);
+    if (parts.length) {
+      const explanation = document.createElement("details");
+      explanation.className = "round-estimate";
+      const title = document.createElement("summary");
+      title.textContent = "How this round is counted";
+      explanation.append(title, estimate);
+      questions.append(explanation);
+    }
     if (data.questions.length) {
       heading("Which element is each of these?",
         "Your description states facts about these people or systems, but not"
@@ -330,10 +340,6 @@
     // or attribute that come together share a box, with a row per element, so
     // a heading can come back later in the round. Each box's title says how
     // many choices it asks.
-    if (data.facts.length) {
-      heading("Facts your description does not state",
-        "Answer each group below. Leave a question blank if you cannot answer it.");
-    }
     // Each question's box: a new one each time the group changes.
     const runOf = new Map();
     let run = -1;
@@ -467,7 +473,7 @@
       group.count += 1;
       group.choices = (group.choices || 0) + (q.decisions || 1);
       const label = document.createElement("b");
-      label.textContent = q.element;
+      label.textContent = q.prompt || q.element;
       // Why the fact matters: the questions of the rules that fire on it.
       label.title = q.reasons.join(" ");
       const about = context(q);
@@ -477,6 +483,7 @@
         group.grid = group.grid || facetTable(group.box, q, rows.length >= 2);
         const before = earlier.get(JSON.stringify(q.key));
         const who = document.createElement("span");
+        label.textContent = q.element;
         who.append(label);
         if (about) who.append(about);
         const read = facetRow(group.grid, q, who, before && before.facets);
@@ -494,6 +501,7 @@
         tick.type = "checkbox";
         tick.checked = true;
         tick.title = "Take the answer under \"Same for all\"";
+        tick.className = "share-answer";
         row.append(tick, " ");
         group.rows.push({ tick, set });
       }
@@ -597,7 +605,7 @@
     for (const a of answeredFacts) {
       const row = document.createElement("p");
       const label = document.createElement("b");
-      label.textContent = a.label;
+      label.textContent = a.prompt || a.label;
       const shown = document.createElement("span");
       shown.textContent = ` — ${said(a.answer)}`;
       row.append(label, shown);
@@ -645,7 +653,7 @@
     for (const q of skipped) {
       const row = document.createElement("p");
       const label = document.createElement("b");
-      label.textContent = q.label;
+      label.textContent = q.prompt || q.label;
       row.append(label);
       const before = earlier.get(JSON.stringify(q.key));
       const kept = document.createElement("span");
@@ -670,6 +678,19 @@
       row.append(" ", open);
       skippedBox.append(row);
     }
+    updateQuestionProgress = () => {
+      const visible = shownChoices();
+      const filled = roundRows.reduce((sum, row) => {
+        const answer = row.read();
+        return sum + (!answer ? 0 : answer.facets ? Object.keys(answer.facets).length : 1);
+      }, 0);
+      const submitted = roundAnswers();
+      saveButton.disabled = !left && !submitted.facts.length && !submitted.links.length;
+      skipButton.disabled = !left;
+      document.getElementById("continue").className = left ? "" : "primary";
+      if (typeof workspace !== "undefined") workspace.progress(data, filled, visible);
+    };
+    updateQuestionProgress();
     asked.hidden = false;
     if (typeof workspace !== "undefined") workspace.grouped(data);
   };
@@ -719,6 +740,7 @@
     finally {
       answerBusy = false;
       controls.forEach((control) => { control.disabled = false; });
+      updateQuestionProgress();
     }
   };
   document.getElementById("continue").addEventListener("click", () => {
@@ -753,6 +775,10 @@
   saveButton.addEventListener("click", () => answerAction(() => saveRound(false)));
   skipButton.addEventListener("click", () => answerAction(() => saveRound(true)));
 
+  asked.addEventListener("input", () => updateQuestionProgress());
+  asked.addEventListener("change", () => updateQuestionProgress());
+  asked.addEventListener("click", () => updateQuestionProgress());
+
   // Follow one run's progress to its end: a report, questions, or a failure.
   const follow = (runId, message) => {
     go.disabled = true;
@@ -760,6 +786,7 @@
     working(message);
     ticks.replaceChildren();
     ticks.hidden = false;
+    if (typeof workspace !== "undefined") workspace.processing();
     const stream = new EventSource("/events/" + encodeURIComponent(runId));
     stream.addEventListener("error", () => {
       stream.close();
@@ -775,6 +802,7 @@
       const item = document.createElement("li");
       item.textContent = JSON.parse(event.data).node;
       ticks.append(item);
+      if (typeof workspace !== "undefined") workspace.processing();
     });
     stream.addEventListener("done", (event) => {
       stream.close();

@@ -818,3 +818,54 @@ a.analysis-row:hover {
   letter-spacing:0;
   color:var(--muted)
 }
+
+/* Keep each group's questions inside its boundary, with one separator per row. */
+#questions > details {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 0;
+  margin-bottom: 24px;
+  overflow: clip;
+}
+#questions > details > summary {
+  background: var(--sidebar);
+  padding: 18px 20px;
+  font-size: 18px;
+}
+#questions > details > p {
+  margin: 0 20px;
+  padding: 20px 0;
+}
+#questions > details > summary + div + p { border-top: 0; }
+#questions > details > p > b { font-size: 15px; font-weight: 500; }
+#questions > details > p:has(.share-answer) {
+  display: grid;
+  grid-template-columns: 20px minmax(0, 1fr);
+  column-gap: 10px;
+  align-items: start;
+}
+#questions > details > p:has(.share-answer) > * { grid-column: 2; }
+#questions > details > p > input.share-answer {
+  grid-column: 1;
+  grid-row: 1;
+  margin: 3px 0 0;
+}
+#questions .shared-controls { margin: 16px 20px 0; }
+#questions > details > table { margin: 8px 0 0; }
+#questions > details > table tr:last-child td { border-bottom: 0; }
+.answer-actions { border-top: 0; padding-top: 0; }
+.entry-actions { justify-content: flex-end; }
+.round-progress { margin-bottom: 28px; max-width: 780px; }
+.round-progress label { display:block; font-size:14px; font-weight:600; margin-bottom:8px; }
+.round-progress progress { display:block; width:100%; height:8px; accent-color:var(--accent); }
+.round-progress .hint { margin:8px 0 0; }
+.analysis-row time { color:var(--muted); font-size:13px; }
+@media(max-width:580px) {
+  #questions > details > summary { padding:16px; }
+  #questions > details > p { margin:0 16px; }
+  #questions .shared-controls { margin:12px 16px 0; }
+}
+
+#questions > details.round-estimate { border:0; border-radius:0; margin:0 0 16px; overflow:visible; }
+#questions > details.round-estimate > summary { padding:0; background:none; font-size:13px; font-weight:400; color:var(--muted); }
+#questions > details.round-estimate > p { border:0; margin:10px 0 0; padding:0; }

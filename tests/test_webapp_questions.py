@@ -1581,7 +1581,7 @@ def test_the_form_script_boxes_each_run_of_one_group_with_a_row_per_element():
 await ids.analyze.listeners.submit({{ preventDefault() {{}} }}); await settle();
 streams[0].listeners.questions({{ data: JSON.stringify({{ run: "r1", questions: [],
   facts: {json.dumps(facts)} }}) }});
-const groups = ids.questions.querySelectorAll("details");
+const groups = ids.questions.querySelectorAll("details").filter(g => g.className !== "round-estimate");
 const rowsOf = g => g.children.filter(r => r.tag === "p");
 const child = (r, tag) => r.children.find(c => typeof c === "object" && c.tag === tag);
 calls.push({{ groups: groups.map(g => ({{
@@ -1823,7 +1823,7 @@ globalThis.fetch = async (url, init) => {{
 await ids.save.listeners.click(); await settle();
 const text = (n) => typeof n === "string" ? n
   : [n.textContent || "", ...(n.children || []).map(text)].join("");
-calls.push({{ waiting: streams.length === 1, saveShown: !ids.save.hidden,
+calls.push({{ waiting: streams.length === 1, saveShown: !ids.save.hidden, saveDisabled: ids.save.disabled,
   asked: !ids.asked.hidden, said: text(ids.questions) }});
 globalThis.fetch = answered;
 await ids.continue.listeners.click(); await settle();
@@ -1839,7 +1839,12 @@ await ids.continue.listeners.click(); await settle();
         "revision": 3,
     }
     assert start["body"]["revision"] == 4, "the start sends the revision it read"
-    assert after["waiting"] and after["asked"] and not after["saveShown"]
+    assert (
+        after["waiting"]
+        and after["asked"]
+        and after["saveShown"]
+        and after["saveDisabled"]
+    )
     assert said in after["said"]
     assert "Nothing runs until you choose Start the analysis" in after["said"]
     assert start["url"] == "/answer/r1" and "save" not in start["body"]

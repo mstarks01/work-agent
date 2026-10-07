@@ -175,7 +175,7 @@ from analysis_service.report_changes import report_changes
 from analysis_service.report_conditions import conditions, corrected_findings
 from analysis_service.selection import SelectionError, resolve_selection
 from analysis_service.sources import ANSWERS_LABEL
-from analysis_service.system_model import SystemModel
+from analysis_service.system_model import DataFlow, SystemModel
 from analysis_service.vendors import (
     CREDENTIAL_MODE_NOTES,
     VendorName,
@@ -237,6 +237,7 @@ class Run:
     """
 
     id: str
+    completed_steps: list[str] = field(default_factory=list)
     name: str = "Your system"
     analysis_id: str = ""
     events: asyncio.Queue[tuple[str, str]] = field(default_factory=asyncio.Queue)
@@ -409,7 +410,12 @@ class Analyses:
             if run.engine is None
             else list(run.engine.framework_options),
             "reports": [
-                {"run": item.id, "url": f"/report/{item.id}"}
+                {
+                    "run": item.id,
+                    "url": f"/report/{item.id}",
+                    "name": item.name,
+                    "generated_at": item.report.job.completed_at.isoformat(),
+                }
                 for item in related
                 if item.report is not None
             ],
@@ -780,6 +786,7 @@ def create_app(
         while run.holding is not None:
             run = run.holding
         payload = analyses.snapshot(run)
+        payload["completed_steps"] = list(run.completed_steps)
         payload["selection"] = (
             []
             if run.engine is None
@@ -1075,8 +1082,7 @@ def _framework_fields(frameworks: Sequence[FrameworkName]) -> str:
     here — and a package that needs no options gets a bare checkbox, because
     an empty options model has no fields to walk.
 
-    Every box ships ticked. That is the form's starting state, not a default
-    the app invented: a submission still has to say what it selected, and the
+    Every box starts unticked so the submitter chooses the analyses to run. The
     :func:`_selection` allow-list is what rules on the answer.
     """
     rows = []
@@ -1087,7 +1093,7 @@ def _framework_fields(frameworks: Sequence[FrameworkName]) -> str:
         )
         rows.append(
             f'<div class="pick"><label><input type="checkbox" name="framework"'
-            f' value="{escape(name)}" checked> <b>{escape(name)}</b></label>'
+            f' value="{escape(name)}"> <b>{escape(name)}</b></label>'
             f'<span class="opts">{options}</span></div>'
         )
     return "\n".join(rows)
@@ -1220,12 +1226,31 @@ def _link_row(question: LinkQuestion, names: Mapping[str, str]) -> dict[str, obj
     }
 
 
+def _question_prompt(question: EarlyQuestion, model: SystemModel) -> str:
+    """Readable UI wording; answer keys and component names remain unchanged."""
+    ref = key_ref(question.key)
+    if not ref.attribute:
+        return question.label
+    element = model.get(ref.element_id)
+    if ref.attribute == "encryption_in_transit" and isinstance(element, DataFlow):
+        source, destination = model.get(element.source), model.get(element.destination)
+        source_name = element.source if source is None else source.name
+        destination_name = (
+            element.destination if destination is None else destination.name
+        )
+        return f"Is the connection from {source_name} to {destination_name} encrypted?"
+    if ref.attribute == "encryption_at_rest":
+        return f"Is data stored in {question.element} encrypted?"
+    return f"What is the {ref.attribute.replace('_', ' ')} for {question.element}?"
+
+
 def _early_row(question: EarlyQuestion, model: SystemModel) -> dict[str, object]:
     """The question as the form page shows it: each choice's element name, and
     the words of the description the question's element was read from."""
     element = model.get(key_ref(question.key).element_id)
     return {
         **question.to_json(),
+        "prompt": _question_prompt(question, model),
         "choices": [
             {"id": choice, "name": getattr(model.get(choice), "name", "")}
             for choice in question.choices
@@ -1330,6 +1355,7 @@ def _ticker(run: Run):
     async def on_node(node: str) -> None:
         # Node names go out verbatim as graph.py emits them. A prettifying
         # table here would be a second place for them to drift from the graph.
+        run.completed_steps.append(node)
         await run.events.put(("node", json.dumps({"node": node})))
 
     return on_node
@@ -1507,8 +1533,7 @@ _FORM_PAGE = (Path(__file__).parent / "workspace.html").read_text(encoding="utf-
 #: The question toggle. Every install can pause: one with no catalog asks its
 #: early questions and no link question.
 _QUESTIONS_FIELD = """<p class="ask-option"><label><input type="checkbox" id="ask" name="ask" checked>
-    Ask questions before starting the analysis</label><br>
-    <span class="hint">Review missing details in groups, then start when you are ready.</span></p>"""
+    Ask me questions to make the report better.</label></p>"""
 
 _DIAGNOSTIC_PAGE = (
     """<!doctype html>
