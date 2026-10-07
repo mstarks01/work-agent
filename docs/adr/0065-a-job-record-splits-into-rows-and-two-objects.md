@@ -12,7 +12,9 @@
 A durable `JobStore` keeps job state in a database and large data in an object
 store. A median record is 86 KB, and the report is 95% of it. A job has
 exactly one report, which the service writes once. Corrections sit beside it,
-and a follow-up is a new job (ADR 0054). The attestation signs exact bytes.
+and a follow-up is a new job (ADR 0054). An attestation signs the canonical
+form of the parsed report (`docs/Report-Attestation.md`), so a report whose
+content changes no longer verifies.
 Object stores differ: conditional writes and object lock are not on every
 provider.
 
@@ -25,8 +27,13 @@ provider.
   version prefix.
 - The checkpoint and the resumption are JSON text in the job row. The events
   are rows in their own table, keyed by the job ID and a sequence number.
-- A JSON part is stored as text, never as `jsonb`, because `jsonb` reorders
-  keys and the round trip must give the same bytes.
+- A JSON part is stored as text, never as `jsonb`. One column type then
+  serves PostgreSQL and SQLite, and no query reads inside the JSON.
+- Each job row stores the `SCHEMA_VERSION` that wrote the record. One
+  function compares its major number with the current one, and a route
+  that must parse an older record refuses it. No migration rewrites a
+  stored report, checkpoint or sources object
+  ([#1532](https://github.com/mstarks01/work-agent/issues/1532)).
 - The row holds the SHA-256 of each object. A read checks it and fails closed
   on a mismatch.
 - The service writes the object first and the row second. It deletes the
