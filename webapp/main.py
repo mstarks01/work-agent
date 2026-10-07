@@ -1331,6 +1331,7 @@ def paused_payload(run: Run, questions: QuestionSet) -> dict[str, object]:
         "remaining": dict(questions.remaining),
         "stop": questions.stop,
         "withheld": questions.withheld,
+        "gates": dict(questions.gates),
         "skipped": [
             _early_row(question, questions.model) for question in questions.skipped
         ],

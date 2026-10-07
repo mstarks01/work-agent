@@ -1,6 +1,6 @@
 """The ASVS framework package: a published standard, as a package.
 
-It has twelve members and a text root at ``frameworks/asvs/``, exactly as STRIDE
+It has thirteen members and a text root at ``frameworks/asvs/``, exactly as STRIDE
 does. What differs is what stands behind them. STRIDE is a method, so its
 ``version`` names this repository's ruleset and it carries no catalog. ASVS is a
 published standard, so ``version`` names the standard's own release, and the 345
@@ -55,6 +55,7 @@ from analysis_service.frameworks.asvs.rules import (
     PREDICATE_READERS,
     RULES,
     asvs_precondition,
+    asvs_precondition_facts,
 )
 
 __all__ = ["ASVS", "AsvsOptions", "applicability_for"]
@@ -204,6 +205,7 @@ ASVS = FrameworkPackage(
     ),
     options=AsvsOptions,
     precondition=asvs_precondition,
+    precondition_facts=asvs_precondition_facts,
     knowledge=KnowledgeTables(
         notes=MappingProxyType(NOTES), cases=MappingProxyType(CASES)
     ),

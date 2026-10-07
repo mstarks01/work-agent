@@ -144,3 +144,65 @@ def test_the_gate_and_the_loader_answer_the_same_question(tmp_path):
     assert not loader.readable("critic")
     with pytest.raises(MarkdownNotFoundError):
         loader.load("critic")
+
+
+# --- The facts that decide an undecidable precondition (ADR 0067) ------------
+
+
+def test_precondition_facts_that_are_not_callable_fail_the_gate():
+    """A paused job could not ask what decides the framework, so it never starts."""
+    from dataclasses import replace
+
+    package = replace(PACKAGES["stride"], precondition_facts=())
+
+    with pytest.raises(FrameworkPackageError) as caught:
+        validate_package(package, STRIDE_ROOT)
+
+    assert "precondition_facts" in str(caught.value)
+
+
+def _undecidable_models():
+    """Every corpus model, and the shared model with nothing said about its
+    interfaces or its transport (#1542 F1)."""
+    from analysis_service.system_model import SystemModel
+
+    models = [
+        (case.name, SystemModel.model_validate_json((case / "model.json").read_text()))
+        for case in sorted((PROJECT_ROOT / "evals" / "corpus").iterdir())
+    ]
+    silent = valid_model()
+    for process in silent.processes:
+        process.interface_kind = "unknown"
+    for flow in silent.data_flows:
+        flow.protocol = "unknown"
+    return [*models, ("silent", silent)]
+
+
+@pytest.mark.parametrize("name", sorted(PACKAGES))
+def test_every_undecidable_precondition_offers_an_answer_that_decides_it(name):
+    """**A package cannot be undecidable with no way for its owner to decide
+    it.** Where the precondition reads ``undecidable``, the facts the package
+    offers are open questions a paused job asks, and one answer to each, from
+    the choices the question offers, decides the gate ``prepare`` runs. Vacuous
+    for a package whose precondition is total, which is the point: the test
+    binds the next package that can be undecidable."""
+    from analysis_service.answer_forms import answer_choices
+    from analysis_service.fact_answers import FactAnswer
+    from analysis_service.fact_writes import answered_model, check_fact_answers
+
+    package = PACKAGES[name]
+    for label, model in _undecidable_models():
+        if run_precondition(package, model) != "undecidable":
+            continue
+        offered = package.precondition_facts(model)
+        assert offered, f"{name} offers nothing to decide {label}"
+        decided = set()
+        for choice_at in range(2):
+            facts = []
+            for ref in offered:
+                choices = answer_choices(ref.key, model, None)
+                value = choices[choice_at % len(choices)] if choices else "https"
+                facts.append(FactAnswer(key=ref.key, value=value))
+            check_fact_answers(facts, model, None)
+            decided.add(run_precondition(package, answered_model(model, facts)))
+        assert decided - {"undecidable"}, f"{name} stays undecidable on {label}"

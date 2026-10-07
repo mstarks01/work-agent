@@ -431,6 +431,7 @@ class TestTheBoundedRounds:
             decisions=11,
             parent=None,
             frameworks=("stride",),
+            gates=(),
         )
         shown, _, _ = next_round([wide], frozenset(), {})
         assert shown == (wide,)
@@ -474,6 +475,7 @@ class TestTheBoundedRounds:
                 decisions=4,
                 parent=None,
                 frameworks=("stride",),
+                gates=(),
             )
 
         listed = [capacity_of(n) for n in range(31)]
@@ -1144,7 +1146,12 @@ def test_no_round_opens_with_more_questions_than_the_one_before(case, run):
         if not asked.early:
             break
         keys = {q.key for q in asked.early}
+        # A question that decides a framework's precondition is asked outside
+        # the limits (ADR 0067), so a round that holds one counts no kind.
+        gated = any(q.gates for q in asked.early)
         for capability, counts in opened.items():
+            if gated:
+                break
             counts.append(
                 sum(
                     1
@@ -1161,6 +1168,10 @@ def test_no_round_opens_with_more_questions_than_the_one_before(case, run):
                 continue
             given[q.key] = _answer_as_a_person(q, choice)
         answered = merged_facts(answered, list(given.values()))
+    if asked.gates and set(asked.gates.values()) == {"refuted"}:
+        # A selection whose one framework will not run asks nothing.
+        assert not any(opened[True]) and not any(opened[False])
+        return
     assert any(opened[True]) or any(opened[False]), "a control: it asks something"
     for counts in opened.values():
         assert counts == sorted(counts, reverse=True), counts
