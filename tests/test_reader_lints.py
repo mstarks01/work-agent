@@ -74,6 +74,12 @@ SCRIPTS: tuple[str, ...] = tuple(
 #: An entry whose field gains a reader in code fails below, so the table
 #: cannot rot into an excuse.
 DECLARED_FIELDS: dict[str, str] = {
+    "Report.schema_version": (
+        "JSON report consumers outside this repository use the schema version"
+        " to interpret the exported payload and detect breaking changes, as"
+        " documented in docs/Report-Schema.md. The report page shows the analysis"
+        " name and generation time instead of serialization metadata."
+    ),
     "CaseMetadata.bootstrap": (
         "Provenance for a person: how the case's model was first made. The"
         " loader requires it, so a case cannot ship without saying, and no rule"
