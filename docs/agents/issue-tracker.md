@@ -55,9 +55,8 @@ gh api --method POST repos/mstarks01/work-agent/issues/<child>/dependencies/bloc
 
 ### The live map
 
-[#1522](https://github.com/mstarks01/work-agent/issues/1522) — persistent storage for jobs,
-reports and sources. PostgreSQL or SQLite holds job state and principals; an S3-API store or the
-filesystem holds reports and sources. Read the map's Decisions so far before you take a ticket.
+**None.** The last map, [#1522](https://github.com/mstarks01/work-agent/issues/1522), is under
+Completed maps. Chart a new one only against the bar at the end of this file.
 
 ### Completed maps
 
@@ -65,6 +64,19 @@ A completed map lives as a closed GitHub issue. Its tickets' resolution comments
 and the code holds the current state, so read the code first. Each map below settles the rules named
 beside it.
 
+- [#1522](https://github.com/mstarks01/work-agent/issues/1522) — persistent storage for jobs,
+  reports and sources. The spec is ready to build; the build is a separate effort.
+  - PostgreSQL, or SQLite on one host, holds job state and principals. `boto3` over the S3 API,
+    or the filesystem, holds the sources and the report. Native GCS and Azure backends are a
+    separate effort.
+  - A principal is one issuer and `sub`, and a random UUIDv4 owner ID stands for it (ADR 0064).
+  - The keys are `<owner-id>/<job-id>/sources.json` and `report.json`. A job has one report,
+    written once. The row holds a SHA-256 of each object, and the object is written first
+    (ADR 0065).
+  - A delete or an expiry keeps a usage row, so that the limits still count the job (ADR 0066).
+  - A startup scan fails each `queued` or `running` job. It is valid for one instance only.
+  - Secrets arrive through `*_FILE` settings only, and database TLS is always `verify-full`.
+  - Sharing, multi-instance work, per-owner encryption and tenants are out of scope.
 - [#491](https://github.com/mstarks01/work-agent/issues/491) — Amazon Bedrock as a vendor row.
   - A deployment declares the credential mechanism, and the vendor's SDK may then discover the
     material. An `IAM` mode passes no credential material at all
