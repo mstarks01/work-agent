@@ -87,9 +87,8 @@ __all__ = [
 
 #: How many fact answers one submission carries. The largest of the 202
 #: archived reports asks 97 fact questions, so this bounds the body above any
-#: real use. A report
-#: can ask more than this, so its follow-up saves its answers in batches
-#: (ADR 0070).
+#: real use. A report can ask more than this, so its follow-up saves its
+#: answers in batches (ADR 0070).
 MAX_FACT_ANSWERS = 200
 
 #: How many fact answers one job holds across every save: the answers the
