@@ -1327,9 +1327,9 @@ def test_the_event_stream_still_streams_under_the_header_middleware(client):
 PAGE_SCRIPTS = {
     "webapp/sitting.py": "sitting.js",
     "webapp/review.py": ("review_queue.js", "review_finding.js"),
-    "webapp/main.py": ("workspace.js", "first_run.js"),
+    "webapp/main.py": ("workspace.js", "answer_detail.js", "first_run.js"),
     "webapp/offline_sitting.py": "offline_sitting.js",
-    "webapp/report_view.html": "report_view.js",
+    "webapp/report_view.html": ("answer_detail.js", "report_view.js"),
 }
 
 #: A ``<script>`` block a page template is allowed to fill itself. Each one

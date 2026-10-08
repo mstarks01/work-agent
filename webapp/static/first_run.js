@@ -157,18 +157,6 @@
     return select;
   };
   let suggestLists = 0;
-  // The submitter's own words beside a closed answer: an exception or a
-  // scope the answer alone would overstate (FactAnswer.detail, ADR 0073).
-  const DETAIL_CHARS = 300;
-  const detailInput = (prefill) => {
-    const detail = document.createElement("input");
-    detail.type = "text";
-    detail.maxLength = DETAIL_CHARS;
-    detail.className = "answer-detail";
-    detail.placeholder = "exceptions or detail (optional)";
-    detail.value = prefill || "";
-    return detail;
-  };
   const withDetail = (answer, detail) => (detail ? { ...answer, detail } : answer);
   const inputFor = (q, prefill, prefillDetail) => {
     let input;
@@ -188,7 +176,7 @@
       }
       input.append(optionOf("I don't know", DONT_KNOW));
       set = (value) => { input.value = value; };
-      detail = detailInput(prefillDetail);
+      detail = answerDetail(prefillDetail || "");
       beside = [input, " ", detail];
     } else if (q.form === "control") {
       // A control: say there is none, say you do not know, or name the
@@ -512,7 +500,7 @@
         row.append(cell);
         return select;
       });
-      const detail = detailInput(prefillDetail);
+      const detail = answerDetail(prefillDetail || "");
       const detailCell = document.createElement("td");
       detailCell.append(detail);
       row.append(detailCell);

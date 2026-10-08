@@ -603,7 +603,10 @@ def render_report(
     return render(
         VIEWER.read_text(encoding="utf-8"),
         _REPORT_GRANTS,
-        script=client_script("report_view.js"),
+        script=client_script("answer_detail.js")
+        + "\n"
+        + client_script("report_view.js"),
+        answer_limits=script_json(dict(ANSWER_LIMITS)),
         report=script_json(report.model_dump(mode="json")),
         units=script_json(unit_rows(report)),
         open_facts=script_json(
@@ -718,15 +721,13 @@ def _corrections_payload(
 
 
 def _draft_payload(state: AnswerState) -> dict[str, object]:
-    """A report's follow-up draft, the revision a save names, and the limits a
-    batch keeps to (ADR 0070)."""
+    """A report's follow-up draft and the revision a save names (ADR 0070)."""
     return {
         "draft": {
             "links": [link.model_dump(mode="json") for link in state.draft_links],
             "facts": [fact.model_dump(mode="json") for fact in state.draft_facts],
         },
         "revision": state.revision,
-        "limits": dict(ANSWER_LIMITS),
     }
 
 
@@ -786,9 +787,11 @@ def create_app(
             render(
                 _FORM_PAGE,
                 _FORM_GRANTS,
-                script=client_script("workspace.js")
-                + "\n"
-                + client_script("first_run.js"),
+                script="\n".join(
+                    client_script(name)
+                    for name in ("workspace.js", "answer_detail.js", "first_run.js")
+                ),
+                answer_limits=script_json(dict(ANSWER_LIMITS)),
                 workspace_style=(
                     Path(__file__).parent / "static" / "workspace.css"
                 ).read_text(encoding="utf-8"),

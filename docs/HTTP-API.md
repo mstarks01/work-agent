@@ -418,7 +418,7 @@ available.
 ([ADR 0070](adr/0070-a-follow-up-saves-a-draft-in-batches.md)). One request
 carries at most the `answer_limits` the questions route publishes: `facts` and
 `links` for one request, `held_facts` and `held_links` for every answer a job
-holds. A report can ask more than one request carries. Send `"save": true`
+holds, and `detail` for the characters one answer's detail carries. A report can ask more than one request carries. Send `"save": true`
 with your `revision` to keep a batch as a draft: no job starts, the follow-up
 is not spent, and the response is `200` with `{"job_id", "saved": true,
 "revision"}`. `draft_facts` and `draft_links` list the draft. A later batch
