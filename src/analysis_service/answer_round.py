@@ -180,18 +180,30 @@ def _early_kind(question: EarlyQuestion) -> str:
 def passes_floor(question: EarlyQuestion, listed: Sequence[EarlyQuestion]) -> bool:
     """Whether a round may show this question: at or above its kind's floor.
 
-    **The one reader of the floor.** A question in the highest band of its
-    kind also passes, where the kind's questions span more than one band: in
-    an ASVS job above level 1, a capability question that settles one level 1
-    requirement is asked, where one that settles only level 2 requirements
-    needs the floor (#1289). Where every question shares one band, as in a
-    level 1 job, the band tells them nothing and the floor alone decides.
+    **The one reader of the floor.** A question in the highest band of one of
+    its frameworks also passes, where that framework's questions of the kind
+    span more than one band: in an ASVS job above level 1, a capability
+    question that settles one level 1 requirement is asked, where one that
+    settles only level 2 requirements needs the floor (#1289). Where every one
+    of a framework's questions shares one band, as in a level 1 job, the band
+    tells them nothing and the floor alone decides. **Each framework's bands
+    are read apart** (ADR 0071): a framework with more bands, selected beside
+    it, cannot move another framework's questions over the floor.
     """
     kind = _early_kind(question)
     if question.score >= EARLY_RULES[kind].floor:
         return True
-    bands = {other.band for other in listed if _early_kind(other) == kind}
-    return len(bands) > 1 and question.band == max(bands)
+    for name, band in question.framework_bands:
+        own = {
+            held
+            for other in listed
+            if _early_kind(other) == kind
+            for served, held in other.framework_bands
+            if served == name
+        }
+        if len(own) > 1 and band == max(own):
+            return True
+    return False
 
 
 class AlreadyResumed(ValueError):

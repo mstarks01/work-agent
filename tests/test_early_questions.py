@@ -349,10 +349,22 @@ class TestCapabilityBands:
     """An ASVS job above level 1 dropped capability questions that settle a
     level 1 requirement, and kept ones that settle only level 2 (#1289)."""
 
-    def question(self, score, band, kind="capability"):
+    def question(self, score, band, kind="capability", framework="asvs"):
         from types import SimpleNamespace
 
-        return SimpleNamespace(kind=kind, score=score, band=band)
+        bands = ((framework, band),) if kind == "capability" else ()
+        return SimpleNamespace(kind=kind, score=score, band=band, framework_bands=bands)
+
+    def test_another_framework_s_bands_leave_this_one_s_floor_alone(self):
+        """One framework's bands never decide another's floor (ADR 0071)."""
+        one = self.question(1.0, 0, framework="asvs")
+        listed = [
+            one,
+            self.question(5.0, 0, framework="asvs"),
+            self.question(5.0, 0, framework="other"),
+            self.question(5.0, -2, framework="other"),
+        ]
+        assert not passes_floor(one, listed)
 
     def test_the_top_band_passes_the_floor_where_bands_differ(self):
         top, low = self.question(1.0, 3), self.question(1.0, 2)

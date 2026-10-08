@@ -209,9 +209,9 @@ class EarlyQuestion:
     #: frameworks in turn (:func:`~analysis_service.answer_round.by_turn`).
     score: float = 0.0
     #: For a capability, the band of the most important unit it could settle,
-    #: as its framework ranks units (level 1 highest for ASVS); 0 for every
-    #: other question. :func:`~analysis_service.answer_round.passes_floor`
-    #: reads it.
+    #: as its framework ranks units (level 1 highest for ASVS), the highest
+    #: over the frameworks it serves; 0 for every other question. The list is
+    #: ordered by it.
     band: int = 0
     #: The key of the question this one depends on: a capability's parent,
     #: whose "no" makes this one moot. ``None`` for every other question.
@@ -221,6 +221,12 @@ class EarlyQuestion:
     #: limits (:func:`~analysis_service.answer_round.next_round`). Empty for
     #: every other question.
     gates: tuple[FrameworkName, ...] = ()
+    #: For a capability, each framework it serves with the band of the most
+    #: important unit it could settle for that framework, in name order; empty
+    #: for every other question.
+    #: :func:`~analysis_service.answer_round.passes_floor` reads it, so one
+    #: framework's bands never decide another framework's floor (ADR 0071).
+    framework_bands: tuple[tuple[FrameworkName, int], ...] = ()
 
     @property
     def decisions(self) -> int:
@@ -442,6 +448,7 @@ def capability_questions(
     counts: Counter[str] = Counter()
     bands: dict[str, int] = {}
     helps: dict[str, list[FrameworkName]] = {}
+    own: dict[str, list[tuple[FrameworkName, int]]] = {}
     for name in sorted(frameworks):
         for key, need in (
             PACKAGES[name].record.open_capabilities(model, frameworks[name]).items()
@@ -449,6 +456,7 @@ def capability_questions(
             counts[key] += need.units
             bands[key] = max(bands.get(key, need.band), need.band)
             helps.setdefault(key, []).append(name)
+            own.setdefault(key, []).append((name, need.band))
 
     def asked_parent(key: str) -> str:
         return next((parent for parent in lineage(key) if parent in counts), "")
@@ -485,6 +493,7 @@ def capability_questions(
                 frameworks=tuple(helps[key]),
                 score=float(counts[key]),
                 band=bands[key],
+                framework_bands=tuple(own[key]),
                 parent=UnknownRef(capability=parent).key if parent else None,
             )
         )
