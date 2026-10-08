@@ -1044,7 +1044,9 @@ class SavedRound:
     revision: int
 
 
-#: The label an amendment's description carries, with its number after it.
+#: The label an amendment's description carries, with the lowest number after
+#: it that no source label of the job already uses. A caller names its own
+#: sources, so no label counts the amendments.
 AMENDMENT_LABEL = "Amendment"
 
 
@@ -1265,10 +1267,14 @@ class AnswerState:
                 "the saved answers changed since these questions were read"
             )
         kept = [source for source in self.sources if source.kind != "answers"]
-        count = 1 + sum(
-            1 for source in kept if source.label.startswith(AMENDMENT_LABEL)
-        )
-        sources = [*kept, Source.description(text, label=f"{AMENDMENT_LABEL} {count}")]
+        taken = {source.label for source in kept}
+        number = 1
+        while f"{AMENDMENT_LABEL} {number}" in taken:
+            number += 1
+        sources = [
+            *kept,
+            Source.description(text, label=f"{AMENDMENT_LABEL} {number}"),
+        ]
         breach = None if limits is None else limits.breach(sources)
         if breach is not None:
             raise SourcesOverLimit(breach)

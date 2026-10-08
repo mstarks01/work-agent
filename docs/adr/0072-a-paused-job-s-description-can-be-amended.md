@@ -21,7 +21,8 @@ refuses an answer to a fact the model states.
 person who waits on a paused job writes what is true, in their own words. The
 service starts a new job from the paused job's sources, with the amendment
 added as one more description, labelled `Amendment 1`, `Amendment 2` and so
-on. The new job runs extraction and the assertion pass again, and it pauses
+on. The number is the lowest that no source label of the job already uses,
+because a caller names its own sources. The new job runs extraction and the assertion pass again, and it pauses
 again. It never resumes at `prepare`, because a new element or flow changes
 the model that every later step reads.
 

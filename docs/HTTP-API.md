@@ -245,7 +245,8 @@ framework in `gates`, and `early_remaining` counts them under `gate`.
 cannot add a component or a flow, and a fact the model states takes no answer.
 Send `POST /v1/jobs/{id}/amendments` with what is true, in your own words, and
 the `revision` you read. A new job extracts the sources again with the
-amendment added, labelled `Amendment 1`, and pauses again. It carries this
+amendment added, labelled `Amendment` and the lowest number that no source
+label of the job uses, and pauses again. It carries this
 job's answers: its own questions take each one they still ask, and
 `carried_dropped` and `carried_dropped_links` list the others. While it is in
 flight or has a report, this job takes no answer; where it fails, this job
