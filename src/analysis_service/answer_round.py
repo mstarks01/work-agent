@@ -47,9 +47,7 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field, replace
 from functools import cached_property
 from types import MappingProxyType
-from typing import TYPE_CHECKING, Annotated, Any, Literal
-
-from pydantic import StringConstraints
+from typing import TYPE_CHECKING, Any, Literal
 
 from analysis_service.assertions import UNKNOWN, AssertionCatalog
 from analysis_service.bands import UNRANKED
@@ -65,6 +63,7 @@ from analysis_service.fact_answers import (
     MAX_FACT_ANSWERS,
     MAX_HELD_FACTS,
     FactAnswer,
+    SkipKey,
     answer_facets,
     answered_keys,
     fact_label,
@@ -115,7 +114,6 @@ __all__ = [
     "ResumedJob",
     "SavedDraft",
     "SavedRound",
-    "SkipKey",
     "SourcesOverLimit",
     "StaleRevision",
     "Stop",
@@ -156,11 +154,6 @@ EARLY_RULES: Mapping[str, EarlyRule] = {
     "field": EarlyRule(floor=1.0, limit=30, per_round=5),
 }
 
-
-#: What a saved round skips for now: an early question's fact key, or a link
-#: question's key, the :func:`~analysis_service.links.fold` of its principal.
-#: A skip of a link places nothing and never means "none of these".
-SkipKey = UnknownKey | Annotated[str, StringConstraints(min_length=1, max_length=200)]
 
 #: Why a waiting job asks nothing more (:attr:`QuestionSet.stop`, ADR 0068).
 Stop = Literal["budget-exhausted", "below-floor", "skipped", "nothing-left"]
@@ -1262,6 +1255,16 @@ class AnswerState:
             return self._question_set(self.facts, self.links)
         return self._question_set(self.held_facts, self.held_links)
 
+    def _check_revision(self, revision: int | None, *, required: bool) -> None:
+        """Refuse a request read off an older revision, or one with none where
+        the request must name it."""
+        if required and revision is None:
+            raise MissingRevision("send the revision the questions were read with")
+        if revision is not None and revision != self.revision:
+            raise StaleRevision(
+                "the saved answers changed since these questions were read"
+            )
+
     def amend(
         self, text: str, *, revision: int | None, limits: SourceLimits | None
     ) -> AmendedJob:
@@ -1285,12 +1288,7 @@ class AnswerState:
                 "only a job waiting on answers takes an amendment; submit the"
                 " corrected description as a new job"
             )
-        if revision is None:
-            raise MissingRevision("send the revision the questions were read with")
-        if revision != self.revision:
-            raise StaleRevision(
-                "the saved answers changed since these questions were read"
-            )
+        self._check_revision(revision, required=True)
         kept = [source for source in self.sources if source.kind != "answers"]
         taken = {source.label for source in kept}
         number = 1
@@ -1326,12 +1324,7 @@ class AnswerState:
         submitter's own choices otherwise. ``limits`` is ``None`` only where
         the job holds no sources to bound, as an eval replay of rounds.
         """
-        if (self.waiting or answers.save) and answers.revision is None:
-            raise MissingRevision("send the revision the questions were read with")
-        if answers.revision is not None and answers.revision != self.revision:
-            raise StaleRevision(
-                "the saved answers changed since these questions were read"
-            )
+        self._check_revision(answers.revision, required=self.waiting or answers.save)
         links, facts = answers.links, answers.facts
         if not self.waiting:
             if answers.save and not (links or facts):

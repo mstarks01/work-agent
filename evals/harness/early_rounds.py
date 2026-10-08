@@ -44,13 +44,17 @@ from analysis_service.answer_round import (
     Answers,
     AnswerState,
     SavedRound,
-    SkipKey,
     passes_floor,
 )
 from analysis_service.assertions import UNKNOWN
 from analysis_service.claims import FrameworkName, UnknownKey
 from analysis_service.early_questions import EarlyQuestion, early_questions
-from analysis_service.fact_answers import FactAnswer, answered_keys, merged_facts
+from analysis_service.fact_answers import (
+    FactAnswer,
+    SkipKey,
+    answered_keys,
+    merged_facts,
+)
 from analysis_service.jobs import Checkpoint
 from analysis_service.report import Report
 from analysis_service.system_model import SystemModel

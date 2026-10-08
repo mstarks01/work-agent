@@ -140,7 +140,6 @@ from analysis_service.answer_round import (
     QuestionSet,
     SavedDraft,
     SavedRound,
-    SkipKey,
     SourcesOverLimit,
     StaleRevision,
 )
@@ -151,6 +150,7 @@ from analysis_service.early_questions import EarlyQuestion
 from analysis_service.fact_answers import (
     MAX_FACT_ANSWERS,
     FactAnswer,
+    SkipKey,
     answer_facets,
     fact_label,
     key_ref,
@@ -992,13 +992,7 @@ def create_app(
                 limits=parent.engine.limits,
             )
         except StaleRevision:
-            return JSONResponse(
-                {
-                    "message": "Your saved answers changed in another tab or"
-                    " window. Reload this page to see them."
-                },
-                status_code=409,
-            )
+            return JSONResponse({"message": _STALE_MESSAGE}, status_code=409)
         except AlreadyResumed:
             return JSONResponse(
                 {
@@ -1090,13 +1084,7 @@ def create_app(
                 text, revision=revision, limits=parent.engine.limits
             )
         except StaleRevision:
-            return JSONResponse(
-                {
-                    "message": "Your saved answers changed in another tab or"
-                    " window. Reload this page to see them."
-                },
-                status_code=409,
-            )
+            return JSONResponse({"message": _STALE_MESSAGE}, status_code=409)
         except AlreadyResumed:
             return JSONResponse(
                 {
@@ -1668,6 +1656,11 @@ _FORM_PAGE = (Path(__file__).parent / "workspace.html").read_text(encoding="utf-
 
 #: The question toggle. Every install can pause: one with no catalog asks its
 #: early questions and no link question.
+#: What the page says where a save in another tab moved the answers first.
+_STALE_MESSAGE = (
+    "Your saved answers changed in another tab or window. Reload this page to see them."
+)
+
 _QUESTIONS_FIELD = """<p class="ask-option"><label><input type="checkbox" id="ask" name="ask" checked>
     Ask me questions to make the report better.</label></p>"""
 

@@ -14,6 +14,7 @@ from analysis_service.claims import FrameworkAnalysis, UnknownKey
 from analysis_service.fact_answers import (
     FactAnswer,
     FactStatus,
+    SkipKey,
     fact_kind,
     fact_line,
     fact_status,
@@ -34,7 +35,7 @@ def conditions(
     model: SystemModel,
     answered: Sequence[FactAnswer],
     shown: Sequence[UnknownKey],
-    skipped: Sequence[object] = (),
+    skipped: Sequence[SkipKey] = (),
 ) -> dict[str, list[tuple[UnknownKey, str, FactStatus]]]:
     """Each conditional finding's open facts, as ``framework/claim``: key, label and status.
 

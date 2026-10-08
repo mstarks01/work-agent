@@ -35,13 +35,12 @@ from uuid import uuid4
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-from analysis_service.answer_round import SkipKey
 from analysis_service.assertions import AssertionRecord
 from analysis_service.budgets import BudgetPolicy, measured_tokens, spent_tokens
 from analysis_service.certification import CertifyResult
 from analysis_service.claims import FrameworkAnalysis, UnknownKey
 from analysis_service.execution import GraphFailed
-from analysis_service.fact_answers import MAX_HELD_FACTS, FactAnswer
+from analysis_service.fact_answers import MAX_HELD_FACTS, FactAnswer, SkipKey
 from analysis_service.links import MAX_HELD_LINKS, LinkAnswer
 from analysis_service.report import (
     FrameworkSelection,

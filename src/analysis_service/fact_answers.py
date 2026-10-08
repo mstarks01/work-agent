@@ -38,12 +38,13 @@ sources (the maintainer's decision of 2026-09-25 on #1225).
 from __future__ import annotations
 
 from collections.abc import Collection, Mapping, Sequence
-from typing import Any, Literal
+from typing import Annotated, Any, Literal
 
 from pydantic import (
     BaseModel,
     ConfigDict,
     Field,
+    StringConstraints,
     field_validator,
     model_validator,
 )
@@ -69,10 +70,12 @@ __all__ = [
     "FactAnswer",
     "FactKind",
     "FactStatus",
+    "SkipKey",
     "answer_facets",
     "answered_keys",
     "answered_row",
     "covers",
+    "detail_note",
     "fact_kind",
     "fact_label",
     "fact_line",
@@ -103,6 +106,11 @@ MAX_HELD_FACTS = 5 * MAX_FACT_ANSWERS
 
 #: The longest detail one answer carries: a sentence, not a description.
 MAX_DETAIL_CHARS = 300
+
+#: What a saved round skips for now: an early question's fact key, or a link
+#: question's key, the :func:`~analysis_service.links.fold` of its principal.
+#: A skip of a link places nothing and never means "none of these".
+SkipKey = UnknownKey | Annotated[str, StringConstraints(min_length=1, max_length=200)]
 
 
 FactKind = Literal["attribute", "assertion", "question", "subject", "capability"]
@@ -293,9 +301,16 @@ def fact_line(fact: FactAnswer) -> str:
         line = f'The open question {assertion} is answered "{fact.value}".'
     else:
         line = f'Asked "{subject}", the answer is "{fact.value}".'
-    if fact.detail:
-        line += f' The submitter adds: "{fact.detail}".'
-    return line
+    return line + detail_note(fact.detail)
+
+
+def detail_note(detail: str) -> str:
+    """The sentence a detail adds after an answer, or nothing (ADR 0073).
+
+    The answers Source and the model's element notes both read it, so the two
+    word a detail alike.
+    """
+    return f' The submitter adds: "{detail}".' if detail else ""
 
 
 def answer_facets(key: UnknownKey) -> tuple[Facet, ...]:
@@ -395,7 +410,7 @@ def fact_status(
     key: UnknownKey,
     said: Mapping[UnknownKey, FactAnswer],
     shown: Collection[UnknownKey],
-    skipped: Collection[object],
+    skipped: Collection[SkipKey],
     facets: Sequence[str] = (),
 ) -> FactStatus:
     """What became of one fact before the analysis (#1542 F4).
