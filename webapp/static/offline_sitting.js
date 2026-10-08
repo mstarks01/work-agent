@@ -15,12 +15,14 @@ const el = (tag, cls, text) => {
 };
 const typed = list => list.reduce((n, s) => n + s.trim().length, 0);
 const written = id => answers[id] && typed(answers[id].own_list) >= DATA.min_own_list;
-const marked = id => answers[id] ? Object.keys(answers[id].marks).length : 0;
+// Every target of the case carries a mark: the rule the merge checks
+// (check_every_finding_marked), so the page calls ready only what it admits.
+const marked = id => BY_ID[id].targets.length > 0
+  && BY_ID[id].targets.every(t => t.fingerprint in answers[id].marks);
 
 function state(id) {
   if (!answers[id]) return ["", "to do"];
-  if (marked(id) >= BY_ID[id].targets.length && BY_ID[id].targets.length)
-    return ["finished", "every record marked"];
+  if (marked(id)) return ["finished", "every record marked"];
   return ["draft", "in progress"];
 }
 
@@ -341,7 +343,12 @@ function restore(text) {
   }
   for (const [id, a] of Object.entries(held.cases || {})) {
     if (!BY_ID[id]) continue;
-    answers[id] = {own_list: a.own_list || [], marks: a.marks || {},
+    // A mark for a target the case no longer has names no finding, which the
+    // merge refuses (check_marks), so it is not carried.
+    const targets = new Set(BY_ID[id].targets.map(t => t.fingerprint));
+    const marks = Object.fromEntries(
+      Object.entries(a.marks || {}).filter(([key]) => targets.has(key)));
+    answers[id] = {own_list: a.own_list || [], marks,
                    missing: a.missing || [], notes: a.notes || "",
                    opened_digests: a.opened_digests || BY_ID[id].digests};
   }
