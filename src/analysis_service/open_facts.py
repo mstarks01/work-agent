@@ -108,8 +108,21 @@ def reference_labels(
     return labels
 
 
+#: The question an attribute asks where the plain form reads badly. Each of
+#: these attributes belongs to one element type: a flow is in transit and a
+#: store is at rest.
+_ATTRIBUTE_QUESTIONS = {
+    "encryption_in_transit": "Is the connection {element} encrypted?",
+    "encryption_at_rest": "Is data stored in {element} encrypted?",
+}
+
+
 def label_of(ref: UnknownRef, names: Mapping[str, str]) -> str:
-    """What a reader sees for one open fact: an element and attribute, or the question."""
+    """What a reader sees for one open fact: the question it asks.
+
+    Every surface words a fact through this, so the form page, the report page,
+    ``/v1`` and a refusal ask it alike.
+    """
     if ref.capability:
         capability = CAPABILITIES.get(ref.capability)
         return capability.question if capability else ref.capability
@@ -121,7 +134,11 @@ def label_of(ref: UnknownRef, names: Mapping[str, str]) -> str:
         return kind.template.format(element=where) if kind else ref.question
     if ref.names_an_element:
         where = names.get(ref.element_id, ref.element_id)
-        return f"{where}: {ref.attribute.replace('_', ' ')}"
+        attribute = ref.attribute.replace("_", " ")
+        template = _ATTRIBUTE_QUESTIONS.get(
+            ref.attribute, f"What is the {attribute} for {{element}}?"
+        )
+        return template.format(element=where)
     return ref.subject
 
 

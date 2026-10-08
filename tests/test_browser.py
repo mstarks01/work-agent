@@ -382,7 +382,7 @@ def test_question_progress_and_entry_guidance(page):
     assert "Answers can add or remove questions" in page.inner_text(
         "#round-progress-detail"
     )
-    assert "Is the connection from Web App to Orders DB encrypted?" in page.inner_text(
+    assert "Is the connection Web App → Orders DB encrypted?" in page.inner_text(
         "#questions"
     )
 

@@ -276,7 +276,7 @@ the reviewer named it (`critic`).
 ```json
 {"key": ["flow:entity:customer>process:web-app>login", "encryption_in_transit", "", "", ""],
  "kind": "attribute", "basis": "evidence",
- "label": "Customer → Web App: encryption in transit",
+ "label": "Is the connection Customer → Web App encrypted?",
  "cited_by": 4, "covered_so_far": 3, "choices": [],
  "form": "control", "suggestions": ["HTTPS", "TLS 1.3", "TLS 1.2"],
  "max_length": 200, "band": "high",

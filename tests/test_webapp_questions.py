@@ -1593,7 +1593,7 @@ def test_the_form_script_boxes_each_run_of_one_group_with_a_row_per_element():
         return {
             "key": [element.id, "", "", "", name, ""],
             "kind": "question",
-            "label": name,
+            "label": element.name,
             "reasons": ["why"],
             "choices": [{"id": c, "name": ""} for c in choices],
             "form": "choice" if choices else "text",
