@@ -30,7 +30,7 @@ import os
 from collections.abc import Awaitable, Callable, Mapping, Sequence
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
-from typing import Any, Literal, Protocol, Self
+from typing import Any, Literal, Protocol, Self, TypeGuard
 from uuid import uuid4
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
@@ -180,6 +180,12 @@ class Resumption(BaseModel):
     #: model and catalog the parent's run built, so its own verdict is combined
     #: with this one.
     certification: CertifyResult | None = None
+
+
+def is_follow_up(resumption: Resumption | None) -> TypeGuard[Resumption]:
+    """Whether a job resumed as a report's one follow-up, so its report is
+    final (ADR 0054)."""
+    return resumption is not None and resumption.follow_up
 
 
 class JobRecord(BaseModel):
@@ -349,7 +355,7 @@ class JobRecord(BaseModel):
 
     def final(self) -> bool:
         """Whether this job's report is final: the one follow-up wrote it (ADR 0054)."""
-        return self.resumption is not None and self.resumption.follow_up
+        return is_follow_up(self.resumption)
 
     def selection(self) -> tuple[str, ...]:
         """This job's frameworks by name, in selection order.

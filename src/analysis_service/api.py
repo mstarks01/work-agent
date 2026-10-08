@@ -82,6 +82,7 @@ from analysis_service.jobs import (
     Resumption,
     build_store,
     execute_job,
+    is_follow_up,
 )
 from analysis_service.links import (
     MAX_LINK_ANSWERS,
@@ -1211,7 +1212,7 @@ def create_app(
         store: JobStore = request.app.state.store
         # The envelope leaves the resumption out, so it is read by name.
         resumption = await store.resumption(job_id, subject)
-        if resumption is None or not resumption.follow_up:
+        if not is_follow_up(resumption):
             raise HTTPException(
                 status_code=409,
                 detail="the job is not a follow-up: it resumed from no finished report",
