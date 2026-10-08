@@ -177,6 +177,20 @@ Start at the places where a one-package assumption survives:
   `notes` on every question, an arbitrary verified quote on every ruling — and
   every check goes green while the output says nothing.
 
+- **The questions a paused job asks.** The package declares
+  `precondition_facts`: the facts an owner answers to decide its
+  **Precondition** where it is undecidable (ADR 0067). A package whose
+  precondition is total declares an empty answer.
+  `test_every_undecidable_precondition_offers_an_answer_that_decides_it` binds
+  the package to it on every corpus model. It needs a row in
+  `question_prior.json`, which may count no run, and its field questions rank
+  on the sum of every package's scores (ADR 0053). Its capability questions
+  share each kind's limit with the other packages. A capability's floor
+  exception reads the bands of every selected package, so a package with more
+  bands than another can move the other package's questions over the floor.
+  `tests/test_future_frameworks.py` drives a third package with three bands, a
+  dense catalog, an empty prior and a gate on a field no prior names.
+
 - **Which class the service asks for.** A package overriding a neutral hook has
   to put it on the class the *caller* reaches, not merely on one of its own.
   An override on a class the caller does not reach resolves to the neutral
