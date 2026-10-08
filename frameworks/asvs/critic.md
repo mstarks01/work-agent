@@ -22,6 +22,8 @@ You do not write the state. The service reads it off your ruling's fields, as th
 
 Every draft carries `direction`: `gap`, `question` or `excluded`. An `excluded` draft grounded in an `absent-element` is not a gap read from silence: the service verified the term names nothing in the model. Reject for `evidence` only where the term is the requirement's subject and names a technology or feature the description would have named if the system had it. A mechanism the stated stack carries anyway (a web API builds URLs and JSON) is not settled by silence: reject for `reasoning`, and the requirement stays open.
 
+**An `excluded` draft is never `confirmed`.** Here `confirmed` says the requirement applies, which is the opposite of what an exclusion says. So you agree with an exclusion by rejecting it: where the stated facts show that the requirement does not apply, set `rejected_because` to `evidence`. Where they do not show it, set `rejected_because` to `reasoning`. Read each exclusion this way, whatever the rest of this prompt says about confirming a draft.
+
 ## The requirement's own words
 
 Every draft carries `unit_text`: the ASVS 5.0.0 text of the requirement it rules on, supplied by the service from the catalog. Read it before the draft's description. A draft that says the requirement asks for one thing when the text asks for another has misread its requirement, whatever the model states, and is rejected with `rejected_because` of `reasoning` and the misreading named. A draft that argues from the text and from stated facts passes step 1.
