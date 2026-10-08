@@ -1255,6 +1255,16 @@ class AnswerState:
             return self._question_set(self.facts, self.links)
         return self._question_set(self.held_facts, self.held_links)
 
+    def _check_revision(self, revision: int | None, *, required: bool) -> None:
+        """Refuse a request read off an older revision, or one with none where
+        the request must name it."""
+        if required and revision is None:
+            raise MissingRevision("send the revision the questions were read with")
+        if revision is not None and revision != self.revision:
+            raise StaleRevision(
+                "the saved answers changed since these questions were read"
+            )
+
     def amend(
         self, text: str, *, revision: int | None, limits: SourceLimits | None
     ) -> AmendedJob:
@@ -1278,12 +1288,7 @@ class AnswerState:
                 "only a job waiting on answers takes an amendment; submit the"
                 " corrected description as a new job"
             )
-        if revision is None:
-            raise MissingRevision("send the revision the questions were read with")
-        if revision != self.revision:
-            raise StaleRevision(
-                "the saved answers changed since these questions were read"
-            )
+        self._check_revision(revision, required=True)
         kept = [source for source in self.sources if source.kind != "answers"]
         taken = {source.label for source in kept}
         number = 1
@@ -1319,12 +1324,7 @@ class AnswerState:
         submitter's own choices otherwise. ``limits`` is ``None`` only where
         the job holds no sources to bound, as an eval replay of rounds.
         """
-        if (self.waiting or answers.save) and answers.revision is None:
-            raise MissingRevision("send the revision the questions were read with")
-        if answers.revision is not None and answers.revision != self.revision:
-            raise StaleRevision(
-                "the saved answers changed since these questions were read"
-            )
+        self._check_revision(answers.revision, required=self.waiting or answers.save)
         links, facts = answers.links, answers.facts
         if not self.waiting:
             if answers.save and not (links or facts):
