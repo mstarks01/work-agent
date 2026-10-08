@@ -208,11 +208,6 @@ class EarlyQuestion:
     #: first; a round reorders its own questions with the
     #: frameworks in turn (:func:`~analysis_service.answer_round.by_turn`).
     score: float = 0.0
-    #: For a capability, the band of the most important unit it could settle,
-    #: as its framework ranks units (level 1 highest for ASVS), the highest
-    #: over the frameworks it serves; 0 for every other question. The list is
-    #: ordered by it.
-    band: int = 0
     #: The key of the question this one depends on: a capability's parent,
     #: whose "no" makes this one moot. ``None`` for every other question.
     parent: UnknownKey | None = None
@@ -492,7 +487,6 @@ def capability_questions(
                 element=CAPABILITIES[key].question,
                 frameworks=tuple(helps[key]),
                 score=float(counts[key]),
-                band=bands[key],
                 framework_bands=tuple(own[key]),
                 parent=UnknownRef(capability=parent).key if parent else None,
             )
