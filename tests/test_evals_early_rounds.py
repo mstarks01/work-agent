@@ -53,3 +53,19 @@ def test_an_owner_who_answers_in_part_and_skips_the_rest_is_not_asked_again():
     found = replay("case", open_controls(), valid_model(), STRIDE, "facets-partial")
     assert found.ended
     assert found.repeats == 0
+
+
+def test_a_replay_records_what_its_stop_leaves_open():
+    """The workload replay reports the stop's summary (#1542 B, ADR 0068):
+    the questions under a floor and held back, and each framework's units by
+    band and state."""
+    found = replay(
+        "case", valid_model(), valid_model(), {"asvs": {"level": 2}}, "capability-yes"
+    )
+    assert found.stop in {"budget-exhausted", "below-floor", "nothing-left"}
+    bands = found.units["asvs"]
+    assert set(bands) == {"level 1", "level 2"}
+    assert all("unaskable" in states for states in bands.values())
+    assert found.held_back + found.below_floor > 0, "a control: something stays out"
+    stride = replay("case", valid_model(), valid_model(), STRIDE, "capability-yes")
+    assert stride.units == {}

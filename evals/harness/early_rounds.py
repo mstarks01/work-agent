@@ -35,7 +35,7 @@ import statistics
 import sys
 from collections import Counter
 from collections.abc import Callable, Mapping, Sequence
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any
 
@@ -172,6 +172,12 @@ class Replay:
     skipped: int
     repeats: int
     stop: str
+    #: What the stop leaves open (:class:`~analysis_service.answer_round.PauseSummary`,
+    #: ADR 0068): the questions under a floor and held back by a limit, and
+    #: for each framework and band its units by applicability state.
+    below_floor: int = 0
+    held_back: int = 0
+    units: Mapping[str, Mapping[str, Mapping[str, int]]] = field(default_factory=dict)
 
 
 def _eligible(listed: Sequence[EarlyQuestion]) -> set[UnknownKey]:
@@ -292,6 +298,20 @@ def replay(
         skipped=len(skipped),
         repeats=sum(count - 1 for count in showings.values()),
         stop=str(asked.stop),
+        below_floor=len(asked.below_floor),
+        held_back=asked.withheld,
+        units={}
+        if asked.summary is None
+        else {
+            name: {
+                band.band or "-": {
+                    **band.states,
+                    "unaskable": band.unaskable,
+                }
+                for band in bands
+            }
+            for name, bands in asked.summary.applicability.items()
+        },
     )
 
 
@@ -344,6 +364,8 @@ FIGURES: Mapping[str, Callable[[Replay], int]] = {
     "repeats": lambda row: row.repeats,
     "added": lambda row: row.added,
     "removed": lambda row: row.removed,
+    "below_floor": lambda row: row.below_floor,
+    "held_back": lambda row: row.held_back,
 }
 
 
@@ -355,9 +377,9 @@ def summary(found: list[Replay]) -> dict[str, dict[str, object]]:
     table = {}
     for group, rows in sorted(groups.items()):
         figures: dict[str, object] = {"models": len(rows)}
-        for field, read in FIGURES.items():
+        for figure, read in FIGURES.items():
             values = [read(row) for row in rows]
-            figures[field] = {
+            figures[figure] = {
                 "median": statistics.median(values),
                 "max": max(values),
             }
@@ -367,8 +389,32 @@ def summary(found: list[Replay]) -> dict[str, dict[str, object]]:
         )
         figures["not_ended"] = sum(1 for row in rows if not row.ended)
         figures["stops"] = dict(Counter(row.stop for row in rows))
+        figures["unknown_share"] = _unknown_shares(rows)
         table[group] = figures
     return table
+
+
+def _unknown_shares(rows: Sequence[Replay]) -> dict[str, dict[str, object]]:
+    """For each framework and band, the share of units still unknown at the
+    stop: the median over the models, and the most."""
+    shares: dict[str, list[float]] = {}
+    for row in rows:
+        for name, bands in row.units.items():
+            for band, states in bands.items():
+                total = sum(
+                    count for state, count in states.items() if state != "unaskable"
+                )
+                if total:
+                    shares.setdefault(f"{name} / {band}", []).append(
+                        states.get("unknown", 0) / total
+                    )
+    return {
+        key: {
+            "median": round(statistics.median(values), 3),
+            "max": round(max(values), 3),
+        }
+        for key, values in sorted(shares.items())
+    }
 
 
 def arguments(parser: argparse.ArgumentParser) -> None:
