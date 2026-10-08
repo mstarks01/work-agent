@@ -1451,15 +1451,9 @@ def paused_payload(run: Run, state: AnswerState) -> dict[str, object]:
     """
     questions = state.questions
     names = _element_names(questions)
-    carried = state.carried
-    return {
+    return state.carried.dropped_json(questions.model) | {
         "run": run.id,
         "revision": run.revision,
-        "carried_dropped": [
-            {"label": fact_label(fact.key, questions.model)}
-            | fact.model_dump(mode="json")
-            for fact in carried.dropped_facts
-        ],
         "questions": question_rows(questions),
         "facts": early_rows(questions),
         "remaining": dict(questions.remaining),

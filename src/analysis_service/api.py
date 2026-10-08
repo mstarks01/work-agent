@@ -68,7 +68,7 @@ from analysis_service.budgets import BudgetPolicy
 from analysis_service.claims import FrameworkAnalysis, FrameworkName
 from analysis_service.deployment import Deployment
 from analysis_service.errors import ConfigError
-from analysis_service.fact_answers import MAX_FACT_ANSWERS, FactAnswer, fact_label
+from analysis_service.fact_answers import MAX_FACT_ANSWERS, FactAnswer
 from analysis_service.frameworks import PACKAGES
 from analysis_service.graph import ENTRY_EXTRACT
 from analysis_service.jobs import (
@@ -755,25 +755,27 @@ def _questions_payload(
     """Every question a job asks, as the questions route serves them."""
     state = _answer_state(record, model, assertions, analyses, resumed_by)
     questions = state.questions
-    carried = state.carried
-    return questions.to_json() | {
-        "carried_dropped": [
-            {"label": fact_label(fact.key, model)} | fact.model_dump(mode="json")
-            for fact in carried.dropped_facts
-        ],
-        "carried_dropped_links": [
-            link.model_dump(mode="json") for link in carried.dropped_links
-        ],
-        "fallback": question_fallback(analyses).to_json(),
-        "revision": record.round_revision,
-        "draft_links": [link.model_dump(mode="json") for link in record.draft_links],
-        "draft_facts": [fact.model_dump(mode="json") for fact in record.draft_facts],
-        "answer_limits": dict(ANSWER_LIMITS),
-        "corrections": [fact.model_dump(mode="json") for fact in record.corrections],
-        "corrected_findings": list(
-            corrected_findings(analyses, record.facts, record.corrections)
-        ),
-    }
+    return (
+        questions.to_json()
+        | state.carried.dropped_json(model)
+        | {
+            "fallback": question_fallback(analyses).to_json(),
+            "revision": record.round_revision,
+            "draft_links": [
+                link.model_dump(mode="json") for link in record.draft_links
+            ],
+            "draft_facts": [
+                fact.model_dump(mode="json") for fact in record.draft_facts
+            ],
+            "answer_limits": dict(ANSWER_LIMITS),
+            "corrections": [
+                fact.model_dump(mode="json") for fact in record.corrections
+            ],
+            "corrected_findings": list(
+                corrected_findings(analyses, record.facts, record.corrections)
+            ),
+        }
+    )
 
 
 def _status_view(record: JobRecord) -> JobStatusView:

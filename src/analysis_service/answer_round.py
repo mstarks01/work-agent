@@ -1063,6 +1063,19 @@ class Carried:
     dropped_links: tuple[LinkAnswer, ...]
     dropped_facts: tuple[FactAnswer, ...]
 
+    def dropped_json(self, model: SystemModel) -> dict[str, list[dict[str, object]]]:
+        """The answers its questions do not take, as every surface lists them:
+        each fact with the label its question shows, and each link."""
+        return {
+            "carried_dropped": [
+                {"label": fact_label(fact.key, model)} | fact.model_dump(mode="json")
+                for fact in self.dropped_facts
+            ],
+            "carried_dropped_links": [
+                link.model_dump(mode="json") for link in self.dropped_links
+            ],
+        }
+
 
 @dataclass(frozen=True)
 class AmendedJob:

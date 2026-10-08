@@ -3367,6 +3367,7 @@ class TestTheAmendment:
         assert sources[-1].text == AMENDMENT and sources[-1].label == "Amendment 1"
         assert answer["key"] in [a["key"] for a in again["answered"]]
         assert again["carried_dropped"] == []
+        assert again["carried_dropped_links"] == []
         held = client.post(
             f"/answer/{paused}",
             json={"links": [], "facts": [], "revision": 1},
@@ -3407,14 +3408,16 @@ streams[0].listeners.questions({ data: JSON.stringify({ run: "r1", questions: []
   facts: [], remaining: {}, stop: "nothing-left", gates: {asvs: "refuted"},
   answered: [], answered_links: [], revision: 0,
   carried_dropped: [{ label: "Old DB: encryption at rest", value: "AES",
-    key: ["store:old", "encryption_at_rest", "", "", "", ""] }] }) });
+    key: ["store:old", "encryption_at_rest", "", "", "", ""] }],
+  carried_dropped_links: [{ principal: "batch loader", element: "none" }] }) });
 const text = (n) => typeof n === "string" ? n
   : [n.textContent || "", ...(n.children || []).map(text)].join("");
 calls.push({ said: text(ids.questions) });
 """
         said = _run_form_script(steps)["calls"][-1]["said"]
-        assert "1 earlier answer(s) do not fit the amended system model" in said
+        assert "2 earlier answer(s) do not fit the amended system model" in said
         assert "Old DB: encryption at rest \u2014 AES" in said
+        assert "batch loader \u2014 none of these" in said, "a link answer is listed"
 
 
 class TestFacetNeedsAndDetails:

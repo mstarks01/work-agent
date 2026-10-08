@@ -787,18 +787,22 @@
     // Answers the run an amendment started carried and could not take: each
     // names a part the amended model no longer has, or a fact it now states
     // (AnswerState.carried, ADR 0072).
-    const dropped = data.carried_dropped || [];
+    const dropped = [
+      ...(data.carried_dropped || []).map((a) => `${a.label} \u2014 ${a.facets
+        ? Object.entries(a.facets).map(([facet, value]) => `${facet}: ${value}`).join("; ")
+        : (a.value === DONT_KNOW ? "I don't know" : a.value)}`),
+      ...(data.carried_dropped_links || []).map((a) => `${a.principal} \u2014 ${
+        a.element === "none" ? "none of these" : a.element}`),
+    ];
     if (dropped.length) {
       const lead = document.createElement("p");
       lead.className = "hint";
       lead.textContent = `${dropped.length} earlier answer(s) do not fit the amended`
         + " system model, so they are not kept:";
       const list = document.createElement("ul");
-      for (const a of dropped) {
+      for (const line of dropped) {
         const item = document.createElement("li");
-        item.textContent = `${a.label} \u2014 ${a.facets
-          ? Object.entries(a.facets).map(([facet, value]) => `${facet}: ${value}`).join("; ")
-          : (a.value === DONT_KNOW ? "I don't know" : a.value)}`;
+        item.textContent = line;
         list.append(item);
       }
       questions.append(lead, list);
