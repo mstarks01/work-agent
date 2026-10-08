@@ -2,18 +2,19 @@
 
 from __future__ import annotations
 
-import shutil
 from pathlib import Path
 
 import pytest
 
 from evals.harness import early_rounds
 from evals.harness.early_rounds import ANSWERERS, replay
-from tests.factories import valid_model
+from tests.factories import FrameworkSelection, sample_report, valid_model
+from tests.test_asvs import _block
 
 STRIDE: dict = {"stride": {}}
 ASVS: dict = {"asvs": {"level": 1}}
 BOTH: dict = STRIDE | ASVS
+CORPUS = Path(__file__).resolve().parents[1] / "evals" / "corpus"
 
 
 def open_controls():
@@ -93,20 +94,27 @@ def test_a_replay_counts_each_package_apart():
     }
 
 
+def _archived(root: Path, case: str, report) -> None:
+    """Write ``report`` where the replay finds an archived report of ``case``."""
+    folder = root / case
+    folder.mkdir()
+    (folder / f"{case}.report.json").write_text(report.model_dump_json())
+
+
+def _asvs_report(level: int):
+    report = sample_report(analyses=[_block(level)])
+    selection = FrameworkSelection(name="asvs", options={"level": level})
+    return report.model_copy(
+        update={"job": report.job.model_copy(update={"frameworks": [selection]})}
+    )
+
+
 def test_a_joint_replay_keeps_the_options_the_report_chose(tmp_path, monkeypatch):
     """A joint replay of an ASVS level 1 report asks at level 1, though an
     archived job at level 2 comes first (#1562)."""
-    runs = Path(
-        "evals/runs/20260906T234806Z-asvs-two-question-t1/analysis-asvs.reports"
-    )
-    stride = Path("evals/runs/20260912-stride-730-flex/analysis-stride.reports")
-    for folder, source in [
-        ("a", runs / "05-cookbook-queue-webapp.report.json"),
-        ("b", runs / "13-dispatch-control-plane.report.json"),
-        ("c", stride / "05-cookbook-queue-webapp.report.json"),
-    ]:
-        (tmp_path / folder).mkdir()
-        shutil.copy(source, tmp_path / folder / source.name)
+    _archived(tmp_path, "01-payments-checkout", _asvs_report(2))
+    _archived(tmp_path, "13-dispatch-control-plane", _asvs_report(1))
+    _archived(tmp_path, "05-cookbook-queue-webapp", sample_report())
     calls = []
     monkeypatch.setattr(
         early_rounds,
@@ -116,10 +124,8 @@ def test_a_joint_replay_keeps_the_options_the_report_chose(tmp_path, monkeypatch
         ),
     )
 
-    early_rounds.replays(tmp_path, Path("evals/corpus"))
+    early_rounds.replays(tmp_path, CORPUS)
 
-    joint = {
-        case: frameworks for case, frameworks, name in calls if len(frameworks) > 1
-    }
+    joint = {case: frameworks for case, frameworks, _ in calls if len(frameworks) > 1}
     assert joint["13-dispatch-control-plane"]["asvs"] == {"level": 1}
-    assert joint["05-cookbook-queue-webapp"]["asvs"] == {"level": 2}
+    assert joint["01-payments-checkout"]["asvs"] == {"level": 2}
