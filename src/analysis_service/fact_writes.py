@@ -38,6 +38,7 @@ from analysis_service.fact_answers import (
     FactAnswer,
     answer_facets,
     answered_row,
+    detail_note,
     fact_label,
     fact_line,
     key_ref,
@@ -265,8 +266,7 @@ def answered_model(model: SystemModel, answers: Sequence[FactAnswer]) -> SystemM
             note = f'The submitter answered {attribute}: "{answer.value}".'
         else:
             note = f"The submitter does not know {attribute}."
-        if answer.detail:
-            note += f' They add: "{answer.detail}".'
+        note += detail_note(answer.detail)
         # A resumed job's checkpoint already holds an earlier round's answers.
         notes = element.get("notes", "")
         if note not in notes:

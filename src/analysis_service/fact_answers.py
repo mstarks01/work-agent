@@ -75,6 +75,7 @@ __all__ = [
     "answered_keys",
     "answered_row",
     "covers",
+    "detail_note",
     "fact_kind",
     "fact_label",
     "fact_line",
@@ -300,9 +301,16 @@ def fact_line(fact: FactAnswer) -> str:
         line = f'The open question {assertion} is answered "{fact.value}".'
     else:
         line = f'Asked "{subject}", the answer is "{fact.value}".'
-    if fact.detail:
-        line += f' The submitter adds: "{fact.detail}".'
-    return line
+    return line + detail_note(fact.detail)
+
+
+def detail_note(detail: str) -> str:
+    """The sentence a detail adds after an answer, or nothing (ADR 0073).
+
+    The answers Source and the model's element notes both read it, so the two
+    word a detail alike.
+    """
+    return f' The submitter adds: "{detail}".' if detail else ""
 
 
 def answer_facets(key: UnknownKey) -> tuple[Facet, ...]:
