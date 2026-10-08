@@ -197,14 +197,14 @@ def passes_floor(question: EarlyQuestion, listed: Sequence[EarlyQuestion]) -> bo
     if question.score >= EARLY_RULES[kind].floor:
         return True
     for name, band in question.framework_bands:
-        own = {
-            held
+        bands = {
+            other_band
             for other in listed
             if _early_kind(other) == kind
-            for served, held in other.framework_bands
+            for served, other_band in other.framework_bands
             if served == name
         }
-        if len(own) > 1 and band == max(own):
+        if len(bands) > 1 and band == max(bands):
             return True
     return False
 
@@ -809,25 +809,25 @@ def _summary(
         counts: dict[tuple[int, str], Counter[str]] = {}
         for entry in record.applicability(prepared, frameworks[name]):
             band = record.unit_band(entry.unit) or UNRANKED
-            held = counts.setdefault((-band.order, band.label), Counter())
-            held[entry.state] += 1
+            tally = counts.setdefault((-band.order, band.label), Counter())
+            tally[entry.state] += 1
             reachable = {
                 key for missing in entry.missing for key in (missing, *lineage(missing))
             }
             if entry.state == "unknown" and not reachable & askable:
-                held["unaskable"] += 1
+                tally["unaskable"] += 1
         if counts:
             applicability[name] = tuple(
                 BandApplicability(
                     band=label,
                     states={
                         state: count
-                        for state, count in held.items()
+                        for state, count in tally.items()
                         if state != "unaskable"
                     },
-                    unaskable=held["unaskable"],
+                    unaskable=tally["unaskable"],
                 )
-                for (_, label), held in sorted(counts.items())
+                for (_, label), tally in sorted(counts.items())
             )
     shown = tuple(dict.fromkeys(introduced))
     content = [_known_content(answer) for answer in answered]

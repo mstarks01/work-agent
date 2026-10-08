@@ -443,3 +443,78 @@ def test_the_page_stamps_the_time_it_was_built():
     built = payload(verify_corpus.CORPUS_DIR, "ada", "ada")
 
     assert re.fullmatch(r"\d{4}-\d{2}-\d{2}T\d{6}Z", built["generated"])
+
+
+class TestACaseIsReadyOnlyWhenEveryTargetIsMarked:
+    """The page calls a case ready by the rule the merge checks: every target
+    of the case carries a mark (``check_every_finding_marked``). A saved file
+    from an older corpus can carry a mark for a target that is gone, and a
+    count of marks then passes a case the merge refuses."""
+
+    def state_of(self, marks: dict) -> str:
+        node = shutil.which("node")
+        if node is None:
+            pytest.skip("no node on PATH to run the page's own block")
+        source = client_script("offline_sitting.js")
+        start, end = "const typed = ", "\nfunction rail()"
+        assert start in source and end in source, "the block moved"
+        block = start + source.split(start, 1)[1].split(end, 1)[0]
+        harness = (
+            "const DATA = {min_own_list: 1, cases: [{case: 'c', targets:"
+            " [{fingerprint: 'a', claims: []}, {fingerprint: 'b', claims: []}]}]};\n"
+            "const BY_ID = {c: DATA.cases[0]};\n"
+            f"const answers = {{c: {{own_list: [], marks: {json.dumps(marks)}}}}};\n"
+            f"{block}\n"
+            "process.stdout.write(state('c')[0]);\n"
+        )
+        with tempfile.TemporaryDirectory() as scratch:
+            path = Path(scratch) / "state.cjs"
+            path.write_text(harness, encoding="utf-8")
+            done = subprocess.run(
+                [node, str(path)],
+                capture_output=True,
+                text=True,
+                timeout=30,
+                check=False,
+            )
+        assert done.returncode == 0, done.stderr
+        return done.stdout
+
+    def test_every_target_marked_is_finished(self):
+        assert self.state_of({"a": "found", "b": "missed"}) == "finished"
+
+    def test_a_mark_for_a_target_that_is_gone_does_not_count(self):
+        assert self.state_of({"a": "found", "stale": "found"}) == "draft"
+
+    def test_a_restored_file_drops_a_mark_for_a_target_that_is_gone(self):
+        node = shutil.which("node")
+        if node is None:
+            pytest.skip("no node on PATH to run the page's own block")
+        source = client_script("offline_sitting.js")
+        start, end = "function restore(text) {", "\nconst picker = "
+        block = start + source.split(start, 1)[1].split(end, 1)[0]
+        saved = {
+            "envelope": 1,
+            "cases": {"c": {"marks": {"a": "found", "stale": "found"}}},
+        }
+        harness = (
+            "const DATA = {envelope: 1, cases: [{case: 'c', digests: {},"
+            " targets: [{fingerprint: 'a', claims: []}]}]};\n"
+            "const BY_ID = {c: DATA.cases[0]};\n"
+            "const answers = {};\nconst draw = () => {};\nconst alert = () => {};\n"
+            f"{block}\n"
+            f"restore({json.dumps(json.dumps(saved))});\n"
+            "process.stdout.write(JSON.stringify(answers.c.marks));\n"
+        )
+        with tempfile.TemporaryDirectory() as scratch:
+            path = Path(scratch) / "restore.cjs"
+            path.write_text(harness, encoding="utf-8")
+            done = subprocess.run(
+                [node, str(path)],
+                capture_output=True,
+                text=True,
+                timeout=30,
+                check=False,
+            )
+        assert done.returncode == 0, done.stderr
+        assert json.loads(done.stdout) == {"a": "found"}
