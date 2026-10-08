@@ -2,8 +2,12 @@
 
 from __future__ import annotations
 
+import shutil
+from pathlib import Path
+
 import pytest
 
+from evals.harness import early_rounds
 from evals.harness.early_rounds import ANSWERERS, replay
 from tests.factories import valid_model
 
@@ -87,3 +91,35 @@ def test_a_replay_counts_each_package_apart():
             "below_floor": alone.below_floor,
         }
     }
+
+
+def test_a_joint_replay_keeps_the_options_the_report_chose(tmp_path, monkeypatch):
+    """A joint replay of an ASVS level 1 report asks at level 1, though an
+    archived job at level 2 comes first (#1562)."""
+    runs = Path(
+        "evals/runs/20260906T234806Z-asvs-two-question-t1/analysis-asvs.reports"
+    )
+    stride = Path("evals/runs/20260912-stride-730-flex/analysis-stride.reports")
+    for folder, source in [
+        ("a", runs / "05-cookbook-queue-webapp.report.json"),
+        ("b", runs / "13-dispatch-control-plane.report.json"),
+        ("c", stride / "05-cookbook-queue-webapp.report.json"),
+    ]:
+        (tmp_path / folder).mkdir()
+        shutil.copy(source, tmp_path / folder / source.name)
+    calls = []
+    monkeypatch.setattr(
+        early_rounds,
+        "replay",
+        lambda case, extracted, blessed, frameworks, name: calls.append(
+            (case, dict(frameworks), name)
+        ),
+    )
+
+    early_rounds.replays(tmp_path, Path("evals/corpus"))
+
+    joint = {
+        case: frameworks for case, frameworks, name in calls if len(frameworks) > 1
+    }
+    assert joint["13-dispatch-control-plane"]["asvs"] == {"level": 1}
+    assert joint["05-cookbook-queue-webapp"]["asvs"] == {"level": 2}
