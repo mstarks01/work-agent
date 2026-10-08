@@ -312,6 +312,7 @@
         "budget-exhausted": `The question limit is reached, so ${data.withheld} more question(s)`
           + " are not asked in a round. ",
         "below-floor": "No recommended question is left. ",
+        "skipped": "You skipped every question that is left. ",
         "nothing-left": "No question is left to ask. ",
       };
       ready.textContent = stops[data.stop]

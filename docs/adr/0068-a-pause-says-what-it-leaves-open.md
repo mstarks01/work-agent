@@ -26,17 +26,19 @@ limit. The limit counts answers, not the questions a person sees.
 
 ## Decision
 
-**No stop says that every fact is settled.** `QuestionSet.stop` has three
+**No stop says that every fact is settled.** `QuestionSet.stop` has four
 values:
 
 | Stop | Meaning |
 | --- | --- |
 | `budget-exhausted` | A limit holds questions back from every round. |
 | `below-floor` | No question passes its floor, and questions under a floor are left. |
+| `skipped` | Every open question left was skipped, and each one still takes an answer. |
 | `nothing-left` | No open question is left to ask. |
 
 The page words each one plainly: "The question limit is reached", "No
-recommended question is left" or "No question is left to ask". It then lists
+recommended question is left", "You skipped every question that is left" or
+"No question is left to ask". It then lists
 what stays open. The workspace label is "No more questions in a round".
 
 **The set names the questions that no round shows.** `held_back` holds the

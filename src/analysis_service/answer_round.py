@@ -47,7 +47,7 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field, replace
 from functools import cached_property
 from types import MappingProxyType
-from typing import TYPE_CHECKING, Annotated, Any
+from typing import TYPE_CHECKING, Annotated, Any, Literal
 
 from pydantic import StringConstraints
 
@@ -118,6 +118,7 @@ __all__ = [
     "SkipKey",
     "SourcesOverLimit",
     "StaleRevision",
+    "Stop",
     "by_turn",
     "next_round",
     "passes_floor",
@@ -160,6 +161,9 @@ EARLY_RULES: Mapping[str, EarlyRule] = {
 #: question's key, the :func:`~analysis_service.links.fold` of its principal.
 #: A skip of a link places nothing and never means "none of these".
 SkipKey = UnknownKey | Annotated[str, StringConstraints(min_length=1, max_length=200)]
+
+#: Why a waiting job asks nothing more (:attr:`QuestionSet.stop`, ADR 0068).
+Stop = Literal["budget-exhausted", "below-floor", "skipped", "nothing-left"]
 
 #: The most skips one save names: every fact and link answer it could carry.
 MAX_SKIPS = MAX_FACT_ANSWERS + MAX_LINK_ANSWERS
@@ -356,19 +360,22 @@ class QuestionSet:
         return len(self.held_back)
 
     @property
-    def stop(self) -> str | None:
+    def stop(self) -> Stop | None:
         """Why a waiting job asks nothing more, or ``None`` while it asks.
 
         **No stop says every fact is settled.** ``budget-exhausted`` where the
         limits hold questions back, ``below-floor`` where only questions under
-        a floor are left, and ``nothing-left`` where no open question is left
-        to ask. In each case :attr:`summary` says what stays open.
+        a floor are left, ``skipped`` where every question left was skipped,
+        and ``nothing-left`` where no open question is left to ask. In each
+        case :attr:`summary` says what stays open.
         """
         if not self.done:
             return None
         if self.held_back:
             return "budget-exhausted"
-        return "below-floor" if self.below_floor else "nothing-left"
+        if self.below_floor:
+            return "below-floor"
+        return "skipped" if self.skipped or self.skipped_links else "nothing-left"
 
     @property
     def asked(self) -> frozenset[UnknownKey]:

@@ -221,7 +221,8 @@ under the limit of 30.
 ([ADR 0068](adr/0068-a-pause-says-what-it-leaves-open.md)). `early_stop` is
 `null` while the job asks something. It is `budget-exhausted` when the limits
 hold questions back, `below-floor` when only questions under a floor are left,
-and `nothing-left` when no open question is left. `early_held_back` lists the
+`skipped` when every question left was skipped, and `nothing-left` when no open
+question is left. `early_held_back` lists the
 questions the limits hold back, and `early_below_floor` the open questions
 under a floor; no round shows them, and an answer to one is still taken.
 `early_withheld` counts `early_held_back`. `early_summary` says what the
