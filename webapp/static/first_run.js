@@ -557,7 +557,7 @@
       group.count += 1;
       group.choices = (group.choices || 0) + (q.decisions || 1);
       const label = document.createElement("b");
-      label.textContent = q.prompt || q.element;
+      label.textContent = q.label;
       // Why the fact matters: the questions of the rules that fire on it.
       label.title = q.reasons.join(" ");
       const about = context(q);
@@ -689,7 +689,7 @@
     for (const a of answeredFacts) {
       const row = document.createElement("p");
       const label = document.createElement("b");
-      label.textContent = a.prompt || a.label;
+      label.textContent = a.label;
       const shown = document.createElement("span");
       shown.textContent = ` — ${said(a.answer)}`;
       row.append(label, shown);
@@ -741,7 +741,7 @@
     const answerLater = (box, q) => {
       const row = document.createElement("p");
       const label = document.createElement("b");
-      label.textContent = q.prompt || q.label;
+      label.textContent = q.label;
       row.append(label);
       const before = earlier.get(JSON.stringify(q.key));
       const kept = document.createElement("span");

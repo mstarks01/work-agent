@@ -177,7 +177,7 @@ from analysis_service.report_changes import report_changes
 from analysis_service.report_conditions import conditions, corrected_findings
 from analysis_service.selection import SelectionError, resolve_selection
 from analysis_service.sources import ANSWERS_LABEL
-from analysis_service.system_model import DataFlow, SystemModel
+from analysis_service.system_model import SystemModel
 from analysis_service.vendors import (
     CREDENTIAL_MODE_NOTES,
     VendorName,
@@ -1374,31 +1374,12 @@ def _link_row(question: LinkQuestion, names: Mapping[str, str]) -> dict[str, obj
     }
 
 
-def _question_prompt(question: EarlyQuestion, model: SystemModel) -> str:
-    """Readable UI wording; answer keys and component names remain unchanged."""
-    ref = key_ref(question.key)
-    if not ref.attribute:
-        return question.label
-    element = model.get(ref.element_id)
-    if ref.attribute == "encryption_in_transit" and isinstance(element, DataFlow):
-        source, destination = model.get(element.source), model.get(element.destination)
-        source_name = element.source if source is None else source.name
-        destination_name = (
-            element.destination if destination is None else destination.name
-        )
-        return f"Is the connection from {source_name} to {destination_name} encrypted?"
-    if ref.attribute == "encryption_at_rest":
-        return f"Is data stored in {question.element} encrypted?"
-    return f"What is the {ref.attribute.replace('_', ' ')} for {question.element}?"
-
-
 def _early_row(question: EarlyQuestion, model: SystemModel) -> dict[str, object]:
     """The question as the form page shows it: each choice's element name, and
     the words of the description the question's element was read from."""
     element = model.get(key_ref(question.key).element_id)
     return {
         **question.to_json(),
-        "prompt": _question_prompt(question, model),
         "choices": [
             {"id": choice, "name": getattr(model.get(choice), "name", "")}
             for choice in question.choices

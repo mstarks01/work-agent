@@ -76,13 +76,11 @@ def test_a_flow_reads_as_its_two_endpoints(report):
     flows = {flow.id: flow for flow in report.system_model.data_flows}
     for block in report.analyses:
         for fact in open_facts(block, report.system_model):
-            element_id, attribute, *_ = fact.key
+            element_id = fact.key[0]
             if element_id in flows:
                 flow = flows[element_id]
-                assert fact.label.startswith(
-                    f"{names[flow.source]} → {names[flow.destination]}: "
-                )
-                assert attribute.replace("_", " ") in fact.label
+                assert f"{names[flow.source]} → {names[flow.destination]}" in fact.label
+                assert fact.label.endswith("?"), "a fact reads as the question it asks"
 
 
 def test_the_page_payload_is_json_per_framework(report):

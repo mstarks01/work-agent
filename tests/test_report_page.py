@@ -118,7 +118,7 @@ def test_the_page_runs_whole():
 def waits_line(parts):
     """The banner's line for the one fact the finding waits on."""
     (line,) = re.findall(
-        r"encryption in transit — ([^.]*?)(?=Until)", parts["analyses"]
+        r"encrypted\? — ([^.]*?)(?=Until)", parts["analyses"]
     )
     return line
 
