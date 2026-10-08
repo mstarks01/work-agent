@@ -342,6 +342,10 @@ class JobRecord(BaseModel):
         """
         return self.ask_questions and self.resumption is None
 
+    def final(self) -> bool:
+        """Whether this job's report is final: the one follow-up wrote it (ADR 0054)."""
+        return self.resumption is not None and self.resumption.follow_up
+
     def selection(self) -> tuple[str, ...]:
         """This job's frameworks by name, in selection order.
 
@@ -839,7 +843,7 @@ class InMemoryJobStore:
             record is None
             or record.owner_subject != subject
             or record.status != "completed"
-            or (record.resumption is not None and record.resumption.follow_up)
+            or record.final()
             or record.round_revision != revision
             or self._resumed_by(job_id) is not None
         ):
@@ -860,8 +864,7 @@ class InMemoryJobStore:
             record is None
             or record.owner_subject != subject
             or record.status != "completed"
-            or record.resumption is None
-            or not record.resumption.follow_up
+            or not record.final()
         ):
             return False
         record.corrections = list(corrections)
