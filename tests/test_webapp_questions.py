@@ -3369,7 +3369,7 @@ const text = (n) => typeof n === "string" ? n
 calls.push({ said: text(ids.questions) });
 """
         said = _run_form_script(steps)["calls"][-1]["said"]
-        assert "1 earlier answer(s) do not fit the corrected system model" in said
+        assert "1 earlier answer(s) do not fit the amended system model" in said
         assert "Old DB: encryption at rest \u2014 AES" in said
 
 

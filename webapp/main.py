@@ -1074,7 +1074,7 @@ def create_app(
         ):
             return JSONResponse(
                 {
-                    "message": "Only a run that waits for your answers takes a correction."
+                    "message": "Only a run that waits for your answers takes an amendment."
                 },
                 status_code=404,
             )
@@ -1105,7 +1105,7 @@ def create_app(
             return JSONResponse(
                 {
                     "message": "These answers already started an analysis. Open"
-                    " it, or correct here again only if it fails."
+                    " it, or amend the description again only if it fails."
                 },
                 status_code=409,
             )
