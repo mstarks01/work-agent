@@ -249,7 +249,7 @@ class JobRecord(BaseModel):
     # description it extracts again with the amendment added. It holds that
     # job as a resumed job does.
     amends: str | None = None
-    # The held job's round revision this job's answers were composed from.
+    # The parent job's round revision this job's answers were composed from.
     # Admission refuses the job where a save moved it since, so a batch saved
     # in another tab never misses the run in silence (ADR 0070).
     parent_revision: int | None = None
