@@ -365,6 +365,21 @@ def test_workspace_reopens_selected_framework_options(page):
     assert page.input_value('select[data-option="level"]') == "2"
 
 
+def test_an_unticked_framework_shows_its_options_disabled(page):
+    """A submitter sees a framework's options before ticking it (#1541)."""
+    level = page.locator('select[data-option="level"]')
+    assert not page.is_checked('input[name="framework"][value="asvs"]'), "a control"
+    assert level.is_visible()
+    assert level.is_disabled()
+    page.check('input[name="framework"][value="asvs"]')
+    assert level.is_enabled()
+    page.select_option('select[data-option="level"]', "3")
+    page.uncheck('input[name="framework"][value="asvs"]')
+    assert level.is_visible() and level.is_disabled()
+    page.check('input[name="framework"][value="asvs"]')
+    assert page.input_value('select[data-option="level"]') == "3", "kept on re-tick"
+
+
 def test_question_progress_and_entry_guidance(page):
     assert page.locator('input[name="framework"]:checked').count() == 0
     assert (

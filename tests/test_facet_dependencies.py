@@ -183,3 +183,42 @@ class TestTheDetail:
         after = before.model_copy(update={"detail": "except the status endpoint"})
         assert _adds_information([], [before], [], [after])
         assert not _adds_information([], [before], [], [before])
+
+
+class TestAFacetTwoFrameworksShare:
+    """One question can serve a STRIDE finding and an ASVS ruling that each
+    need a different facet of it (#1542 Package E, checkpoint review a4)."""
+
+    def analyses(self):
+        from analysis_service.claims import Verdict
+        from tests.test_asvs import _block, sample_asvs_claim
+
+        protected = WHOLE.model_copy(update={"facets": ["record-protected"]})
+        ruling = sample_asvs_claim().model_copy(
+            update={
+                "verdict": Verdict(
+                    status="needs-info",
+                    reason="The sources do not state this.",
+                    related_unknowns=[protected],
+                )
+            }
+        )
+        return [sample_analysis([_finding("S-01", ACTOR)]), _block(1, [ruling])]
+
+    def test_one_question_names_each_framework_s_facets(self):
+        [question] = [
+            q
+            for q in fact_questions(self.analyses(), valid_model(), None)
+            if q.key == KEY
+        ]
+        assert question.findings == ("asvs/v5.0.0-6.2.1", "stride/S-01")
+        assert question.needs == {
+            "asvs/v5.0.0-6.2.1": ("record-protected",),
+            "stride/S-01": ("records-actor",),
+        }
+
+    def test_an_answer_covers_only_the_framework_whose_facet_it_knows(self):
+        actor_only = FactAnswer(key=KEY, facets={"records-actor": "yes"})
+        needs = follow_up_needs(self.analyses(), valid_model(), None, [actor_only])
+        assert ("stride", "S-01") not in needs.waiting
+        assert needs.waiting[("asvs", "v5.0.0-6.2.1")] == frozenset({KEY})
