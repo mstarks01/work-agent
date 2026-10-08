@@ -427,7 +427,7 @@ class TestReserve:
             store = InMemoryJobStore()
             record = make_record()
             await admit(store, record)
-            return await admit(store, record)
+            return await store.reserve(record, ceiling=2, budget=SEEDING_BUDGET)
 
         assert asyncio.run(scenario()).outcome == "duplicate"
 

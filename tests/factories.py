@@ -284,9 +284,14 @@ async def admit(store: Any, record: Any) -> Any:
     :meth:`~analysis_service.jobs.JobStore.reserve` is the only way in, by
     design — the protocol carries no unconditional create, so a backend cannot
     offer one the API might race on. A test that is seeding rather than
-    measuring a bound passes bounds it cannot reach.
+    measuring a bound passes bounds it cannot reach. A refused seed fails
+    here, so the test does not fail later on a record that is not there.
     """
-    return await store.reserve(record, ceiling=_SEEDING_CEILING, budget=SEEDING_BUDGET)
+    admission = await store.reserve(
+        record, ceiling=_SEEDING_CEILING, budget=SEEDING_BUDGET
+    )
+    assert admission.outcome == "admitted", admission
+    return admission
 
 
 def sample_selection(
