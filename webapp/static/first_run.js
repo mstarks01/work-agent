@@ -419,6 +419,8 @@
     for (const q of data.facts) {
       if (!groups.has(runOf.get(q))) {
         const box = document.createElement("details");
+        // The workspace's index lists each box of this class as a group.
+        box.className = "question-group";
         box.open = true;
         const title = document.createElement("summary");
         // "Same for all" goes here, above the rows, where a group takes one.
@@ -764,6 +766,65 @@
       + " reaches the analysis.";
     moreBox.append(moreHint);
     for (const q of [...heldBack, ...belowFloor]) answerLater(moreBox, q);
+    // Answers the run an amendment started carried and could not take: each
+    // names a part the corrected model no longer has, or a fact it now states
+    // (AnswerState.carried, ADR 0072).
+    const dropped = data.carried_dropped || [];
+    if (dropped.length) {
+      const lead = document.createElement("p");
+      lead.className = "hint";
+      lead.textContent = `${dropped.length} earlier answer(s) do not fit the corrected`
+        + " system model, so they are not kept:";
+      const list = document.createElement("ul");
+      for (const a of dropped) {
+        const item = document.createElement("li");
+        item.textContent = `${a.label} \u2014 ${a.facets
+          ? Object.entries(a.facets).map(([facet, value]) => `${facet}: ${value}`).join("; ")
+          : (a.value === DONT_KNOW ? "I don't know" : a.value)}`;
+        list.append(item);
+      }
+      questions.append(lead, list);
+    }
+    // A correction to the description itself: a part missing, or a fact read
+    // wrongly. The service reads the description again with it, asks again,
+    // and keeps every answer that still fits (ADR 0072).
+    const fix = document.createElement("details");
+    fix.className = "amend";
+    const fixTitle = document.createElement("summary");
+    fixTitle.textContent = "Is a part of your system missing, or described wrongly?";
+    const fixHint = document.createElement("p");
+    fixHint.className = "hint";
+    fixHint.textContent = "Write what is true. The service reads your description again"
+      + " with it, which takes a few minutes, and asks again. Answers that still fit"
+      + " are kept.";
+    const fixText = document.createElement("textarea");
+    fixText.rows = 3;
+    const fixButton = document.createElement("button");
+    fixButton.type = "button";
+    fixButton.textContent = "Read the description again with this";
+    fixButton.addEventListener("click", () => answerAction(async () => {
+      const text = fixText.value.trim();
+      if (!text) {
+        refuse("Write the correction first.");
+        return;
+      }
+      const amended = await fetch("/amend/" + pausedRun, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text, revision }),
+      });
+      const body = await amended.json();
+      if (!amended.ok) {
+        refuse(body.message);
+        return;
+      }
+      answerProblem.hidden = true;
+      asked.hidden = true;
+      follow(body.run, "Reading your description again with your correction. The"
+        + " service stops for your answers again before the threat analysis starts.");
+    }));
+    fix.append(fixTitle, fixHint, fixText, fixButton);
+    questions.append(fix);
     updateQuestionProgress = () => {
       const visible = shownChoices();
       const filled = roundRows.reduce((sum, row) => {

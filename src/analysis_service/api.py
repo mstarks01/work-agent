@@ -68,7 +68,7 @@ from analysis_service.budgets import BudgetPolicy
 from analysis_service.claims import FrameworkAnalysis, FrameworkName
 from analysis_service.deployment import Deployment
 from analysis_service.errors import ConfigError
-from analysis_service.fact_answers import MAX_FACT_ANSWERS, FactAnswer
+from analysis_service.fact_answers import MAX_FACT_ANSWERS, FactAnswer, fact_label
 from analysis_service.frameworks import PACKAGES
 from analysis_service.graph import ENTRY_EXTRACT
 from analysis_service.jobs import (
@@ -370,6 +370,17 @@ class AnswersSubmission(BaseModel):
     save: bool = Field(default=False, strict=True)
     skip: list[SkipKey] = Field(default_factory=list, max_length=MAX_SKIPS)
     revision: int | None = Field(default=None, ge=0, strict=True)
+
+
+class AmendmentSubmission(BaseModel):
+    """An amendment to a paused job's description (ADR 0072): what is true
+    that the model misses or reads wrongly, in the submitter's own words.
+    ``revision`` is the round revision the questions were read with."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    text: str = Field(min_length=1)
+    revision: int = Field(ge=0, strict=True)
 
 
 class CorrectionsSubmission(BaseModel):
@@ -729,6 +740,8 @@ def _answer_state(
         resumed_by=resumed_by,
         draft_links=record.draft_links,
         draft_facts=record.draft_facts,
+        carried_links=record.carried_links,
+        carried_facts=record.carried_facts,
     )
 
 
@@ -740,8 +753,17 @@ def _questions_payload(
     resumed_by: str | None,
 ) -> dict[str, Any]:
     """Every question a job asks, as the questions route serves them."""
-    questions = _answer_state(record, model, assertions, analyses, resumed_by).questions
+    state = _answer_state(record, model, assertions, analyses, resumed_by)
+    questions = state.questions
+    carried = state.carried
     return questions.to_json() | {
+        "carried_dropped": [
+            {"label": fact_label(fact.key, model)} | fact.model_dump(mode="json")
+            for fact in carried.dropped_facts
+        ],
+        "carried_dropped_links": [
+            link.model_dump(mode="json") for link in carried.dropped_links
+        ],
         "fallback": question_fallback(analyses).to_json(),
         "revision": record.round_revision,
         "draft_links": [link.model_dump(mode="json") for link in record.draft_links],
@@ -1205,6 +1227,57 @@ def create_app(
                 "findings": [change.to_json() for change in changes],
             }
         )
+
+    @app.post("/v1/jobs/{job_id}/amendments", status_code=201)
+    async def amend_job(
+        job_id: str,
+        body: AmendmentSubmission,
+        request: Request,
+        background_tasks: BackgroundTasks,
+        subject: str = Depends(require_subject),
+    ) -> JSONResponse:
+        """Extract a paused job's description again with an amendment (ADR 0072).
+
+        Starts a **new** job from the paused job's sources with the amendment
+        added; it pauses again, and carries the paused job's answers, which
+        its own questions take where they still ask them. ``201`` with its
+        ``job_id``. ``400`` where the job does not wait on answers, ``409``
+        where its revision has moved or a job already holds its answers.
+        """
+        answerable = await _answerable(request, job_id, subject)
+        if isinstance(answerable, JSONResponse):
+            return answerable
+        parent = answerable[0]
+        state = _answer_state(*answerable)
+        try:
+            amended = await anyio.to_thread.run_sync(
+                partial(
+                    state.amend,
+                    body.text,
+                    revision=body.revision,
+                    limits=request.app.state.limits,
+                )
+            )
+        except (StaleRevision, AlreadyResumed) as exc:
+            raise HTTPException(status_code=409, detail=str(exc)) from exc
+        except SourcesOverLimit as exc:
+            raise HTTPException(
+                status_code=_STATUS_BY_RUNG[exc.breach.rung], detail=str(exc)
+            ) from exc
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        record = JobRecord.create(
+            owner_subject=subject,
+            sources=amended.sources,
+            frameworks=parent.frameworks,
+            system_name=parent.system_name,
+            ask_questions=True,
+            amends=parent.id,
+            carried_links=amended.links,
+            carried_facts=amended.facts,
+            reserved_tokens=budgets.estimate(amended.sources, parent.frameworks),
+        )
+        return await _admit_and_start(request, record, background_tasks, subject)
 
     @app.post("/v1/jobs/{job_id}/corrections")
     async def correct_job(

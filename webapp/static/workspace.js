@@ -156,7 +156,7 @@ const workspace = (() => {
   };
   const indexGroups = () => {
     el("question-index").replaceChildren();
-    const groups = [...el("questions").children].filter((item) => item.tagName === "DETAILS" && !item.classList.contains("round-estimate"));
+    const groups = [...el("questions").children].filter((item) => item.classList.contains("question-group"));
     let visible = 0;
     groups.forEach((group, index) => {
       // Read the renderer's row visibility; do not repeat its dependency rules.

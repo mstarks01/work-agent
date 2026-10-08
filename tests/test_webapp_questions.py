@@ -74,9 +74,11 @@ class PausingRunner(StubPipelineRunner):
         self.catalog = catalog
         self.resumed_links: list = []
         self.resumed_facts: list = []
+        self.paused_sources: list = []
 
     async def run(self, job, on_node):
         if job.pauses():
+            self.paused_sources.append(list(job.sources))
             held = (
                 HELD if self.catalog else HELD.model_copy(update={"assertions": None})
             )
@@ -1602,7 +1604,7 @@ def test_the_form_script_boxes_each_run_of_one_group_with_a_row_per_element():
 await ids.analyze.listeners.submit({{ preventDefault() {{}} }}); await settle();
 streams[0].listeners.questions({{ data: JSON.stringify({{ run: "r1", questions: [],
   facts: {json.dumps(facts)} }}) }});
-const groups = ids.questions.querySelectorAll("details").filter(g => g.className !== "round-estimate");
+const groups = ids.questions.querySelectorAll("details").filter(g => g.className === "question-group");
 const rowsOf = g => g.children.filter(r => r.tag === "p");
 const child = (r, tag) => r.children.find(c => typeof c === "object" && c.tag === tag);
 calls.push({{ groups: groups.map(g => ({{
@@ -3267,3 +3269,89 @@ calls.push({
         ]
         assert page["values"] == ["", "from the draft"]
         assert "Saved and not yet run: 1 answer(s)" in page["said"]
+
+
+AMENDMENT = "A nightly batch loader also writes to the orders database."
+
+
+class TestTheAmendment:
+    """The pause can correct the description itself (#1542 F, ADR 0072)."""
+
+    def paused_with_an_answer(self, tiers, runner):
+        client = client_for(tiers, runner, catalog=False)
+        paused = start(client, questions=True)
+        shown = event(client.get(f"/events/{paused}").text, "questions")
+        question = next(q for q in shown["facts"] if q["choices"])
+        answer = {"key": question["key"], "value": question["choices"][0]["id"]}
+        saved = client.post(
+            f"/answer/{paused}",
+            json={"links": [], "facts": [answer], "save": True, "revision": 0},
+            headers=SAME_ORIGIN,
+        )
+        assert saved.status_code == 200, saved.text
+        return client, paused, answer
+
+    def test_it_reads_the_description_again_and_keeps_the_answers_that_fit(self, tiers):
+        runner = PausingRunner(catalog=False)
+        client, paused, answer = self.paused_with_an_answer(tiers, runner)
+        amended = client.post(
+            f"/amend/{paused}",
+            json={"text": AMENDMENT, "revision": 1},
+            headers=SAME_ORIGIN,
+        )
+        assert amended.status_code == 200, amended.text
+        run = amended.json()["run"]
+        again = event(client.get(f"/events/{run}").text, "questions")
+
+        sources = runner.paused_sources[-1]
+        assert sources[-1].text == AMENDMENT and sources[-1].label == "Amendment 1"
+        assert answer["key"] in [a["key"] for a in again["answered"]]
+        assert again["carried_dropped"] == []
+        held = client.post(
+            f"/answer/{paused}",
+            json={"links": [], "facts": [], "revision": 1},
+            headers=SAME_ORIGIN,
+        )
+        assert held.status_code == 409, "the amended run holds the paused one"
+
+    def test_a_stale_amendment_is_refused(self, tiers):
+        client, paused, _ = self.paused_with_an_answer(
+            tiers, PausingRunner(catalog=False)
+        )
+        stale = client.post(
+            f"/amend/{paused}",
+            json={"text": AMENDMENT, "revision": 0},
+            headers=SAME_ORIGIN,
+        )
+        assert stale.status_code == 409
+
+    def test_the_page_sends_the_correction_and_follows_the_new_run(self):
+        steps = """
+await ids.analyze.listeners.submit({ preventDefault() {} }); await settle();
+streams[0].listeners.questions({ data: JSON.stringify({ run: "r1", questions: [],
+  facts: [], remaining: {}, stop: "nothing-left", gates: {asvs: "refuted"},
+  answered: [], answered_links: [], revision: 2 }) });
+const box = ids.questions.querySelectorAll("details").find(d => d.className === "amend");
+box.querySelectorAll("textarea")[0].value = "  A loader writes nightly.  ";
+await box.querySelectorAll("button")[0].listeners.click(); await settle();
+"""
+        seen = _run_form_script(steps)
+        sent = next(call for call in seen["calls"] if call.get("url") == "/amend/r1")
+        assert sent["body"] == {"text": "A loader writes nightly.", "revision": 2}
+        assert seen["streams"][-1] == "/events/r2"
+
+    def test_the_page_lists_a_carried_answer_that_does_not_fit(self):
+        steps = """
+await ids.analyze.listeners.submit({ preventDefault() {} }); await settle();
+streams[0].listeners.questions({ data: JSON.stringify({ run: "r1", questions: [],
+  facts: [], remaining: {}, stop: "nothing-left", gates: {asvs: "refuted"},
+  answered: [], answered_links: [], revision: 0,
+  carried_dropped: [{ label: "Old DB: encryption at rest", value: "AES",
+    key: ["store:old", "encryption_at_rest", "", "", "", ""] }] }) });
+const text = (n) => typeof n === "string" ? n
+  : [n.textContent || "", ...(n.children || []).map(text)].join("");
+calls.push({ said: text(ids.questions) });
+"""
+        said = _run_form_script(steps)["calls"][-1]["said"]
+        assert "1 earlier answer(s) do not fit the corrected system model" in said
+        assert "Old DB: encryption at rest \u2014 AES" in said
