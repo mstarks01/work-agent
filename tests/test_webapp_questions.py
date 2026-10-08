@@ -1679,7 +1679,11 @@ await ids.continue.listeners.click(); await settle();
 
     facets = QUESTION_KINDS["capacity-limits"].facets
     assert layout == {
-        "columns": ["Part of your system", *(f.question for f in facets)],
+        "columns": [
+            "Part of your system",
+            *(f.question for f in facets),
+            "Exceptions or detail (optional)",
+        ],
         "rows": 2,
     }
     assert sent["body"]["facts"] == [
@@ -2703,7 +2707,7 @@ class TestEarlierAnswers:
         assert stale.status_code == 409
         earlier = self.earlier(client, report)
         assert earlier["draft"]["facts"] == [
-            {"key": key, "value": "no", "facets": None}
+            {"key": key, "value": "no", "facets": None, "detail": ""}
         ]
         assert earlier["limits"]["facts"] == MAX_FACT_ANSWERS
 
@@ -3355,3 +3359,86 @@ calls.push({ said: text(ids.questions) });
         said = _run_form_script(steps)["calls"][-1]["said"]
         assert "1 earlier answer(s) do not fit the corrected system model" in said
         assert "Old DB: encryption at rest \u2014 AES" in said
+
+
+class TestFacetNeedsAndDetails:
+    """The report page counts a finding covered by the facets it needs, and
+    both pages send a detail beside a closed answer (#1542 F6, ADR 0073)."""
+
+    def report_payloads(self, needs):
+        store = valid_model().data_stores[0]
+        question = {
+            **facet_fact(store, "audit-evidence"),
+            "basis": "critic",
+            "cited_by": 2,
+            "covered_so_far": 2,
+            "findings": ["stride/S-01", "stride/S-02"],
+            "needs": needs,
+            "history": "open",
+            "max_length": 500,
+        }
+        return {
+            "report": {"system_model": valid_model().model_dump(mode="json")},
+            "link_questions": [],
+            "fact_questions": [question],
+            "final": False,
+        }
+
+    STEPS = """
+const [actor] = box.all("select");
+actor.value = "yes"; actor.listeners.change();
+const text = (n) => typeof n === "string" ? n
+  : [n.textContent || "", ...(n.children || []).map(text)].join("");
+calls.push({ said: text(box) });
+"""
+
+    def test_a_finding_that_needs_one_facet_is_covered_by_it(self):
+        needs = {"stride/S-01": ["records-actor"]}
+        [page] = _run_answer_block(self.report_payloads(needs), self.STEPS)["calls"]
+        assert (
+            "Your answers cover every question for 1 of the 2 findings" in page["said"]
+        )
+
+    def test_with_no_needs_every_facet_is_needed(self):
+        [page] = _run_answer_block(self.report_payloads({}), self.STEPS)["calls"]
+        assert (
+            "Your answers cover every question for 0 of the 2 findings" in page["said"]
+        )
+
+    def test_the_report_sends_a_detail_beside_a_facet_answer(self):
+        steps = """
+const [actor] = box.all("select");
+actor.value = "yes";
+box.all("input").find(i => i.className === "answer-detail").value = "only on writes";
+await followUp().listeners.click();
+"""
+        [sent] = _run_answer_block(self.report_payloads({}), steps)["calls"]
+        [fact] = sent["body"]["facts"]
+        assert fact["facets"] == {"records-actor": "yes"}
+        assert fact["detail"] == "only on writes"
+
+    def test_the_pause_sends_a_detail_beside_a_choice(self):
+        shape = {
+            "kind": "capability",
+            "form": "choice",
+            "choices": [{"id": "yes", "name": ""}, {"id": "no", "name": ""}],
+        }
+        row = _text_row(["", "", "", "", "", "authentication"], "Sign-in?") | shape
+        steps = f"""
+await ids.analyze.listeners.submit({{ preventDefault() {{}} }}); await settle();
+streams[0].listeners.questions({{ data: JSON.stringify({{ run: "r1", questions: [],
+  facts: {json.dumps([row])}, remaining: {{capability: 1}}, answered: [],
+  answered_links: [], revision: 0 }}) }});
+ids.questions.querySelectorAll("select")[0].value = "yes";
+ids.questions.querySelectorAll("input").find(i => i.className === "answer-detail")
+  .value = "  except the status endpoint ";
+globalThis.fetch = async (url, init) => {{
+  calls.push({{ url, body: JSON.parse(init.body) }});
+  return {{ ok: false, json: async () => ({{ message: "stop after capture" }}) }};
+}};
+await ids.save.listeners.click(); await settle();
+"""
+        sent = _run_form_script(steps)["calls"][-1]["body"]
+        assert sent["facts"] == [
+            {"key": row["key"], "value": "yes", "detail": "except the status endpoint"}
+        ]

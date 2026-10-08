@@ -400,7 +400,13 @@ with `400`. A later round does not ask a fact that an earlier round answered,
 and an "I don't know" answer counts. A question with facets is asked again
 only for the facets that no round answered. You can still send a new answer
 to a fact that an earlier round answered, to change it. Each fact question
-carries `history`, what became of it at the pause: `skipped` (you skipped
+carries `needs`: each finding that waits on only some facets of the
+question, with the facets it needs; a finding not listed needs every facet
+([ADR 0073](adr/0073-a-finding-can-wait-on-some-facets-and-an-answer-can-carry-a-detail.md)).
+A fact answer may carry a `detail`: one line, at most 300 characters, in your
+own words, such as an exception to a "yes". It follows the answer on its line
+of the answers source, and no code reads a fact out of it. Each fact question
+also carries `history`, what became of it at the pause: `skipped` (you skipped
 it), `unanswered` (it was shown and left blank), `partial` (some facets were
 answered), or `open` (it was never shown).
 A follow-up must add information: a new or moved link, or an answer whose

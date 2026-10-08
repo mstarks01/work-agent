@@ -17,6 +17,7 @@ from analysis_service.fact_answers import (
     fact_kind,
     fact_line,
     fact_status,
+    needs_of,
 )
 from analysis_service.open_facts import element_names, label_of
 from analysis_service.sources import ANSWERS_LABEL
@@ -50,20 +51,20 @@ def conditions(
     said = {answer.key: answer for answer in answered}
     showed, aside = set(shown), set(skipped)
 
-    def status(key: UnknownKey) -> FactStatus:
-        return fact_status(key, said, showed, aside)
+    def status(key: UnknownKey, facets: Sequence[str]) -> FactStatus:
+        return fact_status(key, said, showed, aside, facets)
 
     found: dict[str, list[tuple[UnknownKey, str, FactStatus]]] = {}
     for block in analyses:
         for claim in block.all_claims():
             if claim.verdict.status != "needs-info":
                 continue
-            refs = {
-                ref.key: ref
-                for ref in [*claim.unknown_grounds(), *claim.verdict.related_unknowns]
-            }
+            cites = [*claim.unknown_grounds(), *claim.verdict.related_unknowns]
+            refs = {ref.key: ref for ref in cites}
+            wanted = needs_of(cites)
             found[f"{block.framework}/{claim.id}"] = [
-                (key, label_of(ref, names), status(key)) for key, ref in refs.items()
+                (key, label_of(ref, names), status(key, wanted[key]))
+                for key, ref in refs.items()
             ]
     return found
 

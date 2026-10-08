@@ -15,8 +15,11 @@ from analysis_service.claims import UnknownRef
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 
-#: Each form names its own field; ``element_id`` goes with two of them.
-FORMS = sorted(set(UnknownRef.model_json_schema()["properties"]) - {"element_id"})
+#: Each form names its own field; ``element_id`` goes with two of them, and
+#: ``facets`` narrows the ``question`` form rather than being a form (ADR 0073).
+FORMS = sorted(
+    set(UnknownRef.model_json_schema()["properties"]) - {"element_id", "facets"}
+)
 
 
 def _lists() -> list[tuple[Path, str]]:

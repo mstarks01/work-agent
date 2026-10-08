@@ -72,12 +72,15 @@ __all__ = [
     "answer_facets",
     "answered_keys",
     "answered_row",
+    "covers",
     "fact_kind",
     "fact_label",
     "fact_line",
     "fact_status",
     "key_ref",
     "merged_facts",
+    "needed_facets",
+    "needs_of",
     "refuse_repeated_facts",
 ]
 
@@ -95,6 +98,9 @@ MAX_FACT_ANSWERS = 200
 #: the deployment's source limits bound the answers' text as well, because
 #: every answer is a line of the answers Source.
 MAX_HELD_FACTS = 5 * MAX_FACT_ANSWERS
+
+#: The longest detail one answer carries: a sentence, not a description.
+MAX_DETAIL_CHARS = 300
 
 
 FactKind = Literal["attribute", "assertion", "question", "subject", "capability"]
@@ -126,6 +132,12 @@ class FactAnswer(BaseModel):
     #: :data:`FACET_ANSWERS` or ``unknown``. The service writes ``value`` from
     #: it, so a submission sends one or the other.
     facets: dict[str, str] | None = None
+    #: The submitter's own words beside a closed answer: an exception, a scope
+    #: or a detail the answer alone would overstate, such as "yes, except the
+    #: public status endpoint" (ADR 0073). It is part of the answer's line of
+    #: the answers Source, so the analysis reads it as the submitter's words;
+    #: no code reads a fact out of it.
+    detail: str = Field(default="", max_length=MAX_DETAIL_CHARS)
 
     @model_validator(mode="before")
     @classmethod
@@ -192,6 +204,11 @@ class FactAnswer(BaseModel):
     def _one_line(cls, value: str) -> str:
         return plain_name(value)
 
+    @field_validator("detail")
+    @classmethod
+    def _one_line_detail(cls, detail: str) -> str:
+        return plain_name(detail) if detail.strip() else ""
+
     @property
     def kind(self) -> FactKind:
         return fact_kind(self.key)
@@ -256,20 +273,27 @@ def fact_label(key: UnknownKey, model: SystemModel) -> str:
 
 
 def fact_line(fact: FactAnswer) -> str:
-    """The answer as its line of the answers Source, which its span quotes."""
+    """The answer as its line of the answers Source, which its span quotes.
+
+    A detail follows the answer in the submitter's own words (ADR 0073).
+    """
     element_id, attribute, assertion, subject, question, capability = fact.key
     if fact.kind == "capability":
         asked = CAPABILITIES[capability].question
-        return f'Asked "{asked}", the answer is "{fact.value}".'
-    if fact.kind == "question":
+        line = f'Asked "{asked}", the answer is "{fact.value}".'
+    elif fact.kind == "question":
         kind = QUESTION_KINDS[question]
         asked = kind.template.format(element=element_id)
-        return f'Asked "{asked}", the answer is "{fact.value}".'
-    if fact.kind == "attribute":
-        return f'The {attribute} of {element_id} is "{fact.value}".'
-    if fact.kind == "assertion":
-        return f'The open question {assertion} is answered "{fact.value}".'
-    return f'Asked "{subject}", the answer is "{fact.value}".'
+        line = f'Asked "{asked}", the answer is "{fact.value}".'
+    elif fact.kind == "attribute":
+        line = f'The {attribute} of {element_id} is "{fact.value}".'
+    elif fact.kind == "assertion":
+        line = f'The open question {assertion} is answered "{fact.value}".'
+    else:
+        line = f'Asked "{subject}", the answer is "{fact.value}".'
+    if fact.detail:
+        line += f' The submitter adds: "{fact.detail}".'
+    return line
 
 
 def answer_facets(key: UnknownKey) -> tuple[Facet, ...]:
@@ -329,8 +353,14 @@ def merged_facts(
     for fact in later:
         before = merged.get(fact.key)
         if fact.facets is not None and before is not None and before.facets:
+            # A later facet answer that adds facets keeps the earlier detail
+            # unless it gives one of its own.
             fact = FactAnswer.model_validate(
-                {"key": fact.key, "facets": {**before.facets, **fact.facets}}
+                {
+                    "key": fact.key,
+                    "facets": {**before.facets, **fact.facets},
+                    "detail": fact.detail or before.detail,
+                }
             )
         merged[fact.key] = fact
     return list(merged.values())
@@ -364,6 +394,7 @@ def fact_status(
     said: Mapping[UnknownKey, FactAnswer],
     shown: Collection[UnknownKey],
     skipped: Collection[object],
+    facets: Sequence[str] = (),
 ) -> FactStatus:
     """What became of one fact before the analysis (#1542 F4).
 
@@ -373,13 +404,53 @@ def fact_status(
     every question the submitter skipped and did not answer since. A skip is
     the submitter's act and is told apart from a question left blank, and a
     part hidden under its parent's answer was never presented, so it reads
-    ``open``.
+    ``open``. ``facets`` are the parts a finding needs (:func:`needs_of`): an
+    answer that covers them is ``answered`` for that finding, though other
+    parts stay open.
     """
     answer = said.get(key)
     if answer is None:
         if key in skipped:
             return "skipped"
         return "unanswered" if key in shown else "open"
-    if answer.settles:
+    if covers(answer, facets):
         return "answered"
     return "partial" if answer.known else "unknown"
+
+
+def needed_facets(ref: UnknownRef) -> tuple[str, ...]:
+    """The facets of its question kind a dependency waits on, in the kind's order.
+
+    **The one reader of "which part of a question does a finding need"** (ADR
+    0073). The facets the reference names that its kind has; where it names
+    none of them, every facet the kind has, so the finding waits on the whole
+    question. Empty for a fact answered in one value.
+    """
+    every = tuple(facet.id for facet in answer_facets(ref.key))
+    named = tuple(facet for facet in every if facet in ref.facets)
+    return named or every
+
+
+def needs_of(refs: Sequence[UnknownRef]) -> dict[UnknownKey, tuple[str, ...]]:
+    """Each fact these references name, with the facets a finding needs of it.
+
+    A fact named twice needs the facets of both, so a reference to the whole
+    question makes the finding wait on the whole question.
+    """
+    needs: dict[UnknownKey, set[str]] = {}
+    for ref in refs:
+        needs.setdefault(ref.key, set()).update(needed_facets(ref))
+    return {
+        key: tuple(facet.id for facet in answer_facets(key) if facet.id in held)
+        for key, held in needs.items()
+    }
+
+
+def covers(answer: FactAnswer | None, facets: Sequence[str]) -> bool:
+    """True where ``answer`` gives every one of ``facets`` an answer other than
+    "I don't know"; with no facets, where it settles its fact."""
+    if answer is None:
+        return False
+    if not facets or answer.facets is None:
+        return answer.settles
+    return all(answer.facets.get(facet, UNKNOWN) != UNKNOWN for facet in facets)

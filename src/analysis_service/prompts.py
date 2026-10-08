@@ -172,10 +172,16 @@ def render_question_kinds() -> str:
 
     The provider schema lists them too, but a provider may treat a schema as a
     hint and never show the model its descriptions (``QA-2026-09-26-03-E10``),
-    so the instruction carries the list whatever the route does with it.
+    so the instruction carries the list whatever the route does with it. A
+    kind answered in parts lists each part's ID, which a reference names in
+    ``facets`` where the argument rests on some parts only (ADR 0073).
     """
     rows = ["## The question kinds", ""]
-    rows += [f"- `{name}`: {kind.covers}" for name, kind in QUESTION_KINDS.items()]
+    for name, kind in QUESTION_KINDS.items():
+        parts = "; ".join(f"`{facet.id}` ({facet.question})" for facet in kind.facets)
+        rows.append(
+            f"- `{name}`: {kind.covers}" + (f". Its parts: {parts}" if parts else "")
+        )
     return "\n".join(rows)
 
 
