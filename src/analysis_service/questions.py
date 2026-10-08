@@ -22,7 +22,7 @@ from __future__ import annotations
 from collections import Counter
 from collections.abc import Mapping, Sequence
 from collections.abc import Set as AbstractSet
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Literal
 
 from analysis_service.answer_forms import (
@@ -42,7 +42,9 @@ from analysis_service.fact_answers import (
     FactStatus,
     answer_facets,
     answered_keys,
+    covers,
     fact_kind,
+    needs_of,
 )
 from analysis_service.frameworks import PACKAGES
 from analysis_service.open_facts import (
@@ -116,6 +118,10 @@ class FactQuestion:
     #: skipped, left blank or answered in part before the analysis, or never
     #: shown (:func:`~analysis_service.fact_answers.fact_status`).
     history: FactStatus = "open"
+    #: For each finding that waits on only some facets of this question, as
+    #: ``framework/claim``, the facets it needs (ADR 0073). A finding absent
+    #: here needs every facet.
+    needs: Mapping[str, tuple[str, ...]] = field(default_factory=dict)
 
     def to_json(self) -> dict[str, object]:
         return {
@@ -133,6 +139,7 @@ class FactQuestion:
             "max_length": self.max_length,
             "band": self.band,
             "findings": list(self.findings),
+            "needs": {finding: list(need) for finding, need in self.needs.items()},
         }
 
 
@@ -208,6 +215,11 @@ class FollowUpNeeds:
     bands: Mapping[Finding, Band]
     #: The reference each open fact was first cited by.
     refs: Mapping[UnknownKey, UnknownRef]
+    #: For each draft, the question kinds it waits on only in part, with the
+    #: facets it needs of each (ADR 0073). A kind it waits on whole is absent.
+    facets: Mapping[Finding, Mapping[UnknownKey, tuple[str, ...]]] = field(
+        default_factory=dict
+    )
 
 
 def follow_up_needs(
@@ -220,7 +232,9 @@ def follow_up_needs(
 
     A fact ``earlier`` answers in full is not open. A finding that waits on a
     fact ``earlier`` answers without settling it is not conditional, because
-    no answer in the list can cover it.
+    no answer in the list can cover it. **A finding that needs only some facets
+    of a kind** (:func:`~analysis_service.fact_answers.needs_of`) waits on it
+    until those facets are known, and no longer (ADR 0073).
     """
     evidence: dict[Finding, frozenset[UnknownKey]] = {}
     named: dict[Finding, frozenset[UnknownKey]] = {}
@@ -228,15 +242,27 @@ def follow_up_needs(
     conditional: set[Finding] = set()
     prepared = prepared_model(model, catalog)
     done = answered_keys(earlier)
-    unknown = {answer.key for answer in earlier if not answer.settles} & done
+    said = {answer.key: answer for answer in earlier}
     bands: dict[Finding, Band] = {}
+    facets: dict[Finding, dict[UnknownKey, tuple[str, ...]]] = {}
     for block in analyses:
         rank = PACKAGES[block.framework].rank
         for claim in block.all_claims():
             finding = (block.framework, claim.id)
             bands[finding] = rank(claim)
             cites = [*claim.unknown_grounds(), *claim.verdict.related_unknowns]
-            stuck = bool(unknown & {ref.key for ref in cites})
+            wanted = needs_of(cites)
+            covered = {
+                key for key, need in wanted.items() if covers(said.get(key), need)
+            }
+            stuck = any(key in done and key not in covered for key in wanted)
+            partly = {
+                key: need
+                for key, need in wanted.items()
+                if need and len(need) < len(answer_facets(key))
+            }
+            if partly:
+                facets[finding] = partly
             if claim.verdict.status == "needs-info" and not stuck:
                 conditional.add(finding)
             grounds = [
@@ -250,7 +276,9 @@ def follow_up_needs(
                 verdict = [
                     ref
                     for ref in claim.verdict.related_unknowns
-                    if _open(ref, prepared) and ref.key not in done
+                    if _open(ref, prepared)
+                    and ref.key not in done
+                    and ref.key not in covered
                 ]
                 named[finding] = frozenset(ref.key for ref in verdict)
                 cited += verdict
@@ -266,6 +294,7 @@ def follow_up_needs(
         waiting={finding: keys for finding, keys in waiting.items() if keys},
         bands=bands,
         refs=refs,
+        facets=facets,
     )
 
 
@@ -376,6 +405,11 @@ def fact_questions(
                     key=lambda band: band.order,
                     default=UNRANKED,
                 ).label,
+                needs={
+                    f"{framework}/{claim}": partly[key]
+                    for (framework, claim), partly in needs.facets.items()
+                    if key in partly and key in waiting.get((framework, claim), ())
+                },
             )
         )
     return tuple(asked)

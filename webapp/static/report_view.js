@@ -134,6 +134,20 @@
   // follow-up refuses to reopen a settled fact or a settled facet.
   const offersDontKnow = (before, reopen) => reopen || !before || before === DONT_KNOW;
   let suggestLists = 0;
+  // The submitter's own words beside a closed answer: an exception or a scope
+  // the answer alone would overstate (FactAnswer.detail, ADR 0073). It is sent
+  // where it changed from the answer it starts from.
+  const detailFor = (prefill, changed) => {
+    const before = (prefill && prefill.detail) || "";
+    const detail = el("input");
+    detail.type = "text";
+    detail.maxLength = 300;
+    detail.className = "answer-detail";
+    detail.placeholder = "exceptions or detail (optional)";
+    detail.value = before;
+    detail.addEventListener("input", changed);
+    return { node: detail, read: () => detail.value.trim(), changed: () => detail.value.trim() !== before };
+  };
   const editorFor = (q, prefill, changed, reopen = true) => {
     if (q.form === "facets") {
       // One list per facet. Only a facet answered otherwise than `prefill`
@@ -160,13 +174,29 @@
       const given = () => Object.fromEntries(selects
         .filter(s => s.value && s.value !== s.dataset.before)
         .map(s => [s.dataset.facet, s.value]));
+      const detail = detailFor(prefill, changed);
+      // A changed detail alone sends the facets it starts from, which the
+      // service keeps as they are.
+      const kept = () => Object.fromEntries(selects
+        .filter(s => s.value).map(s => [s.dataset.facet, s.value]));
+      const read = () => {
+        const facets = Object.keys(given()).length ? given()
+          : detail.changed() ? kept() : {};
+        if (!Object.keys(facets).length) return null;
+        return detail.read() ? { key: q.key, facets, detail: detail.read() } : { key: q.key, facets };
+      };
       return {
-        nodes: [list],
-        read: () => Object.keys(given()).length ? { key: q.key, facets: given() } : null,
+        nodes: [list, detail.node],
+        read,
         // The critic names the kind, not a facet, so a finding waiting on it
         // is covered only once every facet says more than "I don't know".
         // A facet kept from `prefill` counts, as the service merges it.
         known: () => selects.every(s => s.value && s.value !== DONT_KNOW),
+        // A finding that needs only some facets is covered once those are
+        // known (ADR 0073); `facets` lists them, or is empty for every facet.
+        knownFor: (facets) => selects
+          .filter(s => !facets.length || facets.includes(s.dataset.facet))
+          .every(s => s.value && s.value !== DONT_KNOW),
       };
     }
     const value = (prefill && prefill.value) || "";
@@ -177,6 +207,8 @@
     let nodes;
     // `read` is the answer the row sends, or "" for none.
     let read = () => input.value.trim();
+    // A closed answer takes a detail beside it; free text needs none.
+    let choiceDetail = null;
     if (q.choices.length) {
       input = el("select");
       input.append(option("(leave unanswered)", ""));
@@ -184,7 +216,8 @@
       if (dontKnowOffered) input.append(option("I don't know", DONT_KNOW));
       input.value = value;
       input.addEventListener("change", changed);
-      nodes = [input];
+      choiceDetail = detailFor(prefill, changed);
+      nodes = [input, " ", choiceDetail.node];
     } else if (q.form === "control") {
       // A control: say there is none, say you do not know, or name the
       // mechanism. The suggestions are a start; the text is the answer.
@@ -236,9 +269,14 @@
       nodes = dontKnowOffered ? [input, " ", dontKnow] : [input];
     }
     input.dataset.key = JSON.stringify(q.key);
+    const sent = () => {
+      if (!read()) return null;
+      const detail = choiceDetail ? choiceDetail.read() : "";
+      return detail ? { key: q.key, value: read(), detail } : { key: q.key, value: read() };
+    };
     return {
       nodes,
-      read: () => read() ? { key: q.key, value: read() } : null,
+      read: sent,
       known: () => Boolean(read()) && read() !== DONT_KNOW,
     };
   };
@@ -1142,6 +1180,9 @@
         if (!waitsOn.has(finding)) waitsOn.set(finding, []);
         waitsOn.get(finding).push(index);
       }));
+      // The facets a finding needs of a question it waits on only in part,
+      // as the service read them off its references (FactQuestion.needs).
+      const needOf = (index, finding) => (ordered[index].needs || {})[finding] || [];
       // Each finding's lane, read from the field its package stamps, so the
       // scope line can say how many lanes the answers reach.
       const laneOfFinding = new Map(R.analyses.flatMap(block => block.claims.map(c =>
@@ -1150,7 +1191,8 @@
       const scope = el("div", "meta");
       function recount() {
         const known = index => factAnswers[index].known();
-        const covered = [...waitsOn.values()].filter(asked => asked.every(known)).length;
+        const coveredFor = finding => index => factAnswers[index].knownFor(needOf(index, finding));
+        const covered = [...waitsOn].filter(([finding, asked]) => asked.every(coveredFor(finding))).length;
         tally.textContent =
           `Your answers cover every question for ${covered} of the ${waitsOn.size} findings ` +
           "that wait on one. The analysis decides again whether they are settled.";
@@ -1170,7 +1212,11 @@
         const into = !q.findings.length ? unwaited : index < SHOWN ? box : more;
         const row = el("p");
         const editor = editorFor(q, startFrom(RETAINED.get(JSON.stringify(q.key)), q.key), recount, false);
-        factAnswers.push({ read: editor.read, known: editor.known });
+        factAnswers.push({
+          read: editor.read,
+          known: editor.known,
+          knownFor: editor.knownFor || editor.known,
+        });
         const lead = [el("b", null, q.label), why(q),
           ` \u2014 ${q.cited_by} finding(s) wait on it; answering down to here covers ${q.covered_so_far}`];
         if (q.form === "facets") row.append(...lead, waitingOn(q), ...editor.nodes);

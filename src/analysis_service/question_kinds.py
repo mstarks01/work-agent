@@ -28,7 +28,7 @@ from dataclasses import dataclass
 from types import MappingProxyType
 from typing import Literal
 
-__all__ = ["QUESTION_KINDS", "Facet", "QuestionKind"]
+__all__ = ["ALL_FACET_IDS", "MAX_FACETS", "QUESTION_KINDS", "Facet", "QuestionKind"]
 
 
 @dataclass(frozen=True)
@@ -268,3 +268,11 @@ QUESTION_KINDS: Mapping[str, QuestionKind] = MappingProxyType(
         ),
     }
 )
+
+#: Every facet ID some kind has, which a reference may name.
+ALL_FACET_IDS: frozenset[str] = frozenset(
+    facet.id for kind in QUESTION_KINDS.values() for facet in kind.facets
+)
+
+#: The most facets one kind has, and so the most one reference names.
+MAX_FACETS = max(len(kind.facets) for kind in QUESTION_KINDS.values())

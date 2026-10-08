@@ -157,7 +157,20 @@
     return select;
   };
   let suggestLists = 0;
-  const inputFor = (q, prefill) => {
+  // The submitter's own words beside a closed answer: an exception or a
+  // scope the answer alone would overstate (FactAnswer.detail, ADR 0073).
+  const DETAIL_CHARS = 300;
+  const detailInput = (prefill) => {
+    const detail = document.createElement("input");
+    detail.type = "text";
+    detail.maxLength = DETAIL_CHARS;
+    detail.className = "answer-detail";
+    detail.placeholder = "exceptions or detail (optional)";
+    detail.value = prefill || "";
+    return detail;
+  };
+  const withDetail = (answer, detail) => (detail ? { ...answer, detail } : answer);
+  const inputFor = (q, prefill, prefillDetail) => {
     let input;
     // `read` is the answer the row sends, or "" for none; `set` writes an
     // answer into the row, as "Same for all" and an earlier answer do.
@@ -165,6 +178,8 @@
     let set;
     // `beside` is what follows the label.
     let beside;
+    // A closed answer takes a detail beside it; free text needs none.
+    let detail = null;
     if (q.choices.length) {
       input = document.createElement("select");
       input.append(optionOf("(leave unanswered)", ""));
@@ -173,7 +188,8 @@
       }
       input.append(optionOf("I don't know", DONT_KNOW));
       set = (value) => { input.value = value; };
-      beside = [input];
+      detail = detailInput(prefillDetail);
+      beside = [input, " ", detail];
     } else if (q.form === "control") {
       // A control: say there is none, say you do not know, or name the
       // mechanism. The suggestions are a start; the text is the answer.
@@ -222,7 +238,8 @@
     }
     set(prefill || "");
     input.dataset.key = JSON.stringify(q.key);
-    return { input, beside, read, set };
+    const readDetail = () => (detail ? detail.value.trim() : "");
+    return { input, beside, read, set, readDetail };
   };
 
   // A paused run's round: the link questions, then the open facts in the order
@@ -453,6 +470,9 @@
         head.append(cell);
         return [];
       });
+      const detailHead = document.createElement("th");
+      detailHead.textContent = "Exceptions or detail (optional)";
+      head.append(detailHead);
       table.append(head);
       if (withAll) {
         const all = document.createElement("tr");
@@ -468,13 +488,15 @@
           cell.append(every);
           all.append(cell);
         });
+        // The detail column takes no shared answer: each row's are its own.
+        all.append(document.createElement("td"));
         table.append(all);
       }
       into.append(table);
       return { table, columns };
     };
     // One row of a facet table, filled in from `prefill`, and its reader.
-    const facetRow = (grid, q, label, prefill) => {
+    const facetRow = (grid, q, label, prefill, prefillDetail) => {
       const row = document.createElement("tr");
       const name = document.createElement("td");
       name.append(label);
@@ -490,13 +512,19 @@
         row.append(cell);
         return select;
       });
+      const detail = detailInput(prefillDetail);
+      const detailCell = document.createElement("td");
+      detailCell.append(detail);
+      row.append(detailCell);
       grid.table.append(row);
       const read = () => {
         const given = {};
         for (const select of selects) {
           if (select.value) given[select.dataset.facet] = select.value;
         }
-        return Object.keys(given).length ? { key: q.key, facets: given } : null;
+        return Object.keys(given).length
+          ? withDetail({ key: q.key, facets: given }, detail.value.trim())
+          : null;
       };
       // Whether a facet is still blank, which "Skip the rest" sets aside.
       read.open = () => selects.some((select) => !select.value);
@@ -554,14 +582,14 @@
         label.textContent = q.element;
         who.append(label);
         if (about) who.append(about);
-        const read = facetRow(group.grid, q, who, before && before.facets);
+        const read = facetRow(group.grid, q, who, before && before.facets, before && before.detail);
         answers.push(read);
         roundRows.push({ key: q.key, read, open: read.open });
         counted.push({ decisions: q.decisions || 1, hidden: () => false });
         return;
       }
       const row = document.createElement("p");
-      const { input, beside, read, set } = inputFor(q, "");
+      const { input, beside, read, set, readDetail } = inputFor(q, "");
       inputs.set(input.dataset.key, input);
       if (shareable.has(runOf.get(q))) {
         // Ticked rows take the shared answer; an unticked row is an exception.
@@ -598,7 +626,7 @@
       }
       const answer = () => {
         const value = read();
-        return value && !row.hidden ? { key: q.key, value } : null;
+        return value && !row.hidden ? withDetail({ key: q.key, value }, readDetail()) : null;
       };
       answers.push(answer);
       roundRows.push({ key: q.key, read: answer, hidden: () => row.hidden });
@@ -682,15 +710,16 @@
           const grid = facetTable(row, a, false);
           const name = document.createElement("b");
           name.textContent = a.element;
-          answers.push(facetRow(grid, a, name, a.answer.facets));
+          answers.push(facetRow(grid, a, name, a.answer.facets, a.answer.detail));
           shown.hidden = true;
           return;
         }
-        const { beside, read } = inputFor(a, a.answer.value);
+        const { beside, read, readDetail } = inputFor(a, a.answer.value, a.answer.detail);
         shown.replaceChildren(" — ", ...beside);
         answers.push(() => {
           const value = read();
-          return value && value !== a.answer.value ? { key: a.key, value } : null;
+          const changed = value !== a.answer.value || readDetail() !== (a.answer.detail || "");
+          return value && changed ? withDetail({ key: a.key, value }, readDetail()) : null;
         });
       });
       earlierBox.append(row);
@@ -739,12 +768,13 @@
           const name = document.createElement("b");
           name.textContent = q.element;
           kept.hidden = true;
-          answers.push(facetRow(facetTable(row, q, false), q, name, before && before.facets));
+          answers.push(facetRow(facetTable(row, q, false), q, name, before && before.facets,
+            before && before.detail));
           return;
         }
-        const { beside, read } = inputFor(q, "");
+        const { beside, read, readDetail } = inputFor(q, "");
         row.append(" ", ...beside);
-        answers.push(() => (read() ? { key: q.key, value: read() } : null));
+        answers.push(() => (read() ? withDetail({ key: q.key, value: read() }, readDetail()) : null));
       });
       row.append(" ", open);
       box.append(row);

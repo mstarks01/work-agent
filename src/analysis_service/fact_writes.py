@@ -265,6 +265,8 @@ def answered_model(model: SystemModel, answers: Sequence[FactAnswer]) -> SystemM
             note = f'The submitter answered {attribute}: "{answer.value}".'
         else:
             note = f"The submitter does not know {attribute}."
+        if answer.detail:
+            note += f' They add: "{answer.detail}".'
         # A resumed job's checkpoint already holds an earlier round's answers.
         notes = element.get("notes", "")
         if note not in notes:

@@ -47,7 +47,7 @@ from analysis_service.actions import ActionVerb
 from analysis_service.bands import Band
 from analysis_service.capabilities import CapabilityNeed
 from analysis_service.grounding import MovedKind, meaning_moved
-from analysis_service.question_kinds import QUESTION_KINDS
+from analysis_service.question_kinds import ALL_FACET_IDS, MAX_FACETS, QUESTION_KINDS
 from analysis_service.system_model import (
     SystemModel,
     all_attribute_names,
@@ -341,6 +341,22 @@ class UnknownRef(BaseModel):
             + "; ".join(
                 f"{name} ({kind.covers})" for name, kind in QUESTION_KINDS.items()
             ),
+        },
+    )
+    #: The parts of the ``question`` kind the argument rests on, by facet ID,
+    #: where it rests on some of them and not on all (ADR 0073). Empty where it
+    #: rests on the whole question, and for every other spelling. A facet the
+    #: kind does not have names nothing, and a reference that names none of
+    #: its kind's facets waits on the whole question
+    #: (:func:`~analysis_service.fact_answers.needed_facets`).
+    facets: list[str] = Field(
+        default_factory=list,
+        max_length=MAX_FACETS,
+        json_schema_extra={
+            "items": {"type": "string", "enum": [*sorted(ALL_FACET_IDS)]},
+            "description": "Where the argument rests on only some parts of the"
+            " question kind, those parts' IDs; empty where it rests on the whole"
+            " question.",
         },
     )
     #: The fifth spelling: a **Capability** of the whole application, by its

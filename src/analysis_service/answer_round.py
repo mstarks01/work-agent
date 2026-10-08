@@ -961,7 +961,8 @@ def _adds_information(
 
     A link answer does where it places a principal anew or elsewhere. A fact
     answer does where its known content changes: "I don't know" is none, and
-    of a facet answer only the facets answered otherwise count.
+    of a facet answer only the facets answered otherwise count. A changed
+    detail counts too (ADR 0073).
     """
     placed = {fold(link.principal): link.element for link in earlier_links}
     if any(placed.get(fold(link.principal)) != link.element for link in links):
@@ -970,8 +971,14 @@ def _adds_information(
     after = {fact.key: fact for fact in merged_facts(earlier_facts, facts)}
     return any(
         _known_content(after[fact.key]) != _known_content(before.get(fact.key))
+        or _detail(after[fact.key]) != _detail(before.get(fact.key))
         for fact in facts
     )
+
+
+def _detail(answer: FactAnswer | None) -> str:
+    """An answer's detail, which is new information wherever it changes."""
+    return "" if answer is None else answer.detail
 
 
 def _known_content(answer: FactAnswer | None) -> frozenset[tuple[str, str]]:
