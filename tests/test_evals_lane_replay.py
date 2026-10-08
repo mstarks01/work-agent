@@ -220,3 +220,62 @@ def test_fresh_leads_on_todays_run_are_the_leads_it_captured(recorded, case):  #
             material, case, "stride", lane.lane, PACKAGE_LOADER
         )
         assert rebuilt["lanes"] == material["lanes"], lane.lane
+
+
+def test_a_node_call_keeps_what_the_provider_returned(monkeypatch):
+    """A replay that parses to nothing can be read without a second paid call
+    (#1555): the call keeps the answer text, why the provider stopped and the
+    tokens it counted."""
+    from types import SimpleNamespace
+
+    from google.adk.models.llm_response import LlmResponse
+    from google.genai import types
+
+    from evals.harness import node_call as module
+
+    class Adapter:
+        model = "stub"
+
+        async def generate_content_async(self, request, stream):
+            yield LlmResponse(
+                content=types.Content(
+                    role="model", parts=[types.Part(text='{"claims": []}')]
+                ),
+                finish_reason=types.FinishReason.STOP,
+                usage_metadata=types.GenerateContentResponseUsageMetadata(
+                    candidates_token_count=7, thoughts_token_count=11
+                ),
+            )
+
+    monkeypatch.setattr(
+        module, "build_tier_adapters", lambda *a, **k: {"strong": Adapter()}
+    )
+    deployment = SimpleNamespace(
+        tier_of=lambda node: "strong",
+        tiers=None,
+        resilience=None,
+        env={},
+        sampling=SimpleNamespace(
+            for_tier=lambda tier: SimpleNamespace(
+                to_generate_content_config=types.GenerateContentConfig
+            )
+        ),
+    )
+    seen: list = []
+    call = module.node_call(deployment, "critic", None, [], seen)
+    text = asyncio.run(call("instruction", types.Content(role="user", parts=[])))
+
+    assert text == '{"claims": []}'
+    assert seen == [
+        {
+            "text": '{"claims": []}',
+            "responses": [
+                {
+                    "finish_reason": "FinishReason.STOP",
+                    "error_message": None,
+                    "output_tokens": 7,
+                    "thought_tokens": 11,
+                }
+            ],
+        }
+    ]

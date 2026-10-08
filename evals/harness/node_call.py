@@ -35,6 +35,7 @@ def node_call(
     graph_node: str,
     schema: Any,
     spent: list[float | None] | None = None,
+    seen: list[dict[str, Any]] | None = None,
 ) -> NodeCall:
     """The call ``graph_node`` makes, on this deployment's route for it.
 
@@ -42,6 +43,9 @@ def node_call(
     ``None`` where it reported none, read off the stamp
     :mod:`analysis_service.charges` puts on the response. A replay is a paid
     call, and its caller states what it spent rather than an estimate.
+    ``seen`` receives, for each call, the answer text, why the provider
+    stopped and the tokens it counted, so a replay that parses to nothing can
+    be read without a second paid call.
     """
     tier = deployment.tier_of(graph_node)
     adapter = build_tier_adapters(
@@ -59,11 +63,29 @@ def node_call(
         request = LlmRequest(model=adapter.model, contents=[turn], config=config)
         chunks = []
         charge = None
+        stops: list[dict[str, Any]] = []
         async for response in adapter.generate_content_async(request, False):
             charge = (response.custom_metadata or {}).get(CHARGE_METADATA_KEY, charge)
             chunks.append(answer_text(response))
+            usage = response.usage_metadata
+            stops.append(
+                {
+                    "finish_reason": None
+                    if response.finish_reason is None
+                    else str(response.finish_reason),
+                    "error_message": response.error_message,
+                    "output_tokens": None
+                    if usage is None
+                    else usage.candidates_token_count,
+                    "thought_tokens": None
+                    if usage is None
+                    else usage.thoughts_token_count,
+                }
+            )
         if spent is not None:
             spent.append(charge)
+        if seen is not None:
+            seen.append({"text": "".join(chunks), "responses": stops})
         return "".join(chunks)
 
     return call
