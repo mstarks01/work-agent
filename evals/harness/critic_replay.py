@@ -304,6 +304,13 @@ def arguments(parser: argparse.ArgumentParser) -> None:
         help="also write the replayed rulings here, completed as the graph"
         " completes them, so their reasons and open facts can be read",
     )
+    parser.add_argument(
+        "--raw",
+        type=Path,
+        help="also write the critic's answer as the provider returned it, with"
+        " why it stopped and the tokens it counted, so an answer that parses to"
+        " nothing can be read without a second paid call",
+    )
 
 
 def command_critic_replay(args: argparse.Namespace) -> int:
@@ -320,11 +327,13 @@ def command_critic_replay(args: argparse.Namespace) -> int:
         f" {repo_commit().commit}"
     )
     spent: list[float | None] = []
+    seen: list[dict[str, Any]] = []
     call = node_call(
         Deployment.from_env(),
         FrameworkNodes(args.framework).node(CRITIC_ROLE),
         schemas_for(args.framework).rulings,
         spent,
+        seen,
     )
     rulings = asyncio.run(
         replay(
@@ -334,6 +343,8 @@ def command_critic_replay(args: argparse.Namespace) -> int:
             MarkdownLoader(REPO_ROOT / "prompts"),
         )
     )
+    if args.raw is not None:
+        args.raw.write_text(json.dumps(seen, indent=2) + "\n", encoding="utf-8")
     if args.out is not None:
         write_rulings(args.out, archived, rulings)
     rows = compare(archived, rulings)
