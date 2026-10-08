@@ -848,6 +848,13 @@ _REFUSALS: dict[str, tuple[int, Callable[[Admission, int], str]]] = {
             " answer returned; answer again only if that job fails"
         ),
     ),
+    "parent_moved": (
+        409,
+        lambda admission, ceiling: (
+            "the saved answers changed while this request read them; read the"
+            " questions again"
+        ),
+    ),
 }
 
 
@@ -1162,6 +1169,7 @@ def create_app(
                 certification=parent.certification,
                 follow_up=outcome.follow_up,
             ),
+            parent_revision=parent.round_revision,
             reserved_tokens=budgets.estimate(outcome.sources, parent.frameworks),
         )
         return await _admit_and_start(request, record, background_tasks, subject)
@@ -1273,6 +1281,7 @@ def create_app(
             system_name=parent.system_name,
             ask_questions=True,
             amends=parent.id,
+            parent_revision=parent.round_revision,
             carried_links=amended.links,
             carried_facts=amended.facts,
             reserved_tokens=budgets.estimate(amended.sources, parent.frameworks),

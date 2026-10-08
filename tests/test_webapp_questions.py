@@ -2732,6 +2732,50 @@ class TestEarlierAnswers:
         client.get(f"/events/{started.json()['run']}")
         assert [fact.value for fact in runner.resumed_facts[-1]] == ["no"]
 
+    def test_a_save_while_a_run_reads_its_body_is_not_lost(self, tiers, monkeypatch):
+        """The route reads the state after the body, so a save that lands while
+        a run's body arrives moves the revision the run is checked against
+        (checkpoint review c1)."""
+        from starlette.requests import Request
+
+        from webapp.main import Analyses
+
+        client, _, report, key = self.first_report(tiers, "yes")
+        saved = client.post(
+            f"/answer/{report}",
+            json={
+                "links": [],
+                "facts": [{"key": key, "value": "no"}],
+                "save": True,
+                "revision": 0,
+            },
+            headers=SAME_ORIGIN,
+        )
+        assert saved.json() == {"saved": True, "revision": 1}
+        late = FactAnswer.model_validate({"key": key, "value": "late"})
+        got, read = Analyses.get, Request.json
+        seen = []
+
+        def get(self, run_id):
+            seen.append(got(self, run_id))
+            return seen[-1]
+
+        async def racing(self):
+            body = await read(self)
+            # A second tab's save, as the route writes one.
+            seen[-1].draft_facts, seen[-1].revision = [late], seen[-1].revision + 1
+            return body
+
+        monkeypatch.setattr(Analyses, "get", get)
+        monkeypatch.setattr(Request, "json", racing)
+        started = client.post(
+            f"/answer/{report}",
+            json={"links": [], "facts": [], "revision": 1},
+            headers=SAME_ORIGIN,
+        )
+        assert started.status_code == 409, started.text
+        assert seen[-1].resumed_by is None, "no run started on the old draft"
+
     def test_a_request_over_the_limit_says_to_save_in_parts(self, tiers):
         client, _, report, _ = self.first_report(tiers, "yes")
         facts = [
