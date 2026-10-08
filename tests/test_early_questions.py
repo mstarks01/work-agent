@@ -55,6 +55,11 @@ def prior_of(rates) -> dict[str, PriorRow]:
     }
 
 
+def top_band(question) -> int:
+    """The band a capability is ordered by: its highest over its frameworks."""
+    return max(band for _, band in question.framework_bands)
+
+
 def keys(rates, model=None):
     asked = early_questions(
         model or valid_model(), {"stride": {}}, None, prior_of(rates)
@@ -353,7 +358,7 @@ class TestCapabilityBands:
         from types import SimpleNamespace
 
         bands = ((framework, band),) if kind == "capability" else ()
-        return SimpleNamespace(kind=kind, score=score, band=band, framework_bands=bands)
+        return SimpleNamespace(kind=kind, score=score, framework_bands=bands)
 
     def test_another_framework_s_bands_leave_this_one_s_floor_alone(self):
         """One framework's bands never decide another's floor (ADR 0071)."""
@@ -384,12 +389,14 @@ class TestCapabilityBands:
         asked = early_questions(valid_model(), {"asvs": {"level": 2}}, None)
         capabilities = [q for q in asked if q.kind == "capability"]
         roots = [q for q in capabilities if q.parent is None]
-        assert {q.band for q in capabilities} == {-1, 0}, "a control: two bands"
-        assert [q.band for q in roots] == sorted((q.band for q in roots), reverse=True)
+        assert {top_band(q) for q in capabilities} == {-1, 0}, "a control: two bands"
+        assert [top_band(q) for q in roots] == sorted(
+            map(top_band, roots), reverse=True
+        )
 
     def test_a_level_1_job_has_one_band(self):
         asked = early_questions(valid_model(), {"asvs": {"level": 1}}, None)
-        assert {q.band for q in asked if q.kind == "capability"} == {0}
+        assert {top_band(q) for q in asked if q.kind == "capability"} == {0}
 
     @pytest.mark.parametrize("level", [1, 2, 3])
     def test_every_parent_is_asked_before_its_children(self, level):

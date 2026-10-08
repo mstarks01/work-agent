@@ -233,3 +233,13 @@ class TestTheAmendRule:
             f"{AMENDMENT_LABEL} 2",
         ]
         assert all(source.kind != "answers" for source in again.sources)
+
+    def test_a_caller_s_own_label_never_collides_with_an_amendment_s(self):
+        """A caller names its own sources, so a label is no count of amendments."""
+        from dataclasses import replace
+
+        named = Source.description("The caller's notes.", label=f"{AMENDMENT_LABEL} 2")
+        state = replace(_state(), sources=(*_state().sources, named))
+        amended = state.amend(AMENDMENT, revision=0, limits=ROOM)
+        labels = [source.label for source in amended.sources]
+        assert len(labels) == len(set(labels)), labels

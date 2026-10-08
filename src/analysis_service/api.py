@@ -729,7 +729,7 @@ def _answer_state(
         },
         analyses=analyses,
         waiting=record.status == "awaiting-answers",
-        final=record.resumption is not None and record.resumption.follow_up,
+        final=record.final(),
         sources=record.sources,
         links=record.links,
         facts=record.facts,

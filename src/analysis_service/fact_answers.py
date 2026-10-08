@@ -85,18 +85,20 @@ __all__ = [
 ]
 
 
-#: How many fact answers one submission carries. The largest report measured
-#: raised 85 open facts, so this bounds the body above any real use. A report
-#: can ask more than this, so its follow-up saves its answers in batches
-#: (ADR 0070).
+#: How many fact answers one submission carries. The largest of the 202
+#: archived reports asks 97 fact questions, so this bounds the body above any
+#: real use. A report can ask more than this, so its follow-up saves its
+#: answers in batches (ADR 0070).
 MAX_FACT_ANSWERS = 200
 
 #: How many fact answers one job holds across every save: the answers the
 #: pause and the report's follow-up gathered, and the facts its pause showed.
-#: No schema bound limits how many facts a model or a report can leave open,
-#: so this is a ceiling the answer check refuses at, not a measured maximum;
-#: the deployment's source limits bound the answers' text as well, because
-#: every answer is a line of the answers Source.
+#: The largest archived job can hold 359: 262 questions a pause lists (case 09,
+#: both frameworks) and 97 a report asks. At this ceiling one list of the
+#: widest answers is 1.7 MB and validates in 0.11 s; at ten times it, 16.7 MB
+#: and 1.1 s. A job record holds four such lists, and each read validates
+#: them. The deployment's source limits bound the answers' text as well,
+#: because every answer is a line of the answers Source.
 MAX_HELD_FACTS = 5 * MAX_FACT_ANSWERS
 
 #: The longest detail one answer carries: a sentence, not a description.

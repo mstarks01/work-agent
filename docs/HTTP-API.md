@@ -245,7 +245,8 @@ framework in `gates`, and `early_remaining` counts them under `gate`.
 cannot add a component or a flow, and a fact the model states takes no answer.
 Send `POST /v1/jobs/{id}/amendments` with what is true, in your own words, and
 the `revision` you read. A new job extracts the sources again with the
-amendment added, labelled `Amendment 1`, and pauses again. It carries this
+amendment added, labelled `Amendment` and the lowest number that no source
+label of the job uses, and pauses again. It carries this
 job's answers: its own questions take each one they still ask, and
 `carried_dropped` and `carried_dropped_links` list the others. While it is in
 flight or has a report, this job takes no answer; where it fails, this job
@@ -418,7 +419,7 @@ available.
 ([ADR 0070](adr/0070-a-follow-up-saves-a-draft-in-batches.md)). One request
 carries at most the `answer_limits` the questions route publishes: `facts` and
 `links` for one request, `held_facts` and `held_links` for every answer a job
-holds. A report can ask more than one request carries. Send `"save": true`
+holds, and `detail` for the characters one answer's detail carries. A report can ask more than one request carries. Send `"save": true`
 with your `revision` to keep a batch as a draft: no job starts, the follow-up
 is not spent, and the response is `200` with `{"job_id", "saved": true,
 "revision"}`. `draft_facts` and `draft_links` list the draft. A later batch

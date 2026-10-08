@@ -20,6 +20,7 @@ from fastapi.testclient import TestClient
 
 from analysis_service import Engine, StubPipelineRunner
 from analysis_service.analysis import ABSENT_WORD
+from analysis_service.answer_round import ANSWER_LIMITS
 from analysis_service.assertions import AssertionRecord
 from analysis_service.claims import UnknownRef
 from analysis_service.fact_answers import (
@@ -472,9 +473,11 @@ class Node {
 const ids = {};
 for (const id of ["analyze","description","ticks","problem","go","load","ask",
                   "asked","questions","earlier","save","continue","status",
-                  "status-text","answer-problem","skip","skipped","more"])
+                  "status-text","answer-problem","skip","skipped","more",
+                  "answer_limits"])
   ids[id] = new Node(id);
 ids.ask.checked = true;
+ids.answer_limits.textContent = LIMITS;
 globalThis.document = {
   getElementById: (id) => ids[id] || null,
   createElement: (tag) => new Node(tag),
@@ -505,9 +508,14 @@ def _run_form_script(steps: str, search: str = "") -> dict:
     node = shutil.which("node")
     if node is None:
         pytest.skip("no node on PATH to run the form page's script")
-    script = (PROJECT_ROOT / "webapp" / "static" / "first_run.js").read_text()
+    script = "\n".join(
+        (PROJECT_ROOT / "webapp" / "static" / name).read_text()
+        for name in ("answer_detail.js", "first_run.js")
+    )
     program = (
-        _FORM_HARNESS.replace("SEARCH", json.dumps(search))
+        _FORM_HARNESS.replace("SEARCH", json.dumps(search)).replace(
+            "LIMITS", json.dumps(json.dumps(dict(ANSWER_LIMITS)))
+        )
         + script
         + "\n(async () => {\n"
         + steps
@@ -748,12 +756,14 @@ def _run_answer_block(
     payloads.setdefault(
         "lanes", {name: pkg.id_rule.lane_field for name, pkg in PACKAGES.items()}
     )
+    payloads.setdefault("answer_limits", dict(ANSWER_LIMITS))
     javascript = viewer_javascript()
     helpers = javascript.split(FIRST_VIEWER_CONSTANT)[0]
     start = javascript.index(start_marker)
     end = javascript.index(end_marker, start) + len(end_marker)
     program = (
         _VIEWER_ANSWER_HARNESS.replace("PAYLOADS", json.dumps(payloads))
+        + (PROJECT_ROOT / "webapp" / "static" / "answer_detail.js").read_text()
         + helpers
         + javascript[start:end]
         + "\n(async () => {\n"
@@ -2709,7 +2719,9 @@ class TestEarlierAnswers:
         assert earlier["draft"]["facts"] == [
             {"key": key, "value": "no", "facets": None, "detail": ""}
         ]
-        assert earlier["limits"]["facts"] == MAX_FACT_ANSWERS
+        page = client.get(f"/report/{report}").text
+        limits = re.search(r'id="answer_limits"[^>]*>(.*?)</script>', page, re.DOTALL)
+        assert json.loads(limits.group(1)) == dict(ANSWER_LIMITS)
 
         started = client.post(
             f"/answer/{report}",
@@ -3132,7 +3144,7 @@ await ids.save.listeners.click(); await settle();
     assert sent["facts"] == [{"key": low["key"], "value": "the finance lead"}]
 
 
-def _draft_payloads(count, *, draft=(), revision=0, limits=None):
+def _draft_payloads(count, *, draft=(), revision=0):
     """A report page whose follow-up asks ``count`` free-text questions."""
     return {
         "report": {"system_model": valid_model().model_dump(mode="json")},
@@ -3146,8 +3158,8 @@ def _draft_payloads(count, *, draft=(), revision=0, limits=None):
             "links": [],
             "draft": {"links": [], "facts": list(draft)},
             "revision": revision,
-            "limits": limits or {"facts": 2, "links": 1},
         },
+        "answer_limits": {**ANSWER_LIMITS, "facts": 2, "links": 1},
     }
 
 
@@ -3357,7 +3369,7 @@ const text = (n) => typeof n === "string" ? n
 calls.push({ said: text(ids.questions) });
 """
         said = _run_form_script(steps)["calls"][-1]["said"]
-        assert "1 earlier answer(s) do not fit the corrected system model" in said
+        assert "1 earlier answer(s) do not fit the amended system model" in said
         assert "Old DB: encryption at rest \u2014 AES" in said
 
 

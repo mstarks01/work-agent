@@ -57,8 +57,6 @@
   const DRAFT = EARLIER.draft || { links: [], facts: [] };
   const DRAFT_FACTS = new Map(DRAFT.facts.map(a => [JSON.stringify(a.key), a]));
   const DRAFT_LINKS = new Map(DRAFT.links.map(a => [a.principal, a.element]));
-  // How many answers one request carries, as the service publishes them.
-  const LIMITS = EARLIER.limits || { facts: 200, links: 50 };
   // An answer to start an editor from: the draft's, over a kept answer's.
   const startFrom = (kept, key) => {
     const drafted = DRAFT_FACTS.get(JSON.stringify(key));
@@ -134,17 +132,11 @@
   // follow-up refuses to reopen a settled fact or a settled facet.
   const offersDontKnow = (before, reopen) => reopen || !before || before === DONT_KNOW;
   let suggestLists = 0;
-  // The submitter's own words beside a closed answer: an exception or a scope
-  // the answer alone would overstate (FactAnswer.detail, ADR 0073). It is sent
-  // where it changed from the answer it starts from.
+  // A detail beside an answer (answerDetail). It is sent where it changed
+  // from the answer it starts from.
   const detailFor = (prefill, changed) => {
     const before = (prefill && prefill.detail) || "";
-    const detail = el("input");
-    detail.type = "text";
-    detail.maxLength = 300;
-    detail.className = "answer-detail";
-    detail.placeholder = "exceptions or detail (optional)";
-    detail.value = before;
+    const detail = answerDetail(before);
     detail.addEventListener("input", changed);
     return { node: detail, read: () => detail.value.trim(), changed: () => detail.value.trim() !== before };
   };
@@ -1321,12 +1313,12 @@
     // Save the answers in as many requests as the limits need, each naming
     // the revision the last one returned.
     const saveInParts = async ({ links, facts }) => {
-      const parts = Math.max(Math.ceil(facts.length / LIMITS.facts),
-        Math.ceil(links.length / LIMITS.links), 1);
+      const parts = Math.max(Math.ceil(facts.length / ANSWER_LIMITS.facts),
+        Math.ceil(links.length / ANSWER_LIMITS.links), 1);
       for (let part = 0; part < parts; part += 1) {
         const reply = await post({
-          links: links.slice(part * LIMITS.links, (part + 1) * LIMITS.links),
-          facts: facts.slice(part * LIMITS.facts, (part + 1) * LIMITS.facts),
+          links: links.slice(part * ANSWER_LIMITS.links, (part + 1) * ANSWER_LIMITS.links),
+          facts: facts.slice(part * ANSWER_LIMITS.facts, (part + 1) * ANSWER_LIMITS.facts),
           save: true,
           revision,
         });
@@ -1357,7 +1349,7 @@
       busy(true);
       try {
         let answers = entered();
-        if (answers.links.length > LIMITS.links || answers.facts.length > LIMITS.facts) {
+        if (answers.links.length > ANSWER_LIMITS.links || answers.facts.length > ANSWER_LIMITS.facts) {
           // More than one request carries: save them all first, then run on
           // the draft.
           await saveInParts(answers);

@@ -157,18 +157,6 @@
     return select;
   };
   let suggestLists = 0;
-  // The submitter's own words beside a closed answer: an exception or a
-  // scope the answer alone would overstate (FactAnswer.detail, ADR 0073).
-  const DETAIL_CHARS = 300;
-  const detailInput = (prefill) => {
-    const detail = document.createElement("input");
-    detail.type = "text";
-    detail.maxLength = DETAIL_CHARS;
-    detail.className = "answer-detail";
-    detail.placeholder = "exceptions or detail (optional)";
-    detail.value = prefill || "";
-    return detail;
-  };
   const withDetail = (answer, detail) => (detail ? { ...answer, detail } : answer);
   const inputFor = (q, prefill, prefillDetail) => {
     let input;
@@ -188,7 +176,7 @@
       }
       input.append(optionOf("I don't know", DONT_KNOW));
       set = (value) => { input.value = value; };
-      detail = detailInput(prefillDetail);
+      detail = answerDetail(prefillDetail || "");
       beside = [input, " ", detail];
     } else if (q.form === "control") {
       // A control: say there is none, say you do not know, or name the
@@ -512,7 +500,7 @@
         row.append(cell);
         return select;
       });
-      const detail = detailInput(prefillDetail);
+      const detail = answerDetail(prefillDetail || "");
       const detailCell = document.createElement("td");
       detailCell.append(detail);
       row.append(detailCell);
@@ -797,13 +785,13 @@
     moreBox.append(moreHint);
     for (const q of [...heldBack, ...belowFloor]) answerLater(moreBox, q);
     // Answers the run an amendment started carried and could not take: each
-    // names a part the corrected model no longer has, or a fact it now states
+    // names a part the amended model no longer has, or a fact it now states
     // (AnswerState.carried, ADR 0072).
     const dropped = data.carried_dropped || [];
     if (dropped.length) {
       const lead = document.createElement("p");
       lead.className = "hint";
-      lead.textContent = `${dropped.length} earlier answer(s) do not fit the corrected`
+      lead.textContent = `${dropped.length} earlier answer(s) do not fit the amended`
         + " system model, so they are not kept:";
       const list = document.createElement("ul");
       for (const a of dropped) {
@@ -815,7 +803,7 @@
       }
       questions.append(lead, list);
     }
-    // A correction to the description itself: a part missing, or a fact read
+    // An amendment to the description itself: a part missing, or a fact read
     // wrongly. The service reads the description again with it, asks again,
     // and keeps every answer that still fits (ADR 0072).
     const fix = document.createElement("details");
@@ -835,7 +823,7 @@
     fixButton.addEventListener("click", () => answerAction(async () => {
       const text = fixText.value.trim();
       if (!text) {
-        refuse("Write the correction first.");
+        refuse("Write the amendment first.");
         return;
       }
       const amended = await fetch("/amend/" + pausedRun, {
@@ -850,7 +838,7 @@
       }
       answerProblem.hidden = true;
       asked.hidden = true;
-      follow(body.run, "Reading your description again with your correction. The"
+      follow(body.run, "Reading your description again with your amendment. The"
         + " service stops for your answers again before the threat analysis starts.");
     }));
     fix.append(fixTitle, fixHint, fixText, fixButton);
