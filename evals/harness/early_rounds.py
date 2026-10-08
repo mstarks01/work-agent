@@ -347,8 +347,9 @@ def replays(root: Path, corpus: Path) -> list[Replay]:
     """Every archived report under ``root`` whose case has a blessed model.
 
     Each model is also replayed once with every framework the archive holds,
-    each with the options an archived job chose for it, so a job whose
-    frameworks share the rounds is measured too.
+    so a job whose frameworks share the rounds is measured too. A framework
+    the report selected keeps the report's options, and any other framework
+    takes the options of an archived job that chose it.
     """
     found: list[Replay] = []
     paths = sorted(root.rglob("*.report.json"))
@@ -375,7 +376,13 @@ def replays(root: Path, corpus: Path) -> list[Replay]:
         )
         if len(every) > 1 and set(frameworks) != set(every):
             found.append(
-                replay(case, report.system_model, blessed, every, "capability-yes")
+                replay(
+                    case,
+                    report.system_model,
+                    blessed,
+                    every | frameworks,
+                    "capability-yes",
+                )
             )
     return found
 
