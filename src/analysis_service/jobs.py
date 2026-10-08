@@ -83,6 +83,18 @@ _LEGAL_TRANSITIONS: dict[JobStatus, frozenset[JobStatus]] = {
 UNSPENT_STATUSES: frozenset[JobStatus] = frozenset({"failed", "rejected"})
 
 
+def held_parent(record: JobRecord) -> str | None:
+    """The job ``record`` holds: the one it resumes, or the one its amendment replaces.
+
+    **The one reader of "which job does this one hold".** A resumed job and a
+    job an amendment started each stop their parent from taking answers while
+    they are in flight or have a report (ADR 0072).
+    """
+    if record.resumption is not None:
+        return record.resumption.parent_id
+    return record.amends
+
+
 def holds_its_parent(status: JobStatus) -> bool:
     """True where a resumed job in ``status`` keeps its parent from taking answers.
 
@@ -233,6 +245,19 @@ class JobRecord(BaseModel):
     # Set on a job resumed from a finished one: its run starts at ``prepare``
     # from these, and runs no extraction and no assertion pass.
     resumption: Resumption | None = None
+    # Set on a job an amendment started (ADR 0072): the paused job whose
+    # description it extracts again with the amendment added. It holds that
+    # job as a resumed job does.
+    amends: str | None = None
+    # The paused job's answers, carried to the job its amendment started. Its
+    # question set takes each one whose fact it still asks, and lists the rest.
+    # The extraction never reads them.
+    carried_links: list[LinkAnswer] = Field(
+        default_factory=list, max_length=MAX_HELD_LINKS
+    )
+    carried_facts: list[FactAnswer] = Field(
+        default_factory=list, max_length=MAX_HELD_FACTS
+    )
     # Whether this job stops after its assertion pass to ask a person, and
     # waits for the answers. Off unless a submission asks for it, so an
     # autonomous run never waits.
@@ -280,6 +305,9 @@ class JobRecord(BaseModel):
         shown_early: Sequence[UnknownKey] = (),
         skipped_early: Sequence[SkipKey] = (),
         resumption: Resumption | None = None,
+        amends: str | None = None,
+        carried_links: Sequence[LinkAnswer] = (),
+        carried_facts: Sequence[FactAnswer] = (),
         ask_questions: bool = False,
         reserved_tokens: int = 0,
     ) -> Self:
@@ -296,6 +324,9 @@ class JobRecord(BaseModel):
             shown_early=list(shown_early),
             skipped_early=list(skipped_early),
             resumption=resumption,
+            amends=amends,
+            carried_links=list(carried_links),
+            carried_facts=list(carried_facts),
             ask_questions=ask_questions,
             created_at=now,
             updated_at=now,
@@ -558,10 +589,8 @@ class InMemoryJobStore:
         """
         if record.id in self._records:
             return Admission(outcome="duplicate", active=0)
-        if (
-            record.resumption is not None
-            and self._resumed_by(record.resumption.parent_id) is not None
-        ):
+        parent = held_parent(record)
+        if parent is not None and self._resumed_by(parent) is not None:
             return Admission(outcome="resumed_already", active=0)
 
         subject = record.owner_subject
@@ -616,18 +645,17 @@ class InMemoryJobStore:
 
         **The one reader of "does this job still take answers".** A job takes
         one resumed job: a report's follow-up runs the analysis once (ADR
-        0054), and a paused job's answers start one analysis. A resumed job
-        that failed or was rejected read nothing into a report, so its parent
-        takes answers again. Admission, a saved round and the questions route
+        0054), and a paused job's answers start one analysis. A job an
+        amendment started holds its paused job the same way (ADR 0072). A
+        held job that failed or was rejected read nothing into a report, so
+        its parent takes answers again. Admission, a saved round and the questions route
         all ask this.
         """
         return next(
             (
                 held.id
                 for held in self._records.values()
-                if held.resumption is not None
-                and held.resumption.parent_id == parent_id
-                and holds_its_parent(held.status)
+                if held_parent(held) == parent_id and holds_its_parent(held.status)
             ),
             None,
         )

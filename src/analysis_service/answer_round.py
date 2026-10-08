@@ -96,14 +96,17 @@ if TYPE_CHECKING:
     from analysis_service.jobs import Checkpoint
 
 __all__ = [
+    "AMENDMENT_LABEL",
     "ANSWER_LIMITS",
     "EARLY_RULES",
     "MAX_SKIPS",
     "AdmittedRound",
     "AlreadyResumed",
+    "AmendedJob",
     "AnswerState",
     "Answers",
     "BandApplicability",
+    "Carried",
     "EarlyRule",
     "MissingRevision",
     "PauseSummary",
@@ -1031,6 +1034,33 @@ class SavedRound:
     revision: int
 
 
+#: The label an amendment's description carries, with its number after it.
+AMENDMENT_LABEL = "Amendment"
+
+
+@dataclass(frozen=True)
+class Carried:
+    """The answers a job an amendment started carried from its paused job.
+
+    ``links`` and ``facts`` are the ones its questions take; the two
+    ``dropped`` lists are the ones they do not, which a page lists.
+    """
+
+    links: tuple[LinkAnswer, ...]
+    facts: tuple[FactAnswer, ...]
+    dropped_links: tuple[LinkAnswer, ...]
+    dropped_facts: tuple[FactAnswer, ...]
+
+
+@dataclass(frozen=True)
+class AmendedJob:
+    """The job an amendment starts: what it extracts, and what it carries."""
+
+    sources: list[Source]
+    links: list[LinkAnswer]
+    facts: list[FactAnswer]
+
+
 @dataclass(frozen=True)
 class SavedDraft:
     """What a report keeps after its follow-up saves a batch. No model runs.
@@ -1106,10 +1136,14 @@ class AnswerState:
     #: not yet run. Empty for a waiting job, whose saved rounds are ``facts``.
     draft_links: Sequence[LinkAnswer] = ()
     draft_facts: Sequence[FactAnswer] = ()
+    #: The answers a paused job held when its amendment started this job
+    #: (ADR 0072). This job's questions take each one they still ask.
+    carried_links: Sequence[LinkAnswer] = ()
+    carried_facts: Sequence[FactAnswer] = ()
 
-    @cached_property
-    def questions(self) -> QuestionSet:
-        """Every question this job asks."""
+    def _question_set(
+        self, facts: Sequence[FactAnswer], links: Sequence[LinkAnswer]
+    ) -> QuestionSet:
         assertions = self.checkpoint.assertions
         return question_set(
             self.checkpoint.system_model,
@@ -1117,13 +1151,118 @@ class AnswerState:
             self.frameworks,
             self.analyses,
             waiting=self.waiting,
-            answered=self.facts,
-            answered_links=self.links,
+            answered=facts,
+            answered_links=links,
             final=self.final,
             shown=self.shown,
             skipped=self.skipped,
             resumed_by=self.resumed_by,
         )
+
+    @cached_property
+    def carried(self) -> Carried:
+        """The carried answers this job's questions take, and those they do not.
+
+        **Each carried answer passes the answer check of this job's own
+        questions**, as a submitter's answer does, so an answer about a part
+        the amended model no longer has, or about a fact it now states, is not
+        taken. An answer this job's own rounds gave since replaces the carried
+        one.
+        """
+        if not (self.carried_facts or self.carried_links):
+            return Carried(links=(), facts=(), dropped_links=(), dropped_facts=())
+        base = self._question_set(self.facts, self.links)
+        saved = {answer.key for answer in self.facts}
+        placed = {fold(link.principal) for link in self.links}
+        facts = [answer for answer in self.carried_facts if answer.key not in saved]
+        links = [
+            link for link in self.carried_links if fold(link.principal) not in placed
+        ]
+        kept_facts = tuple(a for a in facts if self._admits(base, facts=[a]))
+        kept_links = tuple(link for link in links if self._admits(base, links=[link]))
+        return Carried(
+            links=kept_links,
+            facts=kept_facts,
+            dropped_links=tuple(link for link in links if link not in kept_links),
+            dropped_facts=tuple(a for a in facts if a not in kept_facts),
+        )
+
+    def _admits(
+        self,
+        base: QuestionSet,
+        *,
+        facts: Sequence[FactAnswer] = (),
+        links: Sequence[LinkAnswer] = (),
+    ) -> bool:
+        try:
+            base.admit(
+                sources=self.sources,
+                earlier_links=self.links,
+                earlier_facts=self.facts,
+                links=links,
+                facts=facts,
+                save=True,
+            )
+        except ValueError:
+            return False
+        return True
+
+    @property
+    def held_facts(self) -> list[FactAnswer]:
+        """Every fact answer this job holds: the carried ones its questions
+        take, under the ones its own rounds gave."""
+        return merged_facts(self.carried.facts, self.facts)
+
+    @property
+    def held_links(self) -> list[LinkAnswer]:
+        """Every link answer this job holds, as :attr:`held_facts` for facts."""
+        return merged_links(self.carried.links, self.links)
+
+    @cached_property
+    def questions(self) -> QuestionSet:
+        """Every question this job asks."""
+        if not (self.carried.facts or self.carried.links):
+            return self._question_set(self.facts, self.links)
+        return self._question_set(self.held_facts, self.held_links)
+
+    def amend(
+        self, text: str, *, revision: int | None, limits: SourceLimits | None
+    ) -> AmendedJob:
+        """The job an amendment to a paused job's description starts (ADR 0072).
+
+        **An amendment is extracted again, not answered.** A person who sees
+        that the model misses a component or a flow, or reads a stated fact
+        wrongly, writes what is true. The new job extracts the paused job's
+        sources with the amendment added as one more description, and pauses
+        again. It carries the answers this job holds, and its own questions
+        take each one they still ask (:attr:`carried`). The amendment names
+        the revision it read, as a save does.
+        """
+        if self.resumed_by is not None:
+            raise AlreadyResumed(
+                f"job {self.resumed_by} already holds this job's answers;"
+                " read that job, and amend here again only if it fails"
+            )
+        if not self.waiting:
+            raise ValueError(
+                "only a job waiting on answers takes an amendment; submit the"
+                " corrected description as a new job"
+            )
+        if revision is None:
+            raise MissingRevision("send the revision the questions were read with")
+        if revision != self.revision:
+            raise StaleRevision(
+                "the saved answers changed since these questions were read"
+            )
+        kept = [source for source in self.sources if source.kind != "answers"]
+        count = 1 + sum(
+            1 for source in kept if source.label.startswith(AMENDMENT_LABEL)
+        )
+        sources = [*kept, Source.description(text, label=f"{AMENDMENT_LABEL} {count}")]
+        breach = None if limits is None else limits.breach(sources)
+        if breach is not None:
+            raise SourcesOverLimit(breach)
+        return AmendedJob(sources=sources, links=self.held_links, facts=self.held_facts)
 
     def answer(
         self, answers: Answers, *, limits: SourceLimits | None
@@ -1160,8 +1299,8 @@ class AnswerState:
             facts = merged_facts(self.draft_facts, facts)
         admitted = self.questions.admit(
             sources=self.sources,
-            earlier_links=self.links,
-            earlier_facts=self.facts,
+            earlier_links=self.held_links,
+            earlier_facts=self.held_facts,
             links=links,
             facts=facts,
             save=answers.save,

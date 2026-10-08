@@ -266,6 +266,10 @@ class Run:
     #: batches and has not run (ADR 0070).
     draft_links: list[LinkAnswer] = field(default_factory=list)
     draft_facts: list[FactAnswer] = field(default_factory=list)
+    #: The answers a paused run held when its amendment started this run
+    #: (ADR 0072); this run's questions take each one they still ask.
+    carried_links: list[LinkAnswer] = field(default_factory=list)
+    carried_facts: list[FactAnswer] = field(default_factory=list)
     #: The run a submitter's answers started from this one, if any.
     resumed_by: Run | None = None
     #: The report this run's answers came from, for a follow-up: what its own
@@ -339,6 +343,8 @@ class Run:
             resumed_by=None if holding is None else holding.id,
             draft_links=self.draft_links,
             draft_facts=self.draft_facts,
+            carried_links=self.carried_links,
+            carried_facts=self.carried_facts,
         )
 
 
@@ -825,7 +831,7 @@ def create_app(
         )
         payload["description"] = "\n\n".join(source.text for source in run.sources)
         if run.status == "awaiting-answers":
-            payload["questions"] = paused_payload(run, run.state().questions)
+            payload["questions"] = paused_payload(run, run.state())
         return JSONResponse(payload)
 
     @app.post("/analyze")
@@ -1021,7 +1027,7 @@ def create_app(
             parent.shown = list(outcome.shown)
             parent.skipped = list(outcome.skipped)
             parent.revision += 1
-            return JSONResponse(paused_payload(parent, parent.state().questions))
+            return JSONResponse(paused_payload(parent, parent.state()))
         try:
             run = analyses.claim(answering=parent)
         except RegistryFull as exc:
@@ -1040,6 +1046,89 @@ def create_app(
         run.shown = list(outcome.shown)
         run.skipped = list(outcome.skipped)
         start = partial(parent.engine.resume, outcome, system_name=run.name)
+        run.task = asyncio.create_task(_drive(analyses, run, start))
+        return JSONResponse({"run": run.id})
+
+    @app.post("/amend/{run_id}")
+    async def amend(run_id: str, request: Request) -> Response:
+        """Extract a paused run's description again with an amendment (ADR 0072).
+
+        The new run reads the paused run's sources with the amendment added,
+        pauses again, and carries the paused run's answers.
+        """
+        if not is_same_origin(request):
+            logger.warning("refused a POST /amend that was not same-origin")
+            return JSONResponse(
+                {"message": "This request did not come from the app's own page."},
+                status_code=403,
+            )
+        parent = analyses.get(run_id)
+        if (
+            parent is None
+            or parent.checkpoint is None
+            or parent.engine is None
+            or parent.report is not None
+        ):
+            return JSONResponse(
+                {
+                    "message": "Only a run that waits for your answers takes a correction."
+                },
+                status_code=404,
+            )
+        try:
+            body = await request.json()
+            text = body["text"]
+            revision = body["revision"]
+            if not isinstance(text, str) or not isinstance(revision, int):
+                raise TypeError
+        except (ValueError, KeyError, TypeError):
+            return JSONResponse(
+                {"message": "Expected a JSON body with a 'text' and a 'revision'."},
+                status_code=400,
+            )
+        try:
+            amended = parent.state().amend(
+                text, revision=revision, limits=parent.engine.limits
+            )
+        except StaleRevision:
+            return JSONResponse(
+                {
+                    "message": "Your saved answers changed in another tab or"
+                    " window. Reload this page to see them."
+                },
+                status_code=409,
+            )
+        except AlreadyResumed:
+            return JSONResponse(
+                {
+                    "message": "These answers already started an analysis. Open"
+                    " it, or correct here again only if it fails."
+                },
+                status_code=409,
+            )
+        except SourcesOverLimit as exc:
+            return JSONResponse({"message": exc.breach.message}, status_code=400)
+        except ValueError as exc:
+            return JSONResponse({"message": str(exc)}, status_code=400)
+        try:
+            run = analyses.claim(answering=parent)
+        except RegistryFull as exc:
+            return JSONResponse({"message": str(exc)}, status_code=409)
+        if run is None:
+            return JSONResponse(
+                {"message": "An analysis is already running. Wait for it to finish."},
+                status_code=409,
+            )
+        parent.resumed_by = run
+        run.name, run.analysis_id = parent.name, parent.workspace_id
+        run.engine, run.sources = parent.engine, amended.sources
+        run.carried_links, run.carried_facts = amended.links, amended.facts
+        start = partial(
+            parent.engine.analyze,
+            amended.sources,
+            system_name=run.name,
+            ask_questions=True,
+        )
         run.task = asyncio.create_task(_drive(analyses, run, start))
         return JSONResponse({"run": run.id})
 
@@ -1251,7 +1340,7 @@ async def _drive(
             await _emit(run, "done", {"url": f"/report/{run.id}"})
         elif isinstance(outcome, PipelineAwaiting):
             run.checkpoint = outcome.checkpoint
-            await _emit(run, "questions", paused_payload(run, run.state().questions))
+            await _emit(run, "questions", paused_payload(run, run.state()))
         else:
             await _emit(
                 run,
@@ -1372,16 +1461,25 @@ def early_rows(questions: QuestionSet) -> list[dict[str, object]]:
     return [_early_row(question, questions.model) for question in questions.early]
 
 
-def paused_payload(run: Run, questions: QuestionSet) -> dict[str, object]:
+def paused_payload(run: Run, state: AnswerState) -> dict[str, object]:
     """What the form page shows for one round at the pause (ADR 0053).
 
     This round's questions, how many each kind has left, and every earlier
-    answer with its question, so the page can show it and take a new one.
+    answer with its question, so the page can show it and take a new one. A
+    run an amendment started also lists the carried answers its questions do
+    not take (ADR 0072).
     """
+    questions = state.questions
     names = _element_names(questions)
+    carried = state.carried
     return {
         "run": run.id,
         "revision": run.revision,
+        "carried_dropped": [
+            {"label": fact_label(fact.key, questions.model)}
+            | fact.model_dump(mode="json")
+            for fact in carried.dropped_facts
+        ],
         "questions": question_rows(questions),
         "facts": early_rows(questions),
         "remaining": dict(questions.remaining),
