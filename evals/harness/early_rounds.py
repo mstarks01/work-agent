@@ -34,7 +34,7 @@ import json
 import statistics
 import sys
 from collections import Counter
-from collections.abc import Callable, Mapping, Sequence
+from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any
@@ -182,6 +182,10 @@ class Replay:
     below_floor: int = 0
     held_back: int = 0
     units: Mapping[str, Mapping[str, Mapping[str, int]]] = field(default_factory=dict)
+    #: For each selected framework, the questions that serve it: asked by the
+    #: rounds, and held back or under a floor at the stop. A question that
+    #: serves two frameworks counts once for each (#1562).
+    packages: Mapping[str, Mapping[str, int]] = field(default_factory=dict)
 
 
 def _eligible(listed: Sequence[EarlyQuestion]) -> set[UnknownKey]:
@@ -239,6 +243,23 @@ def _admitted(state: AnswerState, given: list[FactAnswer]) -> list[FactAnswer]:
     return kept
 
 
+def _by_package(
+    frameworks: Iterable[FrameworkName],
+    asked: Mapping[UnknownKey, tuple[FrameworkName, ...]],
+    held_back: Sequence[EarlyQuestion],
+    below_floor: Sequence[EarlyQuestion],
+) -> dict[str, dict[str, int]]:
+    """Each framework's count of asked, held-back and below-floor questions."""
+    return {
+        name: {
+            "asked": sum(name in served for served in asked.values()),
+            "held_back": sum(name in question.frameworks for question in held_back),
+            "below_floor": sum(name in question.frameworks for question in below_floor),
+        }
+        for name in frameworks
+    }
+
+
 def replay(
     case: str,
     extracted: SystemModel,
@@ -252,7 +273,7 @@ def replay(
     listed = early_questions(extracted, frameworks, None)
     first = _eligible(listed)
     seen: set[UnknownKey] = set()
-    asked_keys: set[UnknownKey] = set()
+    asked_keys: dict[UnknownKey, tuple[FrameworkName, ...]] = {}
     per_round: list[int] = []
     showings: Counter[UnknownKey] = Counter()
     skipped: tuple[SkipKey, ...] = ()
@@ -283,7 +304,7 @@ def replay(
         kept = _admitted(state, given)
         skipped = _saved(state, kept, skips).skipped
         answered = merged_facts(answered, kept)
-        asked_keys |= {question.key for question in asked.early}
+        asked_keys |= {question.key: question.frameworks for question in asked.early}
     else:
         rounds = MAX_ROUNDS
     return Replay(
@@ -297,7 +318,7 @@ def replay(
         decisions=sum(per_round),
         widest=max(per_round, default=0),
         added=len(seen - first),
-        removed=len(first - asked_keys),
+        removed=len(first - asked_keys.keys()),
         ended=rounds < MAX_ROUNDS,
         skipped=len(skipped),
         repeats=sum(count - 1 for count in showings.values()),
@@ -316,6 +337,9 @@ def replay(
             }
             for name, bands in asked.summary.applicability.items()
         },
+        packages=_by_package(
+            frameworks, asked_keys, asked.held_back, asked.below_floor
+        ),
     )
 
 
@@ -394,8 +418,26 @@ def summary(found: list[Replay]) -> dict[str, dict[str, object]]:
         figures["not_ended"] = sum(1 for row in rows if not row.ended)
         figures["stops"] = dict(Counter(row.stop for row in rows))
         figures["unknown_share"] = _unknown_shares(rows)
+        figures["packages"] = _package_figures(rows)
         table[group] = figures
     return table
+
+
+def _package_figures(rows: Sequence[Replay]) -> dict[str, dict[str, object]]:
+    """For each framework, its asked, held-back and below-floor counts: the
+    median over the models, and the most."""
+    counts: dict[str, dict[str, list[int]]] = {}
+    for row in rows:
+        for name, figures in row.packages.items():
+            for figure, value in figures.items():
+                counts.setdefault(name, {}).setdefault(figure, []).append(value)
+    return {
+        name: {
+            figure: {"median": statistics.median(values), "max": max(values)}
+            for figure, values in figures.items()
+        }
+        for name, figures in sorted(counts.items())
+    }
 
 
 def _unknown_shares(rows: Sequence[Replay]) -> dict[str, dict[str, object]]:

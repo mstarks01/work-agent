@@ -69,3 +69,21 @@ def test_a_replay_records_what_its_stop_leaves_open():
     assert found.held_back + found.below_floor > 0, "a control: something stays out"
     stride = replay("case", valid_model(), valid_model(), STRIDE, "capability-yes")
     assert stride.units == {}
+
+
+def test_a_replay_counts_each_package_apart():
+    """Each selected package gets its own asked, held-back and below-floor
+    counts, so the replay shows when one package starves another (#1562)."""
+    both = replay("case", open_controls(), valid_model(), BOTH, "capability-yes")
+    assert set(both.packages) == {"stride", "asvs"}
+    asked = [figures["asked"] for figures in both.packages.values()]
+    assert max(asked) <= both.asked <= sum(asked)
+    assert sum(f["held_back"] for f in both.packages.values()) >= both.held_back
+    alone = replay("case", open_controls(), valid_model(), STRIDE, "capability-yes")
+    assert alone.packages == {
+        "stride": {
+            "asked": alone.asked,
+            "held_back": alone.held_back,
+            "below_floor": alone.below_floor,
+        }
+    }
