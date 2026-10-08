@@ -2732,6 +2732,50 @@ class TestEarlierAnswers:
         client.get(f"/events/{started.json()['run']}")
         assert [fact.value for fact in runner.resumed_facts[-1]] == ["no"]
 
+    def test_a_save_while_a_run_reads_its_body_is_not_lost(self, tiers, monkeypatch):
+        """The route reads the state after the body, so a save that lands while
+        a run's body arrives moves the revision the run is checked against
+        (checkpoint review c1)."""
+        from starlette.requests import Request
+
+        from webapp.main import Analyses
+
+        client, _, report, key = self.first_report(tiers, "yes")
+        saved = client.post(
+            f"/answer/{report}",
+            json={
+                "links": [],
+                "facts": [{"key": key, "value": "no"}],
+                "save": True,
+                "revision": 0,
+            },
+            headers=SAME_ORIGIN,
+        )
+        assert saved.json() == {"saved": True, "revision": 1}
+        late = FactAnswer.model_validate({"key": key, "value": "late"})
+        got, read = Analyses.get, Request.json
+        seen = []
+
+        def get(self, run_id):
+            seen.append(got(self, run_id))
+            return seen[-1]
+
+        async def racing(self):
+            body = await read(self)
+            # A second tab's save, as the route writes one.
+            seen[-1].draft_facts, seen[-1].revision = [late], seen[-1].revision + 1
+            return body
+
+        monkeypatch.setattr(Analyses, "get", get)
+        monkeypatch.setattr(Request, "json", racing)
+        started = client.post(
+            f"/answer/{report}",
+            json={"links": [], "facts": [], "revision": 1},
+            headers=SAME_ORIGIN,
+        )
+        assert started.status_code == 409, started.text
+        assert seen[-1].resumed_by is None, "no run started on the old draft"
+
     def test_a_request_over_the_limit_says_to_save_in_parts(self, tiers):
         client, _, report, _ = self.first_report(tiers, "yes")
         facts = [
@@ -3323,6 +3367,7 @@ class TestTheAmendment:
         assert sources[-1].text == AMENDMENT and sources[-1].label == "Amendment 1"
         assert answer["key"] in [a["key"] for a in again["answered"]]
         assert again["carried_dropped"] == []
+        assert again["carried_dropped_links"] == []
         held = client.post(
             f"/answer/{paused}",
             json={"links": [], "facts": [], "revision": 1},
@@ -3363,14 +3408,16 @@ streams[0].listeners.questions({ data: JSON.stringify({ run: "r1", questions: []
   facts: [], remaining: {}, stop: "nothing-left", gates: {asvs: "refuted"},
   answered: [], answered_links: [], revision: 0,
   carried_dropped: [{ label: "Old DB: encryption at rest", value: "AES",
-    key: ["store:old", "encryption_at_rest", "", "", "", ""] }] }) });
+    key: ["store:old", "encryption_at_rest", "", "", "", ""] }],
+  carried_dropped_links: [{ principal: "batch loader", element: "none" }] }) });
 const text = (n) => typeof n === "string" ? n
   : [n.textContent || "", ...(n.children || []).map(text)].join("");
 calls.push({ said: text(ids.questions) });
 """
         said = _run_form_script(steps)["calls"][-1]["said"]
-        assert "1 earlier answer(s) do not fit the amended system model" in said
+        assert "2 earlier answer(s) do not fit the amended system model" in said
         assert "Old DB: encryption at rest \u2014 AES" in said
+        assert "batch loader \u2014 none of these" in said, "a link answer is listed"
 
 
 class TestFacetNeedsAndDetails:

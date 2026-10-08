@@ -91,6 +91,9 @@ def _completed(store, report, resumption=None):
     )
     if resumption is not None:
         record.resumption = resumption
+        # The revision the parent held when its answers were read, as the
+        # answer route records it; admission refuses any other.
+        record.parent_revision = 0
     record.transition("running")
     record.report = report
     record.transition("completed")

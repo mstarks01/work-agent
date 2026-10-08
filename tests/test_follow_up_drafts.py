@@ -267,3 +267,25 @@ class TestTheDraft:
         assert refused.status_code == 400
         assert "still available" in refused.json()["detail"]
         assert _started(store, job) is None
+
+
+class TestASaveDuringARunIsNotLost:
+    """A run reads the draft, and a save that lands before its admission is
+    not dropped in silence (#1542 Package C, checkpoint review c1)."""
+
+    def test_a_save_between_the_read_and_the_admission_refuses_the_run(self):
+        client, store = _client()
+        job = _finished(store, count=3)
+        late = FactAnswer(key=tuple(_subject(2)), value="late")
+        reserve = store.reserve
+
+        async def racing(record, **bounds):
+            # A second tab's save lands after the run composed its answers.
+            assert await store.save_draft(job, "alice", [], [late], 0)
+            return await reserve(record, **bounds)
+
+        store.reserve = racing
+        response = _post(client, job, {"facts": _facts([0]), "revision": 0})
+        assert response.status_code == 409, response.text
+        assert _started(store, job) is None
+        assert late in asyncio.run(store.owned(job, "alice")).draft_facts

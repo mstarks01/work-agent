@@ -249,6 +249,10 @@ class JobRecord(BaseModel):
     # description it extracts again with the amendment added. It holds that
     # job as a resumed job does.
     amends: str | None = None
+    # The parent job's round revision this job's answers were composed from.
+    # Admission refuses the job where a save moved it since, so a batch saved
+    # in another tab never misses the run in silence (ADR 0070).
+    parent_revision: int | None = None
     # The paused job's answers, carried to the job its amendment started. Its
     # question set takes each one whose fact it still asks, and lists the rest.
     # The extraction never reads them.
@@ -306,6 +310,7 @@ class JobRecord(BaseModel):
         skipped_early: Sequence[SkipKey] = (),
         resumption: Resumption | None = None,
         amends: str | None = None,
+        parent_revision: int | None = None,
         carried_links: Sequence[LinkAnswer] = (),
         carried_facts: Sequence[FactAnswer] = (),
         ask_questions: bool = False,
@@ -325,6 +330,7 @@ class JobRecord(BaseModel):
             skipped_early=list(skipped_early),
             resumption=resumption,
             amends=amends,
+            parent_revision=parent_revision,
             carried_links=list(carried_links),
             carried_facts=list(carried_facts),
             ask_questions=ask_questions,
@@ -450,6 +456,7 @@ AdmissionOutcome = Literal[
     "over_global_budget",
     "duplicate",
     "resumed_already",
+    "parent_moved",
 ]
 
 
@@ -596,6 +603,12 @@ class InMemoryJobStore:
         parent = held_parent(record)
         if parent is not None and self._resumed_by(parent) is not None:
             return Admission(outcome="resumed_already", active=0)
+        parent_record = None if parent is None else self._records.get(parent)
+        if (
+            parent_record is not None
+            and parent_record.round_revision != record.parent_revision
+        ):
+            return Admission(outcome="parent_moved", active=0)
 
         subject = record.owner_subject
         since = budget.window_start()

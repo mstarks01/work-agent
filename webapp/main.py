@@ -936,9 +936,14 @@ def create_app(
                 {"message": "That run asks no question, or no longer exists."},
                 status_code=404,
             )
-        state = parent.state()
         try:
             body = await request.json()
+        except ValueError:
+            body = None  # refused below, as every other malformed body is
+        # Read after the body: nothing awaits from here to the write or the
+        # claim, so a save in another tab cannot land between them.
+        state = parent.state()
+        try:
             raw = body["links"]
             raw_facts = body.get("facts", [])
             if (
@@ -1009,16 +1014,7 @@ def create_app(
             # they are safe to show.
             return JSONResponse({"message": str(exc)}, status_code=400)
         if isinstance(outcome, SavedDraft):
-            # A draft runs nothing and spends no follow-up (ADR 0070). The
-            # revision check and the write are one step: nothing awaits here.
-            if parent.revision != outcome.revision or parent.resumed_by is not None:
-                return JSONResponse(
-                    {
-                        "message": "Your saved answers changed in another tab or"
-                        " window. Reload this page to see them."
-                    },
-                    status_code=409,
-                )
+            # A draft runs nothing and spends no follow-up (ADR 0070).
             parent.draft_links, parent.draft_facts = outcome.links, outcome.facts
             parent.revision += 1
             return JSONResponse({"saved": True, "revision": parent.revision})
@@ -1455,15 +1451,9 @@ def paused_payload(run: Run, state: AnswerState) -> dict[str, object]:
     """
     questions = state.questions
     names = _element_names(questions)
-    carried = state.carried
-    return {
+    return state.carried.dropped_json(questions.model) | {
         "run": run.id,
         "revision": run.revision,
-        "carried_dropped": [
-            {"label": fact_label(fact.key, questions.model)}
-            | fact.model_dump(mode="json")
-            for fact in carried.dropped_facts
-        ],
         "questions": question_rows(questions),
         "facts": early_rows(questions),
         "remaining": dict(questions.remaining),

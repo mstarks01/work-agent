@@ -145,3 +145,32 @@ class TestTheExposureIsCountedApartFromTheLimit:
         assert summary.choices == sum(seen.values()) > summary.introduced
         assert summary.skipped == len(seen)
         assert (summary.settled, summary.partial, summary.unknown) == (0, 0, 0)
+
+
+def test_the_first_round_counts_only_the_questions_it_presented():
+    """A part whose parent is unanswered is hidden, so it is not introduced
+    (ADR 0068, checkpoint review c3)."""
+    asked = _paused(valid_model(), {"asvs": {"level": 2}})
+    presented = asked.presented([])
+    assert len(presented) < len(asked.early), "a control: the round hides a part"
+    assert asked.summary.introduced == len(presented)
+
+
+def test_a_pause_whose_questions_left_were_all_skipped_says_so():
+    """A skipped question stays open and takes an answer, so the stop is not
+    ``nothing-left`` (ADR 0068, checkpoint review c4)."""
+    path = PROJECT_ROOT / "evals/corpus/07-cicd-store-deploy/model.json"
+    model = SystemModel.model_validate_json(path.read_text())
+    selection = {"asvs": {"level": 1}}
+    shown, skipped = (), []
+    for _ in range(30):
+        asked = _paused(model, selection, (), shown, skipped)
+        if asked.done:
+            break
+        admitted = _save(asked, [], skips=list(asked.presented([])))
+        shown, skipped = admitted.shown, list(admitted.skipped)
+    else:
+        pytest.fail("the rounds never ended")
+    assert (asked.held_back, asked.below_floor) == ((), ()), "a control"
+    assert asked.summary.skipped > 0
+    assert asked.stop == "skipped"

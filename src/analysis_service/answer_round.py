@@ -47,7 +47,7 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field, replace
 from functools import cached_property
 from types import MappingProxyType
-from typing import TYPE_CHECKING, Annotated, Any
+from typing import TYPE_CHECKING, Annotated, Any, Literal
 
 from pydantic import StringConstraints
 
@@ -118,6 +118,7 @@ __all__ = [
     "SkipKey",
     "SourcesOverLimit",
     "StaleRevision",
+    "Stop",
     "by_turn",
     "next_round",
     "passes_floor",
@@ -160,6 +161,9 @@ EARLY_RULES: Mapping[str, EarlyRule] = {
 #: question's key, the :func:`~analysis_service.links.fold` of its principal.
 #: A skip of a link places nothing and never means "none of these".
 SkipKey = UnknownKey | Annotated[str, StringConstraints(min_length=1, max_length=200)]
+
+#: Why a waiting job asks nothing more (:attr:`QuestionSet.stop`, ADR 0068).
+Stop = Literal["budget-exhausted", "below-floor", "skipped", "nothing-left"]
 
 #: The most skips one save names: every fact and link answer it could carry.
 MAX_SKIPS = MAX_FACT_ANSWERS + MAX_LINK_ANSWERS
@@ -356,19 +360,22 @@ class QuestionSet:
         return len(self.held_back)
 
     @property
-    def stop(self) -> str | None:
+    def stop(self) -> Stop | None:
         """Why a waiting job asks nothing more, or ``None`` while it asks.
 
         **No stop says every fact is settled.** ``budget-exhausted`` where the
         limits hold questions back, ``below-floor`` where only questions under
-        a floor are left, and ``nothing-left`` where no open question is left
-        to ask. In each case :attr:`summary` says what stays open.
+        a floor are left, ``skipped`` where every question left was skipped,
+        and ``nothing-left`` where no open question is left to ask. In each
+        case :attr:`summary` says what stays open.
         """
         if not self.done:
             return None
         if self.held_back:
             return "budget-exhausted"
-        return "below-floor" if self.below_floor else "nothing-left"
+        if self.below_floor:
+            return "below-floor"
+        return "skipped" if self.skipped or self.skipped_links else "nothing-left"
 
     @property
     def asked(self) -> frozenset[UnknownKey]:
@@ -514,18 +521,7 @@ class QuestionSet:
         and a skip of it is refused. ``answers`` is every answer the job holds
         with this submission's in.
         """
-        said = {answer.key: answer.value for answer in answers}
-        asked = {question.key for question in self.early}
-        hidden: set[UnknownKey] = set()
-        # A parent comes before its parts in a round (by_turn keeps each
-        # framework's order), so one pass reaches a part of a part.
-        for question in self.early:
-            parent = question.parent
-            if parent in asked and (parent in hidden or said.get(parent) != "yes"):
-                hidden.add(question.key)
-        return tuple(
-            question.key for question in self.early if question.key not in hidden
-        )
+        return _presented(self.early, answers)
 
     def correct(
         self,
@@ -763,12 +759,28 @@ def question_set(
             listed,
             done,
             answered,
-            [*shown, *(question.key for question in this_round)],
+            [*shown, *_presented(this_round, answered)],
             skipped=len(aside),
             held_back=len(held_back),
             below_floor=len(below_floor),
         ),
     )
+
+
+def _presented(
+    early: Sequence[EarlyQuestion], answers: Sequence[FactAnswer]
+) -> tuple[UnknownKey, ...]:
+    """The rule :meth:`QuestionSet.presented` states, for a round's questions."""
+    said = {answer.key: answer.value for answer in answers}
+    asked = {question.key for question in early}
+    hidden: set[UnknownKey] = set()
+    # A parent comes before its parts in a round (by_turn keeps each
+    # framework's order), so one pass reaches a part of a part.
+    for question in early:
+        parent = question.parent
+        if parent in asked and (parent in hidden or said.get(parent) != "yes"):
+            hidden.add(question.key)
+    return tuple(question.key for question in early if question.key not in hidden)
 
 
 def _summary(
@@ -1062,6 +1074,19 @@ class Carried:
     facts: tuple[FactAnswer, ...]
     dropped_links: tuple[LinkAnswer, ...]
     dropped_facts: tuple[FactAnswer, ...]
+
+    def dropped_json(self, model: SystemModel) -> dict[str, list[dict[str, object]]]:
+        """The answers its questions do not take, as every surface lists them:
+        each fact with the label its question shows, and each link."""
+        return {
+            "carried_dropped": [
+                {"label": fact_label(fact.key, model)} | fact.model_dump(mode="json")
+                for fact in self.dropped_facts
+            ],
+            "carried_dropped_links": [
+                link.model_dump(mode="json") for link in self.dropped_links
+            ],
+        }
 
 
 @dataclass(frozen=True)
