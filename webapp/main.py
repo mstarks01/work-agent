@@ -140,7 +140,6 @@ from analysis_service.answer_round import (
     QuestionSet,
     SavedDraft,
     SavedRound,
-    SkipKey,
     SourcesOverLimit,
     StaleRevision,
 )
@@ -151,6 +150,7 @@ from analysis_service.early_questions import EarlyQuestion
 from analysis_service.fact_answers import (
     MAX_FACT_ANSWERS,
     FactAnswer,
+    SkipKey,
     answer_facets,
     fact_label,
     key_ref,

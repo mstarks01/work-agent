@@ -47,9 +47,7 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field, replace
 from functools import cached_property
 from types import MappingProxyType
-from typing import TYPE_CHECKING, Annotated, Any, Literal
-
-from pydantic import StringConstraints
+from typing import TYPE_CHECKING, Any, Literal
 
 from analysis_service.assertions import UNKNOWN, AssertionCatalog
 from analysis_service.bands import UNRANKED
@@ -65,6 +63,7 @@ from analysis_service.fact_answers import (
     MAX_FACT_ANSWERS,
     MAX_HELD_FACTS,
     FactAnswer,
+    SkipKey,
     answer_facets,
     answered_keys,
     fact_label,
@@ -115,7 +114,6 @@ __all__ = [
     "ResumedJob",
     "SavedDraft",
     "SavedRound",
-    "SkipKey",
     "SourcesOverLimit",
     "StaleRevision",
     "Stop",
@@ -156,11 +154,6 @@ EARLY_RULES: Mapping[str, EarlyRule] = {
     "field": EarlyRule(floor=1.0, limit=30, per_round=5),
 }
 
-
-#: What a saved round skips for now: an early question's fact key, or a link
-#: question's key, the :func:`~analysis_service.links.fold` of its principal.
-#: A skip of a link places nothing and never means "none of these".
-SkipKey = UnknownKey | Annotated[str, StringConstraints(min_length=1, max_length=200)]
 
 #: Why a waiting job asks nothing more (:attr:`QuestionSet.stop`, ADR 0068).
 Stop = Literal["budget-exhausted", "below-floor", "skipped", "nothing-left"]
