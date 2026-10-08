@@ -6,6 +6,7 @@ from pathlib import Path
 
 import pytest
 
+from analysis_service.frameworks.asvs.catalog import AsvsLevel
 from evals.harness import early_rounds
 from evals.harness.early_rounds import ANSWERERS, replay
 from tests.factories import FrameworkSelection, sample_report, valid_model
@@ -101,7 +102,7 @@ def _archived(root: Path, case: str, report) -> None:
     (folder / f"{case}.report.json").write_text(report.model_dump_json())
 
 
-def _asvs_report(level: int):
+def _asvs_report(level: AsvsLevel):
     report = sample_report(analyses=[_block(level)])
     selection = FrameworkSelection(name="asvs", options={"level": level})
     return report.model_copy(
