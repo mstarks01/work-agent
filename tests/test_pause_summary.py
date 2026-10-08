@@ -145,3 +145,12 @@ class TestTheExposureIsCountedApartFromTheLimit:
         assert summary.choices == sum(seen.values()) > summary.introduced
         assert summary.skipped == len(seen)
         assert (summary.settled, summary.partial, summary.unknown) == (0, 0, 0)
+
+
+def test_the_first_round_counts_only_the_questions_it_presented():
+    """A part whose parent is unanswered is hidden, so it is not introduced
+    (ADR 0068, checkpoint review c3)."""
+    asked = _paused(valid_model(), {"asvs": {"level": 2}})
+    presented = asked.presented([])
+    assert len(presented) < len(asked.early), "a control: the round hides a part"
+    assert asked.summary.introduced == len(presented)

@@ -514,18 +514,7 @@ class QuestionSet:
         and a skip of it is refused. ``answers`` is every answer the job holds
         with this submission's in.
         """
-        said = {answer.key: answer.value for answer in answers}
-        asked = {question.key for question in self.early}
-        hidden: set[UnknownKey] = set()
-        # A parent comes before its parts in a round (by_turn keeps each
-        # framework's order), so one pass reaches a part of a part.
-        for question in self.early:
-            parent = question.parent
-            if parent in asked and (parent in hidden or said.get(parent) != "yes"):
-                hidden.add(question.key)
-        return tuple(
-            question.key for question in self.early if question.key not in hidden
-        )
+        return _presented(self.early, answers)
 
     def correct(
         self,
@@ -763,12 +752,28 @@ def question_set(
             listed,
             done,
             answered,
-            [*shown, *(question.key for question in this_round)],
+            [*shown, *_presented(this_round, answered)],
             skipped=len(aside),
             held_back=len(held_back),
             below_floor=len(below_floor),
         ),
     )
+
+
+def _presented(
+    early: Sequence[EarlyQuestion], answers: Sequence[FactAnswer]
+) -> tuple[UnknownKey, ...]:
+    """The rule :meth:`QuestionSet.presented` states, for a round's questions."""
+    said = {answer.key: answer.value for answer in answers}
+    asked = {question.key for question in early}
+    hidden: set[UnknownKey] = set()
+    # A parent comes before its parts in a round (by_turn keeps each
+    # framework's order), so one pass reaches a part of a part.
+    for question in early:
+        parent = question.parent
+        if parent in asked and (parent in hidden or said.get(parent) != "yes"):
+            hidden.add(question.key)
+    return tuple(question.key for question in early if question.key not in hidden)
 
 
 def _summary(
