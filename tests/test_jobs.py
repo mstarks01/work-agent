@@ -1,9 +1,12 @@
 """Job lifecycle, event log, in-memory store, and executor behavior."""
 
 import asyncio
+import json
+import logging
 
 import pytest
 
+from analysis_service.assertions import AssertionCatalog, AssertionRecord
 from analysis_service.execution import GraphFailed
 from analysis_service.jobs import (
     DEADLINE_FAILURE_MESSAGE,
@@ -16,6 +19,7 @@ from analysis_service.jobs import (
     JobStatus,
     JobStoreConfigError,
     NodeCallback,
+    PipelineCompleted,
     PipelineOutcome,
     PipelineRejected,
     Resumption,
@@ -544,6 +548,36 @@ class TestExecuteJob:
             return await store.get(record.id)
 
         return asyncio.run(scenario())
+
+    def test_a_completed_job_logs_its_use_of_the_catalog(self, caplog):
+        """The job store keeps no history, so the log is where the figures go."""
+
+        class CatalogRunner(StubPipelineRunner):
+            async def run(self, job, on_node):
+                outcome = await super().run(job, on_node)
+                record = AssertionRecord(proposed=0, catalog=AssertionCatalog())
+                return PipelineCompleted(
+                    report=outcome.report.model_copy(update={"assertions": record})
+                )
+
+        with caplog.at_level(logging.INFO, logger="analysis_service.jobs"):
+            record = self.run_with(CatalogRunner())
+
+        (line,) = [
+            entry.getMessage()
+            for entry in caplog.records
+            if "assertion use" in entry.getMessage()
+        ]
+        assert line.startswith(f"job {record.id} assertion use: ")
+        assert json.loads(line.split(": ", 1)[1])["rows"] == 0
+
+    def test_a_job_that_ran_no_pass_logs_no_use(self, caplog):
+        with caplog.at_level(logging.INFO, logger="analysis_service.jobs"):
+            self.run_with(StubPipelineRunner())
+
+        assert not any(
+            "assertion use" in entry.getMessage() for entry in caplog.records
+        )
 
     def test_stub_runner_completes_with_report(self):
         record = self.run_with(StubPipelineRunner())

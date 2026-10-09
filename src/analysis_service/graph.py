@@ -134,7 +134,11 @@ from analysis_service.assertions import (
     CatalogProposal,
 )
 from analysis_service.basis import unbased_controls
-from analysis_service.candidates import CandidateSet, generate_candidates
+from analysis_service.candidates import (
+    CandidateSet,
+    catalog_leads,
+    generate_candidates,
+)
 from analysis_service.claims import (
     AnalysisMarks,
     Claim,
@@ -1687,6 +1691,8 @@ def prepare_analysis(
         else None
     )
     held = None if record is None else record.catalog
+    # What the rules would read with no catalog, for ``catalog_leads``.
+    unprojected = model
     if held is not None:
         # ADR 0034's migration, applied where the catalog answers. The model
         # every consumer reads from here on is the projected one, and it is put
@@ -1774,6 +1780,14 @@ def prepare_analysis(
                         for candidate_set in candidates.values()
                         for candidate in candidate_set.candidates
                     }
+                ),
+                "catalog_leads": (
+                    None
+                    if held is None
+                    else catalog_leads(
+                        candidates,
+                        generate_candidates(unprojected, package.lanes, package.rules),
+                    )
                 ),
             },
         )
@@ -2590,6 +2604,7 @@ def _framework_block(
         ],
         fired_rules=list(retrieved.get("fired_rules", [])),
         knowledge_docs=list(retrieved.get("knowledge_docs", [])),
+        catalog_leads=retrieved.get("catalog_leads"),
         summary=schemas.block.summarize(claims, rejected),
         **{
             field: value

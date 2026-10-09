@@ -94,6 +94,7 @@ class FrameworkAnalysis:
     dropped_claims: list[DroppedClaim]
     fired_rules: list[str]  # this package's deterministic rules that matched
     knowledge_docs: list[str]  # local-corpus documents those rules retrieved
+    catalog_leads: int | None  # leads only the assertion catalog gave; null with no pass
     summary: BlockSummary
 ```
 
@@ -730,6 +731,7 @@ for the reason the split gives above — they name one package's own rules:
 ```python
 fired_rules: list[str]  # this package's deterministic rules that matched, sorted
 knowledge_docs: list[str]  # local-corpus documents those rules retrieved
+catalog_leads: int | None  # leads only the assertion catalog gave; null where no pass ran
 ```
 
 The report records what each node *ran on* (`nodes`, `sampling`) and what each
