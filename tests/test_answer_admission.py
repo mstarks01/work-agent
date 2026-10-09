@@ -433,6 +433,7 @@ class TestTheBoundedRounds:
             parent=None,
             frameworks=("stride",),
             gates=(),
+            group="capacity-limits",
         )
         shown, _, _ = next_round([wide], frozenset(), {})
         assert shown == (wide,)
@@ -473,6 +474,7 @@ class TestTheBoundedRounds:
                 parent=None,
                 frameworks=(framework,),
                 gates=(),
+                group="authentication",
             )
 
         limit = EARLY_RULES["field"].limit
@@ -508,6 +510,7 @@ class TestTheBoundedRounds:
                 parent=None,
                 frameworks=("stride",),
                 gates=(),
+                group="capacity-limits",
             )
 
         listed = [capacity_of(n) for n in range(31)]
@@ -1299,17 +1302,60 @@ class TestTheFrameworksTakeTurns:
         backward = dict(reversed(BOTH.items()))
         assert self.round_of(BOTH) == self.round_of(backward)
 
-    def test_one_framework_keeps_the_list_s_order(self):
-        from analysis_service.answer_round import by_turn
+    def test_one_framework_shows_the_list_s_order_in_boxes(self):
+        from analysis_service.answer_round import in_boxes
 
         shown = self.round_of({"stride": {}})
-        assert list(shown) == by_turn(shown)
         listed = [
-            q.key
+            q
             for q in early_questions(valid_model(), {"stride": {}}, None)
             if q.key in {s.key for s in shown}
         ]
-        assert [q.key for q in shown] == listed
+        assert [q.key for q in shown] == [q.key for q in in_boxes(listed)]
+
+    def test_each_group_shows_once_in_a_round(self):
+        """A page shows a group under one heading, so a round never comes
+        back to a group it has left (QA-2026-10-09-02)."""
+        groups = [q.group for q in self.round_of(BOTH)]
+        runs = [group for at, group in enumerate(groups) if group not in groups[:at]]
+        assert groups == sorted(groups, key=runs.index)
+
+    def test_a_tie_goes_to_the_framework_with_the_smaller_next_box(self):
+        """A large box waits for its framework's turn, so it does not push out
+        another framework's small boxes (QA-2026-10-09-02-E2)."""
+        from analysis_service.answer_round import in_boxes
+
+        def question(key, group, *frameworks, gates=()):
+            return SimpleNamespace(
+                key=(key,), group=group, frameworks=frameworks, decisions=1, gates=gates
+            )
+
+        capabilities = [question(f"c{n}", "capabilities", "asvs") for n in range(5)]
+        field = question("f", "encryption", "stride")
+        later = question("g", "authentication", "stride")
+        order = in_boxes([*capabilities, field, later])
+        assert [q.key for q in order] == [
+            ("f",),
+            *[q.key for q in capabilities],
+            ("g",),
+        ]
+
+    def test_a_box_that_holds_a_gate_comes_first(self):
+        from analysis_service.answer_round import in_boxes
+
+        def question(key, group, gates=()):
+            return SimpleNamespace(
+                key=(key,), group=group, frameworks=("asvs",), decisions=1, gates=gates
+            )
+
+        field = question("f", "encryption")
+        gate = question("g", "capabilities", gates=("asvs",))
+        part = question("p", "capabilities")
+        assert [q.key for q in in_boxes([field, gate, part])] == [
+            ("g",),
+            ("p",),
+            ("f",),
+        ]
 
     def test_a_shared_question_is_charged_to_each_framework_it_serves(self):
         from analysis_service.answer_round import by_turn

@@ -205,8 +205,9 @@ class EarlyQuestion:
     #: not a measured count of the findings an answer changes. For a
     #: capability, how many units it could settle. The list ranks a field
     #: question by this value per choice (:attr:`decisions`), capabilities
-    #: first; a round reorders its own questions with the
-    #: frameworks in turn (:func:`~analysis_service.answer_round.by_turn`).
+    #: first; a round takes its places with the frameworks in turn
+    #: (:func:`~analysis_service.answer_round.by_turn`) and is shown in boxes
+    #: (:func:`~analysis_service.answer_round.in_boxes`).
     score: float = 0.0
     #: The key of the question this one depends on: a capability's parent,
     #: whose "no" makes this one moot. ``None`` for every other question.

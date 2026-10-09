@@ -2633,7 +2633,9 @@ class TestEarlierAnswers:
         client = client_for(tiers, runner)
         paused = start(client, questions=True)
         shown = event(client.get(f"/events/{paused}").text, "questions")
-        key = shown["facts"][0]["key"]
+        key = next(
+            fact["key"] for fact in shown["facts"] if fact["key"][5] == "authentication"
+        )
         started = client.post(
             f"/answer/{paused}",
             json={
