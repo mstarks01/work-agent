@@ -23,6 +23,15 @@ commits, and a replay across a prompt change measures that change.
 **One extra user part, on request.** ``--append`` sends a file's text as a
 second part of the user turn, after the captured input. ADR 0030's measurement
 tries its instruction this way, so both of its arms read the same prompt files.
+
+**Today's ``prepare``, on request.** ``--prepare-today`` builds the lane's whole
+request from the case instead of from a sweep: the real ``prepare`` node runs
+offline over the case's blessed model, with no catalog or with the case's
+signed facts as the assertion proposal. The two arms differ only in that
+catalog, so a pair of replays measures what ``ANALYSIS_ASSERTIONS`` can give a
+lane when its pass writes exactly the signed rows (#1231). The lane's drafts
+are then scored by :func:`~evals.harness.descendants.lane_must_finds`, for the
+package that scores drafts by an action and a place.
 """
 
 from __future__ import annotations
@@ -31,6 +40,7 @@ import argparse
 import asyncio
 import json
 import sys
+from dataclasses import dataclass
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any, cast
@@ -43,18 +53,26 @@ from pydantic import BaseModel
 
 from analysis_service.claims import FrameworkName
 from analysis_service.deployment import Deployment
+from analysis_service.execution import GraphRun, seed_state
 from analysis_service.frameworks import PACKAGES, package_for, schemas_for
 from analysis_service.graph import (
+    STATE_ASSERTION_PROPOSAL,
+    STATE_FRAMEWORK_OPTIONS,
+    STATE_VALID_MODEL,
     FrameworkNodes,
+    GraphKeys,
     Lane,
     analyze_instruction,
     framework_lane_inputs,
+    prepare_analysis,
 )
 from analysis_service.markdown_loader import MarkdownLoader
 from analysis_service.prompts import lane_closing
 from evals.harness.artifact import repo_commit
 from evals.harness.bundle import reports_dir
-from evals.harness.modes import EvalRunError
+from evals.harness.descendants import FRAMEWORK as SCORED
+from evals.harness.descendants import lane_must_finds
+from evals.harness.modes import EvalRunError, case_framework_options
 from evals.harness.node_call import NodeCall, node_call
 from evals.harness.provenance import REPO_ROOT
 from evals.harness.reference import (
@@ -64,6 +82,11 @@ from evals.harness.reference import (
     load_case,
     refuse_holdout,
 )
+from evals.reference_facts import load_facts, signed_proposal
+
+#: What ``--prepare-today`` hands ``prepare`` as the catalog: none, which is a
+#: job with ``ANALYSIS_ASSERTIONS`` off, or the case's signed facts.
+CATALOG_ARMS = ("none", "signed")
 
 
 def lane_of(framework: FrameworkName, name: str) -> Lane:
@@ -161,6 +184,53 @@ def fresh_leads(
     return {**material, "lanes": lanes}
 
 
+@dataclass(frozen=True)
+class PreparedToday:
+    """What today's ``prepare`` wrote for one case: the lanes' material and the state."""
+
+    material: dict[str, Any]
+    state: dict[str, Any]
+
+
+def prepare_today(
+    case: GoldenCase, framework: FrameworkName, arm: str
+) -> PreparedToday:
+    """Every lane input today's ``prepare`` writes over the case's blessed model.
+
+    The real node over a plain session, seeded by
+    :func:`~analysis_service.execution.seed_state` as a graph run is, with the
+    case's options. On the ``signed`` arm the case's signed facts are the
+    assertion proposal, and ``prepare`` resolves and gates them itself, as it
+    does an ``assert`` node's. The material is read through
+    :meth:`~analysis_service.execution.GraphRun.lane_material`, the reader a
+    sweep's lane capture uses.
+    """
+    if arm not in CATALOG_ARMS:
+        raise EvalRunError(
+            f"unknown catalog arm {arm!r}; use {', '.join(CATALOG_ARMS)}"
+        )
+    valid_model = case.model.model_dump(mode="json")
+    extra: dict[str, Any] = {
+        STATE_FRAMEWORK_OPTIONS: case_framework_options(case),
+        STATE_VALID_MODEL: valid_model,
+    }
+    if arm == "signed":
+        facts = load_facts(REPO_ROOT / DEFAULT_CORPUS / case.id)
+        extra[STATE_ASSERTION_PROPOSAL] = signed_proposal(facts).model_dump(mode="json")
+    ctx = SimpleNamespace(state=seed_state(case.sources, extra))
+    event = prepare_analysis(
+        valid_model,
+        ctx,
+        GraphKeys.of([framework]),
+        [framework],
+        MarkdownLoader(REPO_ROOT / "domains"),
+        {framework: MarkdownLoader(REPO_ROOT / "frameworks" / framework)},
+        assertions=arm == "signed",
+    )
+    run = GraphRun(final_state=ctx.state, node_runs=[], prepared=event.output)
+    return PreparedToday(run.lane_material([framework]), ctx.state)
+
+
 def parse(raw: str, framework: FrameworkName) -> BaseModel:
     """The lane's answer under its package's own proposal schema, or a refusal."""
     return schemas_for(framework).proposals.model_validate_json(raw)
@@ -185,7 +255,12 @@ async def replay(
 
 
 def arguments(parser: argparse.ArgumentParser) -> None:
-    parser.add_argument("artifact", type=Path, help="the sweep whose lane to replay")
+    parser.add_argument(
+        "artifact",
+        type=Path,
+        nargs="?",
+        help="the sweep whose lane to replay; omit it with --prepare-today",
+    )
     parser.add_argument("--case", required=True, help="the case the lane ran on")
     parser.add_argument("--lane", required=True, help="the lane, e.g. spoofing")
     parser.add_argument(
@@ -207,30 +282,53 @@ def arguments(parser: argparse.ArgumentParser) -> None:
         action="store_true",
         help="rebuild the lane's leads, scope, notes and cases with today's rules",
     )
+    parser.add_argument(
+        "--prepare-today",
+        choices=CATALOG_ARMS,
+        help="build the request with today's prepare over the case's blessed"
+        " model, with no catalog or the case's signed facts, and score the drafts",
+    )
     parser.add_argument("--out", type=Path, help="write the lane's proposals here")
 
 
 def command_lane_replay(args: argparse.Namespace) -> int:
-    """Send one captured lane request again, and print what the lane proposed."""
+    """Send one lane request again, and print what the lane proposed."""
+    prepared = None
     try:
         refuse_holdout(args.case)
-        material = load_material(args.artifact, args.case)
-        if args.fresh_leads:
-            material = fresh_leads(
-                material,
-                load_case(REPO_ROOT / DEFAULT_CORPUS / args.case),
-                args.framework,
-                args.lane,
-                MarkdownLoader(REPO_ROOT / "frameworks" / args.framework),
+        if (args.artifact is None) == (args.prepare_today is None):
+            raise EvalRunError("name a sweep artifact or --prepare-today, not both")
+        if args.prepare_today is not None and (args.fresh_leads or args.append):
+            raise EvalRunError(
+                "--prepare-today builds the whole request, so it takes neither"
+                " --fresh-leads nor --append"
+            )
+        case = load_case(REPO_ROOT / DEFAULT_CORPUS / args.case)
+        if args.prepare_today is not None:
+            prepared = prepare_today(case, args.framework, args.prepare_today)
+            material = prepared.material
+            print(
+                f"material from today's prepare, catalog {args.prepare_today};"
+                f" prompt files from {repo_commit().commit}"
+            )
+        else:
+            material = load_material(args.artifact, args.case)
+            if args.fresh_leads:
+                material = fresh_leads(
+                    material,
+                    case,
+                    args.framework,
+                    args.lane,
+                    MarkdownLoader(REPO_ROOT / "frameworks" / args.framework),
+                )
+            ran_at = json.loads(args.artifact.read_text(encoding="utf-8"))
+            print(
+                f"material from {ran_at['repo_commit'].get('commit')}; prompt files"
+                f" from {repo_commit().commit}"
             )
     except (CorpusError, EvalRunError) as error:
         print(error, file=sys.stderr)
         return 1
-    ran_at = json.loads(args.artifact.read_text(encoding="utf-8"))["repo_commit"]
-    print(
-        f"material from {ran_at.get('commit')}; prompt files from"
-        f" {repo_commit().commit}"
-    )
     lane = lane_of(args.framework, args.lane)
     spent: list[float | None] = []
     call = node_call(
@@ -260,4 +358,7 @@ def command_lane_replay(args: argparse.Namespace) -> int:
     )
     if args.out:
         args.out.write_text(json.dumps(dumped, indent=2) + "\n", encoding="utf-8")
+    if prepared is not None and args.framework == SCORED:
+        matched = lane_must_finds(case, prepared.state, args.lane, batch)
+        print(f"must-finds matched: {list(matched)}")
     return 0

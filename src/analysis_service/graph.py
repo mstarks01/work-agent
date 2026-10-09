@@ -1856,7 +1856,7 @@ def _resolve_assertions(state: SessionState, model: SystemModel) -> AssertionRec
     return record
 
 
-def _held_assertions(state: SessionState) -> AssertionCatalog | None:
+def held_assertions(state: SessionState) -> AssertionCatalog | None:
     """The catalog ``prepare`` parked, or ``None`` on a graph that ran no pass."""
     record = state.get(STATE_ASSERTION_CATALOG)
     return None if record is None else AssertionRecord.model_validate(record).catalog
@@ -2017,7 +2017,7 @@ def merge_drafts(
         model,
         source_texts or {},
         state.get(nodes.key("ruled_out")) or {},
-        _held_assertions(state),
+        held_assertions(state),
         state.get(nodes.key("ruled_in")) or {},
     )
     state.put(nodes.key("deferred"), merged.deferred)
@@ -2035,7 +2035,7 @@ def merge_drafts(
                 merged.drafts,
                 repaired=merged.marks.repaired_quotes,
                 unverified=merged.marks.unverified_grounds,
-                assertions=_held_assertions(state),
+                assertions=held_assertions(state),
             )
         ),
     )
@@ -2147,7 +2147,7 @@ def route_review(
         model,
         repaired=parked.repaired_quotes,
         unverified=parked.unverified_grounds,
-        assertions=_held_assertions(state),
+        assertions=held_assertions(state),
     )
     if isinstance(outcome, Revision):
         # ``previous_review`` is the parked payload itself rather than anything

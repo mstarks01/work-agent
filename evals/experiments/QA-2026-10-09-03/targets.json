@@ -1,0 +1,75 @@
+{
+ "01-payments-checkout:spoofing": [
+  0
+ ],
+ "01-payments-checkout:tampering": [
+  3
+ ],
+ "01-payments-checkout:repudiation": [
+  7
+ ],
+ "01-payments-checkout:denial-of-service": [
+  14
+ ],
+ "02-iot-fleet-telemetry:tampering": [
+  3
+ ],
+ "03-batch-data-pipeline:spoofing": [
+  1
+ ],
+ "05-cookbook-queue-webapp:denial-of-service": [
+  10
+ ],
+ "06-cookbook-online-game:elevation-of-privilege": [
+  14
+ ],
+ "06-cookbook-online-game:spoofing": [
+  15
+ ],
+ "07-cicd-store-deploy:information-disclosure": [
+  12
+ ],
+ "07-cicd-store-deploy:elevation-of-privilege": [
+  18
+ ],
+ "08-sso-identity-broker:spoofing": [
+  0
+ ],
+ "08-sso-identity-broker:elevation-of-privilege": [
+  19
+ ],
+ "09-cookbook-sokify-retail:tampering": [
+  4
+ ],
+ "09-cookbook-sokify-retail:elevation-of-privilege": [
+  18
+ ],
+ "10-cookbook-generic-cms:spoofing": [
+  0
+ ],
+ "10-cookbook-generic-cms:elevation-of-privilege": [
+  15
+ ],
+ "10-cookbook-generic-cms:tampering": [
+  17
+ ],
+ "11-sparse-shift-scheduling:denial-of-service": [
+  13
+ ],
+ "12-overclaiming-supplier-portal:tampering": [
+  4,
+  17
+ ],
+ "12-overclaiming-supplier-portal:elevation-of-privilege": [
+  14
+ ],
+ "13-dispatch-control-plane:tampering": [
+  5
+ ],
+ "13-dispatch-control-plane:elevation-of-privilege": [
+  16
+ ],
+ "13-dispatch-control-plane:information-disclosure": [
+  19
+ ]
+}
