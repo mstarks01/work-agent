@@ -79,7 +79,7 @@ PARTIAL: dict[tuple[str, str], str] = {
         "the statuses a job stops in, so a status it passes through is absent"
         " by construction"
     ),
-    ("analysis_service.jobs", "UNSPENT_STATUSES"): (
+    ("analysis_service.jobs", "NON_LOCKING_STATUSES"): (
         "the statuses a resumed job ends in without a report, so every status"
         " that runs or ends in one is absent by construction"
     ),

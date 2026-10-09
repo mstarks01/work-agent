@@ -78,9 +78,9 @@ _LEGAL_TRANSITIONS: dict[JobStatus, frozenset[JobStatus]] = {
 }
 
 # The statuses of a resumed job that read none of its answers into a report.
-# Its parent takes answers again: a job takes one resumed job at a time, and
-# only one of these ends that job's claim.
-UNSPENT_STATUSES: frozenset[JobStatus] = frozenset({"failed", "rejected"})
+# A resumed job in one of these does not lock its parent, so the parent takes
+# answers again.
+NON_LOCKING_STATUSES: frozenset[JobStatus] = frozenset({"failed", "rejected"})
 
 
 def parent_of(record: JobRecord) -> str | None:
@@ -102,7 +102,7 @@ def locks_its_parent(status: JobStatus) -> bool:
     **The one reader of "does a resumed job lock its parent".** The
     job store and the first-run app both ask it.
     """
-    return status not in UNSPENT_STATUSES
+    return status not in NON_LOCKING_STATUSES
 
 
 # Stored on a failed job in place of any internal detail.
@@ -646,7 +646,7 @@ class InMemoryJobStore:
         )
 
     def _resumed_by(self, parent_id: str) -> str | None:
-        """The resumed job of ``parent_id`` that is in flight or spent, if any.
+        """The resumed job of ``parent_id`` that locks it, if any.
 
         **The one reader of "does this job still take answers".** A job takes
         one resumed job: a report's follow-up runs the analysis once (ADR
