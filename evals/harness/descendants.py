@@ -32,14 +32,22 @@ import sys
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Any
 
 from analysis_service.claims import FrameworkName
 from analysis_service.fan_in import fan_in
 from analysis_service.frameworks import PACKAGES, schemas_for
 from analysis_service.frameworks.stride.record import DraftThreat
+from analysis_service.graph import (
+    STATE_SOURCE_TEXTS,
+    STATE_VALID_MODEL,
+    FrameworkNodes,
+    GraphKeys,
+    held_assertions,
+)
 from analysis_service.report import Report
-from analysis_service.system_model import ModelIndex
+from analysis_service.system_model import ModelIndex, SystemModel
 from evals.harness.bundle import reports_dir, stride_threats
 from evals.harness.identity import SubsetVerbIdentity
 from evals.harness.ledger import Ledger
@@ -65,8 +73,12 @@ class Replayed:
     dropped: tuple[tuple[str, str], ...]
 
 
-def _matched(case: GoldenCase, produced: Sequence[DraftThreat]) -> frozenset[int]:
-    flows = ModelIndex.of(case.model).flow_endpoints
+def _matched(
+    case: GoldenCase,
+    produced: Sequence[DraftThreat],
+    model: SystemModel | None = None,
+) -> frozenset[int]:
+    flows = ModelIndex.of(case.model if model is None else model).flow_endpoints
     score = score_case(case, produced, SubsetVerbIdentity({case.id: flows}), Ledger())
     return frozenset(pair.reference_index for pair in score.matched)
 
@@ -124,6 +136,39 @@ def replay_case(
         ),
         unruled=tuple(draft.title for draft in unruled),
         dropped=dropped,
+    )
+
+
+def lane_must_finds(
+    case: GoldenCase, state: Mapping[str, Any], lane: str, batch: Any
+) -> tuple[int, ...]:
+    """The must-find references one lane's proposals match, before any critic.
+
+    ``state`` is what ``prepare`` wrote for the case, as ``lane-replay
+    --prepare-today`` runs it. The fan-in runs as ``merge`` runs it, over this
+    lane alone and that state, so a proposal it would drop is not counted. The
+    critic does not run, so this is the most the lane's drafts could keep.
+    """
+    nodes = FrameworkNodes(FRAMEWORK)
+    model = SystemModel.model_validate(state[STATE_VALID_MODEL])
+    session = GraphKeys.of([FRAMEWORK]).state(SimpleNamespace(state=state))
+    merged = fan_in(
+        {lane: schemas_for(FRAMEWORK).proposals.model_validate(batch)},
+        nodes.package,
+        model,
+        state[STATE_SOURCE_TEXTS],
+        state.get(nodes.key("ruled_out")) or {},
+        held_assertions(session),
+        state.get(nodes.key("ruled_in")) or {},
+    )
+    drafts = [draft for draft in merged.drafts if isinstance(draft, DraftThreat)]
+    references = case.stride_claims()
+    return tuple(
+        sorted(
+            index
+            for index in _matched(case, drafts, model)
+            if references[index].must_find
+        )
     )
 
 

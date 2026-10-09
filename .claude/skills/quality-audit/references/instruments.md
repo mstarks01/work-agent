@@ -58,7 +58,10 @@ costs one lane call. `python -m evals.harness.run critic-replay <artifact> --cas
 costs one critic call and compares every draft's verdict with the archived one. Pass `--out <file>` to keep the rulings, because a status says what moved and not why. It rebuilds the request one lane made from the sweep's
 `<case>.lanes.json` and sends it again, so a `place` loss can be read against
 what the lane was shown. The material is the run's and the prompt files are
-this checkout's, and the command prints both commits.
+this checkout's, and the command prints both commits. To compare a lane with and without the assertion catalog, use
+`lane-replay --case <case> --framework stride --lane <lane> --prepare-today none|signed`
+with no artifact: it runs today's `prepare` offline, so the two arms differ only in the
+catalog, and it prints the must-finds the lane's drafts match.
 
 Both replays send a live request, so `ANALYSIS_OFFLINE` refuses them. Their
 names say "replay"; their cost says paid. `replay` and `score` above re-read an

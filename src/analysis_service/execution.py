@@ -164,6 +164,33 @@ def emitted_state(state: Mapping[str, Any]) -> dict[str, Any]:
     }
 
 
+def seed_state(
+    sources: Sequence[Source], extra_state: Mapping[str, Any] | None = None
+) -> dict[str, Any]:
+    """The session state a run starts from: ``extra_state`` plus the job's sources.
+
+    The one writer of the input keys. :meth:`GraphExecutor.run` seeds a session
+    with it, and ``lane-replay`` seeds the ``prepare`` it runs offline with it,
+    so a replayed lane reads the sources as a graph run renders them.
+    """
+    seed: dict[str, Any] = dict(extra_state or {})
+    if STATE_INPUT_TEXT in seed:
+        raise ValueError(
+            f"{STATE_INPUT_TEXT} is rendered from the job's sources, "
+            "not seeded by the caller"
+        )
+    seed[STATE_INPUT_TEXT] = render_sources(sources)
+    # The same bytes, structured: the validity gate checks each element's
+    # citation against these labels, and the draft fan-in checks each
+    # finding's quote against the text under the label it names. Both travel
+    # beside the rendered copy because both are facts about the job rather
+    # than about the model. Keyed by label safely — a job with two sources
+    # sharing one is refused before it reaches here, since a citation naming
+    # two sources at once resolves while pointing nowhere.
+    seed[STATE_SOURCE_TEXTS] = {source.label: source.text for source in sources}
+    return seed
+
+
 @dataclass(frozen=True)
 class GraphRun:
     """One drive of the graph: what the session ended holding, and what ran.
@@ -338,23 +365,8 @@ class GraphExecutor:
         run means, and nothing here converts a failure into a run that looks
         short or into one that looks free.
         """
-        rendered = render_sources(sources)
-        seed: dict[str, Any] = dict(extra_state or {})
-        if STATE_INPUT_TEXT in seed:
-            raise ValueError(
-                f"{STATE_INPUT_TEXT} is rendered from the job's sources, "
-                "not seeded by the caller"
-            )
-        seed[STATE_INPUT_TEXT] = rendered
-        # The same bytes, structured: the validity gate checks each element's
-        # citation against these labels, and the draft fan-in checks each
-        # finding's quote against the text under the label it names. Both travel
-        # beside the rendered copy because both are facts about the job rather
-        # than about the model, and both are the executor's to write. Keyed by
-        # label safely — a job with two sources sharing one is refused before it
-        # reaches here, since a citation naming two sources at once resolves
-        # while pointing nowhere.
-        seed[STATE_SOURCE_TEXTS] = {source.label: source.text for source in sources}
+        seed = seed_state(sources, extra_state)
+        rendered = seed[STATE_INPUT_TEXT]
 
         session = await self._session_service.create_session(
             app_name=self._app_name, user_id=user_id, state=seed

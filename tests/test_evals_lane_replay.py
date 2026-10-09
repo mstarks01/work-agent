@@ -9,19 +9,29 @@ refusal that keeps a replay from sending a request the lane never made.
 
 from __future__ import annotations
 
+import argparse
 import asyncio
 import json
+from pathlib import Path
 
 import pytest
 
 from analysis_service.frameworks import LANE_CLOSING_DOC, PACKAGES
+from analysis_service.frameworks.stride.record import DraftThreat
 from analysis_service.graph import FrameworkNodes
 from analysis_service.markdown_loader import MarkdownLoader
 from analysis_service.prompts import lane_closing
+from analysis_service.system_model import ModelIndex
 from evals.harness import lane_replay
 from evals.harness.bundle import reports_dir, write_reports
+from evals.harness.descendants import lane_must_finds
+from evals.harness.identity import SubsetVerbIdentity
+from evals.harness.ledger import Ledger
 from evals.harness.modes import EvalRunError
 from evals.harness.provenance import REPO_ROOT
+from evals.harness.reference import DEFAULT_CORPUS
+from evals.harness.scorer import score_case
+from evals.reference_facts import load_facts
 from tests import test_evals_run_grounds as grounds
 from tests.test_evals_run_grounds import case  # noqa: F401  (fixture)
 
@@ -279,3 +289,86 @@ def test_a_node_call_keeps_what_the_provider_returned(monkeypatch):
             ],
         }
     ]
+
+
+def test_todays_prepare_without_a_catalog_is_what_a_run_captured(recorded, case):  # noqa: F811
+    """One reader: the offline ``prepare`` writes the material a graph run captures."""
+    out, _ = recorded
+
+    prepared = lane_replay.prepare_today(case, "stride", "none")
+
+    assert prepared.material == lane_replay.load_material(out, case.id)
+
+
+def test_the_signed_arm_changes_only_what_the_catalog_reaches(case):  # noqa: F811
+    off = lane_replay.prepare_today(case, "stride", "none").material
+    on = lane_replay.prepare_today(case, "stride", "signed").material
+    facts = load_facts(REPO_ROOT / DEFAULT_CORPUS / case.id)
+
+    assert on["shared"]["input_text"] == off["shared"]["input_text"]
+    assert on["shared"]["evidence_catalog"] != off["shared"]["evidence_catalog"]
+    assert off["prepared"]["assertion_count"] is None
+    assert on["prepared"]["assertion_count"] == len(facts.rows)
+    assert on["prepared"]["assertions_refused"] == 0
+
+
+def test_an_unknown_catalog_arm_is_refused_with_the_real_ones(case):  # noqa: F811
+    with pytest.raises(EvalRunError, match="none, signed"):
+        lane_replay.prepare_today(case, "stride", "archived")
+
+
+def test_each_lane_scores_the_must_finds_the_run_drafts_match(recorded, case):  # noqa: F811
+    """Scored one lane at a time, the lanes match what the run's drafts match."""
+    out, _ = recorded
+    directory = reports_dir(out)
+    proposals = json.loads((directory / f"{case.id}.proposals.json").read_text())
+    drafts = json.loads((directory / f"{case.id}.drafts.json").read_text())["stride"]
+    prepared = lane_replay.prepare_today(case, "stride", "none")
+    references = case.stride_claims()
+    flows = ModelIndex.of(case.model).flow_endpoints
+
+    by_lane = {
+        index
+        for lane, batch in proposals["stride"].items()
+        for index in lane_must_finds(case, prepared.state, lane, batch)
+    }
+    whole = {
+        pair.reference_index
+        for pair in score_case(
+            case,
+            [DraftThreat.model_validate(draft) for draft in drafts],
+            SubsetVerbIdentity({case.id: flows}),
+            Ledger(),
+        ).matched
+        if references[pair.reference_index].must_find
+    }
+
+    assert whole, "the scripted run matches no must-find, so this compares nothing"
+    assert by_lane == whole
+
+
+@pytest.mark.parametrize(
+    "given",
+    [
+        {"artifact": None, "prepare_today": None},
+        {"artifact": Path("a.json"), "prepare_today": "none"},
+        {"artifact": None, "prepare_today": "signed", "fresh_leads": True},
+    ],
+    ids=["neither", "both", "fresh-leads"],
+)
+def test_a_request_with_two_sources_or_none_is_refused_before_a_call(given, capsys):
+    args = argparse.Namespace(
+        **{
+            "case": "01-payments-checkout",
+            "lane": "spoofing",
+            "framework": "stride",
+            "accept_cost": "0",
+            "append": None,
+            "fresh_leads": False,
+            "out": None,
+            **given,
+        }
+    )
+
+    assert lane_replay.command_lane_replay(args) == 1
+    assert "--prepare-today" in capsys.readouterr().err
