@@ -27,7 +27,7 @@ from analysis_service.resilience import (
     ResilienceConfigError,
     load_resilience,
 )
-from tests.factories import translator_of
+from tests.factories import secret_env, translator_of
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 CONFIG_PATH = PROJECT_ROOT / "config" / "resilience.toml"
@@ -282,7 +282,7 @@ def test_the_timeout_reaching_litellm_is_the_one_the_file_states(
         "ANALYSIS_MODEL_STRONG_MODEL": "gpt-5.6",
         "ANALYSIS_MODEL_REVIEW_VENDOR": "openai",
         "ANALYSIS_MODEL_REVIEW_MODEL": "gpt-5.6",
-        "ANALYSIS_OPENAI_API_KEY": "not-a-real-key",
+        **secret_env("ANALYSIS_OPENAI_API_KEY_FILE", "not-a-real-key"),
     }
     adapter = build_tier_adapters(
         load_model_tiers(PROJECT_ROOT / "config" / "model_tiers.toml", env=env),

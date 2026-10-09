@@ -44,7 +44,13 @@ from analysis_service.model_tiers import SUPPORTED_VERSION as TIERS_SUPPORTED_VE
 from analysis_service.model_tiers import ModelConfigError
 from analysis_service.system_model import EmittedSystemModel
 from analysis_service.vendors import ProviderAuthError, vendor_for
-from tests.factories import DEFAULT_FRAMEWORKS, PROJECT_ROOT, rungs_of, translator_of
+from tests.factories import (
+    DEFAULT_FRAMEWORKS,
+    PROJECT_ROOT,
+    rungs_of,
+    secret_env,
+    translator_of,
+)
 
 # This install's one package's critic nodes. Named per framework now, because
 # two packages each bring their own critic and its bounded re-ask.
@@ -253,7 +259,7 @@ def test_from_env_fails_closed_on_a_missing_resilience_config(tmp_path):
 def test_the_environment_stays_out_of_repr_and_equality():
     """OWASP A09: a deployment in a log or a traceback must not carry a key."""
     deployment = Deployment.from_env(
-        env=VERTEX_ENV | {"ANALYSIS_ANTHROPIC_API_KEY": "sk-secret"}
+        env=VERTEX_ENV | secret_env("ANALYSIS_ANTHROPIC_API_KEY_FILE", "sk-secret")
     )
 
     assert "sk-secret" not in repr(deployment)
@@ -445,7 +451,7 @@ OPENROUTER_ENV = {
     "ANALYSIS_MODEL_STRONG_MODEL": "anthropic/claude-opus-4.7",
     "ANALYSIS_MODEL_REVIEW_MODEL": "anthropic/claude-opus-4.7",
     "ANALYSIS_MODEL_CHARGES_OPENROUTER": "direct",
-    "ANALYSIS_OPENROUTER_API_KEY": "sk-or-test",
+    **secret_env("ANALYSIS_OPENROUTER_API_KEY_FILE", "sk-or-test"),
 }
 
 
@@ -543,7 +549,7 @@ def test_a_credential_error_never_echoes_the_secret():
     with pytest.raises(ProviderAuthError) as excinfo:
         Deployment.from_env(env=env).pipeline(DEFAULT_FRAMEWORKS)
 
-    assert "ANALYSIS_ANTHROPIC_API_KEY" in str(excinfo.value)
+    assert "ANALYSIS_ANTHROPIC_API_KEY_FILE" in str(excinfo.value)
 
 
 def test_an_offline_resolver_short_circuits_the_credential_check():
@@ -609,9 +615,9 @@ ANTHROPIC_ENV = {
     "ANALYSIS_MODEL_STRONG_MODEL": CLAUDE_5,
     "ANALYSIS_MODEL_REVIEW_VENDOR": "anthropic",
     "ANALYSIS_MODEL_REVIEW_MODEL": CLAUDE_5,
-    # A name, not a secret: the loader checks a variable is declared, never that
-    # it authenticates, and nothing here reaches a provider.
-    "ANALYSIS_ANTHROPIC_API_KEY": "sk-ant-not-a-real-key",
+    # A placeholder: the loader checks a variable is declared, never that it
+    # authenticates, and nothing here reaches a provider.
+    **secret_env("ANALYSIS_ANTHROPIC_API_KEY_FILE", "sk-ant-not-a-real-key"),
 }
 
 NO_TEMPERATURE = """\

@@ -46,7 +46,7 @@ engine = Engine.from_config(
         "ANALYSIS_MODEL_BASE_MODEL": "claude-sonnet-5",
         "ANALYSIS_MODEL_STRONG_VENDOR": "anthropic",
         "ANALYSIS_MODEL_STRONG_MODEL": "claude-opus-5-5",
-        "ANALYSIS_ANTHROPIC_API_KEY": "...",
+        "ANALYSIS_ANTHROPIC_API_KEY_FILE": "/run/secrets/anthropic.key",
     },
 )
 ```

@@ -48,6 +48,7 @@ from tests.factories import (
     PROJECT_ROOT,
     SDK_CLIENT_KEY,
     inject_transport,
+    secret_env,
     tiers_for,
     translator_of,
 )
@@ -144,7 +145,7 @@ def _adapter(wire: _Wire, base: TierSampling | None = None):
         tiers_for(VENDOR),
         sampling,
         load_resilience(CONFIG / "resilience.toml", env={}),
-        env={"ANALYSIS_OPENAI_API_KEY": FAKE_KEY},
+        env=secret_env("ANALYSIS_OPENAI_API_KEY_FILE", FAKE_KEY),
     )
     adapter = adapters["base"]
     inject_transport(adapter, VENDOR, wire.handle)
@@ -341,7 +342,9 @@ class TestWhichKeyAuthenticates:
         registry's own refusal is checked against.
         """
         monkeypatch.setenv(ambient, UNDECLARED_KEY)
-        request = self._send(wire, {vendor_for(GATEWAY).api_key_var: DECLARED_KEY})
+        request = self._send(
+            wire, secret_env(vendor_for(GATEWAY).api_key_var, DECLARED_KEY)
+        )
         sent = request.content.decode("utf-8") + str(dict(request.headers))
 
         assert request.headers.get("authorization") == f"Bearer {DECLARED_KEY}"
@@ -367,7 +370,7 @@ class TestWhichKeyAuthenticates:
         monkeypatch.setenv(ambient, UNDECLARED_KEY)
         request = self._send(
             wire,
-            {vendor_for(GATEWAY).api_key_var: DECLARED_KEY},
+            secret_env(vendor_for(GATEWAY).api_key_var, DECLARED_KEY),
             drop_credential=True,
         )
 

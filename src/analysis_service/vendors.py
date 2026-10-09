@@ -43,6 +43,7 @@ import re
 from collections.abc import Mapping
 from dataclasses import dataclass
 from enum import StrEnum
+from pathlib import Path
 from typing import Literal
 
 from analysis_service.errors import ConfigError
@@ -90,7 +91,11 @@ SchemaRule = Literal["as_built", "bounds_described"]
 # the half, so this service names the knob once and runs either generation.
 REASONING_KWARG = "reasoning_effort"
 
-_API_KEY_TEMPLATE = "ANALYSIS_{vendor}_API_KEY"
+# A secret arrives in a file, never in an environment variable: a variable
+# passes to every child process and shows in ``/proc/<pid>/environ``, and a
+# file can have mode ``0400``. The variable holds the file's path.
+SECRET_FILE_SUFFIX = "_FILE"
+_API_KEY_TEMPLATE = "ANALYSIS_{vendor}_API_KEY" + SECRET_FILE_SUFFIX
 
 # Vertex needs a project and a location to address; they are ordinary config,
 # not credentials, but the build cannot construct a working client without them.
@@ -246,7 +251,9 @@ class _SchemaRuleFor:
 class _CredentialVar:
     """One environment variable a ``(vendor, mode)`` pair reads.
 
-    ``secret`` is the field that separates this entry's two readers.
+    ``secret`` is the field that separates this entry's two readers. A secret
+    entry's ``var`` names a file setting, and :func:`read_secret` reads the
+    value from that file.
     :attr:`Vendor.required_env_vars` reports every entry, because an operator
     has to set every one. :meth:`Vendor.secret_env_vars` reports only the
     secret ones, because that is what must never survive into a job summary.
@@ -304,8 +311,8 @@ def _api_key_source(vendor: VendorName) -> _CredentialSource:
 #: instance metadata service.
 CREDENTIAL_MODE_NOTES: dict[CredentialMode, str] = {
     CredentialMode.API_KEY: (
-        "This vendor authenticates with an API key, read from the variable"
-        " below and from nowhere else."
+        "This vendor authenticates with an API key, read from the file that the"
+        " variable below names and from nowhere else."
     ),
     CredentialMode.IAM: (
         "This vendor passes no credential material. The platform supplies the"
@@ -1172,13 +1179,13 @@ class Vendor:
 
         Long-lived API keys are accepted with controls, not avoided: none of
         these vendors issues a short-lived token, so the residual risk is real
-        and is mitigated by keeping keys env-only, out of logs, out of the
+        and is mitigated by keeping keys in files, out of logs, out of the
         report, and out of the fingerprint, plus rotation.
         """
         source = self._source_for(mode)
         kwargs = dict(source.fixed)
         kwargs.update(
-            {entry.kwarg: self._require(env, entry.var, mode) for entry in source.env}
+            {entry.kwarg: self._require(env, entry, mode) for entry in source.env}
         )
         return kwargs
 
@@ -1223,14 +1230,47 @@ class Vendor:
         """
         return tuple(entry.var for entry in self._source_for(mode).env if entry.secret)
 
-    def _require(self, env: Mapping[str, str], var: str, mode: CredentialMode) -> str:
-        value = env.get(var, "")
-        if not value.strip():
+    def _require(
+        self, env: Mapping[str, str], entry: _CredentialVar, mode: CredentialMode
+    ) -> str:
+        if entry.secret:
+            bare = refused_var(entry.var)
+            if env.get(bare, "").strip():
+                raise ProviderAuthError(
+                    f"vendor {self.name!r} reads its secret from the file that"
+                    f" {entry.var} names; unset {bare}, which this service refuses"
+                )
+            value = read_secret(env, entry.var)
+        else:
+            value = env.get(entry.var, "").strip()
+        if not value:
             raise ProviderAuthError(
-                f"vendor {self.name!r} needs {var};"
+                f"vendor {self.name!r} needs {entry.var};"
                 f" it is unset or empty (credential mode: {mode.value})"
             )
-        return value.strip()
+        return value
+
+
+def refused_var(secret_var: str) -> str:
+    """The variable that would hold the secret itself, which the service refuses."""
+    return secret_var.removesuffix(SECRET_FILE_SUFFIX)
+
+
+def read_secret(env: Mapping[str, str], var: str) -> str:
+    """The stripped content of the file that ``var`` names, or ``""`` if ``var`` is unset.
+
+    Raises :class:`ProviderAuthError` when the file cannot be read. The message
+    names the variable and the error class, never the content (OWASP A09).
+    """
+    path = env.get(var, "").strip()
+    if not path:
+        return ""
+    try:
+        return Path(path).read_text(encoding="utf-8").strip()
+    except (OSError, UnicodeDecodeError) as exc:
+        raise ProviderAuthError(
+            f"{var} names a file this service cannot read ({type(exc).__name__})"
+        ) from exc
 
 
 #: The registry. A missing key raises, which is the point: a table nobody can

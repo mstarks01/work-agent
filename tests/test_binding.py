@@ -19,7 +19,7 @@ from analysis_service.model_gate import ModelGateError
 from analysis_service.model_tiers import ModelConfigError, load_model_tiers
 from analysis_service.resilience import load_resilience
 from analysis_service.sampling import load_sampling
-from tests.factories import DEFAULT_FRAMEWORKS, PROJECT_ROOT, repo_tiers
+from tests.factories import DEFAULT_FRAMEWORKS, PROJECT_ROOT, repo_tiers, secret_env
 
 #: This install's whole selection. The node -> tier map is built per selection
 #: now, so a test walking "every node" has to say which graph's nodes it means.
@@ -148,7 +148,7 @@ class TestReasoningTemperatureFloor:
             tiers,
             load_sampling(config, env={}),
             load_resilience(PROJECT_ROOT / "config" / "resilience.toml"),
-            env={"ANALYSIS_OPENAI_API_KEY": "sk-test-not-a-real-key"},
+            env=secret_env("ANALYSIS_OPENAI_API_KEY_FILE", "sk-test-not-a-real-key"),
         )
 
     def test_greedy_decoding_on_a_reasoning_model_fails_the_build(self, tmp_path):

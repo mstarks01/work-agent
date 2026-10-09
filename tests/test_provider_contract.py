@@ -75,7 +75,13 @@ from analysis_service.retry import (
 from analysis_service.sampling import load_sampling
 from analysis_service.system_model import SystemModel
 from analysis_service.vendors import VendorName, vendor_for
-from tests.factories import PROJECT_ROOT, inject_transport, tiers_for, valid_model
+from tests.factories import (
+    PROJECT_ROOT,
+    inject_transport,
+    secret_env,
+    tiers_for,
+    valid_model,
+)
 
 #: Every test here drives the real translator to a transport it supplies.
 pytestmark = pytest.mark.usefixtures("supplied_transport")
@@ -89,8 +95,10 @@ VALID_ANSWER = valid_model().model_dump_json()
 #: Key-shaped strings that are visibly not keys. Nothing here authenticates: the
 #: transport answers before anything reads one.
 FAKE_KEYS: Mapping[VendorName, dict[str, str]] = {
-    "openai": {"ANALYSIS_OPENAI_API_KEY": "not-a-real-openai-key"},
-    "openrouter": {"ANALYSIS_OPENROUTER_API_KEY": "not-a-real-openrouter-key"},
+    "openai": secret_env("ANALYSIS_OPENAI_API_KEY_FILE", "not-a-real-openai-key"),
+    "openrouter": secret_env(
+        "ANALYSIS_OPENROUTER_API_KEY_FILE", "not-a-real-openrouter-key"
+    ),
 }
 
 #: The build the provider says answered, deliberately unlike anything requested.
