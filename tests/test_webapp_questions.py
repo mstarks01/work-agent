@@ -511,7 +511,7 @@ def _run_form_script(steps: str, search: str = "") -> dict:
         pytest.skip("no node on PATH to run the form page's script")
     script = "\n".join(
         (PROJECT_ROOT / "webapp" / "static" / name).read_text()
-        for name in ("answer_detail.js", "first_run.js")
+        for name in ("answer_editor.js", "first_run.js")
     )
     program = (
         _FORM_HARNESS.replace("SEARCH", json.dumps(search)).replace(
@@ -764,7 +764,7 @@ def _run_answer_block(
     end = javascript.index(end_marker, start) + len(end_marker)
     program = (
         _VIEWER_ANSWER_HARNESS.replace("PAYLOADS", json.dumps(payloads))
-        + (PROJECT_ROOT / "webapp" / "static" / "answer_detail.js").read_text()
+        + (PROJECT_ROOT / "webapp" / "static" / "answer_editor.js").read_text()
         + helpers
         + javascript[start:end]
         + "\n(async () => {\n"
@@ -2987,7 +2987,7 @@ for (const combo of combos) {
         node = shutil.which("node")
         if node is None:
             pytest.skip("no node on PATH to run the report page's script")
-        javascript = test_webapp.viewer_javascript()
+        javascript = test_webapp.page_javascript("answer_editor.js")
         rule = "\n".join(
             re.search(rf"const {name} = .*;", javascript)[0]
             for name in ("DONT_KNOW", "offersDontKnow")

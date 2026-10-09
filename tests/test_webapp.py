@@ -1327,9 +1327,9 @@ def test_the_event_stream_still_streams_under_the_header_middleware(client):
 PAGE_SCRIPTS = {
     "webapp/sitting.py": "sitting.js",
     "webapp/review.py": ("review_queue.js", "review_finding.js"),
-    "webapp/main.py": ("workspace.js", "answer_detail.js", "first_run.js"),
+    "webapp/main.py": ("workspace.js", "answer_editor.js", "first_run.js"),
     "webapp/offline_sitting.py": "offline_sitting.js",
-    "webapp/report_view.html": ("answer_detail.js", "report_view.js"),
+    "webapp/report_view.html": ("answer_editor.js", "report_view.js"),
 }
 
 #: A ``<script>`` block a page template is allowed to fill itself. Each one
@@ -1399,6 +1399,38 @@ def test_every_client_script_belongs_to_a_page():
     assert on_disk == named, (
         f"webapp/static holds {sorted(on_disk - named)} that no page names, and"
         f" the table names {sorted(named - on_disk)} that is not there."
+    )
+
+
+#: The pages that take an answer, and what builds an answer's input. Each
+#: marker is a piece of an answer input that only the shared builder spells.
+ANSWER_PAGES = ("report_view.js", "first_run.js")
+ANSWER_BUILDERS = ("answerEditor(", "facetSelect(")
+ANSWER_INPUT_MARKERS = (
+    "FACET_CHOICES",
+    '"There is none"',
+    '"A mechanism, in my own words:"',
+    '" I don\'t know"',
+    "datalist",
+    "offersDontKnow",
+)
+
+
+@pytest.mark.parametrize("page", ANSWER_PAGES)
+def test_a_page_builds_an_answer_input_with_the_shared_builder(page):
+    """Two answer editors keep two sets of rules, so there is one builder.
+
+    Each page calls ``answer_editor.js`` for its inputs and spells no piece of
+    one itself; what differs between the pages is an argument to the builder.
+    """
+    javascript = page_javascript(page)
+    shared = page_javascript("answer_editor.js")
+
+    assert [b for b in ANSWER_BUILDERS if b not in javascript] == []
+    assert [m for m in ANSWER_INPUT_MARKERS if m not in shared] == []
+    assert [m for m in ANSWER_INPUT_MARKERS if m in javascript] == [], (
+        f"{page} builds a piece of an answer input itself. Build it with"
+        " answerEditor or facetSelect in webapp/static/answer_editor.js."
     )
 
 

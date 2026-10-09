@@ -24,14 +24,6 @@
   // The open facts the conditional findings rest on, ranked server-side so
   // with the most-cited fact first. The page only renders them.
   const FACT_QUESTIONS = JSON.parse(document.getElementById("fact_questions").textContent);
-  // The answer that says the submitter does not know. The service writes
-  // nothing for it, so the fact stays open.
-  const DONT_KNOW = "unknown";
-  // The answers a facet takes, as the service lists them in FACET_ANSWERS.
-  const FACET_CHOICES = [
-    ["yes", "yes"], ["no", "no"], ["not applicable", "not applicable"],
-    ["I don't know", DONT_KNOW],
-  ];
   // How many of the reviewer's open facts used the fixed list of questions,
   // and how many it wrote in its own words, counted server-side.
   const FALLBACK = JSON.parse(document.getElementById("question_fallback").textContent);
@@ -124,23 +116,13 @@
     ids.forEach(id => select.append(option(NAMES[id] ? `${NAMES[id]} (${id})` : id, id)));
     select.append(option("None of these", "none"));
   };
-  // One answer's editor, as the follow-up and a correction both show it.
-  // `nodes` follow the label; `read` is the answer as the service takes it,
-  // or null; `known` is whether it says more than "I don't know". `prefill`
-  // is an answer to start from, and `changed` runs on every edit. With
-  // `reopen` false, a known value offers no "I don't know", because the
-  // follow-up refuses to reopen a settled fact or a settled facet.
-  const offersDontKnow = (before, reopen) => reopen || !before || before === DONT_KNOW;
-  let suggestLists = 0;
-  // A detail beside an answer (answerDetail). It is sent where it changed
-  // from the answer it starts from.
-  const detailFor = (prefill, changed) => {
-    const before = (prefill && prefill.detail) || "";
-    const detail = answerDetail(before);
-    detail.addEventListener("input", changed);
-    return { node: detail, read: () => detail.value.trim(), changed: () => detail.value.trim() !== before };
-  };
-  const editorFor = (q, prefill, changed, reopen = true) => {
+  // One answer's editor, as the follow-up and a correction both show it,
+  // built by answerEditor. `nodes` follow the label; `read` is the answer as
+  // the service takes it, or null; `known` is whether it says more than "I
+  // don't know". `prefill` is an answer to start from, and `changed` runs on
+  // every edit. With `reopen` false, a known value offers no "I don't know"
+  // (offersDontKnow), as the follow-up takes it.
+  const editorFor = (q, prefill, changed, reopen) => {
     if (q.form === "facets") {
       // One list per facet. Only a facet answered otherwise than `prefill`
       // is sent: the service keeps the earlier answer to a facet left out,
@@ -148,15 +130,10 @@
       const list = el("ul");
       const selects = q.facets.map(facet => {
         const before = (prefill && prefill.facets && prefill.facets[facet.id]) || "";
-        const select = el("select");
-        if (!before) select.append(option("(leave unanswered)", ""));
-        FACET_CHOICES
-          .filter(([, value]) => value !== DONT_KNOW || offersDontKnow(before, reopen))
-          .forEach(([label, value]) => select.append(option(label, value)));
+        const select = facetSelect(before ? null : "(leave unanswered)", before, reopen);
         select.dataset.key = JSON.stringify(q.key);
         select.dataset.facet = facet.id;
         select.dataset.before = before;
-        select.value = before;
         select.addEventListener("change", changed);
         const item = el("li", null, `${facet.question} `);
         item.append(select);
@@ -166,19 +143,22 @@
       const given = () => Object.fromEntries(selects
         .filter(s => s.value && s.value !== s.dataset.before)
         .map(s => [s.dataset.facet, s.value]));
-      const detail = detailFor(prefill, changed);
+      // A detail is sent where it changed from the answer it starts from.
+      const detailBefore = (prefill && prefill.detail) || "";
+      const detail = answerDetail(detailBefore);
+      detail.addEventListener("input", changed);
       // A changed detail alone sends the facets it starts from, which the
       // service keeps as they are.
       const kept = () => Object.fromEntries(selects
         .filter(s => s.value).map(s => [s.dataset.facet, s.value]));
       const read = () => {
         const facets = Object.keys(given()).length ? given()
-          : detail.changed() ? kept() : {};
+          : detail.value.trim() !== detailBefore ? kept() : {};
         if (!Object.keys(facets).length) return null;
-        return detail.read() ? { key: q.key, facets, detail: detail.read() } : { key: q.key, facets };
+        return withDetail({ key: q.key, facets }, detail.value.trim());
       };
       return {
-        nodes: [list, detail.node],
+        nodes: [list, detail],
         read,
         // The critic names the kind, not a facet, so a finding waiting on it
         // is covered only once every facet says more than "I don't know".
@@ -191,86 +171,9 @@
           .every(s => s.value && s.value !== DONT_KNOW),
       };
     }
-    const value = (prefill && prefill.value) || "";
-    const dontKnowOffered = offersDontKnow(value, reopen);
-    let input;
-    // "unknown" is the answer that says you do not know: the fact stays
-    // open, and it covers no finding.
-    let nodes;
-    // `read` is the answer the row sends, or "" for none.
-    let read = () => input.value.trim();
-    // A closed answer takes a detail beside it; free text needs none.
-    let choiceDetail = null;
-    if (q.choices.length) {
-      input = el("select");
-      input.append(option("(leave unanswered)", ""));
-      q.choices.forEach(choice => input.append(option(NAMES[choice] ? `${NAMES[choice]} (${choice})` : choice, choice)));
-      if (dontKnowOffered) input.append(option("I don't know", DONT_KNOW));
-      input.value = value;
-      input.addEventListener("change", changed);
-      choiceDetail = detailFor(prefill, changed);
-      nodes = [input, " ", choiceDetail.node];
-    } else if (q.form === "control") {
-      // A control: say there is none, say you do not know, or name the
-      // mechanism. The suggestions are a start; the text is the answer.
-      input = el("input");
-      input.type = "text";
-      input.maxLength = q.max_length;
-      input.placeholder = "type it, or pick a common one";
-      const list = el("datalist");
-      list.id = `suggest-${suggestLists++}`;
-      q.suggestions.forEach(s => list.append(option(s, s)));
-      input.setAttribute("list", list.id);
-      const state = el("select");
-      state.append(option("(leave unanswered)", ""), option("There is none", "none"));
-      if (dontKnowOffered) state.append(option("I don't know", DONT_KNOW));
-      state.append(option("A mechanism, in my own words:", "mechanism"));
-      // The state is the answer: blank sends nothing, and the text is read
-      // only under "mechanism". Typing a mechanism chooses it.
-      const fixed = value === "none" || value === DONT_KNOW;
-      state.value = fixed || !value ? value : "mechanism";
-      input.value = fixed ? "" : value;
-      input.disabled = fixed;
-      state.addEventListener("change", () => {
-        input.disabled = state.value === "none" || state.value === DONT_KNOW;
-        changed();
-      });
-      input.addEventListener("input", () => {
-        if (input.value.trim()) state.value = "mechanism";
-        changed();
-      });
-      read = () => (state.value === "mechanism" ? input.value.trim() : state.value);
-      nodes = [state, " ", input, list];
-    } else {
-      input = el("input");
-      input.type = "text";
-      input.maxLength = q.max_length;
-      input.placeholder = "(leave unanswered)";
-      const box = el("input");
-      box.type = "checkbox";
-      input.value = value;
-      box.checked = input.disabled = value === DONT_KNOW;
-      box.addEventListener("change", () => {
-        input.value = box.checked ? DONT_KNOW : "";
-        input.disabled = box.checked;
-        changed();
-      });
-      input.addEventListener("input", changed);
-      const dontKnow = el("label");
-      dontKnow.append(box, " I don't know");
-      nodes = dontKnowOffered ? [input, " ", dontKnow] : [input];
-    }
-    input.dataset.key = JSON.stringify(q.key);
-    const sent = () => {
-      if (!read()) return null;
-      const detail = choiceDetail ? choiceDetail.read() : "";
-      return detail ? { key: q.key, value: read(), detail } : { key: q.key, value: read() };
-    };
-    return {
-      nodes,
-      read: sent,
-      known: () => Boolean(read()) && read() !== DONT_KNOW,
-    };
+    const choices = q.choices.map(id => ({ id, name: NAMES[id] }));
+    const editor = answerEditor(q, { choices, prefill, reopen, changed });
+    return { nodes: editor.nodes, read: editor.answer, known: editor.known };
   };
   // A model writes an identifier the way the prompt hands it over: in
   // backticks. A span that is an element's ID or an evidence reference shows
@@ -1388,7 +1291,7 @@
       change.type = "button";
       change.addEventListener("click", () => {
         change.hidden = true;
-        const editor = editorFor(a, a.answer, () => {});
+        const editor = editorFor(a, a.answer, () => {}, true);
         shown.replaceChildren(" \u2014 ", ...editor.nodes);
         edits.push(editor.read);
       });
