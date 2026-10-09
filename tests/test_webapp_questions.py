@@ -1549,10 +1549,13 @@ calls.push({ shared: shared.length });
 """
 
 
-def test_same_for_all_fills_only_the_ticked_rows():
+@pytest.mark.parametrize("interleaved", [False, True])
+def test_same_for_all_fills_only_the_ticked_rows(interleaved):
     """One answer for several parts, with exceptions (#1289, design note C)."""
     first, second = valid_model().data_flows[:2]
     facts = [_control_row(first), _control_row(second)]
+    if interleaved:
+        facts.insert(1, _text_row(["", "", "", "Who operates it?", "", ""], "Owner"))
     steps = (
         _SHARED_STEPS.replace("FACTS", json.dumps(facts))
         + """
@@ -1584,10 +1587,10 @@ def test_same_for_all_is_offered_only_where_rows_share_a_question(case):
     assert _run_form_script(steps)["calls"][1] == {"shared": 0}
 
 
-def test_the_form_script_boxes_each_run_of_one_group_with_a_row_per_element():
-    """Questions of one kind that come together share a box, a row each; the
-    same kind later in the round opens a new box, so the list order holds."""
+def test_the_form_script_collects_a_category_in_one_box_with_a_row_per_element():
+    """Interleaved categories share one box each, in first-appearance order."""
     store, flow = valid_model().data_stores[0], valid_model().data_flows[0]
+    process = valid_model().processes[0]
 
     def fact(element, name, choices):
         return {
@@ -1608,7 +1611,7 @@ def test_the_form_script_boxes_each_run_of_one_group_with_a_row_per_element():
         fact(flow, "stored-copy-integrity", ["yes", "no"]),
         fact(flow, "audit-evidence", []),
         fact(store, "audit-evidence", []),
-        fact(store, "stored-copy-integrity", ["yes", "no"]),
+        fact(process, "stored-copy-integrity", ["yes", "no"]),
     ]
     steps = f"""
 await ids.analyze.listeners.submit({{ preventDefault() {{}} }}); await settle();
@@ -1622,6 +1625,7 @@ calls.push({{ groups: groups.map(g => ({{
   rows: rowsOf(g).map(r => child(r, "b").textContent),
   open: g.open }})) }});
 child(rowsOf(groups[0])[0], "select").value = "no";
+child(rowsOf(groups[0])[2], "select").value = "yes";
 await ids.continue.listeners.click(); await settle();
 """
     seen = _run_form_script(steps)["calls"]
@@ -1629,8 +1633,8 @@ await ids.continue.listeners.click(); await settle();
 
     assert layout["groups"] == [
         {
-            "title": "stored-copy-integrity heading? (2 question(s), 2 choice(s))",
-            "rows": [store.name, flow.name],
+            "title": "stored-copy-integrity heading? (3 question(s), 3 choice(s))",
+            "rows": [store.name, flow.name, process.name],
             "open": True,
         },
         {
@@ -1638,14 +1642,12 @@ await ids.continue.listeners.click(); await settle();
             "rows": [flow.name, store.name],
             "open": True,
         },
-        {
-            "title": "stored-copy-integrity heading? (1 question(s), 1 choice(s))",
-            "rows": [store.name],
-            "open": True,
-        },
     ]
     (sent,) = [c for c in seen if c.get("url") == "/answer/r1"]
-    assert sent["body"]["facts"] == [{"key": facts[0]["key"], "value": "no"}]
+    assert sent["body"]["facts"] == [
+        {"key": facts[0]["key"], "value": "no"},
+        {"key": facts[4]["key"], "value": "yes"},
+    ]
 
 
 def facet_fact(element, kind="capacity-limits"):
