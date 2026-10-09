@@ -9,6 +9,10 @@ const ANSWER_LIMITS = JSON.parse(document.getElementById("answer_limits").textCo
 // The answer that says the submitter does not know. The service writes
 // nothing for it, so the fact stays open.
 const DONT_KNOW = "unknown";
+// A fact answer as one line of text.
+const answerText = (answer) => (answer.facets
+  ? Object.entries(answer.facets).map(([facet, value]) => `${facet}: ${value}`).join("; ")
+  : (answer.value === DONT_KNOW ? "I don't know" : answer.value));
 // The answers a facet takes, as the service lists them in FACET_ANSWERS.
 const FACET_CHOICES = [
   ["yes", "yes"], ["no", "no"], ["not applicable", "not applicable"],

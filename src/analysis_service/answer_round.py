@@ -49,7 +49,7 @@ from functools import cached_property
 from types import MappingProxyType
 from typing import TYPE_CHECKING, Any, Literal
 
-from analysis_service.answer_sets import NO_ANSWERS, AnswerSet
+from analysis_service.answer_sets import NO_ANSWERS, AnswerSet, within_held_limits
 from analysis_service.assertions import UNKNOWN, AssertionCatalog
 from analysis_service.bands import UNRANKED
 from analysis_service.capabilities import lineage
@@ -444,7 +444,7 @@ class QuestionSet:
         """
         if self.resumed_by is not None:
             raise AlreadyResumed(
-                f"this job's answers already started job {self.resumed_by};"
+                f"job {self.resumed_by} locks this job;"
                 " read that job, and answer here again only if it fails"
             )
         links, facts = given.links, given.facts
@@ -605,8 +605,7 @@ def question_set(
     analyses: Sequence[FrameworkAnalysis],
     *,
     waiting: bool,
-    answered: Sequence[FactAnswer],
-    answered_links: Sequence[LinkAnswer],
+    answered: AnswerSet,
     final: bool,
     shown: Sequence[UnknownKey],
     skipped: Sequence[SkipKey] = (),
@@ -616,9 +615,8 @@ def question_set(
 
     ``frameworks`` maps each selected framework to its options, and ranks the
     early list; ``analyses`` ranks the report's list. So a waiting job passes
-    no analyses, and a finished one's frameworks go unread. ``answered`` and
-    ``answered_links`` are the answers of the earlier rounds, which are not
-    asked again. ``final`` marks a report the follow-up wrote, and ``shown``
+    no analyses, and a finished one's frameworks go unread. ``answered`` holds
+    the answers of the earlier rounds, which are not asked again. ``final`` marks a report the follow-up wrote, and ``shown``
     is every early question the pause presented. ``skipped`` is every early
     question and link question the pause's submitter skipped for now; a
     report's list reads both to say what became of each question before the
@@ -665,7 +663,7 @@ def question_set(
             skipped_links=(),
         )
     if not waiting:
-        said = {answer.key: answer for answer in answered}
+        said = {answer.key: answer for answer in answered.facts}
         showed, set_aside = frozenset(shown), frozenset(skipped)
         return QuestionSet(
             model=model,
@@ -677,7 +675,7 @@ def question_set(
                     question,
                     history=fact_status(question.key, said, showed, set_aside),
                 )
-                for question in fact_questions(analyses, model, catalog, answered)
+                for question in fact_questions(analyses, model, catalog, answered.facts)
             ),
             links=link_questions(catalog, model),
             final=False,
@@ -689,24 +687,24 @@ def question_set(
             skipped=(),
             skipped_links=(),
         )
-    done = answered_keys(answered)
+    done = answered_keys(answered.facts)
     first = early_questions(model, frameworks, catalog)
     asked_links = link_questions(catalog, model)
-    view = answered_model(model, answered)
+    view = answered_model(model, answered.facts)
     if catalog is not None:
-        catalog = apply_answers(catalog, view, answered_links, answered)[0]
+        catalog = apply_answers(catalog, view, answered.links, answered.facts)[0]
     listed = early_questions(view, frameworks, catalog)
     # An answer to a gate question counts toward no kind's limit, so the key
     # stays exempt once its answer has decided the gate and it is no longer
     # listed as one.
-    given = {answer.key: answer for answer in answered}
+    given = {answer.key: answer for answer in answered.facts}
     gated = {question.key for question in (*first, *listed) if question.gates}
     # An answer counts toward the limit of each framework its question served,
     # and of every selected framework where no list holds its question.
     served = {question.key: question.frameworks for question in (*first, *listed)}
     answered_for = {
         answer.key: served.get(answer.key, tuple(frameworks))
-        for answer in answered
+        for answer in answered.facts
         if answer.key not in gated
     }
     aside: frozenset[SkipKey] = frozenset(skipped)
@@ -719,7 +717,7 @@ def question_set(
         and question.key not in aside | done
         and not passes_floor(question, listed)
     )
-    linked = {fold(link.principal): link for link in answered_links}
+    linked = {fold(link.principal): link for link in answered.links}
     open_links = link_questions(catalog, view)
     return QuestionSet(
         model=view,
@@ -758,8 +756,8 @@ def question_set(
             gates,
             listed,
             done,
-            answered,
-            [*shown, *_presented(this_round, answered)],
+            answered.facts,
+            [*shown, *_presented(this_round, answered.facts)],
             skipped=len(aside),
             held_back=len(held_back),
             below_floor=len(below_floor),
@@ -1185,8 +1183,7 @@ class AnswerState:
             self.frameworks,
             self.analyses,
             waiting=self.waiting,
-            answered=answers.facts,
-            answered_links=answers.links,
+            answered=answers,
             final=self.final,
             shown=self.shown,
             skipped=self.skipped,
@@ -1273,7 +1270,7 @@ class AnswerState:
         """
         if self.resumed_by is not None:
             raise AlreadyResumed(
-                f"job {self.resumed_by} already holds this job's answers;"
+                f"job {self.resumed_by} locks this job;"
                 " read that job, and amend here again only if it fails"
             )
         if not self.waiting:
@@ -1330,13 +1327,7 @@ class AnswerState:
             save=answers.save,
             skips=answers.skips,
         )
-        held = admitted.answers
-        if len(held.facts) > MAX_HELD_FACTS or len(held.links) > MAX_HELD_LINKS:
-            raise ValueError(
-                f"a job holds at most {MAX_HELD_FACTS} fact answers and"
-                f" {MAX_HELD_LINKS} link answers in all; these answers would"
-                f" make {len(held.facts)} and {len(held.links)}"
-            )
+        held = within_held_limits(admitted.answers)
         # Checked for a save too: a saved round or draft that no start could
         # run would hold the job until the submitter shortens an answer.
         breach = None if limits is None else limits.breach(admitted.sources)

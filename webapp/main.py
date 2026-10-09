@@ -268,8 +268,8 @@ class Run:
     #: The answers a paused run held when its amendment started this run
     #: (ADR 0072); this run's questions take each one they still ask.
     carried: AnswerSet = NO_ANSWERS
-    #: The run a submitter's answers started from this one, if any.
-    resumed_by: Run | None = None
+    #: The run a submitter's answers started from this one, in any status, if any.
+    resumed_run: Run | None = None
     #: The report this run's answers came from, for a follow-up: what its own
     #: report is compared with.
     previous: Report | None = None
@@ -286,13 +286,13 @@ class Run:
         A run whose resumed run has not reached a report still waits: that
         run can fail, and this one is then the only place its answers resume.
         """
-        resumed = self.resumed_by is not None and self.resumed_by.report is not None
+        resumed = self.resumed_run is not None and self.resumed_run.report is not None
         return self.checkpoint is not None and self.report is None and not resumed
 
     @property
     def locked_by(self) -> Run | None:
         """The run these answers started, where it locks this one, or ``None``."""
-        return self.resumed_by if self.resumed else None
+        return self.resumed_run if self.resumed else None
 
     @property
     def resumed(self) -> bool:
@@ -302,7 +302,7 @@ class Run:
         job. A resumed run that failed read nothing into a report, so this one
         takes answers again.
         """
-        run = self.resumed_by
+        run = self.resumed_run
         return run is not None and locks_its_parent(run.status)
 
     @property
@@ -1030,7 +1030,7 @@ def create_app(
                 {"message": "An analysis is already running. Wait for it to finish."},
                 status_code=409,
             )
-        parent.resumed_by = run
+        parent.resumed_run = run
         run.name, run.analysis_id = parent.name, parent.workspace_id
         run.previous = parent.report
         run.engine, run.sources = parent.engine, parent.sources
@@ -1106,7 +1106,7 @@ def create_app(
                 {"message": "An analysis is already running. Wait for it to finish."},
                 status_code=409,
             )
-        parent.resumed_by = run
+        parent.resumed_run = run
         run.name, run.analysis_id = parent.name, parent.workspace_id
         run.engine, run.sources = parent.engine, amended.sources
         run.carried = amended.answers

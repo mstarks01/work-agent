@@ -99,7 +99,7 @@ def locks_its_parent(status: JobStatus) -> bool:
     """True where a resumed job in ``status`` locks its parent: the parent takes
     no answers.
 
-    **The one reader of "does a resumed job spend its parent's answers".** The
+    **The one reader of "does a resumed job lock its parent".** The
     job store and the first-run app both ask it.
     """
     return status not in UNSPENT_STATUSES

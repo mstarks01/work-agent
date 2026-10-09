@@ -444,8 +444,7 @@ def _paused(model, selection, answers=()):
         selection,
         (),
         waiting=True,
-        answered=list(answers),
-        answered_links=(),
+        answered=AnswerSet(facts=tuple(answers)),
         final=False,
         shown=(),
     )

@@ -37,6 +37,7 @@ from pathlib import Path
 from typing import Any
 
 from analysis_service.answer_round import passes_floor, question_set
+from analysis_service.answer_sets import AnswerSet
 from analysis_service.claims import FrameworkName, UnknownKey
 from analysis_service.early_questions import EarlyQuestion, early_questions
 from analysis_service.fact_answers import FactAnswer, key_ref
@@ -69,8 +70,7 @@ def _rounds(model: SystemModel, frameworks: Selection) -> list[list[EarlyQuestio
             frameworks,
             [],
             waiting=True,
-            answered=answered,
-            answered_links=[],
+            answered=AnswerSet(facts=tuple(answered)),
             final=False,
             shown=[],
         )

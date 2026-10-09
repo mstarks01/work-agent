@@ -12,13 +12,13 @@ from __future__ import annotations
 import asyncio
 
 import pytest
-from pydantic import ValidationError
+from pydantic import TypeAdapter, ValidationError
 
 from analysis_service.answer_round import ANSWER_LIMITS
-from analysis_service.answer_sets import AnswerSet
+from analysis_service.answer_sets import AnswerSet, HeldAnswerSet
 from analysis_service.api import AnswersSubmission
 from analysis_service.claims import UnknownRef, Verdict
-from analysis_service.fact_answers import MAX_FACT_ANSWERS, FactAnswer
+from analysis_service.fact_answers import MAX_FACT_ANSWERS, MAX_HELD_FACTS, FactAnswer
 from analysis_service.jobs import JobRecord
 from analysis_service.links import MAX_LINK_ANSWERS, LinkAnswer
 from analysis_service.sources import SourceLimits
@@ -148,9 +148,9 @@ class TestTheLimitsAgree:
     def test_a_job_holds_at_most_its_held_ceiling(self, monkeypatch):
         """The ceiling on what a job holds is checked on the composed answers,
         across every batch."""
-        from analysis_service import answer_round
+        from analysis_service import answer_sets
 
-        monkeypatch.setattr(answer_round, "MAX_HELD_FACTS", 150)
+        monkeypatch.setattr(answer_sets, "MAX_HELD_FACTS", 150)
         client, store = _client()
         job = _finished(store)
         first = _post(
@@ -164,6 +164,19 @@ class TestTheLimitsAgree:
         )
         assert second.status_code == 400
         assert "holds at most 150 fact answers" in second.json()["detail"]
+
+    def test_a_stored_answer_set_holds_at_most_the_held_ceiling(self):
+        """A job record refuses a stored set over the ceiling a submission
+        is checked against: both ask
+        :func:`~analysis_service.answer_sets.within_held_limits`."""
+        facts = tuple(
+            FactAnswer.model_validate(fact)
+            for fact in _facts(range(MAX_HELD_FACTS + 1))
+        )
+        held = TypeAdapter(HeldAnswerSet)
+        held.validate_python(AnswerSet(facts=facts[:-1]))
+        with pytest.raises(ValidationError, match=f"holds at most {MAX_HELD_FACTS}"):
+            held.validate_python(AnswerSet(facts=facts))
 
 
 class TestTheDraft:

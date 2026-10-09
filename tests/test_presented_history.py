@@ -15,7 +15,7 @@ from dataclasses import replace
 import pytest
 
 from analysis_service.answer_round import question_set
-from analysis_service.answer_sets import NO_ANSWERS
+from analysis_service.answer_sets import NO_ANSWERS, AnswerSet
 from analysis_service.early_questions import early_questions
 from analysis_service.fact_answers import FactAnswer
 from tests.factories import valid_model
@@ -32,8 +32,7 @@ def _paused(answers=(), skipped=(), shown=()):
         LEVEL_2,
         (),
         waiting=True,
-        answered=list(answers),
-        answered_links=(),
+        answered=AnswerSet(facts=tuple(answers)),
         final=False,
         shown=list(shown),
         skipped=list(skipped),
