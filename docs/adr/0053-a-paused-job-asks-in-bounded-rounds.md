@@ -53,7 +53,9 @@ analysis" is available in every round.
 | Capability | 2 | 30 | A capability's score counts the units it could settle, not findings, so it takes its own floor. Under 2, it settles one unit. At ASVS level 2 the floor left 28 of 51, and dropped about 6 a job that settle a level 1 requirement while it kept 13 that settle only level 2; a question in the highest band now passes the floor where bands differ (ADR 0055), so 34 pass and the limit asks 30. |
 
 Two limits, not one: the two kinds' scores are on different scales, so one
-shared limit would let the higher-scored kind take every place.
+shared limit would let the higher-scored kind take every place. Each limit
+applies to each selected framework
+([ADR 0074](0074-each-framework-has-its-own-question-limit.md)).
 
 **The selected frameworks take turns** (`answer_round.by_turn`). Where a job
 selects more than one framework, each kind's places in a round go to the

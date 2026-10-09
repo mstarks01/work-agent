@@ -452,16 +452,43 @@ class TestTheBoundedRounds:
         from analysis_service.answer_round import next_round
 
         listed = _asked_after([]).early
-        held = {
-            ("", "", "", f"subject {n}", "", ""): FactAnswer(
-                key=("", "", "", f"subject {n}", "", ""), value="unknown"
-            )
-            for n in range(30)
-        }
+        held = {("", "", "", f"subject {n}", "", ""): ("stride",) for n in range(30)}
         shown, remaining, withheld = next_round(listed, frozenset(held), held)
         assert not [q for q in shown if q.kind != "capability"]
         assert remaining["field"] == 0
         assert len(withheld) == len([q for q in listed if q.kind != "capability"])
+
+    def test_a_second_framework_takes_no_place_from_the_first(self):
+        """Each framework has its own limit, so a joint pause asks STRIDE what
+        it asks alone (QA-2026-10-09-01-E1)."""
+        from analysis_service.answer_round import EARLY_RULES, next_round
+
+        def field(n, framework):
+            key = (f"process:{framework}{n}", "authentication", "", "", "", "")
+            return SimpleNamespace(
+                key=key,
+                kind="attribute",
+                score=5.0,
+                decisions=1,
+                parent=None,
+                frameworks=(framework,),
+                gates=(),
+            )
+
+        limit = EARLY_RULES["field"].limit
+        stride = [field(n, "stride") for n in range(limit)]
+        asvs = [field(n, "asvs") for n in range(5)]
+        _, remaining, withheld = next_round([*stride, *asvs], frozenset(), {})
+        assert remaining["field"] == limit + len(asvs)
+        assert withheld == ()
+
+        answered = {question.key: ("stride",) for question in stride[:limit]}
+        rest = [field(limit + n, "stride") for n in range(3)]
+        _, remaining, withheld = next_round(
+            [*rest, *asvs], frozenset(answered), answered
+        )
+        assert remaining["field"] == len(asvs)
+        assert [q.key for q in withheld] == [q.key for q in rest]
 
     def test_a_question_answered_in_part_comes_back_outside_the_limit(self):
         """A question with a partial answer stays outside the limit, so thirty
@@ -484,12 +511,9 @@ class TestTheBoundedRounds:
             )
 
         listed = [capacity_of(n) for n in range(31)]
-        held = {
-            q.key: FactAnswer(key=q.key, facets={"rate": "yes"}) for q in listed[:30]
-        }
-        shown, remaining, withheld = next_round(
-            listed, answered_keys(held.values()), held
-        )
+        answers = [FactAnswer(key=q.key, facets={"rate": "yes"}) for q in listed[:30]]
+        held = {q.key: q.frameworks for q in listed[:30]}
+        shown, remaining, withheld = next_round(listed, answered_keys(answers), held)
         per_round = EARLY_RULES["field"].per_round
         assert [q.key for q in shown] == [q.key for q in listed[:per_round]]
         assert remaining["field"] == 30
