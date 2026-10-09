@@ -598,7 +598,7 @@ def render_report(
     return render(
         VIEWER.read_text(encoding="utf-8"),
         _REPORT_GRANTS,
-        script=client_script("answer_detail.js")
+        script=client_script("answer_editor.js")
         + "\n"
         + client_script("report_view.js"),
         answer_limits=script_json(dict(ANSWER_LIMITS)),
@@ -786,7 +786,7 @@ def create_app(
                 _FORM_GRANTS,
                 script="\n".join(
                     client_script(name)
-                    for name in ("workspace.js", "answer_detail.js", "first_run.js")
+                    for name in ("workspace.js", "answer_editor.js", "first_run.js")
                 ),
                 answer_limits=script_json(dict(ANSWER_LIMITS)),
                 workspace_style=(

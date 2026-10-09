@@ -130,105 +130,13 @@
   // This round's questions, each with its key and reader, so "Skip the rest"
   // can name the ones left blank.
   let roundRows = [];
-  // The answer that says the submitter does not know. The service writes
-  // nothing for it, so the fact stays open.
-  const DONT_KNOW = "unknown";
   // How much of an element's source words a row shows; the rest is its title.
   const EXCERPT = 200;
-  // The answers a facet takes, as the service lists them in FACET_ANSWERS.
-  const FACET_CHOICES = [
-    ["yes", "yes"], ["no", "no"], ["not applicable", "not applicable"],
-    ["I don't know", DONT_KNOW],
-  ];
-  // The inputs for one early question: a select of its choices, a control's
-  // none / don't know / mechanism, or a line of text. `prefill` is an earlier
-  // answer's value. The round and "Your answers" both build with this, so
-  // the two cannot differ.
-  const optionOf = (label, value) => {
-    const choice = document.createElement("option");
-    choice.value = value;
-    choice.textContent = label;
-    return choice;
-  };
-  const facetSelect = (blank) => {
-    const select = document.createElement("select");
-    select.append(optionOf(blank, ""));
-    for (const [label, value] of FACET_CHOICES) select.append(optionOf(label, value));
-    return select;
-  };
-  let suggestLists = 0;
-  const withDetail = (answer, detail) => (detail ? { ...answer, detail } : answer);
-  const inputFor = (q, prefill, prefillDetail) => {
-    let input;
-    // `read` is the answer the row sends, or "" for none; `set` writes an
-    // answer into the row, as "Same for all" and an earlier answer do.
-    let read = () => input.value.trim();
-    let set;
-    // `beside` is what follows the label.
-    let beside;
-    // A closed answer takes a detail beside it; free text needs none.
-    let detail = null;
-    if (q.choices.length) {
-      input = document.createElement("select");
-      input.append(optionOf("(leave unanswered)", ""));
-      for (const option of q.choices) {
-        input.append(optionOf(option.name ? `${option.name} (${option.id})` : option.id, option.id));
-      }
-      input.append(optionOf("I don't know", DONT_KNOW));
-      set = (value) => { input.value = value; };
-      detail = answerDetail(prefillDetail || "");
-      beside = [input, " ", detail];
-    } else if (q.form === "control") {
-      // A control: say there is none, say you do not know, or name the
-      // mechanism. The suggestions are a start; the text is the answer.
-      input = document.createElement("input");
-      input.type = "text";
-      input.maxLength = q.max_length;
-      input.placeholder = "type it, or pick a common one";
-      const list = document.createElement("datalist");
-      list.id = `early-suggest-${suggestLists++}`;
-      for (const suggestion of q.suggestions) list.append(optionOf(suggestion, suggestion));
-      input.setAttribute("list", list.id);
-      const state = document.createElement("select");
-      state.append(optionOf("(leave unanswered)", ""), optionOf("There is none", "none"),
-        optionOf("I don't know", DONT_KNOW), optionOf("A mechanism, in my own words:", "mechanism"));
-      // The state is the answer: blank sends nothing, and the text is read
-      // only under "mechanism". Typing a mechanism chooses it.
-      const fix = () => { input.disabled = state.value === "none" || state.value === DONT_KNOW; };
-      state.addEventListener("change", fix);
-      input.addEventListener("input", () => { if (input.value.trim()) state.value = "mechanism"; });
-      set = (value) => {
-        const fixed = value === "none" || value === DONT_KNOW;
-        state.value = fixed || !value ? value : "mechanism";
-        input.value = fixed ? "" : value;
-        fix();
-      };
-      read = () => (state.value === "mechanism" ? input.value.trim() : state.value);
-      beside = [state, " ", input, list];
-    } else {
-      input = document.createElement("input");
-      input.type = "text";
-      input.maxLength = q.max_length;
-      input.placeholder = "(leave unanswered)";
-      const box = document.createElement("input");
-      box.type = "checkbox";
-      box.addEventListener("change", () => {
-        input.value = box.checked ? DONT_KNOW : "";
-        input.disabled = box.checked;
-      });
-      const dontKnow = document.createElement("label");
-      dontKnow.append(box, " I don't know");
-      set = (value) => {
-        input.value = value;
-        box.checked = input.disabled = value === DONT_KNOW;
-      };
-      beside = [input, " ", dontKnow];
-    }
-    set(prefill || "");
-    input.dataset.key = JSON.stringify(q.key);
-    const readDetail = () => (detail ? detail.value.trim() : "");
-    return { input, beside, read, set, readDetail };
-  };
+  // The input for one early question, built by answerEditor. `prefill` is an
+  // earlier answer, or null. A job waiting at its pause takes "I don't know"
+  // over a known answer, so every input offers it. The round, "Your answers"
+  // and the questions no round shows all build with this.
+  const inputFor = (q, prefill) => answerEditor(q, { choices: q.choices, prefill, reopen: true });
 
   // A paused run's round: the link questions, then one box per open-fact
   // category in first-appearance order, and every earlier answer below them.
@@ -460,7 +368,7 @@
         all.append(allLabel);
         q.facets.forEach((facet, column) => {
           const cell = document.createElement("td");
-          const every = facetSelect("(set every row)");
+          const every = facetSelect("(set every row)", "", true);
           every.addEventListener("change", () => {
             for (const select of columns[column]) select.value = every.value;
           });
@@ -481,10 +389,9 @@
       name.append(label);
       row.append(name);
       const selects = q.facets.map((facet, column) => {
-        const select = facetSelect("(leave unanswered)");
+        const select = facetSelect("(leave unanswered)", (prefill && prefill[facet.id]) || "", true);
         select.dataset.key = JSON.stringify(q.key);
         select.dataset.facet = facet.id;
-        select.value = (prefill && prefill[facet.id]) || "";
         grid.columns[column].push(select);
         const cell = document.createElement("td");
         cell.append(select);
@@ -568,7 +475,7 @@
         return;
       }
       const row = document.createElement("p");
-      const { input, beside, read, set, readDetail } = inputFor(q, "");
+      const { input, nodes, set, answer: filled } = inputFor(q, null);
       inputs.set(input.dataset.key, input);
       if (shareable.has(q.group)) {
         // Ticked rows take the shared answer; an unticked row is an exception.
@@ -603,20 +510,17 @@
         followers.get(parent.dataset.key).push(follow);
         follow();
       }
-      const answer = () => {
-        const value = read();
-        return value && !row.hidden ? withDetail({ key: q.key, value }, readDetail()) : null;
-      };
+      const answer = () => (row.hidden ? null : filled());
       answers.push(answer);
       roundRows.push({ key: q.key, read: answer, hidden: () => row.hidden });
-      row.append(label, " ", ...beside);
+      row.append(label, " ", ...nodes);
       if (about) row.append(about);
       group.box.append(row);
     });
     tally();
     for (const [name, group] of groups) {
       if (group.rows.length) {
-        const shared = inputFor(data.facts.find((q) => q.group === name), "");
+        const shared = inputFor(data.facts.find((q) => q.group === name), null);
         const apply = document.createElement("button");
         apply.type = "button";
         apply.textContent = "Apply to the ticked rows";
@@ -626,7 +530,7 @@
         const line = document.createElement("p");
         const title = document.createElement("b");
         title.textContent = "Same for all";
-        line.append(title, " ", ...shared.beside, " ", apply);
+        line.append(title, " ", ...shared.nodes, " ", apply);
         const hint = document.createElement("div");
         hint.className = "hint";
         hint.textContent = "Untick a row the answer does not fit. Each row is sent as its"
@@ -693,12 +597,11 @@
           shown.hidden = true;
           return;
         }
-        const { beside, read, readDetail } = inputFor(a, a.answer.value, a.answer.detail);
-        shown.replaceChildren(" — ", ...beside);
+        const { nodes, read, readDetail, answer } = inputFor(a, a.answer);
+        shown.replaceChildren(" — ", ...nodes);
         answers.push(() => {
-          const value = read();
-          const changed = value !== a.answer.value || readDetail() !== (a.answer.detail || "");
-          return value && changed ? withDetail({ key: a.key, value }, readDetail()) : null;
+          const changed = read() !== a.answer.value || readDetail() !== (a.answer.detail || "");
+          return changed ? answer() : null;
         });
       });
       earlierBox.append(row);
@@ -751,9 +654,9 @@
             before && before.detail));
           return;
         }
-        const { beside, read, readDetail } = inputFor(q, "");
-        row.append(" ", ...beside);
-        answers.push(() => (read() ? withDetail({ key: q.key, value: read() }, readDetail()) : null));
+        const { nodes, answer } = inputFor(q, null);
+        row.append(" ", ...nodes);
+        answers.push(answer);
       });
       row.append(" ", open);
       box.append(row);
