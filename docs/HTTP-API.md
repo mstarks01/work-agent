@@ -189,7 +189,8 @@ answered "yes". Each question's `decisions`
 counts its choices: one a facet, else one.
 A field question needs a `score` of at least 1, and a capability question at
 least 2. One pause asks at most 30 of each kind for each selected
-framework, and a question two frameworks share counts for each of them. `early_remaining`
+framework, and a question two frameworks share counts for each of them
+([ADR 0074](adr/0074-each-framework-has-its-own-question-limit.md)). `early_remaining`
 estimates how many of each kind are left, this round included; answers can
 add or take away questions. Send a round with `"save": true` to keep it: the
 answers are written onto the job, no model runs, and the response is `200`
