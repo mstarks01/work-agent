@@ -22,6 +22,7 @@ from analysis_service.answer_round import (
     SourcesOverLimit,
     StaleRevision,
 )
+from analysis_service.answer_sets import NO_ANSWERS
 from analysis_service.sources import Source, SourceLimits
 from tests.test_pause import held
 
@@ -37,8 +38,7 @@ def waiting(**changes) -> AnswerState:
         waiting=True,
         final=False,
         sources=(Source(kind="description", label="overview", text="A web app."),),
-        links=(),
-        facts=(),
+        answers=NO_ANSWERS,
         shown=(),
         skipped=(),
         corrections=(),

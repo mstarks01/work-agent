@@ -35,13 +35,14 @@ from uuid import uuid4
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
+from analysis_service.answer_sets import NO_ANSWERS, AnswerSet, HeldAnswerSet
 from analysis_service.assertions import AssertionRecord
 from analysis_service.budgets import BudgetPolicy, measured_tokens, spent_tokens
 from analysis_service.certification import CertifyResult
 from analysis_service.claims import FrameworkAnalysis, UnknownKey
 from analysis_service.execution import GraphFailed
 from analysis_service.fact_answers import MAX_HELD_FACTS, FactAnswer, SkipKey
-from analysis_service.links import MAX_HELD_LINKS, LinkAnswer
+from analysis_service.links import MAX_HELD_LINKS
 from analysis_service.report import (
     FrameworkSelection,
     InputRef,
@@ -210,16 +211,13 @@ class JobRecord(BaseModel):
     # things on two installs.
     frameworks: list[FrameworkSelection] = Field(min_length=1)
     system_name: str | None = None
-    # The submitter's answers to an earlier report's link questions. They are
-    # also composed into one of ``sources``, which is what an answer's row
-    # quotes; these are what ``prepare`` writes the rows from. See
-    # :mod:`analysis_service.links`.
-    links: list[LinkAnswer] = Field(default_factory=list, max_length=MAX_HELD_LINKS)
-    # The submitter's answers to a report's open facts, carried by a resumed
-    # job and also composed into its answers Source. See
-    # :mod:`analysis_service.questions`. One request carries at most
-    # MAX_FACT_ANSWERS; a job holds every save's (ADR 0070).
-    facts: list[FactAnswer] = Field(default_factory=list, max_length=MAX_HELD_FACTS)
+    # The submitter's answers to an earlier report's link questions and open
+    # facts. They are also composed into the answers Source, which is what an
+    # answer's row quotes; these are what ``prepare`` writes the rows from. See
+    # :mod:`analysis_service.links` and :mod:`analysis_service.questions`. One
+    # request carries at most MAX_FACT_ANSWERS; a job holds every save's
+    # (ADR 0070).
+    answers: HeldAnswerSet = NO_ANSWERS
     # Every early question the pause presented, answered or not. The report
     # reads it to say what became of a follow-up question before the analysis.
     shown_early: list[UnknownKey] = Field(
@@ -232,12 +230,7 @@ class JobRecord(BaseModel):
     )
     # A finished report's draft answers: what its follow-up saved in batches
     # and has not run. The run composes them with what it is sent (ADR 0070).
-    draft_links: list[LinkAnswer] = Field(
-        default_factory=list, max_length=MAX_HELD_LINKS
-    )
-    draft_facts: list[FactAnswer] = Field(
-        default_factory=list, max_length=MAX_HELD_FACTS
-    )
+    draft: HeldAnswerSet = NO_ANSWERS
     # How many rounds a waiting job, or drafts a finished report, has saved. A
     # save or a continue names the revision it read, so a page left open on an
     # earlier round cannot write over a later one.
@@ -261,12 +254,7 @@ class JobRecord(BaseModel):
     # The paused job's answers, carried to the job its amendment started. Its
     # question set takes each one whose fact it still asks, and lists the rest.
     # The extraction never reads them.
-    carried_links: list[LinkAnswer] = Field(
-        default_factory=list, max_length=MAX_HELD_LINKS
-    )
-    carried_facts: list[FactAnswer] = Field(
-        default_factory=list, max_length=MAX_HELD_FACTS
-    )
+    carried: HeldAnswerSet = NO_ANSWERS
     # Whether this job stops after its assertion pass to ask a person, and
     # waits for the answers. Off unless a submission asks for it, so an
     # autonomous run never waits.
@@ -309,15 +297,13 @@ class JobRecord(BaseModel):
         sources: Sequence[Source],
         frameworks: Sequence[FrameworkSelection],
         system_name: str | None = None,
-        links: Sequence[LinkAnswer] = (),
-        facts: Sequence[FactAnswer] = (),
+        answers: AnswerSet = NO_ANSWERS,
         shown_early: Sequence[UnknownKey] = (),
         skipped_early: Sequence[SkipKey] = (),
         resumption: Resumption | None = None,
         amends: str | None = None,
         parent_revision: int | None = None,
-        carried_links: Sequence[LinkAnswer] = (),
-        carried_facts: Sequence[FactAnswer] = (),
+        carried: AnswerSet = NO_ANSWERS,
         ask_questions: bool = False,
         reserved_tokens: int = 0,
     ) -> Self:
@@ -329,15 +315,13 @@ class JobRecord(BaseModel):
             sources=list(sources),
             frameworks=list(frameworks),
             system_name=system_name,
-            links=list(links),
-            facts=list(facts),
+            answers=answers,
             shown_early=list(shown_early),
             skipped_early=list(skipped_early),
             resumption=resumption,
             amends=amends,
             parent_revision=parent_revision,
-            carried_links=list(carried_links),
-            carried_facts=list(carried_facts),
+            carried=carried,
             ask_questions=ask_questions,
             created_at=now,
             updated_at=now,
@@ -545,8 +529,7 @@ class JobStore(Protocol):
         self,
         job_id: str,
         subject: str,
-        links: Sequence[LinkAnswer],
-        facts: Sequence[FactAnswer],
+        answers: AnswerSet,
         shown: Sequence[UnknownKey],
         skipped: Sequence[SkipKey],
         revision: int,
@@ -560,8 +543,7 @@ class JobStore(Protocol):
         self,
         job_id: str,
         subject: str,
-        links: Sequence[LinkAnswer],
-        facts: Sequence[FactAnswer],
+        draft: AnswerSet,
         revision: int,
     ) -> bool: ...
 
@@ -806,8 +788,7 @@ class InMemoryJobStore:
         self,
         job_id: str,
         subject: str,
-        links: Sequence[LinkAnswer],
-        facts: Sequence[FactAnswer],
+        answers: AnswerSet,
         shown: Sequence[UnknownKey],
         skipped: Sequence[SkipKey],
         revision: int,
@@ -833,8 +814,7 @@ class InMemoryJobStore:
         ):
             return False
         record.round_revision += 1
-        record.links = list(links)
-        record.facts = list(facts)
+        record.answers = answers
         record.shown_early = list(shown)
         record.skipped_early = list(skipped)
         record.updated_at = datetime.now(UTC)
@@ -844,13 +824,12 @@ class InMemoryJobStore:
         self,
         job_id: str,
         subject: str,
-        links: Sequence[LinkAnswer],
-        facts: Sequence[FactAnswer],
+        draft: AnswerSet,
         revision: int,
     ) -> bool:
         """Keep a finished report's draft answers, which run nothing (ADR 0070).
 
-        ``links`` and ``facts`` are every draft answer so far. ``revision`` is
+        ``draft`` is every draft answer so far. ``revision`` is
         the revision the save read: the check and the next revision are one
         step, as for :meth:`save_round`. False where the job is not the
         subject's, has no report, has a final report, or its answers already
@@ -867,8 +846,7 @@ class InMemoryJobStore:
         ):
             return False
         record.round_revision += 1
-        record.draft_links = list(links)
-        record.draft_facts = list(facts)
+        record.draft = draft
         record.updated_at = datetime.now(UTC)
         return True
 

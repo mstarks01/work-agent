@@ -46,6 +46,7 @@ from analysis_service.answer_round import (
     SavedRound,
     passes_floor,
 )
+from analysis_service.answer_sets import AnswerSet
 from analysis_service.assertions import UNKNOWN
 from analysis_service.claims import FrameworkName, UnknownKey
 from analysis_service.early_questions import EarlyQuestion, early_questions
@@ -207,8 +208,7 @@ def _state(
         waiting=True,
         final=False,
         sources=(),
-        links=(),
-        facts=answered,
+        answers=AnswerSet(facts=tuple(answered)),
         shown=(),
         skipped=skipped,
         corrections=(),
@@ -222,7 +222,12 @@ def _saved(
 ) -> SavedRound:
     """One saved round. The replay holds no sources, so no source limit applies."""
     saved = state.answer(
-        Answers(facts=facts, save=True, skips=skips, revision=state.revision),
+        Answers(
+            given=AnswerSet(facts=tuple(facts)),
+            save=True,
+            skips=skips,
+            revision=state.revision,
+        ),
         limits=None,
     )
     if not isinstance(saved, SavedRound):

@@ -21,6 +21,7 @@ from analysis_service.answer_forms import (
     answer_suggestions,
 )
 from analysis_service.answer_round import question_set
+from analysis_service.answer_sets import NO_ANSWERS, AnswerSet
 from analysis_service.assertions import (
     UNKNOWN,
     Assertion,
@@ -396,7 +397,7 @@ class TestTheResumedRunWithoutACatalog:
             owner_subject="idp|user-1",
             sources=with_link_answers([DESCRIPTION], [], [answer]),
             frameworks=sample_selection(),
-            facts=[answer],
+            answers=AnswerSet(facts=(answer,)),
             resumption=Resumption(
                 follow_up=False,
                 parent_id="p",
@@ -459,7 +460,7 @@ class TestTheRoutes:
         )
         assert response.status_code == 201, response.text
         child = asyncio.run(store.get(response.json()["job_id"]))
-        assert child.facts == [FactAnswer.model_validate(answer)]
+        assert child.answers.facts == (FactAnswer.model_validate(answer),)
         assert child.resumption.checkpoint.assertions is None
 
     def test_a_fact_the_report_does_not_hold_is_refused(self):
@@ -509,8 +510,7 @@ def resume(checkpoint, facts=(), earlier=(), given=(DESCRIPTION,)):
         owner_subject="idp|user-1",
         sources=sources,
         frameworks=sample_selection(),
-        links=links,
-        facts=answered,
+        answers=AnswerSet(links=tuple(links), facts=tuple(answered)),
         resumption=Resumption(
             follow_up=False, parent_id="job-parent", checkpoint=checkpoint
         ),
@@ -624,8 +624,7 @@ def resume_links(checkpoint, links, earlier=()):
         owner_subject="idp|user-1",
         sources=sources,
         frameworks=sample_selection(),
-        links=merged,
-        facts=facts,
+        answers=AnswerSet(links=tuple(merged), facts=tuple(facts)),
         resumption=Resumption(
             follow_up=False, parent_id="job-parent", checkpoint=checkpoint
         ),
@@ -814,10 +813,8 @@ class TestTheAdmissionCheck:
         with pytest.raises(ValueError, match="asked no question about"):
             questions.admit(
                 sources=[],
-                earlier_links=[],
-                earlier_facts=[],
-                links=[link],
-                facts=[],
+                earlier=NO_ANSWERS,
+                given=AnswerSet(links=(link,)),
             )
 
     def test_an_earlier_link_answer_may_be_answered_again(self):

@@ -22,6 +22,7 @@ from analysis_service.answer_round import (
     ResumedJob,
     StaleRevision,
 )
+from analysis_service.answer_sets import AnswerSet
 from analysis_service.claims import UnknownRef
 from analysis_service.fact_answers import FactAnswer
 from analysis_service.jobs import Checkpoint, JobRecord
@@ -59,14 +60,13 @@ def _state(*, carried=(), facts=(), waiting=True, model=None):
         waiting=waiting,
         final=False,
         sources=(Source.description(DESCRIPTION_TEXT),),
-        links=(),
-        facts=tuple(facts),
+        answers=AnswerSet(facts=tuple(facts)),
         shown=(),
         skipped=(),
         corrections=(),
         revision=0,
         resumed_by=None,
-        carried_facts=tuple(carried),
+        carried_in=AnswerSet(facts=tuple(carried)),
     )
 
 
@@ -82,7 +82,9 @@ class TestTheRoute:
             key=(STORE, "encryption_at_rest", "", "", "", ""), value="AES"
         )
         parent = asyncio.run(store.get(job))
-        asyncio.run(store.save(parent.model_copy(update={"facts": [saved]})))
+        asyncio.run(
+            store.save(parent.model_copy(update={"answers": AnswerSet(facts=(saved,))}))
+        )
 
         response = _amend(client, job)
 
@@ -92,7 +94,7 @@ class TestTheRoute:
         assert child.sources[-1].text == AMENDMENT
         assert child.amends == job and child.ask_questions
         assert child.resumption is None, "it extracts again; it does not resume"
-        assert child.carried_facts == [saved] and child.facts == []
+        assert child.carried.facts == (saved,) and child.answers.empty
 
     def test_the_paused_job_is_held_while_the_amended_job_is_alive(self):
         client, store = _client()
@@ -152,9 +154,13 @@ class TestTheRoute:
             frameworks=sample_selection(),
             ask_questions=True,
             amends="job-parent",
-            carried_facts=[
-                FactAnswer(key=(STORE, "encryption_at_rest", "", "", "", ""), value="x")
-            ],
+            carried=AnswerSet(
+                facts=(
+                    FactAnswer(
+                        key=(STORE, "encryption_at_rest", "", "", "", ""), value="x"
+                    ),
+                )
+            ),
         )
         seeded = _seeded_state(record)
         assert all(not value for value in seeded.values())
@@ -165,7 +171,7 @@ class TestTheCarriedAnswers:
         key = _open_key(_state())
         answer = FactAnswer(key=key, value="none")
         state = _state(carried=[answer])
-        assert state.carried.facts == (answer,) and not state.carried.dropped_facts
+        assert state.carried.taken.facts == (answer,) and state.carried.dropped.empty
         assert key not in {q.key for q in state.questions.early}
         assert key in {q.key for q, _ in state.questions.answered_early}
 
@@ -175,8 +181,8 @@ class TestTheCarriedAnswers:
             value="AES",
         )
         state = _state(carried=[gone])
-        assert state.carried.dropped_facts == (gone,)
-        assert state.held_facts == []
+        assert state.carried.dropped.facts == (gone,)
+        assert state.held.facts == ()
 
     def test_a_carried_answer_about_a_fact_the_model_now_states_is_dropped(self):
         key = _open_key(_state())
@@ -184,21 +190,21 @@ class TestTheCarriedAnswers:
         model = valid_model()
         setattr(model.get(element_id), attribute, "stated by the amendment")
         state = _state(carried=[FactAnswer(key=key, value="none")], model=model)
-        assert [a.key for a in state.carried.dropped_facts] == [key]
+        assert [a.key for a in state.carried.dropped.facts] == [key]
 
     def test_an_answer_the_new_rounds_gave_replaces_the_carried_one(self):
         key = _open_key(_state())
         carried = FactAnswer(key=key, value="none")
         later = FactAnswer(key=key, value="unknown")
         state = _state(carried=[carried], facts=[later])
-        assert state.held_facts == [later]
+        assert state.held.facts == (later,)
 
     def test_a_continue_carries_the_taken_answers_into_the_analysis(self):
         key = _open_key(_state())
         carried = FactAnswer(key=key, value="none")
         resumed = _state(carried=[carried]).answer(Answers(revision=0), limits=ROOM)
         assert isinstance(resumed, ResumedJob)
-        assert carried in resumed.facts
+        assert carried in resumed.answers.facts
 
 
 class TestTheAmendRule:

@@ -12,6 +12,7 @@ from __future__ import annotations
 import pytest
 
 from analysis_service.answer_round import EARLY_RULES, question_set
+from analysis_service.answer_sets import AnswerSet
 from analysis_service.fact_answers import FactAnswer
 from analysis_service.system_model import SystemModel
 from tests.factories import PROJECT_ROOT, valid_model
@@ -35,10 +36,8 @@ def _paused(model, selection, answers=(), shown=(), skipped=()):
 def _save(asked, earlier, facts=(), skips=()):
     return asked.admit(
         sources=(),
-        earlier_links=(),
-        earlier_facts=earlier,
-        links=(),
-        facts=list(facts),
+        earlier=AnswerSet(facts=tuple(earlier)),
+        given=AnswerSet(facts=tuple(facts)),
         save=True,
         skips=list(skips),
     )
@@ -59,7 +58,7 @@ def _all_yes(level):
             for q in asked.early
         ]
         admitted = _save(asked, held, facts)
-        held, shown = admitted.facts, admitted.shown
+        held, shown = admitted.answers.facts, admitted.shown
     pytest.fail("the rounds never ended")
 
 
@@ -94,7 +93,7 @@ class TestTheStopSaysWhatIsLeft:
         assert low.key in asked.asked
         earlier = [answer for _, answer in asked.answered_early]
         admitted = _save(asked, earlier, [FactAnswer(key=low.key, value="yes")])
-        after = _paused(valid_model(), {"asvs": {"level": 1}}, admitted.facts)
+        after = _paused(valid_model(), {"asvs": {"level": 1}}, admitted.answers.facts)
         assert low.key not in {q.key for q in after.below_floor}
 
     def test_a_unit_no_open_question_can_settle_is_counted(self):

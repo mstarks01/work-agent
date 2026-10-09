@@ -27,8 +27,7 @@ its saves broke its own record.
 ## Decision
 
 **A report's follow-up keeps a draft.** A save to a finished, not final,
-report keeps the answers as a draft on the job (`draft_links` and
-`draft_facts`). It runs no model and does not spend the follow-up. A later
+report keeps the answers as a draft on the job (`JobRecord.draft`). It runs no model and does not spend the follow-up. A later
 batch replaces an earlier draft answer to the same fact or principal.
 
 **The run composes the draft with what it is sent.** A run without `"save"`

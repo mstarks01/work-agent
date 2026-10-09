@@ -49,6 +49,7 @@ from functools import cached_property
 from types import MappingProxyType
 from typing import TYPE_CHECKING, Any, Literal
 
+from analysis_service.answer_sets import NO_ANSWERS, AnswerSet
 from analysis_service.assertions import UNKNOWN, AssertionCatalog
 from analysis_service.bands import UNRANKED
 from analysis_service.capabilities import lineage
@@ -83,7 +84,6 @@ from analysis_service.links import (
     check_answers,
     fold,
     link_questions,
-    merged_links,
     resumed_sources,
 )
 from analysis_service.open_facts import prepared_model
@@ -220,8 +220,7 @@ class AdmittedRound:
     """What a resumed job carries: its sources and every round's answers."""
 
     sources: list[Source]
-    links: list[LinkAnswer]
-    facts: list[FactAnswer]
+    answers: AnswerSet
     #: Every early question the pause showed, this round's included, which
     #: the report reads to say a follow-up question was skipped before.
     shown: tuple[UnknownKey, ...]
@@ -425,19 +424,17 @@ class QuestionSet:
         self,
         *,
         sources: Sequence[Source],
-        earlier_links: Sequence[LinkAnswer],
-        earlier_facts: Sequence[FactAnswer],
-        links: Sequence[LinkAnswer],
-        facts: Sequence[FactAnswer],
+        earlier: AnswerSet,
+        given: AnswerSet,
         save: bool = False,
         skips: Sequence[SkipKey] = (),
     ) -> AdmittedRound:
         """The resumed job this round's answers start, or a ``ValueError``.
 
-        ``sources``, ``earlier_links`` and ``earlier_facts`` are what the
-        answered job was given. A refusal names the submitter's own choices,
-        so its message is safe to show. A link answer to a job with no catalog
-        raises :class:`~analysis_service.links.NoCatalogError`. ``save`` admits
+        ``sources`` and ``earlier`` are what the answered job was given, and
+        ``given`` is this round's answers. A refusal names the submitter's own
+        choices, so its message is safe to show. A link answer to a job with no
+        catalog raises :class:`~analysis_service.links.NoCatalogError`. ``save`` admits
         a round a waiting job keeps, or a report's draft (ADR 0070), which must
         answer or skip something and starts nothing. ``skips`` names questions of this round the submitter
         skips for now; only a saved round skips. A report's one follow-up is
@@ -450,9 +447,10 @@ class QuestionSet:
                 f"this job's answers already started job {self.resumed_by};"
                 " read that job, and answer here again only if it fails"
             )
+        links, facts = given.links, given.facts
         if save and not (links or facts or skips):
             raise ValueError("a saved round answers or skips at least one question")
-        merged = merged_facts(earlier_facts, facts)
+        merged = merged_facts(earlier.facts, facts)
         complete: frozenset[SkipKey] = answered_keys(merged) & {
             fact.key for fact in facts
         } | {fold(link.principal) for link in links}
@@ -473,25 +471,25 @@ class QuestionSet:
             self.model,
             self.catalog,
             self.asked,
-            earlier_facts,
+            earlier.facts,
             asked_links=[
                 question.key for question in (*self.links, *self.skipped_links)
             ],
-            earlier_links=earlier_links,
+            earlier_links=earlier.links,
             reopen=self.waiting,
         )
-        if (
-            not self.waiting
-            and not save
-            and not _adds_information(earlier_links, earlier_facts, links, facts)
-        ):
+        if not self.waiting and not save and not _adds_information(earlier, given):
             raise ValueError(
                 "these answers add nothing the analysis can use: each one is"
                 ' "I don\'t know" or repeats an earlier answer. The follow-up'
                 " has not run, and it is still available"
             )
+        composed, all_links, all_facts = resumed_sources(
+            sources, earlier.links, links, earlier.facts, facts
+        )
         return AdmittedRound(
-            *resumed_sources(sources, earlier_links, links, earlier_facts, facts),
+            sources=composed,
+            answers=AnswerSet(links=tuple(all_links), facts=tuple(all_facts)),
             shown=tuple(dict.fromkeys([*self.shown, *presented])),
             skipped=tuple(
                 dict.fromkeys(
@@ -982,12 +980,7 @@ def _take(candidates: Sequence[EarlyQuestion], per_round: int) -> list[EarlyQues
     return taken
 
 
-def _adds_information(
-    earlier_links: Sequence[LinkAnswer],
-    earlier_facts: Sequence[FactAnswer],
-    links: Sequence[LinkAnswer],
-    facts: Sequence[FactAnswer],
-) -> bool:
+def _adds_information(earlier: AnswerSet, given: AnswerSet) -> bool:
     """True where the answers change what the analysis reads.
 
     A link answer does where it places a principal anew or elsewhere. A fact
@@ -995,15 +988,15 @@ def _adds_information(
     of a facet answer only the facets answered otherwise count. A changed
     detail counts too (ADR 0073).
     """
-    placed = {fold(link.principal): link.element for link in earlier_links}
-    if any(placed.get(fold(link.principal)) != link.element for link in links):
+    placed = {fold(link.principal): link.element for link in earlier.links}
+    if any(placed.get(fold(link.principal)) != link.element for link in given.links):
         return True
-    before = {fact.key: fact for fact in earlier_facts}
-    after = {fact.key: fact for fact in merged_facts(earlier_facts, facts)}
+    before = {fact.key: fact for fact in earlier.facts}
+    after = {fact.key: fact for fact in merged_facts(earlier.facts, given.facts)}
     return any(
         _known_content(after[fact.key]) != _known_content(before.get(fact.key))
         or _detail(after[fact.key]) != _detail(before.get(fact.key))
-        for fact in facts
+        for fact in given.facts
     )
 
 
@@ -1043,14 +1036,13 @@ class SourcesOverLimit(Exception):
 class Answers:
     """One submission of answers to a job's questions.
 
-    ``save`` keeps a waiting job's round, or a report's draft, and starts
-    nothing. ``skips`` names questions of this round the submitter skips for
+    ``given`` is the answers. ``save`` keeps a waiting job's round, or a
+    report's draft, and starts nothing. ``skips`` names questions of this round the submitter skips for
     now; only a waiting job's saved round skips. ``revision`` is the revision
     the questions were read with, which a waiting job and every save require.
     """
 
-    links: Sequence[LinkAnswer] = ()
-    facts: Sequence[FactAnswer] = ()
+    given: AnswerSet = NO_ANSWERS
     save: bool = False
     skips: Sequence[SkipKey] = ()
     revision: int | None = None
@@ -1065,8 +1057,7 @@ class SavedRound:
     read one revision only the first lands.
     """
 
-    links: list[LinkAnswer]
-    facts: list[FactAnswer]
+    answers: AnswerSet
     shown: tuple[UnknownKey, ...]
     skipped: tuple[SkipKey, ...]
     revision: int
@@ -1082,14 +1073,12 @@ AMENDMENT_LABEL = "Amendment"
 class Carried:
     """The answers a job an amendment started carried from its paused job.
 
-    ``links`` and ``facts`` are the ones its questions take; the two
-    ``dropped`` lists are the ones they do not, which a page lists.
+    ``taken`` is the ones its questions take; ``dropped`` is the ones they do
+    not, which a page lists.
     """
 
-    links: tuple[LinkAnswer, ...]
-    facts: tuple[FactAnswer, ...]
-    dropped_links: tuple[LinkAnswer, ...]
-    dropped_facts: tuple[FactAnswer, ...]
+    taken: AnswerSet
+    dropped: AnswerSet
 
     def dropped_json(self, model: SystemModel) -> dict[str, list[dict[str, object]]]:
         """The answers its questions do not take, as every surface lists them:
@@ -1097,10 +1086,10 @@ class Carried:
         return {
             "carried_dropped": [
                 {"label": fact_label(fact.key, model)} | fact.model_dump(mode="json")
-                for fact in self.dropped_facts
+                for fact in self.dropped.facts
             ],
             "carried_dropped_links": [
-                link.model_dump(mode="json") for link in self.dropped_links
+                link.model_dump(mode="json") for link in self.dropped.links
             ],
         }
 
@@ -1110,23 +1099,21 @@ class AmendedJob:
     """The job an amendment starts: what it extracts, and what it carries."""
 
     sources: list[Source]
-    links: list[LinkAnswer]
-    facts: list[FactAnswer]
+    answers: AnswerSet
 
 
 @dataclass(frozen=True)
 class SavedDraft:
     """What a report keeps after its follow-up saves a batch. No model runs.
 
-    ``links`` and ``facts`` are every draft answer so far, this batch's over
-    the earlier ones. The report and its follow-up are unchanged: the run
+    ``draft`` is every draft answer so far, this batch's over the earlier
+    ones. The report and its follow-up are unchanged: the run
     that answers them composes the draft with what it is sent (ADR 0070).
     ``revision`` is the revision the save read, which the store checks as it
     does a saved round's.
     """
 
-    links: list[LinkAnswer]
-    facts: list[FactAnswer]
+    draft: AnswerSet
     revision: int
 
 
@@ -1140,8 +1127,7 @@ class ResumedJob:
     """
 
     sources: list[Source]
-    links: list[LinkAnswer]
-    facts: list[FactAnswer]
+    answers: AnswerSet
     shown: tuple[UnknownKey, ...]
     #: Every question the pause's submitter skipped and did not answer since,
     #: which the report reads to tell a skip from a blank.
@@ -1164,8 +1150,8 @@ class AnswerState:
     job's, or a finished report's. ``analyses`` are the report's findings, and
     empty for a waiting job. ``waiting`` marks a job that waits on answers
     before its analysis, and ``final`` a report its follow-up wrote.
-    ``sources``, ``links`` and ``facts`` are what the job was given, a
-    waiting job's saved rounds included. ``shown`` is every early question
+    ``sources`` and ``answers`` are what the job was given, a waiting job's
+    saved rounds included. ``shown`` is every early question
     the pause showed, ``skipped`` every question its submitter skipped for
     now, and ``corrections`` what a final report's owner corrected since.
     ``revision`` is how many rounds a waiting job saved. ``resumed_by`` names
@@ -1178,25 +1164,20 @@ class AnswerState:
     waiting: bool
     final: bool
     sources: Sequence[Source]
-    links: Sequence[LinkAnswer]
-    facts: Sequence[FactAnswer]
+    answers: AnswerSet
     shown: Sequence[UnknownKey]
     skipped: Sequence[SkipKey]
     corrections: Sequence[FactAnswer]
     revision: int
     resumed_by: str | None
     #: A report's draft answers: what its follow-up saved in batches and has
-    #: not yet run. Empty for a waiting job, whose saved rounds are ``facts``.
-    draft_links: Sequence[LinkAnswer] = ()
-    draft_facts: Sequence[FactAnswer] = ()
+    #: not yet run. Empty for a waiting job, whose saved rounds are ``answers``.
+    draft: AnswerSet = NO_ANSWERS
     #: The answers a paused job held when its amendment started this job
     #: (ADR 0072). This job's questions take each one they still ask.
-    carried_links: Sequence[LinkAnswer] = ()
-    carried_facts: Sequence[FactAnswer] = ()
+    carried_in: AnswerSet = NO_ANSWERS
 
-    def _question_set(
-        self, facts: Sequence[FactAnswer], links: Sequence[LinkAnswer]
-    ) -> QuestionSet:
+    def _question_set(self, answers: AnswerSet) -> QuestionSet:
         assertions = self.checkpoint.assertions
         return question_set(
             self.checkpoint.system_model,
@@ -1204,8 +1185,8 @@ class AnswerState:
             self.frameworks,
             self.analyses,
             waiting=self.waiting,
-            answered=facts,
-            answered_links=links,
+            answered=answers.facts,
+            answered_links=answers.links,
             final=self.final,
             shown=self.shown,
             skipped=self.skipped,
@@ -1222,61 +1203,50 @@ class AnswerState:
         taken. An answer this job's own rounds gave since replaces the carried
         one.
         """
-        if not (self.carried_facts or self.carried_links):
-            return Carried(links=(), facts=(), dropped_links=(), dropped_facts=())
-        base = self._question_set(self.facts, self.links)
-        saved = {answer.key for answer in self.facts}
-        placed = {fold(link.principal) for link in self.links}
-        facts = [answer for answer in self.carried_facts if answer.key not in saved]
+        if self.carried_in.empty:
+            return Carried(taken=NO_ANSWERS, dropped=NO_ANSWERS)
+        base = self._question_set(self.answers)
+        saved = {answer.key for answer in self.answers.facts}
+        placed = {fold(link.principal) for link in self.answers.links}
+        facts = [a for a in self.carried_in.facts if a.key not in saved]
         links = [
-            link for link in self.carried_links if fold(link.principal) not in placed
+            link for link in self.carried_in.links if fold(link.principal) not in placed
         ]
-        kept_facts = tuple(a for a in facts if self._admits(base, facts=[a]))
-        kept_links = tuple(link for link in links if self._admits(base, links=[link]))
+        taken_facts = tuple(
+            a for a in facts if self._admits(base, AnswerSet(facts=(a,)))
+        )
+        taken_links = tuple(
+            link for link in links if self._admits(base, AnswerSet(links=(link,)))
+        )
         return Carried(
-            links=kept_links,
-            facts=kept_facts,
-            dropped_links=tuple(link for link in links if link not in kept_links),
-            dropped_facts=tuple(a for a in facts if a not in kept_facts),
+            taken=AnswerSet(links=taken_links, facts=taken_facts),
+            dropped=AnswerSet(
+                links=tuple(link for link in links if link not in taken_links),
+                facts=tuple(a for a in facts if a not in taken_facts),
+            ),
         )
 
-    def _admits(
-        self,
-        base: QuestionSet,
-        *,
-        facts: Sequence[FactAnswer] = (),
-        links: Sequence[LinkAnswer] = (),
-    ) -> bool:
+    def _admits(self, base: QuestionSet, given: AnswerSet) -> bool:
         try:
             base.admit(
-                sources=self.sources,
-                earlier_links=self.links,
-                earlier_facts=self.facts,
-                links=links,
-                facts=facts,
-                save=True,
+                sources=self.sources, earlier=self.answers, given=given, save=True
             )
         except ValueError:
             return False
         return True
 
     @property
-    def held_facts(self) -> list[FactAnswer]:
-        """Every fact answer this job holds: the carried ones its questions
-        take, under the ones its own rounds gave."""
-        return merged_facts(self.carried.facts, self.facts)
-
-    @property
-    def held_links(self) -> list[LinkAnswer]:
-        """Every link answer this job holds, as :attr:`held_facts` for facts."""
-        return merged_links(self.carried.links, self.links)
+    def held(self) -> AnswerSet:
+        """Every answer this job holds: the carried ones its questions take,
+        under the ones its own rounds gave."""
+        return self.answers.over(self.carried.taken)
 
     @cached_property
     def questions(self) -> QuestionSet:
         """Every question this job asks."""
-        if not (self.carried.facts or self.carried.links):
-            return self._question_set(self.facts, self.links)
-        return self._question_set(self.held_facts, self.held_links)
+        if self.carried.taken.empty:
+            return self._question_set(self.answers)
+        return self._question_set(self.held)
 
     def _check_revision(self, revision: int | None, *, required: bool) -> None:
         """Refuse a request read off an older revision, or one with none where
@@ -1324,7 +1294,7 @@ class AnswerState:
         breach = None if limits is None else limits.breach(sources)
         if breach is not None:
             raise SourcesOverLimit(breach)
-        return AmendedJob(sources=sources, links=self.held_links, facts=self.held_facts)
+        return AmendedJob(sources=sources, answers=self.held)
 
     def answer(
         self, answers: Answers, *, limits: SourceLimits | None
@@ -1348,26 +1318,24 @@ class AnswerState:
         the job holds no sources to bound, as an eval replay of rounds.
         """
         self._check_revision(answers.revision, required=self.waiting or answers.save)
-        links, facts = answers.links, answers.facts
+        given = answers.given
         if not self.waiting:
-            if answers.save and not (links or facts):
+            if answers.save and given.empty:
                 raise ValueError("a saved draft answers at least one question")
-            links = merged_links(self.draft_links, links)
-            facts = merged_facts(self.draft_facts, facts)
+            given = given.over(self.draft)
         admitted = self.questions.admit(
             sources=self.sources,
-            earlier_links=self.held_links,
-            earlier_facts=self.held_facts,
-            links=links,
-            facts=facts,
+            earlier=self.held,
+            given=given,
             save=answers.save,
             skips=answers.skips,
         )
-        if len(admitted.facts) > MAX_HELD_FACTS or len(admitted.links) > MAX_HELD_LINKS:
+        held = admitted.answers
+        if len(held.facts) > MAX_HELD_FACTS or len(held.links) > MAX_HELD_LINKS:
             raise ValueError(
                 f"a job holds at most {MAX_HELD_FACTS} fact answers and"
                 f" {MAX_HELD_LINKS} link answers in all; these answers would"
-                f" make {len(admitted.facts)} and {len(admitted.links)}"
+                f" make {len(held.facts)} and {len(held.links)}"
             )
         # Checked for a save too: a saved round or draft that no start could
         # run would hold the job until the submitter shortens an answer.
@@ -1375,21 +1343,17 @@ class AnswerState:
         if breach is not None:
             raise SourcesOverLimit(breach)
         if answers.save and not self.waiting:
-            return SavedDraft(
-                links=list(links), facts=list(facts), revision=self.revision
-            )
+            return SavedDraft(draft=given, revision=self.revision)
         if answers.save:
             return SavedRound(
-                links=admitted.links,
-                facts=admitted.facts,
+                answers=held,
                 shown=admitted.shown,
                 skipped=admitted.skipped,
                 revision=self.revision,
             )
         return ResumedJob(
             sources=admitted.sources,
-            links=admitted.links,
-            facts=admitted.facts,
+            answers=held,
             shown=admitted.shown,
             skipped=admitted.skipped,
             checkpoint=self.checkpoint,
@@ -1399,5 +1363,5 @@ class AnswerState:
     def correct(self, facts: Sequence[FactAnswer]) -> list[FactAnswer]:
         """Every correction a final report carries once ``facts`` land, or a ``ValueError``."""
         return self.questions.correct(
-            earlier_facts=self.facts, corrections=self.corrections, facts=facts
+            earlier_facts=self.answers.facts, corrections=self.corrections, facts=facts
         )

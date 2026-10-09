@@ -21,6 +21,7 @@ from fastapi.testclient import TestClient
 from analysis_service import Engine, StubPipelineRunner
 from analysis_service.analysis import ABSENT_WORD
 from analysis_service.answer_round import ANSWER_LIMITS
+from analysis_service.answer_sets import AnswerSet
 from analysis_service.assertions import AssertionRecord
 from analysis_service.claims import UnknownRef
 from analysis_service.fact_answers import (
@@ -85,8 +86,8 @@ class PausingRunner(StubPipelineRunner):
             )
             return PipelineAwaiting(checkpoint=held)
         if job.resumption is not None:
-            self.resumed_links.append(list(job.links))
-            self.resumed_facts.append(list(job.facts))
+            self.resumed_links.append(list(job.answers.links))
+            self.resumed_facts.append(list(job.answers.facts))
         outcome = await super().run(job, on_node)
         assert isinstance(outcome, PipelineCompleted)
         report = outcome.report.model_copy(
@@ -2765,7 +2766,10 @@ class TestEarlierAnswers:
         async def racing(self):
             body = await read(self)
             # A second tab's save, as the route writes one.
-            seen[-1].draft_facts, seen[-1].revision = [late], seen[-1].revision + 1
+            seen[-1].draft, seen[-1].revision = (
+                AnswerSet(facts=(late,)),
+                seen[-1].revision + 1,
+            )
             return body
 
         monkeypatch.setattr(Analyses, "get", get)

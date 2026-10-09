@@ -14,6 +14,7 @@ import pytest
 from pydantic import ValidationError
 
 from analysis_service.answer_round import ResumedJob
+from analysis_service.answer_sets import NO_ANSWERS
 from analysis_service.deployment import DEFAULT_RESILIENCE_PATH
 from analysis_service.engine import (
     DEFAULT_CALLER,
@@ -210,8 +211,7 @@ def test_a_resumed_job_is_held_to_the_source_limits_too():
             Source.description("x", label=f"Doc {n}")
             for n in range(TEST_LIMITS.max_sources + 1)
         ],
-        links=[],
-        facts=[],
+        answers=NO_ANSWERS,
         shown=(),
         skipped=(),
         checkpoint=Checkpoint(system_model=valid_model(), assertions=None),

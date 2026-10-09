@@ -15,6 +15,7 @@ from dataclasses import replace
 import pytest
 
 from analysis_service.answer_round import question_set
+from analysis_service.answer_sets import NO_ANSWERS, AnswerSet
 from analysis_service.early_questions import early_questions
 from analysis_service.fact_answers import FactAnswer
 from tests.factories import valid_model
@@ -53,10 +54,8 @@ def _round(*names):
 def _save(asked, earlier=(), facts=(), skips=()):
     return asked.admit(
         sources=(),
-        earlier_links=(),
-        earlier_facts=list(earlier),
-        links=(),
-        facts=list(facts),
+        earlier=AnswerSet(facts=tuple(earlier)),
+        given=AnswerSet(facts=tuple(facts)),
         save=True,
         skips=list(skips),
     )
@@ -152,11 +151,11 @@ class TestTheServiceDecidesWhatWasPresented:
             _round("oauth", "oauth-client"),
             facts=[FactAnswer(key=parent.key, value="unknown")],
         )
-        middle = _paused(first.facts, first.skipped, first.shown)
+        middle = _paused(first.answers.facts, first.skipped, first.shown)
         changed = _save(
-            middle, first.facts, facts=[FactAnswer(key=parent.key, value="yes")]
+            middle, first.answers.facts, facts=[FactAnswer(key=parent.key, value="yes")]
         )
-        held, skipped, shown = changed.facts, changed.skipped, changed.shown
+        held, skipped, shown = changed.answers.facts, changed.skipped, changed.shown
         for _ in range(10):
             after = _paused(held, skipped, shown)
             assert child.key not in {q.key for q in after.skipped}
@@ -165,7 +164,7 @@ class TestTheServiceDecidesWhatWasPresented:
             assert not after.done, "the rounds ended without asking the part"
             # A later round: skip what it shows, which spends no limit.
             saved = _save(after, held, skips=after.presented(held))
-            held, skipped, shown = saved.facts, saved.skipped, saved.shown
+            held, skipped, shown = saved.answers.facts, saved.skipped, saved.shown
         pytest.fail("the part never came to a round")
 
 
@@ -183,8 +182,7 @@ def test_a_resumed_job_carries_the_skips_its_report_reads():
         waiting=True,
         final=False,
         sources=(),
-        links=(),
-        facts=(),
+        answers=NO_ANSWERS,
         shown=(),
         skipped=(skip,),
         corrections=(),
