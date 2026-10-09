@@ -159,17 +159,23 @@ like `vertex` + an API key cannot be written down:
 | Vendor | Credential mode | Required environment |
 | --- | --- | --- |
 | `vertex` | `iam` | `ANALYSIS_VERTEX_PROJECT`, `ANALYSIS_VERTEX_LOCATION` |
-| `anthropic` | `api_key` | `ANALYSIS_ANTHROPIC_API_KEY` |
-| `openai` | `api_key` | `ANALYSIS_OPENAI_API_KEY` |
-| `bedrock` | `api_key` | `ANALYSIS_BEDROCK_API_KEY`, `ANALYSIS_BEDROCK_REGION` |
+| `anthropic` | `api_key` | `ANALYSIS_ANTHROPIC_API_KEY_FILE` |
+| `openai` | `api_key` | `ANALYSIS_OPENAI_API_KEY_FILE` |
+| `bedrock` | `api_key` | `ANALYSIS_BEDROCK_API_KEY_FILE`, `ANALYSIS_BEDROCK_REGION` |
 | `bedrock` | `iam` | `ANALYSIS_BEDROCK_REGION` |
-| `gemini` | `api_key` | `ANALYSIS_GEMINI_API_KEY` |
-| `openrouter` | `api_key` | `ANALYSIS_OPENROUTER_API_KEY` |
+| `gemini` | `api_key` | `ANALYSIS_GEMINI_API_KEY_FILE` |
+| `openrouter` | `api_key` | `ANALYSIS_OPENROUTER_API_KEY_FILE` |
 
 <!-- /every-vendor -->
 
-`api_key` means the deployment passes the key, read only from the variable
-above. `iam` means **the platform supplies the identity**: the deployment passes
+`api_key` means the deployment passes the key. The service reads the key only
+from the file that the `_FILE` variable above names. It refuses a key in the
+environment variable without the `_FILE` suffix, such as
+`ANALYSIS_ANTHROPIC_API_KEY`, and a tier on that vendor does not build. An
+environment variable passes to each child process and shows in
+`/proc/<pid>/environ`, but a file can have mode `0400`.
+
+`iam` means **the platform supplies the identity**: the deployment passes
 no credential material, and the vendor's SDK resolves one from the environment
 this process runs in — a GKE Workload Identity binding, an attached service
 account, or a credentials file that ADC's own chain finds. Neither variable in
@@ -284,8 +290,8 @@ a run. Stating the choice is what closes it.
 
 **A Bedrock API key expires, and nothing here refreshes it.** AWS's short-term
 Bedrock key lasts twelve hours, and LiteLLM never refreshes a bearer token, so
-under `api_key` the operator rotates `ANALYSIS_BEDROCK_API_KEY` before it
-expires. Under `iam` the problem does not arise, because boto3 refreshes the
+under `api_key` the operator rotates the key in `ANALYSIS_BEDROCK_API_KEY_FILE`
+before it expires. Under `iam` the problem does not arise, because boto3 refreshes the
 identity it resolved. The service detects neither state, by decision: it holds
 no schedule and a key that still works is indistinguishable here from one that
 was renewed a minute ago.
@@ -297,17 +303,17 @@ modes need it: LiteLLM's Converse handler resolves credentials through a bare
 `bedrock` refuses to bind without it and names the extra; a deployment that
 never selects `bedrock` never carries it.
 
-Keys are read **only** from these vendor-scoped variables. LiteLLM would
-otherwise pick a credential up from the process environment on its own, and
-that pickup is deliberately unused, so a credential this deployment did not
-declare cannot authenticate a run. The names it reads and this service does
+Keys are read **only** from the files that these vendor-scoped variables name.
+LiteLLM would otherwise pick a credential up from the process environment on
+its own, and that pickup is deliberately unused, so a credential this deployment
+did not declare cannot authenticate a run. The names it reads and this service does
 not are `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `GOOGLE_API_KEY`,
 `GEMINI_API_KEY`, `OPENROUTER_API_KEY`, `OR_API_KEY` and
 `AWS_BEARER_TOKEN_BEDROCK`. The last one is the sharpest: AWS tooling sets it
 for its own reasons, and LiteLLM authenticates with it whenever no key is
 passed, skipping SigV4 — so a token nobody chose would sign the run. Keys are
 never logged, never in the report, and never in a fingerprint; errors name the
-variable, never its value.
+variable, never the key.
 
 Two more names are LiteLLM's fallbacks for *addressing* rather than for a
 credential, and the registry declines them too: `AWS_REGION_NAME` and

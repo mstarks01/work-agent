@@ -41,6 +41,7 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import contextlib
 import json
 import sys
 from collections.abc import Mapping, Sequence
@@ -70,6 +71,7 @@ from analysis_service.report import (
 )
 from analysis_service.sampling import TierSampling
 from analysis_service.sources import Source
+from analysis_service.vendors import ProviderAuthError, read_secret
 
 # The fixture, and it is part of the contract rather than a sample: every
 # provider is asked the same question, so a lane that swapped in its own text
@@ -658,9 +660,9 @@ def _redacted(text: str, deployment: Deployment) -> str:
 
     Errors from a provider library can echo the request that produced them, and
     this text goes into a CI job summary that outlives the run. The vendor
-    registry already knows which variables hold credential material for the
-    selected vendors, so the substitution is exact rather than a guess at what a
-    key looks like (OWASP A09). Names survive; values never do.
+    registry already knows which variables name the files that hold credential
+    material for the selected vendors, so the substitution is exact rather than
+    a guess at what a key looks like (OWASP A09). Names survive; values never do.
 
     ``secret_env_vars``, not ``required_env_vars``. The wider list holds
     addressing config too, and substituting a region out of a provider message
@@ -670,7 +672,10 @@ def _redacted(text: str, deployment: Deployment) -> str:
     for selection in deployment.tiers.tiers.values():
         mode = deployment.tiers.credential_mode(selection.vendor)
         for var in selection.vendor_entry.secret_env_vars(mode):
-            value = deployment.env.get(var, "").strip()
+            # A file this process cannot read put no value into a request.
+            value = ""
+            with contextlib.suppress(ProviderAuthError):
+                value = read_secret(deployment.env, var)
             if value:
                 text = text.replace(value, f"${{{var}}}")
     return text[:MAX_FAILURE_CHARS]

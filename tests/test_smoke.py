@@ -72,6 +72,7 @@ from tests.factories import (
     sample_fingerprint,
     sample_report,
     sample_selection,
+    secret_env,
     served_build,
 )
 
@@ -337,25 +338,25 @@ class TestALaneThatNeverRan:
         assert not result.exercised
         assert result.failed
         assert all(check.result is CheckResult.UNKNOWN for check in result.checks)
-        assert "ANALYSIS_OPENAI_API_KEY" in (result.failure or "")
+        assert "ANALYSIS_OPENAI_API_KEY_FILE" in (result.failure or "")
 
     def test_the_failure_text_carries_no_credential_value(self):
         """Provider errors can echo the request; a job summary outlives the run.
 
-        The registry already knows which variables hold credential material for
-        the selected vendors, so the substitution is exact rather than a guess
+        The registry already knows which files hold credential material for the
+        selected vendors, so the substitution is exact rather than a guess
         at what a key looks like (OWASP A09).
         """
         key = "sk-live-do-not-log-me"
         deployment = Deployment.from_env(
-            env=TEST_TIER_ENV | {"ANALYSIS_OPENAI_API_KEY": key}
+            env=TEST_TIER_ENV | secret_env("ANALYSIS_OPENAI_API_KEY_FILE", key)
         )
         redacted = _redacted(
             f"provider rejected Authorization: Bearer {key}", deployment
         )
 
         assert key not in redacted
-        assert "ANALYSIS_OPENAI_API_KEY" in redacted
+        assert "ANALYSIS_OPENAI_API_KEY_FILE" in redacted
 
     def test_a_region_survives_the_redactor(self):
         """#601: the redactor read the list that answers a different question.
@@ -521,11 +522,11 @@ class TestTheRenderedSummary:
                 checks=tuple(
                     Check(name, CheckResult.UNKNOWN, "nothing ran") for name in CHECKS
                 ),
-                failure="ProviderAuthError: vendor 'openai' needs ANALYSIS_OPENAI_API_KEY",
+                failure="ProviderAuthError: vendor 'openai' needs ANALYSIS_OPENAI_API_KEY_FILE",
             )
         )
         assert "unexercised" in rendered
-        assert "ANALYSIS_OPENAI_API_KEY" in rendered
+        assert "ANALYSIS_OPENAI_API_KEY_FILE" in rendered
 
 
 class TestTheFixture:

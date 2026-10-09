@@ -20,7 +20,11 @@ provenance defect stay invisible to the eval lane.
 """
 
 import asyncio
+import atexit
+import hashlib
 import json
+import shutil
+import tempfile
 from collections.abc import AsyncGenerator, Callable, Mapping, Sequence
 from dataclasses import dataclass, replace
 from datetime import UTC, datetime
@@ -152,6 +156,31 @@ TEST_TIER_ENV: dict[str, str] = {
     "ANALYSIS_MODEL_REVIEW_MODEL": "claude-opus-5",
 }
 
+_KEY_DIR = Path(tempfile.mkdtemp(prefix="analysis-test-keys-"))
+atexit.register(shutil.rmtree, _KEY_DIR, ignore_errors=True)
+
+
+def secret_env(var: str, value: str) -> dict[str, str]:
+    """The env that sets the secret file setting ``var`` to a file holding ``value``."""
+    path = _KEY_DIR / hashlib.sha256(f"{var}={value}".encode()).hexdigest()[:16]
+    path.write_text(value, encoding="utf-8")
+    return {var: str(path)}
+
+
+def declared_env(vendor: VendorName, mode: CredentialMode) -> dict[str, str]:
+    """A placeholder for every variable ``vendor`` needs under ``mode``.
+
+    Each secret arrives through a file, as :func:`secret_env` writes it.
+    """
+    entry = vendor_for(vendor)
+    secrets = entry.secret_env_vars(mode)
+    env: dict[str, str] = {}
+    for var in entry.required_env_vars(mode):
+        value = f"not-a-real-{var.lower()}"
+        env |= secret_env(var, value) if var in secrets else {var: value}
+    return env
+
+
 # What the selection above implies: two API keys and one addressing pair,
 # because the three tiers sit on vendors with different credential modes.
 # Placeholders — the loader checks that a variable is *declared*, never that it
@@ -162,8 +191,8 @@ TEST_TIER_ENV: dict[str, str] = {
 # No Google credentials file. Vertex runs under platform identity and passes no
 # credential material, so the registry names none to declare.
 TEST_CREDENTIAL_ENV: dict[str, str] = {
-    "ANALYSIS_ANTHROPIC_API_KEY": "sk-ant-not-a-real-key",
-    "ANALYSIS_OPENAI_API_KEY": "sk-not-a-real-key",
+    **secret_env("ANALYSIS_ANTHROPIC_API_KEY_FILE", "sk-ant-not-a-real-key"),
+    **secret_env("ANALYSIS_OPENAI_API_KEY_FILE", "sk-not-a-real-key"),
     "ANALYSIS_VERTEX_PROJECT": "test-project",
     "ANALYSIS_VERTEX_LOCATION": "us-central1",
 }

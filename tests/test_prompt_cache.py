@@ -32,9 +32,9 @@ from analysis_service.prompt_cache import (
 from analysis_service.report import TokenUsage
 from analysis_service.resilience import load_resilience
 from analysis_service.sampling import load_sampling
-from analysis_service.vendors import VendorName
+from analysis_service.vendors import VendorName, vendor_for
 from evals.harness.prices import UnitPrices, unit_prices
-from tests.factories import PROJECT_ROOT, inject_transport, tiers_for
+from tests.factories import PROJECT_ROOT, inject_transport, secret_env, tiers_for
 
 pytestmark = pytest.mark.usefixtures("supplied_transport")
 
@@ -185,7 +185,7 @@ def _sent(
         tiers_for(vendor, models=models),
         sampling,
         load_resilience(CONFIG / "resilience.toml", env={}),
-        env={f"ANALYSIS_{vendor.upper()}_API_KEY": "not-a-real-key"},
+        env=secret_env(vendor_for(vendor).api_key_var, "not-a-real-key"),
     )
     adapter = adapters[tier]
     inject_transport(adapter, vendor, wire.handle)

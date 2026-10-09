@@ -23,6 +23,7 @@ from analysis_service.vendors import (
     _CLAUDE_RULE,
     CREDENTIAL_MODE_NOTES,
     REASONING_KWARG,
+    SECRET_FILE_SUFFIX,
     VENDOR_NAMES,
     VENDORS,
     CredentialMode,
@@ -34,11 +35,12 @@ from analysis_service.vendors import (
     join_served,
     missing_sdk,
     openai_reasoning_model,
+    refused_var,
     require_sdk,
     vendor_for,
     vendor_for_route,
 )
-from tests.factories import AMBIENT_KEY_VARS
+from tests.factories import AMBIENT_KEY_VARS, secret_env
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
@@ -171,9 +173,9 @@ class TestCredentialModes:
         assert not vendor.secret_env_vars(mode)
 
     def test_the_key_var_is_vendor_scoped(self):
-        assert vendor_for("anthropic").api_key_var == "ANALYSIS_ANTHROPIC_API_KEY"
-        assert vendor_for("openai").api_key_var == "ANALYSIS_OPENAI_API_KEY"
-        assert vendor_for("gemini").api_key_var == "ANALYSIS_GEMINI_API_KEY"
+        assert vendor_for("anthropic").api_key_var == "ANALYSIS_ANTHROPIC_API_KEY_FILE"
+        assert vendor_for("openai").api_key_var == "ANALYSIS_OPENAI_API_KEY_FILE"
+        assert vendor_for("gemini").api_key_var == "ANALYSIS_GEMINI_API_KEY_FILE"
 
     def test_a_vendor_with_a_choice_refuses_to_answer_for_the_deployment(self):
         """A caller that never learned about the choice must not make it.
@@ -193,8 +195,7 @@ class TestCredentialModes:
         which is what lets the vendor's SDK resolve an identity of its own.
         """
         bedrock = vendor_for("bedrock")
-        env = {
-            "ANALYSIS_BEDROCK_API_KEY": API_KEY,
+        env = secret_env("ANALYSIS_BEDROCK_API_KEY_FILE", API_KEY) | {
             "ANALYSIS_BEDROCK_REGION": "us-east-1",
         }
         assert bedrock.credential_kwargs(env, CredentialMode.API_KEY) == {
@@ -208,7 +209,7 @@ class TestCredentialModes:
             "aws_region_name": "us-east-1",
         }
         assert bedrock.secret_env_vars(CredentialMode.API_KEY) == (
-            "ANALYSIS_BEDROCK_API_KEY",
+            "ANALYSIS_BEDROCK_API_KEY_FILE",
         )
         assert bedrock.secret_env_vars(CredentialMode.IAM) == ()
 
@@ -216,11 +217,31 @@ class TestCredentialModes:
         with pytest.raises(ValueError, match="no 'api_key' credential mode"):
             vendor_for("vertex").credential_kwargs({}, CredentialMode.API_KEY)
 
-    def test_the_key_is_read_from_the_vendor_scoped_var(self):
+    def test_the_key_is_read_from_the_file_the_vendor_scoped_var_names(self):
         kwargs = vendor_for("anthropic").credential_kwargs(
-            {"ANALYSIS_ANTHROPIC_API_KEY": API_KEY}, CredentialMode.API_KEY
+            secret_env("ANALYSIS_ANTHROPIC_API_KEY_FILE", f"{API_KEY}\n"),
+            CredentialMode.API_KEY,
         )
         assert kwargs == {"api_key": API_KEY}
+
+    def test_a_key_in_the_environment_is_refused(self):
+        """A key in a variable passes to every child process; only a file is read."""
+        env = secret_env("ANALYSIS_ANTHROPIC_API_KEY_FILE", API_KEY) | {
+            "ANALYSIS_ANTHROPIC_API_KEY": API_KEY
+        }
+        with pytest.raises(
+            ProviderAuthError, match="unset ANALYSIS_ANTHROPIC_API_KEY,"
+        ):
+            vendor_for("anthropic").credential_kwargs(env, CredentialMode.API_KEY)
+
+    def test_an_unreadable_key_file_fails_closed_naming_the_var(self, tmp_path):
+        missing = str(tmp_path / "absent")
+        with pytest.raises(ProviderAuthError) as excinfo:
+            vendor_for("openai").credential_kwargs(
+                {"ANALYSIS_OPENAI_API_KEY_FILE": missing}, CredentialMode.API_KEY
+            )
+        assert "ANALYSIS_OPENAI_API_KEY_FILE" in str(excinfo.value)
+        assert missing not in str(excinfo.value)
 
     # Read from ``VENDORS`` rather than from ``VENDOR_NAMES``: this check runs
     # at collection time, and a vendor added to ``VENDOR_NAMES`` before its
@@ -256,19 +277,20 @@ class TestCredentialModes:
     def test_a_missing_key_fails_closed_naming_the_var_not_the_value(self):
         with pytest.raises(ProviderAuthError) as excinfo:
             vendor_for("openai").credential_kwargs({}, CredentialMode.API_KEY)
-        assert "ANALYSIS_OPENAI_API_KEY" in str(excinfo.value)
+        assert "ANALYSIS_OPENAI_API_KEY_FILE" in str(excinfo.value)
 
     def test_an_empty_key_is_a_deploy_mistake_not_an_absence(self):
         with pytest.raises(ProviderAuthError):
             vendor_for("openai").credential_kwargs(
-                {"ANALYSIS_OPENAI_API_KEY": "   "}, CredentialMode.API_KEY
+                secret_env("ANALYSIS_OPENAI_API_KEY_FILE", "   "),
+                CredentialMode.API_KEY,
             )
 
     def test_a_key_value_never_appears_in_the_error(self):
         # OWASP A09: a key echoed into a log or a problem+json body has leaked.
         with pytest.raises(ProviderAuthError) as excinfo:
             vendor_for("openai").credential_kwargs(
-                {"ANALYSIS_OPENAI_API_KEY": ""}, CredentialMode.API_KEY
+                {"ANALYSIS_OPENAI_API_KEY_FILE": ""}, CredentialMode.API_KEY
             )
         assert API_KEY not in str(excinfo.value)
 
@@ -336,10 +358,20 @@ class TestWhichVariablesAreSecret:
         )
         assert vertex.secret_env_vars(CredentialMode.IAM) == ()
 
+    @pytest.mark.parametrize(
+        ("vendor", "mode"),
+        sorted((name, mode) for name, v in VENDORS.items() for mode in v.credentials),
+    )
+    def test_every_secret_names_a_file(self, vendor, mode):
+        """A secret without the suffix would refuse its own variable."""
+        for var in vendor_for(vendor).secret_env_vars(mode):
+            assert var.endswith(SECRET_FILE_SUFFIX)
+            assert refused_var(var) != var
+
     def test_an_api_key_is_secret(self):
         anthropic = vendor_for("anthropic")
         assert anthropic.secret_env_vars(CredentialMode.API_KEY) == (
-            "ANALYSIS_ANTHROPIC_API_KEY",
+            "ANALYSIS_ANTHROPIC_API_KEY_FILE",
         )
 
     # Sorted so the parameter ids are stable; ``CredentialMode`` is a

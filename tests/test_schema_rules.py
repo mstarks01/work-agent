@@ -39,7 +39,13 @@ from analysis_service.vendors import (
     VendorName,
     vendor_for,
 )
-from tests.factories import PROJECT_ROOT, collected, tiers_for, translator_of
+from tests.factories import (
+    PROJECT_ROOT,
+    collected,
+    declared_env,
+    tiers_for,
+    translator_of,
+)
 
 #: Every call here ends at a client the test supplies, never at a network.
 pytestmark = pytest.mark.usefixtures("supplied_transport")
@@ -72,10 +78,10 @@ CLAUDE_ON: dict[VendorName, str] = {
 BEDROCK_SONNET_4_6 = CLAUDE_ON["bedrock"]
 
 FAKE_ENV = {
-    var: f"not-a-real-{var.lower()}"
+    var: value
     for name in VENDOR_NAMES
     for mode in vendor_for(name).credential_modes
-    for var in vendor_for(name).required_env_vars(mode)
+    for var, value in declared_env(name, mode).items()
 }
 
 

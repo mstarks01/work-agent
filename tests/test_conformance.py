@@ -69,6 +69,7 @@ from tests.factories import (
     DEFAULT_FRAMEWORKS,
     EMPTY_CLAIMS,
     ScriptedLlm,
+    declared_env,
     repo_package_loaders,
     sample_fingerprint,
     tiers_for,
@@ -134,10 +135,10 @@ def pins_scalar(text: str, value: str) -> bool:
 # name. The loader checks that a variable is declared,
 # never that its value has a shape, so one placeholder serves every variable.
 FAKE_ENV = {
-    var: f"not-a-real-{var.lower()}"
+    var: value
     for name in VENDOR_NAMES
     for mode in vendor_for(name).credential_modes
-    for var in vendor_for(name).required_env_vars(mode)
+    for var, value in declared_env(name, mode).items()
 }
 
 

@@ -155,8 +155,9 @@ jobs:
       # The vendor registry reads its own ANALYSIS_-prefixed variables and nothing
       # else: an ambient credential this deployment did not declare must not be
       # able to authenticate a run, which is the ASI03 inherited-credential
-      # path. That is why this is ANALYSIS_ANTHROPIC_API_KEY rather than the
-      # ANTHROPIC_API_KEY LiteLLM would otherwise pick up on its own.
+      # path. That is why the key arrives through ANALYSIS_ANTHROPIC_API_KEY_FILE
+      # rather than the ANTHROPIC_API_KEY LiteLLM would otherwise pick up on its
+      # own.
       ANALYSIS_MODEL_BASE_VENDOR: ${{ matrix.vendor }}
       ANALYSIS_MODEL_BASE_MODEL: ${{ matrix.base_model }}
       ANALYSIS_MODEL_STRONG_VENDOR: ${{ matrix.vendor }}
@@ -244,12 +245,11 @@ jobs:
           github.event_name != 'workflow_dispatch'
           || inputs.vendor == 'both'
           || inputs.vendor == matrix.vendor
-        # The key is exported under the vendor-scoped name the registry reads,
-        # inside this step, from this leg's own secret. `secrets[matrix.secret_name]`
-        # is what keeps a leg from holding the other vendor's key: the env block
-        # names one secret, not both. The preflight above already reads it this
-        # way; this step named both and so ran the anthropic leg holding the
-        # openai key, and the reverse.
+        # The key is written to a file, and the file's path is exported under
+        # the vendor-scoped name the registry reads, inside this step, from this
+        # leg's own secret. `secrets[matrix.secret_name]` is what keeps a leg
+        # from holding the other vendor's key: the env block names one secret,
+        # not both.
         env:
           EVAL_MODE: ${{ inputs.mode || 'end-to-end' }}
           VENDOR: ${{ matrix.vendor }}
@@ -257,7 +257,13 @@ jobs:
           SECRET_NAME: ${{ matrix.secret_name }}
         run: |
           set -euo pipefail
-          export "${SECRET_NAME}=${VENDOR_API_KEY}"
+          # The registry reads a key only from a file, never from a variable:
+          # a variable passes to every child process. The step's own variable
+          # is unset before anything runs.
+          key_file="${RUNNER_TEMP}/${SECRET_NAME}"
+          (umask 077 && printf '%s' "${VENDOR_API_KEY}" >"${key_file}")
+          unset VENDOR_API_KEY
+          export "${SECRET_NAME}_FILE=${key_file}"
           uv run python -m evals.harness.run run \
             --mode "$EVAL_MODE" \
             --out "eval-artifact-${VENDOR}.json"

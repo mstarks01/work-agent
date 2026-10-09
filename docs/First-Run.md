@@ -30,11 +30,11 @@ are the reference pairs declared in `analysis_service.conformance.REFERENCE_MODE
 
 | Vendor | `base` | `strong` | Credentials read by the code |
 | --- | --- | --- | --- |
-| Anthropic | `claude-sonnet-5` | `claude-opus-5-5` | `ANALYSIS_ANTHROPIC_API_KEY` |
-| Bedrock | `global.anthropic.claude-sonnet-4-6` | `global.anthropic.claude-opus-5-5` | `ANALYSIS_BEDROCK_API_KEY`, `ANALYSIS_BEDROCK_REGION` |
-| Gemini | `gemini-2.5-flash` | `gemini-2.5-pro` | `ANALYSIS_GEMINI_API_KEY` |
-| OpenAI | `gpt-4o-2024-08-06` | `gpt-5.6-sol` | `ANALYSIS_OPENAI_API_KEY` |
-| OpenRouter | `anthropic/claude-sonnet-4.6` | `anthropic/claude-opus-4.7` | `ANALYSIS_OPENROUTER_API_KEY` |
+| Anthropic | `claude-sonnet-5` | `claude-opus-5-5` | `ANALYSIS_ANTHROPIC_API_KEY_FILE` |
+| Bedrock | `global.anthropic.claude-sonnet-4-6` | `global.anthropic.claude-opus-5-5` | `ANALYSIS_BEDROCK_API_KEY_FILE`, `ANALYSIS_BEDROCK_REGION` |
+| Gemini | `gemini-2.5-flash` | `gemini-2.5-pro` | `ANALYSIS_GEMINI_API_KEY_FILE` |
+| OpenAI | `gpt-4o-2024-08-06` | `gpt-5.6-sol` | `ANALYSIS_OPENAI_API_KEY_FILE` |
+| OpenRouter | `anthropic/claude-sonnet-4.6` | `anthropic/claude-opus-4.7` | `ANALYSIS_OPENROUTER_API_KEY_FILE` |
 | Vertex AI | `gemini-2.5-flash` | `gemini-2.5-pro` | `ANALYSIS_VERTEX_PROJECT`, `ANALYSIS_VERTEX_LOCATION` |
 
 <!-- /every-vendor -->
@@ -57,10 +57,20 @@ model = "gpt-5.6-sol"
 
 Then export the credentials for the vendor or vendors you selected.
 
+Each API key lives in a file, and a `_FILE` variable holds the file's path. An
+environment variable passes to each child process, but a file can have mode
+`0400`. The service refuses a key in `ANALYSIS_{VENDOR}_API_KEY`, and a tier on
+that vendor does not build. Write the key to a file that only you can read:
+
+```sh
+mkdir -p ~/.config/analysis
+(umask 077 && printf '%s' 'sk-ant-...' >~/.config/analysis/anthropic.key)
+```
+
 ### Anthropic
 
 ```sh
-export ANALYSIS_ANTHROPIC_API_KEY=sk-ant-...
+export ANALYSIS_ANTHROPIC_API_KEY_FILE=~/.config/analysis/anthropic.key
 ```
 
 ### Bedrock
@@ -79,10 +89,10 @@ Then choose a credential mode. Bedrock is the one vendor that offers two, so
 bedrock = "api_key"    # or "iam"
 ```
 
-Under `api_key`, export the key and the region:
+Under `api_key`, export the key file and the region:
 
 ```sh
-export ANALYSIS_BEDROCK_API_KEY=...
+export ANALYSIS_BEDROCK_API_KEY_FILE=~/.config/analysis/bedrock.key
 export ANALYSIS_BEDROCK_REGION=us-east-1
 ```
 
@@ -114,7 +124,7 @@ foundation model in each Region associated with it."
 ### Gemini
 
 ```sh
-export ANALYSIS_GEMINI_API_KEY=AIza...
+export ANALYSIS_GEMINI_API_KEY_FILE=~/.config/analysis/gemini.key
 ```
 
 This is the Gemini Developer API, with a key from Google AI Studio. It serves
@@ -124,13 +134,13 @@ Cloud project. Select `vertex` when the platform supplies the identity.
 ### OpenAI
 
 ```sh
-export ANALYSIS_OPENAI_API_KEY=sk-...
+export ANALYSIS_OPENAI_API_KEY_FILE=~/.config/analysis/openai.key
 ```
 
 ### OpenRouter
 
 ```sh
-export ANALYSIS_OPENROUTER_API_KEY=sk-or-...
+export ANALYSIS_OPENROUTER_API_KEY_FILE=~/.config/analysis/openrouter.key
 ```
 
 OpenRouter is an aggregator: one endpoint in front of many providers' models.

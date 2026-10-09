@@ -29,6 +29,7 @@ from analysis_service.vendors import (
     CredentialMode,
     vendor_for,
 )
+from tests.factories import secret_env
 
 PROJECT_ROOT = Path(__file__).parents[1]
 REPO_CONFIG = PROJECT_ROOT / "config" / "model_tiers.toml"
@@ -1085,6 +1086,6 @@ def test_the_review_tier_needs_no_credentials_until_something_runs_on_it():
         tiers,
         load_sampling(PROJECT_ROOT / "config" / "sampling.toml", env={}),
         load_resilience(PROJECT_ROOT / "config" / "resilience.toml", env={}),
-        env={"ANALYSIS_OPENAI_API_KEY": "sk-not-a-real-key"},
+        env=secret_env("ANALYSIS_OPENAI_API_KEY_FILE", "sk-not-a-real-key"),
     )
     assert set(adapters) == {"base", "strong"}

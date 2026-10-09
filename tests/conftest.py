@@ -9,6 +9,7 @@ from __future__ import annotations
 import pytest
 
 from analysis_service.offline import OFFLINE_ENV
+from analysis_service.vendors import VENDORS, refused_var
 from tests.factories import TEST_CREDENTIAL_ENV, TEST_TIER_ENV
 
 
@@ -27,6 +28,11 @@ def _selected_tiers(monkeypatch: pytest.MonkeyPatch) -> None:
     """
     for var, value in (TEST_TIER_ENV | TEST_CREDENTIAL_ENV).items():
         monkeypatch.setenv(var, value)
+    # A key the developer's shell exports would make every build refuse it.
+    for vendor in VENDORS.values():
+        for mode in vendor.credentials:
+            for var in vendor.secret_env_vars(mode):
+                monkeypatch.delenv(refused_var(var), raising=False)
 
 
 @pytest.fixture(autouse=True)

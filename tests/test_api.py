@@ -754,7 +754,7 @@ class TestAdmissionOutcomes:
 
         def unconfigured(selection, entry):
             raise ProviderAuthError(
-                "vendor 'anthropic' needs ANALYSIS_ANTHROPIC_API_KEY; it is unset"
+                "vendor 'anthropic' needs ANALYSIS_ANTHROPIC_API_KEY_FILE; it is unset"
             )
 
         client.app.state.runner_for = unconfigured
@@ -765,8 +765,8 @@ class TestAdmissionOutcomes:
 
         assert refused.status_code == 503
         assert refused.headers["content-type"] == "application/problem+json"
-        assert "ANALYSIS_ANTHROPIC_API_KEY" not in refused.text
-        assert "ANALYSIS_ANTHROPIC_API_KEY" in caplog.text
+        assert "ANALYSIS_ANTHROPIC_API_KEY_FILE" not in refused.text
+        assert "ANALYSIS_ANTHROPIC_API_KEY_FILE" in caplog.text
         # No slot is held, so the ceiling of one still admits the next job.
         assert admitted.status_code == 201
 

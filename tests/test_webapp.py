@@ -34,7 +34,7 @@ from analysis_service import (
 )
 from analysis_service.deployment import Deployment
 from analysis_service.vendors import ProviderAuthError
-from tests.factories import TEST_TIER_ENV, report_state, sample_selection
+from tests.factories import TEST_TIER_ENV, report_state, sample_selection, secret_env
 from webapp.main import Analyses, Startup, create_app, render_report
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -611,7 +611,7 @@ def test_the_diagnostic_reports_the_vendors_the_build_actually_binds():
         # the other two tiers do not use.
         "ANALYSIS_MODEL_REVIEW_VENDOR": "bedrock",
         "ANALYSIS_MODEL_REVIEW_MODEL": "anthropic.claude-opus-5",
-        "ANALYSIS_ANTHROPIC_API_KEY": "declared",
+        **secret_env("ANALYSIS_ANTHROPIC_API_KEY_FILE", "declared"),
     }
     config = PROJECT_ROOT / "config"
     tiers = load_model_tiers(config / "model_tiers.toml", env=env)
