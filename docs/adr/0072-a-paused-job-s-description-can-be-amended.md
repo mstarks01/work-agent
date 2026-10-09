@@ -28,7 +28,7 @@ the model that every later step reads.
 
 **The amended job carries the paused job's answers, and its own questions
 decide which to take.** It holds them apart from its own answers
-(`carried_facts` and `carried_links`), so its extraction and its catalog pass
+(`JobRecord.carried`), so its extraction and its catalog pass
 never read them. Its question set takes each carried answer that passes its
 own answer check, as a submitter's answer would. An answer about a part that
 the amended model no longer has, or about a fact that it now states, is not

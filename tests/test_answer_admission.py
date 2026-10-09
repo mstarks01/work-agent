@@ -18,6 +18,7 @@ from pydantic import ValidationError
 
 from analysis_service.answer_forms import answer_choices, answer_limit
 from analysis_service.answer_round import question_set
+from analysis_service.answer_sets import NO_ANSWERS, AnswerSet
 from analysis_service.assertions import MAX_QUOTE_CHARS, AssertionCatalog
 from analysis_service.early_questions import early_questions
 from analysis_service.fact_answers import FactAnswer, answered_keys, fact_line
@@ -246,7 +247,7 @@ class TestOnlyAnAskedFactTakesAnAnswer:
         )
         assert response.status_code == 201, response.text
         child = asyncio.run(store.get(response.json()["job_id"]))
-        assert [list(fact.key) for fact in child.facts] == [question["key"]]
+        assert [list(fact.key) for fact in child.answers.facts] == [question["key"]]
 
     def test_an_earlier_answer_may_be_answered_again(self):
         """A stated attribute is no longer asked, and the round that stated it
@@ -281,10 +282,8 @@ def asked_of(catalog, *, waiting):
 def admit(questions, links=(), facts=(), save=False, skips=()):
     return questions.admit(
         sources=[],
-        earlier_links=[],
-        earlier_facts=[],
-        links=links,
-        facts=facts,
+        earlier=NO_ANSWERS,
+        given=AnswerSet(links=tuple(links), facts=tuple(facts)),
         save=save,
         skips=skips,
     )
@@ -296,7 +295,7 @@ class TestOneRoundHasOneAdmissionRule:
 
     def test_a_waiting_job_continues_without_answers(self):
         admitted = admit(asked_of(held().assertions.catalog, waiting=True))
-        assert (admitted.links, admitted.facts) == ([], [])
+        assert admitted.answers.empty
 
     def test_a_finished_job_has_nothing_to_continue(self):
         with pytest.raises(ValueError, match="no answers were sent"):
@@ -608,7 +607,7 @@ class TestTheBoundedRounds:
         assert response.status_code == 201, response.text
         child = asyncio.run(store.get(response.json()["job_id"]))
         assert child.resumption.follow_up is False
-        assert child.facts, "the saved answers reach the analysis"
+        assert child.answers.facts, "the saved answers reach the analysis"
         assert child.shown_early, "the report can say what the pause showed"
 
 
@@ -629,7 +628,7 @@ class TestSkipForNow:
         first = _asked_after([]).early[0]
         after = _asked_after([], skipped=[first.key])
         admitted = admit(after, save=True, skips=[after.early[0].key])
-        assert admitted.facts == []
+        assert admitted.answers.facts == ()
         assert after.remaining == {
             kind: count
             - (kind == ("capability" if first.kind == "capability" else "field"))
@@ -642,7 +641,7 @@ class TestSkipForNow:
         answer = FactAnswer(key=first.key, value="unknown")
         admitted = admit(after, facts=[answer], save=True)
         assert admitted.skipped == ()
-        assert admitted.facts == [answer]
+        assert admitted.answers.facts == (answer,)
 
     def test_a_submitter_who_skips_every_round_reaches_the_end(self):
         skipped: tuple = ()
@@ -676,7 +675,7 @@ class TestSkipForNow:
         asked = _asked_after([])
         (link,) = asked.links
         admitted = admit(asked, save=True, skips=[link.key])
-        assert (admitted.links, admitted.facts) == ([], [])
+        assert admitted.answers.empty
         after = _asked_after([], skipped=admitted.skipped)
         assert after.links == ()
         assert after.skipped_links == (link,)
@@ -688,7 +687,7 @@ class TestSkipForNow:
         answer = LinkAnswer(principal=link.principal, element="none")
         admitted = admit(after, links=[answer], save=True)
         assert admitted.skipped == ()
-        assert admitted.links == [answer]
+        assert admitted.answers.links == (answer,)
 
     def test_a_link_is_answered_or_skipped_not_both(self):
         asked = _asked_after([])
@@ -774,7 +773,9 @@ class TestTheRoundRevision:
 
         def save(revision):
             return asyncio.run(
-                store.save_round(job, record.owner_subject, [], [], [], [], revision)
+                store.save_round(
+                    job, record.owner_subject, NO_ANSWERS, [], [], revision
+                )
             )
 
         assert save(0)
@@ -802,14 +803,12 @@ class TestTakingAnAnswerBack:
         back = FactAnswer(key=question.key, value="unknown")
         admitted = _asked_after(earlier).admit(
             sources=[],
-            earlier_links=[],
-            earlier_facts=earlier,
-            links=[],
-            facts=[back],
+            earlier=AnswerSet(facts=tuple(earlier)),
+            given=AnswerSet(facts=(back,)),
             save=True,
         )
-        assert admitted.facts == [back]
-        after = _asked_after(admitted.facts)
+        assert admitted.answers.facts == (back,)
+        after = _asked_after(admitted.answers.facts)
         element_id, attribute = question.key[:2]
         assert open_attribute(after.model, element_id, attribute)
         assert [a for q, a in after.answered_early if q.key == question.key] == [back]
@@ -841,10 +840,8 @@ class TestTakingAnAnswerBack:
         with pytest.raises(ValueError, match="earlier answer settled"):
             finished.admit(
                 sources=[],
-                earlier_links=[],
-                earlier_facts=earlier,
-                links=[],
-                facts=[FactAnswer(key=question.key, value="unknown")],
+                earlier=AnswerSet(facts=tuple(earlier)),
+                given=AnswerSet(facts=(FactAnswer(key=question.key, value="unknown"),)),
             )
 
 
@@ -903,13 +900,23 @@ class TestAFollowUpMustAddSomething:
     def test_only_known_content_that_changes_is_information(self, earlier, sent, adds):
         from analysis_service.answer_round import _adds_information
 
-        assert _adds_information([], earlier, [], sent) is adds
+        assert (
+            _adds_information(
+                AnswerSet(facts=tuple(earlier)), AnswerSet(facts=tuple(sent))
+            )
+            is adds
+        )
 
     @pytest.mark.parametrize(("earlier", "adds"), [([], True), ([LINK], False)])
     def test_a_link_is_information_where_it_places_anew(self, earlier, adds):
         from analysis_service.answer_round import _adds_information
 
-        assert _adds_information(earlier, [], [self.LINK], []) is adds
+        assert (
+            _adds_information(
+                AnswerSet(links=tuple(earlier)), AnswerSet(links=(self.LINK,))
+            )
+            is adds
+        )
 
     def test_the_route_refuses_it_and_keeps_the_follow_up(self):
         from tests.test_questions import TestTheRoutes
@@ -948,9 +955,9 @@ class TestSkippingAPartAnswer:
         self.capacity(asked)
         part = _facets({"rate": "yes"})
         admitted = admit(asked, facts=[part], save=True, skips=[CAPACITY])
-        assert admitted.facts == [part]
+        assert admitted.answers.facts == (part,)
         assert admitted.skipped == (CAPACITY,)
-        after = _asked_after(admitted.facts, skipped=admitted.skipped)
+        after = _asked_after(admitted.answers.facts, skipped=admitted.skipped)
         assert CAPACITY not in {q.key for q in after.early}
 
     def test_a_full_answer_is_still_not_skipped(self):
@@ -1121,7 +1128,7 @@ def test_answers_that_break_the_input_limits_are_refused_at_once(save):
     )
 
     assert sent.status_code == 413, sent.text
-    assert asyncio.run(store.get(waited)).facts == []
+    assert asyncio.run(store.get(waited)).answers.empty
 
 
 #: The selections the round test runs over every corpus model, and the answer

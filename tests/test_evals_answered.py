@@ -13,6 +13,7 @@ import json
 
 import pytest
 
+from analysis_service.answer_sets import AnswerSet
 from analysis_service.fact_answers import FactAnswer
 from analysis_service.graph import (
     ENTRY_PREPARE,
@@ -63,7 +64,7 @@ def test_the_mode_seeds_the_run_a_resumed_job_seeds(case, monkeypatch):  # noqa:
         owner_subject="idp|user-1",
         sources=list(case.sources),
         frameworks=sample_selection(),
-        facts=[AT_REST, KIND],
+        answers=AnswerSet(facts=(AT_REST, KIND)),
         resumption=Resumption(
             follow_up=False,
             parent_id="job-parent",

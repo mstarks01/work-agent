@@ -264,7 +264,9 @@ def _seeded_state(job: JobRecord) -> dict[str, Any]:
     """
     held = None if job.resumption is None else job.resumption.checkpoint
     seeded = answered_state(
-        None if held is None else held.system_model, job.links, job.facts
+        None if held is None else held.system_model,
+        job.answers.links,
+        job.answers.facts,
     )
     if held is not None and held.assertions is not None:
         seeded[STATE_ASSERTION_CATALOG] = held.assertions.model_dump(mode="json")

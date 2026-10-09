@@ -15,6 +15,7 @@ import pytest
 from pydantic import ValidationError
 
 from analysis_service.answer_round import ANSWER_LIMITS
+from analysis_service.answer_sets import AnswerSet
 from analysis_service.api import AnswersSubmission
 from analysis_service.claims import UnknownRef, Verdict
 from analysis_service.fact_answers import MAX_FACT_ANSWERS, FactAnswer
@@ -51,7 +52,7 @@ def _finished(store, count=MAX_FACT_ANSWERS + 1, earlier=()):
         owner_subject="alice",
         sources=[DESCRIPTION],
         frameworks=sample_selection(),
-        facts=list(earlier),
+        answers=AnswerSet(facts=tuple(earlier)),
     )
     record.transition("running")
     record.report = sample_report(claims)
@@ -193,7 +194,7 @@ class TestTheDraft:
         started = _post(client, job, {"links": [], "facts": [], "revision": 2})
         assert started.status_code == 201, started.text
         child = asyncio.run(store.get(started.json()["job_id"]))
-        assert len(child.facts) == MAX_FACT_ANSWERS + 1
+        assert len(child.answers.facts) == MAX_FACT_ANSWERS + 1
         assert child.resumption is not None and child.resumption.follow_up
 
     def test_a_later_batch_changes_an_answer_an_earlier_batch_saved(self):
@@ -249,7 +250,7 @@ class TestTheDraft:
         _post(client, job, {"facts": _facts([0, 1]), "save": True, "revision": 0})
         started = _post(client, job, {"facts": _facts([1, 2], "final"), "revision": 1})
         child = asyncio.run(store.get(started.json()["job_id"]))
-        assert {fact.key[3]: fact.value for fact in child.facts} == {
+        assert {fact.key[3]: fact.value for fact in child.answers.facts} == {
             "Distinct fact 0": "known 0",
             "Distinct fact 1": "final 1",
             "Distinct fact 2": "final 2",
@@ -281,11 +282,11 @@ class TestASaveDuringARunIsNotLost:
 
         async def racing(record, **bounds):
             # A second tab's save lands after the run composed its answers.
-            assert await store.save_draft(job, "alice", [], [late], 0)
+            assert await store.save_draft(job, "alice", AnswerSet(facts=(late,)), 0)
             return await reserve(record, **bounds)
 
         store.reserve = racing
         response = _post(client, job, {"facts": _facts([0]), "revision": 0})
         assert response.status_code == 409, response.text
         assert _started(store, job) is None
-        assert late in asyncio.run(store.owned(job, "alice")).draft_facts
+        assert late in asyncio.run(store.owned(job, "alice")).draft.facts

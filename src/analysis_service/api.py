@@ -58,6 +58,7 @@ from analysis_service.answer_round import (
     SourcesOverLimit,
     StaleRevision,
 )
+from analysis_service.answer_sets import AnswerSet
 from analysis_service.assertions import AssertionRecord
 from analysis_service.auth import (
     AuthenticationError,
@@ -732,17 +733,14 @@ def _answer_state(
         waiting=record.status == "awaiting-answers",
         final=record.final(),
         sources=record.sources,
-        links=record.links,
-        facts=record.facts,
+        answers=record.answers,
         shown=record.shown_early,
         skipped=record.skipped_early,
         corrections=record.corrections,
         revision=record.round_revision,
         resumed_by=resumed_by,
-        draft_links=record.draft_links,
-        draft_facts=record.draft_facts,
-        carried_links=record.carried_links,
-        carried_facts=record.carried_facts,
+        draft=record.draft,
+        carried_in=record.carried,
     )
 
 
@@ -763,17 +761,17 @@ def _questions_payload(
             "fallback": question_fallback(analyses).to_json(),
             "revision": record.round_revision,
             "draft_links": [
-                link.model_dump(mode="json") for link in record.draft_links
+                link.model_dump(mode="json") for link in record.draft.links
             ],
             "draft_facts": [
-                fact.model_dump(mode="json") for fact in record.draft_facts
+                fact.model_dump(mode="json") for fact in record.draft.facts
             ],
             "answer_limits": dict(ANSWER_LIMITS),
             "corrections": [
                 fact.model_dump(mode="json") for fact in record.corrections
             ],
             "corrected_findings": list(
-                corrected_findings(analyses, record.facts, record.corrections)
+                corrected_findings(analyses, record.answers.facts, record.corrections)
             ),
         }
     )
@@ -1057,7 +1055,7 @@ def create_app(
             sources=sources,
             frameworks=selection,
             system_name=submission.system_name,
-            links=submission.links,
+            answers=AnswerSet(links=tuple(submission.links)),
             ask_questions=submission.questions,
             reserved_tokens=budgets.estimate(sources, selection),
         )
@@ -1105,8 +1103,9 @@ def create_app(
                 partial(
                     state.answer,
                     Answers(
-                        links=answers.links,
-                        facts=answers.facts,
+                        given=AnswerSet(
+                            links=tuple(answers.links), facts=tuple(answers.facts)
+                        ),
                         save=answers.save,
                         skips=answers.skip,
                         revision=answers.revision,
@@ -1128,7 +1127,7 @@ def create_app(
             raise HTTPException(status_code=400, detail=str(exc)) from exc
         if isinstance(outcome, SavedDraft):
             if not await request.app.state.store.save_draft(
-                parent.id, subject, outcome.links, outcome.facts, outcome.revision
+                parent.id, subject, outcome.draft, outcome.revision
             ):
                 raise HTTPException(
                     status_code=409,
@@ -1144,8 +1143,7 @@ def create_app(
             if not await store.save_round(
                 parent.id,
                 subject,
-                outcome.links,
-                outcome.facts,
+                outcome.answers,
                 outcome.shown,
                 outcome.skipped,
                 outcome.revision,
@@ -1162,8 +1160,7 @@ def create_app(
             sources=outcome.sources,
             frameworks=parent.frameworks,
             system_name=parent.system_name,
-            links=outcome.links,
-            facts=outcome.facts,
+            answers=outcome.answers,
             shown_early=outcome.shown,
             skipped_early=list(outcome.skipped),
             resumption=Resumption(
@@ -1285,8 +1282,7 @@ def create_app(
             ask_questions=True,
             amends=parent.id,
             parent_revision=parent.round_revision,
-            carried_links=amended.links,
-            carried_facts=amended.facts,
+            carried=amended.answers,
             reserved_tokens=budgets.estimate(amended.sources, parent.frameworks),
         )
         return await _admit_and_start(request, record, background_tasks, subject)
@@ -1323,7 +1319,7 @@ def create_app(
                 "job_id": parent.id,
                 "corrections": [fact.model_dump(mode="json") for fact in corrections],
                 "corrected_findings": list(
-                    corrected_findings(analyses, parent.facts, corrections)
+                    corrected_findings(analyses, parent.answers.facts, corrections)
                 ),
             }
         )

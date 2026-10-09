@@ -14,6 +14,7 @@ from types import MappingProxyType
 import pytest
 
 from analysis_service import graph
+from analysis_service.answer_sets import AnswerSet
 from analysis_service.assertions import (
     ABSENT,
     Assertion,
@@ -83,7 +84,7 @@ class TestTheResumedRun:
             owner_subject="idp|user-1",
             sources=with_link_answers([Source.description(DESCRIPTION_TEXT)], links),
             frameworks=sample_selection(),
-            links=links,
+            answers=AnswerSet(links=tuple(links)),
             resumption=Resumption(
                 follow_up=False,
                 parent_id="job-parent",
@@ -141,7 +142,7 @@ class TestTheAnswersRoute:
                 [Source.description(DESCRIPTION_TEXT)], list(links)
             ),
             frameworks=sample_selection(),
-            links=list(links),
+            answers=AnswerSet(links=tuple(links)),
         )
         record.transition("running")
         held = AssertionRecord(proposed=1, catalog=parent_catalog())
@@ -170,7 +171,7 @@ class TestTheAnswersRoute:
 
         assert child.resumption.parent_id == parent
         assert child.resumption.checkpoint.assertions.catalog == parent_catalog()
-        assert child.links == [LINK]
+        assert child.answers.links == (LINK,)
         assert [source.kind for source in child.sources] == ["description", "answers"]
 
     def test_the_resumed_job_is_run_from_prepare(self):
@@ -186,7 +187,7 @@ class TestTheAnswersRoute:
         parent = self.completed(store, links=[earlier, other])
         child = self.child(store, self.post(client, parent, LINK.model_dump()))
 
-        assert child.links == [LINK, other]
+        assert child.answers.links == (LINK, other)
         (answers,) = [s for s in child.sources if s.kind == "answers"]
         assert "entity:customer" in answers.text
         assert "none of the elements" in answers.text

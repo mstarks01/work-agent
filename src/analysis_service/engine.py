@@ -284,7 +284,7 @@ class Engine:
         breach = self._limits.breach(resumed.sources)
         if breach is not None:
             raise EngineInputError(breach.message)
-        if resumed.links and not self._carries_catalog:
+        if resumed.answers.links and not self._carries_catalog:
             raise EngineInputError(
                 "this deployment builds no assertion catalog, so nothing would"
                 " read a link answer"
@@ -294,8 +294,7 @@ class Engine:
             sources=resumed.sources,
             frameworks=self._frameworks,
             system_name=_engine_system_name(system_name),
-            links=resumed.links,
-            facts=resumed.facts,
+            answers=resumed.answers,
             shown_early=resumed.shown,
             skipped_early=list(resumed.skipped),
             resumption=Resumption(

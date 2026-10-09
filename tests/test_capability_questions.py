@@ -5,6 +5,7 @@ from __future__ import annotations
 import pytest
 
 from analysis_service.answer_round import question_set
+from analysis_service.answer_sets import NO_ANSWERS, AnswerSet
 from analysis_service.capabilities import CAPABILITIES
 from analysis_service.claims import UnknownRef
 from analysis_service.early_questions import capability_questions
@@ -104,12 +105,10 @@ class TestWhatIsAsked:
         assert _key("oauth") in asked.asked
         admitted = asked.admit(
             sources=[Source.description("A system.")],
-            earlier_links=[],
-            earlier_facts=[],
-            links=[],
-            facts=[_answer("oauth", "no")],
+            earlier=NO_ANSWERS,
+            given=AnswerSet(facts=(_answer("oauth", "no"),)),
         )
-        assert [fact.key for fact in admitted.facts] == [_key("oauth")]
+        assert [fact.key for fact in admitted.answers.facts] == [_key("oauth")]
 
 
 class TestTheAnswerCheck:
@@ -162,10 +161,8 @@ class TestTheAnswerCheck:
         with pytest.raises(ValueError, match="is part of 'oauth'"):
             asked.admit(
                 sources=[Source.description("A system.")],
-                earlier_links=[],
-                earlier_facts=earlier,
-                links=[],
-                facts=[_answer("oauth", "no")],
+                earlier=AnswerSet(facts=tuple(earlier)),
+                given=AnswerSet(facts=(_answer("oauth", "no"),)),
             )
 
     def test_a_revision_that_answers_both_is_admitted(self):
@@ -244,7 +241,7 @@ def test_a_resumed_asvs_run_reports_the_answered_absence():
         owner_subject="idp|user-1",
         sources=with_link_answers([Source.description(DESCRIPTION_TEXT)], [], [answer]),
         frameworks=[FrameworkSelection(name="asvs", options={"level": 1})],
-        facts=[answer],
+        answers=AnswerSet(facts=(answer,)),
         resumption=Resumption(
             follow_up=False,
             parent_id="p",

@@ -143,6 +143,7 @@ from analysis_service.answer_round import (
     SourcesOverLimit,
     StaleRevision,
 )
+from analysis_service.answer_sets import NO_ANSWERS, AnswerSet
 from analysis_service.claims import UnknownKey
 from analysis_service.critic import SEVERITY_ORDER
 from analysis_service.deployment import Deployment
@@ -247,8 +248,7 @@ class Run:
     task: asyncio.Task | None = None
     engine: Engine | None = None
     sources: list[Source] = field(default_factory=list)
-    links: list[LinkAnswer] = field(default_factory=list)
-    facts: list[FactAnswer] = field(default_factory=list)
+    answers: AnswerSet = NO_ANSWERS
     checkpoint: Checkpoint | None = None
     #: True for a run the report's follow-up started: its report is final.
     final: bool = False
@@ -264,12 +264,10 @@ class Run:
     revision: int = 0
     #: A finished run's draft answers: what its report's follow-up saved in
     #: batches and has not run (ADR 0070).
-    draft_links: list[LinkAnswer] = field(default_factory=list)
-    draft_facts: list[FactAnswer] = field(default_factory=list)
+    draft: AnswerSet = NO_ANSWERS
     #: The answers a paused run held when its amendment started this run
     #: (ADR 0072); this run's questions take each one they still ask.
-    carried_links: list[LinkAnswer] = field(default_factory=list)
-    carried_facts: list[FactAnswer] = field(default_factory=list)
+    carried: AnswerSet = NO_ANSWERS
     #: The run a submitter's answers started from this one, if any.
     resumed_by: Run | None = None
     #: The report this run's answers came from, for a follow-up: what its own
@@ -334,17 +332,14 @@ class Run:
             waiting=self.report is None,
             final=self.final,
             sources=self.sources,
-            links=self.links,
-            facts=self.facts,
+            answers=self.answers,
             shown=self.shown,
             skipped=self.skipped,
             corrections=self.corrections,
             revision=self.revision,
             resumed_by=None if holding is None else holding.id,
-            draft_links=self.draft_links,
-            draft_facts=self.draft_facts,
-            carried_links=self.carried_links,
-            carried_facts=self.carried_facts,
+            draft=self.draft,
+            carried_in=self.carried,
         )
 
 
@@ -618,18 +613,20 @@ def render_report(
         final=script_json(asked["final"]),
         resumed_by=script_json(asked["resumed_by"]),
         corrections=script_json(
-            _corrections_payload(report, state.facts, state.corrections)
+            _corrections_payload(report, state.answers.facts, state.corrections)
             if state.final
             else {}
         ),
         earlier=script_json(
-            _earlier_payload(report, state.facts, state.links, state.questions.asked)
+            _earlier_payload(
+                report, state.answers.facts, state.answers.links, state.questions.asked
+            )
             | _draft_payload(state)
             if not state.final and state.resumed_by is None
             else {}
         ),
         provenance=script_json(
-            _provenance_payload(report, state.facts, state.shown, state.skipped)
+            _provenance_payload(report, state.answers.facts, state.shown, state.skipped)
         ),
         changes=script_json(
             {
@@ -724,8 +721,8 @@ def _draft_payload(state: AnswerState) -> dict[str, object]:
     """A report's follow-up draft and the revision a save names (ADR 0070)."""
     return {
         "draft": {
-            "links": [link.model_dump(mode="json") for link in state.draft_links],
-            "facts": [fact.model_dump(mode="json") for fact in state.draft_facts],
+            "links": [link.model_dump(mode="json") for link in state.draft.links],
+            "facts": [fact.model_dump(mode="json") for fact in state.draft.facts],
         },
         "revision": state.revision,
     }
@@ -987,7 +984,10 @@ def create_app(
         try:
             outcome = state.answer(
                 Answers(
-                    links=links, facts=facts, save=save, skips=skips, revision=revision
+                    given=AnswerSet(links=tuple(links), facts=tuple(facts)),
+                    save=save,
+                    skips=skips,
+                    revision=revision,
                 ),
                 limits=parent.engine.limits,
             )
@@ -1009,14 +1009,14 @@ def create_app(
             return JSONResponse({"message": str(exc)}, status_code=400)
         if isinstance(outcome, SavedDraft):
             # A draft runs nothing and spends no follow-up (ADR 0070).
-            parent.draft_links, parent.draft_facts = outcome.links, outcome.facts
+            parent.draft = outcome.draft
             parent.revision += 1
             return JSONResponse({"saved": True, "revision": parent.revision})
         if isinstance(outcome, SavedRound):
             # A saved round runs no model: the answers go onto the paused run,
             # and the next round is read off the model with them in. Where
             # none is left, the page says so and waits for its start button.
-            parent.links, parent.facts = outcome.links, outcome.facts
+            parent.answers = outcome.answers
             parent.shown = list(outcome.shown)
             parent.skipped = list(outcome.skipped)
             parent.revision += 1
@@ -1034,7 +1034,7 @@ def create_app(
         run.name, run.analysis_id = parent.name, parent.workspace_id
         run.previous = parent.report
         run.engine, run.sources = parent.engine, parent.sources
-        run.links, run.facts = outcome.links, outcome.facts
+        run.answers = outcome.answers
         run.final = outcome.follow_up
         run.shown = list(outcome.shown)
         run.skipped = list(outcome.skipped)
@@ -1109,7 +1109,7 @@ def create_app(
         parent.resumed_by = run
         run.name, run.analysis_id = parent.name, parent.workspace_id
         run.engine, run.sources = parent.engine, amended.sources
-        run.carried_links, run.carried_facts = amended.links, amended.facts
+        run.carried = amended.answers
         start = partial(
             parent.engine.analyze,
             amended.sources,

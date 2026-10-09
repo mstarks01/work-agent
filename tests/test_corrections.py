@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 
+from analysis_service.answer_sets import AnswerSet
 from analysis_service.claims import Ground, UnknownRef
 from analysis_service.fact_answers import FactAnswer, fact_line
 from analysis_service.jobs import Checkpoint, JobRecord, Resumption
@@ -34,7 +35,7 @@ def finished(store, *, final: bool = True) -> str:
         owner_subject="alice",
         sources=[Source.description(DESCRIPTION_TEXT)],
         frameworks=sample_selection(),
-        facts=[ANSWER],
+        answers=AnswerSet(facts=(ANSWER,)),
         resumption=Resumption(
             parent_id="parent",
             checkpoint=Checkpoint(system_model=report.system_model, assertions=None),
@@ -70,7 +71,9 @@ class TestTheRoute:
         assert body["corrected_findings"] == ["stride/S-01"]
         record = asyncio.run(store.get(job))
         assert record.corrections == [back]
-        assert record.facts == [ANSWER], "the answers the run read stay as they were"
+        assert record.answers.facts == (ANSWER,), (
+            "the answers the run read stay as they were"
+        )
         questions = client.get(f"/v1/jobs/{job}/questions", headers=auth()).json()
         assert questions["corrections"] == body["corrections"]
         assert questions["corrected_findings"] == ["stride/S-01"]

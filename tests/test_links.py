@@ -313,7 +313,7 @@ class TestTheEntryPoints:
         )
         assert response.status_code == 201
         record = asyncio.run(store.get(response.json()["job_id"]))
-        assert record.links == [LinkAnswer(**self.LINK)]
+        assert record.answers.links == (LinkAnswer(**self.LINK),)
         assert [source.kind for source in record.sources] == ["description", "answers"]
 
     def test_answers_alone_still_meet_the_empty_sources_rung(self):

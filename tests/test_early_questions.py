@@ -14,6 +14,7 @@ import pytest
 
 from analysis_service.answer_forms import YES_NO, answer_choices
 from analysis_service.answer_round import EARLY_RULES, passes_floor
+from analysis_service.answer_sets import NO_ANSWERS, AnswerSet
 from analysis_service.candidates import generate_candidates
 from analysis_service.claims import UnknownRef
 from analysis_service.early_questions import (
@@ -514,15 +515,13 @@ class TestTheFrameworkGates:
         facts = [FactAnswer(key=q.key, value=answer) for q in asked.early]
         admitted = asked.admit(
             sources=(),
-            earlier_links=(),
-            earlier_facts=(),
-            links=(),
-            facts=facts,
+            earlier=NO_ANSWERS,
+            given=AnswerSet(facts=tuple(facts)),
             save=True,
         )
-        after = _paused(model, LEVEL_2, admitted.facts)
+        after = _paused(model, LEVEL_2, admitted.answers.facts)
         seeded = SystemModel.model_validate(
-            answered_state(model, [], admitted.facts)[STATE_VALID_MODEL]
+            answered_state(model, [], admitted.answers.facts)[STATE_VALID_MODEL]
         )
         assert run_precondition(PACKAGES["asvs"], seeded) == state
         assert dict(after.gates) == {"asvs": state}

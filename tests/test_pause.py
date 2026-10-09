@@ -226,7 +226,7 @@ class TestTheRoutes:
         )
         assert response.status_code == 201
         child = asyncio.run(store.get(response.json()["job_id"]))
-        assert child.links == []
+        assert child.answers.links == ()
         assert [source.kind for source in child.sources] == ["description"]
 
     def test_a_waiting_job_takes_no_in_flight_slot(self):
