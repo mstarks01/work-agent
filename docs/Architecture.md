@@ -56,8 +56,8 @@ flowchart TD
 
 Purple nodes are model calls. Everything else is a deterministic `FunctionNode`:
 blue ones do work, amber ones only choose an edge, and the rounded ends are the
-run's three outcomes. `assert` is in the graph only where the deployment sets
-`ANALYSIS_ASSERTIONS`; otherwise a valid model goes straight to `prepare`.
+run's three outcomes. `assert` is in the graph unless the deployment sets
+`ANALYSIS_ASSERTIONS=false`; then a valid model goes straight to `prepare`.
 
 - **extract** turns the untrusted text into a canonical system model (five DFD
   element types: external entity, process, data store, data flow, trust
@@ -218,8 +218,9 @@ disabled by default and unmeasured. No run has compared the two.
 
 ## The assertion pass
 
-`ANALYSIS_ASSERTIONS` puts one more `base`-tier call into every job, between
-the validity gate and `prepare`. The `assert` node reads the sources against
+The assertion pass puts one more `base`-tier call into every job, between
+the validity gate and `prepare`. It runs by default (ADR 0075), and
+`ANALYSIS_ASSERTIONS=false` turns it off. The `assert` node reads the sources against
 the validated model and proposes one row per statement the sources make: a
 subject, a predicate from the service's registry, a value, a scope and the
 quote that says so. `prepare` resolves the proposal in code, once, and parks
@@ -239,7 +240,7 @@ same report. The pass is off by default, and a report built without it carries
 
 | Variable | Effect |
 | --- | --- |
-| `ANALYSIS_ASSERTIONS` | Run the assertion pass on every job. Off by default. |
+| `ANALYSIS_ASSERTIONS` | Run the assertion pass on every job. On by default; `false` turns it off. |
 
 ## The source review
 

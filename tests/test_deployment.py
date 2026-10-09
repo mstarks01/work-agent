@@ -288,7 +288,7 @@ def test_the_pipeline_binds_the_pinned_models_from_config():
     # build can build, and the production entry builds its own: the assertion
     # graph's node is in the map and in no graph of this shape.
     assert set(pipeline.node_models) <= set(TIER_NODES)
-    assert graph.ASSERT_NODE not in pipeline.node_models
+    assert pipeline.node_models[graph.ASSERT_NODE] == "vertex_ai/gemini-2.5-flash"
 
 
 # --- The extraction transport -----------------------------------------------
@@ -345,8 +345,17 @@ def test_an_entry_that_extracts_nothing_records_no_transport():
 # --- The assertion pass -----------------------------------------------------
 
 
-def test_an_install_that_sets_nothing_runs_no_assertion_pass():
+def test_an_install_that_sets_nothing_runs_the_assertion_pass():
     deployment = Deployment.from_env(env=VERTEX_ENV)
+    pipeline = deployment.pipeline(DEFAULT_FRAMEWORKS)
+
+    assert deployment.assertions is True
+    assert graph.ASSERT_NODE in pipeline.node_models
+
+
+@pytest.mark.parametrize("value", ["false", "0", "off", "no"])
+def test_a_negative_value_turns_the_assertion_pass_off(value):
+    deployment = Deployment.from_env(env=VERTEX_ENV | {ASSERTIONS_VAR: value})
     pipeline = deployment.pipeline(DEFAULT_FRAMEWORKS)
 
     assert deployment.assertions is False
@@ -377,7 +386,7 @@ def test_the_llm_nodes_share_two_adapters_one_per_tier():
     nodes = {node.name: node for node in pipeline.workflow.graph.nodes}
 
     adapters = {id(nodes[name].model) for name in pipeline.node_models}
-    assert len(pipeline.node_models) == 10
+    assert len(pipeline.node_models) == 11
     assert len(adapters) == 2
 
 

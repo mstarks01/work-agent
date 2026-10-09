@@ -154,6 +154,10 @@ TEST_TIER_ENV: dict[str, str] = {
     # hide every defect in selecting it.
     "ANALYSIS_MODEL_REVIEW_VENDOR": "anthropic",
     "ANALYSIS_MODEL_REVIEW_MODEL": "claude-opus-5",
+    # The assertion pass runs by default (ADR 0075). The scripted sweeps that
+    # read this env script the lanes and the critic and no ``assert`` node, so
+    # they turn it off; a test of the pass sets it on.
+    "ANALYSIS_ASSERTIONS": "false",
 }
 
 _KEY_DIR = Path(tempfile.mkdtemp(prefix="analysis-test-keys-"))

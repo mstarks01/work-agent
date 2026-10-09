@@ -6,10 +6,11 @@ retrospectively* — so this table is written now, against the one baseline that
 exists, and the runs that follow are read against it rather than the other way
 round.
 
-**What is being decided.** Whether ``ANALYSIS_ASSERTIONS`` ships on by default.
-The layer is complete as code and off by default, so the decision is a
-deployment one: a job that sets the flag pays one base-tier call and gets a
-catalog its lanes may cite.
+**What these gates read.** Whether a measured promotion of ``ANALYSIS_ASSERTIONS``
+would pass: a job with the pass pays one base-tier call and gets a catalog
+its lanes may cite. The pass runs by default by the owner's decision (ADR
+0075), which these gates did not make; they state what a measured promotion
+needs.
 
 **Two kinds of gate, and the difference matters.**
 

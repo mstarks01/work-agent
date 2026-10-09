@@ -344,7 +344,7 @@ The app can ask you questions before the analysis, and after the report.
   applicable or "I don't know". The most
   likely needed questions come first and are open; the rest are one click
   away. Hover over a part's name to see why a rule asks about it. Where your
-  install builds an assertion catalog (`ANALYSIS_ASSERTIONS=true`), it also
+  install builds an assertion catalog (the default), it also
   asks which element each group of people or accounts is, such as "shopper
   accounts", so that facts about the group reach the model. Rows you leave
   blank stay open.

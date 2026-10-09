@@ -35,7 +35,7 @@ of four survivals:
 
 * ``structural``: it reached a graph attribute a framework rule reads.
 * ``catalog``: it reached the assertion catalog and no graph attribute, so a
-  consumer reaches it only where a deployment sets ``ANALYSIS_ASSERTIONS``.
+  consumer reaches it only where the assertion pass runs, which is the default.
 * ``question``: it reached the sidecar as an open question — named, answerable,
   and read by nothing.
 * ``lost``: it reached none of the three.

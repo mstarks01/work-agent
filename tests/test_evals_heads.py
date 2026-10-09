@@ -166,7 +166,9 @@ class TestTheHeadOnlyGraph:
         with pytest.raises(modes.EvalRunError, match="no pass that makes one"):
             modes.build_eval_pipeline(
                 graph.ENTRY_HEAD_ONLY,
-                deployment=Deployment.from_env(env=dict(VERTEX_ENV)),
+                deployment=Deployment.from_env(
+                    env=VERTEX_ENV | {"ANALYSIS_ASSERTIONS": "false"}
+                ),
                 resolve_model=lambda tier_node: ScriptedLlm(
                     model=EVAL_MODEL, reply="{}", seen=[]
                 ),

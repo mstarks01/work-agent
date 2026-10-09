@@ -107,8 +107,8 @@ predicate, a value, and the quote that supports it. For example: the flow from
 the shopper to the storefront uses a session cookie, and the source says so in
 these words. A closed list of predicates says which facts a row may record.
 
-Assertions come from an optional pass that is off by default. An operator turns
-it on with `ANALYSIS_ASSERTIONS`; see
+Assertions come from a pass that runs by default. An operator turns it off
+with `ANALYSIS_ASSERTIONS=false`; see
 [Configuration](Configuration.md#optional-passes).
 
 The pass exists because the system model has a field for only some facts. It

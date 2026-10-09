@@ -1030,7 +1030,7 @@ class Report(BaseModel):
         """How much of this model the job's assertion pass reached, or ``None``.
 
         ``None`` on a job that ran no pass, which is every job on a deployment
-        that has not set ``ANALYSIS_ASSERTIONS``. A reader that sees a number
+        that sets ``ANALYSIS_ASSERTIONS`` off. A reader that sees a number
         here can tell a system with few stated facts from a pass that asked
         few questions, and those look identical without it.
 
