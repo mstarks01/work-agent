@@ -61,17 +61,29 @@ applies to each selected framework
 selects more than one framework, each kind's places in a round go to the
 frameworks in turn: the next place goes to the first question that serves
 the framework charged the fewest choices so far, and every framework a
-question serves is charged its choices. The round is then shown in the same
-order, and the page starts a new box each time the question group changes,
-so a heading can come back within a round. Summing the frameworks' scores
-put ten capability questions first, and the page showed them in one box: an
-owner who stopped after ten choices completed no STRIDE finding with ASVS
-selected, where STRIDE alone completed 517 (E29). Measured
-on the same archive with both selected, at 10 choices STRIDE completes 1,036
-findings and ASVS 125, where the summed order completed 0 and 0; the cost is
-ASVS units settled early, 1,209 against 2,186 at 10 choices; from 30
-choices on the two orders settle within 2% of each other (E32). With one framework selected, nothing
-changes (maintainer's decision of 2026-10-01).
+question serves is charged its choices. Summing the frameworks' scores put ten
+capability questions first: an owner who stopped after ten choices completed
+no STRIDE finding with ASVS selected, where STRIDE alone completed 517 (E29).
+Measured on the same archive with both selected, at 10 choices STRIDE
+completes 1,036 findings, where the summed order completed 0 (E32). With one
+framework selected, nothing changes (maintainer's decision of 2026-10-01).
+
+**A round is shown in boxes, one for each group, and the frameworks take
+turns by whole boxes** (`answer_round.in_boxes`). A page shows each group in
+one box under its heading, so each heading appears once in a round. The boxes
+that hold a question that decides a precondition come first. Then the next box
+is the first left that serves the framework charged the fewest choices, and
+every framework a box serves is charged the box's choices. On a tie, the
+framework whose next box asks fewer choices goes first. Every capability
+question is in one group, so its box is large. A box order that puts that box
+first completed 103 STRIDE findings at 10 choices with both frameworks
+selected, where the question turn order completed 1,147
+(`QA-2026-10-09-02-E1`). The box turn order completes 1,103, 1,154 and 1,375
+STRIDE findings at 5, 10 and 20 choices, against 1,009, 1,147 and 1,293 for
+the question turn order. It settles the same ASVS units at 10, 15 and 20
+choices, and 32 against 173 at 5 choices. The maintainer accepted that cost on
+2026-10-09 (`QA-2026-10-09-02-E2`). With one framework selected, the box
+order completes as many findings as the list order, or more.
 
 **A turn ranks a shared field question on the summed score.** A
 framework's turn takes the first question in the list that serves it, and the list ranks a field

@@ -1,0 +1,131 @@
+diff --git a/evals/harness/early_policies.py b/evals/harness/early_policies.py
+index 0954d773..6e6623aa 100644
+--- a/evals/harness/early_policies.py
++++ b/evals/harness/early_policies.py
+@@ -42,6 +42,7 @@ from analysis_service.claims import FrameworkName, UnknownKey
+ from analysis_service.early_questions import EarlyQuestion, early_questions
+ from analysis_service.fact_answers import FactAnswer, key_ref
+ from analysis_service.frameworks import PACKAGES
++from analysis_service.open_facts import CAPABILITY_GROUP
+ from analysis_service.questions import fact_questions
+ from analysis_service.report import Report
+ from analysis_service.system_model import SystemModel
+@@ -87,6 +88,95 @@ def _shipped_rounds(model: SystemModel, frameworks: Selection) -> list[EarlyQues
+     return [question for shown in _rounds(model, frameworks) for question in shown]
+ 
+ 
++def _boxes(shown: Sequence[EarlyQuestion], group_of=None) -> list[list[EarlyQuestion]]:
++    """One round's questions in boxes, one for each group, each box in the
++    order its group first appears and its rows in the round's order."""
++    boxes: dict[object, list[EarlyQuestion]] = {}
++    for question in shown:
++        group = question.group if group_of is None else group_of(question)
++        boxes.setdefault(group, []).append(question)
++    return list(boxes.values())
++
++
++def _boxed(
++    model: SystemModel,
++    frameworks: Selection,
++    arrange: Callable[[Sequence[EarlyQuestion]], list[list[EarlyQuestion]]],
++) -> list[EarlyQuestion]:
++    """The shipped rounds, each shown as ``arrange`` puts it in boxes."""
++    return [
++        question
++        for shown in _rounds(model, frameworks)
++        for box in arrange(shown)
++        for question in box
++    ]
++
++
++def _cost(box: Sequence[EarlyQuestion]) -> int:
++    return sum(question.decisions for question in box)
++
++
++def _boxes_in_turn(
++    shown: Sequence[EarlyQuestion], *, smaller_first: bool
++) -> list[list[EarlyQuestion]]:
++    """The boxes with the frameworks in turn: the next box is the first left
++    that serves the framework charged the fewest choices, and every framework
++    a box serves is charged the box's choices. A tie goes to the first
++    framework by name, or with ``smaller_first`` to the framework whose next
++    box asks fewer choices."""
++    left = _boxes(shown)
++    charged: Counter[str] = Counter()
++    order = []
++    while left:
++        served = {name for box in left for q in box for name in q.frameworks}
++        if not served:
++            return order + left
++
++        def next_box(name: str) -> list[EarlyQuestion]:
++            return next(box for box in left if any(name in q.frameworks for q in box))
++
++        def rank(name: str) -> tuple:
++            size = _cost(next_box(name)) if smaller_first else 0
++            return (charged[name], size, name)
++
++        box = next_box(min(served, key=rank))
++        left.remove(box)
++        order.append(box)
++        for name in {name for q in box for name in q.frameworks}:
++            charged[name] += _cost(box)
++    return order
++
++
++def _capabilities_last(shown: Sequence[EarlyQuestion]) -> list[list[EarlyQuestion]]:
++    """The field boxes in the order each first appears, then the capability box."""
++    boxes = _boxes(shown)
++    return sorted(boxes, key=lambda box: box[0].group == CAPABILITY_GROUP)
++
++
++def _capabilities_at_middle(
++    shown: Sequence[EarlyQuestion],
++) -> list[list[EarlyQuestion]]:
++    """Each field box where its group first appears, and the capability box
++    where the round's turn order reaches half of the capability choices."""
++    anchor: dict[str, float] = {}
++    spent, total = 0, sum(q.decisions for q in shown if q.group == CAPABILITY_GROUP)
++    for at, question in enumerate(shown):
++        if question.group != CAPABILITY_GROUP:
++            anchor.setdefault(question.group, at)
++            continue
++        spent += question.decisions
++        if 2 * spent >= total:
++            anchor.setdefault(CAPABILITY_GROUP, at)
++    return sorted(_boxes(shown), key=lambda box: anchor[box[0].group])
++
++
++def _capability_root(question: EarlyQuestion) -> object:
++    """A capability's own group, with its parts; any other question's group."""
++    if question.group != CAPABILITY_GROUP:
++        return question.group
++    return question.parent or question.key
++
++
+ def _own_lists(
+     model: SystemModel, frameworks: Selection
+ ) -> dict[FrameworkName, list[EarlyQuestion]]:
+@@ -141,6 +231,22 @@ def _merge(
+ #: Every order compared, by name.
+ POLICIES: Mapping[str, Callable[[SystemModel, Selection], list[EarlyQuestion]]] = {
+     "shipped-rounds": _shipped_rounds,
++    "grouped-rounds": lambda model, chosen: _boxed(model, chosen, _boxes),
++    "boxes-in-turn": lambda model, chosen: _boxed(
++        model, chosen, lambda shown: _boxes_in_turn(shown, smaller_first=False)
++    ),
++    "boxes-in-turn-smaller": lambda model, chosen: _boxed(
++        model, chosen, lambda shown: _boxes_in_turn(shown, smaller_first=True)
++    ),
++    "capabilities-last": lambda model, chosen: _boxed(
++        model, chosen, _capabilities_last
++    ),
++    "capabilities-at-middle": lambda model, chosen: _boxed(
++        model, chosen, _capabilities_at_middle
++    ),
++    "capability-boxes": lambda model, chosen: _boxed(
++        model, chosen, lambda shown: _boxes(shown, _capability_root)
++    ),
+     "framework-merge": lambda model, chosen: _merge(model, chosen, grouped=False),
+     "grouped-merge": lambda model, chosen: _merge(model, chosen, grouped=True),
+ }

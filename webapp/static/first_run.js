@@ -313,9 +313,10 @@
       // A skipped link places nothing: it is not "None of these".
       roundRows.push({ key: q.key, read: () => select.value });
     }
-    // One box per category, ordered by its first appearance in the round.
-    // Build rows in service order so parents exist before their dependants,
-    // and append each row to its category even when other categories intervene.
+    // One box per category, in the order the service lists the round. The
+    // service sends each category's questions together and puts the boxes in
+    // order (answer_round.in_boxes), so a box here never moves a question.
+    // Rows are built in service order, so parents exist before their dependants.
     // An earlier answer by its key: a question with facets comes back while a
     // facet has no answer, and its answered facets are filled in.
     const earlier = new Map((data.answered || []).map((a) => [JSON.stringify(a.key), a.answer]));

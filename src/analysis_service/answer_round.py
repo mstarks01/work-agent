@@ -19,8 +19,9 @@ questions of each kind, its ``per_round``, so every round asks as many
 questions as the one before it, and only the last asks fewer. A question is
 shown only at or above its kind's floor, and one pause asks each kind at most
 its limit for each selected framework: :data:`EARLY_RULES` is the table. Where a job selects
-more than one framework, the frameworks take turns, both for the places in a
-round and for the order it is shown in (:func:`by_turn`). A question answered in
+more than one framework, the frameworks take turns for the places in a round
+(:func:`by_turn`), and by whole boxes for the order it is shown in, one box
+for each group (:func:`in_boxes`). A question answered in
 part is taken before any new question, outside the limit, and where the limits hold questions
 back the job says so (:attr:`QuestionSet.stop`). A question that decides whether a
 selected framework runs at all comes first in every round, outside the limits
@@ -118,6 +119,7 @@ __all__ = [
     "StaleRevision",
     "Stop",
     "by_turn",
+    "in_boxes",
     "next_round",
     "passes_floor",
     "question_set",
@@ -773,7 +775,8 @@ def _presented(
     asked = {question.key for question in early}
     hidden: set[UnknownKey] = set()
     # A parent comes before its parts in a round (by_turn keeps each
-    # framework's order), so one pass reaches a part of a part.
+    # framework's order, and in_boxes keeps a group's order), so one pass
+    # reaches a part of a part.
     for question in early:
         parent = question.parent
         if parent in asked and (parent in hidden or said.get(parent) != "yes"):
@@ -875,10 +878,10 @@ def next_round(
     A round takes the first ``per_round`` questions of each kind, so the
     number of questions a round opens with never grows from one round to the
     next (:func:`_take`). Each kind's questions are taken with the selected
-    frameworks in turn, so each framework's best questions reach the round,
-    and the whole round is shown in that order too (:func:`by_turn`). So a
-    question answered in part is shown where its framework's turn puts it,
-    which is not always first.
+    frameworks in turn, so each framework's best questions reach the round
+    (:func:`by_turn`). The round is shown in boxes, one for each group, with
+    the frameworks in turn by whole boxes (:func:`in_boxes`). So a question
+    answered in part is shown in its group's box, which is not always first.
 
     **A question that decides a framework's precondition is taken first**, every
     one still open, outside the limits and the floor (ADR 0067). Its count is
@@ -917,7 +920,7 @@ def next_round(
                 held_back.append(question)
         remaining[kind] = len(started) + len(taken)
         shown += _take([*started, *taken], rule.per_round)
-    return (*gates, *by_turn(shown)), remaining, tuple(held_back)
+    return in_boxes([*gates, *by_turn(shown)]), remaining, tuple(held_back)
 
 
 def by_turn(questions: Sequence[EarlyQuestion]) -> list[EarlyQuestion]:
@@ -948,6 +951,66 @@ def by_turn(questions: Sequence[EarlyQuestion]) -> list[EarlyQuestion]:
         order.append(question)
         for holder in question.frameworks:
             charged[holder] += question.decisions
+    return order
+
+
+def in_boxes(questions: Sequence[EarlyQuestion]) -> tuple[EarlyQuestion, ...]:
+    """A round's questions in the order it is shown: one box for each group.
+
+    **The one reader of the order a round is shown in.** A page shows each
+    group in one box under its heading, so each heading appears once in a
+    round. A box holds its group's questions in their order here, so a parent
+    still comes before its parts. The boxes that hold a question deciding a
+    precondition come first (ADR 0067). Then the selected frameworks take
+    turns by whole boxes: the next box is the first left that serves the
+    framework charged the fewest choices so far, and every framework a box
+    serves is charged the box's choices. On a tie the framework whose next box
+    asks fewer choices goes first, then the first by name. So a large box,
+    such as every capability question in one, waits for its framework's turn
+    and does not push out another framework's small boxes
+    (``QA-2026-10-09-02-E2``).
+    """
+    boxes: dict[str, list[EarlyQuestion]] = {}
+    for question in questions:
+        boxes.setdefault(question.group, []).append(question)
+    gated = [box for box in boxes.values() if any(q.gates for q in box)]
+    rest = [box for box in boxes.values() if not any(q.gates for q in box)]
+    return tuple(
+        question
+        for box in (*_boxes_in_turn(gated), *_boxes_in_turn(rest))
+        for question in box
+    )
+
+
+def _boxes_in_turn(
+    boxes: Sequence[Sequence[EarlyQuestion]],
+) -> list[Sequence[EarlyQuestion]]:
+    """The boxes with the frameworks in turn, as :func:`in_boxes` states."""
+
+    def serves(box: Sequence[EarlyQuestion]) -> set[str]:
+        return {name for question in box for name in question.frameworks}
+
+    def choices(box: Sequence[EarlyQuestion]) -> int:
+        return sum(question.decisions for question in box)
+
+    charged: Counter[str] = Counter()
+    left = list(boxes)
+    order: list[Sequence[EarlyQuestion]] = []
+    while left:
+        served = set().union(*map(serves, left))
+        if not served:
+            return order + left
+        next_box = {
+            name: next(box for box in left if name in serves(box)) for name in served
+        }
+        name = min(
+            served, key=lambda each: (charged[each], choices(next_box[each]), each)
+        )
+        box = next_box[name]
+        left.remove(box)
+        order.append(box)
+        for holder in serves(box):
+            charged[holder] += choices(box)
     return order
 
 
