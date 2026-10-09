@@ -421,7 +421,9 @@ def test_the_question_limits_are_the_early_rules():
         r" question at least (\d+)\.",
         text,
     )
-    limit = re.search(r"One pause asks at most (\d+) of each kind in all", text)
+    limit = re.search(
+        r"One pause asks at most (\d+) of each kind for each selected framework", text
+    )
     limit_again = re.search(r"takes no place under the limit of (\d+)\.", text)
     links = re.search(r"or there are more than (\d+) entries", text)
 

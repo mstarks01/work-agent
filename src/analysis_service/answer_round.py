@@ -18,7 +18,7 @@ may continue with no answers, and a finished one has nothing to continue.
 questions of each kind, its ``per_round``, so every round asks as many
 questions as the one before it, and only the last asks fewer. A question is
 shown only at or above its kind's floor, and one pause asks each kind at most
-its limit in all: :data:`EARLY_RULES` is the table. Where a job selects
+its limit for each selected framework: :data:`EARLY_RULES` is the table. Where a job selects
 more than one framework, the frameworks take turns, both for the places in a
 round and for the order it is shown in (:func:`by_turn`). A question answered in
 part is taken before any new question, outside the limit, and where the limits hold questions
@@ -129,7 +129,9 @@ class EarlyRule:
     """Which early questions of one kind a round may show.
 
     ``floor`` is the score a question needs, ``limit`` how many of the kind
-    one pause asks in all, and ``per_round`` how many one round asks. The two
+    one pause asks for each selected framework, and ``per_round`` how many one
+    round asks. A question counts toward the limit of every framework it
+    serves, so a second framework takes no place from the first. The two
     kinds' scores are not on one scale: a field question's is a ranking value
     read off the prior, and a capability question's is units it could settle.
     """
@@ -701,7 +703,14 @@ def question_set(
     # listed as one.
     given = {answer.key: answer for answer in answered}
     gated = {question.key for question in (*first, *listed) if question.gates}
-    held = {answer.key: answer for answer in answered if answer.key not in gated}
+    # An answer counts toward the limit of each framework its question served,
+    # and of every selected framework where no list holds its question.
+    served = {question.key: question.frameworks for question in (*first, *listed)}
+    held = {
+        answer.key: served.get(answer.key, tuple(frameworks))
+        for answer in answered
+        if answer.key not in gated
+    }
     aside: frozenset[SkipKey] = frozenset(skipped)
     gates = framework_gates(view, frameworks, catalog)
     this_round, remaining, held_back = next_round(listed, aside | done, held)
@@ -852,7 +861,7 @@ def _summary(
 def next_round(
     listed: Sequence[EarlyQuestion],
     done: frozenset[SkipKey],
-    held: Mapping[UnknownKey, FactAnswer],
+    held: Mapping[UnknownKey, Sequence[FrameworkName]],
 ) -> tuple[tuple[EarlyQuestion, ...], dict[str, int], tuple[EarlyQuestion, ...]]:
     """This round's questions, how many each kind has left, and the questions the limits hold back.
 
@@ -860,6 +869,12 @@ def next_round(
     answered in part is taken first, and takes no place under the limit, which
     it already counts toward: each earlier answer counts toward its kind's
     limit, and the limit bounds only the questions not yet answered at all.
+    ``held`` maps each answered question to the frameworks it served.
+
+    **Each framework has its own limit.** A question counts toward the limit
+    of every framework it serves, and a new question is taken while one of
+    them has a place left. So the questions one framework asks alone keep
+    their places when a second framework is selected (``QA-2026-10-09-01-E1``).
 
     A round takes the first ``per_round`` questions of each kind, so the
     number of questions a round opens with never grows from one round to the
@@ -880,10 +895,12 @@ def next_round(
     remaining = {"gate": len(gates)}
     held_back: list[EarlyQuestion] = []
     for kind, rule in EARLY_RULES.items():
-        asked = sum(
-            1 for key in held if (kind == "capability") == bool(key_ref(key).capability)
+        counted = Counter(
+            name
+            for key, served in held.items()
+            if (kind == "capability") == bool(key_ref(key).capability)
+            for name in served
         )
-        left = max(rule.limit - asked, 0)
         eligible = [
             question
             for question in listed
@@ -893,11 +910,17 @@ def next_round(
             and question.key not in done
         ]
         started = [question for question in eligible if question.key in held]
-        fresh = [question for question in eligible if question.key not in held]
-        remaining[kind] = len(started) + min(len(fresh), left)
-        turns = by_turn(fresh)
-        held_back += turns[left:]
-        shown += _take([*started, *turns[:left]], rule.per_round)
+        taken: list[EarlyQuestion] = []
+        for question in by_turn(
+            [question for question in eligible if question.key not in held]
+        ):
+            if any(counted[name] < rule.limit for name in question.frameworks):
+                taken.append(question)
+                counted.update(question.frameworks)
+            else:
+                held_back.append(question)
+        remaining[kind] = len(started) + len(taken)
+        shown += _take([*started, *taken], rule.per_round)
     return (*gates, *by_turn(shown)), remaining, tuple(held_back)
 
 

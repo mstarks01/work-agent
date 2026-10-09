@@ -188,7 +188,8 @@ whose `parent` the round also asks takes no place: show it once the parent is
 answered "yes". Each question's `decisions`
 counts its choices: one a facet, else one.
 A field question needs a `score` of at least 1, and a capability question at
-least 2. One pause asks at most 30 of each kind in all. `early_remaining`
+least 2. One pause asks at most 30 of each kind for each selected
+framework, and a question two frameworks share counts for each of them. `early_remaining`
 estimates how many of each kind are left, this round included; answers can
 add or take away questions. Send a round with `"save": true` to keep it: the
 answers are written onto the job, no model runs, and the response is `200`
