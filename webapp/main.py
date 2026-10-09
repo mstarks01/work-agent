@@ -163,7 +163,7 @@ from analysis_service.jobs import (
     JobStatus,
     PipelineAwaiting,
     PipelineOutcome,
-    holds_its_parent,
+    locks_its_parent,
 )
 from analysis_service.links import (
     MAX_LINK_ANSWERS,
@@ -290,8 +290,8 @@ class Run:
         return self.checkpoint is not None and self.report is None and not resumed
 
     @property
-    def holding(self) -> Run | None:
-        """The run these answers started, where it holds this one, or ``None``."""
+    def locked_by(self) -> Run | None:
+        """The run these answers started, where it locks this one, or ``None``."""
         return self.resumed_by if self.resumed else None
 
     @property
@@ -303,7 +303,7 @@ class Run:
         takes answers again.
         """
         run = self.resumed_by
-        return run is not None and holds_its_parent(run.status)
+        return run is not None and locks_its_parent(run.status)
 
     @property
     def status(self) -> JobStatus:
@@ -324,7 +324,7 @@ class Run:
         """What this run's questions and answers read, from its engine and checkpoint."""
         if self.engine is None or self.checkpoint is None:
             raise RuntimeError(f"run {self.id} has reached no checkpoint")
-        holding = self.holding
+        locked_by = self.locked_by
         return AnswerState(
             checkpoint=self.checkpoint,
             frameworks=self.engine.framework_options,
@@ -337,7 +337,7 @@ class Run:
             skipped=self.skipped,
             corrections=self.corrections,
             revision=self.revision,
-            resumed_by=None if holding is None else holding.id,
+            resumed_by=None if locked_by is None else locked_by.id,
             draft=self.draft,
             carried_in=self.carried,
         )
@@ -817,8 +817,8 @@ def create_app(
                 },
                 status_code=404,
             )
-        while run.holding is not None:
-            run = run.holding
+        while run.locked_by is not None:
+            run = run.locked_by
         payload = analyses.snapshot(run)
         payload["completed_steps"] = list(run.completed_steps)
         payload["selection"] = (

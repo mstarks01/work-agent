@@ -212,7 +212,7 @@ def passes_floor(question: EarlyQuestion, listed: Sequence[EarlyQuestion]) -> bo
 
 
 class AlreadyResumed(ValueError):
-    """Answers to a job whose earlier answers started a job that holds it."""
+    """Answers to a job whose earlier answers started a job that locks it."""
 
 
 @dataclass(frozen=True)
@@ -332,7 +332,7 @@ class QuestionSet:
     #: For a waiting job, each link question the submitter skipped for now,
     #: kept apart from :attr:`links` as :attr:`skipped` is from :attr:`early`.
     skipped_links: tuple[LinkQuestion, ...]
-    #: The job this one's answers started, which holds it: it asks nothing
+    #: The job this one's answers started, which locks it: it asks nothing
     #: and admits no answer while that job is in flight or has its report.
     resumed_by: str | None = None
     #: For a waiting job, what each selected framework's precondition reads
@@ -625,7 +625,7 @@ def question_set(
     analysis (:func:`~analysis_service.fact_answers.fact_status`). A waiting
     job's ``model`` and ``catalog`` are its checkpoint's, and the saved answers
     are written in here, as the resumed run writes them. ``resumed_by`` is the
-    job this one's answers started and that holds it, which a store reads
+    job this one's answers started and that locks it, which a store reads
     (:meth:`~analysis_service.jobs.JobStore.resumed_by`); such a job asks
     nothing.
     """
@@ -704,14 +704,14 @@ def question_set(
     # An answer counts toward the limit of each framework its question served,
     # and of every selected framework where no list holds its question.
     served = {question.key: question.frameworks for question in (*first, *listed)}
-    held = {
+    answered_for = {
         answer.key: served.get(answer.key, tuple(frameworks))
         for answer in answered
         if answer.key not in gated
     }
     aside: frozenset[SkipKey] = frozenset(skipped)
     gates = framework_gates(view, frameworks, catalog)
-    this_round, remaining, held_back = next_round(listed, aside | done, held)
+    this_round, remaining, held_back = next_round(listed, aside | done, answered_for)
     below_floor = tuple(
         question
         for question in listed
@@ -859,7 +859,7 @@ def _summary(
 def next_round(
     listed: Sequence[EarlyQuestion],
     done: frozenset[SkipKey],
-    held: Mapping[UnknownKey, Sequence[FrameworkName]],
+    answered_for: Mapping[UnknownKey, Sequence[FrameworkName]],
 ) -> tuple[tuple[EarlyQuestion, ...], dict[str, int], tuple[EarlyQuestion, ...]]:
     """This round's questions, how many each kind has left, and the questions the limits hold back.
 
@@ -867,7 +867,7 @@ def next_round(
     answered in part is taken first, and takes no place under the limit, which
     it already counts toward: each earlier answer counts toward its kind's
     limit, and the limit bounds only the questions not yet answered at all.
-    ``held`` maps each answered question to the frameworks it served.
+    ``answered_for`` maps each answered question to the frameworks it served.
 
     **Each framework has its own limit.** A question counts toward the limit
     of every framework it serves, and a new question is taken while one of
@@ -895,7 +895,7 @@ def next_round(
     for kind, rule in EARLY_RULES.items():
         counted = Counter(
             name
-            for key, served in held.items()
+            for key, served in answered_for.items()
             if (kind == "capability") == bool(key_ref(key).capability)
             for name in served
         )
@@ -907,10 +907,10 @@ def next_round(
             and passes_floor(question, listed)
             and question.key not in done
         ]
-        started = [question for question in eligible if question.key in held]
+        started = [question for question in eligible if question.key in answered_for]
         taken: list[EarlyQuestion] = []
         for question in by_turn(
-            [question for question in eligible if question.key not in held]
+            [question for question in eligible if question.key not in answered_for]
         ):
             if any(counted[name] < rule.limit for name in question.frameworks):
                 taken.append(question)
@@ -1155,7 +1155,7 @@ class AnswerState:
     the pause showed, ``skipped`` every question its submitter skipped for
     now, and ``corrections`` what a final report's owner corrected since.
     ``revision`` is how many rounds a waiting job saved. ``resumed_by`` names
-    the job these answers started, where it holds this one.
+    the job these answers started, where it locks this one.
     """
 
     checkpoint: Checkpoint
@@ -1310,7 +1310,7 @@ class AnswerState:
 
         A refusal raises: :class:`MissingRevision` or :class:`StaleRevision`
         for the revision, :class:`AlreadyResumed` where these answers already
-        started a job that holds this one,
+        started a job that locks this one,
         :class:`~analysis_service.links.NoCatalogError` for a link answer to a
         job with no catalog, :class:`SourcesOverLimit` where the composed
         sources break ``limits``, and a ``ValueError`` that names the

@@ -36,8 +36,8 @@ taken. The first-run page lists those answers, and the questions route
 returns them as `carried_dropped`. An answer that the new rounds give
 replaces the carried one.
 
-**The amendment holds the paused job.** The amended job holds its parent as a
-resumed job does (`jobs.held_parent`). While it is in flight or has a report,
+**The amendment locks the paused job.** The amended job locks its parent as a
+resumed job does (`jobs.parent_of`, `jobs.locks_its_parent`). While it is in flight or has a report,
 the paused job takes no answer and no second amendment. Where it fails, the
 paused job takes answers again. An amendment names the round revision that it
 read, as a save does, and the amended sources must fit the source limits.

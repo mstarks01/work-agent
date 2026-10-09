@@ -531,7 +531,7 @@ async def _answerable(
     Each heavy field is read by name, once. The envelope carries neither, so a
     status read never pays for them, and the report is copied as an object
     rather than serialized and validated again. The last value is the job
-    this one's answers started and that holds it
+    this one's answers started and that locks it
     (:meth:`~analysis_service.jobs.JobStore.resumed_by`).
     """
     store: JobStore = request.app.state.store
@@ -1250,7 +1250,7 @@ def create_app(
         added; it pauses again, and carries the paused job's answers, which
         its own questions take where they still ask them. ``201`` with its
         ``job_id``. ``400`` where the job does not wait on answers, ``409``
-        where its revision has moved or a job already holds its answers.
+        where its revision has moved or a job already locks it.
         """
         answerable = await _answerable(request, job_id, subject)
         if isinstance(answerable, JSONResponse):
