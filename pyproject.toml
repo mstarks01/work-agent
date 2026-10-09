@@ -80,6 +80,7 @@ dev = [
     "mypy>=1.18",
     "pip-audit>=2.9",
     "pytest>=8",
+    "pytest-xdist>=3.8",
     "ruff>=0.16.0",
 ]
 # The lite first-run web app's server (#32). A dependency-group, not an extra

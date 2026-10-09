@@ -158,10 +158,11 @@ See [Concepts](docs/Concepts.md) for the full plain-language glossary.
 
 ## Development
 
-The offline suite needs no provider credentials:
+The offline suite needs no provider credentials. `-n auto` runs one worker
+per CPU; omit it for a small run of a few test files:
 
 ```sh
-uv run pytest
+uv run pytest -n auto
 uv run ruff check .
 uv run mypy
 uv run python evals/verify_corpus.py

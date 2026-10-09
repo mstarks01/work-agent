@@ -114,10 +114,12 @@ jobs:
       - name: Corpus lints
         run: uv run python evals/verify_corpus.py
 
+      # One worker per CPU. The flag is here and not in `addopts`, because
+      # worker start-up makes a small local run twice as slow.
       - name: Test suite
         env:
           REQUIRE_BROWSER: "1"
-        run: uv run --group browser pytest -q
+        run: uv run --group browser pytest -q -n auto
 
       # The vendor conformance matrix, rendered into the job summary.
       #
