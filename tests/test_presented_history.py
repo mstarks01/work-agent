@@ -15,10 +15,11 @@ from dataclasses import replace
 import pytest
 
 from analysis_service.answer_round import question_set
-from analysis_service.answer_sets import NO_ANSWERS, AnswerSet
+from analysis_service.answer_sets import NO_ANSWERS
 from analysis_service.early_questions import early_questions
 from analysis_service.fact_answers import FactAnswer
 from tests.factories import valid_model
+from tests.test_pause_summary import _save
 from tests.test_webapp_questions import _run_form_script, _text_row
 
 LEVEL_2 = {"asvs": {"level": 2}}
@@ -49,16 +50,6 @@ def _chain(*names):
 def _round(*names):
     """A round that asks exactly these capabilities, parents first."""
     return replace(_paused(), early=_chain(*names))
-
-
-def _save(asked, earlier=(), facts=(), skips=()):
-    return asked.admit(
-        sources=(),
-        earlier=AnswerSet(facts=tuple(earlier)),
-        given=AnswerSet(facts=tuple(facts)),
-        save=True,
-        skips=list(skips),
-    )
 
 
 def _sent_by_the_page(parent_value):

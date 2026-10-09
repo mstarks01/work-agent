@@ -10,6 +10,7 @@ coverage, a report's conditions, the critic's prompt and the answer's line.
 from __future__ import annotations
 
 from analysis_service.answer_round import question_set
+from analysis_service.answer_sets import AnswerSet
 from analysis_service.claims import UnknownRef
 from analysis_service.fact_answers import (
     FactAnswer,
@@ -181,8 +182,9 @@ class TestTheDetail:
 
         before = FactAnswer(key=("", "", "", "", "", "authentication"), value="yes")
         after = before.model_copy(update={"detail": "except the status endpoint"})
-        assert _adds_information([], [before], [], [after])
-        assert not _adds_information([], [before], [], [before])
+        earlier = AnswerSet(facts=(before,))
+        assert _adds_information(earlier, AnswerSet(facts=(after,)))
+        assert not _adds_information(earlier, earlier)
 
 
 class TestAFacetTwoFrameworksShare:

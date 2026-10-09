@@ -33,7 +33,7 @@ def _paused(model, selection, answers=(), shown=(), skipped=()):
     )
 
 
-def _save(asked, earlier, facts=(), skips=()):
+def _save(asked, earlier=(), facts=(), skips=()):
     return asked.admit(
         sources=(),
         earlier=AnswerSet(facts=tuple(earlier)),
