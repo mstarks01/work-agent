@@ -35,7 +35,8 @@ the part is asked once it shows. "Skip the rest" on the page skips only the
 rows that show.
 
 **Only a presented question is recorded as shown.** So the history of a
-question tells apart what the page presented from what the round planned.
+question holds only what the page presented. A part that the round asked but
+the page hid behind its parent is not in it, and no state records it.
 
 **The report reads one history rule.** `fact_answers.fact_status` gives
 each fact one of six states: `answered`, `partial`, `unknown`, `skipped`
