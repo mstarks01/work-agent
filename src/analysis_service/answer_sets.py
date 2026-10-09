@@ -38,17 +38,23 @@ class AnswerSet(BaseModel):
         )
 
 
-def _within_held_limits(answers: AnswerSet) -> AnswerSet:
-    if len(answers.links) > MAX_HELD_LINKS or len(answers.facts) > MAX_HELD_FACTS:
+def within_held_limits(answers: AnswerSet) -> AnswerSet:
+    """``answers``, or a ``ValueError`` where they break the limits a job holds.
+
+    **The one reader of the held limits.** A submission and a stored job
+    record both ask it.
+    """
+    if len(answers.facts) > MAX_HELD_FACTS or len(answers.links) > MAX_HELD_LINKS:
         raise ValueError(
-            f"a job holds at most {MAX_HELD_LINKS} link answers and"
-            f" {MAX_HELD_FACTS} fact answers in one set"
+            f"a job holds at most {MAX_HELD_FACTS} fact answers and"
+            f" {MAX_HELD_LINKS} link answers; these answers would make"
+            f" {len(answers.facts)} and {len(answers.links)}"
         )
     return answers
 
 
 #: An :class:`AnswerSet` a job record stores, within the limits a job holds.
-HeldAnswerSet = Annotated[AnswerSet, AfterValidator(_within_held_limits)]
+HeldAnswerSet = Annotated[AnswerSet, AfterValidator(within_held_limits)]
 
 
 #: The set with no answer, which a holder starts from.

@@ -107,10 +107,6 @@
   };
   const code = (text) => el("code", null, text);
   const option = (label, value) => Object.assign(el("option", null, label), { value });
-  // An answer as one line of text.
-  const said = a => a.facets
-    ? Object.entries(a.facets).map(([facet, value]) => `${facet}: ${value}`).join("; ")
-    : (a.value === DONT_KNOW ? "I don't know" : a.value);
   // A link question's choices: each element it may be, then "None of these".
   const linkOptions = (select, ids) => {
     ids.forEach(id => select.append(option(NAMES[id] ? `${NAMES[id]} (${id})` : id, id)));
@@ -1164,7 +1160,7 @@
       EARLIER_FACTS.forEach(a => {
         const row = el("p");
         row.append(el("b", null, a.label));
-        changer(row, el("span", null, ` \u2014 ${said(a.answer)}`), () => {
+        changer(row, el("span", null, ` \u2014 ${answerText(a.answer)}`), () => {
           const editor = editorFor(a, startFrom(a.answer, a.key), () => {}, false);
           earlierFacts.push(editor.read);
           return editor.nodes;
@@ -1286,7 +1282,7 @@
     CORRECTIONS.answers.forEach(a => {
       const row = el("p");
       const shown = el("span", null,
-        ` \u2014 ${said(a.answer)}` + (a.corrected ? " (corrected after this report)" : ""));
+        ` \u2014 ${answerText(a.answer)}` + (a.corrected ? " (corrected after this report)" : ""));
       const change = el("button", null, "Change");
       change.type = "button";
       change.addEventListener("click", () => {

@@ -18,6 +18,7 @@ from typing import Any, ClassVar
 import pytest
 
 from analysis_service.answer_round import EARLY_RULES, question_set
+from analysis_service.answer_sets import AnswerSet
 from analysis_service.capabilities import CapabilityNeed
 from analysis_service.claims import UnknownRef
 from analysis_service.early_questions import QUESTION_PRIOR, PriorRow
@@ -119,8 +120,7 @@ def _paused(selection, answers=(), model=None):
             selection,
             (),
             waiting=True,
-            answered=list(answers),
-            answered_links=(),
+            answered=AnswerSet(facts=tuple(answers)),
             final=False,
             shown=(),
         )

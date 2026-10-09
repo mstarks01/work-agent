@@ -558,9 +558,6 @@
     const title = document.createElement("summary");
     title.textContent = `Your answers (${answeredLinks.length + answeredFacts.length})`;
     earlierBox.append(title);
-    const said = (answer) => answer.facets
-      ? Object.entries(answer.facets).map(([facet, value]) => `${facet}: ${value}`).join("; ")
-      : (answer.value === DONT_KNOW ? "I don't know" : answer.value);
     const change = (row, open) => {
       const button = document.createElement("button");
       button.type = "button";
@@ -586,7 +583,7 @@
       const label = document.createElement("b");
       label.textContent = a.label;
       const shown = document.createElement("span");
-      shown.textContent = ` — ${said(a.answer)}`;
+      shown.textContent = ` — ${answerText(a.answer)}`;
       row.append(label, shown);
       change(row, () => {
         if (a.form === "facets") {
@@ -639,7 +636,7 @@
       row.append(label);
       const before = earlier.get(JSON.stringify(q.key));
       const kept = document.createElement("span");
-      if (before) kept.textContent = ` \u2014 ${said(before)}`;
+      if (before) kept.textContent = ` \u2014 ${answerText(before)}`;
       row.append(kept);
       const open = document.createElement("button");
       open.type = "button";
@@ -682,9 +679,7 @@
     // names a part the amended model no longer has, or a fact it now states
     // (AnswerState.carried, ADR 0072).
     const dropped = [
-      ...(data.carried_dropped || []).map((a) => `${a.label} \u2014 ${a.facets
-        ? Object.entries(a.facets).map(([facet, value]) => `${facet}: ${value}`).join("; ")
-        : (a.value === DONT_KNOW ? "I don't know" : a.value)}`),
+      ...(data.carried_dropped || []).map((a) => `${a.label} \u2014 ${answerText(a)}`),
       ...(data.carried_dropped_links || []).map((a) => `${a.principal} \u2014 ${
         a.element === "none" ? "none of these" : a.element}`),
     ];

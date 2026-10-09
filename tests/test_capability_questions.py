@@ -97,8 +97,7 @@ class TestWhatIsAsked:
             ASVS_L1,
             [],
             waiting=True,
-            answered=[],
-            answered_links=[],
+            answered=AnswerSet(),
             final=False,
             shown=[],
         )
@@ -153,8 +152,7 @@ class TestTheAnswerCheck:
             ASVS_L1,
             [],
             waiting=True,
-            answered=earlier,
-            answered_links=[],
+            answered=AnswerSet(facts=tuple(earlier)),
             final=False,
             shown=[],
         )

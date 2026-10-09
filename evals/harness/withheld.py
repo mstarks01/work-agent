@@ -36,6 +36,7 @@ from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any, cast
 
+from analysis_service.answer_sets import AnswerSet
 from analysis_service.claims import FrameworkName
 from analysis_service.fact_answers import FactAnswer
 from analysis_service.fact_writes import check_fact_answers
@@ -176,8 +177,7 @@ def answers_within_rounds(
             frameworks,
             [],
             waiting=True,
-            answered=given,
-            answered_links=[],
+            answered=AnswerSet(facts=tuple(given)),
             final=False,
             shown=[],
         )

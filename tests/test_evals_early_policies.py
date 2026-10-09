@@ -7,6 +7,7 @@ from pathlib import Path
 import pytest
 
 from analysis_service.answer_round import question_set
+from analysis_service.answer_sets import AnswerSet
 from analysis_service.report import Report
 from evals.harness import early_policies
 from evals.harness.early_policies import POLICIES, _prefix, needs_of, readings
@@ -26,8 +27,7 @@ def test_the_shipped_order_starts_with_the_pause_s_first_round():
         BOTH,
         [],
         waiting=True,
-        answered=[],
-        answered_links=[],
+        answered=AnswerSet(),
         final=False,
         shown=[],
     ).early

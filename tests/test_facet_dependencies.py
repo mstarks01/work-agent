@@ -112,8 +112,7 @@ class TestTheFollowUp:
             {},
             _analyses(),
             waiting=False,
-            answered=[],
-            answered_links=[],
+            answered=AnswerSet(),
             final=False,
             shown=[],
         )

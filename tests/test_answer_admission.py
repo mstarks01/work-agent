@@ -185,8 +185,7 @@ class TestOnlyAnAskedFactTakesAnAnswer:
             {"stride": {}},
             [],
             waiting=True,
-            answered=[],
-            answered_links=[],
+            answered=AnswerSet(),
             final=False,
             shown=[],
         ).asked
@@ -272,8 +271,7 @@ def asked_of(catalog, *, waiting):
         {"stride": {}},
         [],
         waiting=waiting,
-        answered=[],
-        answered_links=[],
+        answered=AnswerSet(),
         final=False,
         shown=[],
     )
@@ -315,8 +313,7 @@ def _asked_after(answered, *, waiting=True, final=False, shown=(), skipped=()):
         {"stride": {}},
         [],
         waiting=waiting,
-        answered=answered,
-        answered_links=[],
+        answered=AnswerSet(facts=tuple(answered)),
         final=final,
         shown=shown,
         skipped=skipped,
@@ -1041,7 +1038,7 @@ class TestOneResumedJob:
         again = self.answer(client, finished, facts)
 
         assert again.status_code == 409
-        assert "already started job" in again.json()["detail"]
+        assert "locks this job" in again.json()["detail"]
 
     def test_a_waiting_job_starts_one_analysis(self):
         client, store = catalog_client()
@@ -1187,8 +1184,7 @@ def test_no_round_opens_with_more_questions_than_the_one_before(case, run):
             selection,
             [],
             waiting=True,
-            answered=answered,
-            answered_links=[],
+            answered=AnswerSet(facts=tuple(answered)),
             final=False,
             shown=[],
         )
@@ -1278,8 +1274,7 @@ class TestTheFrameworksTakeTurns:
             frameworks,
             [],
             waiting=True,
-            answered=[],
-            answered_links=[],
+            answered=AnswerSet(),
             final=False,
             shown=[],
         ).early

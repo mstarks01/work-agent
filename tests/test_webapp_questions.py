@@ -1201,7 +1201,7 @@ def test_a_failed_resumed_run_leaves_its_paused_run_to_answer_again(start):
     analyses, (first, _) = _waiting_registry()
     first.facts = [FactAnswer(key=FACT["key"], value="TLS")]
     run = analyses.claim(answering=first)
-    first.resumed_by = run
+    first.resumed_run = run
 
     async def drive():
         run.task = asyncio.create_task(_drive(analyses, run, start))
@@ -1269,7 +1269,7 @@ def test_a_full_registry_retries_a_failed_resumed_run_with_its_saved_answers(tie
 def test_a_paused_run_goes_once_its_resumed_run_has_a_report():
     analyses, (first, second) = _waiting_registry()
     run = analyses.claim(answering=first)
-    first.resumed_by = run
+    first.resumed_run = run
     run.report = sample_report([])
     analyses.release()
 
@@ -1283,7 +1283,7 @@ def test_a_run_waits_until_the_run_its_answers_started_has_a_report():
     """A paused run stays until the run its answers started has a report (#1289)."""
     _, (paused, _) = _waiting_registry()
     resumed = Run(id="resumed")
-    paused.resumed_by = resumed
+    paused.resumed_run = resumed
 
     assert paused.waiting
     resumed.report = sample_report([])
@@ -2464,7 +2464,7 @@ def test_the_app_and_the_store_free_a_parent_alike(state, status):
     if state.get("report"):
         state = state | {"report": sample_report([])}
     resumed = Run(id="resumed", **state)
-    paused = Run(id="paused", checkpoint=HELD, resumed_by=resumed)
+    paused = Run(id="paused", checkpoint=HELD, resumed_run=resumed)
 
     store = InMemoryJobStore()
     held = JobRecord.create(
@@ -2592,8 +2592,7 @@ def test_the_page_opens_a_round_with_the_questions_the_service_counts(case):
         {"asvs": {"level": 2}},
         [],
         waiting=True,
-        answered=[],
-        answered_links=[],
+        answered=AnswerSet(),
         final=False,
         shown=[],
     )
@@ -2780,7 +2779,7 @@ class TestEarlierAnswers:
             headers=SAME_ORIGIN,
         )
         assert started.status_code == 409, started.text
-        assert seen[-1].resumed_by is None, "no run started on the old draft"
+        assert seen[-1].resumed_run is None, "no run started on the old draft"
 
     def test_a_request_over_the_limit_says_to_save_in_parts(self, tiers):
         client, _, report, _ = self.first_report(tiers, "yes")
