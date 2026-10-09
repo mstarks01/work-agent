@@ -36,6 +36,12 @@ taken. The first-run page lists those answers, and the questions route
 returns them as `carried_dropped`. An answer that the new rounds give
 replaces the carried one.
 
+**No list of dropped answers comes before the amendment starts.** Only the
+amended job's extraction builds the amended model, so before it the service
+cannot know which answers the new questions will not take. The page says,
+before the owner sends an amendment, that answers that still fit are kept. The
+amended job's first pause lists each one it dropped (#1561).
+
 **The amendment locks the paused job.** The amended job locks its parent as a
 resumed job does (`jobs.parent_of`, `jobs.locks_its_parent`). While it is in flight or has a report,
 the paused job takes no answer and no second amendment. Where it fails, the
