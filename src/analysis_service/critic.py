@@ -1059,7 +1059,7 @@ def _assertion_rows(draft: Claim, assertions: AssertionCatalog | None) -> list[d
     the two agents cannot be told two things about one fact.
 
     Empty for a draft citing none, and for every draft on a job that ran no
-    assertion catalog — which is every job with ``ANALYSIS_ASSERTIONS`` off.
+    assertion catalog, which is every job with ``ANALYSIS_ASSERTIONS`` off.
     """
     if assertions is None:
         return []

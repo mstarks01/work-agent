@@ -149,10 +149,9 @@ REQUIRE_CERTIFIED_VAR = "ANALYSIS_REQUIRE_CERTIFIED"
 COMPACT_EXTRACTION_VAR = "ANALYSIS_COMPACT_EXTRACTION"
 #: Run the assertion pass on every job: the ``assert`` node between the
 #: validity gate and ``prepare``, whose settled rows the evidence catalog
-#: offers and the report embeds (ADR 0036). Off by default, so an install that
-#: sets nothing runs the graph it always ran and spends nothing more. One
-#: variable and one restart is the rollback: a report built without the pass
-#: carries ``assertions: null`` and every other field it carried before.
+#: offers and the report embeds (ADR 0036). On by default (ADR 0075); a value
+#: other than an affirmative turns it off. A report built without the pass
+#: carries ``assertions: null`` and every other field it carries with it.
 ASSERTIONS_VAR = "ANALYSIS_ASSERTIONS"
 #: Read the sources facts-first (#1003 arm B): ``facts`` emits a **Source Fact
 #: Bundle** and ``resolve`` turns it into the model the validity gate reads and
@@ -277,7 +276,7 @@ class Deployment:
     #: Whether every job runs the assertion pass. A property of the deployment
     #: for the reason the transport is: a report with the pass and one without
     #: are compared with everything else held fixed.
-    assertions: bool = False
+    assertions: bool = True
     #: Whether every job runs the bounded source review. A property of the
     #: deployment for the reason the pass ahead of it is.
     source_review: bool = False
@@ -338,7 +337,7 @@ class Deployment:
                 COMPACT_FORMAT if env_flag(env, COMPACT_EXTRACTION_VAR) else FULL_FORMAT
             ),
             extraction_strategy=_strategy(env),
-            assertions=env_flag(env, ASSERTIONS_VAR),
+            assertions=env_flag(env, ASSERTIONS_VAR, default=True),
             source_review=env_flag(env, SOURCE_REVIEW_VAR),
             env=MappingProxyType(dict(env)),
         )

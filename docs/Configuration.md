@@ -1159,17 +1159,18 @@ restart.
 
 | Variable | Status | What it does |
 | --- | --- | --- |
-| `ANALYSIS_ASSERTIONS` | supported | Runs the assertion pass on every job (see below). |
+| `ANALYSIS_ASSERTIONS` | supported | Runs the assertion pass on every job. On by default; `false` turns it off (see below). |
 | `ANALYSIS_COMPACT_EXTRACTION` | experiment (#938) | Extraction writes a compact form that code expands into the same system model. |
-| `ANALYSIS_FACTS_FIRST_EXTRACTION` | experiment (#1003) | Extraction reads source facts first and code builds the model from them. It writes its own assertion rows, so it cannot be combined with `ANALYSIS_ASSERTIONS`. |
+| `ANALYSIS_FACTS_FIRST_EXTRACTION` | experiment (#1003) | Extraction reads source facts first and code builds the model from them. It writes its own assertion rows, so a deployment that selects it runs no assertion pass. |
 | `ANALYSIS_FACTS_SPLIT_EXTRACTION` | experiment (#1003) | The facts-first reading, split over two calls. It replaces the variable above. |
 | `ANALYSIS_SOURCE_REVIEW` | experiment (#1003) | A bounded second read of the sources against the model and the catalog. It needs a route that produces a catalog: `ANALYSIS_ASSERTIONS` or `ANALYSIS_FACTS_FIRST_EXTRACTION`. |
 
 Use the experiments only to measure them. Their results are recorded on the
 issues named in the table.
 
-**The assertion pass.** With `ANALYSIS_ASSERTIONS` on, an `assert` node runs
-after the model passes its validity check and before the lanes start. It reads
+**The assertion pass.** By default, an `assert` node runs after the model
+passes its validity check and before the lanes start. Set
+`ANALYSIS_ASSERTIONS=false` to turn it off. It reads
 the same sources as extraction and records what they state as **assertions**:
 one row for each fact, with its subject, its value, and the quote that supports
 it. Code checks each quote against the source text and drops a row whose quote
@@ -1184,7 +1185,8 @@ it cannot find. See [Concepts](Concepts.md#assertion) for what the rows do.
 - **Report.** A report from a job with the pass on carries an `assertions`
   block: the catalog of rows and the rows code refused. With the pass off, the
   block is `null`. See [Report Schema](Report-Schema.md).
-- **Rollback.** Unset the variable and restart. Nothing stored changes shape.
+- **Turn it off.** Set `ANALYSIS_ASSERTIONS=false` and restart. Nothing stored
+  changes shape.
 
 ### Provider environment
 

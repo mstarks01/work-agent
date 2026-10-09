@@ -26,6 +26,9 @@ def read_toml(path: Path | str, error: type[Exception]) -> dict[str, Any]:
         raise error(f"{path}: cannot be read: {exc}") from exc
 
 
-def env_flag(env: Mapping[str, str], var: str) -> bool:
-    """A boolean env flag, on only for an explicit affirmative."""
-    return env.get(var, "").strip().lower() in ("1", "true", "yes", "on")
+def env_flag(env: Mapping[str, str], var: str, *, default: bool = False) -> bool:
+    """A boolean env flag: ``default`` when unset or empty, else on only for an affirmative."""
+    value = env.get(var, "").strip().lower()
+    if not value:
+        return default
+    return value in ("1", "true", "yes", "on")

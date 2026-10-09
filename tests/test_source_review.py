@@ -168,7 +168,7 @@ class TestWhatTheBuilderRefuses:
 
     def test_an_install_asking_for_one_on_a_route_with_no_catalog(self) -> None:
         """The deployment computes the builder's rule rather than tripping it."""
-        assert arm(**{SOURCE_REVIEW_VAR: "true"}) == [
+        assert arm(**{SOURCE_REVIEW_VAR: "true", ASSERTIONS_VAR: "false"}) == [
             graph.EXTRACT_NODE,
             graph.PREPARE_NODE,
         ]
