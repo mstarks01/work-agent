@@ -83,20 +83,21 @@ _LEGAL_TRANSITIONS: dict[JobStatus, frozenset[JobStatus]] = {
 UNSPENT_STATUSES: frozenset[JobStatus] = frozenset({"failed", "rejected"})
 
 
-def held_parent(record: JobRecord) -> str | None:
-    """The job ``record`` holds: the one it resumes, or the one its amendment replaces.
+def parent_of(record: JobRecord) -> str | None:
+    """The parent of ``record``: the job it resumes, or the one its amendment replaces.
 
-    **The one reader of "which job does this one hold".** A resumed job and a
-    job an amendment started each stop their parent from taking answers while
-    they are in flight or have a report (ADR 0072).
+    **The one reader of "which job can this one lock".** A resumed job and a
+    job an amendment started each lock their parent, so the parent takes no
+    answers, while they are in flight or have a report (ADR 0072).
     """
     if record.resumption is not None:
         return record.resumption.parent_id
     return record.amends
 
 
-def holds_its_parent(status: JobStatus) -> bool:
-    """True where a resumed job in ``status`` keeps its parent from taking answers.
+def locks_its_parent(status: JobStatus) -> bool:
+    """True where a resumed job in ``status`` locks its parent: the parent takes
+    no answers.
 
     **The one reader of "does a resumed job spend its parent's answers".** The
     job store and the first-run app both ask it.
@@ -244,7 +245,7 @@ class JobRecord(BaseModel):
     # from these, and runs no extraction and no assertion pass.
     resumption: Resumption | None = None
     # Set on a job an amendment started (ADR 0072): the paused job whose
-    # description it extracts again with the amendment added. It holds that
+    # description it extracts again with the amendment added. It locks that
     # job as a resumed job does.
     amends: str | None = None
     # The parent job's round revision this job's answers were composed from.
@@ -587,7 +588,7 @@ class InMemoryJobStore:
         """
         if record.id in self._records:
             return Admission(outcome="duplicate", active=0)
-        parent = held_parent(record)
+        parent = parent_of(record)
         if parent is not None and self._resumed_by(parent) is not None:
             return Admission(outcome="resumed_already", active=0)
         parent_record = None if parent is None else self._records.get(parent)
@@ -650,22 +651,22 @@ class InMemoryJobStore:
         **The one reader of "does this job still take answers".** A job takes
         one resumed job: a report's follow-up runs the analysis once (ADR
         0054), and a paused job's answers start one analysis. A job an
-        amendment started holds its paused job the same way (ADR 0072). A
-        held job that failed or was rejected read nothing into a report, so
+        amendment started locks its paused job the same way (ADR 0072). A
+        child job that failed or was rejected read nothing into a report, so
         its parent takes answers again. Admission, a saved round and the questions route
         all ask this.
         """
         return next(
             (
-                held.id
-                for held in self._records.values()
-                if held_parent(held) == parent_id and holds_its_parent(held.status)
+                child.id
+                for child in self._records.values()
+                if parent_of(child) == parent_id and locks_its_parent(child.status)
             ),
             None,
         )
 
     async def resumed_by(self, job_id: str, subject: str) -> str | None:
-        """The ID of the owned job's resumed job that holds it, or ``None``.
+        """The ID of the owned job's resumed job that locks it, or ``None``.
 
         ``None`` too where the job is not the subject's, as every other read
         answers a foreign job.

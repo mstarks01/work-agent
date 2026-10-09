@@ -451,8 +451,12 @@ class TestTheBoundedRounds:
         from analysis_service.answer_round import next_round
 
         listed = _asked_after([]).early
-        held = {("", "", "", f"subject {n}", "", ""): ("stride",) for n in range(30)}
-        shown, remaining, withheld = next_round(listed, frozenset(held), held)
+        answered_for = {
+            ("", "", "", f"subject {n}", "", ""): ("stride",) for n in range(30)
+        }
+        shown, remaining, withheld = next_round(
+            listed, frozenset(answered_for), answered_for
+        )
         assert not [q for q in shown if q.kind != "capability"]
         assert remaining["field"] == 0
         assert len(withheld) == len([q for q in listed if q.kind != "capability"])
@@ -511,8 +515,10 @@ class TestTheBoundedRounds:
 
         listed = [capacity_of(n) for n in range(31)]
         answers = [FactAnswer(key=q.key, facets={"rate": "yes"}) for q in listed[:30]]
-        held = {q.key: q.frameworks for q in listed[:30]}
-        shown, remaining, withheld = next_round(listed, answered_keys(answers), held)
+        answered_for = {q.key: q.frameworks for q in listed[:30]}
+        shown, remaining, withheld = next_round(
+            listed, answered_keys(answers), answered_for
+        )
         per_round = EARLY_RULES["field"].per_round
         assert [q.key for q in shown] == [q.key for q in listed[:per_round]]
         assert remaining["field"] == 30

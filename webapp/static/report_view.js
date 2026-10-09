@@ -29,7 +29,7 @@
   const FALLBACK = JSON.parse(document.getElementById("question_fallback").textContent);
   // True for a report the follow-up wrote: it asks nothing more (ADR 0054).
   const FINAL = JSON.parse(document.getElementById("final").textContent);
-  // The run this report's follow-up started, where one holds it: the report
+  // The run this report's follow-up started, where one locks it: the report
   // then asks nothing, and its follow-up's report is the next one to read.
   const RESUMED_BY = JSON.parse(document.getElementById("resumed_by").textContent);
   // A final report's answers, the corrections kept beside it, and the

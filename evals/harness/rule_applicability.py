@@ -282,11 +282,11 @@ def simulate_questions(fixture: Fixture) -> QuestionRun:
         )
 
     before = unknown(model)
-    held: dict[UnknownKey, tuple[FrameworkName, ...]] = {}
+    answered_for: dict[UnknownKey, tuple[FrameworkName, ...]] = {}
     settled, keys, avoided, conformance, rounds = [], [], 0, 0, 0
     while True:
         shown, _, _ = next_round(
-            capability_questions(model, options), frozenset(held), held
+            capability_questions(model, options), frozenset(answered_for), answered_for
         )
         if not shown:
             break
@@ -297,7 +297,7 @@ def simulate_questions(fixture: Fixture) -> QuestionRun:
             key = key_ref(question.key).capability
             if key not in CAPABILITIES:
                 conformance += 1
-                held[question.key] = question.frameworks
+                answered_for[question.key] = question.frameworks
                 continue
             if question.parent in asked and given.get(question.parent) != "yes":
                 avoided += 1
@@ -306,7 +306,7 @@ def simulate_questions(fixture: Fixture) -> QuestionRun:
                 key=question.key, value=_ANSWER[fixture.truth.get(key, "unknown")]
             )
             given[question.key] = answer.value
-            held[question.key] = question.frameworks
+            answered_for[question.key] = question.frameworks
             count = unknown(model)
             model = answered_model(model, [answer])
             settled.append(count - unknown(model))
