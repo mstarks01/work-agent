@@ -1118,11 +1118,10 @@ class ExtractionScore:
         """Scored fields the reference carries, whether or not one was compared.
 
         The denominator :attr:`attributes_compared` is a subset of. An element
-        the extraction named differently leaves the comparison entirely, taking
-        its attributes with it, so agreement can be *improved* by dropping the
-        elements whose facts are hardest to get right — five renamed flows take
-        25 of case 01's 47 fields out of the numerator and the denominator
-        together (#925).
+        the alignment cannot pair leaves the comparison entirely, taking its
+        attributes with it, so agreement can be *improved* by dropping the
+        elements whose facts are hardest to get right (#925). The count beside
+        the figure is what makes that drop visible.
         """
         return self.blessed_scored_fields
 
@@ -1141,9 +1140,11 @@ class ExtractionScore:
         """What fraction of the reference's scored fields was compared at all.
 
         Read beside every agreement above it. A high agreement over a low
-        coverage is a statement about the elements that happened to align, and
-        alignment here is exact-ID: a renamed element is not compared, not
-        compared leniently.
+        coverage is a statement about the elements that happened to align.
+        The pairs come from :mod:`evals.harness.alignment`, so an element found
+        under a reader's alias, a zone found by its members and a sole flow
+        between paired endpoints are compared; an element no rule pairs is
+        not compared, not compared leniently.
         """
         total = self.attributes_comparable
         return self.attributes_compared / total if total else 0.0
