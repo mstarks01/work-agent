@@ -2194,6 +2194,16 @@ class Refusal(NamedTuple):
     reason: str
 
 
+def deferral_reason(kind: str) -> str:
+    """The reason a deferred unit's scope entry states.
+
+    It says a lane raised the unit, never that the unit applies: the lane's
+    ``question`` directs a question, and the applicability rule may still
+    read ``unknown`` on the unit.
+    """
+    return f"a lane raised it, and settling it needs {kind}"
+
+
 class ScopeEntry(BaseModel):
     """One unit a framework raised no claim about.
 
@@ -2580,7 +2590,7 @@ class FrameworkAnalysis(BaseModel):
                     ScopeEntry(
                         unit=unit,
                         state="needs-other-evidence",
-                        reason=f"applies, and settling it needs {kind}",
+                        reason=deferral_reason(kind),
                         needs=kind,
                     )
                     for unit, kind in deferred.items()
