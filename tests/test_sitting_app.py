@@ -1359,8 +1359,11 @@ class TestTheDraftSurvivesTheProcess:
         app.post("/api/own-list", json={"case": CASE, "items": OWN_LIST})
         held = json.loads(draft_file(tree, CASE).read_text("utf-8"))
         case_dir = tree / "evals" / "corpus" / CASE
-        declared = json.loads((case_dir / "case.json").read_text("utf-8"))["frameworks"]
-        wanted = sittings.required_files(item["name"] for item in declared)
+        declared = json.loads((case_dir / "case.json").read_text("utf-8"))
+        wanted = sittings.required_files(
+            (source["file"] for source in declared["sources"]),
+            (item["name"] for item in declared["frameworks"]),
+        )
         assert set(held["opened_digests"]) == set(wanted)
         for name, digest in held["opened_digests"].items():
             assert hashlib.sha256((case_dir / name).read_bytes()).hexdigest() == digest

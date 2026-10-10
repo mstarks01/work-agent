@@ -427,13 +427,13 @@ class TestWhatTheFindingsRestOn:
         return bottleneck.placement_reliance(CORPUS)
 
     def test_every_case_is_counted(self, reliance) -> None:
-        assert len(reliance) == 13
-        assert sum(one.must_finds for one in reliance) == 153
+        assert len(reliance) == 14
+        assert sum(one.must_finds for one in reliance) == 161
 
     def test_two_in_five_must_finds_rest_on_an_inferred_crossing(
         self, reliance
     ) -> None:
-        assert sum(one.assumed for one in reliance) == 60
+        assert sum(one.assumed for one in reliance) == 64
 
     def test_one_in_seven_rests_on_a_crossing_of_two_guesses(self, reliance) -> None:
         assert sum(one.wholly for one in reliance) == 20

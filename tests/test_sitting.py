@@ -14,11 +14,13 @@ refusals, the token, and the shape of each reply.
 
 from __future__ import annotations
 
+import re
 from typing import get_args
 
 import pytest
 from pydantic import ValidationError
 
+from evals import build_review_docs as docs
 from evals.harness import sitting as sittings
 from evals.harness.reference import ANONYMOUS
 from evals.harness.sitting import Draft, Store
@@ -301,3 +303,20 @@ class TestUnsureIsAnAnswer:
     def test_a_value_outside_the_set_is_still_refused(self, store):
         with pytest.raises(ValidationError):
             sittings.Draft(case=CASE, marks={"v3:abc": "maybe"})
+
+
+class TestASittingReadsEverySource:
+    def test_a_second_source_is_pinned_beside_the_first(self):
+        """A transcript the reader is shown is a file the record signs."""
+        case_dir = sittings.CORPUS_DIR / "16-library-lending-interview"
+        prepared = sittings.prepare(case_dir)
+        assert prepared.shared_files == ["source.md", "transcript.md", "model.json"]
+        assert set(prepared.shared_files) <= set(prepared.files)
+
+    def test_the_reading_document_pins_the_files_the_app_pins(self):
+        """Two readers of one rule, held to each other over every case."""
+        for case_dir in sorted(sittings.CORPUS_DIR.iterdir()):
+            meta = docs.load_meta(case_dir / "case.json")
+            closing = docs.closing(case_dir.name, meta)
+            pinned = re.findall(r'^\s+"([^"]+)": "[0-9a-f]{64}"', closing, re.MULTILINE)
+            assert pinned == sittings.prepare(case_dir).files, case_dir.name

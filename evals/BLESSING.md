@@ -10,7 +10,7 @@ bookkeeping around it.
 > is free, offline, and open to outside contributors. New here? Start at
 > [`../CONTRIBUTING.md`](../CONTRIBUTING.md).
 
-> **A person has read every case but the two holdout cases.** All 15 cases in
+> **A person has read every case but the two holdout cases and case 16.** All 16 cases in
 > `evals/corpus/` were written by an agent. On 2026-09-21 a single **Case
 > Sitting** cleared the first 13: 130 own-list threats written blind, then all 344 recorded claims
 > marked — 233 `agree`, 61 `unsure`, 26 `reject`, 24 `duplicate`. Two

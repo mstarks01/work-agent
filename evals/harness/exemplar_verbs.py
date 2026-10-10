@@ -9,11 +9,11 @@ over-report at once.
 
 ## The measurement
 
-STRIDE ships 19 exemplars, and the corpus holds 272 reference claims. No
-exemplar is read from a holdout case (#744), so this reads the 242 in the
+STRIDE ships 19 exemplars, and the corpus holds 284 reference claims. No
+exemplar is read from a holdout case (#744), so this reads the 254 in the
 tuned cases.
 46 of those claims name a verb no exemplar in their lane demonstrates.
-18 of the 46 are ``must-find``, and all 13 cases carry at least one.
+18 of the 46 are ``must-find``, and 13 of the 14 tuned cases carry at least one.
 
 They split into two populations, and each wants a different answer:
 
