@@ -245,6 +245,8 @@ looked". The complement is not derived — every unit appears.
 - `not-raised` — no lane filed a claim on the unit. A fact about the output,
   not a verdict that the unit applies: the lanes were handed the unit and
   filed nothing, and nothing in the report certifies that they weighed it.
+  Where the package's own rule applied the unit, the entry says so in its
+  reason, so a reader can tell a gap in the output from an open question.
 - `needs-other-evidence` — a lane raised the unit, and the service withheld
   the claim because settling it needs evidence of a kind the job does not
   carry: `code`, `config` or `people`, where a job carries `prose`. The

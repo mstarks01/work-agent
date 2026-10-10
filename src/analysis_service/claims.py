@@ -2194,6 +2194,12 @@ class Refusal(NamedTuple):
     reason: str
 
 
+#: The reason a ``not-raised`` entry states when the package's own rule applied
+#: the unit and no lane filed on it: the row is a gap in the output, not an
+#: open question.
+RULED_IN_UNRAISED_REASON = "applies by the service's rule, and no lane filed on it"
+
+
 def deferral_reason(kind: str) -> str:
     """The reason a deferred unit's scope entry states.
 
@@ -2551,6 +2557,7 @@ class FrameworkAnalysis(BaseModel):
         refusal: Refusal | None = None,
         deferred: Mapping[str, str] = MappingProxyType({}),
         ruled_out: Mapping[str, str] = MappingProxyType({}),
+        ruled_in: Mapping[str, str] = MappingProxyType({}),
     ) -> list[ScopeEntry]:
         """What this framework raised no claim about.
 
@@ -2577,9 +2584,12 @@ class FrameworkAnalysis(BaseModel):
         nothing, which is every package whose claims rest on the system's own
         shape. It arrives here rather than being recomputed because the fan-in
         is where the proposals were, and a second derivation could disagree with
-        the first.
+        the first. ``ruled_in`` maps a unit the package's rules applied to the
+        reason, from :meth:`Claim.ruled_in`; a package that answers in its own
+        units states it on a unit no lane filed on, and the base, which lists
+        only the exceptions, has no such entry.
         """
-        del claims, options
+        del claims, options, ruled_in
         if refusal is None:
             return [
                 *(

@@ -1040,6 +1040,24 @@ class TestScopeEntryNamesWhatWouldSettleIt:
 
         assert entry.needs == "code"
 
+    def test_a_ruled_in_unit_nobody_filed_on_says_so(self):
+        """The rule applied it and no lane filed: a gap in the output, not an
+        open question, and the entry's reason says which."""
+        from analysis_service.claims import RULED_IN_UNRAISED_REASON
+        from analysis_service.frameworks.asvs.record import AsvsAnalysis
+
+        entries = AsvsAnalysis.scope_entries(
+            lanes=["authentication"],
+            claims=[],
+            options={"level": 1},
+            ruled_in={"V1.2.1": "Applies: the rule says so."},
+        )
+        by_unit = {entry.unit: entry for entry in entries}
+
+        assert by_unit["V1.2.1"].state == "not-raised"
+        assert by_unit["V1.2.1"].reason == RULED_IN_UNRAISED_REASON
+        assert by_unit["V1.2.2"].reason == ""
+
     def test_a_deferred_entry_must_name_one(self):
         with pytest.raises(ValidationError, match="must name the evidence"):
             ScopeEntry(

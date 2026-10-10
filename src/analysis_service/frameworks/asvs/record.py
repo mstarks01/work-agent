@@ -47,6 +47,7 @@ from analysis_service.capabilities import (
     open_capability_needs,
 )
 from analysis_service.claims import (
+    RULED_IN_UNRAISED_REASON,
     ApplicabilityEntry,
     BlockSummary,
     Claim,
@@ -602,6 +603,7 @@ class AsvsAnalysis(FrameworkAnalysis):
         refusal: Refusal | None = None,
         deferred: Mapping[str, str] = MappingProxyType({}),
         ruled_out: Mapping[str, str] = MappingProxyType({}),
+        ruled_in: Mapping[str, str] = MappingProxyType({}),
     ) -> list[ScopeEntry]:
         """Every requirement in the selected level this block raised no claim about.
 
@@ -618,6 +620,9 @@ class AsvsAnalysis(FrameworkAnalysis):
           ``undecidable`` for an input that never said.
         * satisfied — every requirement no claim, deferral or rule covers is
           ``not-raised``: no lane filed on it, which is all the block knows.
+          Where the applicability rule applied the unit, the entry says so in
+          its reason, so the row reads as a gap in the output and not as an
+          open question.
         """
         del lanes
         # Through the package's own options model rather than by reading the key,
@@ -634,7 +639,8 @@ class AsvsAnalysis(FrameworkAnalysis):
                     deferral_reason(deferred[requirement.id])
                     if requirement.id in deferred
                     else ""
-                ),
+                )
+                or (RULED_IN_UNRAISED_REASON if requirement.id in ruled_in else ""),
                 needs=(
                     ""
                     if refusal or requirement.id in ruled_out

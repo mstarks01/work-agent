@@ -1519,7 +1519,7 @@ def test_a_unit_part_that_is_a_digit_but_not_a_decimal_sorts_as_text():
 
 def test_a_ruling_that_a_unit_does_not_apply_sits_on_the_units_row():
     """An `evidence` rejection rules on the unit its draft names, so the page
-    shows it as "Does not apply" on the requirement's row and keeps it out of
+    shows it as "Excluded by review" on the requirement's row and keeps it out of
     the dismissed list. Only a block that answers in units reads it so: for an
     open-set framework an `evidence` rejection is a draft that failed on its
     own substance, and the page has no row to hang it on. The page draws into
@@ -1531,11 +1531,13 @@ def test_a_ruling_that_a_unit_does_not_apply_sits_on_the_units_row():
     assert '(c.verdict.rejected_because ?? "evidence") === "evidence"' in script
     assert "answersInUnits(block) &&" in script, "gated on the block answering in units"
     assert (
-        'SCOPE_STATE["not-applicable"]'
+        "REVIEW_EXCLUDED"
         in script.split("function unitTable")[1].split("function renderBlock")[0]
-    ), "the requirement row reads the ruling as Does not apply"
+    ), "the requirement row reads the ruling as Excluded by review"
     assert "dismissed.forEach" in script, "the dismissed list is the rest"
-    assert '"Does not apply"]] : []' in script, "the tile exists only where units do"
+    assert '"Excluded by review"]] : []' in script, (
+        "the tile exists only where units do"
+    )
 
 
 def test_a_run_whose_runner_cannot_be_built_names_the_setting():
