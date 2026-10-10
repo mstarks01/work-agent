@@ -58,9 +58,12 @@ fix owes. See "Offline completion and paid runs" in `AGENTS.md`.
 | Lane closing on cases 02, 05, 10: needs-info, confirmed, open facts | 38 to 78, 6 to 6, 28 to 44 | ledger `QA-2026-09-26-02-E1` |
 | Share of needs-info findings six ranked questions settle (cases 02, 05, 10) | 53% without the closing, 24% with it; ten settle 38% | ledger `QA-2026-09-26-03-E6` |
 
-The holdout figure measures agreement with references that nobody has read yet
-(see open work below). The corpus spread is about 3.4 must-finds per sweep, so
-one sweep cannot separate a change smaller than that from sampling.
+The holdout figure measures agreement with a read reference: a sitting read
+both holdout cases on 2026-10-03 (#1436), their rulings were applied (#1439),
+and a confirming sitting cleared the changed rows on 2026-10-04 (#1453). The
+spread of the holdout cases is unread (see open work below). The corpus spread
+is about 3.4 must-finds per sweep, so one sweep cannot separate a change
+smaller than that from sampling.
 
 ## Mechanisms in the pipeline
 
@@ -122,6 +125,7 @@ fan-in loss.
 | Findings the lane closing added | Voted: of 50 findings that match no reference, 1 up, 7 down and 42 need evidence; the cost side of ADR 0030 waits on answers to the open facts | `QA-2026-10-05-02-E4` |
 | One attack filed in two lanes | 28 of 30 duplicate votes have a partner in another lane at the same place; a shared control does not separate them (it fires on 92 claims voted as their own finding to catch 19); no field-level rule found | `QA-2026-10-05-02-E5` |
 | Full 15-case sweep with the lane closing | About $5.50; gives the first holdout reading with the closing | after OpenRouter credits allow |
+| Spread of the holdout cases | Five analysis runs per holdout case on one execution identity, about $3.50 at the 2026-10-02 preflight charges ($0.38 for case 14, $0.32 for case 15); the archive holds four readings of each case over two builds and three prompt states | #744 |
 | Intake questions | Ranking design measured offline; not built | #1225 |
 | Readable report remainder | Plain summaries and progressive disclosure | #561 |
 | Assertion flag and reference edits | Parked by decision | #1231 |
