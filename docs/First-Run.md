@@ -34,7 +34,7 @@ are the reference pairs declared in `analysis_service.conformance.REFERENCE_MODE
 | Bedrock | `global.anthropic.claude-sonnet-4-6` | `global.anthropic.claude-opus-5-5` | `ANALYSIS_BEDROCK_API_KEY_FILE`, `ANALYSIS_BEDROCK_REGION` |
 | Gemini | `gemini-2.5-flash` | `gemini-2.5-pro` | `ANALYSIS_GEMINI_API_KEY_FILE` |
 | OpenAI | `gpt-4o-2024-08-06` | `gpt-5.6-sol` | `ANALYSIS_OPENAI_API_KEY_FILE` |
-| OpenRouter | `anthropic/claude-sonnet-5` | `anthropic/claude-opus-4.7` | `ANALYSIS_OPENROUTER_API_KEY_FILE` |
+| OpenRouter | `anthropic/claude-sonnet-5` | `anthropic/claude-opus-5.5` | `ANALYSIS_OPENROUTER_API_KEY_FILE` |
 | Vertex AI | `gemini-2.5-flash` | `gemini-2.5-pro` | `ANALYSIS_VERTEX_PROJECT`, `ANALYSIS_VERTEX_LOCATION` |
 
 <!-- /every-vendor -->

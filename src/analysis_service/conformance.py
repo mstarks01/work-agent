@@ -179,7 +179,7 @@ REFERENCE_MODELS: dict[str, tuple[str, ...]] = {
     # the direct route and report it as the gateway's. These two have
     # ``openrouter`` entries of their own, so every cell below is about the
     # route that would actually serve.
-    "openrouter": ("anthropic/claude-sonnet-5", "anthropic/claude-opus-4.7"),
+    "openrouter": ("anthropic/claude-sonnet-5", "anthropic/claude-opus-5.5"),
     # The same identifiers as the ``gemini`` row, behind a location the
     # operator supplies. On Vertex the endpoint is a location and never a
     # segment of the model name, so nothing about the endpoint reaches this
@@ -318,9 +318,9 @@ def _probe_structured_output(vendor: Vendor, model: str) -> Capability:
     **``UNKNOWN`` is the third answer.** LiteLLM's boolean lookup returns
     ``False`` both for a map entry that says no and for one that says nothing,
     so this does not read it. A silent entry is ``UNKNOWN``: for example,
-    ``openrouter/anthropic/claude-sonnet-4.6`` has a silent entry and honours a
-    schema when asked. The module's own header calls rendering an unknown as
-    ``UNSUPPORTED`` "inventing a fact".
+    ``openrouter/anthropic/claude-3.7-sonnet`` has a silent entry, and the
+    lookup answers ``False`` for it. The module's own header calls rendering
+    an unknown as ``UNSUPPORTED`` "inventing a fact".
 
     :attr:`ProviderProfile.known` could not catch it: that flag is per *entry*,
     and this pair has an entry. Coverage has to be answered per capability.
