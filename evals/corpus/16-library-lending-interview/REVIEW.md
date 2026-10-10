@@ -299,7 +299,7 @@ on either of them. That is the finding this sitting exists for.
 
 - `flow:entity:member>process:lending-api>borrow-renew-and-reserve`, `entity:member`
 - severity: medium/low · verb: `unattributable`
-- It follows from the same unknown as the spoofing must-find. It stays separate because the question differs: who acted, not who could act.
+- It follows from the same unknown as the spoofing claim. It stays separate because the question differs: who acted, not who could act.
 
 > mark:
 
@@ -425,7 +425,7 @@ your missing list, your notes and a digest of each file you read:
       "transcript.md": "c48f8b9e53090b42971ffb548ed2302d0021a8c2b8539552973211c21df3f765",
       "model.json": "4f8389ff5391fef68fb20eccc45cf5ba18d5f0692da02ac9347b416f127bef87",
       "claims/asvs.json": "617a68c8e31065f8886e8b544ee4c67b63eaa7e43c769cd179d35b437443f8d7",
-      "claims/stride.json": "ede0d6c741edf22c7e156c4f59101b3a17c345f9aa162c9f4a6dff9b6d77ed29"
+      "claims/stride.json": "a01fbfb9c7d112851237fa8a0e4a04e3a5cc623339f3bd7cbb87ca72598cdefb"
       }
     }
   }
