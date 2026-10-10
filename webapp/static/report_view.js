@@ -226,6 +226,13 @@
       "The unit applies and this input cannot settle it. Supplying the evidence named below can."],
   };
 
+  // A claim the critic rejected for `evidence` rules its unit out, and the
+  // page says which reader did it: the lane excluded it and the critic
+  // agreed, while "Does it apply here?" on the same row still carries the
+  // rule's own answer, which may be unknown.
+  const REVIEW_EXCLUDED = ["Excluded by review",
+    "A lane excluded it and the critic agreed. The rule's own answer is above."];
+
   // The same for a claim's verdict, in this service's terms rather than the
   // schema's. No verdict here reports a pass, and the wording says so.
   const VERDICT_STATE = {
@@ -633,7 +640,7 @@
       const entry = byUnit[row.unit];
       const [label, meaning] = claim
         ? (rulesOut(block, claim)
-            ? SCOPE_STATE["not-applicable"]
+            ? REVIEW_EXCLUDED
             : (VERDICT_STATE[claim.verdict.status] || ["Ruled", ""]))
         : (SCOPE_STATE[entry ? entry.state : "not-raised"] || ["Listed", ""]);
 
@@ -704,7 +711,7 @@
     [
       [block.summary.claim_count, "Actionable claims"],
       [block.summary.needs_info_count, "Needs info"],
-      ...(answersInUnits(block) ? [[ruledOutClaims.length, "Does not apply"]] : []),
+      ...(answersInUnits(block) ? [[ruledOutClaims.length, "Excluded by review"]] : []),
       [dismissed.length, "Rejected"],
       [deferredCount, "Needs other evidence"],
     ].forEach(([n, k]) => {

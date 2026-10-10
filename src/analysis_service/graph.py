@@ -2593,6 +2593,7 @@ def _framework_block(
             refusal=refusal,
             deferred=state.get(nodes.key("deferred")) or {},
             ruled_out=state.get(nodes.key("ruled_out")) or {},
+            ruled_in=state.get(nodes.key("ruled_in")) or {},
         ),
         # A refused precondition answers for every unit in the scope already.
         applicability=(
