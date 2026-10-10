@@ -108,7 +108,7 @@ Not part of the question, but the records cite these names, so you need them.
 
 | id | exposure | interface | zone | technology |
 |---|---|---|---|---|
-| process:lending-api | unknown | web | boundary:council-data-centre | a plain REST service, JSON in and JSON out |
+| process:lending-api | internet-facing | web | boundary:council-data-centre | a plain REST service, JSON in and JSON out |
 | process:self-service-kiosk | unknown | unknown | boundary:branch-network | unknown |
 
 **Data stores**
@@ -136,7 +136,7 @@ Not part of the question, but the records cite these names, so you need them.
 
 **Recorded notes** — hedges, probed gaps and source disagreements live here, so read them before the sets.
 
-- `process:lending-api` — The two sources disagree on exposure, so the value is unknown and both claims are kept. Lending service note: "The lending API is internal-only." Interview transcript, Priya: "The phones talk straight to the lending API over the internet." Priya on load: "the API is one service with no queue in front of it"; it went down twice last summer on the reading challenge launch day.
+- `process:lending-api` — The transcript corrects the note on exposure. Lending service note: "The lending API is internal-only." Interview transcript, Dan quotes that line and Priya answers: "That is one of the wrong bits. The phones talk straight to the lending API over the internet. We opened it up last year when the app moved off the council's old portal, and nobody updated the note because nobody owns the note." The note describes the service before that change, so exposure is internet-facing. Neither source states which operations a call from the internet can reach. Priya on load: "the API is one service with no queue in front of it"; it went down twice last summer on the reading challenge launch day.
 - `process:self-service-kiosk` — What else the kiosks talk to was asked and not answered. Dan asked: "Do the kiosks still write straight into the loans database, the way the old ones did?" Priya: "The kiosks are Dev's team's area. I couldn't tell you what they talk to these days." A question states no fact, so the model holds no kiosk-to-database flow.
 - `store:loans-database` — Priya corrected herself in one turn: "It writes to the two databases— actually, no. We merged those in the spring. It's one loans database now." The later statement stands, so the model holds one database.
 - `flow:entity:member>process:lending-api>borrow-renew-and-reserve` — Authentication was asked about and answered with a hedge, so it stays unknown. Priya: "I think it checks a token the app gets at sign-in, but I'd have to look." and "Honestly I could not tell you today what it accepts, or what it does with a call it does not like."
@@ -295,11 +295,11 @@ on either of them. That is the finding this sitting exists for.
 
 > mark:
 
-**6.** If the lending API does not tie each renewal and reservation to the authenticated member in a record it can trust, a member denies one and nothing settles it.
+**6.** If the API does not keep trustworthy records tying renewals and reservations to authenticated members, a member could deny an action and the service may be unable to attribute it reliably.
 
 - `flow:entity:member>process:lending-api>borrow-renew-and-reserve`, `entity:member`
 - severity: medium/low · verb: `unattributable`
-- It follows from the same unknown as the spoofing claim. It stays separate because the question differs: who acted, not who could act.
+- Caller authentication and trustworthy records of each action are separate controls, and neither source states either one. The question differs from the spoofing claim: who acted, not who could act.
 
 > mark:
 
@@ -336,22 +336,22 @@ on either of them. That is the finding this sitting exists for.
 
 ### elevation-of-privilege
 
-**10.** If the lending API does not check for a staff role on its manual-return, block-clearing and extension operations, a member or an unauthenticated caller from the internet invokes them.
+**10.** If a member or unauthenticated caller can reach the API's manual-return, block-clearing or extension operations and the API fails to enforce staff authorization, that caller could perform staff-only changes.
 
 - `process:lending-api`, `flow:entity:member>process:lending-api>borrow-renew-and-reserve`
 - severity: medium/high · verb: `escalate`
-- The circulation page and the app's calls reach one API, and neither source states a role check or which operations a call from the app can reach. Exposure is unknown, because the note and the transcript disagree on it. The transcript still puts the member flow on the internet. An extraction that believes the note and writes internal removes the internet caller from this finding.
+- The transcript puts the lending API on the internet, and the circulation page and the app's calls reach one API. Neither source states which operations a call from outside the branch network can reach, or a staff role check. An extraction that believes the superseded note and writes internal removes the internet caller from this finding.
 
 > mark:
 
 
 ### tampering
 
-**11.** A desk worker marks an unreturned book as returned, clears a justified block or extends a loan on purpose, through the circulation page, with the powers the desk already has.
+**11.** A desk worker marks an unreturned book as returned, clears a justified block or grants an improper extension on purpose, through the circulation page, with the powers the desk already has.
 
 - `flow:entity:desk-staff>process:lending-api>change-loans-by-hand`, `store:loans-database`
 - severity: medium/high · verb: `alter`
-- Desk staff hold these powers by the note, so this is misuse of a grant, not an escalation. The shared login makes it hard to detect, which is the repudiation claim on the same flow.
+- Desk staff hold these powers by the note, so this is misuse of a grant, not an escalation. The shared login stops the change being traced to a person or a branch, which is the repudiation claim on the same flow.
 
 > mark:
 
@@ -423,9 +423,9 @@ your missing list, your notes and a digest of each file you read:
       "opened_digests": {
       "source.md": "8bc51704b4514584c02f95f04048086a70f43a3dbb2c40af53afe13b3f79e6a9",
       "transcript.md": "c48f8b9e53090b42971ffb548ed2302d0021a8c2b8539552973211c21df3f765",
-      "model.json": "4f8389ff5391fef68fb20eccc45cf5ba18d5f0692da02ac9347b416f127bef87",
+      "model.json": "273a81ef4f52e7b84a64bdff2e15815383b51ccdf5d4def8a6e49f186f068563",
       "claims/asvs.json": "617a68c8e31065f8886e8b544ee4c67b63eaa7e43c769cd179d35b437443f8d7",
-      "claims/stride.json": "a01fbfb9c7d112851237fa8a0e4a04e3a5cc623339f3bd7cbb87ca72598cdefb"
+      "claims/stride.json": "87120ad43f66af05e1a80a1dcd9cc93bbbc794b7d9d9f1c154b60dd15f2c97cc"
       }
     }
   }

@@ -203,27 +203,6 @@
         "subject_type": "component",
         "subject": "process:lending-api",
         "predicate": "internet-exposure",
-        "value": "internal",
-        "reason": null,
-        "scope": [],
-        "basis": "stated",
-        "quotes": [
-          {
-            "source_label": "Lending service note",
-            "quote": "The lending API is internal-only."
-          }
-        ],
-        "explanation": "",
-        "exclusive": false
-      },
-      "rationale": "The note states it. The transcript states the opposite in the next row, so the two rows conflict and the blessed value is unknown.",
-      "reviewed_by": null
-    },
-    {
-      "assertion": {
-        "subject_type": "component",
-        "subject": "process:lending-api",
-        "predicate": "internet-exposure",
         "value": "internet-facing",
         "reason": null,
         "scope": [],
@@ -231,13 +210,13 @@
         "quotes": [
           {
             "source_label": "Interview transcript",
-            "quote": "The phones talk straight to the lending API over the internet."
+            "quote": "That is one of the wrong bits. The phones talk straight to the lending API over the internet."
           }
         ],
         "explanation": "",
         "exclusive": false
       },
-      "rationale": "The transcript states it. It conflicts with the note's row above. Neither source says which one holds, so the two rows stand side by side.",
+      "rationale": "The transcript states it, and it corrects the note: Dan quotes the note's \"The lending API is internal-only.\" and Priya calls it one of the wrong bits. The note describes the service before the API was opened up last year, so its claim does not stand against this one.",
       "reviewed_by": null
     },
     {

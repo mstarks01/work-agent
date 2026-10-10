@@ -79,13 +79,13 @@
       "flow:entity:member>process:lending-api>borrow-renew-and-reserve",
       "entity:member"
     ],
-    "claim": "If the lending API does not tie each renewal and reservation to the authenticated member in a record it can trust, a member denies one and nothing settles it.",
+    "claim": "If the API does not keep trustworthy records tying renewals and reservations to authenticated members, a member could deny an action and the service may be unable to attribute it reliably.",
     "tier": "expected",
     "severity": {
       "likelihood": "medium",
       "impact": "low"
     },
-    "notes": "It follows from the same unknown as the spoofing claim. It stays separate because the question differs: who acted, not who could act.",
+    "notes": "Caller authentication and trustworthy records of each action are separate controls, and neither source states either one. The question differs from the spoofing claim: who acted, not who could act.",
     "verb": "unattributable"
   },
   {
@@ -137,13 +137,13 @@
       "process:lending-api",
       "flow:entity:member>process:lending-api>borrow-renew-and-reserve"
     ],
-    "claim": "If the lending API does not check for a staff role on its manual-return, block-clearing and extension operations, a member or an unauthenticated caller from the internet invokes them.",
+    "claim": "If a member or unauthenticated caller can reach the API's manual-return, block-clearing or extension operations and the API fails to enforce staff authorization, that caller could perform staff-only changes.",
     "tier": "must-find",
     "severity": {
       "likelihood": "medium",
       "impact": "high"
     },
-    "notes": "The circulation page and the app's calls reach one API, and neither source states a role check or which operations a call from the app can reach. Exposure is unknown, because the note and the transcript disagree on it. The transcript still puts the member flow on the internet. An extraction that believes the note and writes internal removes the internet caller from this finding.",
+    "notes": "The transcript puts the lending API on the internet, and the circulation page and the app's calls reach one API. Neither source states which operations a call from outside the branch network can reach, or a staff role check. An extraction that believes the superseded note and writes internal removes the internet caller from this finding.",
     "verb": "escalate"
   },
   {
@@ -152,13 +152,13 @@
       "flow:entity:desk-staff>process:lending-api>change-loans-by-hand",
       "store:loans-database"
     ],
-    "claim": "A desk worker marks an unreturned book as returned, clears a justified block or extends a loan on purpose, through the circulation page, with the powers the desk already has.",
+    "claim": "A desk worker marks an unreturned book as returned, clears a justified block or grants an improper extension on purpose, through the circulation page, with the powers the desk already has.",
     "tier": "must-find",
     "severity": {
       "likelihood": "medium",
       "impact": "high"
     },
-    "notes": "Desk staff hold these powers by the note, so this is misuse of a grant, not an escalation. The shared login makes it hard to detect, which is the repudiation claim on the same flow.",
+    "notes": "Desk staff hold these powers by the note, so this is misuse of a grant, not an escalation. The shared login stops the change being traced to a person or a branch, which is the repudiation claim on the same flow.",
     "verb": "alter"
   },
   {

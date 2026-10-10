@@ -36,9 +36,9 @@
       "source_label": "Lending service note",
       "technology": "a plain REST service, JSON in and JSON out",
       "trust_zone": "boundary:council-data-centre",
-      "exposure": "unknown",
+      "exposure": "internet-facing",
       "interface_kind": "web",
-      "notes": "The two sources disagree on exposure, so the value is unknown and both claims are kept. Lending service note: \"The lending API is internal-only.\" Interview transcript, Priya: \"The phones talk straight to the lending API over the internet.\" Priya on load: \"the API is one service with no queue in front of it\"; it went down twice last summer on the reading challenge launch day."
+      "notes": "The transcript corrects the note on exposure. Lending service note: \"The lending API is internal-only.\" Interview transcript, Dan quotes that line and Priya answers: \"That is one of the wrong bits. The phones talk straight to the lending API over the internet. We opened it up last year when the app moved off the council's old portal, and nobody updated the note because nobody owns the note.\" The note describes the service before that change, so exposure is internet-facing. Neither source states which operations a call from the internet can reach. Priya on load: \"the API is one service with no queue in front of it\"; it went down twice last summer on the reading challenge launch day."
     },
     {
       "id": "process:self-service-kiosk",
