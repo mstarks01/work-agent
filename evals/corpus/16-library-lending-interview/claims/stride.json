@@ -1,0 +1,195 @@
+[
+  {
+    "category": "spoofing",
+    "affected_element_ids": [
+      "flow:entity:member>process:lending-api>borrow-renew-and-reserve",
+      "entity:member"
+    ],
+    "claim": "If the lending API does not authenticate calls from the app, an attacker borrows, renews or reserves books as another member.",
+    "tier": "must-find",
+    "severity": {
+      "likelihood": "medium",
+      "impact": "medium"
+    },
+    "notes": "The hedge this case exists for. Priya's answer about the token is a hedge, so authentication is unknown and the finding is conditional. An extraction that records the hedged token as the value suppresses this finding.",
+    "verb": "impersonate"
+  },
+  {
+    "category": "spoofing",
+    "affected_element_ids": [
+      "flow:process:self-service-kiosk>process:lending-api>record-loans-and-returns",
+      "process:self-service-kiosk"
+    ],
+    "claim": "If the lending API does not authenticate kiosks and check what each one may record, an attacker who reaches the kiosk operations forges loans and returns.",
+    "tier": "expected",
+    "severity": {
+      "likelihood": "medium",
+      "impact": "medium"
+    },
+    "notes": "Neither source states how a kiosk authenticates to the API. The kiosks sit on the branch network, which is the network desk staff also use.",
+    "verb": "impersonate"
+  },
+  {
+    "category": "spoofing",
+    "affected_element_ids": [
+      "flow:entity:desk-staff>process:lending-api>change-loans-by-hand",
+      "entity:desk-staff"
+    ],
+    "claim": "An attacker who reads the shared desk password off the card taped under a desk signs in to the circulation page as desk staff.",
+    "tier": "expected",
+    "severity": {
+      "likelihood": "medium",
+      "impact": "medium"
+    },
+    "notes": "Stated outright: the password is on a card under the desk. The likelihood depends on who stands behind a desk, which neither source states.",
+    "verb": "use-credential"
+  },
+  {
+    "category": "tampering",
+    "affected_element_ids": [
+      "flow:entity:member>process:lending-api>borrow-renew-and-reserve"
+    ],
+    "claim": "If the connection between a member's phone and the lending API has no effective authenticated encryption, an attacker on the path alters a renewal or a reservation in flight.",
+    "tier": "expected",
+    "severity": {
+      "likelihood": "low",
+      "impact": "low"
+    },
+    "notes": "encryption_in_transit is unknown on a flow the transcript says crosses the internet. The impact is one member's loan or reservation.",
+    "verb": "alter-in-transit"
+  },
+  {
+    "category": "repudiation",
+    "affected_element_ids": [
+      "flow:entity:desk-staff>process:lending-api>change-loans-by-hand",
+      "entity:desk-staff"
+    ],
+    "claim": "A loan closed by hand or a block cleared at the desk cannot be traced to a person or a branch, because every desk shares one login and the history records only that the change was made by hand.",
+    "tier": "must-find",
+    "severity": {
+      "likelihood": "high",
+      "impact": "medium"
+    },
+    "notes": "Stated outright, twice: the shared login, and that nobody can tell who or which branch. The finding with the strongest grounds in the case.",
+    "verb": "unattributable"
+  },
+  {
+    "category": "repudiation",
+    "affected_element_ids": [
+      "flow:entity:member>process:lending-api>borrow-renew-and-reserve",
+      "entity:member"
+    ],
+    "claim": "If the API does not keep trustworthy records tying renewals and reservations to authenticated members, a member could deny an action and the service may be unable to attribute it reliably.",
+    "tier": "expected",
+    "severity": {
+      "likelihood": "medium",
+      "impact": "low"
+    },
+    "notes": "Caller authentication and trustworthy records of each action are separate controls, and neither source states either one. The question differs from the spoofing claim: who acted, not who could act.",
+    "verb": "unattributable"
+  },
+  {
+    "category": "information-disclosure",
+    "affected_element_ids": [
+      "store:loans-database"
+    ],
+    "claim": "If the loans database and its copies have no effective protection at rest, an attacker who obtains the storage reads every member's home address and full borrowing history.",
+    "tier": "expected",
+    "severity": {
+      "likelihood": "low",
+      "impact": "high"
+    },
+    "notes": "encryption_at_rest is unknown on a store that holds home addresses and every member's reading history.",
+    "verb": "read"
+  },
+  {
+    "category": "information-disclosure",
+    "affected_element_ids": [
+      "flow:entity:member>process:lending-api>borrow-renew-and-reserve"
+    ],
+    "claim": "If the connection between a member's phone and the lending API has no effective encryption, an attacker on the path reads which books a member borrows and reserves.",
+    "tier": "expected",
+    "severity": {
+      "likelihood": "medium",
+      "impact": "medium"
+    },
+    "notes": "No source states TLS on this flow. The transcript says the phones reach the API over the internet.",
+    "verb": "intercept"
+  },
+  {
+    "category": "denial-of-service",
+    "affected_element_ids": [
+      "process:lending-api",
+      "flow:entity:member>process:lending-api>borrow-renew-and-reserve"
+    ],
+    "claim": "An attacker floods the lending API with calls, and no member or kiosk can borrow or return anything, because ordinary launch-day load already took the one service down twice.",
+    "tier": "must-find",
+    "severity": {
+      "likelihood": "high",
+      "impact": "medium"
+    },
+    "notes": "The source states this failure already happened twice last summer under legitimate load alone, and that every kiosk and every phone depends on the one API.",
+    "verb": "flood"
+  },
+  {
+    "category": "elevation-of-privilege",
+    "affected_element_ids": [
+      "process:lending-api",
+      "flow:entity:member>process:lending-api>borrow-renew-and-reserve"
+    ],
+    "claim": "If a member or unauthenticated caller can reach the API's manual-return, block-clearing or extension operations and the API fails to enforce staff authorization, that caller could perform staff-only changes.",
+    "tier": "must-find",
+    "severity": {
+      "likelihood": "medium",
+      "impact": "high"
+    },
+    "notes": "The transcript puts the lending API on the internet, and the circulation page and the app's calls reach one API. Neither source states which operations a call from outside the branch network can reach, or a staff role check. An extraction that believes the superseded note and writes internal removes the internet caller from this finding.",
+    "verb": "escalate"
+  },
+  {
+    "category": "tampering",
+    "affected_element_ids": [
+      "flow:entity:desk-staff>process:lending-api>change-loans-by-hand",
+      "store:loans-database"
+    ],
+    "claim": "A desk worker marks an unreturned book as returned, clears a justified block or grants an improper extension on purpose, through the circulation page, with the powers the desk already has.",
+    "tier": "must-find",
+    "severity": {
+      "likelihood": "medium",
+      "impact": "high"
+    },
+    "notes": "Desk staff hold these powers by the note, so this is misuse of a grant, not an escalation. The shared login stops the change being traced to a person or a branch, which is the repudiation claim on the same flow.",
+    "verb": "alter"
+  },
+  {
+    "category": "spoofing",
+    "affected_element_ids": [
+      "process:self-service-kiosk",
+      "entity:member"
+    ],
+    "claim": "If a scanned library card is all a kiosk checks, a person with another member's borrowed, stolen or copied card borrows books on that member's account.",
+    "tier": "expected",
+    "severity": {
+      "likelihood": "medium",
+      "impact": "low"
+    },
+    "notes": "The note says a member scans their card and their books at a kiosk. Neither source states a second check.",
+    "verb": "use-credential"
+  },
+  {
+    "category": "information-disclosure",
+    "affected_element_ids": [
+      "flow:entity:desk-staff>process:lending-api>change-loans-by-hand",
+      "flow:process:self-service-kiosk>process:lending-api>record-loans-and-returns",
+      "flow:process:lending-api>store:loans-database>read-and-write-loans"
+    ],
+    "claim": "If the desk, kiosk or database connections of the lending API have no effective encryption, an attacker on one of those paths reads the circulation credentials or member data they carry.",
+    "tier": "expected",
+    "severity": {
+      "likelihood": "low",
+      "impact": "medium"
+    },
+    "notes": "encryption_in_transit is unknown on all three flows. The member flow is a separate claim.",
+    "verb": "intercept"
+  }
+]

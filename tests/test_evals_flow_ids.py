@@ -435,10 +435,10 @@ def test_a_case_directory_pattern_reaches_every_file_a_case_carries():
         for path in case.rglob("*")
         if path.is_file()
     }
-    # Everything but the submitted source and the generated reading document,
+    # Everything but the submitted sources and the generated reading document,
     # which no rename reaches: a source is the submitter's own bytes and a
     # generator owns the document.
-    assert present - reached == {"source.md", "REVIEW.md"}
+    assert present - reached == {"source.md", "transcript.md", "REVIEW.md"}
 
 
 def test_the_generated_reading_documents_carry_no_earlier_id():

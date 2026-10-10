@@ -74,7 +74,7 @@ as content, which costs a diagnostic line and never a rejection.
 The measurement
 ===============
 
-Over the 15 corpus models and their sources, every stated value of the three
+Over the 16 corpus models and their sources, every stated value of the three
 in-scope attributes. A flag on a blessed value is a **false rejection**: the
 corpus is the closest thing to ground truth this repo has, so a value it carries
 is treated as one a person would keep.
@@ -82,15 +82,15 @@ is treated as one a person would keep.
 =====================================  ======  =======  ============
 rung                                   values  flagged  false-reject
 =====================================  ======  =======  ============
-every content token present                38       16        42.1%
-**at least one content token present**     38        0         0.0%
+every content token present                39       17        43.6%
+**at least one content token present**     39        0         0.0%
 =====================================  ======  =======  ============
 
 **The strict rung is dead, and not because the values are wrong.** It fails on
 the prose around the mechanism: ``"static per-partner key issued at onboarding,
 never rotated"`` names a key the source names, and then loses on ``issued``,
 ``onboarding`` and ``rotated`` — the writer's summary of a source that said the
-same thing in other words. Sixteen of the 38 fail that way. So the rule is the
+same thing in other words. Sixteen of the 39 fail that way. So the rule is the
 weak rung, and the strict one is recorded here to say it was measured rather
 than assumed.
 
@@ -110,7 +110,7 @@ eval corpus; this one needs only the job's own sources and so runs on every job.
 It is carried on :class:`~evals.harness.modes.ExtractionScore` beside that
 score, so a sweep reports the pair.
 
-**Read the rate for what it is.** 38 values is a small sample beside the 206
+**Read the rate for what it is.** 39 values is a small sample beside the 206
 element excerpts that calibrated the grounding ladder, and the corpus is
 agent-authored — no case has been read by a person (#226). A 0% flag rate may
 mean a blessed model reuses its source's wording, which is exactly what an agent
@@ -213,7 +213,7 @@ FUNCTION_WORDS: frozenset[str] = frozenset(
 #:
 #: Measured, on the tree that carries this constant: a search runs at about
 #: 930,000 characters per millisecond, so 20 million characters is about 21 ms
-#: of CPU (#1316). The worst of the 15 corpus cases spends 46,732, which is 427 times
+#: of CPU (#1316). The worst of the 16 corpus cases spends 58,788, which is 340 times
 #: under the budget. A job that spends it names over a thousand different words
 #: across its controls and matches none of them, which is not a model this
 #: measures usefully.

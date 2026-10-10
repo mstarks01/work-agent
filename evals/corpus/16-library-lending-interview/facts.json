@@ -1,0 +1,383 @@
+{
+  "case": "16-library-lending-interview",
+  "drafted_by": "agent-stand-in",
+  "rows": [
+    {
+      "assertion": {
+        "subject_type": "interaction",
+        "subject": "flow:entity:member>process:lending-api>borrow-renew-and-reserve",
+        "predicate": "authentication-mechanism",
+        "value": "unknown",
+        "reason": "hedged",
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "Interview transcript",
+            "quote": "I think it checks a token the app gets at sign-in, but I'd have to look."
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      "rationale": "Asked and answered with a hedge. The speaker says they would have to look, so the row states no mechanism.",
+      "reviewed_by": "mstarks01"
+    },
+    {
+      "assertion": {
+        "subject_type": "interaction",
+        "subject": "flow:process:self-service-kiosk>process:lending-api>record-loans-and-returns",
+        "predicate": "authentication-mechanism",
+        "value": "unknown",
+        "reason": "silent",
+        "scope": [],
+        "basis": "stated",
+        "quotes": [],
+        "explanation": "",
+        "exclusive": false
+      },
+      "rationale": "Neither source says how a kiosk identifies itself to the lending API.",
+      "reviewed_by": "mstarks01"
+    },
+    {
+      "assertion": {
+        "subject_type": "interaction",
+        "subject": "flow:entity:desk-staff>process:lending-api>change-loans-by-hand",
+        "predicate": "authentication-mechanism",
+        "value": "password authentication using one login shared by all desk staff",
+        "reason": null,
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "Interview transcript",
+            "quote": "Everyone at the desk uses the same shared login for the circulation page."
+          },
+          {
+            "source_label": "Interview transcript",
+            "quote": "The password is on a card taped under the desk."
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      "rationale": "The transcript establishes password authentication and a shared account; it does not specify the underlying authentication protocol.",
+      "reviewed_by": "mstarks01"
+    },
+    {
+      "assertion": {
+        "subject_type": "interaction",
+        "subject": "flow:process:lending-api>store:loans-database>read-and-write-loans",
+        "predicate": "authentication-mechanism",
+        "value": "unknown",
+        "reason": "silent",
+        "scope": [],
+        "basis": "stated",
+        "quotes": [],
+        "explanation": "",
+        "exclusive": false
+      },
+      "rationale": "Neither source says how the lending API authenticates to the loans database.",
+      "reviewed_by": "mstarks01"
+    },
+    {
+      "assertion": {
+        "subject_type": "credential",
+        "subject": "the shared desk login",
+        "predicate": "credential-sharing",
+        "value": "shared",
+        "reason": null,
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "Interview transcript",
+            "quote": "Everyone at the desk uses the same shared login for the circulation page."
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      "rationale": "One login for every member of desk staff is the definition of shared.",
+      "reviewed_by": "mstarks01"
+    },
+    {
+      "assertion": {
+        "subject_type": "credential",
+        "subject": "the shared desk login",
+        "predicate": "credential-custody",
+        "value": "a card taped under the desk",
+        "reason": null,
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "Interview transcript",
+            "quote": "The password is on a card taped under the desk."
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      "rationale": "Stated custody of the password.",
+      "reviewed_by": "mstarks01"
+    },
+    {
+      "assertion": {
+        "subject_type": "interaction",
+        "subject": "flow:entity:member>process:lending-api>borrow-renew-and-reserve",
+        "predicate": "transport-encryption",
+        "value": "unknown",
+        "reason": "silent",
+        "scope": [],
+        "basis": "stated",
+        "quotes": [],
+        "explanation": "",
+        "exclusive": false
+      },
+      "rationale": "Neither source says whether the app's calls to the lending API are encrypted in transit.",
+      "reviewed_by": "mstarks01"
+    },
+    {
+      "assertion": {
+        "subject_type": "interaction",
+        "subject": "flow:process:self-service-kiosk>process:lending-api>record-loans-and-returns",
+        "predicate": "transport-encryption",
+        "value": "unknown",
+        "reason": "silent",
+        "scope": [],
+        "basis": "stated",
+        "quotes": [],
+        "explanation": "",
+        "exclusive": false
+      },
+      "rationale": "Neither source says whether the kiosks' calls to the lending API are encrypted in transit.",
+      "reviewed_by": "mstarks01"
+    },
+    {
+      "assertion": {
+        "subject_type": "interaction",
+        "subject": "flow:entity:desk-staff>process:lending-api>change-loans-by-hand",
+        "predicate": "transport-encryption",
+        "value": "unknown",
+        "reason": "silent",
+        "scope": [],
+        "basis": "stated",
+        "quotes": [],
+        "explanation": "",
+        "exclusive": false
+      },
+      "rationale": "Neither source says whether the circulation page are encrypted in transit.",
+      "reviewed_by": "mstarks01"
+    },
+    {
+      "assertion": {
+        "subject_type": "interaction",
+        "subject": "flow:process:lending-api>store:loans-database>read-and-write-loans",
+        "predicate": "transport-encryption",
+        "value": "unknown",
+        "reason": "silent",
+        "scope": [],
+        "basis": "stated",
+        "quotes": [],
+        "explanation": "",
+        "exclusive": false
+      },
+      "rationale": "Neither source says whether the lending API's connection to the loans database are encrypted in transit.",
+      "reviewed_by": "mstarks01"
+    },
+    {
+      "assertion": {
+        "subject_type": "component",
+        "subject": "store:loans-database",
+        "predicate": "storage-encryption",
+        "value": "unknown",
+        "reason": "silent",
+        "scope": [],
+        "basis": "stated",
+        "quotes": [],
+        "explanation": "",
+        "exclusive": false
+      },
+      "rationale": "Neither source says how the loans database is protected at rest.",
+      "reviewed_by": "mstarks01"
+    },
+    {
+      "assertion": {
+        "subject_type": "component",
+        "subject": "process:lending-api",
+        "predicate": "internet-exposure",
+        "value": "internet-facing",
+        "reason": null,
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "Interview transcript",
+            "quote": "That is one of the wrong bits. The phones talk straight to the lending API over the internet."
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      "rationale": "The transcript states it, and it corrects the note: Dan quotes the note's \"The lending API is internal-only.\" and Priya calls it one of the wrong bits. The note describes the service before the API was opened up last year, so its claim does not stand against this one.",
+      "reviewed_by": "mstarks01"
+    },
+    {
+      "assertion": {
+        "subject_type": "component",
+        "subject": "process:lending-api",
+        "predicate": "network-membership",
+        "value": "boundary:council-data-centre",
+        "reason": null,
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "Lending service note",
+            "quote": "The lending API and the loans database run in the council data centre."
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      "rationale": "Stated placement.",
+      "reviewed_by": "mstarks01"
+    },
+    {
+      "assertion": {
+        "subject_type": "component",
+        "subject": "store:loans-database",
+        "predicate": "network-membership",
+        "value": "boundary:council-data-centre",
+        "reason": null,
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "Lending service note",
+            "quote": "The lending API and the loans database run in the council data centre."
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      "rationale": "Stated placement.",
+      "reviewed_by": "mstarks01"
+    },
+    {
+      "assertion": {
+        "subject_type": "component",
+        "subject": "process:self-service-kiosk",
+        "predicate": "network-membership",
+        "value": "boundary:branch-network",
+        "reason": null,
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "Lending service note",
+            "quote": "The kiosks sit on the branch network."
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      "rationale": "Stated placement.",
+      "reviewed_by": "mstarks01"
+    },
+    {
+      "assertion": {
+        "subject_type": "component",
+        "subject": "entity:desk-staff",
+        "predicate": "network-membership",
+        "value": "boundary:branch-network",
+        "reason": null,
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "Lending service note",
+            "quote": "Desk staff work on the branch network."
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      "rationale": "Stated placement.",
+      "reviewed_by": "mstarks01"
+    },
+    {
+      "assertion": {
+        "subject_type": "component",
+        "subject": "entity:member",
+        "predicate": "network-membership",
+        "value": "unknown",
+        "reason": "silent",
+        "scope": [],
+        "basis": "stated",
+        "quotes": [],
+        "explanation": "",
+        "exclusive": false
+      },
+      "rationale": "Members' phones reach the API over the internet, which says how they reach it and not where members are. model.json's zone is a placement the schema requires, recorded in its assumption.",
+      "reviewed_by": "mstarks01"
+    },
+    {
+      "assertion": {
+        "subject_type": "principal",
+        "subject": "desk staff",
+        "predicate": "authorization-grant",
+        "value": "extend a loan, clear a block on a member's account or mark a book as returned",
+        "reason": null,
+        "scope": [
+          {
+            "kind": "resource",
+            "value": "loans and member accounts"
+          },
+          {
+            "kind": "operation",
+            "value": "write"
+          }
+        ],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "Lending service note",
+            "quote": "Desk staff can extend a loan, clear a block on a member's account or mark a book as returned by hand"
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      "rationale": "Desk staff are explicitly permitted to extend loans, clear account blocks and mark books returned through the circulation page. One login is shared across branches, but neither source establishes that it can act on every member record or that no record-level or branch-level restrictions exist.",
+      "reviewed_by": "mstarks01"
+    },
+    {
+      "assertion": {
+        "subject_type": "component",
+        "subject": "store:loans-database",
+        "predicate": "data-classification",
+        "value": "confidential",
+        "reason": null,
+        "scope": [],
+        "basis": "inferred",
+        "quotes": [
+          {
+            "source_label": "Interview transcript",
+            "quote": "Names, email addresses, home addresses and every member's full borrowing history live in the loans database."
+          }
+        ],
+        "explanation": "The source says what the store holds, and the tier `confidential` follows from those contents; the source does not name a tier.",
+        "exclusive": false
+      },
+      "rationale": "Inferred from stated contents: Names, email addresses, home addresses and every member's full borrowing history live in the loans database. Only a source that names the tier states it (ruled 2026-09-24, #926).",
+      "reviewed_by": "mstarks01"
+    }
+  ],
+  "disputed": [],
+  "aliases": {
+    "subjects": [],
+    "qualifiers": []
+  }
+}

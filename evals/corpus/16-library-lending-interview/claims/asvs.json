@@ -1,0 +1,85 @@
+[
+  {
+    "chapter": "authorization",
+    "requirement": "V8.2.1",
+    "affected_element_ids": [
+      "flow:entity:desk-staff>process:lending-api>change-loans-by-hand",
+      "process:lending-api"
+    ],
+    "claim": "The circulation page acts for one login every desk shares, so no access rule on it can name a person.",
+    "tier": "must-find",
+    "disposition": "gap-from-prose",
+    "notes": "Stated outright: one login, no second check, a history with no person in it."
+  },
+  {
+    "chapter": "authorization",
+    "requirement": "V8.2.2",
+    "affected_element_ids": [
+      "flow:entity:member>process:lending-api>borrow-renew-and-reserve",
+      "process:lending-api"
+    ],
+    "claim": "Nothing states that the lending API lets a member change only their own loans and reservations.",
+    "tier": "must-find",
+    "disposition": "needs-code",
+    "notes": "What the API checks on a call from the app is a hedge, so whether a call is tied to one member's records is open."
+  },
+  {
+    "chapter": "session-management",
+    "requirement": "V7.2.1",
+    "affected_element_ids": [
+      "flow:entity:member>process:lending-api>borrow-renew-and-reserve",
+      "process:lending-api"
+    ],
+    "claim": "A token the app gets at sign-in is mentioned once, inside a hedge, and nothing says where it is verified.",
+    "tier": "expected",
+    "disposition": "needs-code",
+    "notes": "The one mention is a hedge, so it is not evidence either way."
+  },
+  {
+    "chapter": "secure-communication",
+    "requirement": "V12.2.1",
+    "affected_element_ids": [
+      "flow:entity:member>process:lending-api>borrow-renew-and-reserve"
+    ],
+    "claim": "Nothing states whether the connection between the app and the lending API uses TLS.",
+    "tier": "must-find",
+    "disposition": "needs-more-prose",
+    "notes": "REST and JSON are stated and the transport never is. The transcript puts this flow on the internet."
+  },
+  {
+    "chapter": "authentication",
+    "requirement": "V6.1.1",
+    "affected_element_ids": [
+      "flow:entity:desk-staff>process:lending-api>change-loans-by-hand",
+      "flow:entity:member>process:lending-api>borrow-renew-and-reserve"
+    ],
+    "claim": "Nothing documents what limits repeated sign-in attempts on the app or on the circulation page.",
+    "tier": "expected",
+    "disposition": "needs-more-prose",
+    "notes": "Neither source describes a sign-in defence; a fuller description could answer it."
+  },
+  {
+    "chapter": "validation-and-business-logic",
+    "requirement": "V2.2.2",
+    "affected_element_ids": [
+      "flow:process:self-service-kiosk>process:lending-api>record-loans-and-returns",
+      "process:lending-api"
+    ],
+    "claim": "Nothing states that the lending API checks a loan or a return a kiosk sends, rather than trusting the kiosk.",
+    "tier": "expected",
+    "disposition": "needs-code",
+    "notes": "How a kiosk is identified is also unknown, which is the spoofing claim on the same flow."
+  },
+  {
+    "chapter": "encoding-and-sanitization",
+    "requirement": "V1.2.4",
+    "affected_element_ids": [
+      "flow:process:lending-api>store:loans-database>read-and-write-loans",
+      "process:lending-api"
+    ],
+    "claim": "The lending API reads and writes the loans database and nothing says how its queries are built.",
+    "tier": "expected",
+    "disposition": "needs-code",
+    "notes": "A property of the code, which neither source can settle."
+  }
+]

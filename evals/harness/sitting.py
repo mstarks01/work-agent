@@ -379,10 +379,14 @@ def document_name(submitted_by: str) -> str:
     return f"REVIEW-{submitted_by}.md"
 
 
-#: What every sitting reads whatever the case declares: the words the
-#: submitter wrote, and the **System Model** built from them. A submission that
-#: carries no digest for these read no case at all.
-SHARED_FILES = ("source.md", "model.json")
+def shared_files(source_files: Iterable[str]) -> list[str]:
+    """What every sitting reads whatever frameworks the case declares.
+
+    Each source file the case declares, which holds the words the submitter
+    wrote, and the **System Model** built from them. A submission that
+    carries no digest for these read no case at all.
+    """
+    return [*source_files, "model.json"]
 
 
 def claim_file(framework: str) -> str:
@@ -390,16 +394,16 @@ def claim_file(framework: str) -> str:
     return f"{CLAIMS_DIR}/{framework}.json"
 
 
-def required_files(frameworks: Iterable[str]) -> list[str]:
+def required_files(source_files: Iterable[str], frameworks: Iterable[str]) -> list[str]:
     """What a complete sitting reads, derived from the case's own declaration.
 
     The shared artefacts plus one reference set per declared framework, so a
-    case that gains a package requires its set read by construction and no
-    table here needs editing. The caller passes the declared names, because
+    case that gains a source or a package requires it read by construction and
+    no table here needs editing. The caller passes the declared names, because
     the declaration reaches this module as raw JSON on one path and as a
     loaded :class:`~evals.harness.reference.CaseMetadata` on the other.
     """
-    return ["source.md", "model.json", *claim_files(frameworks)]
+    return [*shared_files(source_files), *claim_files(frameworks)]
 
 
 def moved(case_dir: Path, digests: Mapping[str, str]) -> list[str]:
@@ -639,6 +643,8 @@ class Prepared:
     #: Framework -> that package's recorded set, as blocks. A surface must not
     #: send this until the reader's own list is in.
     part_two_blocks: dict[str, dict]
+    #: The files a sitting reads before the own list, and pins as it serves them.
+    shared_files: list[str]
     files: list[str]
     #: One target per recorded finding, in the order the parts render. Part of
     #: part two rather than part one: a target names a claim, and a count of
@@ -797,12 +803,14 @@ def _key_of(
 def prepare(case_dir: Path) -> Prepared:
     """Everything a sitting needs, split at the own-list boundary."""
     case = load_case(case_dir)
+    source_files = [source.file for source in case.meta.sources]
     return Prepared(
         case_id=case.id,
         title=case.meta.title,
         part_one_blocks=docs.part_one_blocks(case_dir),
         part_two_blocks=docs.parts_after_blocks(case_dir),
-        files=required_files(case.frameworks),
+        shared_files=shared_files(source_files),
+        files=required_files(source_files, case.frameworks),
         mark_targets=mark_targets(case),
     )
 
@@ -1015,7 +1023,7 @@ def sitting_problems(
         )
 
     recorded = set(opened_digests)
-    if absent := sorted(set(SHARED_FILES) - recorded):
+    if absent := sorted(set(prepared.shared_files) - recorded):
         problems.append(f"{case_id}: the review carries no digest for {absent}")
     if extra := sorted(recorded - set(prepared.files)):
         problems.append(f"{case_id}: the review carries unexpected digests for {extra}")

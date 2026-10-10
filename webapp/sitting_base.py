@@ -224,7 +224,7 @@ def create_app(session: Session, page: str, script: str) -> FastAPI:
         work = held or sittings.Draft(case=prepared.case_id)
         covered = review_submissions.current_reviews(session.root)
         moved = _moved(session, prepared, held)
-        _served(session, prepared, held, sittings.SHARED_FILES)
+        _served(session, prepared, held, prepared.shared_files)
         return JSONResponse(
             {
                 "case": prepared.case_id,

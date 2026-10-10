@@ -83,7 +83,7 @@ def test_a_sibling_is_a_demonstrated_verb_of_the_same_family(corpus):
 
 
 def test_the_undemonstrated_count_is_what_the_sweep_measured(swept):
-    """46 of 242, 18 of them must-find. See this module's docstring when it
+    """46 of 254, 18 of them must-find. See this module's docstring when it
     moves."""
     assert len(swept) == 46
     assert sum(1 for entry in swept if entry.must_find) == 18
@@ -98,14 +98,17 @@ def test_the_two_populations_still_split_where_they_did(swept):
     assert len(swept) - len(near) == 14
 
 
-def test_every_case_carries_at_least_one_disagreement(corpus, swept):
-    """The reach is why this is not three rows to re-bless by hand."""
+def test_all_but_one_case_carries_a_disagreement(corpus, swept):
+    """The reach is why this is not three rows to re-bless by hand.
+
+    Case 16 asks only for verbs its lanes demonstrate, so it carries none.
+    """
     graded = {
         case.id
         for case in tuning_cases(corpus)
         if any(framework in case.frameworks for framework in verb_keyed_frameworks())
     }
-    assert {entry.case for entry in swept} == graded
+    assert graded - {entry.case for entry in swept} == {"16-library-lending-interview"}
 
 
 def test_a_swept_package_disagrees_with_its_own_corpus_and_no_other(corpus):

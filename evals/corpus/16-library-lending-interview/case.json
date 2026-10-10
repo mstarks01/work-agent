@@ -1,0 +1,38 @@
+{
+  "id": "16-library-lending-interview",
+  "title": "A library lending service, from a written note and a later interview that contradicts it",
+  "domain": "library-lending",
+  "provenance": "Synthetic system authored for this corpus (issue #64). Not derived from, or sanitized from, any real system or any real conversation: there is nothing to leak by omission. The transcript's form follows the properties measured from real exports in #51: attribution by participant name, no uncertainty markers, cleaned turns. Its content is invented.",
+  "bootstrap": "agent-stand-in",
+  "holdout": false,
+  "sources": [
+    {
+      "kind": "description",
+      "label": "Lending service note",
+      "file": "source.md",
+      "sha256": "8bc51704b4514584c02f95f04048086a70f43a3dbb2c40af53afe13b3f79e6a9"
+    },
+    {
+      "kind": "transcript",
+      "label": "Interview transcript",
+      "file": "transcript.md",
+      "sha256": "c48f8b9e53090b42971ffb548ed2302d0021a8c2b8539552973211c21df3f765"
+    }
+  ],
+  "source_sha256": "d084a9d7e77ec50c1662c495072e511258f765e4f5d6de64f8fa40b33f7e6b5a",
+  "frameworks": [
+    {
+      "name": "asvs",
+      "options": {
+        "level": 1
+      },
+      "exemplar_proximity": "far"
+    },
+    {
+      "name": "stride",
+      "options": {},
+      "exemplar_proximity": "far"
+    }
+  ],
+  "notes": "The corpus's first transcript and first two-source case, written for issue #64 to grade the conversational rules in prompts/extract.md across two sources. Five traps. A hedge on the app's authentication must stay unknown, and the spoofing must-find rests on that unknown. A fact inside a question must produce no kiosk-to-database flow. A self-correction must produce no second database, and a hypothetical must produce no partner entity; both are element-level. The note says the lending API is internal-only, and the transcript corrects it: Priya calls that line wrong and says when it changed. Exposure is internet-facing, and an extraction that believes the note removes the internet caller from the elevation-of-privilege must-find. The domain is a public library, which no other case covers; it has no payment data, and it keeps clear of case 14's loyalty platform, a holdout case."
+}
