@@ -1,0 +1,2720 @@
+{
+  "proposal": {
+    "assertions": [
+      {
+        "subject_type": "component",
+        "subject": "process:dispatch-api",
+        "predicate": "network-membership",
+        "value": "boundary:production-control-plane",
+        "reason": null,
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "The dispatch API runs in the production control plane."
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      {
+        "subject_type": "component",
+        "subject": "process:schedule-importer",
+        "predicate": "network-membership",
+        "value": "boundary:corporate-network",
+        "reason": null,
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "Our schedule importer runs on the corporate network."
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      {
+        "subject_type": "component",
+        "subject": "process:dispatch-api",
+        "predicate": "internet-exposure",
+        "value": "internal",
+        "reason": null,
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "The control plane is not reachable from the internet."
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      {
+        "subject_type": "interaction",
+        "subject": "flow:process:dispatch-console>process:dispatch-api>calls-dispatch-api",
+        "predicate": "authentication-mechanism",
+        "value": "unknown",
+        "reason": "silent",
+        "scope": [],
+        "basis": "stated",
+        "quotes": [],
+        "explanation": "",
+        "exclusive": false
+      },
+      {
+        "subject_type": "interaction",
+        "subject": "flow:process:dispatch-console>process:dispatch-api>calls-dispatch-api",
+        "predicate": "origin-verification",
+        "value": "unknown",
+        "reason": "silent",
+        "scope": [],
+        "basis": "stated",
+        "quotes": [],
+        "explanation": "",
+        "exclusive": false
+      },
+      {
+        "subject_type": "interaction",
+        "subject": "flow:process:dispatch-console>process:dispatch-api>calls-dispatch-api",
+        "predicate": "destination-verification",
+        "value": "unknown",
+        "reason": "silent",
+        "scope": [],
+        "basis": "stated",
+        "quotes": [],
+        "explanation": "",
+        "exclusive": false
+      },
+      {
+        "subject_type": "interaction",
+        "subject": "flow:process:dispatch-console>process:dispatch-api>opens-websocket",
+        "predicate": "transport-encryption",
+        "value": "unknown",
+        "reason": "silent",
+        "scope": [],
+        "basis": "stated",
+        "quotes": [],
+        "explanation": "",
+        "exclusive": false
+      },
+      {
+        "subject_type": "interaction",
+        "subject": "flow:process:dispatch-console>process:dispatch-api>opens-websocket",
+        "predicate": "authentication-mechanism",
+        "value": "unknown",
+        "reason": "silent",
+        "scope": [],
+        "basis": "stated",
+        "quotes": [],
+        "explanation": "",
+        "exclusive": false
+      },
+      {
+        "subject_type": "interaction",
+        "subject": "flow:process:dispatch-console>process:dispatch-api>opens-websocket",
+        "predicate": "credential-presented",
+        "value": "unknown",
+        "reason": "silent",
+        "scope": [],
+        "basis": "stated",
+        "quotes": [],
+        "explanation": "",
+        "exclusive": false
+      },
+      {
+        "subject_type": "interaction",
+        "subject": "flow:process:dispatch-api>store:dispatch-database>reads-and-writes",
+        "predicate": "authentication-mechanism",
+        "value": "unknown",
+        "reason": "silent",
+        "scope": [],
+        "basis": "stated",
+        "quotes": [],
+        "explanation": "",
+        "exclusive": false
+      },
+      {
+        "subject_type": "component",
+        "subject": "store:dispatch-database",
+        "predicate": "storage-encryption",
+        "value": "unknown",
+        "reason": "silent",
+        "scope": [],
+        "basis": "stated",
+        "quotes": [],
+        "explanation": "",
+        "exclusive": false
+      },
+      {
+        "subject_type": "interaction",
+        "subject": "flow:process:schedule-importer>entity:scheduling-partner>pulls-soap-feed",
+        "predicate": "transport-encryption",
+        "value": "HTTPS",
+        "reason": null,
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "pulls the partner's SOAP feed over HTTPS"
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      {
+        "subject_type": "interaction",
+        "subject": "flow:process:schedule-importer>entity:scheduling-partner>pulls-soap-feed",
+        "predicate": "authentication-mechanism",
+        "value": "unknown",
+        "reason": "silent",
+        "scope": [],
+        "basis": "stated",
+        "quotes": [],
+        "explanation": "",
+        "exclusive": false
+      },
+      {
+        "subject_type": "interaction",
+        "subject": "flow:process:schedule-importer>entity:scheduling-partner>pulls-soap-feed",
+        "predicate": "origin-verification",
+        "value": "unknown",
+        "reason": "silent",
+        "scope": [],
+        "basis": "stated",
+        "quotes": [],
+        "explanation": "",
+        "exclusive": false
+      },
+      {
+        "subject_type": "interaction",
+        "subject": "flow:process:schedule-importer>entity:scheduling-partner>pulls-soap-feed",
+        "predicate": "destination-verification",
+        "value": "unknown",
+        "reason": "silent",
+        "scope": [],
+        "basis": "stated",
+        "quotes": [],
+        "explanation": "",
+        "exclusive": false
+      },
+      {
+        "subject_type": "interaction",
+        "subject": "flow:process:schedule-importer>process:dispatch-api>posts-work-orders",
+        "predicate": "credential-presented",
+        "value": "API token",
+        "reason": null,
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "It presents an API token."
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      {
+        "subject_type": "credential",
+        "subject": "API token",
+        "predicate": "credential-rotation",
+        "value": "not-rotated",
+        "reason": null,
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "That token was issued when the importer was built and nobody has rotated it since."
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      {
+        "subject_type": "credential",
+        "subject": "API token",
+        "predicate": "credential-lifetime",
+        "value": "issued when the importer was built",
+        "reason": null,
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "That token was issued when the importer was built"
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      {
+        "subject_type": "principal",
+        "subject": "an account there",
+        "predicate": "authorization-grant",
+        "value": "move a crew",
+        "reason": null,
+        "scope": [
+          {
+            "kind": "resource",
+            "value": "a crew"
+          },
+          {
+            "kind": "operation",
+            "value": "move"
+          }
+        ],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "an account there can move a crew"
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      {
+        "subject_type": "principal",
+        "subject": "an account there",
+        "predicate": "authorization-grant",
+        "value": "change the work a depot does that day",
+        "reason": null,
+        "scope": [
+          {
+            "kind": "resource",
+            "value": "the work a depot does that day"
+          },
+          {
+            "kind": "operation",
+            "value": "change"
+          }
+        ],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "it can change the work a depot does that day"
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      {
+        "subject_type": "component",
+        "subject": "store:dispatch-database",
+        "predicate": "record-attribution",
+        "value": "intermediary",
+        "reason": null,
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "Every job order in it carries the token or the session that created it, and nothing about the person behind that token."
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      }
+    ]
+  },
+  "catalog": {
+    "registry_version": 8,
+    "subjects": [
+      {
+        "id": "boundary:corporate-network",
+        "type": "zone",
+        "label": "corporate network"
+      },
+      {
+        "id": "boundary:production-control-plane",
+        "type": "zone",
+        "label": "production control plane"
+      },
+      {
+        "id": "credential:api-token",
+        "type": "credential",
+        "label": "API token"
+      },
+      {
+        "id": "entity:duty-engineers",
+        "type": "component",
+        "label": "duty engineers"
+      },
+      {
+        "id": "flow:process:dispatch-api>store:dispatch-database>reads-and-writes",
+        "type": "interaction",
+        "label": "reads and writes"
+      },
+      {
+        "id": "flow:process:dispatch-console>process:dispatch-api>calls-dispatch-api",
+        "type": "interaction",
+        "label": "calls dispatch API"
+      },
+      {
+        "id": "flow:process:dispatch-console>process:dispatch-api>opens-websocket",
+        "type": "interaction",
+        "label": "opens WebSocket"
+      },
+      {
+        "id": "flow:process:schedule-importer>entity:scheduling-partner>pulls-soap-feed",
+        "type": "interaction",
+        "label": "pulls SOAP feed"
+      },
+      {
+        "id": "flow:process:schedule-importer>process:dispatch-api>posts-work-orders",
+        "type": "interaction",
+        "label": "posts work orders"
+      },
+      {
+        "id": "principal:an-account-there",
+        "type": "principal",
+        "label": "an account there"
+      },
+      {
+        "id": "process:dispatch-api",
+        "type": "component",
+        "label": "dispatch API"
+      },
+      {
+        "id": "process:schedule-importer",
+        "type": "component",
+        "label": "schedule importer"
+      },
+      {
+        "id": "store:dispatch-database",
+        "type": "component",
+        "label": "dispatch database"
+      }
+    ],
+    "entries": [
+      {
+        "subject": "process:dispatch-api",
+        "predicate": "network-membership",
+        "value": "boundary:production-control-plane",
+        "scope": [],
+        "basis": "stated",
+        "reason": null,
+        "support": [
+          {
+            "source_label": "System description",
+            "digest": "7e370ab58f5a0138f9dd36d41cb6d3ef2b88e15594ab7995a9eb1488b157fec7",
+            "start": 409,
+            "end": 463,
+            "quote": "The dispatch API runs in the production control plane."
+          }
+        ],
+        "premises": [],
+        "explanation": "",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      },
+      {
+        "subject": "process:schedule-importer",
+        "predicate": "network-membership",
+        "value": "boundary:corporate-network",
+        "scope": [],
+        "basis": "stated",
+        "reason": null,
+        "support": [
+          {
+            "source_label": "System description",
+            "digest": "7e370ab58f5a0138f9dd36d41cb6d3ef2b88e15594ab7995a9eb1488b157fec7",
+            "start": 1628,
+            "end": 1680,
+            "quote": "Our schedule importer runs on the corporate network."
+          }
+        ],
+        "premises": [],
+        "explanation": "",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      },
+      {
+        "subject": "process:dispatch-api",
+        "predicate": "internet-exposure",
+        "value": "internal",
+        "scope": [],
+        "basis": "stated",
+        "reason": null,
+        "support": [
+          {
+            "source_label": "System description",
+            "digest": "7e370ab58f5a0138f9dd36d41cb6d3ef2b88e15594ab7995a9eb1488b157fec7",
+            "start": 700,
+            "end": 753,
+            "quote": "The control plane is not reachable from the internet."
+          }
+        ],
+        "premises": [],
+        "explanation": "",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      },
+      {
+        "subject": "flow:process:dispatch-console>process:dispatch-api>calls-dispatch-api",
+        "predicate": "authentication-mechanism",
+        "value": "unknown",
+        "scope": [],
+        "basis": "stated",
+        "reason": "silent",
+        "support": [],
+        "premises": [],
+        "explanation": "",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      },
+      {
+        "subject": "flow:process:dispatch-console>process:dispatch-api>calls-dispatch-api",
+        "predicate": "origin-verification",
+        "value": "unknown",
+        "scope": [],
+        "basis": "stated",
+        "reason": "silent",
+        "support": [],
+        "premises": [],
+        "explanation": "",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      },
+      {
+        "subject": "flow:process:dispatch-console>process:dispatch-api>calls-dispatch-api",
+        "predicate": "destination-verification",
+        "value": "unknown",
+        "scope": [],
+        "basis": "stated",
+        "reason": "silent",
+        "support": [],
+        "premises": [],
+        "explanation": "",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      },
+      {
+        "subject": "flow:process:dispatch-console>process:dispatch-api>opens-websocket",
+        "predicate": "transport-encryption",
+        "value": "unknown",
+        "scope": [],
+        "basis": "stated",
+        "reason": "silent",
+        "support": [],
+        "premises": [],
+        "explanation": "",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      },
+      {
+        "subject": "flow:process:dispatch-console>process:dispatch-api>opens-websocket",
+        "predicate": "authentication-mechanism",
+        "value": "unknown",
+        "scope": [],
+        "basis": "stated",
+        "reason": "silent",
+        "support": [],
+        "premises": [],
+        "explanation": "",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      },
+      {
+        "subject": "flow:process:dispatch-console>process:dispatch-api>opens-websocket",
+        "predicate": "credential-presented",
+        "value": "unknown",
+        "scope": [],
+        "basis": "stated",
+        "reason": "silent",
+        "support": [],
+        "premises": [],
+        "explanation": "",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      },
+      {
+        "subject": "flow:process:dispatch-api>store:dispatch-database>reads-and-writes",
+        "predicate": "authentication-mechanism",
+        "value": "unknown",
+        "scope": [],
+        "basis": "stated",
+        "reason": "silent",
+        "support": [],
+        "premises": [],
+        "explanation": "",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      },
+      {
+        "subject": "store:dispatch-database",
+        "predicate": "storage-encryption",
+        "value": "unknown",
+        "scope": [],
+        "basis": "stated",
+        "reason": "silent",
+        "support": [],
+        "premises": [],
+        "explanation": "",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      },
+      {
+        "subject": "flow:process:schedule-importer>entity:scheduling-partner>pulls-soap-feed",
+        "predicate": "transport-encryption",
+        "value": "HTTPS",
+        "scope": [],
+        "basis": "stated",
+        "reason": null,
+        "support": [
+          {
+            "source_label": "System description",
+            "digest": "7e370ab58f5a0138f9dd36d41cb6d3ef2b88e15594ab7995a9eb1488b157fec7",
+            "start": 1695,
+            "end": 1735,
+            "quote": "pulls the partner's SOAP feed over HTTPS"
+          }
+        ],
+        "premises": [],
+        "explanation": "",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      },
+      {
+        "subject": "flow:process:schedule-importer>entity:scheduling-partner>pulls-soap-feed",
+        "predicate": "authentication-mechanism",
+        "value": "unknown",
+        "scope": [],
+        "basis": "stated",
+        "reason": "silent",
+        "support": [],
+        "premises": [],
+        "explanation": "",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      },
+      {
+        "subject": "flow:process:schedule-importer>entity:scheduling-partner>pulls-soap-feed",
+        "predicate": "origin-verification",
+        "value": "unknown",
+        "scope": [],
+        "basis": "stated",
+        "reason": "silent",
+        "support": [],
+        "premises": [],
+        "explanation": "",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      },
+      {
+        "subject": "flow:process:schedule-importer>entity:scheduling-partner>pulls-soap-feed",
+        "predicate": "destination-verification",
+        "value": "unknown",
+        "scope": [],
+        "basis": "stated",
+        "reason": "silent",
+        "support": [],
+        "premises": [],
+        "explanation": "",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      },
+      {
+        "subject": "flow:process:schedule-importer>process:dispatch-api>posts-work-orders",
+        "predicate": "credential-presented",
+        "value": "credential:api-token",
+        "scope": [],
+        "basis": "stated",
+        "reason": null,
+        "support": [
+          {
+            "source_label": "System description",
+            "digest": "7e370ab58f5a0138f9dd36d41cb6d3ef2b88e15594ab7995a9eb1488b157fec7",
+            "start": 2088,
+            "end": 2113,
+            "quote": "It presents an API token."
+          }
+        ],
+        "premises": [],
+        "explanation": "",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      },
+      {
+        "subject": "credential:api-token",
+        "predicate": "credential-rotation",
+        "value": "not-rotated",
+        "scope": [],
+        "basis": "stated",
+        "reason": null,
+        "support": [
+          {
+            "source_label": "System description",
+            "digest": "7e370ab58f5a0138f9dd36d41cb6d3ef2b88e15594ab7995a9eb1488b157fec7",
+            "start": 2114,
+            "end": 2196,
+            "quote": "That token was issued when the importer was built and nobody has rotated it since."
+          }
+        ],
+        "premises": [],
+        "explanation": "",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      },
+      {
+        "subject": "credential:api-token",
+        "predicate": "credential-lifetime",
+        "value": "issued when the importer was built",
+        "scope": [],
+        "basis": "stated",
+        "reason": null,
+        "support": [
+          {
+            "source_label": "System description",
+            "digest": "7e370ab58f5a0138f9dd36d41cb6d3ef2b88e15594ab7995a9eb1488b157fec7",
+            "start": 2114,
+            "end": 2163,
+            "quote": "That token was issued when the importer was built"
+          }
+        ],
+        "premises": [],
+        "explanation": "",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      },
+      {
+        "subject": "principal:an-account-there",
+        "predicate": "authorization-grant",
+        "value": "move a crew",
+        "scope": [
+          {
+            "kind": "resource",
+            "value": "a crew"
+          },
+          {
+            "kind": "operation",
+            "value": "move"
+          }
+        ],
+        "basis": "stated",
+        "reason": null,
+        "support": [
+          {
+            "source_label": "System description",
+            "digest": "7e370ab58f5a0138f9dd36d41cb6d3ef2b88e15594ab7995a9eb1488b157fec7",
+            "start": 569,
+            "end": 602,
+            "quote": "an account there can move a crew"
+          }
+        ],
+        "premises": [],
+        "explanation": "",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      },
+      {
+        "subject": "principal:an-account-there",
+        "predicate": "authorization-grant",
+        "value": "change the work a depot does that day",
+        "scope": [
+          {
+            "kind": "resource",
+            "value": "the work a depot does that day"
+          },
+          {
+            "kind": "operation",
+            "value": "change"
+          }
+        ],
+        "basis": "stated",
+        "reason": null,
+        "support": [
+          {
+            "source_label": "System description",
+            "digest": "7e370ab58f5a0138f9dd36d41cb6d3ef2b88e15594ab7995a9eb1488b157fec7",
+            "start": 607,
+            "end": 652,
+            "quote": "it can change the work a depot does that day"
+          }
+        ],
+        "premises": [],
+        "explanation": "",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      },
+      {
+        "subject": "store:dispatch-database",
+        "predicate": "record-attribution",
+        "value": "intermediary",
+        "scope": [],
+        "basis": "stated",
+        "reason": null,
+        "support": [
+          {
+            "source_label": "System description",
+            "digest": "7e370ab58f5a0138f9dd36d41cb6d3ef2b88e15594ab7995a9eb1488b157fec7",
+            "start": 1356,
+            "end": 1475,
+            "quote": "Every job order in it carries the token or the session that created it, and nothing about the person behind that token."
+          }
+        ],
+        "premises": [],
+        "explanation": "",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      },
+      {
+        "subject": "entity:duty-engineers",
+        "predicate": "network-membership",
+        "value": "boundary:corporate-network",
+        "scope": [],
+        "basis": "stated",
+        "reason": null,
+        "support": [
+          {
+            "source_label": "System description",
+            "digest": "7e370ab58f5a0138f9dd36d41cb6d3ef2b88e15594ab7995a9eb1488b157fec7",
+            "start": 146,
+            "end": 190,
+            "quote": "Duty engineers sit on the corporate network"
+          }
+        ],
+        "premises": [],
+        "explanation": "",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      }
+    ]
+  },
+  "issues": [],
+  "proposed": 22,
+  "quarantined": [],
+  "projection": [
+    {
+      "element_id": "entity:duty-engineers",
+      "attribute": "trust_zone",
+      "value": "boundary:corporate-network",
+      "reason": "stated",
+      "rows": [
+        "assertion:network-membership~entity:duty-engineers~any~boundary:corporate-network"
+      ]
+    },
+    {
+      "element_id": "flow:process:dispatch-api>store:dispatch-database>reads-and-writes",
+      "attribute": "authentication",
+      "value": "unknown",
+      "reason": "unknown",
+      "rows": [
+        "assertion:authentication-mechanism~flow:process:dispatch-api>store:dispatch-database>reads-and-writes~any~unknown"
+      ]
+    },
+    {
+      "element_id": "flow:process:dispatch-console>process:dispatch-api>calls-dispatch-api",
+      "attribute": "authentication",
+      "value": "unknown",
+      "reason": "unknown",
+      "rows": [
+        "assertion:authentication-mechanism~flow:process:dispatch-console>process:dispatch-api>calls-dispatch-api~any~unknown"
+      ]
+    },
+    {
+      "element_id": "flow:process:dispatch-console>process:dispatch-api>opens-websocket",
+      "attribute": "authentication",
+      "value": "unknown",
+      "reason": "unknown",
+      "rows": [
+        "assertion:authentication-mechanism~flow:process:dispatch-console>process:dispatch-api>opens-websocket~any~unknown",
+        "assertion:credential-presented~flow:process:dispatch-console>process:dispatch-api>opens-websocket~any~unknown"
+      ]
+    },
+    {
+      "element_id": "flow:process:dispatch-console>process:dispatch-api>opens-websocket",
+      "attribute": "encryption_in_transit",
+      "value": "unknown",
+      "reason": "unknown",
+      "rows": [
+        "assertion:transport-encryption~flow:process:dispatch-console>process:dispatch-api>opens-websocket~any~unknown"
+      ]
+    },
+    {
+      "element_id": "flow:process:schedule-importer>entity:scheduling-partner>pulls-soap-feed",
+      "attribute": "authentication",
+      "value": "unknown",
+      "reason": "unknown",
+      "rows": [
+        "assertion:authentication-mechanism~flow:process:schedule-importer>entity:scheduling-partner>pulls-soap-feed~any~unknown"
+      ]
+    },
+    {
+      "element_id": "flow:process:schedule-importer>entity:scheduling-partner>pulls-soap-feed",
+      "attribute": "encryption_in_transit",
+      "value": "HTTPS",
+      "reason": "stated",
+      "rows": [
+        "assertion:transport-encryption~flow:process:schedule-importer>entity:scheduling-partner>pulls-soap-feed~any~v.3e1943522517"
+      ]
+    },
+    {
+      "element_id": "flow:process:schedule-importer>process:dispatch-api>posts-work-orders",
+      "attribute": "authentication",
+      "value": "API token",
+      "reason": "stated",
+      "rows": [
+        "assertion:credential-presented~flow:process:schedule-importer>process:dispatch-api>posts-work-orders~any~credential:api-token"
+      ]
+    },
+    {
+      "element_id": "process:dispatch-api",
+      "attribute": "exposure",
+      "value": "internal",
+      "reason": "stated",
+      "rows": [
+        "assertion:internet-exposure~process:dispatch-api~any~internal"
+      ]
+    },
+    {
+      "element_id": "process:dispatch-api",
+      "attribute": "trust_zone",
+      "value": "boundary:production-control-plane",
+      "reason": "stated",
+      "rows": [
+        "assertion:network-membership~process:dispatch-api~any~boundary:production-control-plane"
+      ]
+    },
+    {
+      "element_id": "process:schedule-importer",
+      "attribute": "trust_zone",
+      "value": "boundary:corporate-network",
+      "reason": "stated",
+      "rows": [
+        "assertion:network-membership~process:schedule-importer~any~boundary:corporate-network"
+      ]
+    },
+    {
+      "element_id": "store:dispatch-database",
+      "attribute": "encryption_at_rest",
+      "value": "unknown",
+      "reason": "unknown",
+      "rows": [
+        "assertion:storage-encryption~store:dispatch-database~any~unknown"
+      ]
+    }
+  ],
+  "stages": {
+    "source_facts": {
+      "mentions": [
+        {
+          "handle": "m1",
+          "text": "field dispatch platform",
+          "roles": [
+            "process"
+          ],
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "We run our own field dispatch platform."
+            }
+          ]
+        },
+        {
+          "handle": "m2",
+          "text": "corporate network",
+          "roles": [
+            "network-zone"
+          ],
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "Duty engineers sit on the corporate network."
+            }
+          ]
+        },
+        {
+          "handle": "m3",
+          "text": "dispatch console",
+          "roles": [
+            "process"
+          ],
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "They open the dispatch console in their browser."
+            }
+          ]
+        },
+        {
+          "handle": "m4",
+          "text": "corporate web host",
+          "roles": [
+            "process"
+          ],
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "our corporate web host serves it"
+            }
+          ]
+        },
+        {
+          "handle": "m5",
+          "text": "dispatch API",
+          "roles": [
+            "process"
+          ],
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "The console calls the dispatch API."
+            }
+          ]
+        },
+        {
+          "handle": "m6",
+          "text": "production control plane",
+          "roles": [
+            "privilege-zone"
+          ],
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "The dispatch API runs in the production control plane."
+            }
+          ]
+        },
+        {
+          "handle": "m7",
+          "text": "corporate laptop",
+          "roles": [
+            "other-zone"
+          ],
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "A corporate laptop holds none of those rights."
+            }
+          ]
+        },
+        {
+          "handle": "m8",
+          "text": "dispatch database",
+          "roles": [
+            "store"
+          ],
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "The dispatch API reads and writes the dispatch database."
+            }
+          ]
+        },
+        {
+          "handle": "m9",
+          "text": "scheduling partner",
+          "roles": [
+            "external-system"
+          ],
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "A scheduling partner, which is another company"
+            }
+          ]
+        },
+        {
+          "handle": "m10",
+          "text": "schedule importer",
+          "roles": [
+            "process"
+          ],
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "Our schedule importer runs on the corporate network."
+            }
+          ]
+        },
+        {
+          "handle": "m11",
+          "text": "schedule archive",
+          "roles": [
+            "store"
+          ],
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "the schedule archive, a folder on the corporate file store"
+            }
+          ]
+        },
+        {
+          "handle": "m12",
+          "text": "corporate file store",
+          "roles": [
+            "store"
+          ],
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "a folder on the corporate file store"
+            }
+          ]
+        },
+        {
+          "handle": "m13",
+          "text": "duty engineers",
+          "roles": [
+            "person"
+          ],
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "Duty engineers sit on the corporate network."
+            }
+          ]
+        },
+        {
+          "handle": "m14",
+          "text": "WebSocket",
+          "roles": [
+            "process"
+          ],
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "The console also opens a WebSocket to the dispatch API"
+            }
+          ]
+        }
+      ],
+      "interactions": [
+        {
+          "handle": "i1",
+          "initiator": "m3",
+          "receiver": "m5",
+          "action": "calls dispatch API",
+          "protocol": "",
+          "operations": "unknown",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "The console calls the dispatch API."
+            }
+          ]
+        },
+        {
+          "handle": "i2",
+          "initiator": "m3",
+          "receiver": "m5",
+          "action": "opens WebSocket",
+          "protocol": "WebSocket",
+          "operations": "unknown",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "The console also opens a WebSocket to the dispatch API"
+            }
+          ]
+        },
+        {
+          "handle": "i3",
+          "initiator": "m5",
+          "receiver": "m8",
+          "action": "reads and writes",
+          "protocol": "",
+          "operations": "read-write",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "The dispatch API reads and writes the dispatch database."
+            }
+          ]
+        },
+        {
+          "handle": "i4",
+          "initiator": "m9",
+          "receiver": "m10",
+          "action": "publishes planned work",
+          "protocol": "SOAP",
+          "operations": "write",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "A scheduling partner, which is another company, publishes tomorrow's planned work."
+            }
+          ]
+        },
+        {
+          "handle": "i5",
+          "initiator": "m10",
+          "receiver": "m9",
+          "action": "pulls SOAP feed",
+          "protocol": "HTTPS",
+          "operations": "read",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "Every hour it pulls the partner's SOAP feed over HTTPS"
+            }
+          ]
+        },
+        {
+          "handle": "i6",
+          "initiator": "m10",
+          "receiver": "m11",
+          "action": "writes documents",
+          "protocol": "",
+          "operations": "write",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "It writes each document it downloads into the schedule archive"
+            }
+          ]
+        },
+        {
+          "handle": "i7",
+          "initiator": "m10",
+          "receiver": "m5",
+          "action": "posts work orders",
+          "protocol": "",
+          "operations": "write",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "The importer then posts the parsed work orders to the same dispatch API"
+            }
+          ]
+        }
+      ],
+      "facts": [
+        {
+          "handle": "f1",
+          "subject_kind": "mention",
+          "subject": "m5",
+          "predicate": "network-membership",
+          "value": "m6",
+          "scope": [],
+          "basis": "stated",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "The dispatch API runs in the production control plane."
+            }
+          ],
+          "explanation": "",
+          "exclusive": false
+        },
+        {
+          "handle": "f2",
+          "subject_kind": "mention",
+          "subject": "m10",
+          "predicate": "network-membership",
+          "value": "m2",
+          "scope": [],
+          "basis": "stated",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "Our schedule importer runs on the corporate network."
+            }
+          ],
+          "explanation": "",
+          "exclusive": false
+        },
+        {
+          "handle": "f3",
+          "subject_kind": "mention",
+          "subject": "m5",
+          "predicate": "internet-exposure",
+          "value": "internal",
+          "scope": [],
+          "basis": "stated",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "The control plane is not reachable from the internet."
+            }
+          ],
+          "explanation": "",
+          "exclusive": false
+        },
+        {
+          "handle": "f4",
+          "subject_kind": "interaction",
+          "subject": "i1",
+          "predicate": "authentication-mechanism",
+          "value": "unknown",
+          "reason": "silent",
+          "scope": [],
+          "basis": "stated",
+          "quotes": [],
+          "explanation": "",
+          "exclusive": false
+        },
+        {
+          "handle": "f5",
+          "subject_kind": "interaction",
+          "subject": "i1",
+          "predicate": "origin-verification",
+          "value": "unknown",
+          "reason": "silent",
+          "scope": [],
+          "basis": "stated",
+          "quotes": [],
+          "explanation": "",
+          "exclusive": false
+        },
+        {
+          "handle": "f6",
+          "subject_kind": "interaction",
+          "subject": "i1",
+          "predicate": "destination-verification",
+          "value": "unknown",
+          "reason": "silent",
+          "scope": [],
+          "basis": "stated",
+          "quotes": [],
+          "explanation": "",
+          "exclusive": false
+        },
+        {
+          "handle": "f7",
+          "subject_kind": "interaction",
+          "subject": "i2",
+          "predicate": "transport-encryption",
+          "value": "unknown",
+          "reason": "silent",
+          "scope": [],
+          "basis": "stated",
+          "quotes": [],
+          "explanation": "",
+          "exclusive": false
+        },
+        {
+          "handle": "f8",
+          "subject_kind": "interaction",
+          "subject": "i2",
+          "predicate": "authentication-mechanism",
+          "value": "unknown",
+          "reason": "silent",
+          "scope": [],
+          "basis": "stated",
+          "quotes": [],
+          "explanation": "",
+          "exclusive": false
+        },
+        {
+          "handle": "f9",
+          "subject_kind": "interaction",
+          "subject": "i2",
+          "predicate": "credential-presented",
+          "value": "unknown",
+          "reason": "silent",
+          "scope": [],
+          "basis": "stated",
+          "quotes": [],
+          "explanation": "",
+          "exclusive": false
+        },
+        {
+          "handle": "f10",
+          "subject_kind": "interaction",
+          "subject": "i3",
+          "predicate": "authentication-mechanism",
+          "value": "unknown",
+          "reason": "silent",
+          "scope": [],
+          "basis": "stated",
+          "quotes": [],
+          "explanation": "",
+          "exclusive": false
+        },
+        {
+          "handle": "f11",
+          "subject_kind": "mention",
+          "subject": "m8",
+          "predicate": "storage-encryption",
+          "value": "unknown",
+          "reason": "silent",
+          "scope": [],
+          "basis": "stated",
+          "quotes": [],
+          "explanation": "",
+          "exclusive": false
+        },
+        {
+          "handle": "f12",
+          "subject_kind": "interaction",
+          "subject": "i5",
+          "predicate": "transport-encryption",
+          "value": "HTTPS",
+          "scope": [],
+          "basis": "stated",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "pulls the partner's SOAP feed over HTTPS"
+            }
+          ],
+          "explanation": "",
+          "exclusive": false
+        },
+        {
+          "handle": "f13",
+          "subject_kind": "interaction",
+          "subject": "i5",
+          "predicate": "authentication-mechanism",
+          "value": "unknown",
+          "reason": "silent",
+          "scope": [],
+          "basis": "stated",
+          "quotes": [],
+          "explanation": "",
+          "exclusive": false
+        },
+        {
+          "handle": "f14",
+          "subject_kind": "interaction",
+          "subject": "i5",
+          "predicate": "origin-verification",
+          "value": "unknown",
+          "reason": "silent",
+          "scope": [],
+          "basis": "stated",
+          "quotes": [],
+          "explanation": "",
+          "exclusive": false
+        },
+        {
+          "handle": "f15",
+          "subject_kind": "interaction",
+          "subject": "i5",
+          "predicate": "destination-verification",
+          "value": "unknown",
+          "reason": "silent",
+          "scope": [],
+          "basis": "stated",
+          "quotes": [],
+          "explanation": "",
+          "exclusive": false
+        },
+        {
+          "handle": "f16",
+          "subject_kind": "interaction",
+          "subject": "i7",
+          "predicate": "credential-presented",
+          "value": "API token",
+          "scope": [],
+          "basis": "stated",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "It presents an API token."
+            }
+          ],
+          "explanation": "",
+          "exclusive": false
+        },
+        {
+          "handle": "f17",
+          "subject_kind": "credential",
+          "subject": "API token",
+          "predicate": "credential-rotation",
+          "value": "not-rotated",
+          "scope": [],
+          "basis": "stated",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "That token was issued when the importer was built and nobody has rotated it since."
+            }
+          ],
+          "explanation": "",
+          "exclusive": false
+        },
+        {
+          "handle": "f18",
+          "subject_kind": "credential",
+          "subject": "API token",
+          "predicate": "credential-lifetime",
+          "value": "issued when the importer was built",
+          "scope": [],
+          "basis": "stated",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "That token was issued when the importer was built"
+            }
+          ],
+          "explanation": "",
+          "exclusive": false
+        },
+        {
+          "handle": "f19",
+          "subject_kind": "principal",
+          "subject": "an account there",
+          "predicate": "authorization-grant",
+          "value": "move a crew",
+          "scope": [
+            {
+              "kind": "resource",
+              "value": "a crew"
+            },
+            {
+              "kind": "operation",
+              "value": "move"
+            }
+          ],
+          "basis": "stated",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "an account there can move a crew"
+            }
+          ],
+          "explanation": "",
+          "exclusive": false
+        },
+        {
+          "handle": "f20",
+          "subject_kind": "principal",
+          "subject": "an account there",
+          "predicate": "authorization-grant",
+          "value": "change the work a depot does that day",
+          "scope": [
+            {
+              "kind": "resource",
+              "value": "the work a depot does that day"
+            },
+            {
+              "kind": "operation",
+              "value": "change"
+            }
+          ],
+          "basis": "stated",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "it can change the work a depot does that day"
+            }
+          ],
+          "explanation": "",
+          "exclusive": false
+        },
+        {
+          "handle": "f21",
+          "subject_kind": "mention",
+          "subject": "m8",
+          "predicate": "record-attribution",
+          "value": "intermediary",
+          "scope": [],
+          "basis": "stated",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "Every job order in it carries the token or the session that created it, and nothing about the person behind that token."
+            }
+          ],
+          "explanation": "",
+          "exclusive": false
+        }
+      ],
+      "unresolved": [
+        {
+          "handle": "u1",
+          "question": "How does an engineer sign in to the dispatch console?",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "Nobody wrote down how an engineer signs in to it."
+            }
+          ]
+        },
+        {
+          "handle": "u2",
+          "question": "Which origins does the dispatch API allow through CORS, and does it allow credentials?",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "Whoever configured CORS did not record which origins the API allows, or whether it allows credentials."
+            }
+          ]
+        },
+        {
+          "handle": "u3",
+          "question": "Does the WebSocket run over TLS, is its handshake authenticated, and does it check the engineer's session again after opening?",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "Nobody wrote down whether that socket runs over TLS, whether its handshake is authenticated, or whether it checks the engineer's session again after it is open."
+            }
+          ]
+        },
+        {
+          "handle": "u4",
+          "question": "How is the dispatch database protected at rest?",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "How the database is protected at rest is not written down anywhere."
+            }
+          ]
+        },
+        {
+          "handle": "u5",
+          "question": "How does the scheduling partner identify the schedule importer?",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "Nothing was written down about how the partner identifies our importer"
+            }
+          ]
+        },
+        {
+          "handle": "u6",
+          "question": "How does the schedule importer identify the scheduling partner?",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "or how our importer identifies the partner."
+            }
+          ]
+        },
+        {
+          "handle": "u7",
+          "question": "Are the API token and the token or session carried by job orders the same credential?",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "Every job order in it carries the token or the session that created it"
+            }
+          ]
+        },
+        {
+          "handle": "u8",
+          "question": "Are the dispatch console and the corporate web host the same component or distinct components?",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "The console is a single-page JavaScript app and our corporate web host serves it."
+            }
+          ]
+        }
+      ]
+    },
+    "bundle_dispositions": [
+      {
+        "handle": "m2",
+        "kind": "mention",
+        "disposition": "consumed",
+        "target": "boundary:corporate-network",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "m6",
+        "kind": "mention",
+        "disposition": "consumed",
+        "target": "boundary:production-control-plane",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "m7",
+        "kind": "mention",
+        "disposition": "consumed",
+        "target": "boundary:corporate-laptop",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "m1",
+        "kind": "mention",
+        "disposition": "consumed",
+        "target": "process:field-dispatch-platform",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "m3",
+        "kind": "mention",
+        "disposition": "consumed",
+        "target": "process:dispatch-console",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "m4",
+        "kind": "mention",
+        "disposition": "consumed",
+        "target": "process:corporate-web-host",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "m5",
+        "kind": "mention",
+        "disposition": "consumed",
+        "target": "process:dispatch-api",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "m8",
+        "kind": "mention",
+        "disposition": "consumed",
+        "target": "store:dispatch-database",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "m9",
+        "kind": "mention",
+        "disposition": "consumed",
+        "target": "entity:scheduling-partner",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "m10",
+        "kind": "mention",
+        "disposition": "consumed",
+        "target": "process:schedule-importer",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "m11",
+        "kind": "mention",
+        "disposition": "consumed",
+        "target": "store:schedule-archive",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "m12",
+        "kind": "mention",
+        "disposition": "consumed",
+        "target": "store:corporate-file-store",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "m13",
+        "kind": "mention",
+        "disposition": "consumed",
+        "target": "entity:duty-engineers",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "m14",
+        "kind": "mention",
+        "disposition": "consumed",
+        "target": "process:websocket",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "i1",
+        "kind": "interaction",
+        "disposition": "consumed",
+        "target": "flow:process:dispatch-console>process:dispatch-api>calls-dispatch-api",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "i2",
+        "kind": "interaction",
+        "disposition": "consumed",
+        "target": "flow:process:dispatch-console>process:dispatch-api>opens-websocket",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "i3",
+        "kind": "interaction",
+        "disposition": "consumed",
+        "target": "flow:process:dispatch-api>store:dispatch-database>reads-and-writes",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "i4",
+        "kind": "interaction",
+        "disposition": "consumed",
+        "target": "flow:entity:scheduling-partner>process:schedule-importer>publishes-planned-work",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "i5",
+        "kind": "interaction",
+        "disposition": "consumed",
+        "target": "flow:process:schedule-importer>entity:scheduling-partner>pulls-soap-feed",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "i6",
+        "kind": "interaction",
+        "disposition": "consumed",
+        "target": "flow:process:schedule-importer>store:schedule-archive>writes-documents",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "i7",
+        "kind": "interaction",
+        "disposition": "consumed",
+        "target": "flow:process:schedule-importer>process:dispatch-api>posts-work-orders",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "f1",
+        "kind": "fact",
+        "disposition": "consumed",
+        "target": "process:dispatch-api",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "f2",
+        "kind": "fact",
+        "disposition": "consumed",
+        "target": "process:schedule-importer",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "f3",
+        "kind": "fact",
+        "disposition": "consumed",
+        "target": "process:dispatch-api",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "f4",
+        "kind": "fact",
+        "disposition": "consumed",
+        "target": "flow:process:dispatch-console>process:dispatch-api>calls-dispatch-api",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "f5",
+        "kind": "fact",
+        "disposition": "preserved",
+        "target": "flow:process:dispatch-console>process:dispatch-api>calls-dispatch-api",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "f6",
+        "kind": "fact",
+        "disposition": "preserved",
+        "target": "flow:process:dispatch-console>process:dispatch-api>calls-dispatch-api",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "f7",
+        "kind": "fact",
+        "disposition": "consumed",
+        "target": "flow:process:dispatch-console>process:dispatch-api>opens-websocket",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "f8",
+        "kind": "fact",
+        "disposition": "consumed",
+        "target": "flow:process:dispatch-console>process:dispatch-api>opens-websocket",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "f9",
+        "kind": "fact",
+        "disposition": "consumed",
+        "target": "flow:process:dispatch-console>process:dispatch-api>opens-websocket",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "f10",
+        "kind": "fact",
+        "disposition": "consumed",
+        "target": "flow:process:dispatch-api>store:dispatch-database>reads-and-writes",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "f11",
+        "kind": "fact",
+        "disposition": "consumed",
+        "target": "store:dispatch-database",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "f12",
+        "kind": "fact",
+        "disposition": "consumed",
+        "target": "flow:process:schedule-importer>entity:scheduling-partner>pulls-soap-feed",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "f13",
+        "kind": "fact",
+        "disposition": "consumed",
+        "target": "flow:process:schedule-importer>entity:scheduling-partner>pulls-soap-feed",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "f14",
+        "kind": "fact",
+        "disposition": "preserved",
+        "target": "flow:process:schedule-importer>entity:scheduling-partner>pulls-soap-feed",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "f15",
+        "kind": "fact",
+        "disposition": "preserved",
+        "target": "flow:process:schedule-importer>entity:scheduling-partner>pulls-soap-feed",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "f16",
+        "kind": "fact",
+        "disposition": "consumed",
+        "target": "flow:process:schedule-importer>process:dispatch-api>posts-work-orders",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "f17",
+        "kind": "fact",
+        "disposition": "preserved",
+        "target": "API token",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "f18",
+        "kind": "fact",
+        "disposition": "preserved",
+        "target": "API token",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "f19",
+        "kind": "fact",
+        "disposition": "preserved",
+        "target": "an account there",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "f20",
+        "kind": "fact",
+        "disposition": "preserved",
+        "target": "an account there",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "f21",
+        "kind": "fact",
+        "disposition": "preserved",
+        "target": "store:dispatch-database",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "u1",
+        "kind": "unresolved",
+        "disposition": "unresolved",
+        "target": "",
+        "code": "open-question",
+        "message": "How does an engineer sign in to the dispatch console?"
+      },
+      {
+        "handle": "u2",
+        "kind": "unresolved",
+        "disposition": "unresolved",
+        "target": "",
+        "code": "open-question",
+        "message": "Which origins does the dispatch API allow through CORS, and does it allow credentials?"
+      },
+      {
+        "handle": "u3",
+        "kind": "unresolved",
+        "disposition": "unresolved",
+        "target": "",
+        "code": "open-question",
+        "message": "Does the WebSocket run over TLS, is its handshake authenticated, and does it check the engineer's session again after opening?"
+      },
+      {
+        "handle": "u4",
+        "kind": "unresolved",
+        "disposition": "unresolved",
+        "target": "",
+        "code": "open-question",
+        "message": "How is the dispatch database protected at rest?"
+      },
+      {
+        "handle": "u5",
+        "kind": "unresolved",
+        "disposition": "unresolved",
+        "target": "",
+        "code": "open-question",
+        "message": "How does the scheduling partner identify the schedule importer?"
+      },
+      {
+        "handle": "u6",
+        "kind": "unresolved",
+        "disposition": "unresolved",
+        "target": "",
+        "code": "open-question",
+        "message": "How does the schedule importer identify the scheduling partner?"
+      },
+      {
+        "handle": "u7",
+        "kind": "unresolved",
+        "disposition": "unresolved",
+        "target": "",
+        "code": "open-question",
+        "message": "Are the API token and the token or session carried by job orders the same credential?"
+      },
+      {
+        "handle": "u8",
+        "kind": "unresolved",
+        "disposition": "unresolved",
+        "target": "",
+        "code": "open-question",
+        "message": "Are the dispatch console and the corporate web host the same component or distinct components?"
+      }
+    ],
+    "extracted_model": {
+      "external_entities": [
+        {
+          "id": "entity:scheduling-partner",
+          "name": "scheduling partner",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "A scheduling partner, which is another company",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "kind": "external-system",
+          "trust_zone": "unknown"
+        },
+        {
+          "id": "entity:duty-engineers",
+          "name": "duty engineers",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "Duty engineers sit on the corporate network.",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "kind": "human",
+          "trust_zone": "unknown"
+        }
+      ],
+      "processes": [
+        {
+          "id": "process:field-dispatch-platform",
+          "name": "field dispatch platform",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "We run our own field dispatch platform.",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "technology": "unknown",
+          "trust_zone": "unknown",
+          "exposure": "unknown",
+          "interface_kind": "unknown"
+        },
+        {
+          "id": "process:dispatch-console",
+          "name": "dispatch console",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "They open the dispatch console in their browser.",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "technology": "unknown",
+          "trust_zone": "unknown",
+          "exposure": "unknown",
+          "interface_kind": "unknown"
+        },
+        {
+          "id": "process:corporate-web-host",
+          "name": "corporate web host",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "our corporate web host serves it",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "technology": "unknown",
+          "trust_zone": "unknown",
+          "exposure": "unknown",
+          "interface_kind": "unknown"
+        },
+        {
+          "id": "process:dispatch-api",
+          "name": "dispatch API",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "The console calls the dispatch API.",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "technology": "unknown",
+          "trust_zone": "unknown",
+          "exposure": "unknown",
+          "interface_kind": "unknown"
+        },
+        {
+          "id": "process:schedule-importer",
+          "name": "schedule importer",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "Our schedule importer runs on the corporate network.",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "technology": "unknown",
+          "trust_zone": "unknown",
+          "exposure": "unknown",
+          "interface_kind": "unknown"
+        },
+        {
+          "id": "process:websocket",
+          "name": "WebSocket",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "The console also opens a WebSocket to the dispatch API",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "technology": "unknown",
+          "trust_zone": "unknown",
+          "exposure": "unknown",
+          "interface_kind": "unknown"
+        }
+      ],
+      "data_stores": [
+        {
+          "id": "store:dispatch-database",
+          "name": "dispatch database",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "The dispatch API reads and writes the dispatch database.",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "technology": "unknown",
+          "trust_zone": "unknown",
+          "data_classification": "unknown",
+          "encryption_at_rest": "unknown"
+        },
+        {
+          "id": "store:schedule-archive",
+          "name": "schedule archive",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "the schedule archive, a folder on the corporate file store",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "technology": "unknown",
+          "trust_zone": "unknown",
+          "data_classification": "unknown",
+          "encryption_at_rest": "unknown"
+        },
+        {
+          "id": "store:corporate-file-store",
+          "name": "corporate file store",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "a folder on the corporate file store",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "technology": "unknown",
+          "trust_zone": "unknown",
+          "data_classification": "unknown",
+          "encryption_at_rest": "unknown"
+        }
+      ],
+      "data_flows": [
+        {
+          "id": "flow:process:dispatch-console>process:dispatch-api>calls-dispatch-api",
+          "name": "calls dispatch API",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "The console calls the dispatch API.",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "source": "process:dispatch-console",
+          "destination": "process:dispatch-api",
+          "protocol": "",
+          "authentication": "unknown",
+          "data_description": "unknown",
+          "encryption_in_transit": "unknown",
+          "operations": "unknown"
+        },
+        {
+          "id": "flow:process:dispatch-console>process:dispatch-api>opens-websocket",
+          "name": "opens WebSocket",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "The console also opens a WebSocket to the dispatch API",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "source": "process:dispatch-console",
+          "destination": "process:dispatch-api",
+          "protocol": "WebSocket",
+          "authentication": "unknown",
+          "data_description": "unknown",
+          "encryption_in_transit": "unknown",
+          "operations": "unknown"
+        },
+        {
+          "id": "flow:process:dispatch-api>store:dispatch-database>reads-and-writes",
+          "name": "reads and writes",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "The dispatch API reads and writes the dispatch database.",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "source": "process:dispatch-api",
+          "destination": "store:dispatch-database",
+          "protocol": "",
+          "authentication": "unknown",
+          "data_description": "unknown",
+          "encryption_in_transit": "unknown",
+          "operations": "read-write"
+        },
+        {
+          "id": "flow:entity:scheduling-partner>process:schedule-importer>publishes-planned-work",
+          "name": "publishes planned work",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "A scheduling partner, which is another company, publishes tomorrow's planned work.",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "source": "entity:scheduling-partner",
+          "destination": "process:schedule-importer",
+          "protocol": "SOAP",
+          "authentication": "unknown",
+          "data_description": "unknown",
+          "encryption_in_transit": "unknown",
+          "operations": "write"
+        },
+        {
+          "id": "flow:process:schedule-importer>entity:scheduling-partner>pulls-soap-feed",
+          "name": "pulls SOAP feed",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "Every hour it pulls the partner's SOAP feed over HTTPS",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "source": "process:schedule-importer",
+          "destination": "entity:scheduling-partner",
+          "protocol": "HTTPS",
+          "authentication": "unknown",
+          "data_description": "unknown",
+          "encryption_in_transit": "unknown",
+          "operations": "read"
+        },
+        {
+          "id": "flow:process:schedule-importer>store:schedule-archive>writes-documents",
+          "name": "writes documents",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "It writes each document it downloads into the schedule archive",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "source": "process:schedule-importer",
+          "destination": "store:schedule-archive",
+          "protocol": "",
+          "authentication": "unknown",
+          "data_description": "unknown",
+          "encryption_in_transit": "unknown",
+          "operations": "write"
+        },
+        {
+          "id": "flow:process:schedule-importer>process:dispatch-api>posts-work-orders",
+          "name": "posts work orders",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "The importer then posts the parsed work orders to the same dispatch API",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "source": "process:schedule-importer",
+          "destination": "process:dispatch-api",
+          "protocol": "",
+          "authentication": "unknown",
+          "data_description": "unknown",
+          "encryption_in_transit": "unknown",
+          "operations": "write"
+        }
+      ],
+      "trust_boundaries": [
+        {
+          "id": "boundary:corporate-network",
+          "name": "corporate network",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "Duty engineers sit on the corporate network.",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "kind": "network"
+        },
+        {
+          "id": "boundary:production-control-plane",
+          "name": "production control plane",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "The dispatch API runs in the production control plane.",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "kind": "privilege"
+        },
+        {
+          "id": "boundary:corporate-laptop",
+          "name": "corporate laptop",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "A corporate laptop holds none of those rights.",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "kind": "other"
+        }
+      ],
+      "assumptions": [],
+      "capabilities": []
+    },
+    "valid_model": {
+      "external_entities": [
+        {
+          "id": "entity:scheduling-partner",
+          "name": "scheduling partner",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "A scheduling partner, which is another company",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "kind": "external-system",
+          "trust_zone": "unknown"
+        },
+        {
+          "id": "entity:duty-engineers",
+          "name": "duty engineers",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "Duty engineers sit on the corporate network.",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "kind": "human",
+          "trust_zone": "unknown"
+        }
+      ],
+      "processes": [
+        {
+          "id": "process:field-dispatch-platform",
+          "name": "field dispatch platform",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "We run our own field dispatch platform.",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "technology": "unknown",
+          "trust_zone": "unknown",
+          "exposure": "unknown",
+          "interface_kind": "unknown"
+        },
+        {
+          "id": "process:dispatch-console",
+          "name": "dispatch console",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "They open the dispatch console in their browser.",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "technology": "unknown",
+          "trust_zone": "unknown",
+          "exposure": "unknown",
+          "interface_kind": "unknown"
+        },
+        {
+          "id": "process:corporate-web-host",
+          "name": "corporate web host",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "our corporate web host serves it",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "technology": "unknown",
+          "trust_zone": "unknown",
+          "exposure": "unknown",
+          "interface_kind": "unknown"
+        },
+        {
+          "id": "process:dispatch-api",
+          "name": "dispatch API",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "The console calls the dispatch API.",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "technology": "unknown",
+          "trust_zone": "unknown",
+          "exposure": "unknown",
+          "interface_kind": "unknown"
+        },
+        {
+          "id": "process:schedule-importer",
+          "name": "schedule importer",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "Our schedule importer runs on the corporate network.",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "technology": "unknown",
+          "trust_zone": "unknown",
+          "exposure": "unknown",
+          "interface_kind": "unknown"
+        },
+        {
+          "id": "process:websocket",
+          "name": "WebSocket",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "The console also opens a WebSocket to the dispatch API",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "technology": "unknown",
+          "trust_zone": "unknown",
+          "exposure": "unknown",
+          "interface_kind": "unknown"
+        }
+      ],
+      "data_stores": [
+        {
+          "id": "store:dispatch-database",
+          "name": "dispatch database",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "The dispatch API reads and writes the dispatch database.",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "technology": "unknown",
+          "trust_zone": "unknown",
+          "data_classification": "unknown",
+          "encryption_at_rest": "unknown"
+        },
+        {
+          "id": "store:schedule-archive",
+          "name": "schedule archive",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "the schedule archive, a folder on the corporate file store",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "technology": "unknown",
+          "trust_zone": "unknown",
+          "data_classification": "unknown",
+          "encryption_at_rest": "unknown"
+        },
+        {
+          "id": "store:corporate-file-store",
+          "name": "corporate file store",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "a folder on the corporate file store",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "technology": "unknown",
+          "trust_zone": "unknown",
+          "data_classification": "unknown",
+          "encryption_at_rest": "unknown"
+        }
+      ],
+      "data_flows": [
+        {
+          "id": "flow:process:dispatch-console>process:dispatch-api>calls-dispatch-api",
+          "name": "calls dispatch API",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "The console calls the dispatch API.",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "source": "process:dispatch-console",
+          "destination": "process:dispatch-api",
+          "protocol": "",
+          "authentication": "unknown",
+          "data_description": "unknown",
+          "encryption_in_transit": "unknown",
+          "operations": "unknown"
+        },
+        {
+          "id": "flow:process:dispatch-console>process:dispatch-api>opens-websocket",
+          "name": "opens WebSocket",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "The console also opens a WebSocket to the dispatch API",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "source": "process:dispatch-console",
+          "destination": "process:dispatch-api",
+          "protocol": "WebSocket",
+          "authentication": "unknown",
+          "data_description": "unknown",
+          "encryption_in_transit": "unknown",
+          "operations": "unknown"
+        },
+        {
+          "id": "flow:process:dispatch-api>store:dispatch-database>reads-and-writes",
+          "name": "reads and writes",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "The dispatch API reads and writes the dispatch database.",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "source": "process:dispatch-api",
+          "destination": "store:dispatch-database",
+          "protocol": "",
+          "authentication": "unknown",
+          "data_description": "unknown",
+          "encryption_in_transit": "unknown",
+          "operations": "read-write"
+        },
+        {
+          "id": "flow:entity:scheduling-partner>process:schedule-importer>publishes-planned-work",
+          "name": "publishes planned work",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "A scheduling partner, which is another company, publishes tomorrow's planned work.",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "source": "entity:scheduling-partner",
+          "destination": "process:schedule-importer",
+          "protocol": "SOAP",
+          "authentication": "unknown",
+          "data_description": "unknown",
+          "encryption_in_transit": "unknown",
+          "operations": "write"
+        },
+        {
+          "id": "flow:process:schedule-importer>entity:scheduling-partner>pulls-soap-feed",
+          "name": "pulls SOAP feed",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "Every hour it pulls the partner's SOAP feed over HTTPS",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "source": "process:schedule-importer",
+          "destination": "entity:scheduling-partner",
+          "protocol": "HTTPS",
+          "authentication": "unknown",
+          "data_description": "unknown",
+          "encryption_in_transit": "unknown",
+          "operations": "read"
+        },
+        {
+          "id": "flow:process:schedule-importer>store:schedule-archive>writes-documents",
+          "name": "writes documents",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "It writes each document it downloads into the schedule archive",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "source": "process:schedule-importer",
+          "destination": "store:schedule-archive",
+          "protocol": "",
+          "authentication": "unknown",
+          "data_description": "unknown",
+          "encryption_in_transit": "unknown",
+          "operations": "write"
+        },
+        {
+          "id": "flow:process:schedule-importer>process:dispatch-api>posts-work-orders",
+          "name": "posts work orders",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "The importer then posts the parsed work orders to the same dispatch API",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "source": "process:schedule-importer",
+          "destination": "process:dispatch-api",
+          "protocol": "",
+          "authentication": "unknown",
+          "data_description": "unknown",
+          "encryption_in_transit": "unknown",
+          "operations": "write"
+        },
+        {
+          "id": "flow:process:corporate-web-host>process:dispatch-console>serves",
+          "name": "serves",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "our corporate web host serves it",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "source": "process:corporate-web-host",
+          "destination": "process:dispatch-console",
+          "protocol": "",
+          "authentication": "unknown",
+          "data_description": "unknown",
+          "encryption_in_transit": "unknown",
+          "operations": "write"
+        },
+        {
+          "id": "flow:entity:duty-engineers>process:dispatch-console>open",
+          "name": "open",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "They open the dispatch console in their browser",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "source": "entity:duty-engineers",
+          "destination": "process:dispatch-console",
+          "protocol": "",
+          "authentication": "unknown",
+          "data_description": "unknown",
+          "encryption_in_transit": "unknown",
+          "operations": "read"
+        }
+      ],
+      "trust_boundaries": [
+        {
+          "id": "boundary:corporate-network",
+          "name": "corporate network",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "Duty engineers sit on the corporate network.",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "kind": "network"
+        },
+        {
+          "id": "boundary:production-control-plane",
+          "name": "production control plane",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "The dispatch API runs in the production control plane.",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "kind": "privilege"
+        },
+        {
+          "id": "boundary:corporate-laptop",
+          "name": "corporate laptop",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "A corporate laptop holds none of those rights.",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "kind": "other"
+        }
+      ],
+      "assumptions": [],
+      "capabilities": []
+    },
+    "patch_outcomes": {
+      "rolled_back": false,
+      "outcomes": [
+        {
+          "handle": "serve_console",
+          "state": "applied",
+          "code": "",
+          "message": ""
+        },
+        {
+          "handle": "engineers_open_console",
+          "state": "applied",
+          "code": "",
+          "message": ""
+        },
+        {
+          "handle": "engineers_corporate_network",
+          "state": "applied",
+          "code": "",
+          "message": ""
+        }
+      ]
+    }
+  }
+}

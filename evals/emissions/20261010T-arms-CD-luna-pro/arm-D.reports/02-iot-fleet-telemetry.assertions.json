@@ -1,0 +1,2287 @@
+{
+  "proposal": {
+    "assertions": [
+      {
+        "subject_type": "component",
+        "subject": "entity:sensor-node",
+        "predicate": "network-membership",
+        "value": "boundary:customer-site",
+        "reason": null,
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "sensor nodes installed on customer sites"
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      {
+        "subject_type": "component",
+        "subject": "process:telemetry-normalizer",
+        "predicate": "network-membership",
+        "value": "boundary:analytics-network",
+        "reason": null,
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "the telemetry normalizer, a Python consumer in our analytics network"
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      {
+        "subject_type": "component",
+        "subject": "process:device-gateway",
+        "predicate": "internet-exposure",
+        "value": "internet-facing",
+        "reason": null,
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "the device gateway ... expose to the internet"
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      {
+        "subject_type": "component",
+        "subject": "store:cloud-storage-bucket",
+        "predicate": "internet-exposure",
+        "value": "internet-facing",
+        "reason": null,
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "The bucket is public read"
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      {
+        "subject_type": "component",
+        "subject": "store:telemetry-lake",
+        "predicate": "data-classification",
+        "value": "confidential",
+        "reason": null,
+        "scope": [],
+        "basis": "inferred",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "The lake has site addresses and occupancy patterns in it, so it is customer data"
+          }
+        ],
+        "explanation": "Customer data is treated as confidential data.",
+        "exclusive": false
+      },
+      {
+        "subject_type": "interaction",
+        "subject": "flow:entity:sensor-node>process:device-gateway>publishes-readings",
+        "predicate": "authentication-mechanism",
+        "value": "pre-shared key",
+        "reason": null,
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "Nodes authenticate to the broker with a pre-shared key"
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      {
+        "subject_type": "credential",
+        "subject": "pre-shared key",
+        "predicate": "credential-sharing",
+        "value": "shared",
+        "reason": null,
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "The key is per fleet, not per device"
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      {
+        "subject_type": "credential",
+        "subject": "pre-shared key",
+        "predicate": "credential-rotation",
+        "value": "not-rotated",
+        "reason": null,
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "Nobody has rotated it since deployment"
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      {
+        "subject_type": "interaction",
+        "subject": "flow:entity:sensor-node>process:device-gateway>publishes-readings",
+        "predicate": "credential-presented",
+        "value": "pre-shared key",
+        "reason": null,
+        "scope": [],
+        "basis": "inferred",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "Nodes authenticate to the broker with a pre-shared key"
+          }
+        ],
+        "explanation": "The key is the credential used by the nodes to authenticate on this interaction.",
+        "exclusive": false
+      },
+      {
+        "subject_type": "principal",
+        "subject": "sensor nodes",
+        "predicate": "credential-presented",
+        "value": "pre-shared key",
+        "reason": null,
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "Nodes authenticate to the broker with a pre-shared key"
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      {
+        "subject_type": "interaction",
+        "subject": "flow:entity:sensor-node>store:cloud-storage-bucket>polls-for-image",
+        "predicate": "authentication-mechanism",
+        "value": "absent",
+        "reason": null,
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "The bucket is public read, because making the nodes authenticate to it was awkward"
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      {
+        "subject_type": "artifact",
+        "subject": "image",
+        "predicate": "signature-verification",
+        "value": "unknown",
+        "reason": "hedged",
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "I do not know whether the nodes check a signature on the image before installing it"
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      {
+        "subject_type": "interaction",
+        "subject": "flow:entity:sensor-node>store:cloud-storage-bucket>polls-for-image",
+        "predicate": "signature-verification",
+        "value": "unknown",
+        "reason": "hedged",
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "I do not know whether the nodes check a signature on the image before installing it"
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      {
+        "subject_type": "interaction",
+        "subject": "flow:entity:sensor-node>process:device-gateway>publishes-readings",
+        "predicate": "transport-encryption",
+        "value": "unknown",
+        "reason": "silent",
+        "scope": [],
+        "basis": "stated",
+        "quotes": [],
+        "explanation": "",
+        "exclusive": false
+      },
+      {
+        "subject_type": "interaction",
+        "subject": "flow:entity:sensor-node>store:cloud-storage-bucket>polls-for-image",
+        "predicate": "origin-verification",
+        "value": "unknown",
+        "reason": "silent",
+        "scope": [],
+        "basis": "stated",
+        "quotes": [],
+        "explanation": "",
+        "exclusive": false
+      },
+      {
+        "subject_type": "zone",
+        "subject": "boundary:local-serial-console",
+        "predicate": "authentication-mechanism",
+        "value": "unknown",
+        "reason": "hedged",
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "I don't know what authentication that console has, if any"
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      {
+        "subject_type": "component",
+        "subject": "entity:sensor-node",
+        "predicate": "tenant-ownership",
+        "value": "customer",
+        "reason": null,
+        "scope": [],
+        "basis": "inferred",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "They are outside our physical control"
+          }
+        ],
+        "explanation": "The nodes are installed on customer sites and outside the described organization's physical control.",
+        "exclusive": false
+      }
+    ]
+  },
+  "catalog": {
+    "registry_version": 8,
+    "subjects": [
+      {
+        "id": "artifact:image",
+        "type": "artifact",
+        "label": "image"
+      },
+      {
+        "id": "boundary:analytics-network",
+        "type": "zone",
+        "label": "analytics network"
+      },
+      {
+        "id": "boundary:customer-site",
+        "type": "zone",
+        "label": "customer site"
+      },
+      {
+        "id": "credential:pre-shared-key",
+        "type": "credential",
+        "label": "pre-shared key"
+      },
+      {
+        "id": "entity:sensor-node",
+        "type": "component",
+        "label": "sensor node"
+      },
+      {
+        "id": "flow:entity:sensor-node>process:device-gateway>publishes-readings",
+        "type": "interaction",
+        "label": "publishes readings"
+      },
+      {
+        "id": "flow:entity:sensor-node>store:cloud-storage-bucket>polls-for-image",
+        "type": "interaction",
+        "label": "polls for image"
+      },
+      {
+        "id": "principal:customer",
+        "type": "principal",
+        "label": "customer"
+      },
+      {
+        "id": "principal:sensor-nodes",
+        "type": "principal",
+        "label": "sensor nodes"
+      },
+      {
+        "id": "process:device-gateway",
+        "type": "component",
+        "label": "device gateway"
+      },
+      {
+        "id": "process:telemetry-normalizer",
+        "type": "component",
+        "label": "telemetry normalizer"
+      },
+      {
+        "id": "store:cloud-storage-bucket",
+        "type": "component",
+        "label": "Cloud Storage bucket"
+      },
+      {
+        "id": "store:telemetry-lake",
+        "type": "component",
+        "label": "telemetry lake"
+      }
+    ],
+    "entries": [
+      {
+        "subject": "entity:sensor-node",
+        "predicate": "network-membership",
+        "value": "boundary:customer-site",
+        "scope": [],
+        "basis": "stated",
+        "reason": null,
+        "support": [
+          {
+            "source_label": "System description",
+            "digest": "fc745e273aff8be740a814f0a9b4a45d6f3c6fe39dc7c8efa2b879d4f270ac74",
+            "start": 74,
+            "end": 115,
+            "quote": "sensor nodes installed on customer sites"
+          }
+        ],
+        "premises": [],
+        "explanation": "",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      },
+      {
+        "subject": "process:telemetry-normalizer",
+        "predicate": "network-membership",
+        "value": "boundary:analytics-network",
+        "scope": [],
+        "basis": "stated",
+        "reason": null,
+        "support": [
+          {
+            "source_label": "System description",
+            "digest": "fc745e273aff8be740a814f0a9b4a45d6f3c6fe39dc7c8efa2b879d4f270ac74",
+            "start": 722,
+            "end": 791,
+            "quote": "the telemetry normalizer, a Python consumer in our analytics network"
+          }
+        ],
+        "premises": [],
+        "explanation": "",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      },
+      {
+        "subject": "process:device-gateway",
+        "predicate": "internet-exposure",
+        "value": "internet-facing",
+        "scope": [],
+        "basis": "stated",
+        "reason": null,
+        "support": [
+          {
+            "source_label": "System description",
+            "digest": "fc745e273aff8be740a814f0a9b4a45d6f3c6fe39dc7c8efa2b879d4f270ac74",
+            "start": 254,
+            "end": 273,
+            "quote": "the device gateway"
+          },
+          {
+            "source_label": "System description",
+            "digest": "fc745e273aff8be740a814f0a9b4a45d6f3c6fe39dc7c8efa2b879d4f270ac74",
+            "start": 316,
+            "end": 338,
+            "quote": "expose to the internet"
+          }
+        ],
+        "premises": [],
+        "explanation": "",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      },
+      {
+        "subject": "store:cloud-storage-bucket",
+        "predicate": "internet-exposure",
+        "value": "internet-facing",
+        "scope": [],
+        "basis": "stated",
+        "reason": null,
+        "support": [
+          {
+            "source_label": "System description",
+            "digest": "fc745e273aff8be740a814f0a9b4a45d6f3c6fe39dc7c8efa2b879d4f270ac74",
+            "start": 1051,
+            "end": 1077,
+            "quote": "The bucket is public read"
+          }
+        ],
+        "premises": [],
+        "explanation": "",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      },
+      {
+        "subject": "store:telemetry-lake",
+        "predicate": "data-classification",
+        "value": "confidential",
+        "scope": [],
+        "basis": "inferred",
+        "reason": null,
+        "support": [
+          {
+            "source_label": "System description",
+            "digest": "fc745e273aff8be740a814f0a9b4a45d6f3c6fe39dc7c8efa2b879d4f270ac74",
+            "start": 847,
+            "end": 928,
+            "quote": "The lake has site addresses and occupancy patterns in it, so it is customer data"
+          }
+        ],
+        "premises": [],
+        "explanation": "Customer data is treated as confidential data.",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      },
+      {
+        "subject": "flow:entity:sensor-node>process:device-gateway>publishes-readings",
+        "predicate": "authentication-mechanism",
+        "value": "pre-shared key",
+        "scope": [],
+        "basis": "stated",
+        "reason": null,
+        "support": [
+          {
+            "source_label": "System description",
+            "digest": "fc745e273aff8be740a814f0a9b4a45d6f3c6fe39dc7c8efa2b879d4f270ac74",
+            "start": 380,
+            "end": 435,
+            "quote": "Nodes authenticate to the broker with a pre-shared key"
+          }
+        ],
+        "premises": [],
+        "explanation": "",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      },
+      {
+        "subject": "credential:pre-shared-key",
+        "predicate": "credential-sharing",
+        "value": "shared",
+        "scope": [],
+        "basis": "stated",
+        "reason": null,
+        "support": [
+          {
+            "source_label": "System description",
+            "digest": "fc745e273aff8be740a814f0a9b4a45d6f3c6fe39dc7c8efa2b879d4f270ac74",
+            "start": 436,
+            "end": 473,
+            "quote": "The key is per fleet, not per device"
+          }
+        ],
+        "premises": [],
+        "explanation": "",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      },
+      {
+        "subject": "credential:pre-shared-key",
+        "predicate": "credential-rotation",
+        "value": "not-rotated",
+        "scope": [],
+        "basis": "stated",
+        "reason": null,
+        "support": [
+          {
+            "source_label": "System description",
+            "digest": "fc745e273aff8be740a814f0a9b4a45d6f3c6fe39dc7c8efa2b879d4f270ac74",
+            "start": 474,
+            "end": 513,
+            "quote": "Nobody has rotated it since deployment"
+          }
+        ],
+        "premises": [],
+        "explanation": "",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      },
+      {
+        "subject": "flow:entity:sensor-node>process:device-gateway>publishes-readings",
+        "predicate": "credential-presented",
+        "value": "credential:pre-shared-key",
+        "scope": [],
+        "basis": "inferred",
+        "reason": null,
+        "support": [
+          {
+            "source_label": "System description",
+            "digest": "fc745e273aff8be740a814f0a9b4a45d6f3c6fe39dc7c8efa2b879d4f270ac74",
+            "start": 380,
+            "end": 435,
+            "quote": "Nodes authenticate to the broker with a pre-shared key"
+          }
+        ],
+        "premises": [],
+        "explanation": "The key is the credential used by the nodes to authenticate on this interaction.",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      },
+      {
+        "subject": "principal:sensor-nodes",
+        "predicate": "credential-presented",
+        "value": "credential:pre-shared-key",
+        "scope": [],
+        "basis": "stated",
+        "reason": null,
+        "support": [
+          {
+            "source_label": "System description",
+            "digest": "fc745e273aff8be740a814f0a9b4a45d6f3c6fe39dc7c8efa2b879d4f270ac74",
+            "start": 380,
+            "end": 435,
+            "quote": "Nodes authenticate to the broker with a pre-shared key"
+          }
+        ],
+        "premises": [],
+        "explanation": "",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      },
+      {
+        "subject": "flow:entity:sensor-node>store:cloud-storage-bucket>polls-for-image",
+        "predicate": "authentication-mechanism",
+        "value": "absent",
+        "scope": [],
+        "basis": "stated",
+        "reason": null,
+        "support": [
+          {
+            "source_label": "System description",
+            "digest": "fc745e273aff8be740a814f0a9b4a45d6f3c6fe39dc7c8efa2b879d4f270ac74",
+            "start": 1051,
+            "end": 1134,
+            "quote": "The bucket is public read, because making the nodes authenticate to it was awkward"
+          }
+        ],
+        "premises": [],
+        "explanation": "",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      },
+      {
+        "subject": "artifact:image",
+        "predicate": "signature-verification",
+        "value": "unknown",
+        "scope": [],
+        "basis": "stated",
+        "reason": "hedged",
+        "support": [
+          {
+            "source_label": "System description",
+            "digest": "fc745e273aff8be740a814f0a9b4a45d6f3c6fe39dc7c8efa2b879d4f270ac74",
+            "start": 1135,
+            "end": 1219,
+            "quote": "I do not know whether the nodes check a signature on the image before installing it"
+          }
+        ],
+        "premises": [],
+        "explanation": "",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      },
+      {
+        "subject": "flow:entity:sensor-node>store:cloud-storage-bucket>polls-for-image",
+        "predicate": "signature-verification",
+        "value": "unknown",
+        "scope": [],
+        "basis": "stated",
+        "reason": "hedged",
+        "support": [
+          {
+            "source_label": "System description",
+            "digest": "fc745e273aff8be740a814f0a9b4a45d6f3c6fe39dc7c8efa2b879d4f270ac74",
+            "start": 1135,
+            "end": 1219,
+            "quote": "I do not know whether the nodes check a signature on the image before installing it"
+          }
+        ],
+        "premises": [],
+        "explanation": "",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      },
+      {
+        "subject": "flow:entity:sensor-node>process:device-gateway>publishes-readings",
+        "predicate": "transport-encryption",
+        "value": "unknown",
+        "scope": [],
+        "basis": "stated",
+        "reason": "silent",
+        "support": [],
+        "premises": [],
+        "explanation": "",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      },
+      {
+        "subject": "flow:entity:sensor-node>store:cloud-storage-bucket>polls-for-image",
+        "predicate": "origin-verification",
+        "value": "unknown",
+        "scope": [],
+        "basis": "stated",
+        "reason": "silent",
+        "support": [],
+        "premises": [],
+        "explanation": "",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      },
+      {
+        "subject": "entity:sensor-node",
+        "predicate": "tenant-ownership",
+        "value": "principal:customer",
+        "scope": [],
+        "basis": "inferred",
+        "reason": null,
+        "support": [
+          {
+            "source_label": "System description",
+            "digest": "fc745e273aff8be740a814f0a9b4a45d6f3c6fe39dc7c8efa2b879d4f270ac74",
+            "start": 116,
+            "end": 153,
+            "quote": "They are outside our physical control"
+          }
+        ],
+        "premises": [],
+        "explanation": "The nodes are installed on customer sites and outside the described organization's physical control.",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      }
+    ]
+  },
+  "issues": [
+    {
+      "code": "wrong-subject-type",
+      "message": "'authentication-mechanism' accepts component, interaction, not 'zone'",
+      "subject": "boundary:local-serial-console",
+      "assertion": null,
+      "row": 15
+    }
+  ],
+  "proposed": 17,
+  "quarantined": [],
+  "projection": [
+    {
+      "element_id": "entity:sensor-node",
+      "attribute": "trust_zone",
+      "value": "boundary:customer-site",
+      "reason": "stated",
+      "rows": [
+        "assertion:network-membership~entity:sensor-node~any~boundary:customer-site"
+      ]
+    },
+    {
+      "element_id": "flow:entity:sensor-node>process:device-gateway>publishes-readings",
+      "attribute": "authentication",
+      "value": "unknown",
+      "reason": "compatible",
+      "rows": [
+        "assertion:authentication-mechanism~flow:entity:sensor-node>process:device-gateway>publishes-readings~any~v.f5085099088d",
+        "assertion:credential-presented~flow:entity:sensor-node>process:device-gateway>publishes-readings~any~credential:pre-shared-key"
+      ]
+    },
+    {
+      "element_id": "flow:entity:sensor-node>process:device-gateway>publishes-readings",
+      "attribute": "encryption_in_transit",
+      "value": "unknown",
+      "reason": "unknown",
+      "rows": [
+        "assertion:transport-encryption~flow:entity:sensor-node>process:device-gateway>publishes-readings~any~unknown"
+      ]
+    },
+    {
+      "element_id": "flow:entity:sensor-node>store:cloud-storage-bucket>polls-for-image",
+      "attribute": "authentication",
+      "value": "none",
+      "reason": "absent",
+      "rows": [
+        "assertion:authentication-mechanism~flow:entity:sensor-node>store:cloud-storage-bucket>polls-for-image~any~absent"
+      ]
+    },
+    {
+      "element_id": "process:device-gateway",
+      "attribute": "exposure",
+      "value": "internet-facing",
+      "reason": "stated",
+      "rows": [
+        "assertion:internet-exposure~process:device-gateway~any~internet-facing"
+      ]
+    },
+    {
+      "element_id": "process:telemetry-normalizer",
+      "attribute": "trust_zone",
+      "value": "boundary:analytics-network",
+      "reason": "stated",
+      "rows": [
+        "assertion:network-membership~process:telemetry-normalizer~any~boundary:analytics-network"
+      ]
+    },
+    {
+      "element_id": "store:telemetry-lake",
+      "attribute": "data_classification",
+      "value": "confidential",
+      "reason": "stated",
+      "rows": [
+        "assertion:data-classification~store:telemetry-lake~any~confidential"
+      ]
+    }
+  ],
+  "stages": {
+    "source_facts": {
+      "mentions": [
+        {
+          "handle": "m1",
+          "text": "sensor node",
+          "roles": [
+            "external-system"
+          ],
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "a few thousand sensor nodes installed on customer sites"
+            }
+          ]
+        },
+        {
+          "handle": "m2",
+          "text": "customer site",
+          "roles": [
+            "tenant-zone"
+          ],
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "customer sites"
+            }
+          ]
+        },
+        {
+          "handle": "m3",
+          "text": "device gateway",
+          "roles": [
+            "process"
+          ],
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "the device gateway, which is an MQTT broker we run on GKE"
+            }
+          ]
+        },
+        {
+          "handle": "m4",
+          "text": "device registry (Firestore)",
+          "roles": [
+            "store"
+          ],
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "a device registry (Firestore)"
+            }
+          ]
+        },
+        {
+          "handle": "m5",
+          "text": "Pub/Sub",
+          "roles": [
+            "process",
+            "external-system"
+          ],
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "forwarded onto Pub/Sub"
+            }
+          ]
+        },
+        {
+          "handle": "m6",
+          "text": "telemetry normalizer",
+          "roles": [
+            "process"
+          ],
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "the telemetry normalizer, a Python consumer"
+            }
+          ]
+        },
+        {
+          "handle": "m7",
+          "text": "analytics network",
+          "roles": [
+            "network-zone"
+          ],
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "in our analytics network"
+            }
+          ]
+        },
+        {
+          "handle": "m8",
+          "text": "telemetry lake",
+          "roles": [
+            "store"
+          ],
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "the telemetry lake in BigQuery"
+            }
+          ]
+        },
+        {
+          "handle": "m9",
+          "text": "BigQuery",
+          "roles": [
+            "external-system"
+          ],
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "in BigQuery"
+            }
+          ]
+        },
+        {
+          "handle": "m10",
+          "text": "Cloud Storage bucket",
+          "roles": [
+            "store"
+          ],
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "a Cloud Storage bucket"
+            }
+          ]
+        },
+        {
+          "handle": "m11",
+          "text": "local serial console",
+          "roles": [
+            "other-zone"
+          ],
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "over a local serial console"
+            }
+          ]
+        },
+        {
+          "handle": "m12",
+          "text": "corporate network",
+          "roles": [
+            "network-zone"
+          ],
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "from the corporate network"
+            }
+          ]
+        },
+        {
+          "handle": "m13",
+          "text": "dashboards",
+          "roles": [
+            "process"
+          ],
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "look at dashboards over BigQuery"
+            }
+          ]
+        },
+        {
+          "handle": "i1",
+          "text": "pre-shared key",
+          "roles": [],
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "Nodes authenticate to the broker with a pre-shared key"
+            }
+          ]
+        },
+        {
+          "handle": "a1",
+          "text": "new image",
+          "roles": [],
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "for a new image"
+            }
+          ]
+        },
+        {
+          "handle": "z1",
+          "text": "customer",
+          "roles": [],
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "to find out which customer the node belongs to"
+            }
+          ]
+        },
+        {
+          "handle": "z2",
+          "text": "fleet operators",
+          "roles": [],
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "Our own fleet operators"
+            }
+          ]
+        },
+        {
+          "handle": "z3",
+          "text": "field technicians",
+          "roles": [],
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "Field technicians service nodes"
+            }
+          ]
+        }
+      ],
+      "interactions": [
+        {
+          "handle": "x1",
+          "initiator": "m1",
+          "receiver": "m3",
+          "action": "publishes readings",
+          "protocol": "MQTT",
+          "operations": "write",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "Each node publishes readings over MQTT to the device gateway"
+            }
+          ]
+        },
+        {
+          "handle": "x2",
+          "initiator": "m3",
+          "receiver": "m4",
+          "action": "looks up the device",
+          "protocol": "",
+          "operations": "read",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "The gateway looks up the device in a device registry (Firestore)"
+            }
+          ]
+        },
+        {
+          "handle": "x3",
+          "initiator": "m3",
+          "receiver": "m5",
+          "action": "forwards readings",
+          "protocol": "",
+          "operations": "write",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "Readings the gateway accepts are forwarded onto Pub/Sub"
+            }
+          ]
+        },
+        {
+          "handle": "x4",
+          "initiator": "m5",
+          "receiver": "m6",
+          "action": "picks up readings",
+          "protocol": "",
+          "operations": "read",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "picked up by the telemetry normalizer"
+            }
+          ]
+        },
+        {
+          "handle": "x5",
+          "initiator": "m6",
+          "receiver": "m8",
+          "action": "writes readings",
+          "protocol": "",
+          "operations": "write",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "which writes them into the telemetry lake in BigQuery"
+            }
+          ]
+        },
+        {
+          "handle": "x6",
+          "initiator": "m1",
+          "receiver": "m10",
+          "action": "polls for image",
+          "protocol": "",
+          "operations": "read",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "nodes poll a Cloud Storage bucket for a new image"
+            }
+          ]
+        }
+      ],
+      "facts": [
+        {
+          "handle": "f1",
+          "subject_kind": "mention",
+          "subject": "m1",
+          "predicate": "network-membership",
+          "value": "m2",
+          "scope": [],
+          "basis": "stated",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "sensor nodes installed on customer sites"
+            }
+          ],
+          "explanation": "",
+          "exclusive": false
+        },
+        {
+          "handle": "f2",
+          "subject_kind": "mention",
+          "subject": "m6",
+          "predicate": "network-membership",
+          "value": "m7",
+          "scope": [],
+          "basis": "stated",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "the telemetry normalizer, a Python consumer in our analytics network"
+            }
+          ],
+          "explanation": "",
+          "exclusive": false
+        },
+        {
+          "handle": "f3",
+          "subject_kind": "mention",
+          "subject": "m3",
+          "predicate": "internet-exposure",
+          "value": "internet-facing",
+          "scope": [],
+          "basis": "stated",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "the device gateway ... expose to the internet"
+            }
+          ],
+          "explanation": "",
+          "exclusive": false
+        },
+        {
+          "handle": "f4",
+          "subject_kind": "mention",
+          "subject": "m10",
+          "predicate": "internet-exposure",
+          "value": "internet-facing",
+          "scope": [],
+          "basis": "stated",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "The bucket is public read"
+            }
+          ],
+          "explanation": "",
+          "exclusive": false
+        },
+        {
+          "handle": "f5",
+          "subject_kind": "mention",
+          "subject": "m8",
+          "predicate": "data-classification",
+          "value": "confidential",
+          "scope": [],
+          "basis": "inferred",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "The lake has site addresses and occupancy patterns in it, so it is customer data"
+            }
+          ],
+          "explanation": "Customer data is treated as confidential data.",
+          "exclusive": false
+        },
+        {
+          "handle": "f6",
+          "subject_kind": "interaction",
+          "subject": "x1",
+          "predicate": "authentication-mechanism",
+          "value": "pre-shared key",
+          "scope": [],
+          "basis": "stated",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "Nodes authenticate to the broker with a pre-shared key"
+            }
+          ],
+          "explanation": "",
+          "exclusive": false
+        },
+        {
+          "handle": "f7",
+          "subject_kind": "credential",
+          "subject": "pre-shared key",
+          "predicate": "credential-sharing",
+          "value": "shared",
+          "scope": [],
+          "basis": "stated",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "The key is per fleet, not per device"
+            }
+          ],
+          "explanation": "",
+          "exclusive": false
+        },
+        {
+          "handle": "f8",
+          "subject_kind": "credential",
+          "subject": "pre-shared key",
+          "predicate": "credential-rotation",
+          "value": "not-rotated",
+          "scope": [],
+          "basis": "stated",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "Nobody has rotated it since deployment"
+            }
+          ],
+          "explanation": "",
+          "exclusive": false
+        },
+        {
+          "handle": "f9",
+          "subject_kind": "interaction",
+          "subject": "x1",
+          "predicate": "credential-presented",
+          "value": "pre-shared key",
+          "scope": [],
+          "basis": "inferred",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "Nodes authenticate to the broker with a pre-shared key"
+            }
+          ],
+          "explanation": "The key is the credential used by the nodes to authenticate on this interaction.",
+          "exclusive": false
+        },
+        {
+          "handle": "f10",
+          "subject_kind": "principal",
+          "subject": "sensor nodes",
+          "predicate": "credential-presented",
+          "value": "pre-shared key",
+          "scope": [],
+          "basis": "stated",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "Nodes authenticate to the broker with a pre-shared key"
+            }
+          ],
+          "explanation": "",
+          "exclusive": false
+        },
+        {
+          "handle": "f11",
+          "subject_kind": "interaction",
+          "subject": "x6",
+          "predicate": "authentication-mechanism",
+          "value": "absent",
+          "scope": [],
+          "basis": "stated",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "The bucket is public read, because making the nodes authenticate to it was awkward"
+            }
+          ],
+          "explanation": "",
+          "exclusive": false
+        },
+        {
+          "handle": "f12",
+          "subject_kind": "artifact",
+          "subject": "image",
+          "predicate": "signature-verification",
+          "value": "unknown",
+          "reason": "hedged",
+          "scope": [],
+          "basis": "stated",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "I do not know whether the nodes check a signature on the image before installing it"
+            }
+          ],
+          "explanation": "",
+          "exclusive": false
+        },
+        {
+          "handle": "f13",
+          "subject_kind": "interaction",
+          "subject": "x6",
+          "predicate": "signature-verification",
+          "value": "unknown",
+          "reason": "hedged",
+          "scope": [],
+          "basis": "stated",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "I do not know whether the nodes check a signature on the image before installing it"
+            }
+          ],
+          "explanation": "",
+          "exclusive": false
+        },
+        {
+          "handle": "f14",
+          "subject_kind": "interaction",
+          "subject": "x1",
+          "predicate": "transport-encryption",
+          "value": "unknown",
+          "reason": "silent",
+          "scope": [],
+          "basis": "stated",
+          "quotes": [],
+          "explanation": "",
+          "exclusive": false
+        },
+        {
+          "handle": "f15",
+          "subject_kind": "interaction",
+          "subject": "x6",
+          "predicate": "origin-verification",
+          "value": "unknown",
+          "reason": "silent",
+          "scope": [],
+          "basis": "stated",
+          "quotes": [],
+          "explanation": "",
+          "exclusive": false
+        },
+        {
+          "handle": "f16",
+          "subject_kind": "mention",
+          "subject": "m11",
+          "predicate": "authentication-mechanism",
+          "value": "unknown",
+          "reason": "hedged",
+          "scope": [],
+          "basis": "stated",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "I don't know what authentication that console has, if any"
+            }
+          ],
+          "explanation": "",
+          "exclusive": false
+        },
+        {
+          "handle": "f17",
+          "subject_kind": "mention",
+          "subject": "m1",
+          "predicate": "tenant-ownership",
+          "value": "customer",
+          "scope": [],
+          "basis": "inferred",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "They are outside our physical control"
+            }
+          ],
+          "explanation": "The nodes are installed on customer sites and outside the described organization's physical control.",
+          "exclusive": false
+        }
+      ],
+      "unresolved": [
+        {
+          "handle": "u1",
+          "question": "Does the firmware image have a signature that the sensor nodes check before installing it?",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "I do not know whether the nodes check a signature on the image before installing it"
+            }
+          ]
+        },
+        {
+          "handle": "u2",
+          "question": "What authentication, if any, does the local serial console have?",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "I don't know what authentication that console has, if any"
+            }
+          ]
+        }
+      ]
+    },
+    "bundle_dispositions": [
+      {
+        "handle": "m2",
+        "kind": "mention",
+        "disposition": "consumed",
+        "target": "boundary:customer-site",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "m5",
+        "kind": "mention",
+        "disposition": "unresolved",
+        "target": "",
+        "code": "competing-roles",
+        "message": "mention 'Pub/Sub' reads as process, external-system; the bundle settles which, and code does not settle it by position"
+      },
+      {
+        "handle": "m7",
+        "kind": "mention",
+        "disposition": "consumed",
+        "target": "boundary:analytics-network",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "m11",
+        "kind": "mention",
+        "disposition": "consumed",
+        "target": "boundary:local-serial-console",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "m12",
+        "kind": "mention",
+        "disposition": "consumed",
+        "target": "boundary:corporate-network",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "i1",
+        "kind": "mention",
+        "disposition": "unresolved",
+        "target": "",
+        "code": "no-role",
+        "message": "mention 'pre-shared key' reads as nothing; the bundle settles which, and code does not settle it by position"
+      },
+      {
+        "handle": "a1",
+        "kind": "mention",
+        "disposition": "unresolved",
+        "target": "",
+        "code": "no-role",
+        "message": "mention 'new image' reads as nothing; the bundle settles which, and code does not settle it by position"
+      },
+      {
+        "handle": "z1",
+        "kind": "mention",
+        "disposition": "unresolved",
+        "target": "",
+        "code": "no-role",
+        "message": "mention 'customer' reads as nothing; the bundle settles which, and code does not settle it by position"
+      },
+      {
+        "handle": "z2",
+        "kind": "mention",
+        "disposition": "unresolved",
+        "target": "",
+        "code": "no-role",
+        "message": "mention 'fleet operators' reads as nothing; the bundle settles which, and code does not settle it by position"
+      },
+      {
+        "handle": "z3",
+        "kind": "mention",
+        "disposition": "unresolved",
+        "target": "",
+        "code": "no-role",
+        "message": "mention 'field technicians' reads as nothing; the bundle settles which, and code does not settle it by position"
+      },
+      {
+        "handle": "m1",
+        "kind": "mention",
+        "disposition": "consumed",
+        "target": "entity:sensor-node",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "m3",
+        "kind": "mention",
+        "disposition": "consumed",
+        "target": "process:device-gateway",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "m4",
+        "kind": "mention",
+        "disposition": "consumed",
+        "target": "store:device-registry-firestore",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "m6",
+        "kind": "mention",
+        "disposition": "consumed",
+        "target": "process:telemetry-normalizer",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "m8",
+        "kind": "mention",
+        "disposition": "consumed",
+        "target": "store:telemetry-lake",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "m9",
+        "kind": "mention",
+        "disposition": "consumed",
+        "target": "entity:bigquery",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "m10",
+        "kind": "mention",
+        "disposition": "consumed",
+        "target": "store:cloud-storage-bucket",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "m13",
+        "kind": "mention",
+        "disposition": "consumed",
+        "target": "process:dashboards",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "x1",
+        "kind": "interaction",
+        "disposition": "consumed",
+        "target": "flow:entity:sensor-node>process:device-gateway>publishes-readings",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "x2",
+        "kind": "interaction",
+        "disposition": "consumed",
+        "target": "flow:process:device-gateway>store:device-registry-firestore>looks-up-the-device",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "x3",
+        "kind": "interaction",
+        "disposition": "rejected",
+        "target": "",
+        "code": "dangling-endpoint",
+        "message": "receiver 'm5' names no placed component of this bundle"
+      },
+      {
+        "handle": "x4",
+        "kind": "interaction",
+        "disposition": "rejected",
+        "target": "",
+        "code": "dangling-endpoint",
+        "message": "initiator 'm5' names no placed component of this bundle"
+      },
+      {
+        "handle": "x5",
+        "kind": "interaction",
+        "disposition": "consumed",
+        "target": "flow:process:telemetry-normalizer>store:telemetry-lake>writes-readings",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "x6",
+        "kind": "interaction",
+        "disposition": "consumed",
+        "target": "flow:entity:sensor-node>store:cloud-storage-bucket>polls-for-image",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "f1",
+        "kind": "fact",
+        "disposition": "consumed",
+        "target": "entity:sensor-node",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "f2",
+        "kind": "fact",
+        "disposition": "consumed",
+        "target": "process:telemetry-normalizer",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "f3",
+        "kind": "fact",
+        "disposition": "consumed",
+        "target": "process:device-gateway",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "f4",
+        "kind": "fact",
+        "disposition": "preserved",
+        "target": "store:cloud-storage-bucket",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "f5",
+        "kind": "fact",
+        "disposition": "consumed",
+        "target": "store:telemetry-lake",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "f6",
+        "kind": "fact",
+        "disposition": "consumed",
+        "target": "flow:entity:sensor-node>process:device-gateway>publishes-readings",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "f7",
+        "kind": "fact",
+        "disposition": "preserved",
+        "target": "pre-shared key",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "f8",
+        "kind": "fact",
+        "disposition": "preserved",
+        "target": "pre-shared key",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "f9",
+        "kind": "fact",
+        "disposition": "consumed",
+        "target": "flow:entity:sensor-node>process:device-gateway>publishes-readings",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "f10",
+        "kind": "fact",
+        "disposition": "preserved",
+        "target": "sensor nodes",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "f11",
+        "kind": "fact",
+        "disposition": "consumed",
+        "target": "flow:entity:sensor-node>store:cloud-storage-bucket>polls-for-image",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "f12",
+        "kind": "fact",
+        "disposition": "preserved",
+        "target": "image",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "f13",
+        "kind": "fact",
+        "disposition": "preserved",
+        "target": "flow:entity:sensor-node>store:cloud-storage-bucket>polls-for-image",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "f14",
+        "kind": "fact",
+        "disposition": "consumed",
+        "target": "flow:entity:sensor-node>process:device-gateway>publishes-readings",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "f15",
+        "kind": "fact",
+        "disposition": "preserved",
+        "target": "flow:entity:sensor-node>store:cloud-storage-bucket>polls-for-image",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "f16",
+        "kind": "fact",
+        "disposition": "rejected",
+        "target": "",
+        "code": "wrong-subject-type",
+        "message": "'authentication-mechanism' accepts component, interaction, not 'zone'"
+      },
+      {
+        "handle": "f17",
+        "kind": "fact",
+        "disposition": "preserved",
+        "target": "entity:sensor-node",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "u1",
+        "kind": "unresolved",
+        "disposition": "unresolved",
+        "target": "",
+        "code": "open-question",
+        "message": "Does the firmware image have a signature that the sensor nodes check before installing it?"
+      },
+      {
+        "handle": "u2",
+        "kind": "unresolved",
+        "disposition": "unresolved",
+        "target": "",
+        "code": "open-question",
+        "message": "What authentication, if any, does the local serial console have?"
+      }
+    ],
+    "extracted_model": {
+      "external_entities": [
+        {
+          "id": "entity:sensor-node",
+          "name": "sensor node",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "a few thousand sensor nodes installed on customer sites",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "kind": "external-system",
+          "trust_zone": "unknown"
+        },
+        {
+          "id": "entity:bigquery",
+          "name": "BigQuery",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "in BigQuery",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "kind": "external-system",
+          "trust_zone": "unknown"
+        }
+      ],
+      "processes": [
+        {
+          "id": "process:device-gateway",
+          "name": "device gateway",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "the device gateway, which is an MQTT broker we run on GKE",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "technology": "unknown",
+          "trust_zone": "unknown",
+          "exposure": "unknown",
+          "interface_kind": "unknown"
+        },
+        {
+          "id": "process:telemetry-normalizer",
+          "name": "telemetry normalizer",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "the telemetry normalizer, a Python consumer",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "technology": "unknown",
+          "trust_zone": "unknown",
+          "exposure": "unknown",
+          "interface_kind": "unknown"
+        },
+        {
+          "id": "process:dashboards",
+          "name": "dashboards",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "look at dashboards over BigQuery",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "technology": "unknown",
+          "trust_zone": "unknown",
+          "exposure": "unknown",
+          "interface_kind": "unknown"
+        }
+      ],
+      "data_stores": [
+        {
+          "id": "store:device-registry-firestore",
+          "name": "device registry (Firestore)",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "a device registry (Firestore)",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "technology": "unknown",
+          "trust_zone": "unknown",
+          "data_classification": "unknown",
+          "encryption_at_rest": "unknown"
+        },
+        {
+          "id": "store:telemetry-lake",
+          "name": "telemetry lake",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "the telemetry lake in BigQuery",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "technology": "unknown",
+          "trust_zone": "unknown",
+          "data_classification": "unknown",
+          "encryption_at_rest": "unknown"
+        },
+        {
+          "id": "store:cloud-storage-bucket",
+          "name": "Cloud Storage bucket",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "a Cloud Storage bucket",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "technology": "unknown",
+          "trust_zone": "unknown",
+          "data_classification": "unknown",
+          "encryption_at_rest": "unknown"
+        }
+      ],
+      "data_flows": [
+        {
+          "id": "flow:entity:sensor-node>process:device-gateway>publishes-readings",
+          "name": "publishes readings",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "Each node publishes readings over MQTT to the device gateway",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "source": "entity:sensor-node",
+          "destination": "process:device-gateway",
+          "protocol": "MQTT",
+          "authentication": "unknown",
+          "data_description": "unknown",
+          "encryption_in_transit": "unknown",
+          "operations": "write"
+        },
+        {
+          "id": "flow:process:device-gateway>store:device-registry-firestore>looks-up-the-device",
+          "name": "looks up the device",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "The gateway looks up the device in a device registry (Firestore)",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "source": "process:device-gateway",
+          "destination": "store:device-registry-firestore",
+          "protocol": "",
+          "authentication": "unknown",
+          "data_description": "unknown",
+          "encryption_in_transit": "unknown",
+          "operations": "read"
+        },
+        {
+          "id": "flow:process:telemetry-normalizer>store:telemetry-lake>writes-readings",
+          "name": "writes readings",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "which writes them into the telemetry lake in BigQuery",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "source": "process:telemetry-normalizer",
+          "destination": "store:telemetry-lake",
+          "protocol": "",
+          "authentication": "unknown",
+          "data_description": "unknown",
+          "encryption_in_transit": "unknown",
+          "operations": "write"
+        },
+        {
+          "id": "flow:entity:sensor-node>store:cloud-storage-bucket>polls-for-image",
+          "name": "polls for image",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "nodes poll a Cloud Storage bucket for a new image",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "source": "entity:sensor-node",
+          "destination": "store:cloud-storage-bucket",
+          "protocol": "",
+          "authentication": "unknown",
+          "data_description": "unknown",
+          "encryption_in_transit": "unknown",
+          "operations": "read"
+        }
+      ],
+      "trust_boundaries": [
+        {
+          "id": "boundary:customer-site",
+          "name": "customer site",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "customer sites",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "kind": "tenant"
+        },
+        {
+          "id": "boundary:analytics-network",
+          "name": "analytics network",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "in our analytics network",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "kind": "network"
+        },
+        {
+          "id": "boundary:local-serial-console",
+          "name": "local serial console",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "over a local serial console",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "kind": "other"
+        },
+        {
+          "id": "boundary:corporate-network",
+          "name": "corporate network",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "from the corporate network",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "kind": "network"
+        }
+      ],
+      "assumptions": [],
+      "capabilities": []
+    },
+    "valid_model": {
+      "external_entities": [
+        {
+          "id": "entity:sensor-node",
+          "name": "sensor node",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "a few thousand sensor nodes installed on customer sites",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "kind": "external-system",
+          "trust_zone": "unknown"
+        },
+        {
+          "id": "entity:bigquery",
+          "name": "BigQuery",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "in BigQuery",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "kind": "external-system",
+          "trust_zone": "unknown"
+        }
+      ],
+      "processes": [
+        {
+          "id": "process:device-gateway",
+          "name": "device gateway",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "the device gateway, which is an MQTT broker we run on GKE",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "technology": "unknown",
+          "trust_zone": "unknown",
+          "exposure": "unknown",
+          "interface_kind": "unknown"
+        },
+        {
+          "id": "process:telemetry-normalizer",
+          "name": "telemetry normalizer",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "the telemetry normalizer, a Python consumer",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "technology": "unknown",
+          "trust_zone": "unknown",
+          "exposure": "unknown",
+          "interface_kind": "unknown"
+        },
+        {
+          "id": "process:dashboards",
+          "name": "dashboards",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "look at dashboards over BigQuery",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "technology": "unknown",
+          "trust_zone": "unknown",
+          "exposure": "unknown",
+          "interface_kind": "unknown"
+        }
+      ],
+      "data_stores": [
+        {
+          "id": "store:device-registry-firestore",
+          "name": "device registry (Firestore)",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "a device registry (Firestore)",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "technology": "unknown",
+          "trust_zone": "unknown",
+          "data_classification": "unknown",
+          "encryption_at_rest": "unknown"
+        },
+        {
+          "id": "store:telemetry-lake",
+          "name": "telemetry lake",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "the telemetry lake in BigQuery",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "technology": "unknown",
+          "trust_zone": "unknown",
+          "data_classification": "unknown",
+          "encryption_at_rest": "unknown"
+        },
+        {
+          "id": "store:cloud-storage-bucket",
+          "name": "Cloud Storage bucket",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "a Cloud Storage bucket",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "technology": "unknown",
+          "trust_zone": "unknown",
+          "data_classification": "unknown",
+          "encryption_at_rest": "unknown"
+        }
+      ],
+      "data_flows": [
+        {
+          "id": "flow:entity:sensor-node>process:device-gateway>publishes-readings",
+          "name": "publishes readings",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "Each node publishes readings over MQTT to the device gateway",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "source": "entity:sensor-node",
+          "destination": "process:device-gateway",
+          "protocol": "MQTT",
+          "authentication": "unknown",
+          "data_description": "unknown",
+          "encryption_in_transit": "unknown",
+          "operations": "write"
+        },
+        {
+          "id": "flow:process:device-gateway>store:device-registry-firestore>looks-up-the-device",
+          "name": "looks up the device",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "The gateway looks up the device in a device registry (Firestore)",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "source": "process:device-gateway",
+          "destination": "store:device-registry-firestore",
+          "protocol": "",
+          "authentication": "unknown",
+          "data_description": "unknown",
+          "encryption_in_transit": "unknown",
+          "operations": "read"
+        },
+        {
+          "id": "flow:process:telemetry-normalizer>store:telemetry-lake>writes-readings",
+          "name": "writes readings",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "which writes them into the telemetry lake in BigQuery",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "source": "process:telemetry-normalizer",
+          "destination": "store:telemetry-lake",
+          "protocol": "",
+          "authentication": "unknown",
+          "data_description": "unknown",
+          "encryption_in_transit": "unknown",
+          "operations": "write"
+        },
+        {
+          "id": "flow:entity:sensor-node>store:cloud-storage-bucket>polls-for-image",
+          "name": "polls for image",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "nodes poll a Cloud Storage bucket for a new image",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "source": "entity:sensor-node",
+          "destination": "store:cloud-storage-bucket",
+          "protocol": "",
+          "authentication": "unknown",
+          "data_description": "unknown",
+          "encryption_in_transit": "unknown",
+          "operations": "read"
+        }
+      ],
+      "trust_boundaries": [
+        {
+          "id": "boundary:customer-site",
+          "name": "customer site",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "customer sites",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "kind": "tenant"
+        },
+        {
+          "id": "boundary:analytics-network",
+          "name": "analytics network",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "in our analytics network",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "kind": "network"
+        },
+        {
+          "id": "boundary:local-serial-console",
+          "name": "local serial console",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "over a local serial console",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "kind": "other"
+        },
+        {
+          "id": "boundary:corporate-network",
+          "name": "corporate network",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "from the corporate network",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "kind": "network"
+        }
+      ],
+      "assumptions": [],
+      "capabilities": []
+    },
+    "patch_outcomes": {
+      "rolled_back": true,
+      "outcomes": [
+        {
+          "handle": "add_pubsub",
+          "state": "refused",
+          "code": "batch-rolled-back",
+          "message": "the batch was discarded whole, so this did not land"
+        },
+        {
+          "handle": "place_fleet_operators",
+          "state": "refused",
+          "code": "batch-rolled-back",
+          "message": "the batch was discarded whole, so this did not land"
+        },
+        {
+          "handle": "place_field_technicians",
+          "state": "refused",
+          "code": "batch-rolled-back",
+          "message": "the batch was discarded whole, so this did not land"
+        },
+        {
+          "handle": "forward_readings",
+          "state": "refused",
+          "code": "dangling-endpoint",
+          "message": "receiver 'pubsub' names no placed component of this bundle"
+        },
+        {
+          "handle": "pickup_readings",
+          "state": "refused",
+          "code": "dangling-endpoint",
+          "message": "initiator 'store:pub-sub' names no placed component of this bundle"
+        },
+        {
+          "handle": "operators_dashboard",
+          "state": "refused",
+          "code": "dangling-endpoint",
+          "message": "initiator 'fleet_operators' names no placed component of this bundle"
+        },
+        {
+          "handle": "technicians_service",
+          "state": "refused",
+          "code": "dangling-endpoint",
+          "message": "initiator 'field_technicians' names no placed component of this bundle"
+        },
+        {
+          "handle": "fleet_operator_network",
+          "state": "refused",
+          "code": "dangling-subject",
+          "message": "subject 'fleet_operators' names no mention this bundle built"
+        },
+        {
+          "handle": "sso_dashboard_auth",
+          "state": "refused",
+          "code": "dangling-subject",
+          "message": "subject 'operators_dashboard' names no interaction this bundle built"
+        },
+        {
+          "handle": "console_auth_question",
+          "state": "refused",
+          "code": "batch-rolled-back",
+          "message": "the batch was discarded whole, so this did not land"
+        },
+        {
+          "handle": "",
+          "state": "refused",
+          "code": "operation-refused",
+          "message": "fleet_operator_network, forward_readings, operators_dashboard, pickup_readings, sso_dashboard_auth, technicians_service did not land, so the batch was discarded and the original output stands"
+        }
+      ]
+    }
+  }
+}

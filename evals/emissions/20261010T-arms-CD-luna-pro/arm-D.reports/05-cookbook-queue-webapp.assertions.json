@@ -1,0 +1,2097 @@
+{
+  "proposal": {
+    "assertions": [
+      {
+        "subject_type": "component",
+        "subject": "process:users-browser",
+        "predicate": "network-membership",
+        "value": "boundary:outside-our-network",
+        "reason": null,
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "The browser sits outside our network"
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      {
+        "subject_type": "component",
+        "subject": "process:web-application",
+        "predicate": "network-membership",
+        "value": "boundary:web-tier",
+        "reason": null,
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "the web application runs in our web tier."
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      {
+        "subject_type": "component",
+        "subject": "store:message-queue",
+        "predicate": "network-membership",
+        "value": "boundary:backend-tier",
+        "reason": null,
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "The queue, the worker and the database are all in the backend tier"
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      {
+        "subject_type": "component",
+        "subject": "process:background-worker-process",
+        "predicate": "network-membership",
+        "value": "boundary:backend-tier",
+        "reason": null,
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "The queue, the worker and the database are all in the backend tier"
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      {
+        "subject_type": "component",
+        "subject": "store:database",
+        "predicate": "network-membership",
+        "value": "boundary:backend-tier",
+        "reason": null,
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "The queue, the worker and the database are all in the backend tier"
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      {
+        "subject_type": "interaction",
+        "subject": "flow:process:web-application>store:message-queue>puts-jobs-onto",
+        "predicate": "authentication-mechanism",
+        "value": "unknown",
+        "reason": "silent",
+        "scope": [],
+        "basis": "stated",
+        "quotes": [],
+        "explanation": "",
+        "exclusive": false
+      },
+      {
+        "subject_type": "interaction",
+        "subject": "flow:process:background-worker-process>store:database>writes-database",
+        "predicate": "authentication-mechanism",
+        "value": "unknown",
+        "reason": "silent",
+        "scope": [],
+        "basis": "stated",
+        "quotes": [],
+        "explanation": "",
+        "exclusive": false
+      },
+      {
+        "subject_type": "interaction",
+        "subject": "flow:process:users-browser>process:web-application>talks-to",
+        "predicate": "transport-encryption",
+        "value": "encrypted",
+        "reason": null,
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "The browser-to-application traffic is the one link marked as encrypted."
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      {
+        "subject_type": "component",
+        "subject": "process:web-application",
+        "predicate": "internet-exposure",
+        "value": "internet-facing",
+        "reason": null,
+        "scope": [],
+        "basis": "inferred",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "A user's browser talks to the web application over HTTP/S across the public internet."
+          }
+        ],
+        "explanation": "The description states that a browser reaches the web application across the public internet.",
+        "exclusive": false
+      },
+      {
+        "subject_type": "credential",
+        "subject": "web application's queue credentials",
+        "predicate": "credential-custody",
+        "value": "web application config",
+        "reason": null,
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "the web application's queue credentials"
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      {
+        "subject_type": "credential",
+        "subject": "worker's database credentials",
+        "predicate": "credential-custody",
+        "value": "worker config",
+        "reason": null,
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "the worker's database credentials"
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      {
+        "subject_type": "component",
+        "subject": "store:database",
+        "predicate": "storage-encryption",
+        "value": "unknown",
+        "reason": "silent",
+        "scope": [],
+        "basis": "stated",
+        "quotes": [],
+        "explanation": "",
+        "exclusive": false
+      },
+      {
+        "subject_type": "component",
+        "subject": "store:web-application-config",
+        "predicate": "storage-encryption",
+        "value": "unknown",
+        "reason": "silent",
+        "scope": [],
+        "basis": "stated",
+        "quotes": [],
+        "explanation": "",
+        "exclusive": false
+      },
+      {
+        "subject_type": "component",
+        "subject": "store:worker-config",
+        "predicate": "storage-encryption",
+        "value": "unknown",
+        "reason": "silent",
+        "scope": [],
+        "basis": "stated",
+        "quotes": [],
+        "explanation": "",
+        "exclusive": false
+      }
+    ]
+  },
+  "catalog": {
+    "registry_version": 8,
+    "subjects": [
+      {
+        "id": "boundary:backend-tier",
+        "type": "zone",
+        "label": "backend tier"
+      },
+      {
+        "id": "boundary:outside-our-network",
+        "type": "zone",
+        "label": "outside our network"
+      },
+      {
+        "id": "boundary:web-tier",
+        "type": "zone",
+        "label": "web tier"
+      },
+      {
+        "id": "credential:web-applications-queue-credentials",
+        "type": "credential",
+        "label": "web application's queue credentials"
+      },
+      {
+        "id": "credential:workers-database-credentials",
+        "type": "credential",
+        "label": "worker's database credentials"
+      },
+      {
+        "id": "flow:process:background-worker-process>store:database>reads-database",
+        "type": "interaction",
+        "label": "reads database"
+      },
+      {
+        "id": "flow:process:background-worker-process>store:database>writes-database",
+        "type": "interaction",
+        "label": "writes database"
+      },
+      {
+        "id": "flow:process:users-browser>process:web-application>talks-to",
+        "type": "interaction",
+        "label": "talks to"
+      },
+      {
+        "id": "flow:process:web-application>store:message-queue>puts-jobs-onto",
+        "type": "interaction",
+        "label": "puts jobs onto"
+      },
+      {
+        "id": "process:background-worker-process",
+        "type": "component",
+        "label": "background worker process"
+      },
+      {
+        "id": "process:users-browser",
+        "type": "component",
+        "label": "user's browser"
+      },
+      {
+        "id": "process:web-application",
+        "type": "component",
+        "label": "web application"
+      },
+      {
+        "id": "store:database",
+        "type": "component",
+        "label": "database"
+      },
+      {
+        "id": "store:message-queue",
+        "type": "component",
+        "label": "message queue"
+      },
+      {
+        "id": "store:web-application-config",
+        "type": "component",
+        "label": "web application config"
+      },
+      {
+        "id": "store:worker-config",
+        "type": "component",
+        "label": "worker config"
+      }
+    ],
+    "entries": [
+      {
+        "subject": "process:users-browser",
+        "predicate": "network-membership",
+        "value": "boundary:outside-our-network",
+        "scope": [],
+        "basis": "stated",
+        "reason": null,
+        "support": [
+          {
+            "source_label": "System description",
+            "digest": "20b0aa82c922766db2353cade33f7a26b38c60a3c7061244ef4686b7a647778b",
+            "start": 146,
+            "end": 183,
+            "quote": "The browser sits outside our network"
+          }
+        ],
+        "premises": [],
+        "explanation": "",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      },
+      {
+        "subject": "process:web-application",
+        "predicate": "network-membership",
+        "value": "boundary:web-tier",
+        "scope": [],
+        "basis": "stated",
+        "reason": null,
+        "support": [
+          {
+            "source_label": "System description",
+            "digest": "20b0aa82c922766db2353cade33f7a26b38c60a3c7061244ef4686b7a647778b",
+            "start": 184,
+            "end": 225,
+            "quote": "the web application runs in our web tier."
+          }
+        ],
+        "premises": [],
+        "explanation": "",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      },
+      {
+        "subject": "store:message-queue",
+        "predicate": "network-membership",
+        "value": "boundary:backend-tier",
+        "scope": [],
+        "basis": "stated",
+        "reason": null,
+        "support": [
+          {
+            "source_label": "System description",
+            "digest": "20b0aa82c922766db2353cade33f7a26b38c60a3c7061244ef4686b7a647778b",
+            "start": 382,
+            "end": 449,
+            "quote": "The queue, the worker and the database are all in the backend tier"
+          }
+        ],
+        "premises": [],
+        "explanation": "",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      },
+      {
+        "subject": "process:background-worker-process",
+        "predicate": "network-membership",
+        "value": "boundary:backend-tier",
+        "scope": [],
+        "basis": "stated",
+        "reason": null,
+        "support": [
+          {
+            "source_label": "System description",
+            "digest": "20b0aa82c922766db2353cade33f7a26b38c60a3c7061244ef4686b7a647778b",
+            "start": 382,
+            "end": 449,
+            "quote": "The queue, the worker and the database are all in the backend tier"
+          }
+        ],
+        "premises": [],
+        "explanation": "",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      },
+      {
+        "subject": "store:database",
+        "predicate": "network-membership",
+        "value": "boundary:backend-tier",
+        "scope": [],
+        "basis": "stated",
+        "reason": null,
+        "support": [
+          {
+            "source_label": "System description",
+            "digest": "20b0aa82c922766db2353cade33f7a26b38c60a3c7061244ef4686b7a647778b",
+            "start": 382,
+            "end": 449,
+            "quote": "The queue, the worker and the database are all in the backend tier"
+          }
+        ],
+        "premises": [],
+        "explanation": "",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      },
+      {
+        "subject": "flow:process:web-application>store:message-queue>puts-jobs-onto",
+        "predicate": "authentication-mechanism",
+        "value": "unknown",
+        "scope": [],
+        "basis": "stated",
+        "reason": "silent",
+        "support": [],
+        "premises": [],
+        "explanation": "",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      },
+      {
+        "subject": "flow:process:background-worker-process>store:database>writes-database",
+        "predicate": "authentication-mechanism",
+        "value": "unknown",
+        "scope": [],
+        "basis": "stated",
+        "reason": "silent",
+        "support": [],
+        "premises": [],
+        "explanation": "",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      },
+      {
+        "subject": "flow:process:users-browser>process:web-application>talks-to",
+        "predicate": "transport-encryption",
+        "value": "encrypted",
+        "scope": [],
+        "basis": "stated",
+        "reason": null,
+        "support": [
+          {
+            "source_label": "System description",
+            "digest": "20b0aa82c922766db2353cade33f7a26b38c60a3c7061244ef4686b7a647778b",
+            "start": 1064,
+            "end": 1135,
+            "quote": "The browser-to-application traffic is the one link marked as encrypted."
+          }
+        ],
+        "premises": [],
+        "explanation": "",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      },
+      {
+        "subject": "process:web-application",
+        "predicate": "internet-exposure",
+        "value": "internet-facing",
+        "scope": [],
+        "basis": "inferred",
+        "reason": null,
+        "support": [
+          {
+            "source_label": "System description",
+            "digest": "20b0aa82c922766db2353cade33f7a26b38c60a3c7061244ef4686b7a647778b",
+            "start": 60,
+            "end": 145,
+            "quote": "A user's browser talks to the web application over HTTP/S across the public internet."
+          }
+        ],
+        "premises": [],
+        "explanation": "The description states that a browser reaches the web application across the public internet.",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      },
+      {
+        "subject": "credential:web-applications-queue-credentials",
+        "predicate": "credential-custody",
+        "value": "web application config",
+        "scope": [],
+        "basis": "stated",
+        "reason": null,
+        "support": [
+          {
+            "source_label": "System description",
+            "digest": "20b0aa82c922766db2353cade33f7a26b38c60a3c7061244ef4686b7a647778b",
+            "start": 803,
+            "end": 843,
+            "quote": "the web application's queue credentials"
+          }
+        ],
+        "premises": [],
+        "explanation": "",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      },
+      {
+        "subject": "credential:workers-database-credentials",
+        "predicate": "credential-custody",
+        "value": "worker config",
+        "scope": [],
+        "basis": "stated",
+        "reason": null,
+        "support": [
+          {
+            "source_label": "System description",
+            "digest": "20b0aa82c922766db2353cade33f7a26b38c60a3c7061244ef4686b7a647778b",
+            "start": 848,
+            "end": 882,
+            "quote": "the worker's database credentials"
+          }
+        ],
+        "premises": [],
+        "explanation": "",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      },
+      {
+        "subject": "store:database",
+        "predicate": "storage-encryption",
+        "value": "unknown",
+        "scope": [],
+        "basis": "stated",
+        "reason": "silent",
+        "support": [],
+        "premises": [],
+        "explanation": "",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      },
+      {
+        "subject": "store:web-application-config",
+        "predicate": "storage-encryption",
+        "value": "unknown",
+        "scope": [],
+        "basis": "stated",
+        "reason": "silent",
+        "support": [],
+        "premises": [],
+        "explanation": "",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      },
+      {
+        "subject": "store:worker-config",
+        "predicate": "storage-encryption",
+        "value": "unknown",
+        "scope": [],
+        "basis": "stated",
+        "reason": "silent",
+        "support": [],
+        "premises": [],
+        "explanation": "",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      },
+      {
+        "subject": "flow:process:background-worker-process>store:database>reads-database",
+        "predicate": "authentication-mechanism",
+        "value": "unknown",
+        "scope": [],
+        "basis": "stated",
+        "reason": "unmeasured",
+        "support": [
+          {
+            "source_label": "System description",
+            "digest": "20b0aa82c922766db2353cade33f7a26b38c60a3c7061244ef4686b7a647778b",
+            "start": 884,
+            "end": 1063,
+            "quote": "The diagram does not say anything about how the web application authenticates to the queue, how the worker authenticates to the database, or whether anything is encrypted at rest."
+          }
+        ],
+        "premises": [],
+        "explanation": "The source explicitly leaves the worker's database authentication unspecified.",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      },
+      {
+        "subject": "store:message-queue",
+        "predicate": "storage-encryption",
+        "value": "unknown",
+        "scope": [],
+        "basis": "stated",
+        "reason": "unmeasured",
+        "support": [
+          {
+            "source_label": "System description",
+            "digest": "20b0aa82c922766db2353cade33f7a26b38c60a3c7061244ef4686b7a647778b",
+            "start": 1022,
+            "end": 1063,
+            "quote": "or whether anything is encrypted at rest."
+          }
+        ],
+        "premises": [],
+        "explanation": "The source leaves at-rest encryption unspecified for the message queue as well as the other stores.",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      }
+    ]
+  },
+  "issues": [],
+  "proposed": 16,
+  "quarantined": [],
+  "projection": [
+    {
+      "element_id": "flow:process:background-worker-process>store:database>reads-database",
+      "attribute": "authentication",
+      "value": "unknown",
+      "reason": "unknown",
+      "rows": [
+        "assertion:authentication-mechanism~flow:process:background-worker-process>store:database>reads-database~any~unknown"
+      ]
+    },
+    {
+      "element_id": "flow:process:background-worker-process>store:database>writes-database",
+      "attribute": "authentication",
+      "value": "unknown",
+      "reason": "unknown",
+      "rows": [
+        "assertion:authentication-mechanism~flow:process:background-worker-process>store:database>writes-database~any~unknown"
+      ]
+    },
+    {
+      "element_id": "flow:process:users-browser>process:web-application>talks-to",
+      "attribute": "encryption_in_transit",
+      "value": "encrypted",
+      "reason": "stated",
+      "rows": [
+        "assertion:transport-encryption~flow:process:users-browser>process:web-application>talks-to~any~v.954d1bb83d80"
+      ]
+    },
+    {
+      "element_id": "flow:process:web-application>store:message-queue>puts-jobs-onto",
+      "attribute": "authentication",
+      "value": "unknown",
+      "reason": "unknown",
+      "rows": [
+        "assertion:authentication-mechanism~flow:process:web-application>store:message-queue>puts-jobs-onto~any~unknown"
+      ]
+    },
+    {
+      "element_id": "process:background-worker-process",
+      "attribute": "trust_zone",
+      "value": "boundary:backend-tier",
+      "reason": "stated",
+      "rows": [
+        "assertion:network-membership~process:background-worker-process~any~boundary:backend-tier"
+      ]
+    },
+    {
+      "element_id": "process:users-browser",
+      "attribute": "trust_zone",
+      "value": "boundary:outside-our-network",
+      "reason": "stated",
+      "rows": [
+        "assertion:network-membership~process:users-browser~any~boundary:outside-our-network"
+      ]
+    },
+    {
+      "element_id": "process:web-application",
+      "attribute": "exposure",
+      "value": "internet-facing",
+      "reason": "stated",
+      "rows": [
+        "assertion:internet-exposure~process:web-application~any~internet-facing"
+      ]
+    },
+    {
+      "element_id": "process:web-application",
+      "attribute": "trust_zone",
+      "value": "boundary:web-tier",
+      "reason": "stated",
+      "rows": [
+        "assertion:network-membership~process:web-application~any~boundary:web-tier"
+      ]
+    },
+    {
+      "element_id": "store:database",
+      "attribute": "encryption_at_rest",
+      "value": "unknown",
+      "reason": "unknown",
+      "rows": [
+        "assertion:storage-encryption~store:database~any~unknown"
+      ]
+    },
+    {
+      "element_id": "store:database",
+      "attribute": "trust_zone",
+      "value": "boundary:backend-tier",
+      "reason": "stated",
+      "rows": [
+        "assertion:network-membership~store:database~any~boundary:backend-tier"
+      ]
+    },
+    {
+      "element_id": "store:message-queue",
+      "attribute": "encryption_at_rest",
+      "value": "unknown",
+      "reason": "unknown",
+      "rows": [
+        "assertion:storage-encryption~store:message-queue~any~unknown"
+      ]
+    },
+    {
+      "element_id": "store:message-queue",
+      "attribute": "trust_zone",
+      "value": "boundary:backend-tier",
+      "reason": "stated",
+      "rows": [
+        "assertion:network-membership~store:message-queue~any~boundary:backend-tier"
+      ]
+    },
+    {
+      "element_id": "store:web-application-config",
+      "attribute": "encryption_at_rest",
+      "value": "unknown",
+      "reason": "unknown",
+      "rows": [
+        "assertion:storage-encryption~store:web-application-config~any~unknown"
+      ]
+    },
+    {
+      "element_id": "store:worker-config",
+      "attribute": "encryption_at_rest",
+      "value": "unknown",
+      "reason": "unknown",
+      "rows": [
+        "assertion:storage-encryption~store:worker-config~any~unknown"
+      ]
+    }
+  ],
+  "stages": {
+    "source_facts": {
+      "mentions": [
+        {
+          "handle": "browser",
+          "text": "user's browser",
+          "roles": [
+            "process"
+          ],
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "A user's browser talks to the web application over HTTP/S across the public internet."
+            }
+          ]
+        },
+        {
+          "handle": "web_app",
+          "text": "web application",
+          "roles": [
+            "process"
+          ],
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "the web application runs in our web tier."
+            }
+          ]
+        },
+        {
+          "handle": "message_queue",
+          "text": "message queue",
+          "roles": [
+            "store"
+          ],
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "It puts jobs onto a message queue, and a background worker process picks them up and does the work."
+            }
+          ]
+        },
+        {
+          "handle": "worker",
+          "text": "background worker process",
+          "roles": [
+            "process"
+          ],
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "a background worker process picks them up and does the work."
+            }
+          ]
+        },
+        {
+          "handle": "database",
+          "text": "database",
+          "roles": [
+            "store"
+          ],
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "The background worker reads and writes the database."
+            }
+          ]
+        },
+        {
+          "handle": "web_config",
+          "text": "web application config",
+          "roles": [
+            "store"
+          ],
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "the web application has a web application config"
+            }
+          ]
+        },
+        {
+          "handle": "worker_config",
+          "text": "worker config",
+          "roles": [
+            "store"
+          ],
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "the worker has a worker config."
+            }
+          ]
+        },
+        {
+          "handle": "public_internet",
+          "text": "public internet",
+          "roles": [
+            "network-zone"
+          ],
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "across the public internet"
+            }
+          ]
+        },
+        {
+          "handle": "outside_network",
+          "text": "outside our network",
+          "roles": [
+            "network-zone"
+          ],
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "The browser sits outside our network"
+            }
+          ]
+        },
+        {
+          "handle": "web_tier",
+          "text": "web tier",
+          "roles": [
+            "network-zone"
+          ],
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "the web application runs in our web tier."
+            }
+          ]
+        },
+        {
+          "handle": "backend_tier",
+          "text": "backend tier",
+          "roles": [
+            "network-zone"
+          ],
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "The queue, the worker and the database are all in the backend tier"
+            }
+          ]
+        }
+      ],
+      "interactions": [
+        {
+          "handle": "browser_talks_app",
+          "initiator": "browser",
+          "receiver": "web_app",
+          "action": "talks to",
+          "protocol": "HTTP/S",
+          "operations": "unknown",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "A user's browser talks to the web application over HTTP/S across the public internet."
+            }
+          ]
+        },
+        {
+          "handle": "app_puts_jobs",
+          "initiator": "web_app",
+          "receiver": "message_queue",
+          "action": "puts jobs onto",
+          "protocol": "unspecified",
+          "operations": "write",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "It puts jobs onto a message queue"
+            }
+          ]
+        },
+        {
+          "handle": "worker_picks_jobs",
+          "initiator": "worker",
+          "receiver": "message_queue",
+          "action": "picks them up",
+          "protocol": "unspecified",
+          "operations": "read",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "a background worker process picks them up and does the work."
+            }
+          ]
+        },
+        {
+          "handle": "worker_reads_database",
+          "initiator": "worker",
+          "receiver": "database",
+          "action": "reads database",
+          "protocol": "unspecified",
+          "operations": "read",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "The background worker reads and writes the database."
+            }
+          ]
+        },
+        {
+          "handle": "worker_writes_database",
+          "initiator": "worker",
+          "receiver": "database",
+          "action": "writes database",
+          "protocol": "unspecified",
+          "operations": "write",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "The background worker reads and writes the database."
+            }
+          ]
+        },
+        {
+          "handle": "app_reads_config",
+          "initiator": "web_app",
+          "receiver": "web_config",
+          "action": "reads settings from",
+          "protocol": "unspecified",
+          "operations": "read",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "Both processes read their settings from a config store: the web application has a web application config"
+            }
+          ]
+        },
+        {
+          "handle": "worker_reads_config",
+          "initiator": "worker",
+          "receiver": "worker_config",
+          "action": "reads settings from",
+          "protocol": "unspecified",
+          "operations": "read",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "Both processes read their settings from a config store: the web application has a web application config, and the worker has a worker config."
+            }
+          ]
+        }
+      ],
+      "facts": [
+        {
+          "handle": "f_browser_zone",
+          "subject_kind": "mention",
+          "subject": "browser",
+          "predicate": "network-membership",
+          "value": "outside_network",
+          "scope": [],
+          "basis": "stated",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "The browser sits outside our network"
+            }
+          ],
+          "explanation": "",
+          "exclusive": false
+        },
+        {
+          "handle": "f_app_zone",
+          "subject_kind": "mention",
+          "subject": "web_app",
+          "predicate": "network-membership",
+          "value": "web_tier",
+          "scope": [],
+          "basis": "stated",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "the web application runs in our web tier."
+            }
+          ],
+          "explanation": "",
+          "exclusive": false
+        },
+        {
+          "handle": "f_queue_zone",
+          "subject_kind": "mention",
+          "subject": "message_queue",
+          "predicate": "network-membership",
+          "value": "backend_tier",
+          "scope": [],
+          "basis": "stated",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "The queue, the worker and the database are all in the backend tier"
+            }
+          ],
+          "explanation": "",
+          "exclusive": false
+        },
+        {
+          "handle": "f_worker_zone",
+          "subject_kind": "mention",
+          "subject": "worker",
+          "predicate": "network-membership",
+          "value": "backend_tier",
+          "scope": [],
+          "basis": "stated",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "The queue, the worker and the database are all in the backend tier"
+            }
+          ],
+          "explanation": "",
+          "exclusive": false
+        },
+        {
+          "handle": "f_database_zone",
+          "subject_kind": "mention",
+          "subject": "database",
+          "predicate": "network-membership",
+          "value": "backend_tier",
+          "scope": [],
+          "basis": "stated",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "The queue, the worker and the database are all in the backend tier"
+            }
+          ],
+          "explanation": "",
+          "exclusive": false
+        },
+        {
+          "handle": "f_app_auth_queue",
+          "subject_kind": "interaction",
+          "subject": "app_puts_jobs",
+          "predicate": "authentication-mechanism",
+          "value": "unknown",
+          "reason": "silent",
+          "scope": [],
+          "basis": "stated",
+          "quotes": [],
+          "explanation": "",
+          "exclusive": false
+        },
+        {
+          "handle": "f_worker_auth_database",
+          "subject_kind": "interaction",
+          "subject": "worker_writes_database",
+          "predicate": "authentication-mechanism",
+          "value": "unknown",
+          "reason": "silent",
+          "scope": [],
+          "basis": "stated",
+          "quotes": [],
+          "explanation": "",
+          "exclusive": false
+        },
+        {
+          "handle": "f_browser_encryption",
+          "subject_kind": "interaction",
+          "subject": "browser_talks_app",
+          "predicate": "transport-encryption",
+          "value": "encrypted",
+          "scope": [],
+          "basis": "stated",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "The browser-to-application traffic is the one link marked as encrypted."
+            }
+          ],
+          "explanation": "",
+          "exclusive": false
+        },
+        {
+          "handle": "f_app_internet",
+          "subject_kind": "mention",
+          "subject": "web_app",
+          "predicate": "internet-exposure",
+          "value": "internet-facing",
+          "scope": [],
+          "basis": "inferred",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "A user's browser talks to the web application over HTTP/S across the public internet."
+            }
+          ],
+          "explanation": "The description states that a browser reaches the web application across the public internet.",
+          "exclusive": false
+        },
+        {
+          "handle": "f_queue_credentials_custody",
+          "subject_kind": "credential",
+          "subject": "web application's queue credentials",
+          "predicate": "credential-custody",
+          "value": "web application config",
+          "scope": [],
+          "basis": "stated",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "the web application's queue credentials"
+            }
+          ],
+          "explanation": "",
+          "exclusive": false
+        },
+        {
+          "handle": "f_database_credentials_custody",
+          "subject_kind": "credential",
+          "subject": "worker's database credentials",
+          "predicate": "credential-custody",
+          "value": "worker config",
+          "scope": [],
+          "basis": "stated",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "the worker's database credentials"
+            }
+          ],
+          "explanation": "",
+          "exclusive": false
+        },
+        {
+          "handle": "f_database_storage",
+          "subject_kind": "mention",
+          "subject": "database",
+          "predicate": "storage-encryption",
+          "value": "unknown",
+          "reason": "silent",
+          "scope": [],
+          "basis": "stated",
+          "quotes": [],
+          "explanation": "",
+          "exclusive": false
+        },
+        {
+          "handle": "f_web_config_storage",
+          "subject_kind": "mention",
+          "subject": "web_config",
+          "predicate": "storage-encryption",
+          "value": "unknown",
+          "reason": "silent",
+          "scope": [],
+          "basis": "stated",
+          "quotes": [],
+          "explanation": "",
+          "exclusive": false
+        },
+        {
+          "handle": "f_worker_config_storage",
+          "subject_kind": "mention",
+          "subject": "worker_config",
+          "predicate": "storage-encryption",
+          "value": "unknown",
+          "reason": "silent",
+          "scope": [],
+          "basis": "stated",
+          "quotes": [],
+          "explanation": "",
+          "exclusive": false
+        }
+      ],
+      "unresolved": [
+        {
+          "handle": "u_app_queue_auth",
+          "question": "How does the web application authenticate to the message queue?",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "The diagram does not say anything about how the web application authenticates to the queue"
+            }
+          ]
+        },
+        {
+          "handle": "u_worker_database_auth",
+          "question": "How does the worker authenticate to the database?",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "how the worker authenticates to the database"
+            }
+          ]
+        },
+        {
+          "handle": "u_storage_encryption",
+          "question": "Is anything encrypted at rest?",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "or whether anything is encrypted at rest"
+            }
+          ]
+        }
+      ]
+    },
+    "bundle_dispositions": [
+      {
+        "handle": "public_internet",
+        "kind": "mention",
+        "disposition": "consumed",
+        "target": "boundary:public-internet",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "outside_network",
+        "kind": "mention",
+        "disposition": "consumed",
+        "target": "boundary:outside-our-network",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "web_tier",
+        "kind": "mention",
+        "disposition": "consumed",
+        "target": "boundary:web-tier",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "backend_tier",
+        "kind": "mention",
+        "disposition": "consumed",
+        "target": "boundary:backend-tier",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "browser",
+        "kind": "mention",
+        "disposition": "consumed",
+        "target": "process:users-browser",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "web_app",
+        "kind": "mention",
+        "disposition": "consumed",
+        "target": "process:web-application",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "message_queue",
+        "kind": "mention",
+        "disposition": "consumed",
+        "target": "store:message-queue",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "worker",
+        "kind": "mention",
+        "disposition": "consumed",
+        "target": "process:background-worker-process",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "database",
+        "kind": "mention",
+        "disposition": "consumed",
+        "target": "store:database",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "web_config",
+        "kind": "mention",
+        "disposition": "consumed",
+        "target": "store:web-application-config",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "worker_config",
+        "kind": "mention",
+        "disposition": "consumed",
+        "target": "store:worker-config",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "browser_talks_app",
+        "kind": "interaction",
+        "disposition": "consumed",
+        "target": "flow:process:users-browser>process:web-application>talks-to",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "app_puts_jobs",
+        "kind": "interaction",
+        "disposition": "consumed",
+        "target": "flow:process:web-application>store:message-queue>puts-jobs-onto",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "worker_picks_jobs",
+        "kind": "interaction",
+        "disposition": "consumed",
+        "target": "flow:process:background-worker-process>store:message-queue>picks-them-up",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "worker_reads_database",
+        "kind": "interaction",
+        "disposition": "consumed",
+        "target": "flow:process:background-worker-process>store:database>reads-database",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "worker_writes_database",
+        "kind": "interaction",
+        "disposition": "consumed",
+        "target": "flow:process:background-worker-process>store:database>writes-database",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "app_reads_config",
+        "kind": "interaction",
+        "disposition": "consumed",
+        "target": "flow:process:web-application>store:web-application-config>reads-settings-from",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "worker_reads_config",
+        "kind": "interaction",
+        "disposition": "consumed",
+        "target": "flow:process:background-worker-process>store:worker-config>reads-settings-from",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "f_browser_zone",
+        "kind": "fact",
+        "disposition": "consumed",
+        "target": "process:users-browser",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "f_app_zone",
+        "kind": "fact",
+        "disposition": "consumed",
+        "target": "process:web-application",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "f_queue_zone",
+        "kind": "fact",
+        "disposition": "consumed",
+        "target": "store:message-queue",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "f_worker_zone",
+        "kind": "fact",
+        "disposition": "consumed",
+        "target": "process:background-worker-process",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "f_database_zone",
+        "kind": "fact",
+        "disposition": "consumed",
+        "target": "store:database",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "f_app_auth_queue",
+        "kind": "fact",
+        "disposition": "consumed",
+        "target": "flow:process:web-application>store:message-queue>puts-jobs-onto",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "f_worker_auth_database",
+        "kind": "fact",
+        "disposition": "consumed",
+        "target": "flow:process:background-worker-process>store:database>writes-database",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "f_browser_encryption",
+        "kind": "fact",
+        "disposition": "consumed",
+        "target": "flow:process:users-browser>process:web-application>talks-to",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "f_app_internet",
+        "kind": "fact",
+        "disposition": "consumed",
+        "target": "process:web-application",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "f_queue_credentials_custody",
+        "kind": "fact",
+        "disposition": "preserved",
+        "target": "web application's queue credentials",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "f_database_credentials_custody",
+        "kind": "fact",
+        "disposition": "preserved",
+        "target": "worker's database credentials",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "f_database_storage",
+        "kind": "fact",
+        "disposition": "consumed",
+        "target": "store:database",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "f_web_config_storage",
+        "kind": "fact",
+        "disposition": "consumed",
+        "target": "store:web-application-config",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "f_worker_config_storage",
+        "kind": "fact",
+        "disposition": "consumed",
+        "target": "store:worker-config",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "u_app_queue_auth",
+        "kind": "unresolved",
+        "disposition": "unresolved",
+        "target": "",
+        "code": "open-question",
+        "message": "How does the web application authenticate to the message queue?"
+      },
+      {
+        "handle": "u_worker_database_auth",
+        "kind": "unresolved",
+        "disposition": "unresolved",
+        "target": "",
+        "code": "open-question",
+        "message": "How does the worker authenticate to the database?"
+      },
+      {
+        "handle": "u_storage_encryption",
+        "kind": "unresolved",
+        "disposition": "unresolved",
+        "target": "",
+        "code": "open-question",
+        "message": "Is anything encrypted at rest?"
+      }
+    ],
+    "extracted_model": {
+      "external_entities": [],
+      "processes": [
+        {
+          "id": "process:users-browser",
+          "name": "user's browser",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "A user's browser talks to the web application over HTTP/S across the public internet.",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "technology": "unknown",
+          "trust_zone": "unknown",
+          "exposure": "unknown",
+          "interface_kind": "unknown"
+        },
+        {
+          "id": "process:web-application",
+          "name": "web application",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "the web application runs in our web tier.",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "technology": "unknown",
+          "trust_zone": "unknown",
+          "exposure": "unknown",
+          "interface_kind": "unknown"
+        },
+        {
+          "id": "process:background-worker-process",
+          "name": "background worker process",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "a background worker process picks them up and does the work.",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "technology": "unknown",
+          "trust_zone": "unknown",
+          "exposure": "unknown",
+          "interface_kind": "unknown"
+        }
+      ],
+      "data_stores": [
+        {
+          "id": "store:message-queue",
+          "name": "message queue",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "It puts jobs onto a message queue, and a background worker process picks them up and does the work.",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "technology": "unknown",
+          "trust_zone": "unknown",
+          "data_classification": "unknown",
+          "encryption_at_rest": "unknown"
+        },
+        {
+          "id": "store:database",
+          "name": "database",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "The background worker reads and writes the database.",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "technology": "unknown",
+          "trust_zone": "unknown",
+          "data_classification": "unknown",
+          "encryption_at_rest": "unknown"
+        },
+        {
+          "id": "store:web-application-config",
+          "name": "web application config",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "the web application has a web application config",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "technology": "unknown",
+          "trust_zone": "unknown",
+          "data_classification": "unknown",
+          "encryption_at_rest": "unknown"
+        },
+        {
+          "id": "store:worker-config",
+          "name": "worker config",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "the worker has a worker config.",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "technology": "unknown",
+          "trust_zone": "unknown",
+          "data_classification": "unknown",
+          "encryption_at_rest": "unknown"
+        }
+      ],
+      "data_flows": [
+        {
+          "id": "flow:process:users-browser>process:web-application>talks-to",
+          "name": "talks to",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "A user's browser talks to the web application over HTTP/S across the public internet.",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "source": "process:users-browser",
+          "destination": "process:web-application",
+          "protocol": "HTTP/S",
+          "authentication": "unknown",
+          "data_description": "unknown",
+          "encryption_in_transit": "unknown",
+          "operations": "unknown"
+        },
+        {
+          "id": "flow:process:web-application>store:message-queue>puts-jobs-onto",
+          "name": "puts jobs onto",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "It puts jobs onto a message queue",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "source": "process:web-application",
+          "destination": "store:message-queue",
+          "protocol": "unspecified",
+          "authentication": "unknown",
+          "data_description": "unknown",
+          "encryption_in_transit": "unknown",
+          "operations": "write"
+        },
+        {
+          "id": "flow:process:background-worker-process>store:message-queue>picks-them-up",
+          "name": "picks them up",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "a background worker process picks them up and does the work.",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "source": "process:background-worker-process",
+          "destination": "store:message-queue",
+          "protocol": "unspecified",
+          "authentication": "unknown",
+          "data_description": "unknown",
+          "encryption_in_transit": "unknown",
+          "operations": "read"
+        },
+        {
+          "id": "flow:process:background-worker-process>store:database>reads-database",
+          "name": "reads database",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "The background worker reads and writes the database.",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "source": "process:background-worker-process",
+          "destination": "store:database",
+          "protocol": "unspecified",
+          "authentication": "unknown",
+          "data_description": "unknown",
+          "encryption_in_transit": "unknown",
+          "operations": "read"
+        },
+        {
+          "id": "flow:process:background-worker-process>store:database>writes-database",
+          "name": "writes database",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "The background worker reads and writes the database.",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "source": "process:background-worker-process",
+          "destination": "store:database",
+          "protocol": "unspecified",
+          "authentication": "unknown",
+          "data_description": "unknown",
+          "encryption_in_transit": "unknown",
+          "operations": "write"
+        },
+        {
+          "id": "flow:process:web-application>store:web-application-config>reads-settings-from",
+          "name": "reads settings from",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "Both processes read their settings from a config store: the web application has a web application config",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "source": "process:web-application",
+          "destination": "store:web-application-config",
+          "protocol": "unspecified",
+          "authentication": "unknown",
+          "data_description": "unknown",
+          "encryption_in_transit": "unknown",
+          "operations": "read"
+        },
+        {
+          "id": "flow:process:background-worker-process>store:worker-config>reads-settings-from",
+          "name": "reads settings from",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "Both processes read their settings from a config store: the web application has a web application config, and the worker has a worker config.",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "source": "process:background-worker-process",
+          "destination": "store:worker-config",
+          "protocol": "unspecified",
+          "authentication": "unknown",
+          "data_description": "unknown",
+          "encryption_in_transit": "unknown",
+          "operations": "read"
+        }
+      ],
+      "trust_boundaries": [
+        {
+          "id": "boundary:public-internet",
+          "name": "public internet",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "across the public internet",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "kind": "network"
+        },
+        {
+          "id": "boundary:outside-our-network",
+          "name": "outside our network",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "The browser sits outside our network",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "kind": "network"
+        },
+        {
+          "id": "boundary:web-tier",
+          "name": "web tier",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "the web application runs in our web tier.",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "kind": "network"
+        },
+        {
+          "id": "boundary:backend-tier",
+          "name": "backend tier",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "The queue, the worker and the database are all in the backend tier",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "kind": "network"
+        }
+      ],
+      "assumptions": [],
+      "capabilities": []
+    },
+    "valid_model": {
+      "external_entities": [],
+      "processes": [
+        {
+          "id": "process:users-browser",
+          "name": "user's browser",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "A user's browser talks to the web application over HTTP/S across the public internet.",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "technology": "unknown",
+          "trust_zone": "unknown",
+          "exposure": "unknown",
+          "interface_kind": "unknown"
+        },
+        {
+          "id": "process:web-application",
+          "name": "web application",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "the web application runs in our web tier.",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "technology": "unknown",
+          "trust_zone": "unknown",
+          "exposure": "unknown",
+          "interface_kind": "unknown"
+        },
+        {
+          "id": "process:background-worker-process",
+          "name": "background worker process",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "a background worker process picks them up and does the work.",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "technology": "unknown",
+          "trust_zone": "unknown",
+          "exposure": "unknown",
+          "interface_kind": "unknown"
+        }
+      ],
+      "data_stores": [
+        {
+          "id": "store:message-queue",
+          "name": "message queue",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "It puts jobs onto a message queue, and a background worker process picks them up and does the work.",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "technology": "unknown",
+          "trust_zone": "unknown",
+          "data_classification": "unknown",
+          "encryption_at_rest": "unknown"
+        },
+        {
+          "id": "store:database",
+          "name": "database",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "The background worker reads and writes the database.",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "technology": "unknown",
+          "trust_zone": "unknown",
+          "data_classification": "unknown",
+          "encryption_at_rest": "unknown"
+        },
+        {
+          "id": "store:web-application-config",
+          "name": "web application config",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "the web application has a web application config",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "technology": "unknown",
+          "trust_zone": "unknown",
+          "data_classification": "unknown",
+          "encryption_at_rest": "unknown"
+        },
+        {
+          "id": "store:worker-config",
+          "name": "worker config",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "the worker has a worker config.",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "technology": "unknown",
+          "trust_zone": "unknown",
+          "data_classification": "unknown",
+          "encryption_at_rest": "unknown"
+        }
+      ],
+      "data_flows": [
+        {
+          "id": "flow:process:users-browser>process:web-application>talks-to",
+          "name": "talks to",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "A user's browser talks to the web application over HTTP/S across the public internet.",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "source": "process:users-browser",
+          "destination": "process:web-application",
+          "protocol": "HTTP/S",
+          "authentication": "unknown",
+          "data_description": "unknown",
+          "encryption_in_transit": "unknown",
+          "operations": "unknown"
+        },
+        {
+          "id": "flow:process:web-application>store:message-queue>puts-jobs-onto",
+          "name": "puts jobs onto",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "It puts jobs onto a message queue",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "source": "process:web-application",
+          "destination": "store:message-queue",
+          "protocol": "unspecified",
+          "authentication": "unknown",
+          "data_description": "unknown",
+          "encryption_in_transit": "unknown",
+          "operations": "write"
+        },
+        {
+          "id": "flow:process:background-worker-process>store:message-queue>picks-them-up",
+          "name": "picks them up",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "a background worker process picks them up and does the work.",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "source": "process:background-worker-process",
+          "destination": "store:message-queue",
+          "protocol": "unspecified",
+          "authentication": "unknown",
+          "data_description": "unknown",
+          "encryption_in_transit": "unknown",
+          "operations": "read"
+        },
+        {
+          "id": "flow:process:background-worker-process>store:database>reads-database",
+          "name": "reads database",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "The background worker reads and writes the database.",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "source": "process:background-worker-process",
+          "destination": "store:database",
+          "protocol": "unspecified",
+          "authentication": "unknown",
+          "data_description": "unknown",
+          "encryption_in_transit": "unknown",
+          "operations": "read"
+        },
+        {
+          "id": "flow:process:background-worker-process>store:database>writes-database",
+          "name": "writes database",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "The background worker reads and writes the database.",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "source": "process:background-worker-process",
+          "destination": "store:database",
+          "protocol": "unspecified",
+          "authentication": "unknown",
+          "data_description": "unknown",
+          "encryption_in_transit": "unknown",
+          "operations": "write"
+        },
+        {
+          "id": "flow:process:web-application>store:web-application-config>reads-settings-from",
+          "name": "reads settings from",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "Both processes read their settings from a config store: the web application has a web application config",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "source": "process:web-application",
+          "destination": "store:web-application-config",
+          "protocol": "unspecified",
+          "authentication": "unknown",
+          "data_description": "unknown",
+          "encryption_in_transit": "unknown",
+          "operations": "read"
+        },
+        {
+          "id": "flow:process:background-worker-process>store:worker-config>reads-settings-from",
+          "name": "reads settings from",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "Both processes read their settings from a config store: the web application has a web application config, and the worker has a worker config.",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "source": "process:background-worker-process",
+          "destination": "store:worker-config",
+          "protocol": "unspecified",
+          "authentication": "unknown",
+          "data_description": "unknown",
+          "encryption_in_transit": "unknown",
+          "operations": "read"
+        }
+      ],
+      "trust_boundaries": [
+        {
+          "id": "boundary:public-internet",
+          "name": "public internet",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "across the public internet",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "kind": "network"
+        },
+        {
+          "id": "boundary:outside-our-network",
+          "name": "outside our network",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "The browser sits outside our network",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "kind": "network"
+        },
+        {
+          "id": "boundary:web-tier",
+          "name": "web tier",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "the web application runs in our web tier.",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "kind": "network"
+        },
+        {
+          "id": "boundary:backend-tier",
+          "name": "backend tier",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "The queue, the worker and the database are all in the backend tier",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "kind": "network"
+        }
+      ],
+      "assumptions": [],
+      "capabilities": []
+    },
+    "patch_outcomes": {
+      "rolled_back": false,
+      "outcomes": [
+        {
+          "handle": "authworkerdbread",
+          "state": "applied",
+          "code": "",
+          "message": ""
+        },
+        {
+          "handle": "queueatrestunknown",
+          "state": "applied",
+          "code": "",
+          "message": ""
+        }
+      ]
+    }
+  }
+}
