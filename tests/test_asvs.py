@@ -1034,7 +1034,7 @@ class TestScopeEntryNamesWhatWouldSettleIt:
         entry = ScopeEntry(
             unit="V1.2.4",
             state="needs-other-evidence",
-            reason="applies, and settling it needs code",
+            reason="a lane raised it, and settling it needs code",
             needs="code",
         )
 
@@ -1045,7 +1045,7 @@ class TestScopeEntryNamesWhatWouldSettleIt:
             ScopeEntry(
                 unit="V1.2.4",
                 state="needs-other-evidence",
-                reason="applies, and nothing here settles it",
+                reason="a lane raised it, and nothing here settles it",
             )
 
     def test_only_a_deferred_entry_may_name_one(self):

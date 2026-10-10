@@ -60,6 +60,7 @@ from analysis_service.claims import (
     RulingBatch,
     ScopeEntry,
     build_block_summary,
+    deferral_reason,
 )
 from analysis_service.frameworks.asvs.applicability import (
     RATIONALES,
@@ -630,7 +631,7 @@ class AsvsAnalysis(FrameworkAnalysis):
                 reason=(refusal.reason if refusal else "")
                 or ruled_out.get(requirement.id, "")
                 or (
-                    f"applies, and settling it needs {deferred[requirement.id]}"
+                    deferral_reason(deferred[requirement.id])
                     if requirement.id in deferred
                     else ""
                 ),

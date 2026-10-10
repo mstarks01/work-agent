@@ -245,9 +245,9 @@ looked". The complement is not derived — every unit appears.
 - `not-raised` — no lane filed a claim on the unit. A fact about the output,
   not a verdict that the unit applies: the lanes were handed the unit and
   filed nothing, and nothing in the report certifies that they weighed it.
-- `needs-other-evidence` — the unit applies, a lane raised it, and the service
-  withheld the claim because settling it needs evidence of a kind the job does
-  not carry: `code`, `config` or `people`, where a job carries `prose`. The
+- `needs-other-evidence` — a lane raised the unit, and the service withheld
+  the claim because settling it needs evidence of a kind the job does not
+  carry: `code`, `config` or `people`, where a job carries `prose`. The
   kind sits in `needs` as a field rather than a phrase in `reason`, so a reader
   can group by it. The answer is actionable by supplying that kind of input.
 
