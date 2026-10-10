@@ -1185,6 +1185,13 @@ it cannot find. See [Concepts](Concepts.md#assertion) for what the rows do.
 - **Report.** A report from a job with the pass on carries an `assertions`
   block: the catalog of rows and the rows code refused. With the pass off, the
   block is `null`. See [Report Schema](Report-Schema.md).
+- **Use figures.** Each finished job with the pass on writes one `INFO` log
+  line, `job <id> assertion use: {...}`. The line holds counts only: the rows,
+  the refused rows, the open link questions, the `assert` node's time and
+  charge, and for each framework the claims that cite a row, the claims that
+  rest only on rows, and `catalog_leads`. The job store keeps no history, so
+  collect these lines from the log. `run.py assertion-use` reads the same
+  figures from archived reports.
 - **Turn it off.** Set `ANALYSIS_ASSERTIONS=false` and restart. Nothing stored
   changes shape.
 

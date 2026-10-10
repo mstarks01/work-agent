@@ -69,6 +69,7 @@ from analysis_service.report import (
 from evals.harness import (
     arms,
     assembly,
+    assertion_use,
     audit,
     bottleneck,
     comparison,
@@ -2789,6 +2790,12 @@ COMMANDS: dict[str, Command] = {
         " rejected, findings withdrawn and leads reopened (#926, no credentials)",
         run=population.command_reassess,
         arguments=population.reassess_arguments,
+    ),
+    "assertion-use": Command(
+        help="read each archived report's use of its assertion catalog: claims"
+        " that cite or rest only on its rows, catalog-only leads (no credentials)",
+        run=assertion_use.command_assertion_use,
+        arguments=assertion_use.arguments,
     ),
     "guard-cost": Command(
         help="price what ADR 0041's guard holds back over archived proposal/graph"

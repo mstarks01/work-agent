@@ -2482,6 +2482,11 @@ class FrameworkAnalysis(BaseModel):
     dropped_claims: list[DroppedClaim] = Field(default_factory=list)
     fired_rules: list[str] = Field(default_factory=list)
     knowledge_docs: list[str] = Field(default_factory=list)
+    #: How many **Candidates** fire only because of the assertion catalog: the
+    #: leads this job's rules give that the same rules give no lane on the model
+    #: before the catalog's projection. ``None`` where no catalog was held, so
+    #: an unmeasured job never reads as a zero.
+    catalog_leads: int | None = Field(default=None, ge=0)
     summary: SerializeAsAny[BlockSummary]
 
     def all_claims(self) -> tuple[RuledClaim, ...]:

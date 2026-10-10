@@ -2431,6 +2431,43 @@ def test_prepare_records_the_packs_and_rules_the_agents_were_given(
     assert "information-disclosure-store-at-rest-unverified" in retrieved["fired_rules"]
 
 
+def test_prepare_measures_no_catalog_leads_where_it_holds_no_catalog(
+    domain_loader, package_loaders
+):
+    """``None`` and not 0: a job that ran no pass measured nothing."""
+    ctx = FakeContext()
+    graph.prepare_analysis(
+        valid_model().model_dump(mode="json"),
+        ctx,
+        KEYS,
+        FRAMEWORKS,
+        domain_loader,
+        package_loaders,
+    )
+
+    assert ctx.state[NODES.key("retrieved")]["catalog_leads"] is None
+
+
+def test_prepare_counts_the_leads_only_the_catalog_gives(
+    domain_loader, package_loaders
+):
+    """A stated absence of a second factor on the login fires one more lead."""
+    absent_on_login = AssertionProposal(
+        subject_type="interaction",
+        subject="flow:entity:customer>process:web-app>login",
+        predicate="mfa-requirement",
+        value=ABSENT,
+        basis="inferred",
+        explanation="the description names password login and nothing else",
+    )
+    ctx = FakeContext(**{graph.STATE_ASSERTION_PROPOSAL: proposal(absent_on_login)})
+    prepare_with_assertions(ctx, valid_model(), domain_loader, package_loaders)
+
+    retrieved = ctx.state[NODES.key("retrieved")]
+    assert "spoofing-second-factor-stated-absent" in retrieved["fired_rules"]
+    assert retrieved["catalog_leads"] == 1
+
+
 # --- The run-time precondition gate -----------------------------------------
 #
 # ``prepare`` is the gate: it runs each selected framework's precondition over

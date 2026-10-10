@@ -25,6 +25,7 @@ internal detail and never surfaces it.
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
 import os
 from collections.abc import Awaitable, Callable, Mapping, Sequence
@@ -36,6 +37,7 @@ from uuid import uuid4
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from analysis_service.answer_sets import NO_ANSWERS, AnswerSet, HeldAnswerSet
+from analysis_service.assertion_use import assertion_use
 from analysis_service.assertions import AssertionRecord
 from analysis_service.budgets import BudgetPolicy, measured_tokens, spent_tokens
 from analysis_service.certification import CertifyResult
@@ -1112,6 +1114,11 @@ async def execute_job(
         record.report = outcome.report
         record.certification = outcome.certification
         record.transition("completed")
+        # One line per job, because the job store keeps no history to read
+        # these figures from later. Counts only: no source text, no claim.
+        use = assertion_use(outcome.report)
+        if use is not None:
+            logger.info("job %s assertion use: %s", job_id, json.dumps(use.to_json()))
     elif isinstance(outcome, PipelineAwaiting):
         # The node runs first, for the settling reason below.
         record.checkpoint = outcome.checkpoint
