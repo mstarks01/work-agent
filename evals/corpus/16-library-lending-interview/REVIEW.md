@@ -123,7 +123,7 @@ Not part of the question, but the records cite these names, so you need them.
 |---|---|---|---|---|---|
 | flow:entity:member>process:lending-api>borrow-renew-and-reserve | entity:member | process:lending-api | unknown | unknown | unknown |
 | flow:process:self-service-kiosk>process:lending-api>record-loans-and-returns | process:self-service-kiosk | process:lending-api | unknown | unknown | unknown |
-| flow:entity:desk-staff>process:lending-api>change-loans-by-hand | entity:desk-staff | process:lending-api | unknown | one login shared by all desk staff in every branch; the password is on a card taped under the desk | unknown |
+| flow:entity:desk-staff>process:lending-api>change-loans-by-hand | entity:desk-staff | process:lending-api | unknown | password authentication using one login shared by all desk staff in every branch; the password is on a card taped under the desk | unknown |
 | flow:process:lending-api>store:loans-database>read-and-write-loans | process:lending-api | store:loans-database | unknown | unknown | unknown |
 
 **Trust boundaries**
@@ -423,7 +423,7 @@ your missing list, your notes and a digest of each file you read:
       "opened_digests": {
       "source.md": "8bc51704b4514584c02f95f04048086a70f43a3dbb2c40af53afe13b3f79e6a9",
       "transcript.md": "c48f8b9e53090b42971ffb548ed2302d0021a8c2b8539552973211c21df3f765",
-      "model.json": "273a81ef4f52e7b84a64bdff2e15815383b51ccdf5d4def8a6e49f186f068563",
+      "model.json": "688f37efb88281779b67349b5b0fa55791a8c06e0db8f175f455678c0bfdd1c0",
       "claims/asvs.json": "617a68c8e31065f8886e8b544ee4c67b63eaa7e43c769cd179d35b437443f8d7",
       "claims/stride.json": "87120ad43f66af05e1a80a1dcd9cc93bbbc794b7d9d9f1c154b60dd15f2c97cc"
       }

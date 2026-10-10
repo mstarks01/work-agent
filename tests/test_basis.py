@@ -28,7 +28,7 @@ from evals.harness.reference import load_case
 # the prose and the code cannot drift apart.
 CORPUS_VALUES = 39
 CORPUS_FLAGGED_WEAK = 0
-CORPUS_FLAGGED_STRICT = 16
+CORPUS_FLAGGED_STRICT = 17
 
 
 def _model(**flow) -> SystemModel:
@@ -289,7 +289,7 @@ def test_the_published_weak_rung_rate_is_what_the_corpus_gives(corpus_values):
 
 
 def test_the_published_strict_rung_rate_is_what_the_corpus_gives(corpus_values):
-    """16 in 38, which is why the strict rung is recorded and not shipped."""
+    """17 in 39, which is why the strict rung is recorded and not shipped."""
     flagged = [
         case_id
         for case_id, tokens, source in corpus_values
@@ -344,7 +344,7 @@ def test_the_corpus_runs_clean_through_the_shipped_reader():
 
 
 def test_the_corpus_spends_a_fraction_of_the_scan_budget():
-    """The worst case is 408 times under the bound, which is what the constant says.
+    """The worst case is 340 times under the bound, which is what the constant says.
 
     Re-derived rather than asserted in prose: the budget is a number somebody
     will want to lower, and this says what lowering it would cost.
@@ -360,8 +360,8 @@ def test_the_corpus_spends_a_fraction_of_the_scan_budget():
         }
         worst = max(worst, sum(len(sources[label]) for _, label in scans))
 
-    assert worst == 48_990
-    assert worst * 400 < MAX_SCAN_WORK
+    assert worst == 58_788
+    assert worst * 300 < MAX_SCAN_WORK
 
 
 def test_the_scan_stops_at_the_budget_and_says_so(caplog):

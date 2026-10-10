@@ -129,7 +129,7 @@
       "source": "entity:desk-staff",
       "destination": "process:lending-api",
       "protocol": "unknown",
-      "authentication": "one login shared by all desk staff in every branch; the password is on a card taped under the desk",
+      "authentication": "password authentication using one login shared by all desk staff in every branch; the password is on a card taped under the desk",
       "data_description": "loan extensions, cleared account blocks and loans closed by hand",
       "encryption_in_transit": "unknown",
       "operations": "read-write",

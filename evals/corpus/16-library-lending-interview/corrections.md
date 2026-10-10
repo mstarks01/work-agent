@@ -10,15 +10,17 @@ Applying these in reverse to `model.json` reconstructs the bootstrap artifact.
 | 3 | `store:reservations-database` | present | removed | Invented from the half-sentence Priya corrected in the same turn: "It writes to the two databases— actually, no. We merged those in the spring. It's one loans database now." The later statement stands, and the retracted one produces no element. |
 | 4 | `entity:regional-interlibrary-scheme` and `flow:process:lending-api>entity:regional-interlibrary-scheme>share-loans` | present | removed | Invented from a hypothetical: "If we ever join the regional interlibrary scheme, we'd have to stand something up for the other libraries, but nothing like that exists today." A hypothetical produces no element. |
 | 5 | `store:loans-database.data_classification` | `unknown` | `confidential` | The bootstrap left the field empty although Priya lists what the store holds: "Names, email addresses, home addresses and every member's full borrowing history live in the loans database." That is personal data, and the scheme in `prompts/extract.md` files personal data as `confidential`. Neither source states a local tier, so the value is the scheme word and no more. |
+| 6 | `flow:entity:desk-staff>process:lending-api>change-loans-by-hand.authentication` | `one login shared by all desk staff in every branch; the password is on a card taped under the desk` | `password authentication using` the same words | The bootstrap described the account and did not name the mechanism, and rule 5 of `prompts/extract.md` names the mechanism first. Priya states both a shared login and "The password is on a card taped under the desk." Ruled with the reference facts on 2026-10-10. |
 
 ## Signal
 
 Corrections 1 to 4 are each a failure of a conversational rule in
 `prompts/extract.md`, which is what this case was written to grade: a hedge
 became a value, a question became a flow, a retracted half-sentence became a
-store, and a hypothetical became an entity and a flow. Correction 5 is not a
-conversational rule: the bootstrap left a scored attribute `unknown` against a
-list of what the store holds.
+store, and a hypothetical became an entity and a flow. Corrections 5 and 6 are
+not conversational rules: the bootstrap left a scored attribute `unknown`
+against a list of what the store holds, and it described a shared account
+without naming its mechanism.
 
 The bootstrap read exposure correctly, so it carries no correction. The note
 says the lending API is internal-only, and in the transcript Priya calls that
@@ -28,7 +30,7 @@ does not apply. The value is `internet-facing`.
 
 Three of the corrections are element-level (2, 3, 4), so the extraction score
 sees an invented flow, store or entity as an element that the blessed model
-does not hold. The two attribute-level corrections (1, 5) are on scored
+does not hold. The attribute-level corrections (1, 5, 6) are on scored
 attributes, so the extraction score sees them on any element both models
 carry. Correction 1 is also graded end-to-end by a must-find reference threat
 that rests on the unknown: the spoofing claim on the member flow. A value of

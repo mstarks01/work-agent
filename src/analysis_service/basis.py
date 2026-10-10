@@ -82,7 +82,7 @@ is treated as one a person would keep.
 =====================================  ======  =======  ============
 rung                                   values  flagged  false-reject
 =====================================  ======  =======  ============
-every content token present                39       16        41.0%
+every content token present                39       17        43.6%
 **at least one content token present**     39        0         0.0%
 =====================================  ======  =======  ============
 
@@ -213,7 +213,7 @@ FUNCTION_WORDS: frozenset[str] = frozenset(
 #:
 #: Measured, on the tree that carries this constant: a search runs at about
 #: 930,000 characters per millisecond, so 20 million characters is about 21 ms
-#: of CPU (#1316). The worst of the 16 corpus cases spends 48,990, which is 408 times
+#: of CPU (#1316). The worst of the 16 corpus cases spends 58,788, which is 340 times
 #: under the budget. A job that spends it names over a thousand different words
 #: across its controls and matches none of them, which is not a model this
 #: measures usefully.
