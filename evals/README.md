@@ -32,7 +32,7 @@ of 60; the exact finite-population 95% interval for that non-boundary
 population's discrepancy rate is 0.7%–10.5%. It was a joint review, not two
 independent ratings, and it says nothing about corpus correctness.
 
-**Cases 01 to 15 have a merged Case Sitting, and case 16 waits for one.** That is the
+**Every case has a merged Case Sitting.** That is the
 reading session over a case's source, model and reference sets together
 (`BLESSING.md` step 6), and it is what would catch the case-04 defect anywhere
 else. The act is a **Case Sitting**, recorded as one JSON file under

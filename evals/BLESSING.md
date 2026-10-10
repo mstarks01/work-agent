@@ -10,10 +10,10 @@ bookkeeping around it.
 > is free, offline, and open to outside contributors. New here? Start at
 > [`../CONTRIBUTING.md`](../CONTRIBUTING.md).
 
-> **A person has read every case but case 16.** All 16 cases in
+> **A person has read every case.** All 16 cases in
 > `evals/corpus/` were written by an agent. On 2026-09-21 a single **Case
 > Sitting** cleared the first 13, and sittings on 2026-10-03 and 2026-10-04
-> cleared the two holdout cases. The first sitting wrote 130 own-list threats blind, then
+> cleared the two holdout cases, and two on 2026-10-10 cleared case 16. The first sitting wrote 130 own-list threats blind, then
 > marked all 344 recorded claims: 233 `agree`, 61 `unsure`, 26 `reject`, 24 `duplicate`. Two
 > calibration reviews read the pairs step 5 produces:
 > [`calibration_labels/REVIEW-01.md`](calibration_labels/REVIEW-01.md) on
