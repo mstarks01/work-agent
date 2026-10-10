@@ -165,11 +165,9 @@ def native_structured_output(vendor: Vendor, model: str) -> bool | None:
     nothing about response schemas, and most of its entries are silent.
 
     **A report may not turn that silence into a no.** LiteLLM's lookup returns
-    ``False`` for a silent entry, so a matrix built on it printed
-    ``unsupported`` for ``openrouter/anthropic/claude-sonnet-4.6`` — a pair that
-    honours a schema when asked. Measured live on 2026-09-11: the request
-    carried ``response_format`` and the reply parsed as JSON against it. The map
-    had simply not caught up with the slug.
+    ``False`` for a silent entry, so a matrix built on it would print
+    ``unsupported`` for ``openrouter/anthropic/claude-3.7-sonnet``. That entry
+    says nothing about response schemas, so the true answer is unknown.
 
     Emulation is checked first and is definitive. Where LiteLLM would satisfy
     the constraint with a synthesised tool, the schema does not reach the model
