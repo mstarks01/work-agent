@@ -397,7 +397,7 @@ def test_the_merge_direction_refuses_a_package_with_no_contract():
 #: the author who moves them has to say what the new number is.
 #:
 #: ASVS's denominator is small because the chapter separates almost everything
-#: first: 613 within-case pairs of reference requirements, of which 98 share a
+#: first: 641 within-case pairs of reference requirements, of which 101 share a
 #: chapter, of which none shares a requirement identifier. That is the shape a
 #: catalog claim set should have, and a rise in the third column would mean two
 #: rulings on one requirement in one place — one vote answering for both.

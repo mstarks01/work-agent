@@ -71,6 +71,7 @@ from evals.harness.calibration import (
 )
 from evals.harness.identity import MechanicalIdentity, SubsetVerbIdentity
 from evals.harness.reference import flows_by_case, load_corpus, tuning_cases
+from evals.harness.replay import unsigned_rows
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 
@@ -319,11 +320,80 @@ def _corpus() -> Mapping[str, object]:
     return {"value": count, "word": WORDS.get(count, str(count))}
 
 
+def _collisions() -> Mapping[str, object]:
+    """Each package's collision count, and the pairs ASVS's chapter removes first."""
+    corpus = load_corpus(verify_corpus.CORPUS_DIR)
+    flows = flows_by_case(corpus)
+    stride = measure_merges(corpus, "stride", flows)
+    asvs = measure_merges(corpus, "asvs", flows)
+    within_case = sum(
+        len(case.references.get("asvs", ()))
+        * (len(case.references.get("asvs", ())) - 1)
+        for case in corpus
+    )
+    return {
+        "stride_pairs": stride.within_lane_pairs,
+        "stride_merges": len(stride.merges),
+        "asvs_pairs": asvs.within_lane_pairs,
+        "asvs_merges": len(asvs.merges),
+        "asvs_within_case": within_case // 2,
+    }
+
+
+def _signed_facts() -> Mapping[str, object]:
+    """How many cases carry a facts file with every row signed."""
+    corpus_dir = verify_corpus.CORPUS_DIR
+    count = sum(
+        unsigned_rows(corpus_dir, case) == 0 for case in load_corpus(corpus_dir)
+    )
+    return {"value": count, "word": WORDS.get(count, str(count))}
+
+
 FIGURES: tuple[Figure, ...] = (
     Figure(
         name="the widest framework fan-out",
         compute=lambda: {"value": widest_fan_out()},
         claims=(("evals/TUNING.md", "{value} today", 1),),
+    ),
+    Figure(
+        name="the package collision counts",
+        compute=_collisions,
+        claims=(
+            (
+                "docs/agents/claim-identity.md",
+                "| `stride` | {stride_pairs} | {stride_merges} |",
+                1,
+            ),
+            (
+                "docs/agents/claim-identity.md",
+                "| `asvs` | {asvs_pairs} | {asvs_merges} |",
+                1,
+            ),
+            (
+                "docs/agents/claim-identity.md",
+                (
+                    "first: {asvs_within_case} within-case pairs, of which"
+                    " {asvs_pairs} share a chapter"
+                ),
+                1,
+            ),
+            (
+                "tests/test_evals_calibration.py",
+                (
+                    "first: {asvs_within_case} within-case pairs of reference"
+                    " requirements, of which {asvs_pairs} share a"
+                ),
+                1,
+            ),
+        ),
+    ),
+    Figure(
+        name="the cases with signed reference facts",
+        compute=_signed_facts,
+        claims=(
+            ("evals/README.md", "**{word} cases carry signed reference facts.**", 1),
+            ("evals/README.md", "a draft until signed ({value} cases signed)", 1),
+        ),
     ),
     Figure(
         name="the corpus size",
