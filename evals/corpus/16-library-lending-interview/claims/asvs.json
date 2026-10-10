@@ -24,17 +24,6 @@
     "notes": "What the API checks on a call from the app is a hedge, so whether a call is tied to one member's records is open."
   },
   {
-    "chapter": "authorization",
-    "requirement": "V8.1.1",
-    "affected_element_ids": [
-      "process:lending-api"
-    ],
-    "claim": "No document says who may extend a loan, clear a block or mark a book as returned.",
-    "tier": "expected",
-    "disposition": "needs-more-prose",
-    "notes": "A documentation requirement, which a fuller description could answer."
-  },
-  {
     "chapter": "session-management",
     "requirement": "V7.2.1",
     "affected_element_ids": [

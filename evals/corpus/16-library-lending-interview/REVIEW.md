@@ -34,8 +34,6 @@ Roughly an hour.
 > Members, loans and reservations live in the loans database. The lending API and the loans database run in the council data centre.
 >
 > Desk staff can extend a loan, clear a block on a member's account or mark a book as returned by hand, through a circulation page the lending API serves. Desk staff work on the branch network.
->
-> This note is old in places. Priya on the digital services team has the current picture; the interview transcript alongside is more recent than this note.
 
 ### Interview transcript (transcript)
 
@@ -117,7 +115,7 @@ Not part of the question, but the records cite these names, so you need them.
 
 | id | zone | at rest | classification |
 |---|---|---|---|
-| store:loans-database | boundary:council-data-centre | unknown | unknown |
+| store:loans-database | boundary:council-data-centre | unknown | confidential |
 
 **Data flows**
 
@@ -138,7 +136,7 @@ Not part of the question, but the records cite these names, so you need them.
 
 **Recorded notes** — hedges, probed gaps and source disagreements live here, so read them before the sets.
 
-- `process:lending-api` — The two sources disagree on exposure, so the value is unknown and both claims are kept. Lending service note: "The lending API is internal-only." Interview transcript, Priya: "The phones talk straight to the lending API over the internet." The note states the transcript is more recent; recency does not settle a disagreement. Priya on load: "the API is one service with no queue in front of it"; it went down twice last summer on the reading challenge launch day.
+- `process:lending-api` — The two sources disagree on exposure, so the value is unknown and both claims are kept. Lending service note: "The lending API is internal-only." Interview transcript, Priya: "The phones talk straight to the lending API over the internet." Priya on load: "the API is one service with no queue in front of it"; it went down twice last summer on the reading challenge launch day.
 - `process:self-service-kiosk` — What else the kiosks talk to was asked and not answered. Dan asked: "Do the kiosks still write straight into the loans database, the way the old ones did?" Priya: "The kiosks are Dev's team's area. I couldn't tell you what they talk to these days." A question states no fact, so the model holds no kiosk-to-database flow.
 - `store:loans-database` — Priya corrected herself in one turn: "It writes to the two databases— actually, no. We merged those in the spring. It's one loans database now." The later statement stands, so the model holds one database.
 - `flow:entity:member>process:lending-api>borrow-renew-and-reserve` — Authentication was asked about and answered with a hedge, so it stays unknown. Priya: "I think it checks a token the app gets at sign-in, but I'd have to look." and "Honestly I could not tell you today what it accepts, or what it does with a call it does not like."
@@ -162,7 +160,7 @@ category.
 
 ---
 
-## Part 2 — the 8 recorded ASVS records
+## Part 2 — the 7 recorded ASVS records
 
 The narrower question, per record: **does this requirement apply to this system, and does the input show it satisfied?** An ASVS claim rules applicability and never a pass.
 
@@ -183,17 +181,10 @@ The narrower question, per record: **does this requirement apply to this system,
 
 > mark:
 
-**A3.** `V8.1.1` — No document says who may extend a loan, clear a block or mark a book as returned.
-
-- `process:lending-api`
-- A documentation requirement, which a fuller description could answer.
-
-> mark:
-
 
 ### session-management
 
-**A4.** `V7.2.1` — A token the app gets at sign-in is mentioned once, inside a hedge, and nothing says where it is verified.
+**A3.** `V7.2.1` — A token the app gets at sign-in is mentioned once, inside a hedge, and nothing says where it is verified.
 
 - `flow:entity:member>process:lending-api>borrow-renew-and-reserve`, `process:lending-api`
 - The one mention is a hedge, so it is not evidence either way.
@@ -203,7 +194,7 @@ The narrower question, per record: **does this requirement apply to this system,
 
 ### secure-communication
 
-**A5.** `V12.2.1` — Nothing states whether the connection between the app and the lending API uses TLS.
+**A4.** `V12.2.1` — Nothing states whether the connection between the app and the lending API uses TLS.
 
 - `flow:entity:member>process:lending-api>borrow-renew-and-reserve`
 - REST and JSON are stated and the transport never is. The transcript puts this flow on the internet.
@@ -213,7 +204,7 @@ The narrower question, per record: **does this requirement apply to this system,
 
 ### authentication
 
-**A6.** `V6.1.1` — Nothing documents what limits repeated sign-in attempts on the app or on the circulation page.
+**A5.** `V6.1.1` — Nothing documents what limits repeated sign-in attempts on the app or on the circulation page.
 
 - `flow:entity:desk-staff>process:lending-api>change-loans-by-hand`, `flow:entity:member>process:lending-api>borrow-renew-and-reserve`
 - Neither source describes a sign-in defence; a fuller description could answer it.
@@ -223,7 +214,7 @@ The narrower question, per record: **does this requirement apply to this system,
 
 ### validation-and-business-logic
 
-**A7.** `V2.2.2` — Nothing states that the lending API checks a loan or a return a kiosk sends, rather than trusting the kiosk.
+**A6.** `V2.2.2` — Nothing states that the lending API checks a loan or a return a kiosk sends, rather than trusting the kiosk.
 
 - `flow:process:self-service-kiosk>process:lending-api>record-loans-and-returns`, `process:lending-api`
 - How a kiosk is identified is also unknown, which is the spoofing claim on the same flow.
@@ -233,14 +224,14 @@ The narrower question, per record: **does this requirement apply to this system,
 
 ### encoding-and-sanitization
 
-**A8.** `V1.2.4` — The lending API reads and writes the loans database and nothing says how its queries are built.
+**A7.** `V1.2.4` — The lending API reads and writes the loans database and nothing says how its queries are built.
 
 - `flow:process:lending-api>store:loans-database>read-and-write-loans`, `process:lending-api`
 - A property of the code, which neither source can settle.
 
 > mark:
 
-## Part 3 — the 12 recorded STRIDE threats
+## Part 3 — the 13 recorded STRIDE threats
 
 Only after your own list exists.
 
@@ -258,7 +249,7 @@ on either of them. That is the finding this sitting exists for.
 
 ### spoofing
 
-**1.** An attacker calls the lending API as another member and renews, reserves or ends loans on that member's account, because nothing states what the API checks on a call from the app.
+**1.** If the lending API does not authenticate calls from the app, an attacker borrows, renews or reserves books as another member.
 
 - `flow:entity:member>process:lending-api>borrow-renew-and-reserve`, `entity:member`
 - severity: medium/medium · verb: `impersonate`
@@ -266,7 +257,7 @@ on either of them. That is the finding this sitting exists for.
 
 > mark:
 
-**2.** An attacker presents itself to the lending API as a branch kiosk and records loans and returns against any member's card, because nothing states how the API knows a call comes from a kiosk.
+**2.** If the lending API does not authenticate kiosks and check what each one may record, an attacker who reaches the kiosk operations forges loans and returns.
 
 - `flow:process:self-service-kiosk>process:lending-api>record-loans-and-returns`, `process:self-service-kiosk`
 - severity: medium/medium · verb: `impersonate`
@@ -285,7 +276,7 @@ on either of them. That is the finding this sitting exists for.
 
 ### tampering
 
-**4.** An attacker on the network path between a member's phone and the lending API alters a renewal or a reservation in flight, because nothing states that the connection is encrypted.
+**4.** If the connection between a member's phone and the lending API has no effective authenticated encryption, an attacker on the path alters a renewal or a reservation in flight.
 
 - `flow:entity:member>process:lending-api>borrow-renew-and-reserve`
 - severity: low/low · verb: `alter-in-transit`
@@ -293,18 +284,10 @@ on either of them. That is the finding this sitting exists for.
 
 > mark:
 
-**5.** An attacker who reaches the loans database closes loans or clears blocks directly, past every rule the lending API applies.
-
-- `store:loans-database`, `flow:process:lending-api>store:loans-database>read-and-write-loans`
-- severity: low/high · verb: `alter`
-- How the API authenticates to the database is unknown. The API is stated to be the only thing that touches the store, which makes direct access the tampering path to name.
-
-> mark:
-
 
 ### repudiation
 
-**6.** A loan closed by hand or a block cleared at the desk cannot be traced to a person or a branch, because every desk shares one login and the history records only that the change was made by hand.
+**5.** A loan closed by hand or a block cleared at the desk cannot be traced to a person or a branch, because every desk shares one login and the history records only that the change was made by hand.
 
 - `flow:entity:desk-staff>process:lending-api>change-loans-by-hand`, `entity:desk-staff`
 - severity: high/medium · verb: `unattributable`
@@ -312,7 +295,7 @@ on either of them. That is the finding this sitting exists for.
 
 > mark:
 
-**7.** A member denies a renewal or a reservation made from the app and nothing can contradict them, because nothing states what the API verifies about the caller.
+**6.** If the lending API does not tie each renewal and reservation to the authenticated member in a record it can trust, a member denies one and nothing settles it.
 
 - `flow:entity:member>process:lending-api>borrow-renew-and-reserve`, `entity:member`
 - severity: medium/low · verb: `unattributable`
@@ -323,7 +306,7 @@ on either of them. That is the finding this sitting exists for.
 
 ### information-disclosure
 
-**8.** An attacker who reaches the loans database or a copy of it reads every member's home address and full borrowing history, because nothing states how the store is protected at rest.
+**7.** If the loans database and its copies have no effective protection at rest, an attacker who obtains the storage reads every member's home address and full borrowing history.
 
 - `store:loans-database`
 - severity: low/high · verb: `read`
@@ -331,18 +314,18 @@ on either of them. That is the finding this sitting exists for.
 
 > mark:
 
-**9.** An attacker on the network path between a member's phone and the lending API reads which books a member borrows and reserves, because nothing states that the connection is encrypted.
+**8.** If the connection between a member's phone and the lending API has no effective encryption, an attacker on the path reads which books a member borrows and reserves.
 
 - `flow:entity:member>process:lending-api>borrow-renew-and-reserve`
 - severity: medium/medium · verb: `intercept`
-- No source states TLS on this flow. The disagreement about exposure makes the path itself uncertain, which widens who could sit on it.
+- No source states TLS on this flow. The transcript says the phones reach the API over the internet.
 
 > mark:
 
 
 ### denial-of-service
 
-**10.** An attacker floods the lending API with calls and no member or kiosk can borrow or return anything, because it is one service with no queue in front of it.
+**9.** An attacker floods the lending API with calls, and no member or kiosk can borrow or return anything, because ordinary launch-day load already took the one service down twice.
 
 - `process:lending-api`, `flow:entity:member>process:lending-api>borrow-renew-and-reserve`
 - severity: high/medium · verb: `flood`
@@ -353,19 +336,44 @@ on either of them. That is the finding this sitting exists for.
 
 ### elevation-of-privilege
 
-**11.** An attacker on the internet reaches the lending API and the circulation page it serves directly, from outside the branch network and the council data centre, because the sources disagree on whether the API is exposed to the internet.
+**10.** If the lending API does not check for a staff role on its manual-return, block-clearing and extension operations, a member or an unauthenticated caller from the internet invokes them.
 
-- `process:lending-api`
+- `process:lending-api`, `flow:entity:member>process:lending-api>borrow-renew-and-reserve`
 - severity: medium/high · verb: `escalate`
-- The disagreement this case exists for. The note says internal-only and the transcript says straight over the internet, so exposure is unknown. An extraction that believes the note and writes internal suppresses this finding.
+- The circulation page and the app's calls reach one API, and neither source states a role check or which operations a call from the app can reach. Exposure is unknown, because the note and the transcript disagree on it. The transcript still puts the member flow on the internet. An extraction that believes the note and writes internal removes the internet caller from this finding.
 
 > mark:
 
-**12.** Anyone who holds the shared desk login closes loans and clears blocks on any member's account in any branch, because nothing scopes what the circulation page allows or reviews what it did.
+
+### tampering
+
+**11.** A desk worker marks an unreturned book as returned, clears a justified block or extends a loan on purpose, through the circulation page, with the powers the desk already has.
 
 - `flow:entity:desk-staff>process:lending-api>change-loans-by-hand`, `store:loans-database`
-- severity: medium/high · verb: `abuse-grant`
-- The grant is every member's record in every branch, and the control on it is one password on a card.
+- severity: medium/high · verb: `alter`
+- Desk staff hold these powers by the note, so this is misuse of a grant, not an escalation. The shared login makes it hard to detect, which is the repudiation claim on the same flow.
+
+> mark:
+
+
+### spoofing
+
+**12.** If a scanned library card is all a kiosk checks, a person with another member's borrowed, stolen or copied card borrows books on that member's account.
+
+- `process:self-service-kiosk`, `entity:member`
+- severity: medium/low · verb: `use-credential`
+- The note says a member scans their card and their books at a kiosk. Neither source states a second check.
+
+> mark:
+
+
+### information-disclosure
+
+**13.** If the desk, kiosk or database connections of the lending API have no effective encryption, an attacker on one of those paths reads the circulation credentials or member data they carry.
+
+- `flow:entity:desk-staff>process:lending-api>change-loans-by-hand`, `flow:process:self-service-kiosk>process:lending-api>record-loans-and-returns`, `flow:process:lending-api>store:loans-database>read-and-write-loans`
+- severity: low/medium · verb: `intercept`
+- encryption_in_transit is unknown on all three flows. The member flow is a separate claim.
 
 > mark:
 
@@ -413,11 +421,11 @@ your missing list, your notes and a digest of each file you read:
       "missing": ["<what the recorded sets do not name>"],
       "notes": "<counts, and anything you would change>",
       "opened_digests": {
-      "source.md": "2156beaf7b3c646d8a000a71bfe30d060d64e40e640a3064b11b1d1ed77c27e7",
+      "source.md": "8bc51704b4514584c02f95f04048086a70f43a3dbb2c40af53afe13b3f79e6a9",
       "transcript.md": "c48f8b9e53090b42971ffb548ed2302d0021a8c2b8539552973211c21df3f765",
-      "model.json": "9229bca3922505cbad92f718e99a5ca58a0b41f8ac56d9d99e6d3a6a088d7150",
-      "claims/asvs.json": "e6732e6b6f2bd910bea03584611ccf7fbf187fa98c7e0a8a83f367f6fb3435c6",
-      "claims/stride.json": "7a7bc15023854bb1457eed2fec333db11d055560ebd40aba011cf56145e046b3"
+      "model.json": "4f8389ff5391fef68fb20eccc45cf5ba18d5f0692da02ac9347b416f127bef87",
+      "claims/asvs.json": "617a68c8e31065f8886e8b544ee4c67b63eaa7e43c769cd179d35b437443f8d7",
+      "claims/stride.json": "ede0d6c741edf22c7e156c4f59101b3a17c345f9aa162c9f4a6dff9b6d77ed29"
       }
     }
   }

@@ -57,22 +57,22 @@ the last colon gives a wrong label for a typed endpoint.
 Elements alone cannot separate a read from a write against one store. The
 frontier in `tests/test_evals_identity.py` prices every rule on all three ways
 of being wrong — false splits over the 169 labelled match pairs, false merges
-over the 92 scored candidate negatives, and 2 false merges over the 361
+over the 92 scored candidate negatives, and 2 false merges over the 365
 within-lane reference pairs:
 
-| Rule | False splits (of 169) | Candidate merges (of 92) | Reference merges (of 361) |
+| Rule | False splits (of 169) | Candidate merges (of 92) | Reference merges (of 365) |
 |---|---|---|---|
 | equality | 72 | 20 | 5 |
 | endpoint subset | 12 | 69 | 42 |
 | **endpoint subset + verb** | **13** | **2** | **2** |
-| overlap | 3 | 66 | 56 |
-| endpoint overlap | 1 | 81 | 184 |
+| overlap | 3 | 66 | 58 |
+| endpoint overlap | 1 | 81 | 187 |
 
 No element-only row is usable: the tightest loses 72 paraphrases and the loosest
-destroys 184 findings. **The verb row is the first one that is.**
+destroys 187 findings. **The verb row is the first one that is.**
 
 **Read the candidate column, not the reference one.** On reference pairs alone
-`endpoint subset` merges 42 of 361 and looks survivable. On the candidate
+`endpoint subset` merges 42 of 365 and looks survivable. On the candidate
 paraphrases a live run actually emits it merges **69 of 92** — it is barely a
 rule. The verb takes that to 2, and it costs one split to do it — 12 becomes 13,
 which is the whole price in the first column. The candidate column rests on
@@ -139,8 +139,8 @@ answered it: a direction is not available, and it would not pay if it were.
 **A direction is not a field.** `affected_element_ids` is a list whose order no
 rule reads, so a claim naming two processes says nothing about which way the
 attacker moves between them. Only a claim naming a **Data Flow** states a
-direction, through that flow's endpoints. 194 of the 284 corpus claims name
-exactly one flow; 8 name several and 82 name none, and neither of those yields
+direction, through that flow's endpoints. 194 of the 285 corpus claims name
+exactly one flow; 9 name several and 82 name none, and neither of those yields
 the single direction a comparison needs.
 
 #652's ruling rests on the priced reading below, not on one pair.
@@ -385,11 +385,11 @@ no reviewer sees it go. So every package carries a collision rule, and
 
 | Package | Comparable reference pairs | Collisions |
 |---|---|---|
-| `stride` | 361 | 2 |
-| `asvs` | 101 | 0 |
+| `stride` | 365 | 2 |
+| `asvs` | 99 | 0 |
 
 ASVS's denominator is small because the chapter separates almost everything
-first: 641 within-case pairs, of which 101 share a chapter, of which none shares
+first: 634 within-case pairs, of which 99 share a chapter, of which none shares
 a requirement identifier. A rise in the second column would mean two rulings on
 one requirement in one place, and one vote answering for both.
 
@@ -412,7 +412,7 @@ The rule is the only matcher a scored sweep has. A `match` is a recall hit; a
 the vote ledger — `rejected`, `pooled`, `open`, `unvoted` or `stale`, the last
 being a vote cast on an argument this run has moved past. Nothing asks a
 model. The rule's known error costs are the record above: 13 of 169 labelled
-matches split, 2 of 92 candidate negatives merged, 2 of 361 reference pairs
+matches split, 2 of 92 candidate negatives merged, 2 of 365 reference pairs
 merged. A split surfaces as an unvoted finding in the queue rather than
 vanishing. A merge does not surface at all, which is why the candidate merge
 column is the one to watch.

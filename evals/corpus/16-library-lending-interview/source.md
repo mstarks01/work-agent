@@ -7,5 +7,3 @@ Every branch has self-service kiosks where a member scans their library card and
 Members, loans and reservations live in the loans database. The lending API and the loans database run in the council data centre.
 
 Desk staff can extend a loan, clear a block on a member's account or mark a book as returned by hand, through a circulation page the lending API serves. Desk staff work on the branch network.
-
-This note is old in places. Priya on the digital services team has the current picture; the interview transcript alongside is more recent than this note.

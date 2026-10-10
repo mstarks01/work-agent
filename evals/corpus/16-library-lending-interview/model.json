@@ -38,7 +38,7 @@
       "trust_zone": "boundary:council-data-centre",
       "exposure": "unknown",
       "interface_kind": "web",
-      "notes": "The two sources disagree on exposure, so the value is unknown and both claims are kept. Lending service note: \"The lending API is internal-only.\" Interview transcript, Priya: \"The phones talk straight to the lending API over the internet.\" The note states the transcript is more recent; recency does not settle a disagreement. Priya on load: \"the API is one service with no queue in front of it\"; it went down twice last summer on the reading challenge launch day."
+      "notes": "The two sources disagree on exposure, so the value is unknown and both claims are kept. Lending service note: \"The lending API is internal-only.\" Interview transcript, Priya: \"The phones talk straight to the lending API over the internet.\" Priya on load: \"the API is one service with no queue in front of it\"; it went down twice last summer on the reading challenge launch day."
     },
     {
       "id": "process:self-service-kiosk",
@@ -71,7 +71,7 @@
       "source_speaker": "Priya",
       "technology": "unknown",
       "trust_zone": "boundary:council-data-centre",
-      "data_classification": "unknown",
+      "data_classification": "confidential",
       "encryption_at_rest": "unknown",
       "notes": "Priya corrected herself in one turn: \"It writes to the two databases— actually, no. We merged those in the spring. It's one loans database now.\" The later statement stands, so the model holds one database."
     }

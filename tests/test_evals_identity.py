@@ -79,7 +79,7 @@ MEASURED = {
 #: on two thirds of the corpus.** ``affected_element_ids`` is a list whose order
 #: no rule reads, so a claim naming two processes says nothing about which way
 #: the attacker moves between them. A claim naming a **Data Flow** says it
-#: through that flow's endpoints, and 194 of 284 corpus claims name exactly one.
+#: through that flow's endpoints, and 194 of 285 corpus claims name exactly one.
 #:
 #: The two readings of an absent direction are both dead ends, and the numbers
 #: below are why. Read it as a mismatch and the rule splits 90 of the 186
@@ -88,9 +88,9 @@ MEASURED = {
 #: that survive the verb the coarser side cites no flow.
 DIRECTION = {
     # Over the corpus, what a claim yields without a new field.
-    "claims": 284,
+    "claims": 285,
     "one_flow_cited": 194,
-    "several_flows_cited": 8,
+    "several_flows_cited": 9,
     "no_flow_cited": 82,
     # Over the 2 reference merges the shipped rule makes.
     "merges_with_a_direction_on_both_sides": 0,
@@ -131,14 +131,14 @@ FRONTIER = {
     "endpoint equality": {"splits": 49, "candidate_merges": 33, "reference_merges": 15},
     "subset": {"splits": 33, "candidate_merges": 54, "reference_merges": 18},
     "endpoint subset": {"splits": 12, "candidate_merges": 69, "reference_merges": 42},
-    "overlap": {"splits": 3, "candidate_merges": 66, "reference_merges": 56},
+    "overlap": {"splits": 3, "candidate_merges": 66, "reference_merges": 58},
     # Case 02's calibration pair about disabling the Pub/Sub topic names
     # ``store:pub-sub`` (#925), which is one candidate that does not merge
     # under the loosest rung.
     "endpoint overlap": {
         "splits": 1,
         "candidate_merges": 81,
-        "reference_merges": 184,
+        "reference_merges": 187,
     },
 }
 
@@ -404,7 +404,7 @@ class TestAClaimThatNamesNoPlaceMatchesNothing:
 #: is what survives the verb. The gap between them is what the verb buys.
 VERB_MEASURED = {
     "cases": 16,
-    "within_lane_pairs": 361,
+    "within_lane_pairs": 365,
     "subset": 42,
     "subset_verb": 2,
 }

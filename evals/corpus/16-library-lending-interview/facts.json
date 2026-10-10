@@ -237,7 +237,7 @@
         "explanation": "",
         "exclusive": false
       },
-      "rationale": "The transcript states it. It conflicts with the note's row above. The note says the transcript is more recent, and recency does not settle the conflict.",
+      "rationale": "The transcript states it. It conflicts with the note's row above. Neither source says which one holds, so the two rows stand side by side.",
       "reviewed_by": null
     },
     {
@@ -389,6 +389,27 @@
         "exclusive": false
       },
       "rationale": "The record names the shared desk login and no person. The drafter reads that as attribution to an intermediary; a reviewer may read it as no attribution at all.",
+      "reviewed_by": null
+    },
+    {
+      "assertion": {
+        "subject_type": "component",
+        "subject": "store:loans-database",
+        "predicate": "data-classification",
+        "value": "confidential",
+        "reason": null,
+        "scope": [],
+        "basis": "inferred",
+        "quotes": [
+          {
+            "source_label": "Interview transcript",
+            "quote": "Names, email addresses, home addresses and every member's full borrowing history live in the loans database."
+          }
+        ],
+        "explanation": "The source says what the store holds, and the tier `confidential` follows from those contents; the source does not name a tier.",
+        "exclusive": false
+      },
+      "rationale": "Inferred from stated contents: Names, email addresses, home addresses and every member's full borrowing history live in the loans database. Only a source that names the tier states it (ruled 2026-09-24, #926).",
       "reviewed_by": null
     }
   ],
