@@ -295,7 +295,7 @@ jobs:
           # through to the direct route's entry.
           - vendor: openrouter
             secret_name: ANALYSIS_OPENROUTER_API_KEY
-            base_model: anthropic/claude-sonnet-4.6
+            base_model: anthropic/claude-sonnet-5
             strong_model: anthropic/claude-opus-4.7
             addressing: ""
 

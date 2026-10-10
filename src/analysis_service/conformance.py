@@ -179,7 +179,7 @@ REFERENCE_MODELS: dict[str, tuple[str, ...]] = {
     # the direct route and report it as the gateway's. These two have
     # ``openrouter`` entries of their own, so every cell below is about the
     # route that would actually serve.
-    "openrouter": ("anthropic/claude-sonnet-4.6", "anthropic/claude-opus-4.7"),
+    "openrouter": ("anthropic/claude-sonnet-5", "anthropic/claude-opus-4.7"),
     # The same identifiers as the ``gemini`` row, behind a location the
     # operator supplies. On Vertex the endpoint is a location and never a
     # segment of the model name, so nothing about the endpoint reaches this
