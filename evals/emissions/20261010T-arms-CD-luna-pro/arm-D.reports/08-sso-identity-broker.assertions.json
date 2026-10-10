@@ -1,0 +1,2231 @@
+{
+  "proposal": {
+    "assertions": [
+      {
+        "subject_type": "component",
+        "subject": "process:identity-broker",
+        "predicate": "network-membership",
+        "value": "boundary:corporate-network",
+        "reason": null,
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "The broker runs on the corporate network."
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      {
+        "subject_type": "component",
+        "subject": "process:store-admin-console",
+        "predicate": "network-membership",
+        "value": "boundary:corporate-network",
+        "reason": null,
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "It also runs on the corporate network."
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      {
+        "subject_type": "component",
+        "subject": "process:identity-broker",
+        "predicate": "internet-exposure",
+        "value": "internal",
+        "reason": null,
+        "scope": [],
+        "basis": "inferred",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "The broker runs on the corporate network."
+          }
+        ],
+        "explanation": "The source places the broker on the corporate network.",
+        "exclusive": false
+      },
+      {
+        "subject_type": "component",
+        "subject": "process:store-admin-console",
+        "predicate": "internet-exposure",
+        "value": "internal",
+        "reason": null,
+        "scope": [],
+        "basis": "inferred",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "It also runs on the corporate network."
+          }
+        ],
+        "explanation": "The source places the console on the corporate network.",
+        "exclusive": false
+      },
+      {
+        "subject_type": "principal",
+        "subject": "colleagues",
+        "predicate": "credential-presented",
+        "value": "token",
+        "reason": null,
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "Once the broker has signed a colleague in it issues them a token."
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      {
+        "subject_type": "credential",
+        "subject": "token",
+        "predicate": "credential-lifetime",
+        "value": "twelve hours",
+        "reason": null,
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "Tokens are good for twelve hours"
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      {
+        "subject_type": "credential",
+        "subject": "token",
+        "predicate": "credential-expiry",
+        "value": "expires",
+        "reason": null,
+        "scope": [],
+        "basis": "inferred",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "Tokens are good for twelve hours"
+          }
+        ],
+        "explanation": "A stated twelve-hour validity period means the token expires after that period.",
+        "exclusive": false
+      },
+      {
+        "subject_type": "credential",
+        "subject": "token",
+        "predicate": "credential-revocation",
+        "value": "absent",
+        "reason": null,
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "there is no way to pull one back before it expires."
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      {
+        "subject_type": "credential",
+        "subject": "signing key",
+        "predicate": "credential-custody",
+        "value": "keystore",
+        "reason": null,
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "The broker signs tokens with a signing key it keeps in a key store."
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      {
+        "subject_type": "credential",
+        "subject": "signing key",
+        "predicate": "credential-sharing",
+        "value": "shared",
+        "reason": null,
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "The same key signs the tokens for every application."
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      {
+        "subject_type": "interaction",
+        "subject": "flow:process:application>process:identity-broker>fetch-public-half",
+        "predicate": "signature-verification",
+        "value": "verified",
+        "reason": null,
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "Applications fetch the public half from the broker to check the signature."
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      {
+        "subject_type": "principal",
+        "subject": "colleagues",
+        "predicate": "authorization-grant",
+        "value": "change prices and void transactions when the token has the store-manager group",
+        "reason": null,
+        "scope": [
+          {
+            "kind": "resource",
+            "value": "store admin console"
+          },
+          {
+            "kind": "operation",
+            "value": "change prices and void transactions"
+          }
+        ],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "If the token has the store-manager group in it, the console lets the holder change prices and void transactions."
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      {
+        "subject_type": "component",
+        "subject": "process:store-admin-console",
+        "predicate": "authorization-grant",
+        "value": "absent",
+        "reason": null,
+        "scope": [
+          {
+            "kind": "resource",
+            "value": "store"
+          },
+          {
+            "kind": "operation",
+            "value": "change prices and void transactions"
+          }
+        ],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "The console does not check which store the colleague belongs to"
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      {
+        "subject_type": "component",
+        "subject": "store:directory",
+        "predicate": "origin-verification",
+        "value": "unknown",
+        "reason": "silent",
+        "scope": [],
+        "basis": "stated",
+        "quotes": [],
+        "explanation": "",
+        "exclusive": false
+      },
+      {
+        "subject_type": "component",
+        "subject": "store:directory",
+        "predicate": "storage-encryption",
+        "value": "unknown",
+        "reason": "hedged",
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "Nobody has written down ... whether the directory or the log are encrypted where they sit."
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      {
+        "subject_type": "component",
+        "subject": "store:audit-log",
+        "predicate": "storage-encryption",
+        "value": "unknown",
+        "reason": "hedged",
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "Nobody has written down ... whether the directory or the log are encrypted where they sit."
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      {
+        "subject_type": "principal",
+        "subject": "colleagues",
+        "predicate": "mfa-requirement",
+        "value": "unknown",
+        "reason": "hedged",
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "Nor has anyone written down whether colleagues are asked for a second factor."
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      {
+        "subject_type": "principal",
+        "subject": "franchise colleagues",
+        "predicate": "mfa-requirement",
+        "value": "unknown",
+        "reason": "hedged",
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "Nor has anyone written down whether colleagues are asked for a second factor."
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      }
+    ]
+  },
+  "catalog": {
+    "registry_version": 8,
+    "subjects": [
+      {
+        "id": "boundary:corporate-network",
+        "type": "zone",
+        "label": "corporate network"
+      },
+      {
+        "id": "credential:signing-key",
+        "type": "credential",
+        "label": "signing key"
+      },
+      {
+        "id": "credential:token",
+        "type": "credential",
+        "label": "token"
+      },
+      {
+        "id": "flow:process:application>process:identity-broker>fetch-public-half",
+        "type": "interaction",
+        "label": "fetch public half"
+      },
+      {
+        "id": "principal:colleagues",
+        "type": "principal",
+        "label": "colleagues"
+      },
+      {
+        "id": "principal:franchise-colleagues",
+        "type": "principal",
+        "label": "franchise colleagues"
+      },
+      {
+        "id": "process:identity-broker",
+        "type": "component",
+        "label": "identity broker"
+      },
+      {
+        "id": "process:store-admin-console",
+        "type": "component",
+        "label": "store admin console"
+      },
+      {
+        "id": "store:audit-log",
+        "type": "component",
+        "label": "audit log"
+      },
+      {
+        "id": "store:directory",
+        "type": "component",
+        "label": "directory"
+      }
+    ],
+    "entries": [
+      {
+        "subject": "process:identity-broker",
+        "predicate": "network-membership",
+        "value": "boundary:corporate-network",
+        "scope": [],
+        "basis": "stated",
+        "reason": null,
+        "support": [
+          {
+            "source_label": "System description",
+            "digest": "36115502847aa04640666b0dd9f458881e6f7f8968e4d499b58983b3403dc721",
+            "start": 113,
+            "end": 154,
+            "quote": "The broker runs on the corporate network."
+          }
+        ],
+        "premises": [],
+        "explanation": "",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      },
+      {
+        "subject": "process:store-admin-console",
+        "predicate": "network-membership",
+        "value": "boundary:corporate-network",
+        "scope": [],
+        "basis": "stated",
+        "reason": null,
+        "support": [
+          {
+            "source_label": "System description",
+            "digest": "36115502847aa04640666b0dd9f458881e6f7f8968e4d499b58983b3403dc721",
+            "start": 621,
+            "end": 659,
+            "quote": "It also runs on the corporate network."
+          }
+        ],
+        "premises": [],
+        "explanation": "",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      },
+      {
+        "subject": "process:identity-broker",
+        "predicate": "internet-exposure",
+        "value": "internal",
+        "scope": [],
+        "basis": "inferred",
+        "reason": null,
+        "support": [
+          {
+            "source_label": "System description",
+            "digest": "36115502847aa04640666b0dd9f458881e6f7f8968e4d499b58983b3403dc721",
+            "start": 113,
+            "end": 154,
+            "quote": "The broker runs on the corporate network."
+          }
+        ],
+        "premises": [],
+        "explanation": "The source places the broker on the corporate network.",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      },
+      {
+        "subject": "process:store-admin-console",
+        "predicate": "internet-exposure",
+        "value": "internal",
+        "scope": [],
+        "basis": "inferred",
+        "reason": null,
+        "support": [
+          {
+            "source_label": "System description",
+            "digest": "36115502847aa04640666b0dd9f458881e6f7f8968e4d499b58983b3403dc721",
+            "start": 621,
+            "end": 659,
+            "quote": "It also runs on the corporate network."
+          }
+        ],
+        "premises": [],
+        "explanation": "The source places the console on the corporate network.",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      },
+      {
+        "subject": "principal:colleagues",
+        "predicate": "credential-presented",
+        "value": "credential:token",
+        "scope": [],
+        "basis": "stated",
+        "reason": null,
+        "support": [
+          {
+            "source_label": "System description",
+            "digest": "36115502847aa04640666b0dd9f458881e6f7f8968e4d499b58983b3403dc721",
+            "start": 242,
+            "end": 307,
+            "quote": "Once the broker has signed a colleague in it issues them a token."
+          }
+        ],
+        "premises": [],
+        "explanation": "",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      },
+      {
+        "subject": "credential:token",
+        "predicate": "credential-lifetime",
+        "value": "twelve hours",
+        "scope": [],
+        "basis": "stated",
+        "reason": null,
+        "support": [
+          {
+            "source_label": "System description",
+            "digest": "36115502847aa04640666b0dd9f458881e6f7f8968e4d499b58983b3403dc721",
+            "start": 1351,
+            "end": 1383,
+            "quote": "Tokens are good for twelve hours"
+          }
+        ],
+        "premises": [],
+        "explanation": "",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      },
+      {
+        "subject": "credential:token",
+        "predicate": "credential-expiry",
+        "value": "expires",
+        "scope": [],
+        "basis": "inferred",
+        "reason": null,
+        "support": [
+          {
+            "source_label": "System description",
+            "digest": "36115502847aa04640666b0dd9f458881e6f7f8968e4d499b58983b3403dc721",
+            "start": 1351,
+            "end": 1383,
+            "quote": "Tokens are good for twelve hours"
+          }
+        ],
+        "premises": [],
+        "explanation": "A stated twelve-hour validity period means the token expires after that period.",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      },
+      {
+        "subject": "credential:token",
+        "predicate": "credential-revocation",
+        "value": "absent",
+        "scope": [],
+        "basis": "stated",
+        "reason": null,
+        "support": [
+          {
+            "source_label": "System description",
+            "digest": "36115502847aa04640666b0dd9f458881e6f7f8968e4d499b58983b3403dc721",
+            "start": 1388,
+            "end": 1439,
+            "quote": "there is no way to pull one back before it expires."
+          }
+        ],
+        "premises": [],
+        "explanation": "",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      },
+      {
+        "subject": "credential:signing-key",
+        "predicate": "credential-custody",
+        "value": "keystore",
+        "scope": [],
+        "basis": "stated",
+        "reason": null,
+        "support": [
+          {
+            "source_label": "System description",
+            "digest": "36115502847aa04640666b0dd9f458881e6f7f8968e4d499b58983b3403dc721",
+            "start": 891,
+            "end": 958,
+            "quote": "The broker signs tokens with a signing key it keeps in a key store."
+          }
+        ],
+        "premises": [],
+        "explanation": "",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      },
+      {
+        "subject": "credential:signing-key",
+        "predicate": "credential-sharing",
+        "value": "shared",
+        "scope": [],
+        "basis": "stated",
+        "reason": null,
+        "support": [
+          {
+            "source_label": "System description",
+            "digest": "36115502847aa04640666b0dd9f458881e6f7f8968e4d499b58983b3403dc721",
+            "start": 959,
+            "end": 1011,
+            "quote": "The same key signs the tokens for every application."
+          }
+        ],
+        "premises": [],
+        "explanation": "",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      },
+      {
+        "subject": "flow:process:application>process:identity-broker>fetch-public-half",
+        "predicate": "signature-verification",
+        "value": "verified",
+        "scope": [],
+        "basis": "stated",
+        "reason": null,
+        "support": [
+          {
+            "source_label": "System description",
+            "digest": "36115502847aa04640666b0dd9f458881e6f7f8968e4d499b58983b3403dc721",
+            "start": 1012,
+            "end": 1086,
+            "quote": "Applications fetch the public half from the broker to check the signature."
+          }
+        ],
+        "premises": [],
+        "explanation": "",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      },
+      {
+        "subject": "principal:colleagues",
+        "predicate": "authorization-grant",
+        "value": "change prices and void transactions when the token has the store-manager group",
+        "scope": [
+          {
+            "kind": "resource",
+            "value": "store admin console"
+          },
+          {
+            "kind": "operation",
+            "value": "change prices and void transactions"
+          }
+        ],
+        "basis": "stated",
+        "reason": null,
+        "support": [
+          {
+            "source_label": "System description",
+            "digest": "36115502847aa04640666b0dd9f458881e6f7f8968e4d499b58983b3403dc721",
+            "start": 660,
+            "end": 772,
+            "quote": "If the token has the store-manager group in it, the console lets the holder change prices and void transactions."
+          }
+        ],
+        "premises": [],
+        "explanation": "",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      },
+      {
+        "subject": "store:directory",
+        "predicate": "storage-encryption",
+        "value": "unknown",
+        "scope": [],
+        "basis": "stated",
+        "reason": "hedged",
+        "support": [
+          {
+            "source_label": "System description",
+            "digest": "36115502847aa04640666b0dd9f458881e6f7f8968e4d499b58983b3403dc721",
+            "start": 1746,
+            "end": 1769,
+            "quote": "Nobody has written down"
+          },
+          {
+            "source_label": "System description",
+            "digest": "36115502847aa04640666b0dd9f458881e6f7f8968e4d499b58983b3403dc721",
+            "start": 1835,
+            "end": 1897,
+            "quote": "whether the directory or the log are encrypted where they sit."
+          }
+        ],
+        "premises": [],
+        "explanation": "",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      },
+      {
+        "subject": "store:audit-log",
+        "predicate": "storage-encryption",
+        "value": "unknown",
+        "scope": [],
+        "basis": "stated",
+        "reason": "hedged",
+        "support": [
+          {
+            "source_label": "System description",
+            "digest": "36115502847aa04640666b0dd9f458881e6f7f8968e4d499b58983b3403dc721",
+            "start": 1746,
+            "end": 1769,
+            "quote": "Nobody has written down"
+          },
+          {
+            "source_label": "System description",
+            "digest": "36115502847aa04640666b0dd9f458881e6f7f8968e4d499b58983b3403dc721",
+            "start": 1835,
+            "end": 1897,
+            "quote": "whether the directory or the log are encrypted where they sit."
+          }
+        ],
+        "premises": [],
+        "explanation": "",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      },
+      {
+        "subject": "principal:colleagues",
+        "predicate": "mfa-requirement",
+        "value": "unknown",
+        "scope": [],
+        "basis": "stated",
+        "reason": "hedged",
+        "support": [
+          {
+            "source_label": "System description",
+            "digest": "36115502847aa04640666b0dd9f458881e6f7f8968e4d499b58983b3403dc721",
+            "start": 1898,
+            "end": 1975,
+            "quote": "Nor has anyone written down whether colleagues are asked for a second factor."
+          }
+        ],
+        "premises": [],
+        "explanation": "",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      },
+      {
+        "subject": "principal:franchise-colleagues",
+        "predicate": "mfa-requirement",
+        "value": "unknown",
+        "scope": [],
+        "basis": "stated",
+        "reason": "hedged",
+        "support": [
+          {
+            "source_label": "System description",
+            "digest": "36115502847aa04640666b0dd9f458881e6f7f8968e4d499b58983b3403dc721",
+            "start": 1898,
+            "end": 1975,
+            "quote": "Nor has anyone written down whether colleagues are asked for a second factor."
+          }
+        ],
+        "premises": [],
+        "explanation": "",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      }
+    ]
+  },
+  "issues": [
+    {
+      "code": "wrong-subject-type",
+      "message": "'authorization-grant' accepts principal, not 'component'",
+      "subject": "process:store-admin-console",
+      "assertion": null,
+      "row": 12
+    },
+    {
+      "code": "wrong-subject-type",
+      "message": "'origin-verification' accepts interaction, not 'component'",
+      "subject": "store:directory",
+      "assertion": null,
+      "row": 13
+    }
+  ],
+  "proposed": 18,
+  "quarantined": [],
+  "projection": [
+    {
+      "element_id": "process:identity-broker",
+      "attribute": "exposure",
+      "value": "internal",
+      "reason": "stated",
+      "rows": [
+        "assertion:internet-exposure~process:identity-broker~any~internal"
+      ]
+    },
+    {
+      "element_id": "process:identity-broker",
+      "attribute": "trust_zone",
+      "value": "boundary:corporate-network",
+      "reason": "stated",
+      "rows": [
+        "assertion:network-membership~process:identity-broker~any~boundary:corporate-network"
+      ]
+    },
+    {
+      "element_id": "process:store-admin-console",
+      "attribute": "exposure",
+      "value": "internal",
+      "reason": "stated",
+      "rows": [
+        "assertion:internet-exposure~process:store-admin-console~any~internal"
+      ]
+    },
+    {
+      "element_id": "process:store-admin-console",
+      "attribute": "trust_zone",
+      "value": "boundary:corporate-network",
+      "reason": "stated",
+      "rows": [
+        "assertion:network-membership~process:store-admin-console~any~boundary:corporate-network"
+      ]
+    },
+    {
+      "element_id": "store:audit-log",
+      "attribute": "encryption_at_rest",
+      "value": "unknown",
+      "reason": "hedged",
+      "rows": [
+        "assertion:storage-encryption~store:audit-log~any~unknown"
+      ]
+    },
+    {
+      "element_id": "store:directory",
+      "attribute": "encryption_at_rest",
+      "value": "unknown",
+      "reason": "hedged",
+      "rows": [
+        "assertion:storage-encryption~store:directory~any~unknown"
+      ]
+    }
+  ],
+  "stages": {
+    "source_facts": {
+      "mentions": [
+        {
+          "handle": "broker",
+          "text": "identity broker",
+          "roles": [
+            "process"
+          ],
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "Everything colleagues use signs them in through one identity broker."
+            }
+          ]
+        },
+        {
+          "handle": "corpnet",
+          "text": "corporate network",
+          "roles": [
+            "network-zone"
+          ],
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "The broker runs on the corporate network."
+            }
+          ]
+        },
+        {
+          "handle": "homedevices",
+          "text": "own devices at home",
+          "roles": [
+            "tenant-zone"
+          ],
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "including their own devices at home."
+            }
+          ]
+        },
+        {
+          "handle": "applications",
+          "text": "application",
+          "roles": [
+            "process"
+          ],
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "Every application takes that token and decides what the colleague may do from the groups in it."
+            }
+          ]
+        },
+        {
+          "handle": "console",
+          "text": "store admin console",
+          "roles": [
+            "process"
+          ],
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "The store admin console is one of those applications."
+            }
+          ]
+        },
+        {
+          "handle": "keystore",
+          "text": "key store",
+          "roles": [
+            "store"
+          ],
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "The broker signs tokens with a signing key it keeps in a key store."
+            }
+          ]
+        },
+        {
+          "handle": "directory",
+          "text": "directory",
+          "roles": [
+            "store"
+          ],
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "The broker keeps the colleagues and the groups they are in its own directory."
+            }
+          ]
+        },
+        {
+          "handle": "hrsystem",
+          "text": "HR system",
+          "roles": [
+            "external-system"
+          ],
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "it comes from the HR system overnight."
+            }
+          ]
+        },
+        {
+          "handle": "franchisestores",
+          "text": "franchise stores",
+          "roles": [
+            "tenant-zone"
+          ],
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "We also let the franchise stores in."
+            }
+          ]
+        },
+        {
+          "handle": "identityprovider",
+          "text": "identity provider",
+          "roles": [
+            "external-system"
+          ],
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "their own identity provider vouches for them"
+            }
+          ]
+        },
+        {
+          "handle": "auditlog",
+          "text": "audit log",
+          "roles": [
+            "store"
+          ],
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "The broker writes sign-ins to an audit log."
+            }
+          ]
+        }
+      ],
+      "interactions": [
+        {
+          "handle": "colleague_signin",
+          "initiator": "homedevices",
+          "receiver": "broker",
+          "action": "sign in",
+          "protocol": "",
+          "operations": "unknown",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "Colleagues sign in to it from wherever they are, including their own devices at home."
+            }
+          ]
+        },
+        {
+          "handle": "app_public_half",
+          "initiator": "applications",
+          "receiver": "broker",
+          "action": "fetch public half",
+          "protocol": "",
+          "operations": "read",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "Applications fetch the public half from the broker to check the signature."
+            }
+          ]
+        },
+        {
+          "handle": "broker_hr_changes",
+          "initiator": "broker",
+          "receiver": "hrsystem",
+          "action": "pull changes",
+          "protocol": "",
+          "operations": "read",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "The broker pulls the changes once a night"
+            }
+          ]
+        },
+        {
+          "handle": "provider_vouch",
+          "initiator": "identityprovider",
+          "receiver": "broker",
+          "action": "vouches for",
+          "protocol": "",
+          "operations": "unknown",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "their own identity provider vouches for them and the broker takes that as a sign-in."
+            }
+          ]
+        },
+        {
+          "handle": "broker_audit",
+          "initiator": "broker",
+          "receiver": "auditlog",
+          "action": "writes sign-ins",
+          "protocol": "",
+          "operations": "write",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "The broker writes sign-ins to an audit log."
+            }
+          ]
+        }
+      ],
+      "facts": [
+        {
+          "handle": "broker_network",
+          "subject_kind": "mention",
+          "subject": "broker",
+          "predicate": "network-membership",
+          "value": "corpnet",
+          "scope": [],
+          "basis": "stated",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "The broker runs on the corporate network."
+            }
+          ],
+          "explanation": "",
+          "exclusive": false
+        },
+        {
+          "handle": "console_network",
+          "subject_kind": "mention",
+          "subject": "console",
+          "predicate": "network-membership",
+          "value": "corpnet",
+          "scope": [],
+          "basis": "stated",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "It also runs on the corporate network."
+            }
+          ],
+          "explanation": "",
+          "exclusive": false
+        },
+        {
+          "handle": "broker_internal",
+          "subject_kind": "mention",
+          "subject": "broker",
+          "predicate": "internet-exposure",
+          "value": "internal",
+          "scope": [],
+          "basis": "inferred",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "The broker runs on the corporate network."
+            }
+          ],
+          "explanation": "The source places the broker on the corporate network.",
+          "exclusive": false
+        },
+        {
+          "handle": "console_internal",
+          "subject_kind": "mention",
+          "subject": "console",
+          "predicate": "internet-exposure",
+          "value": "internal",
+          "scope": [],
+          "basis": "inferred",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "It also runs on the corporate network."
+            }
+          ],
+          "explanation": "The source places the console on the corporate network.",
+          "exclusive": false
+        },
+        {
+          "handle": "colleagues_token",
+          "subject_kind": "principal",
+          "subject": "colleagues",
+          "predicate": "credential-presented",
+          "value": "token",
+          "scope": [],
+          "basis": "stated",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "Once the broker has signed a colleague in it issues them a token."
+            }
+          ],
+          "explanation": "",
+          "exclusive": false
+        },
+        {
+          "handle": "token",
+          "subject_kind": "credential",
+          "subject": "token",
+          "predicate": "credential-lifetime",
+          "value": "twelve hours",
+          "scope": [],
+          "basis": "stated",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "Tokens are good for twelve hours"
+            }
+          ],
+          "explanation": "",
+          "exclusive": false
+        },
+        {
+          "handle": "token_expires",
+          "subject_kind": "credential",
+          "subject": "token",
+          "predicate": "credential-expiry",
+          "value": "expires",
+          "scope": [],
+          "basis": "inferred",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "Tokens are good for twelve hours"
+            }
+          ],
+          "explanation": "A stated twelve-hour validity period means the token expires after that period.",
+          "exclusive": false
+        },
+        {
+          "handle": "token_no_revoke",
+          "subject_kind": "credential",
+          "subject": "token",
+          "predicate": "credential-revocation",
+          "value": "absent",
+          "scope": [],
+          "basis": "stated",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "there is no way to pull one back before it expires."
+            }
+          ],
+          "explanation": "",
+          "exclusive": false
+        },
+        {
+          "handle": "signing_key_custody",
+          "subject_kind": "credential",
+          "subject": "signing key",
+          "predicate": "credential-custody",
+          "value": "keystore",
+          "scope": [],
+          "basis": "stated",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "The broker signs tokens with a signing key it keeps in a key store."
+            }
+          ],
+          "explanation": "",
+          "exclusive": false
+        },
+        {
+          "handle": "signing_key_shared",
+          "subject_kind": "credential",
+          "subject": "signing key",
+          "predicate": "credential-sharing",
+          "value": "shared",
+          "scope": [],
+          "basis": "stated",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "The same key signs the tokens for every application."
+            }
+          ],
+          "explanation": "",
+          "exclusive": false
+        },
+        {
+          "handle": "token_signature_checked",
+          "subject_kind": "interaction",
+          "subject": "app_public_half",
+          "predicate": "signature-verification",
+          "value": "verified",
+          "scope": [],
+          "basis": "stated",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "Applications fetch the public half from the broker to check the signature."
+            }
+          ],
+          "explanation": "",
+          "exclusive": false
+        },
+        {
+          "handle": "colleague_grant",
+          "subject_kind": "principal",
+          "subject": "colleagues",
+          "predicate": "authorization-grant",
+          "value": "change prices and void transactions when the token has the store-manager group",
+          "scope": [
+            {
+              "kind": "resource",
+              "value": "store admin console"
+            },
+            {
+              "kind": "operation",
+              "value": "change prices and void transactions"
+            }
+          ],
+          "basis": "stated",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "If the token has the store-manager group in it, the console lets the holder change prices and void transactions."
+            }
+          ],
+          "explanation": "",
+          "exclusive": false
+        },
+        {
+          "handle": "console_store_scope_absent",
+          "subject_kind": "mention",
+          "subject": "console",
+          "predicate": "authorization-grant",
+          "value": "absent",
+          "scope": [
+            {
+              "kind": "resource",
+              "value": "store"
+            },
+            {
+              "kind": "operation",
+              "value": "change prices and void transactions"
+            }
+          ],
+          "basis": "stated",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "The console does not check which store the colleague belongs to"
+            }
+          ],
+          "explanation": "",
+          "exclusive": false
+        },
+        {
+          "handle": "directory_hr_source",
+          "subject_kind": "mention",
+          "subject": "directory",
+          "predicate": "origin-verification",
+          "value": "unknown",
+          "reason": "silent",
+          "scope": [],
+          "basis": "stated",
+          "quotes": [],
+          "explanation": "",
+          "exclusive": false
+        },
+        {
+          "handle": "directory_storage_encryption",
+          "subject_kind": "mention",
+          "subject": "directory",
+          "predicate": "storage-encryption",
+          "value": "unknown",
+          "reason": "hedged",
+          "scope": [],
+          "basis": "stated",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "Nobody has written down ... whether the directory or the log are encrypted where they sit."
+            }
+          ],
+          "explanation": "",
+          "exclusive": false
+        },
+        {
+          "handle": "audit_storage_encryption",
+          "subject_kind": "mention",
+          "subject": "auditlog",
+          "predicate": "storage-encryption",
+          "value": "unknown",
+          "reason": "hedged",
+          "scope": [],
+          "basis": "stated",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "Nobody has written down ... whether the directory or the log are encrypted where they sit."
+            }
+          ],
+          "explanation": "",
+          "exclusive": false
+        },
+        {
+          "handle": "mfa_unknown",
+          "subject_kind": "principal",
+          "subject": "colleagues",
+          "predicate": "mfa-requirement",
+          "value": "unknown",
+          "reason": "hedged",
+          "scope": [],
+          "basis": "stated",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "Nor has anyone written down whether colleagues are asked for a second factor."
+            }
+          ],
+          "explanation": "",
+          "exclusive": false
+        },
+        {
+          "handle": "franchise_mfa_unknown",
+          "subject_kind": "principal",
+          "subject": "franchise colleagues",
+          "predicate": "mfa-requirement",
+          "value": "unknown",
+          "reason": "hedged",
+          "scope": [],
+          "basis": "stated",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "Nor has anyone written down whether colleagues are asked for a second factor."
+            }
+          ],
+          "explanation": "",
+          "exclusive": false
+        }
+      ],
+      "unresolved": [
+        {
+          "handle": "provider_scope",
+          "question": "Which colleagues is the identity provider allowed to vouch for?",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "We have not written down which colleagues that provider is allowed to vouch for."
+            }
+          ]
+        },
+        {
+          "handle": "audit_contents",
+          "question": "What does the audit log record?",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "Nobody has written down what that log records"
+            }
+          ]
+        },
+        {
+          "handle": "audit_franchise_route",
+          "question": "Does the audit log cover the franchise route?",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "whether it covers the franchise route"
+            }
+          ]
+        },
+        {
+          "handle": "directory_log_encryption",
+          "question": "Are the directory and the audit log encrypted where they sit?",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "whether the directory or the log are encrypted where they sit"
+            }
+          ]
+        },
+        {
+          "handle": "second_factor",
+          "question": "Are colleagues asked for a second factor?",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "Nor has anyone written down whether colleagues are asked for a second factor."
+            }
+          ]
+        }
+      ]
+    },
+    "bundle_dispositions": [
+      {
+        "handle": "corpnet",
+        "kind": "mention",
+        "disposition": "consumed",
+        "target": "boundary:corporate-network",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "homedevices",
+        "kind": "mention",
+        "disposition": "consumed",
+        "target": "boundary:own-devices-at-home",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "franchisestores",
+        "kind": "mention",
+        "disposition": "consumed",
+        "target": "boundary:franchise-stores",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "broker",
+        "kind": "mention",
+        "disposition": "consumed",
+        "target": "process:identity-broker",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "applications",
+        "kind": "mention",
+        "disposition": "consumed",
+        "target": "process:application",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "console",
+        "kind": "mention",
+        "disposition": "consumed",
+        "target": "process:store-admin-console",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "keystore",
+        "kind": "mention",
+        "disposition": "consumed",
+        "target": "store:key-store",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "directory",
+        "kind": "mention",
+        "disposition": "consumed",
+        "target": "store:directory",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "hrsystem",
+        "kind": "mention",
+        "disposition": "consumed",
+        "target": "entity:hr-system",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "identityprovider",
+        "kind": "mention",
+        "disposition": "consumed",
+        "target": "entity:identity-provider",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "auditlog",
+        "kind": "mention",
+        "disposition": "consumed",
+        "target": "store:audit-log",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "colleague_signin",
+        "kind": "interaction",
+        "disposition": "rejected",
+        "target": "",
+        "code": "dangling-endpoint",
+        "message": "initiator 'homedevices' names no placed component of this bundle"
+      },
+      {
+        "handle": "app_public_half",
+        "kind": "interaction",
+        "disposition": "consumed",
+        "target": "flow:process:application>process:identity-broker>fetch-public-half",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "broker_hr_changes",
+        "kind": "interaction",
+        "disposition": "consumed",
+        "target": "flow:process:identity-broker>entity:hr-system>pull-changes",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "provider_vouch",
+        "kind": "interaction",
+        "disposition": "consumed",
+        "target": "flow:entity:identity-provider>process:identity-broker>vouches-for",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "broker_audit",
+        "kind": "interaction",
+        "disposition": "consumed",
+        "target": "flow:process:identity-broker>store:audit-log>writes-sign-ins",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "broker_network",
+        "kind": "fact",
+        "disposition": "consumed",
+        "target": "process:identity-broker",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "console_network",
+        "kind": "fact",
+        "disposition": "consumed",
+        "target": "process:store-admin-console",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "broker_internal",
+        "kind": "fact",
+        "disposition": "consumed",
+        "target": "process:identity-broker",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "console_internal",
+        "kind": "fact",
+        "disposition": "consumed",
+        "target": "process:store-admin-console",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "colleagues_token",
+        "kind": "fact",
+        "disposition": "preserved",
+        "target": "colleagues",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "token",
+        "kind": "fact",
+        "disposition": "preserved",
+        "target": "token",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "token_expires",
+        "kind": "fact",
+        "disposition": "preserved",
+        "target": "token",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "token_no_revoke",
+        "kind": "fact",
+        "disposition": "preserved",
+        "target": "token",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "signing_key_custody",
+        "kind": "fact",
+        "disposition": "preserved",
+        "target": "signing key",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "signing_key_shared",
+        "kind": "fact",
+        "disposition": "preserved",
+        "target": "signing key",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "token_signature_checked",
+        "kind": "fact",
+        "disposition": "preserved",
+        "target": "flow:process:application>process:identity-broker>fetch-public-half",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "colleague_grant",
+        "kind": "fact",
+        "disposition": "preserved",
+        "target": "colleagues",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "console_store_scope_absent",
+        "kind": "fact",
+        "disposition": "rejected",
+        "target": "",
+        "code": "wrong-subject-type",
+        "message": "'authorization-grant' accepts principal, not 'component'"
+      },
+      {
+        "handle": "directory_hr_source",
+        "kind": "fact",
+        "disposition": "rejected",
+        "target": "",
+        "code": "wrong-subject-type",
+        "message": "'origin-verification' accepts interaction, not 'component'"
+      },
+      {
+        "handle": "directory_storage_encryption",
+        "kind": "fact",
+        "disposition": "consumed",
+        "target": "store:directory",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "audit_storage_encryption",
+        "kind": "fact",
+        "disposition": "consumed",
+        "target": "store:audit-log",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "mfa_unknown",
+        "kind": "fact",
+        "disposition": "preserved",
+        "target": "colleagues",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "franchise_mfa_unknown",
+        "kind": "fact",
+        "disposition": "preserved",
+        "target": "franchise colleagues",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "provider_scope",
+        "kind": "unresolved",
+        "disposition": "unresolved",
+        "target": "",
+        "code": "open-question",
+        "message": "Which colleagues is the identity provider allowed to vouch for?"
+      },
+      {
+        "handle": "audit_contents",
+        "kind": "unresolved",
+        "disposition": "unresolved",
+        "target": "",
+        "code": "open-question",
+        "message": "What does the audit log record?"
+      },
+      {
+        "handle": "audit_franchise_route",
+        "kind": "unresolved",
+        "disposition": "unresolved",
+        "target": "",
+        "code": "open-question",
+        "message": "Does the audit log cover the franchise route?"
+      },
+      {
+        "handle": "directory_log_encryption",
+        "kind": "unresolved",
+        "disposition": "unresolved",
+        "target": "",
+        "code": "open-question",
+        "message": "Are the directory and the audit log encrypted where they sit?"
+      },
+      {
+        "handle": "second_factor",
+        "kind": "unresolved",
+        "disposition": "unresolved",
+        "target": "",
+        "code": "open-question",
+        "message": "Are colleagues asked for a second factor?"
+      }
+    ],
+    "extracted_model": {
+      "external_entities": [
+        {
+          "id": "entity:hr-system",
+          "name": "HR system",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "it comes from the HR system overnight.",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "kind": "external-system",
+          "trust_zone": "unknown"
+        },
+        {
+          "id": "entity:identity-provider",
+          "name": "identity provider",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "their own identity provider vouches for them",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "kind": "external-system",
+          "trust_zone": "unknown"
+        }
+      ],
+      "processes": [
+        {
+          "id": "process:identity-broker",
+          "name": "identity broker",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "Everything colleagues use signs them in through one identity broker.",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "technology": "unknown",
+          "trust_zone": "unknown",
+          "exposure": "unknown",
+          "interface_kind": "unknown"
+        },
+        {
+          "id": "process:application",
+          "name": "application",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "Every application takes that token and decides what the colleague may do from the groups in it.",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "technology": "unknown",
+          "trust_zone": "unknown",
+          "exposure": "unknown",
+          "interface_kind": "unknown"
+        },
+        {
+          "id": "process:store-admin-console",
+          "name": "store admin console",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "The store admin console is one of those applications.",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "technology": "unknown",
+          "trust_zone": "unknown",
+          "exposure": "unknown",
+          "interface_kind": "unknown"
+        }
+      ],
+      "data_stores": [
+        {
+          "id": "store:key-store",
+          "name": "key store",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "The broker signs tokens with a signing key it keeps in a key store.",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "technology": "unknown",
+          "trust_zone": "unknown",
+          "data_classification": "unknown",
+          "encryption_at_rest": "unknown"
+        },
+        {
+          "id": "store:directory",
+          "name": "directory",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "The broker keeps the colleagues and the groups they are in its own directory.",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "technology": "unknown",
+          "trust_zone": "unknown",
+          "data_classification": "unknown",
+          "encryption_at_rest": "unknown"
+        },
+        {
+          "id": "store:audit-log",
+          "name": "audit log",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "The broker writes sign-ins to an audit log.",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "technology": "unknown",
+          "trust_zone": "unknown",
+          "data_classification": "unknown",
+          "encryption_at_rest": "unknown"
+        }
+      ],
+      "data_flows": [
+        {
+          "id": "flow:process:application>process:identity-broker>fetch-public-half",
+          "name": "fetch public half",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "Applications fetch the public half from the broker to check the signature.",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "source": "process:application",
+          "destination": "process:identity-broker",
+          "protocol": "",
+          "authentication": "unknown",
+          "data_description": "unknown",
+          "encryption_in_transit": "unknown",
+          "operations": "read"
+        },
+        {
+          "id": "flow:process:identity-broker>entity:hr-system>pull-changes",
+          "name": "pull changes",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "The broker pulls the changes once a night",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "source": "process:identity-broker",
+          "destination": "entity:hr-system",
+          "protocol": "",
+          "authentication": "unknown",
+          "data_description": "unknown",
+          "encryption_in_transit": "unknown",
+          "operations": "read"
+        },
+        {
+          "id": "flow:entity:identity-provider>process:identity-broker>vouches-for",
+          "name": "vouches for",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "their own identity provider vouches for them and the broker takes that as a sign-in.",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "source": "entity:identity-provider",
+          "destination": "process:identity-broker",
+          "protocol": "",
+          "authentication": "unknown",
+          "data_description": "unknown",
+          "encryption_in_transit": "unknown",
+          "operations": "unknown"
+        },
+        {
+          "id": "flow:process:identity-broker>store:audit-log>writes-sign-ins",
+          "name": "writes sign-ins",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "The broker writes sign-ins to an audit log.",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "source": "process:identity-broker",
+          "destination": "store:audit-log",
+          "protocol": "",
+          "authentication": "unknown",
+          "data_description": "unknown",
+          "encryption_in_transit": "unknown",
+          "operations": "write"
+        }
+      ],
+      "trust_boundaries": [
+        {
+          "id": "boundary:corporate-network",
+          "name": "corporate network",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "The broker runs on the corporate network.",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "kind": "network"
+        },
+        {
+          "id": "boundary:own-devices-at-home",
+          "name": "own devices at home",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "including their own devices at home.",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "kind": "tenant"
+        },
+        {
+          "id": "boundary:franchise-stores",
+          "name": "franchise stores",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "We also let the franchise stores in.",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "kind": "tenant"
+        }
+      ],
+      "assumptions": [],
+      "capabilities": []
+    },
+    "valid_model": {
+      "external_entities": [
+        {
+          "id": "entity:hr-system",
+          "name": "HR system",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "it comes from the HR system overnight.",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "kind": "external-system",
+          "trust_zone": "unknown"
+        },
+        {
+          "id": "entity:identity-provider",
+          "name": "identity provider",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "their own identity provider vouches for them",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "kind": "external-system",
+          "trust_zone": "unknown"
+        }
+      ],
+      "processes": [
+        {
+          "id": "process:identity-broker",
+          "name": "identity broker",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "Everything colleagues use signs them in through one identity broker.",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "technology": "unknown",
+          "trust_zone": "unknown",
+          "exposure": "unknown",
+          "interface_kind": "unknown"
+        },
+        {
+          "id": "process:application",
+          "name": "application",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "Every application takes that token and decides what the colleague may do from the groups in it.",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "technology": "unknown",
+          "trust_zone": "unknown",
+          "exposure": "unknown",
+          "interface_kind": "unknown"
+        },
+        {
+          "id": "process:store-admin-console",
+          "name": "store admin console",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "The store admin console is one of those applications.",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "technology": "unknown",
+          "trust_zone": "unknown",
+          "exposure": "unknown",
+          "interface_kind": "unknown"
+        }
+      ],
+      "data_stores": [
+        {
+          "id": "store:key-store",
+          "name": "key store",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "The broker signs tokens with a signing key it keeps in a key store.",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "technology": "unknown",
+          "trust_zone": "unknown",
+          "data_classification": "unknown",
+          "encryption_at_rest": "unknown"
+        },
+        {
+          "id": "store:directory",
+          "name": "directory",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "The broker keeps the colleagues and the groups they are in its own directory.",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "technology": "unknown",
+          "trust_zone": "unknown",
+          "data_classification": "unknown",
+          "encryption_at_rest": "unknown"
+        },
+        {
+          "id": "store:audit-log",
+          "name": "audit log",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "The broker writes sign-ins to an audit log.",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "technology": "unknown",
+          "trust_zone": "unknown",
+          "data_classification": "unknown",
+          "encryption_at_rest": "unknown"
+        }
+      ],
+      "data_flows": [
+        {
+          "id": "flow:process:application>process:identity-broker>fetch-public-half",
+          "name": "fetch public half",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "Applications fetch the public half from the broker to check the signature.",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "source": "process:application",
+          "destination": "process:identity-broker",
+          "protocol": "",
+          "authentication": "unknown",
+          "data_description": "unknown",
+          "encryption_in_transit": "unknown",
+          "operations": "read"
+        },
+        {
+          "id": "flow:process:identity-broker>entity:hr-system>pull-changes",
+          "name": "pull changes",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "The broker pulls the changes once a night",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "source": "process:identity-broker",
+          "destination": "entity:hr-system",
+          "protocol": "",
+          "authentication": "unknown",
+          "data_description": "unknown",
+          "encryption_in_transit": "unknown",
+          "operations": "read"
+        },
+        {
+          "id": "flow:entity:identity-provider>process:identity-broker>vouches-for",
+          "name": "vouches for",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "their own identity provider vouches for them and the broker takes that as a sign-in.",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "source": "entity:identity-provider",
+          "destination": "process:identity-broker",
+          "protocol": "",
+          "authentication": "unknown",
+          "data_description": "unknown",
+          "encryption_in_transit": "unknown",
+          "operations": "unknown"
+        },
+        {
+          "id": "flow:process:identity-broker>store:audit-log>writes-sign-ins",
+          "name": "writes sign-ins",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "The broker writes sign-ins to an audit log.",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "source": "process:identity-broker",
+          "destination": "store:audit-log",
+          "protocol": "",
+          "authentication": "unknown",
+          "data_description": "unknown",
+          "encryption_in_transit": "unknown",
+          "operations": "write"
+        }
+      ],
+      "trust_boundaries": [
+        {
+          "id": "boundary:corporate-network",
+          "name": "corporate network",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "The broker runs on the corporate network.",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "kind": "network"
+        },
+        {
+          "id": "boundary:own-devices-at-home",
+          "name": "own devices at home",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "including their own devices at home.",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "kind": "tenant"
+        },
+        {
+          "id": "boundary:franchise-stores",
+          "name": "franchise stores",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "We also let the franchise stores in.",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "kind": "tenant"
+        }
+      ],
+      "assumptions": [],
+      "capabilities": []
+    },
+    "patch_outcomes": {
+      "rolled_back": true,
+      "outcomes": [
+        {
+          "handle": "add_colleagues",
+          "state": "refused",
+          "code": "batch-rolled-back",
+          "message": "the batch was discarded whole, so this did not land"
+        },
+        {
+          "handle": "colleagues_sign_in",
+          "state": "refused",
+          "code": "dangling-endpoint",
+          "message": "initiator 'colleagues' names no placed component of this bundle"
+        },
+        {
+          "handle": "broker_issues_token",
+          "state": "refused",
+          "code": "dangling-endpoint",
+          "message": "receiver 'colleagues' names no placed component of this bundle"
+        },
+        {
+          "handle": "franchise_vouching_scope",
+          "state": "refused",
+          "code": "batch-rolled-back",
+          "message": "the batch was discarded whole, so this did not land"
+        },
+        {
+          "handle": "audit_log_coverage",
+          "state": "refused",
+          "code": "batch-rolled-back",
+          "message": "the batch was discarded whole, so this did not land"
+        },
+        {
+          "handle": "",
+          "state": "refused",
+          "code": "operation-refused",
+          "message": "broker_issues_token, colleagues_sign_in did not land, so the batch was discarded and the original output stands"
+        }
+      ]
+    }
+  }
+}

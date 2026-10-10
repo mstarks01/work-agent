@@ -37,6 +37,7 @@ wrote, and `evals/harness/archive.py` names the spelling each kind carries.
 | `20260917T-arms-luna-pro` | heads | #1003's arms A, B and E over 13 cases, one repeat each |
 | `20260918T-placement-rule` | extraction | the placement rule of #1068, five runs each side |
 | `20260919T-naming-rule` | extraction | the `extract.md` edits of #1076 and #1078, three runs |
+| `20261010T-arms-CD-luna-pro` | heads | #1003's arms C and D over 13 cases, one repeat each; `preflight-C` holds C's case 01 |
 
 The arms sweep carries three reading routes: `arm-A` reads through `extract`,
 `arm-B2` through `facts`, and `arm-E` through the split `inventory` and `rows`
