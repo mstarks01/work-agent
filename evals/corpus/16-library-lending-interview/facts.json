@@ -21,7 +21,7 @@
         "exclusive": false
       },
       "rationale": "Asked and answered with a hedge. The speaker says they would have to look, so the row states no mechanism.",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "assertion": {
@@ -37,14 +37,14 @@
         "exclusive": false
       },
       "rationale": "Neither source says how a kiosk identifies itself to the lending API.",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "assertion": {
         "subject_type": "interaction",
         "subject": "flow:entity:desk-staff>process:lending-api>change-loans-by-hand",
         "predicate": "authentication-mechanism",
-        "value": "one login shared by all desk staff",
+        "value": "password authentication using one login shared by all desk staff",
         "reason": null,
         "scope": [],
         "basis": "stated",
@@ -52,13 +52,17 @@
           {
             "source_label": "Interview transcript",
             "quote": "Everyone at the desk uses the same shared login for the circulation page."
+          },
+          {
+            "source_label": "Interview transcript",
+            "quote": "The password is on a card taped under the desk."
           }
         ],
         "explanation": "",
         "exclusive": false
       },
-      "rationale": "Stated outright.",
-      "reviewed_by": null
+      "rationale": "The transcript establishes password authentication and a shared account; it does not specify the underlying authentication protocol.",
+      "reviewed_by": "mstarks01"
     },
     {
       "assertion": {
@@ -74,7 +78,7 @@
         "exclusive": false
       },
       "rationale": "Neither source says how the lending API authenticates to the loans database.",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "assertion": {
@@ -95,7 +99,7 @@
         "exclusive": false
       },
       "rationale": "One login for every member of desk staff is the definition of shared.",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "assertion": {
@@ -116,7 +120,7 @@
         "exclusive": false
       },
       "rationale": "Stated custody of the password.",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "assertion": {
@@ -132,7 +136,7 @@
         "exclusive": false
       },
       "rationale": "Neither source says whether the app's calls to the lending API are encrypted in transit.",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "assertion": {
@@ -148,7 +152,7 @@
         "exclusive": false
       },
       "rationale": "Neither source says whether the kiosks' calls to the lending API are encrypted in transit.",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "assertion": {
@@ -164,7 +168,7 @@
         "exclusive": false
       },
       "rationale": "Neither source says whether the circulation page are encrypted in transit.",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "assertion": {
@@ -180,7 +184,7 @@
         "exclusive": false
       },
       "rationale": "Neither source says whether the lending API's connection to the loans database are encrypted in transit.",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "assertion": {
@@ -196,7 +200,7 @@
         "exclusive": false
       },
       "rationale": "Neither source says how the loans database is protected at rest.",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "assertion": {
@@ -217,7 +221,7 @@
         "exclusive": false
       },
       "rationale": "The transcript states it, and it corrects the note: Dan quotes the note's \"The lending API is internal-only.\" and Priya calls it one of the wrong bits. The note describes the service before the API was opened up last year, so its claim does not stand against this one.",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "assertion": {
@@ -238,7 +242,7 @@
         "exclusive": false
       },
       "rationale": "Stated placement.",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "assertion": {
@@ -259,7 +263,7 @@
         "exclusive": false
       },
       "rationale": "Stated placement.",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "assertion": {
@@ -280,7 +284,7 @@
         "exclusive": false
       },
       "rationale": "Stated placement.",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "assertion": {
@@ -301,7 +305,7 @@
         "exclusive": false
       },
       "rationale": "Stated placement.",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "assertion": {
@@ -317,7 +321,7 @@
         "exclusive": false
       },
       "rationale": "Members' phones reach the API over the internet, which says how they reach it and not where members are. model.json's zone is a placement the schema requires, recorded in its assumption.",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "assertion": {
@@ -346,29 +350,8 @@
         "explanation": "",
         "exclusive": false
       },
-      "rationale": "Stated grant. The transcript adds that one login serves every branch, so the grant reaches every member's record.",
-      "reviewed_by": null
-    },
-    {
-      "assertion": {
-        "subject_type": "component",
-        "subject": "store:loans-database",
-        "predicate": "record-attribution",
-        "value": "intermediary",
-        "reason": null,
-        "scope": [],
-        "basis": "stated",
-        "quotes": [
-          {
-            "source_label": "Interview transcript",
-            "quote": "You can tell it was the desk. You cannot tell who, or even which branch."
-          }
-        ],
-        "explanation": "A loan closed by hand is recorded against the shared desk login, not a person.",
-        "exclusive": false
-      },
-      "rationale": "The record names the shared desk login and no person. The drafter reads that as attribution to an intermediary; a reviewer may read it as no attribution at all.",
-      "reviewed_by": null
+      "rationale": "Desk staff are explicitly permitted to extend loans, clear account blocks and mark books returned through the circulation page. One login is shared across branches, but neither source establishes that it can act on every member record or that no record-level or branch-level restrictions exist.",
+      "reviewed_by": "mstarks01"
     },
     {
       "assertion": {
@@ -389,7 +372,7 @@
         "exclusive": false
       },
       "rationale": "Inferred from stated contents: Names, email addresses, home addresses and every member's full borrowing history live in the loans database. Only a source that names the tier states it (ruled 2026-09-24, #926).",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     }
   ],
   "disputed": [],
