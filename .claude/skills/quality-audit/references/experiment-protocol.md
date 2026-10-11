@@ -46,8 +46,14 @@ a report that states a higher claim than its rung has reached is wrong.
 | 2 | the same input through the fixed production function | the local fix is verified | no |
 | 3 | the changed stage plus its affected deterministic consumers, on scripted or archived input | the affected consumers are verified | no |
 | 3a | the free instruments over archived outputs under the fixed code | the behaviour on archived inputs is measured | no |
-| 4 | a designed run on the shipped route | a downstream gain was measured | yes |
+| 4 | a designed run on the shipped route, read with `run.py gain` beside the score | a downstream gain was measured | yes |
 | 5 | held-out confirmation | the gain holds on material the fix never saw | yes |
+
+A coverage gain at rung 4 counts only when `run.py gain` passes every gate
+against the baseline. A run can raise coverage by saying more, because an
+unlisted finding is not counted wrong. The `volume` gate catches that offline,
+and the `reviewed` and `rejected-rate` gates wait for votes on what the
+candidate added. A gate that reads `inconclusive` leaves the gain unconfirmed.
 
 Each rung-5 reading spends one of the holdout's `HOLDOUT_READS`, so confirm
 only a gain that rung 4 already measured. Record the read in `holdout_reads`.
