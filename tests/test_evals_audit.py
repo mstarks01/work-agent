@@ -36,6 +36,13 @@ def _namespace(**fields) -> argparse.Namespace:
     return argparse.Namespace(**fields)
 
 
+def experiments_arguments(*argv: str) -> argparse.Namespace:
+    """The ``experiments`` command's arguments, parsed by its own parser."""
+    parser = argparse.ArgumentParser()
+    audit.arguments(parser)
+    return parser.parse_args(argv)
+
+
 def _record(**overrides) -> dict:
     """One well-formed row, which each test spoils in exactly one way."""
     row = {
@@ -169,6 +176,30 @@ class TestTheRowAndItsFieldsAreOneList:
                 exposure="built by an agent that had read the case-01 misses",
                 stage="analysis",
             ),
+            candidate=audit.Candidate(
+                branch="qa/x",
+                commit="1" * 40,
+                verdict="reverted",
+                reason="the lane still cited the neighbour",
+                paths=("frameworks/stride/lanes/spoofing/skill.md",),
+            ),
+            ticket=audit.Ticket(
+                title="no critic replay",
+                question="q",
+                evidence="e",
+                missing="m",
+                alternatives="a",
+                belongs="harness",
+                change="c",
+                acceptance="t",
+                cost="$0",
+                risk="r",
+            ),
+            rule=audit.Rule(
+                checks="c", remedies="r", limits="l", supporting=("QA-x-00",)
+            ),
+            resolves="QA-x-02",
+            rerun_reason="the scorer moved",
         )
 
         assert audit.parse(filled.to_json(), source="test") == filled
@@ -436,17 +467,13 @@ class TestTheCommands:
         path = tmp_path / "row.json"
         path.write_text(json.dumps(_record(outcome="splendid")), encoding="utf-8")
 
-        code = audit.command_experiments(
-            _namespace(record=str(path), signature="", phase=None, framework=None)
-        )
+        code = audit.command_experiments(experiments_arguments("--record", str(path)))
 
         assert code == 1
         assert "splendid" in capsys.readouterr().err
 
     def test_a_lookup_over_the_shipped_ledger_prints(self, capsys):
-        code = audit.command_experiments(
-            _namespace(record=None, signature="", phase=None, framework=None)
-        )
+        code = audit.command_experiments(experiments_arguments())
 
         assert code == 0
         assert capsys.readouterr().out

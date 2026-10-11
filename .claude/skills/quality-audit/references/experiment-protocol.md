@@ -138,6 +138,13 @@ any amount. The control is informed consent, so your job is to state the
 labelled amount — `recorded`, `estimated` or `unpriced` — and stop when the
 answer is no.
 
+The ledger holds an audit to the amount the user granted, which enforces
+their choice and sets no cap of its own. Record each grant with the user's
+words (`experiments --grant`). `--record` then refuses a row that takes the
+audit's spend past the sum of its grants. A row's cost is its `actual_usd`,
+or its `estimated_usd` where no actual exists. A further amount is a new
+grant, never an edit.
+
 ## Execution identity
 
 Reuse an earlier result only under a complete identity: the same inputs,
@@ -157,8 +164,14 @@ When implementation is authorised:
 
 - one candidate change per branch, and one lever per change;
 - run the regressions the change can reach, and say which;
-- an unsuccessful change is reverted and its record kept;
+- an unsuccessful change is reverted and its row keeps the reason;
 - the skill's own files are candidate changes too, with reviewable diffs.
+
+The branch is the isolation. Start it from the commit the experiment runs
+against, and keep the ledger rows off it: they go to `main` through their own
+pull request, so a reverted candidate does not take its record with it. A kept
+candidate goes through the ordinary pull request and review. The audit never
+merges its own work.
 
 ## Before changing any identity rule
 
