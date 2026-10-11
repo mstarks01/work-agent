@@ -1378,6 +1378,34 @@ class TestTheFrameworksTakeTurns:
             ("shared",),
         ]
 
+    def test_the_question_order_and_the_box_order_read_one_turn_rule(self):
+        """`by_turn` and `in_boxes` take the frameworks in turn through one
+        reader, so with one question in each box, and every box asking the
+        same number of choices, the two orders agree on every input."""
+        from itertools import permutations
+
+        from analysis_service.answer_round import by_turn, in_boxes
+
+        def question(key, *frameworks):
+            return SimpleNamespace(
+                key=(key,),
+                group=key,
+                frameworks=frameworks,
+                decisions=1,
+                gates=(),
+                parent=None,
+            )
+
+        questions = [
+            question("shared", "asvs", "stride"),
+            question("a1", "asvs"),
+            question("a2", "asvs"),
+            question("s1", "stride"),
+            question("none"),
+        ]
+        for listed in permutations(questions):
+            assert [q.key for q in in_boxes(listed)] == [q.key for q in by_turn(listed)]
+
 
 AUDIT = (valid_model().data_stores[0].id, "", "", "", "audit-evidence", "")
 
