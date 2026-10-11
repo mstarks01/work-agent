@@ -8,6 +8,7 @@ questions a finished report asks and run it again.
 
 from __future__ import annotations
 
+import asyncio
 import json
 import re
 import shutil
@@ -1257,6 +1258,34 @@ def test_a_paused_run_goes_once_its_resumed_run_has_a_report(tiers):
         another = _completed(client)
 
         assert _listed(client) == {child, another}, "the answered run went first"
+
+
+def test_the_run_an_answer_continues_is_never_deleted_for_it(tiers):
+    """Room for an answer's run comes from other finished runs, never from
+    the run the answer continues, however old."""
+    from tests.test_webapp import stub_settings
+    from webapp.main import Workspace
+
+    runner = PausingRunner(catalog=False)
+    workspace = Workspace(stub_settings(runner, catalog=False), max_jobs=2)
+    with TestClient(
+        app_for(tiers, runner, catalog=False, workspace=workspace), base_url=LOOPBACK
+    ) as client:
+        oldest = _completed(client)
+        paused = _paused(client)
+        resumed = client.post(
+            f"/answer/{paused}", json={"links": [], "revision": 0}, headers=SAME_ORIGIN
+        )
+        child = resumed.json()["run"]
+        assert ran(client, child) == "completed"
+
+        async def answer_the_oldest():
+            async with workspace.make_room(answering=oldest):
+                pass
+
+        asyncio.run(answer_the_oldest())
+
+        assert _listed(client) == {oldest, child}
 
 
 CONTROL = {

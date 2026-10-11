@@ -116,6 +116,20 @@ class TestAFailedCandidateIsRevertedAndKept:
         assert kept.candidate.verdict == "kept"
 
 
+@pytest.mark.parametrize(
+    "overrides",
+    [
+        {"candidate": _candidate(reason=5)},
+        {"candidate": _candidate(), "resolves": ["A-E0"]},
+        {"rerun_reason": 5},
+    ],
+    ids=["reason", "resolves", "rerun_reason"],
+)
+def test_a_text_field_of_another_type_is_refused(overrides):
+    with pytest.raises(audit.ExperimentError, match="is not a string"):
+        _one(outcome="refuted", **overrides)
+
+
 class TestARerunSaysWhy:
     """Criterion 2: an audit reuses evidence and explains any rerun."""
 

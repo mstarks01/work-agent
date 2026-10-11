@@ -12,7 +12,7 @@ import asyncio
 
 import pytest
 
-from analysis_service.answer_round import Answers
+from analysis_service.answer_round import Answers, StaleRevision
 from analysis_service.answer_sets import AnswerSet
 from analysis_service.errors import ConfigError
 from analysis_service.fact_answers import FactAnswer
@@ -181,6 +181,31 @@ class TestAnsweringAWaitingJob:
                     start=Starts(),
                 )
             )
+
+    def test_an_answer_read_off_an_older_round_is_refused_and_starts_nothing(self):
+        store = InMemoryJobStore()
+        job = waiting(store)
+        answers = operations(store)
+        key = first_early_key(answers, job)
+        saved = Answers(
+            given=AnswerSet(facts=(FactAnswer(key=key, value="unknown"),)),
+            save=True,
+            skips=(),
+            revision=0,
+        )
+        asyncio.run(answers.answer(job, SUBJECT, saved, start=Starts()))
+        starts = Starts()
+        with pytest.raises(StaleRevision):
+            asyncio.run(
+                answers.answer(
+                    job,
+                    SUBJECT,
+                    Answers(given=AnswerSet(), save=False, skips=(), revision=0),
+                    start=starts,
+                )
+            )
+        assert starts.started == []
+        assert asyncio.run(store.resumed_by(job, SUBJECT)) is None
 
 
 class TestAnsweringAReport:

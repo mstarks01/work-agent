@@ -98,6 +98,7 @@ from collections.abc import (
     Mapping,
     Sequence,
 )
+from contextlib import asynccontextmanager, nullcontext
 from dataclasses import dataclass
 from functools import partial
 from pathlib import Path
@@ -177,6 +178,7 @@ from analysis_service.jobs import (
     JobStore,
     PipelineRunner,
     execute_job,
+    parent_of,
 )
 from analysis_service.links import (
     MAX_LINK_ANSWERS,
@@ -219,10 +221,8 @@ SAMPLE = REPO_ROOT / "examples" / "orders.md"
 HOST = "127.0.0.1"
 PORT = 8000
 
-# The registry is a demo surface, not a job store — /v1 already is one. It holds
-# untrusted prose and its report, in memory, per process, never persisted, and
-# oldest-first evicted. A run that waits for answers is never evicted: a new run
-# is refused instead. A restart loses history, which is correct here.
+#: The most jobs the app holds. :class:`Workspace` says which job it deletes
+#: to stay inside the bound.
 MAX_RUNS = 20
 
 #: The report page loads nothing external. It reaches its own origin for one
@@ -248,7 +248,7 @@ _DIAGNOSTIC_GRANTS = Grants(style=True)
 OWNER = DEFAULT_CALLER
 
 
-class RegistryFull(Exception):
+class WorkspaceFull(Exception):
     """Every job the workspace holds waits for answers, so none can make room."""
 
 
@@ -320,36 +320,43 @@ class Workspace:
         child = await self.store.get(locker)
         return child is None or child.status != "completed"
 
-    async def make_room(self, *, answering: bool = False) -> None:
-        """Delete the oldest jobs that wait for nothing, until a new job fits.
+    @asynccontextmanager
+    async def make_room(self, *, answering: str | None = None) -> AsyncIterator[None]:
+        """Delete the oldest jobs that wait for nothing, once the body admits a
+        new job, until that job fits.
 
-        A job that answers a waiting one may hold one place over the bound:
-        the waiting job stays the place to retry from until that job has a
-        report. Raises :class:`RegistryFull` where every held job waits.
+        The jobs are chosen on entry and deleted on a clean exit, so a
+        submission the body refuses deletes nothing. A job that answers the
+        job ``answering``, paused or finished, may hold one place over the
+        bound: that job stays the place to retry from until its answer has a
+        report, and it is never deleted to make room for its own answer. Raises
+        :class:`WorkspaceFull` where every held job waits.
         """
-        limit = self._max_jobs + answering
+        limit = self._max_jobs + (answering is not None)
         held = await self.store.owned_jobs(OWNER)
-        while len(held) >= limit:
-            removable = [
-                job
-                for job in held
-                if job.status in TERMINAL_STATUSES and not await self.waiting(job)
-            ]
-            if not removable:
-                raise RegistryFull(
-                    f"{len(held)} analyses wait for answers. Answer or continue"
-                    " one of them before you start another."
-                )
-            await self.store.delete(removable[0].id, OWNER)
-            held = [job for job in held if job.id != removable[0].id]
+        removable = [
+            job.id
+            for job in held
+            if job.status in TERMINAL_STATUSES
+            and job.id != answering
+            and not await self.waiting(job)
+        ]
+        excess = len(held) - limit + 1
+        if excess > len(removable):
+            raise WorkspaceFull(
+                f"{len(held)} analyses wait for answers. Answer or continue"
+                " one of them before you start another."
+            )
+        yield
+        for job_id in removable[: max(excess, 0)]:
+            await self.store.delete(job_id, OWNER)
 
     async def parent_of(self, record: JobRecord) -> str | None:
-        """The job this one resumes or amends, read by name: an envelope
-        leaves the resumption out for its weight."""
-        if record.amends is not None:
-            return record.amends
+        """The job this one resumes or amends: :func:`parent_of` over the
+        record with its resumption, which an envelope leaves out for its
+        weight."""
         resumption = await self.store.resumption(record.id, OWNER)
-        return None if resumption is None else resumption.parent_id
+        return parent_of(record.model_copy(update={"resumption": resumption}))
 
     async def workspace_id(self, record: JobRecord) -> str:
         """The analysis this job belongs to: the root of its parent chain.
@@ -760,12 +767,19 @@ _REFUSAL_STATUS: dict[type[Exception], int] = {
     NoCatalogError: 409,
     Refused: 400,
     SaveConflict: 409,
-    RegistryFull: 409,
+    WorkspaceFull: 409,
     RunnerUnavailable: 503,
     JobDataMissing: 500,
 }
 
-#: What the page is told for each admission refusal, keyed by outcome.
+#: What the page says where a save in another tab moved the answers first.
+_STALE_MESSAGE = (
+    "Your saved answers changed in another tab or window. Reload this page to see them."
+)
+
+#: What the page is told for each admission refusal, keyed by outcome. An
+#: outcome missing here is this app's defect: ``duplicate`` cannot follow from
+#: a page, because ``JobRecord.create`` mints the ID.
 _ADMISSION_MESSAGES: dict[str, str] = {
     "at_ceiling": "An analysis is already running. Wait for it to finish.",
     "over_rate": "This workspace started too many analyses in the current"
@@ -776,6 +790,7 @@ _ADMISSION_MESSAGES: dict[str, str] = {
     " for the current window. Retry later, or submit less text.",
     "resumed_already": "These answers already started an analysis. Open its"
     " report, or answer again only if it fails.",
+    "parent_moved": _STALE_MESSAGE,
 }
 
 
@@ -789,8 +804,6 @@ async def _refused(status: int, request: Request, exc: Exception) -> JSONRespons
 
 async def _not_admitted(request: Request, exc: NotAdmitted) -> JSONResponse:
     outcome = exc.admission.outcome
-    if outcome == "parent_moved":
-        return _message(409, _STALE_MESSAGE)
     if outcome in _ADMISSION_MESSAGES:
         return _message(409, _ADMISSION_MESSAGES[outcome])
     logger.error("job was not admitted: %s", outcome)
@@ -951,8 +964,8 @@ def create_app(
             ask_questions=ask_questions,
             reserved_tokens=budgets.estimate(sources, selection),
         )
-        await workspace.make_room()
-        started = await workspace.answers.admit(record, start=workspace.start)
+        async with workspace.make_room():
+            started = await workspace.answers.admit(record, start=workspace.start)
         return JSONResponse({"run": started.job_id})
 
     @app.post("/answer/{run_id}")
@@ -1012,19 +1025,20 @@ def create_app(
                 "Expected a JSON body with a 'links' list and a 'facts' list of"
                 " answers this report asked for.",
             )
-        if not save:
-            await workspace.make_room(answering=True)
-        outcome = await workspace.answers.answer(
-            run_id,
-            OWNER,
-            Answers(
-                given=AnswerSet(links=tuple(links), facts=tuple(facts)),
-                save=save,
-                skips=skips,
-                revision=revision,
-            ),
-            start=workspace.start,
-        )
+        # A save starts no job, so it needs no room.
+        room = nullcontext() if save else workspace.make_room(answering=run_id)
+        async with room:
+            outcome = await workspace.answers.answer(
+                run_id,
+                OWNER,
+                Answers(
+                    given=AnswerSet(links=tuple(links), facts=tuple(facts)),
+                    save=save,
+                    skips=skips,
+                    revision=revision,
+                ),
+                start=workspace.start,
+            )
         if isinstance(outcome, Started):
             return JSONResponse({"run": outcome.job_id})
         if outcome.revision is not None:
@@ -1056,10 +1070,10 @@ def create_app(
                 raise TypeError
         except (ValueError, KeyError, TypeError):
             return _message(400, "Expected a JSON body with a 'text' and a 'revision'.")
-        await workspace.make_room(answering=True)
-        started = await workspace.answers.amend(
-            run_id, OWNER, text, revision=revision, start=workspace.start
-        )
+        async with workspace.make_room(answering=run_id):
+            started = await workspace.answers.amend(
+                run_id, OWNER, text, revision=revision, start=workspace.start
+            )
         return JSONResponse({"run": started.job_id})
 
     @app.get("/events/{run_id}")
@@ -1479,11 +1493,6 @@ _FORM_PAGE = (Path(__file__).parent / "workspace.html").read_text(encoding="utf-
 
 #: The question toggle. Every install can pause: one with no catalog asks its
 #: early questions and no link question.
-#: What the page says where a save in another tab moved the answers first.
-_STALE_MESSAGE = (
-    "Your saved answers changed in another tab or window. Reload this page to see them."
-)
-
 _QUESTIONS_FIELD = """<p class="ask-option"><label><input type="checkbox" id="ask" name="ask" checked>
     Ask me questions to make the report better.</label></p>"""
 

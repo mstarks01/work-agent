@@ -64,6 +64,10 @@ The first-run app keeps the draft on the run in memory, as it keeps every
 other answer. The durable store of #1282 and ADR 0065 holds it with the rest
 of the job record, so this ADR adds no second store.
 
+> **Amended by [ADR 0077](0077-the-first-run-app-holds-job-records-in-the-job-store.md).**
+> The first-run app holds its jobs in the job store, so it keeps the draft on
+> the job record, as the API does.
+
 A draft of answers that add nothing is kept, because a save is not a run. The
 run that would read nothing new is refused, and the follow-up stays available.
 
