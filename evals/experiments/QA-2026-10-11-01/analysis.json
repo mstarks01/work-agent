@@ -1,0 +1,3849 @@
+{
+  "artifact_version": 7,
+  "mode": "analysis",
+  "cases": [
+    "16-library-lending-interview"
+  ],
+  "models": {
+    "tiers_config_version": 9,
+    "tiers": {
+      "base": {
+        "vendor": "openrouter",
+        "model": "openai/gpt-5.6-luna-pro",
+        "upstreams": [
+          "openai/flex"
+        ]
+      },
+      "strong": {
+        "vendor": "openrouter",
+        "model": "openai/gpt-5.6-luna-pro",
+        "upstreams": [
+          "openai/flex"
+        ]
+      },
+      "review": {
+        "vendor": "openrouter",
+        "model": "openai/gpt-5.6-luna-pro",
+        "upstreams": [
+          "openai/flex"
+        ]
+      }
+    }
+  },
+  "gating": "tier-1-structural-only",
+  "certification": {
+    "certified": false,
+    "uncertified_nodes": [
+      {
+        "node": "analyze_stride_denial_of_service",
+        "fingerprint": "d4c0563792f71247616a2b2e39be3ee3df854630401401128fef0b61662a5d4a"
+      },
+      {
+        "node": "analyze_stride_elevation_of_privilege",
+        "fingerprint": "d4c0563792f71247616a2b2e39be3ee3df854630401401128fef0b61662a5d4a"
+      },
+      {
+        "node": "analyze_stride_information_disclosure",
+        "fingerprint": "d4c0563792f71247616a2b2e39be3ee3df854630401401128fef0b61662a5d4a"
+      },
+      {
+        "node": "analyze_stride_repudiation",
+        "fingerprint": "d4c0563792f71247616a2b2e39be3ee3df854630401401128fef0b61662a5d4a"
+      },
+      {
+        "node": "analyze_stride_spoofing",
+        "fingerprint": "d4c0563792f71247616a2b2e39be3ee3df854630401401128fef0b61662a5d4a"
+      },
+      {
+        "node": "analyze_stride_tampering",
+        "fingerprint": "d4c0563792f71247616a2b2e39be3ee3df854630401401128fef0b61662a5d4a"
+      },
+      {
+        "node": "critic_stride",
+        "fingerprint": "d4c0563792f71247616a2b2e39be3ee3df854630401401128fef0b61662a5d4a"
+      },
+      {
+        "node": "recritic_stride",
+        "fingerprint": "d4c0563792f71247616a2b2e39be3ee3df854630401401128fef0b61662a5d4a"
+      }
+    ],
+    "unexercised_tiers": []
+  },
+  "provenance": {
+    "identity_version": 2,
+    "build": {
+      "analysis-service": "0.1.0",
+      "google-adk": "2.5.0",
+      "google-genai": "2.11.0",
+      "litellm": "1.104.0"
+    },
+    "sampling_config_version": 5,
+    "tiers_config_version": 9,
+    "sampling": {
+      "base": {
+        "temperature": null,
+        "top_p": null,
+        "seed": null,
+        "max_output_tokens": 16384,
+        "candidate_count": 1,
+        "presence_penalty": null,
+        "frequency_penalty": null,
+        "thinking": null,
+        "constrain_output": true,
+        "structured_output": "auto"
+      },
+      "strong": {
+        "temperature": null,
+        "top_p": null,
+        "seed": null,
+        "max_output_tokens": 64000,
+        "candidate_count": 1,
+        "presence_penalty": null,
+        "frequency_penalty": null,
+        "thinking": null,
+        "constrain_output": true,
+        "structured_output": "auto"
+      },
+      "review": {
+        "temperature": null,
+        "top_p": null,
+        "seed": null,
+        "max_output_tokens": 64000,
+        "candidate_count": 1,
+        "presence_penalty": null,
+        "frequency_penalty": null,
+        "thinking": null,
+        "constrain_output": true,
+        "structured_output": "auto"
+      }
+    },
+    "node_runs": {
+      "analyze_stride_denial_of_service": [
+        {
+          "node": "analyze_stride_denial_of_service",
+          "tier": "strong",
+          "requested_model": "openrouter/openai/gpt-5.6-luna-pro",
+          "served_model": "openrouter/openai/gpt-5.6-luna-pro",
+          "instruction_sha256": "6a59f7bd1a336696d092cbb2f249103900cfc6f1a442547e0343514eea67b43e",
+          "generation_fingerprint": "d4c0563792f71247616a2b2e39be3ee3df854630401401128fef0b61662a5d4a",
+          "served_upstream": "OpenAI"
+        }
+      ],
+      "analyze_stride_elevation_of_privilege": [
+        {
+          "node": "analyze_stride_elevation_of_privilege",
+          "tier": "strong",
+          "requested_model": "openrouter/openai/gpt-5.6-luna-pro",
+          "served_model": "openrouter/openai/gpt-5.6-luna-pro",
+          "instruction_sha256": "6a59f7bd1a336696d092cbb2f249103900cfc6f1a442547e0343514eea67b43e",
+          "generation_fingerprint": "d4c0563792f71247616a2b2e39be3ee3df854630401401128fef0b61662a5d4a",
+          "served_upstream": "OpenAI"
+        }
+      ],
+      "analyze_stride_information_disclosure": [
+        {
+          "node": "analyze_stride_information_disclosure",
+          "tier": "strong",
+          "requested_model": "openrouter/openai/gpt-5.6-luna-pro",
+          "served_model": "openrouter/openai/gpt-5.6-luna-pro",
+          "instruction_sha256": "6a59f7bd1a336696d092cbb2f249103900cfc6f1a442547e0343514eea67b43e",
+          "generation_fingerprint": "d4c0563792f71247616a2b2e39be3ee3df854630401401128fef0b61662a5d4a",
+          "served_upstream": "OpenAI"
+        }
+      ],
+      "analyze_stride_repudiation": [
+        {
+          "node": "analyze_stride_repudiation",
+          "tier": "strong",
+          "requested_model": "openrouter/openai/gpt-5.6-luna-pro",
+          "served_model": "openrouter/openai/gpt-5.6-luna-pro",
+          "instruction_sha256": "6a59f7bd1a336696d092cbb2f249103900cfc6f1a442547e0343514eea67b43e",
+          "generation_fingerprint": "d4c0563792f71247616a2b2e39be3ee3df854630401401128fef0b61662a5d4a",
+          "served_upstream": "OpenAI"
+        }
+      ],
+      "analyze_stride_spoofing": [
+        {
+          "node": "analyze_stride_spoofing",
+          "tier": "strong",
+          "requested_model": "openrouter/openai/gpt-5.6-luna-pro",
+          "served_model": "openrouter/openai/gpt-5.6-luna-pro",
+          "instruction_sha256": "6a59f7bd1a336696d092cbb2f249103900cfc6f1a442547e0343514eea67b43e",
+          "generation_fingerprint": "d4c0563792f71247616a2b2e39be3ee3df854630401401128fef0b61662a5d4a",
+          "served_upstream": "OpenAI"
+        }
+      ],
+      "analyze_stride_tampering": [
+        {
+          "node": "analyze_stride_tampering",
+          "tier": "strong",
+          "requested_model": "openrouter/openai/gpt-5.6-luna-pro",
+          "served_model": "openrouter/openai/gpt-5.6-luna-pro",
+          "instruction_sha256": "6a59f7bd1a336696d092cbb2f249103900cfc6f1a442547e0343514eea67b43e",
+          "generation_fingerprint": "d4c0563792f71247616a2b2e39be3ee3df854630401401128fef0b61662a5d4a",
+          "served_upstream": "OpenAI"
+        }
+      ],
+      "critic_stride": [
+        {
+          "node": "critic_stride",
+          "tier": "strong",
+          "requested_model": "openrouter/openai/gpt-5.6-luna-pro",
+          "served_model": "openrouter/openai/gpt-5.6-luna-pro",
+          "instruction_sha256": "6a59f7bd1a336696d092cbb2f249103900cfc6f1a442547e0343514eea67b43e",
+          "generation_fingerprint": "d4c0563792f71247616a2b2e39be3ee3df854630401401128fef0b61662a5d4a",
+          "served_upstream": "OpenAI"
+        }
+      ],
+      "recritic_stride": [
+        {
+          "node": "recritic_stride",
+          "tier": "strong",
+          "requested_model": "openrouter/openai/gpt-5.6-luna-pro",
+          "served_model": "openrouter/openai/gpt-5.6-luna-pro",
+          "instruction_sha256": "6a59f7bd1a336696d092cbb2f249103900cfc6f1a442547e0343514eea67b43e",
+          "generation_fingerprint": "d4c0563792f71247616a2b2e39be3ee3df854630401401128fef0b61662a5d4a",
+          "served_upstream": "OpenAI"
+        }
+      ]
+    },
+    "generation_identities": {
+      "strong": {
+        "requested_models": [
+          "openrouter/openai/gpt-5.6-luna-pro"
+        ],
+        "served_models": [
+          "openrouter/openai/gpt-5.6-luna-pro"
+        ],
+        "instruction_digests": [
+          "6a59f7bd1a336696d092cbb2f249103900cfc6f1a442547e0343514eea67b43e"
+        ],
+        "fingerprints": [
+          "d4c0563792f71247616a2b2e39be3ee3df854630401401128fef0b61662a5d4a"
+        ],
+        "nodes": [
+          "analyze_stride_denial_of_service",
+          "analyze_stride_elevation_of_privilege",
+          "analyze_stride_information_disclosure",
+          "analyze_stride_repudiation",
+          "analyze_stride_spoofing",
+          "analyze_stride_tampering",
+          "critic_stride",
+          "recritic_stride"
+        ]
+      }
+    }
+  },
+  "node_usage": {
+    "analyze_stride_repudiation": {
+      "prompt_tokens": 87925,
+      "cached_prompt_tokens": 15140,
+      "cache_write_tokens": 0,
+      "completion_tokens": 9166,
+      "reasoning_tokens": 3320,
+      "total_tokens": 97091
+    },
+    "analyze_stride_denial_of_service": {
+      "prompt_tokens": 85950,
+      "cached_prompt_tokens": 13770,
+      "cache_write_tokens": 0,
+      "completion_tokens": 8736,
+      "reasoning_tokens": 5141,
+      "total_tokens": 94686
+    },
+    "analyze_stride_tampering": {
+      "prompt_tokens": 91148,
+      "cached_prompt_tokens": 13530,
+      "cache_write_tokens": 6765,
+      "completion_tokens": 11519,
+      "reasoning_tokens": 5020,
+      "total_tokens": 102667
+    },
+    "analyze_stride_spoofing": {
+      "prompt_tokens": 91471,
+      "cached_prompt_tokens": 13502,
+      "cache_write_tokens": 0,
+      "completion_tokens": 13196,
+      "reasoning_tokens": 5108,
+      "total_tokens": 104667
+    },
+    "analyze_stride_elevation_of_privilege": {
+      "prompt_tokens": 85110,
+      "cached_prompt_tokens": 13822,
+      "cache_write_tokens": 0,
+      "completion_tokens": 13306,
+      "reasoning_tokens": 7561,
+      "total_tokens": 98416
+    },
+    "analyze_stride_information_disclosure": {
+      "prompt_tokens": 92161,
+      "cached_prompt_tokens": 13490,
+      "cache_write_tokens": 0,
+      "completion_tokens": 14485,
+      "reasoning_tokens": 5345,
+      "total_tokens": 106646
+    },
+    "critic_stride": {
+      "prompt_tokens": 128527,
+      "cached_prompt_tokens": 10164,
+      "cache_write_tokens": 5082,
+      "completion_tokens": 15953,
+      "reasoning_tokens": 4440,
+      "total_tokens": 144480
+    },
+    "recritic_stride": {
+      "prompt_tokens": 67006,
+      "cached_prompt_tokens": 9758,
+      "cache_write_tokens": 4879,
+      "completion_tokens": 1102,
+      "reasoning_tokens": 566,
+      "total_tokens": 68108
+    }
+  },
+  "node_charges": {
+    "analyze_stride_repudiation": 0.0129295,
+    "analyze_stride_denial_of_service": 0.0125973,
+    "analyze_stride_tampering": 0.014977625,
+    "analyze_stride_spoofing": 0.01584952,
+    "analyze_stride_elevation_of_privilege": 0.01525062,
+    "analyze_stride_information_disclosure": 0.016693,
+    "critic_stride": 0.02163679,
+    "recritic_stride": 0.006605555
+  },
+  "node_latency": {
+    "prepare": {
+      "executions": 1,
+      "total_ms": 12,
+      "slowest_ms": 12,
+      "mean_ms": 12
+    },
+    "analyze_stride_repudiation": {
+      "executions": 1,
+      "total_ms": 38756,
+      "slowest_ms": 38756,
+      "mean_ms": 38756
+    },
+    "analyze_stride_denial_of_service": {
+      "executions": 1,
+      "total_ms": 41779,
+      "slowest_ms": 41779,
+      "mean_ms": 41779
+    },
+    "analyze_stride_tampering": {
+      "executions": 1,
+      "total_ms": 48543,
+      "slowest_ms": 48543,
+      "mean_ms": 48543
+    },
+    "analyze_stride_spoofing": {
+      "executions": 1,
+      "total_ms": 53182,
+      "slowest_ms": 53182,
+      "mean_ms": 53182
+    },
+    "analyze_stride_elevation_of_privilege": {
+      "executions": 1,
+      "total_ms": 57871,
+      "slowest_ms": 57871,
+      "mean_ms": 57871
+    },
+    "analyze_stride_information_disclosure": {
+      "executions": 1,
+      "total_ms": 63198,
+      "slowest_ms": 63198,
+      "mean_ms": 63198
+    },
+    "join_stride": {
+      "executions": 1,
+      "total_ms": 1,
+      "slowest_ms": 1,
+      "mean_ms": 1
+    },
+    "merge_stride": {
+      "executions": 1,
+      "total_ms": 100,
+      "slowest_ms": 100,
+      "mean_ms": 100
+    },
+    "critic_stride": {
+      "executions": 1,
+      "total_ms": 51358,
+      "slowest_ms": 51358,
+      "mean_ms": 51358
+    },
+    "router_stride": {
+      "executions": 1,
+      "total_ms": 4,
+      "slowest_ms": 4,
+      "mean_ms": 4
+    },
+    "recritic_stride": {
+      "executions": 1,
+      "total_ms": 6622,
+      "slowest_ms": 6622,
+      "mean_ms": 6622
+    },
+    "rereview_stride": {
+      "executions": 1,
+      "total_ms": 3,
+      "slowest_ms": 3,
+      "mean_ms": 3
+    },
+    "assemble": {
+      "executions": 1,
+      "total_ms": 5,
+      "slowest_ms": 5,
+      "mean_ms": 5
+    }
+  },
+  "structural_failures": [],
+  "mode_output": [
+    {
+      "case": "16-library-lending-interview",
+      "structural_issues": [],
+      "grounds": [
+        {
+          "case": "16-library-lending-interview",
+          "framework": "stride",
+          "counts": {
+            "threats": 28,
+            "grounds": 83,
+            "quoteless_threats": 14,
+            "unverified_quotes": 2,
+            "repaired_quotes": 1,
+            "dropped_claims": 0,
+            "quote": 24,
+            "unknown-attribute": 35,
+            "absent-attribute": 0,
+            "derived-fact": 24,
+            "assertion": 0
+          },
+          "metrics": {
+            "grounds_per_threat": 2.964,
+            "quoteless_rate": 0.5,
+            "unverified_rate": 0.083,
+            "repaired_rate": 0.042,
+            "dropped_rate": 0.0
+          },
+          "threats": [
+            {
+              "threat_id": "S-01",
+              "framework": "stride",
+              "lane": "spoofing",
+              "total": 2,
+              "kinds": [
+                "derived-fact",
+                "unknown-attribute"
+              ],
+              "unverified": [],
+              "repaired": []
+            },
+            {
+              "threat_id": "S-02",
+              "framework": "stride",
+              "lane": "spoofing",
+              "total": 2,
+              "kinds": [
+                "derived-fact",
+                "unknown-attribute"
+              ],
+              "unverified": [],
+              "repaired": []
+            },
+            {
+              "threat_id": "S-03",
+              "framework": "stride",
+              "lane": "spoofing",
+              "total": 2,
+              "kinds": [
+                "quote",
+                "derived-fact"
+              ],
+              "unverified": [],
+              "repaired": []
+            },
+            {
+              "threat_id": "S-04",
+              "framework": "stride",
+              "lane": "spoofing",
+              "total": 3,
+              "kinds": [
+                "derived-fact",
+                "unknown-attribute",
+                "unknown-attribute"
+              ],
+              "unverified": [],
+              "repaired": []
+            },
+            {
+              "threat_id": "S-05",
+              "framework": "stride",
+              "lane": "spoofing",
+              "total": 3,
+              "kinds": [
+                "derived-fact",
+                "unknown-attribute",
+                "unknown-attribute"
+              ],
+              "unverified": [],
+              "repaired": []
+            },
+            {
+              "threat_id": "S-06",
+              "framework": "stride",
+              "lane": "spoofing",
+              "total": 3,
+              "kinds": [
+                "derived-fact",
+                "unknown-attribute",
+                "unknown-attribute"
+              ],
+              "unverified": [],
+              "repaired": []
+            },
+            {
+              "threat_id": "T-01",
+              "framework": "stride",
+              "lane": "tampering",
+              "total": 3,
+              "kinds": [
+                "derived-fact",
+                "unknown-attribute",
+                "unknown-attribute"
+              ],
+              "unverified": [],
+              "repaired": []
+            },
+            {
+              "threat_id": "T-02",
+              "framework": "stride",
+              "lane": "tampering",
+              "total": 3,
+              "kinds": [
+                "derived-fact",
+                "unknown-attribute",
+                "unknown-attribute"
+              ],
+              "unverified": [],
+              "repaired": []
+            },
+            {
+              "threat_id": "T-03",
+              "framework": "stride",
+              "lane": "tampering",
+              "total": 3,
+              "kinds": [
+                "derived-fact",
+                "unknown-attribute",
+                "unknown-attribute"
+              ],
+              "unverified": [],
+              "repaired": []
+            },
+            {
+              "threat_id": "T-04",
+              "framework": "stride",
+              "lane": "tampering",
+              "total": 3,
+              "kinds": [
+                "quote",
+                "unknown-attribute",
+                "unknown-attribute"
+              ],
+              "unverified": [],
+              "repaired": []
+            },
+            {
+              "threat_id": "T-05",
+              "framework": "stride",
+              "lane": "tampering",
+              "total": 2,
+              "kinds": [
+                "quote",
+                "unknown-attribute"
+              ],
+              "unverified": [],
+              "repaired": []
+            },
+            {
+              "threat_id": "R-01",
+              "framework": "stride",
+              "lane": "repudiation",
+              "total": 4,
+              "kinds": [
+                "quote",
+                "quote",
+                "derived-fact",
+                "unknown-attribute"
+              ],
+              "unverified": [],
+              "repaired": []
+            },
+            {
+              "threat_id": "R-02",
+              "framework": "stride",
+              "lane": "repudiation",
+              "total": 2,
+              "kinds": [
+                "derived-fact",
+                "unknown-attribute"
+              ],
+              "unverified": [],
+              "repaired": []
+            },
+            {
+              "threat_id": "R-03",
+              "framework": "stride",
+              "lane": "repudiation",
+              "total": 2,
+              "kinds": [
+                "quote",
+                "unknown-attribute"
+              ],
+              "unverified": [],
+              "repaired": []
+            },
+            {
+              "threat_id": "R-04",
+              "framework": "stride",
+              "lane": "repudiation",
+              "total": 4,
+              "kinds": [
+                "quote",
+                "quote",
+                "quote",
+                "derived-fact"
+              ],
+              "unverified": [],
+              "repaired": []
+            },
+            {
+              "threat_id": "I-01",
+              "framework": "stride",
+              "lane": "information-disclosure",
+              "total": 3,
+              "kinds": [
+                "unknown-attribute",
+                "unknown-attribute",
+                "derived-fact"
+              ],
+              "unverified": [],
+              "repaired": []
+            },
+            {
+              "threat_id": "I-02",
+              "framework": "stride",
+              "lane": "information-disclosure",
+              "total": 3,
+              "kinds": [
+                "unknown-attribute",
+                "unknown-attribute",
+                "derived-fact"
+              ],
+              "unverified": [],
+              "repaired": []
+            },
+            {
+              "threat_id": "I-03",
+              "framework": "stride",
+              "lane": "information-disclosure",
+              "total": 3,
+              "kinds": [
+                "unknown-attribute",
+                "unknown-attribute",
+                "derived-fact"
+              ],
+              "unverified": [],
+              "repaired": []
+            },
+            {
+              "threat_id": "I-04",
+              "framework": "stride",
+              "lane": "information-disclosure",
+              "total": 2,
+              "kinds": [
+                "unknown-attribute",
+                "unknown-attribute"
+              ],
+              "unverified": [],
+              "repaired": []
+            },
+            {
+              "threat_id": "I-05",
+              "framework": "stride",
+              "lane": "information-disclosure",
+              "total": 1,
+              "kinds": [
+                "unknown-attribute"
+              ],
+              "unverified": [],
+              "repaired": []
+            },
+            {
+              "threat_id": "I-06",
+              "framework": "stride",
+              "lane": "information-disclosure",
+              "total": 3,
+              "kinds": [
+                "quote",
+                "quote",
+                "unknown-attribute"
+              ],
+              "unverified": [
+                0
+              ],
+              "repaired": []
+            },
+            {
+              "threat_id": "I-07",
+              "framework": "stride",
+              "lane": "information-disclosure",
+              "total": 3,
+              "kinds": [
+                "quote",
+                "unknown-attribute",
+                "derived-fact"
+              ],
+              "unverified": [
+                0
+              ],
+              "repaired": []
+            },
+            {
+              "threat_id": "I-08",
+              "framework": "stride",
+              "lane": "information-disclosure",
+              "total": 2,
+              "kinds": [
+                "quote",
+                "derived-fact"
+              ],
+              "unverified": [],
+              "repaired": []
+            },
+            {
+              "threat_id": "I-09",
+              "framework": "stride",
+              "lane": "information-disclosure",
+              "total": 2,
+              "kinds": [
+                "quote",
+                "derived-fact"
+              ],
+              "unverified": [],
+              "repaired": []
+            },
+            {
+              "threat_id": "D-01",
+              "framework": "stride",
+              "lane": "denial-of-service",
+              "total": 10,
+              "kinds": [
+                "quote",
+                "quote",
+                "quote",
+                "quote",
+                "quote",
+                "derived-fact",
+                "derived-fact",
+                "derived-fact",
+                "unknown-attribute",
+                "unknown-attribute"
+              ],
+              "unverified": [],
+              "repaired": []
+            },
+            {
+              "threat_id": "E-01",
+              "framework": "stride",
+              "lane": "elevation-of-privilege",
+              "total": 4,
+              "kinds": [
+                "quote",
+                "quote",
+                "unknown-attribute",
+                "derived-fact"
+              ],
+              "unverified": [],
+              "repaired": []
+            },
+            {
+              "threat_id": "E-02",
+              "framework": "stride",
+              "lane": "elevation-of-privilege",
+              "total": 3,
+              "kinds": [
+                "quote",
+                "unknown-attribute",
+                "derived-fact"
+              ],
+              "unverified": [],
+              "repaired": []
+            },
+            {
+              "threat_id": "E-03",
+              "framework": "stride",
+              "lane": "elevation-of-privilege",
+              "total": 3,
+              "kinds": [
+                "quote",
+                "quote",
+                "derived-fact"
+              ],
+              "unverified": [],
+              "repaired": [
+                0
+              ]
+            }
+          ],
+          "dropped": []
+        }
+      ]
+    }
+  ],
+  "trusted": false,
+  "repo_commit": {
+    "commit": "fe8e309c9fb56b647aba750b8e65773710af0bef",
+    "clean": true
+  },
+  "corpus_digest": "5992277cc303c7d90dac7049af13040a49fcc4af81aa62da249a15bb97b7e020",
+  "flow_identity_version": 2,
+  "frameworks": [
+    "stride"
+  ],
+  "stopped": [],
+  "series": {
+    "primary": "maintainer",
+    "standings": {
+      "maintainer": [
+        "maintainer"
+      ],
+      "all": [
+        "maintainer",
+        "contributor"
+      ]
+    },
+    "blocks": {
+      "all": {
+        "scores": [
+          {
+            "case": "16-library-lending-interview",
+            "exemplar_proximity": "far",
+            "holdout": false,
+            "counts": {
+              "produced": 27,
+              "references": 13,
+              "matched": 12,
+              "missed": 1,
+              "must_find_total": 5,
+              "must_find_matched": 5,
+              "foreign": 0,
+              "eligible": 15,
+              "reviewed": 0,
+              "lane_errors": 0,
+              "rejected": 0,
+              "pooled": 0,
+              "open": 0,
+              "unvoted": 15,
+              "stale": 0
+            },
+            "metrics": {
+              "must_find_coverage": 1.0,
+              "expected_coverage": 0.875,
+              "reference_coverage": 0.923,
+              "lane_accuracy": 1.0,
+              "element_agreement": 1.0,
+              "element_jaccard": 0.565,
+              "rejected_rate": 0.0,
+              "rejected_rate_of_reviewed": 0.0,
+              "severity_exact_rate": 0.167
+            },
+            "severity_confusion": {
+              "high->critical": 3,
+              "high->high": 1,
+              "low->critical": 1,
+              "low->high": 1,
+              "low->medium": 1,
+              "medium->high": 4,
+              "medium->medium": 1
+            },
+            "matched": [
+              {
+                "reference_index": 0,
+                "threat_id": "S-01",
+                "tier": "must-find",
+                "element_overlap": true,
+                "element_jaccard": 0.667,
+                "reference_level": "medium",
+                "produced_level": "high",
+                "likelihood_agrees": true,
+                "impact_agrees": false
+              },
+              {
+                "reference_index": 1,
+                "threat_id": "S-02",
+                "tier": "expected",
+                "element_overlap": true,
+                "element_jaccard": 0.667,
+                "reference_level": "medium",
+                "produced_level": "high",
+                "likelihood_agrees": true,
+                "impact_agrees": false
+              },
+              {
+                "reference_index": 2,
+                "threat_id": "S-03",
+                "tier": "expected",
+                "element_overlap": true,
+                "element_jaccard": 0.667,
+                "reference_level": "medium",
+                "produced_level": "high",
+                "likelihood_agrees": true,
+                "impact_agrees": false
+              },
+              {
+                "reference_index": 3,
+                "threat_id": "T-01",
+                "tier": "expected",
+                "element_overlap": true,
+                "element_jaccard": 0.5,
+                "reference_level": "low",
+                "produced_level": "high",
+                "likelihood_agrees": false,
+                "impact_agrees": false
+              },
+              {
+                "reference_index": 4,
+                "threat_id": "R-04",
+                "tier": "must-find",
+                "element_overlap": true,
+                "element_jaccard": 0.667,
+                "reference_level": "high",
+                "produced_level": "critical",
+                "likelihood_agrees": true,
+                "impact_agrees": false
+              },
+              {
+                "reference_index": 5,
+                "threat_id": "R-01",
+                "tier": "expected",
+                "element_overlap": true,
+                "element_jaccard": 0.667,
+                "reference_level": "low",
+                "produced_level": "critical",
+                "likelihood_agrees": false,
+                "impact_agrees": false
+              },
+              {
+                "reference_index": 6,
+                "threat_id": "I-05",
+                "tier": "expected",
+                "element_overlap": true,
+                "element_jaccard": 1.0,
+                "reference_level": "medium",
+                "produced_level": "high",
+                "likelihood_agrees": false,
+                "impact_agrees": true
+              },
+              {
+                "reference_index": 7,
+                "threat_id": "I-01",
+                "tier": "expected",
+                "element_overlap": true,
+                "element_jaccard": 0.333,
+                "reference_level": "medium",
+                "produced_level": "medium",
+                "likelihood_agrees": true,
+                "impact_agrees": true
+              },
+              {
+                "reference_index": 8,
+                "threat_id": "D-01",
+                "tier": "must-find",
+                "element_overlap": true,
+                "element_jaccard": 0.5,
+                "reference_level": "high",
+                "produced_level": "critical",
+                "likelihood_agrees": true,
+                "impact_agrees": false
+              },
+              {
+                "reference_index": 9,
+                "threat_id": "E-01",
+                "tier": "must-find",
+                "element_overlap": true,
+                "element_jaccard": 0.667,
+                "reference_level": "high",
+                "produced_level": "critical",
+                "likelihood_agrees": false,
+                "impact_agrees": true
+              },
+              {
+                "reference_index": 10,
+                "threat_id": "T-04",
+                "tier": "must-find",
+                "element_overlap": true,
+                "element_jaccard": 0.25,
+                "reference_level": "high",
+                "produced_level": "high",
+                "likelihood_agrees": true,
+                "impact_agrees": true
+              },
+              {
+                "reference_index": 12,
+                "threat_id": "I-02",
+                "tier": "expected",
+                "element_overlap": true,
+                "element_jaccard": 0.2,
+                "reference_level": "low",
+                "produced_level": "medium",
+                "likelihood_agrees": false,
+                "impact_agrees": true
+              }
+            ],
+            "missed": [
+              11
+            ],
+            "lane_errors": [],
+            "unlisted": [
+              {
+                "threat_id": "E-03",
+                "category": "elevation-of-privilege",
+                "claim": "The shared desk credential lets a branch-network attacker gain circulation authority",
+                "fingerprint": "v6:39adc780bb95c056",
+                "standing": "unvoted"
+              },
+              {
+                "threat_id": "I-08",
+                "category": "information-disclosure",
+                "claim": "The shared desk password can be recovered from the branch workspace",
+                "fingerprint": "v6:e37ee2ff68f97414",
+                "standing": "unvoted"
+              },
+              {
+                "threat_id": "E-02",
+                "category": "elevation-of-privilege",
+                "claim": "A branch-network attacker may use the kiosk path to act on member loans",
+                "fingerprint": "v6:6735d5c00c961dae",
+                "standing": "unvoted"
+              },
+              {
+                "threat_id": "I-06",
+                "category": "information-disclosure",
+                "claim": "A compromised lending API may read the full member and loan corpus",
+                "fingerprint": "v6:9c5b2d4c77fd2841",
+                "standing": "unvoted"
+              },
+              {
+                "threat_id": "R-02",
+                "category": "repudiation",
+                "claim": "A kiosk transaction may be deniable because the submitting kiosk is not identified",
+                "fingerprint": "v6:fd275e7ef819462b",
+                "standing": "unvoted"
+              },
+              {
+                "threat_id": "R-03",
+                "category": "repudiation",
+                "claim": "Database writes may lose the originating actor behind the lending API",
+                "fingerprint": "v6:cba4857c762d220c",
+                "standing": "unvoted"
+              },
+              {
+                "threat_id": "T-02",
+                "category": "tampering",
+                "claim": "On-path alteration of kiosk loan and return messages",
+                "fingerprint": "v6:b18cce213659a909",
+                "standing": "unvoted"
+              },
+              {
+                "threat_id": "T-03",
+                "category": "tampering",
+                "claim": "On-path alteration of desk circulation changes",
+                "fingerprint": "v6:8db22fedaf6f7fa1",
+                "standing": "unvoted"
+              },
+              {
+                "threat_id": "I-03",
+                "category": "information-disclosure",
+                "claim": "Desk circulation traffic may expose account and loan activity",
+                "fingerprint": "v6:41eb18fca57e77e4",
+                "standing": "unvoted"
+              },
+              {
+                "threat_id": "I-04",
+                "category": "information-disclosure",
+                "claim": "The API-to-database connection may expose the loans corpus to a local observer",
+                "fingerprint": "v6:51ca07410024853d",
+                "standing": "unvoted"
+              },
+              {
+                "threat_id": "I-09",
+                "category": "information-disclosure",
+                "claim": "API error handling may elicit internal details from internet callers",
+                "fingerprint": "v6:93f62721b3d7fb1a",
+                "standing": "unvoted"
+              },
+              {
+                "threat_id": "S-04",
+                "category": "spoofing",
+                "claim": "An on-path attacker may impersonate the lending API to a member",
+                "fingerprint": "v6:9c78d0a74ddfb21d",
+                "standing": "unvoted"
+              },
+              {
+                "threat_id": "S-06",
+                "category": "spoofing",
+                "claim": "A branch-network attacker may impersonate the lending API to desk staff",
+                "fingerprint": "v6:fbbcf52a55917835",
+                "standing": "unvoted"
+              },
+              {
+                "threat_id": "T-05",
+                "category": "tampering",
+                "claim": "Offline tampering of the confidential loans database",
+                "fingerprint": "v6:0b649dd4d37dd049",
+                "standing": "unvoted"
+              },
+              {
+                "threat_id": "S-05",
+                "category": "spoofing",
+                "claim": "A branch-network attacker may impersonate the lending API to a kiosk",
+                "fingerprint": "v6:43611ef59e949638",
+                "standing": "unvoted"
+              }
+            ],
+            "foreign": [],
+            "rulings": [
+              {
+                "reference_index": 0,
+                "threat_id": "S-01",
+                "category": "spoofing",
+                "cross_lane": false,
+                "match": true,
+                "rationale": "one element set contains the other; impersonate vs impersonate is one action"
+              },
+              {
+                "reference_index": 0,
+                "threat_id": "S-02",
+                "category": "spoofing",
+                "cross_lane": false,
+                "match": false,
+                "rationale": "neither element set contains the other; impersonate vs impersonate is one action"
+              },
+              {
+                "reference_index": 0,
+                "threat_id": "S-03",
+                "category": "spoofing",
+                "cross_lane": false,
+                "match": false,
+                "rationale": "neither element set contains the other; impersonate vs use-credential are two actions"
+              },
+              {
+                "reference_index": 0,
+                "threat_id": "S-04",
+                "category": "spoofing",
+                "cross_lane": false,
+                "match": true,
+                "rationale": "one element set contains the other; impersonate vs impersonate is one action"
+              },
+              {
+                "reference_index": 0,
+                "threat_id": "S-06",
+                "category": "spoofing",
+                "cross_lane": false,
+                "match": false,
+                "rationale": "neither element set contains the other; impersonate vs impersonate is one action"
+              },
+              {
+                "reference_index": 0,
+                "threat_id": "S-05",
+                "category": "spoofing",
+                "cross_lane": false,
+                "match": false,
+                "rationale": "neither element set contains the other; impersonate vs impersonate is one action"
+              },
+              {
+                "reference_index": 1,
+                "threat_id": "S-01",
+                "category": "spoofing",
+                "cross_lane": false,
+                "match": false,
+                "rationale": "neither element set contains the other; impersonate vs impersonate is one action"
+              },
+              {
+                "reference_index": 1,
+                "threat_id": "S-02",
+                "category": "spoofing",
+                "cross_lane": false,
+                "match": true,
+                "rationale": "one element set contains the other; impersonate vs impersonate is one action"
+              },
+              {
+                "reference_index": 1,
+                "threat_id": "S-03",
+                "category": "spoofing",
+                "cross_lane": false,
+                "match": false,
+                "rationale": "neither element set contains the other; impersonate vs use-credential are two actions"
+              },
+              {
+                "reference_index": 1,
+                "threat_id": "S-04",
+                "category": "spoofing",
+                "cross_lane": false,
+                "match": false,
+                "rationale": "neither element set contains the other; impersonate vs impersonate is one action"
+              },
+              {
+                "reference_index": 1,
+                "threat_id": "S-06",
+                "category": "spoofing",
+                "cross_lane": false,
+                "match": false,
+                "rationale": "neither element set contains the other; impersonate vs impersonate is one action"
+              },
+              {
+                "reference_index": 1,
+                "threat_id": "S-05",
+                "category": "spoofing",
+                "cross_lane": false,
+                "match": true,
+                "rationale": "one element set contains the other; impersonate vs impersonate is one action"
+              },
+              {
+                "reference_index": 2,
+                "threat_id": "S-01",
+                "category": "spoofing",
+                "cross_lane": false,
+                "match": false,
+                "rationale": "neither element set contains the other; use-credential vs impersonate are two actions"
+              },
+              {
+                "reference_index": 2,
+                "threat_id": "S-02",
+                "category": "spoofing",
+                "cross_lane": false,
+                "match": false,
+                "rationale": "neither element set contains the other; use-credential vs impersonate are two actions"
+              },
+              {
+                "reference_index": 2,
+                "threat_id": "S-03",
+                "category": "spoofing",
+                "cross_lane": false,
+                "match": true,
+                "rationale": "one element set contains the other; use-credential vs use-credential is one action"
+              },
+              {
+                "reference_index": 2,
+                "threat_id": "S-04",
+                "category": "spoofing",
+                "cross_lane": false,
+                "match": false,
+                "rationale": "neither element set contains the other; use-credential vs impersonate are two actions"
+              },
+              {
+                "reference_index": 2,
+                "threat_id": "S-06",
+                "category": "spoofing",
+                "cross_lane": false,
+                "match": false,
+                "rationale": "one element set contains the other; use-credential vs impersonate are two actions"
+              },
+              {
+                "reference_index": 2,
+                "threat_id": "S-05",
+                "category": "spoofing",
+                "cross_lane": false,
+                "match": false,
+                "rationale": "neither element set contains the other; use-credential vs impersonate are two actions"
+              },
+              {
+                "reference_index": 3,
+                "threat_id": "T-01",
+                "category": "tampering",
+                "cross_lane": false,
+                "match": true,
+                "rationale": "one element set contains the other; alter-in-transit vs alter-in-transit is one action"
+              },
+              {
+                "reference_index": 3,
+                "threat_id": "T-02",
+                "category": "tampering",
+                "cross_lane": false,
+                "match": false,
+                "rationale": "neither element set contains the other; alter-in-transit vs alter-in-transit is one action"
+              },
+              {
+                "reference_index": 3,
+                "threat_id": "T-03",
+                "category": "tampering",
+                "cross_lane": false,
+                "match": false,
+                "rationale": "neither element set contains the other; alter-in-transit vs alter-in-transit is one action"
+              },
+              {
+                "reference_index": 3,
+                "threat_id": "T-04",
+                "category": "tampering",
+                "cross_lane": false,
+                "match": false,
+                "rationale": "neither element set contains the other; alter-in-transit vs alter are two actions"
+              },
+              {
+                "reference_index": 3,
+                "threat_id": "T-05",
+                "category": "tampering",
+                "cross_lane": false,
+                "match": false,
+                "rationale": "neither element set contains the other; alter-in-transit vs alter are two actions"
+              },
+              {
+                "reference_index": 4,
+                "threat_id": "R-01",
+                "category": "repudiation",
+                "cross_lane": false,
+                "match": false,
+                "rationale": "neither element set contains the other; unattributable vs unattributable is one action"
+              },
+              {
+                "reference_index": 4,
+                "threat_id": "R-04",
+                "category": "repudiation",
+                "cross_lane": false,
+                "match": true,
+                "rationale": "one element set contains the other; unattributable vs unattributable is one action"
+              },
+              {
+                "reference_index": 4,
+                "threat_id": "R-02",
+                "category": "repudiation",
+                "cross_lane": false,
+                "match": false,
+                "rationale": "neither element set contains the other; unattributable vs unattributable is one action"
+              },
+              {
+                "reference_index": 4,
+                "threat_id": "R-03",
+                "category": "repudiation",
+                "cross_lane": false,
+                "match": false,
+                "rationale": "neither element set contains the other; unattributable vs unattributable is one action"
+              },
+              {
+                "reference_index": 5,
+                "threat_id": "R-01",
+                "category": "repudiation",
+                "cross_lane": false,
+                "match": true,
+                "rationale": "one element set contains the other; unattributable vs unattributable is one action"
+              },
+              {
+                "reference_index": 5,
+                "threat_id": "R-04",
+                "category": "repudiation",
+                "cross_lane": false,
+                "match": false,
+                "rationale": "neither element set contains the other; unattributable vs unattributable is one action"
+              },
+              {
+                "reference_index": 5,
+                "threat_id": "R-02",
+                "category": "repudiation",
+                "cross_lane": false,
+                "match": false,
+                "rationale": "neither element set contains the other; unattributable vs unattributable is one action"
+              },
+              {
+                "reference_index": 5,
+                "threat_id": "R-03",
+                "category": "repudiation",
+                "cross_lane": false,
+                "match": false,
+                "rationale": "neither element set contains the other; unattributable vs unattributable is one action"
+              },
+              {
+                "reference_index": 6,
+                "threat_id": "I-08",
+                "category": "information-disclosure",
+                "cross_lane": false,
+                "match": false,
+                "rationale": "neither element set contains the other; read vs recover-credential are two actions"
+              },
+              {
+                "reference_index": 6,
+                "threat_id": "I-05",
+                "category": "information-disclosure",
+                "cross_lane": false,
+                "match": true,
+                "rationale": "one element set contains the other; read vs read is one action"
+              },
+              {
+                "reference_index": 6,
+                "threat_id": "I-06",
+                "category": "information-disclosure",
+                "cross_lane": false,
+                "match": true,
+                "rationale": "one element set contains the other; read vs read is one action"
+              },
+              {
+                "reference_index": 6,
+                "threat_id": "I-01",
+                "category": "information-disclosure",
+                "cross_lane": false,
+                "match": false,
+                "rationale": "neither element set contains the other; read vs intercept are two actions"
+              },
+              {
+                "reference_index": 6,
+                "threat_id": "I-02",
+                "category": "information-disclosure",
+                "cross_lane": false,
+                "match": false,
+                "rationale": "neither element set contains the other; read vs intercept are two actions"
+              },
+              {
+                "reference_index": 6,
+                "threat_id": "I-03",
+                "category": "information-disclosure",
+                "cross_lane": false,
+                "match": false,
+                "rationale": "neither element set contains the other; read vs intercept are two actions"
+              },
+              {
+                "reference_index": 6,
+                "threat_id": "I-04",
+                "category": "information-disclosure",
+                "cross_lane": false,
+                "match": false,
+                "rationale": "one element set contains the other; read vs intercept are two actions"
+              },
+              {
+                "reference_index": 6,
+                "threat_id": "I-09",
+                "category": "information-disclosure",
+                "cross_lane": false,
+                "match": false,
+                "rationale": "neither element set contains the other; read vs elicit are two actions"
+              },
+              {
+                "reference_index": 7,
+                "threat_id": "I-08",
+                "category": "information-disclosure",
+                "cross_lane": false,
+                "match": false,
+                "rationale": "neither element set contains the other; intercept vs recover-credential are two actions"
+              },
+              {
+                "reference_index": 7,
+                "threat_id": "I-05",
+                "category": "information-disclosure",
+                "cross_lane": false,
+                "match": false,
+                "rationale": "neither element set contains the other; intercept vs read are two actions"
+              },
+              {
+                "reference_index": 7,
+                "threat_id": "I-06",
+                "category": "information-disclosure",
+                "cross_lane": false,
+                "match": false,
+                "rationale": "neither element set contains the other; intercept vs read are two actions"
+              },
+              {
+                "reference_index": 7,
+                "threat_id": "I-01",
+                "category": "information-disclosure",
+                "cross_lane": false,
+                "match": true,
+                "rationale": "one element set contains the other; intercept vs intercept is one action"
+              },
+              {
+                "reference_index": 7,
+                "threat_id": "I-02",
+                "category": "information-disclosure",
+                "cross_lane": false,
+                "match": false,
+                "rationale": "neither element set contains the other; intercept vs intercept is one action"
+              },
+              {
+                "reference_index": 7,
+                "threat_id": "I-03",
+                "category": "information-disclosure",
+                "cross_lane": false,
+                "match": false,
+                "rationale": "neither element set contains the other; intercept vs intercept is one action"
+              },
+              {
+                "reference_index": 7,
+                "threat_id": "I-04",
+                "category": "information-disclosure",
+                "cross_lane": false,
+                "match": false,
+                "rationale": "neither element set contains the other; intercept vs intercept is one action"
+              },
+              {
+                "reference_index": 7,
+                "threat_id": "I-09",
+                "category": "information-disclosure",
+                "cross_lane": false,
+                "match": false,
+                "rationale": "one element set contains the other; intercept vs elicit are two actions"
+              },
+              {
+                "reference_index": 8,
+                "threat_id": "D-01",
+                "category": "denial-of-service",
+                "cross_lane": false,
+                "match": true,
+                "rationale": "one element set contains the other; flood vs flood is one action"
+              },
+              {
+                "reference_index": 9,
+                "threat_id": "E-01",
+                "category": "elevation-of-privilege",
+                "cross_lane": false,
+                "match": true,
+                "rationale": "one element set contains the other; escalate vs escalate is one action"
+              },
+              {
+                "reference_index": 9,
+                "threat_id": "E-03",
+                "category": "elevation-of-privilege",
+                "cross_lane": false,
+                "match": false,
+                "rationale": "neither element set contains the other; escalate vs escalate is one action"
+              },
+              {
+                "reference_index": 9,
+                "threat_id": "E-02",
+                "category": "elevation-of-privilege",
+                "cross_lane": false,
+                "match": false,
+                "rationale": "neither element set contains the other; escalate vs escalate is one action"
+              },
+              {
+                "reference_index": 10,
+                "threat_id": "T-01",
+                "category": "tampering",
+                "cross_lane": false,
+                "match": false,
+                "rationale": "neither element set contains the other; alter vs alter-in-transit are two actions"
+              },
+              {
+                "reference_index": 10,
+                "threat_id": "T-02",
+                "category": "tampering",
+                "cross_lane": false,
+                "match": false,
+                "rationale": "neither element set contains the other; alter vs alter-in-transit are two actions"
+              },
+              {
+                "reference_index": 10,
+                "threat_id": "T-03",
+                "category": "tampering",
+                "cross_lane": false,
+                "match": false,
+                "rationale": "one element set contains the other; alter vs alter-in-transit are two actions"
+              },
+              {
+                "reference_index": 10,
+                "threat_id": "T-04",
+                "category": "tampering",
+                "cross_lane": false,
+                "match": true,
+                "rationale": "one element set contains the other; alter vs alter is one action"
+              },
+              {
+                "reference_index": 10,
+                "threat_id": "T-05",
+                "category": "tampering",
+                "cross_lane": false,
+                "match": true,
+                "rationale": "one element set contains the other; alter vs alter is one action"
+              },
+              {
+                "reference_index": 11,
+                "threat_id": "S-01",
+                "category": "spoofing",
+                "cross_lane": false,
+                "match": false,
+                "rationale": "neither element set contains the other; use-credential vs impersonate are two actions"
+              },
+              {
+                "reference_index": 11,
+                "threat_id": "S-02",
+                "category": "spoofing",
+                "cross_lane": false,
+                "match": false,
+                "rationale": "neither element set contains the other; use-credential vs impersonate are two actions"
+              },
+              {
+                "reference_index": 11,
+                "threat_id": "S-03",
+                "category": "spoofing",
+                "cross_lane": false,
+                "match": false,
+                "rationale": "neither element set contains the other; use-credential vs use-credential is one action"
+              },
+              {
+                "reference_index": 11,
+                "threat_id": "S-04",
+                "category": "spoofing",
+                "cross_lane": false,
+                "match": false,
+                "rationale": "neither element set contains the other; use-credential vs impersonate are two actions"
+              },
+              {
+                "reference_index": 11,
+                "threat_id": "S-06",
+                "category": "spoofing",
+                "cross_lane": false,
+                "match": false,
+                "rationale": "neither element set contains the other; use-credential vs impersonate are two actions"
+              },
+              {
+                "reference_index": 11,
+                "threat_id": "S-05",
+                "category": "spoofing",
+                "cross_lane": false,
+                "match": false,
+                "rationale": "neither element set contains the other; use-credential vs impersonate are two actions"
+              },
+              {
+                "reference_index": 12,
+                "threat_id": "I-08",
+                "category": "information-disclosure",
+                "cross_lane": false,
+                "match": false,
+                "rationale": "one element set contains the other; intercept vs recover-credential are two actions"
+              },
+              {
+                "reference_index": 12,
+                "threat_id": "I-05",
+                "category": "information-disclosure",
+                "cross_lane": false,
+                "match": false,
+                "rationale": "one element set contains the other; intercept vs read are two actions"
+              },
+              {
+                "reference_index": 12,
+                "threat_id": "I-06",
+                "category": "information-disclosure",
+                "cross_lane": false,
+                "match": false,
+                "rationale": "one element set contains the other; intercept vs read are two actions"
+              },
+              {
+                "reference_index": 12,
+                "threat_id": "I-01",
+                "category": "information-disclosure",
+                "cross_lane": false,
+                "match": false,
+                "rationale": "neither element set contains the other; intercept vs intercept is one action"
+              },
+              {
+                "reference_index": 12,
+                "threat_id": "I-02",
+                "category": "information-disclosure",
+                "cross_lane": false,
+                "match": true,
+                "rationale": "one element set contains the other; intercept vs intercept is one action"
+              },
+              {
+                "reference_index": 12,
+                "threat_id": "I-03",
+                "category": "information-disclosure",
+                "cross_lane": false,
+                "match": true,
+                "rationale": "one element set contains the other; intercept vs intercept is one action"
+              },
+              {
+                "reference_index": 12,
+                "threat_id": "I-04",
+                "category": "information-disclosure",
+                "cross_lane": false,
+                "match": true,
+                "rationale": "one element set contains the other; intercept vs intercept is one action"
+              },
+              {
+                "reference_index": 12,
+                "threat_id": "I-09",
+                "category": "information-disclosure",
+                "cross_lane": false,
+                "match": false,
+                "rationale": "neither element set contains the other; intercept vs elicit are two actions"
+              },
+              {
+                "reference_index": 11,
+                "threat_id": "E-03",
+                "category": "spoofing",
+                "cross_lane": true,
+                "match": false,
+                "rationale": "neither element set contains the other; use-credential vs escalate are two actions"
+              },
+              {
+                "reference_index": 11,
+                "threat_id": "I-08",
+                "category": "spoofing",
+                "cross_lane": true,
+                "match": false,
+                "rationale": "neither element set contains the other; use-credential vs recover-credential are two actions"
+              },
+              {
+                "reference_index": 11,
+                "threat_id": "E-02",
+                "category": "spoofing",
+                "cross_lane": true,
+                "match": false,
+                "rationale": "neither element set contains the other; use-credential vs escalate are two actions"
+              },
+              {
+                "reference_index": 11,
+                "threat_id": "I-06",
+                "category": "spoofing",
+                "cross_lane": true,
+                "match": false,
+                "rationale": "neither element set contains the other; use-credential vs read are two actions"
+              },
+              {
+                "reference_index": 11,
+                "threat_id": "R-02",
+                "category": "spoofing",
+                "cross_lane": true,
+                "match": false,
+                "rationale": "neither element set contains the other; use-credential vs unattributable are two actions"
+              },
+              {
+                "reference_index": 11,
+                "threat_id": "R-03",
+                "category": "spoofing",
+                "cross_lane": true,
+                "match": false,
+                "rationale": "neither element set contains the other; use-credential vs unattributable are two actions"
+              },
+              {
+                "reference_index": 11,
+                "threat_id": "T-02",
+                "category": "spoofing",
+                "cross_lane": true,
+                "match": false,
+                "rationale": "neither element set contains the other; use-credential vs alter-in-transit are two actions"
+              },
+              {
+                "reference_index": 11,
+                "threat_id": "T-03",
+                "category": "spoofing",
+                "cross_lane": true,
+                "match": false,
+                "rationale": "neither element set contains the other; use-credential vs alter-in-transit are two actions"
+              },
+              {
+                "reference_index": 11,
+                "threat_id": "I-03",
+                "category": "spoofing",
+                "cross_lane": true,
+                "match": false,
+                "rationale": "neither element set contains the other; use-credential vs intercept are two actions"
+              },
+              {
+                "reference_index": 11,
+                "threat_id": "I-04",
+                "category": "spoofing",
+                "cross_lane": true,
+                "match": false,
+                "rationale": "neither element set contains the other; use-credential vs intercept are two actions"
+              },
+              {
+                "reference_index": 11,
+                "threat_id": "I-09",
+                "category": "spoofing",
+                "cross_lane": true,
+                "match": false,
+                "rationale": "neither element set contains the other; use-credential vs elicit are two actions"
+              },
+              {
+                "reference_index": 11,
+                "threat_id": "T-05",
+                "category": "spoofing",
+                "cross_lane": true,
+                "match": false,
+                "rationale": "neither element set contains the other; use-credential vs alter are two actions"
+              }
+            ]
+          }
+        ],
+        "exemplar_delta": {
+          "near_coverage": 0.0,
+          "far_coverage": 0.923,
+          "delta": -0.923
+        },
+        "holdout_split": null,
+        "unlisted_for_promotion": [],
+        "critic_yield": [
+          {
+            "case": "16-library-lending-interview",
+            "counts": {
+              "drafts_in": 28,
+              "threats_out": 27,
+              "killed": 1,
+              "rejected_before": 0,
+              "rejected_after": 0,
+              "rejected_killed": 0,
+              "matched_before": 12,
+              "matched_after": 12,
+              "matched_killed": 0,
+              "must_find_before": 5,
+              "must_find_after": 5,
+              "must_find_total": 5,
+              "must_find_killed": 0,
+              "matched_lost": 0,
+              "must_find_lost": 0
+            },
+            "metrics": {
+              "kill_rate": 0.036,
+              "rejected_kill_rate": 0.0,
+              "matched_kill_rate": 0.0,
+              "kill_precision": 0.0
+            },
+            "killed_by_cause": {
+              "lane": {
+                "killed": 1,
+                "matched": 0,
+                "must_find": 0
+              }
+            },
+            "killed": [
+              {
+                "threat_id": "I-07",
+                "category": "information-disclosure",
+                "claim": "The internet-facing API may disclose other members' records through missing object authorization",
+                "disposition": "unvoted",
+                "reference_index": null,
+                "cause": "lane"
+              }
+            ]
+          }
+        ],
+        "critic_yield_aggregate": {
+          "cases": 1,
+          "drafts_in": 28,
+          "threats_out": 27,
+          "killed": 1,
+          "rejected_killed": 0,
+          "matched_killed": 0,
+          "must_find_killed": 0,
+          "matched_lost": 0,
+          "must_find_lost": 0,
+          "kill_rate": 0.036,
+          "rejected_kill_rate": 0.0,
+          "matched_kill_rate": 0.0,
+          "kill_precision": 0.0,
+          "killed_by_cause": {
+            "lane": {
+              "killed": 1,
+              "matched": 0,
+              "must_find": 0
+            }
+          }
+        },
+        "losses": [
+          {
+            "case": "16-library-lending-interview",
+            "proposals_read": true,
+            "by_cause": {
+              "verb": 0,
+              "merged": 0,
+              "misfiled": 0,
+              "critic": 0,
+              "fan-in": 0,
+              "place": 1,
+              "unled": 0
+            },
+            "re_asked_by_cause": {
+              "verb": 0,
+              "merged": 0,
+              "misfiled": 0,
+              "critic": 0,
+              "fan-in": 0,
+              "place": 0,
+              "unled": 0
+            },
+            "displaced_by_cause": {
+              "verb": 0,
+              "merged": 0,
+              "misfiled": 0,
+              "critic": 0,
+              "fan-in": 0,
+              "place": 1,
+              "unled": 0
+            },
+            "assertion_backed": {
+              "resting": 0,
+              "matched": 0,
+              "must_find": 0
+            },
+            "losses": [
+              {
+                "reference_index": 11,
+                "lane": "spoofing",
+                "must_find": false,
+                "cause": "place",
+                "reference_verb": "use-credential",
+                "draft_id": null,
+                "draft_verb": null,
+                "place_relation": null,
+                "re_ask": [],
+                "displaced_draft_id": "S-01",
+                "displaced_standing": null,
+                "proposal_title": null,
+                "fan_in_effect": null,
+                "fan_in_reasons": []
+              }
+            ]
+          }
+        ],
+        "losses_aggregate": {
+          "cases": 1,
+          "proposals_read": 1,
+          "losses": 1,
+          "fan_in_by_effect": {
+            "removed": 0,
+            "narrowed": 0
+          },
+          "by_cause": {
+            "verb": 0,
+            "merged": 0,
+            "misfiled": 0,
+            "critic": 0,
+            "fan-in": 0,
+            "place": 1,
+            "unled": 0
+          },
+          "must_find_by_cause": {
+            "verb": 0,
+            "merged": 0,
+            "misfiled": 0,
+            "critic": 0,
+            "fan-in": 0,
+            "place": 0,
+            "unled": 0
+          },
+          "re_asked_by_cause": {
+            "verb": 0,
+            "merged": 0,
+            "misfiled": 0,
+            "critic": 0,
+            "fan-in": 0,
+            "place": 0,
+            "unled": 0
+          },
+          "re_asked": 0,
+          "displaced_by_cause": {
+            "verb": 0,
+            "merged": 0,
+            "misfiled": 0,
+            "critic": 0,
+            "fan-in": 0,
+            "place": 1,
+            "unled": 0
+          },
+          "displaced": 1,
+          "assertion_backed": {
+            "resting": 0,
+            "matched": 0,
+            "must_find": 0
+          },
+          "displaced_standing": {
+            "matched": 1
+          },
+          "displaced_standing_must_find": {
+            "matched": 0
+          },
+          "by_re_ask_kind": {},
+          "verb_by_relation": {
+            "equal": 0,
+            "reference-contains": 0,
+            "draft-contains": 0,
+            "overlap": 0
+          },
+          "verb_must_find_by_relation": {
+            "equal": 0,
+            "reference-contains": 0,
+            "draft-contains": 0,
+            "overlap": 0
+          },
+          "verb_pairs": []
+        },
+        "writing": [
+          {
+            "case": "16-library-lending-interview",
+            "framework": "stride",
+            "produced": 27,
+            "answered": 0,
+            "objections": 0,
+            "carried": 0,
+            "objection_rate": 0.0,
+            "by_reason": {}
+          }
+        ],
+        "writing_aggregate": {
+          "answered": 0,
+          "objections": 0,
+          "carried": 0,
+          "objection_rate": 0.0,
+          "by_framework": {
+            "stride": {
+              "produced": 27,
+              "answered": 0,
+              "objections": 0,
+              "carried": 0
+            }
+          },
+          "by_reason": {}
+        }
+      }
+    }
+  },
+  "completion": {
+    "attempted": 1,
+    "scored": 1,
+    "failed": 0,
+    "stopped_before": 0
+  },
+  "attribute_aggregate": null,
+  "grounds": [
+    {
+      "case": "16-library-lending-interview",
+      "framework": "stride",
+      "counts": {
+        "threats": 28,
+        "grounds": 83,
+        "quoteless_threats": 14,
+        "unverified_quotes": 2,
+        "repaired_quotes": 1,
+        "dropped_claims": 0,
+        "quote": 24,
+        "unknown-attribute": 35,
+        "absent-attribute": 0,
+        "derived-fact": 24,
+        "assertion": 0
+      },
+      "metrics": {
+        "grounds_per_threat": 2.964,
+        "quoteless_rate": 0.5,
+        "unverified_rate": 0.083,
+        "repaired_rate": 0.042,
+        "dropped_rate": 0.0
+      },
+      "threats": [
+        {
+          "threat_id": "S-01",
+          "framework": "stride",
+          "lane": "spoofing",
+          "total": 2,
+          "kinds": [
+            "derived-fact",
+            "unknown-attribute"
+          ],
+          "unverified": [],
+          "repaired": []
+        },
+        {
+          "threat_id": "S-02",
+          "framework": "stride",
+          "lane": "spoofing",
+          "total": 2,
+          "kinds": [
+            "derived-fact",
+            "unknown-attribute"
+          ],
+          "unverified": [],
+          "repaired": []
+        },
+        {
+          "threat_id": "S-03",
+          "framework": "stride",
+          "lane": "spoofing",
+          "total": 2,
+          "kinds": [
+            "quote",
+            "derived-fact"
+          ],
+          "unverified": [],
+          "repaired": []
+        },
+        {
+          "threat_id": "S-04",
+          "framework": "stride",
+          "lane": "spoofing",
+          "total": 3,
+          "kinds": [
+            "derived-fact",
+            "unknown-attribute",
+            "unknown-attribute"
+          ],
+          "unverified": [],
+          "repaired": []
+        },
+        {
+          "threat_id": "S-05",
+          "framework": "stride",
+          "lane": "spoofing",
+          "total": 3,
+          "kinds": [
+            "derived-fact",
+            "unknown-attribute",
+            "unknown-attribute"
+          ],
+          "unverified": [],
+          "repaired": []
+        },
+        {
+          "threat_id": "S-06",
+          "framework": "stride",
+          "lane": "spoofing",
+          "total": 3,
+          "kinds": [
+            "derived-fact",
+            "unknown-attribute",
+            "unknown-attribute"
+          ],
+          "unverified": [],
+          "repaired": []
+        },
+        {
+          "threat_id": "T-01",
+          "framework": "stride",
+          "lane": "tampering",
+          "total": 3,
+          "kinds": [
+            "derived-fact",
+            "unknown-attribute",
+            "unknown-attribute"
+          ],
+          "unverified": [],
+          "repaired": []
+        },
+        {
+          "threat_id": "T-02",
+          "framework": "stride",
+          "lane": "tampering",
+          "total": 3,
+          "kinds": [
+            "derived-fact",
+            "unknown-attribute",
+            "unknown-attribute"
+          ],
+          "unverified": [],
+          "repaired": []
+        },
+        {
+          "threat_id": "T-03",
+          "framework": "stride",
+          "lane": "tampering",
+          "total": 3,
+          "kinds": [
+            "derived-fact",
+            "unknown-attribute",
+            "unknown-attribute"
+          ],
+          "unverified": [],
+          "repaired": []
+        },
+        {
+          "threat_id": "T-04",
+          "framework": "stride",
+          "lane": "tampering",
+          "total": 3,
+          "kinds": [
+            "quote",
+            "unknown-attribute",
+            "unknown-attribute"
+          ],
+          "unverified": [],
+          "repaired": []
+        },
+        {
+          "threat_id": "T-05",
+          "framework": "stride",
+          "lane": "tampering",
+          "total": 2,
+          "kinds": [
+            "quote",
+            "unknown-attribute"
+          ],
+          "unverified": [],
+          "repaired": []
+        },
+        {
+          "threat_id": "R-01",
+          "framework": "stride",
+          "lane": "repudiation",
+          "total": 4,
+          "kinds": [
+            "quote",
+            "quote",
+            "derived-fact",
+            "unknown-attribute"
+          ],
+          "unverified": [],
+          "repaired": []
+        },
+        {
+          "threat_id": "R-02",
+          "framework": "stride",
+          "lane": "repudiation",
+          "total": 2,
+          "kinds": [
+            "derived-fact",
+            "unknown-attribute"
+          ],
+          "unverified": [],
+          "repaired": []
+        },
+        {
+          "threat_id": "R-03",
+          "framework": "stride",
+          "lane": "repudiation",
+          "total": 2,
+          "kinds": [
+            "quote",
+            "unknown-attribute"
+          ],
+          "unverified": [],
+          "repaired": []
+        },
+        {
+          "threat_id": "R-04",
+          "framework": "stride",
+          "lane": "repudiation",
+          "total": 4,
+          "kinds": [
+            "quote",
+            "quote",
+            "quote",
+            "derived-fact"
+          ],
+          "unverified": [],
+          "repaired": []
+        },
+        {
+          "threat_id": "I-01",
+          "framework": "stride",
+          "lane": "information-disclosure",
+          "total": 3,
+          "kinds": [
+            "unknown-attribute",
+            "unknown-attribute",
+            "derived-fact"
+          ],
+          "unverified": [],
+          "repaired": []
+        },
+        {
+          "threat_id": "I-02",
+          "framework": "stride",
+          "lane": "information-disclosure",
+          "total": 3,
+          "kinds": [
+            "unknown-attribute",
+            "unknown-attribute",
+            "derived-fact"
+          ],
+          "unverified": [],
+          "repaired": []
+        },
+        {
+          "threat_id": "I-03",
+          "framework": "stride",
+          "lane": "information-disclosure",
+          "total": 3,
+          "kinds": [
+            "unknown-attribute",
+            "unknown-attribute",
+            "derived-fact"
+          ],
+          "unverified": [],
+          "repaired": []
+        },
+        {
+          "threat_id": "I-04",
+          "framework": "stride",
+          "lane": "information-disclosure",
+          "total": 2,
+          "kinds": [
+            "unknown-attribute",
+            "unknown-attribute"
+          ],
+          "unverified": [],
+          "repaired": []
+        },
+        {
+          "threat_id": "I-05",
+          "framework": "stride",
+          "lane": "information-disclosure",
+          "total": 1,
+          "kinds": [
+            "unknown-attribute"
+          ],
+          "unverified": [],
+          "repaired": []
+        },
+        {
+          "threat_id": "I-06",
+          "framework": "stride",
+          "lane": "information-disclosure",
+          "total": 3,
+          "kinds": [
+            "quote",
+            "quote",
+            "unknown-attribute"
+          ],
+          "unverified": [
+            0
+          ],
+          "repaired": []
+        },
+        {
+          "threat_id": "I-07",
+          "framework": "stride",
+          "lane": "information-disclosure",
+          "total": 3,
+          "kinds": [
+            "quote",
+            "unknown-attribute",
+            "derived-fact"
+          ],
+          "unverified": [
+            0
+          ],
+          "repaired": []
+        },
+        {
+          "threat_id": "I-08",
+          "framework": "stride",
+          "lane": "information-disclosure",
+          "total": 2,
+          "kinds": [
+            "quote",
+            "derived-fact"
+          ],
+          "unverified": [],
+          "repaired": []
+        },
+        {
+          "threat_id": "I-09",
+          "framework": "stride",
+          "lane": "information-disclosure",
+          "total": 2,
+          "kinds": [
+            "quote",
+            "derived-fact"
+          ],
+          "unverified": [],
+          "repaired": []
+        },
+        {
+          "threat_id": "D-01",
+          "framework": "stride",
+          "lane": "denial-of-service",
+          "total": 10,
+          "kinds": [
+            "quote",
+            "quote",
+            "quote",
+            "quote",
+            "quote",
+            "derived-fact",
+            "derived-fact",
+            "derived-fact",
+            "unknown-attribute",
+            "unknown-attribute"
+          ],
+          "unverified": [],
+          "repaired": []
+        },
+        {
+          "threat_id": "E-01",
+          "framework": "stride",
+          "lane": "elevation-of-privilege",
+          "total": 4,
+          "kinds": [
+            "quote",
+            "quote",
+            "unknown-attribute",
+            "derived-fact"
+          ],
+          "unverified": [],
+          "repaired": []
+        },
+        {
+          "threat_id": "E-02",
+          "framework": "stride",
+          "lane": "elevation-of-privilege",
+          "total": 3,
+          "kinds": [
+            "quote",
+            "unknown-attribute",
+            "derived-fact"
+          ],
+          "unverified": [],
+          "repaired": []
+        },
+        {
+          "threat_id": "E-03",
+          "framework": "stride",
+          "lane": "elevation-of-privilege",
+          "total": 3,
+          "kinds": [
+            "quote",
+            "quote",
+            "derived-fact"
+          ],
+          "unverified": [],
+          "repaired": [
+            0
+          ]
+        }
+      ],
+      "dropped": []
+    }
+  ],
+  "grounds_failures": [],
+  "grounds_aggregate": {
+    "cases": 1,
+    "threats": 28,
+    "grounds": 83,
+    "quoteless_threats": 14,
+    "unverified_quotes": 2,
+    "repaired_quotes": 1,
+    "dropped_claims": 0,
+    "quote": 24,
+    "unknown-attribute": 35,
+    "absent-attribute": 0,
+    "derived-fact": 24,
+    "assertion": 0,
+    "grounds_per_threat": 2.964,
+    "quoteless_rate": 0.5,
+    "unverified_rate": 0.083,
+    "repaired_rate": 0.042,
+    "dropped_rate": 0.0,
+    "failed_cases": 0
+  },
+  "coverage": [
+    {
+      "framework": "stride",
+      "lane": "spoofing",
+      "cases": 1,
+      "drafts": 6,
+      "rules": 5,
+      "rules_fired": 1,
+      "rules_fired_rate": 0.2,
+      "candidates": 2,
+      "candidates_cited": 2,
+      "elements": 12,
+      "elements_cited": 10,
+      "boundary_crossings": 3,
+      "boundary_crossings_cited": 3,
+      "unknown_controls": 9,
+      "unknown_controls_cited": 5,
+      "cited_rates": {
+        "candidates_cited": 1.0,
+        "elements_cited": 0.833,
+        "boundary_crossings_cited": 1.0,
+        "unknown_controls_cited": 0.556
+      }
+    },
+    {
+      "framework": "stride",
+      "lane": "tampering",
+      "cases": 1,
+      "drafts": 5,
+      "rules": 4,
+      "rules_fired": 2,
+      "rules_fired_rate": 0.5,
+      "candidates": 4,
+      "candidates_cited": 1,
+      "elements": 12,
+      "elements_cited": 9,
+      "boundary_crossings": 3,
+      "boundary_crossings_cited": 3,
+      "unknown_controls": 9,
+      "unknown_controls_cited": 5,
+      "cited_rates": {
+        "candidates_cited": 0.25,
+        "elements_cited": 0.75,
+        "boundary_crossings_cited": 1.0,
+        "unknown_controls_cited": 0.556
+      }
+    },
+    {
+      "framework": "stride",
+      "lane": "repudiation",
+      "cases": 1,
+      "drafts": 4,
+      "rules": 3,
+      "rules_fired": 1,
+      "rules_fired_rate": 0.333,
+      "candidates": 3,
+      "candidates_cited": 3,
+      "elements": 12,
+      "elements_cited": 12,
+      "boundary_crossings": 3,
+      "boundary_crossings_cited": 3,
+      "unknown_controls": 9,
+      "unknown_controls_cited": 3,
+      "cited_rates": {
+        "candidates_cited": 1.0,
+        "elements_cited": 1.0,
+        "boundary_crossings_cited": 1.0,
+        "unknown_controls_cited": 0.333
+      }
+    },
+    {
+      "framework": "stride",
+      "lane": "information-disclosure",
+      "cases": 1,
+      "drafts": 9,
+      "rules": 4,
+      "rules_fired": 3,
+      "rules_fired_rate": 0.75,
+      "candidates": 6,
+      "candidates_cited": 6,
+      "elements": 12,
+      "elements_cited": 12,
+      "boundary_crossings": 3,
+      "boundary_crossings_cited": 3,
+      "unknown_controls": 9,
+      "unknown_controls_cited": 7,
+      "cited_rates": {
+        "candidates_cited": 1.0,
+        "elements_cited": 1.0,
+        "boundary_crossings_cited": 1.0,
+        "unknown_controls_cited": 0.778
+      }
+    },
+    {
+      "framework": "stride",
+      "lane": "denial-of-service",
+      "cases": 1,
+      "drafts": 1,
+      "rules": 2,
+      "rules_fired": 2,
+      "rules_fired_rate": 1.0,
+      "candidates": 2,
+      "candidates_cited": 1,
+      "elements": 12,
+      "elements_cited": 7,
+      "boundary_crossings": 3,
+      "boundary_crossings_cited": 3,
+      "unknown_controls": 9,
+      "unknown_controls_cited": 2,
+      "cited_rates": {
+        "candidates_cited": 0.5,
+        "elements_cited": 0.583,
+        "boundary_crossings_cited": 1.0,
+        "unknown_controls_cited": 0.222
+      }
+    },
+    {
+      "framework": "stride",
+      "lane": "elevation-of-privilege",
+      "cases": 1,
+      "drafts": 3,
+      "rules": 2,
+      "rules_fired": 0,
+      "rules_fired_rate": 0.0,
+      "candidates": 0,
+      "candidates_cited": 0,
+      "elements": 12,
+      "elements_cited": 9,
+      "boundary_crossings": 3,
+      "boundary_crossings_cited": 3,
+      "unknown_controls": 9,
+      "unknown_controls_cited": 2,
+      "cited_rates": {
+        "candidates_cited": 0.0,
+        "elements_cited": 0.75,
+        "boundary_crossings_cited": 1.0,
+        "unknown_controls_cited": 0.222
+      }
+    }
+  ],
+  "coverage_totals": {
+    "cases": 1,
+    "drafts": 28,
+    "rules_fired": 9,
+    "rules": 20,
+    "candidates": 17,
+    "candidates_cited": 13,
+    "elements": 72,
+    "elements_cited": 59,
+    "boundary_crossings": 18,
+    "boundary_crossings_cited": 18,
+    "unknown_controls": 54,
+    "unknown_controls_cited": 24,
+    "cited_rates": {
+      "candidates_cited": 0.765,
+      "elements_cited": 0.819,
+      "boundary_crossings_cited": 1.0,
+      "unknown_controls_cited": 0.444
+    }
+  },
+  "filler": {
+    "stride": {
+      "claims": 28,
+      "pointers": 34,
+      "ineligible_pointers": 0,
+      "ineligible_share": 0.0,
+      "modal_grounds": "derived-fact+unknown-attribute",
+      "modal_grounds_share": 0.4286
+    }
+  },
+  "instruction": [
+    {
+      "framework": "stride",
+      "node": "analyze_stride_denial_of_service",
+      "tokens": 10087,
+      "sha256": "eac1607906ae88f6e1ade9699ae021de9888221fc920523a8b0d8d841b026e81"
+    },
+    {
+      "framework": "stride",
+      "node": "analyze_stride_elevation_of_privilege",
+      "tokens": 10451,
+      "sha256": "edbb0119b4ba26c01e406a65c92ebf36b4dd469de777a99c3f3375187ef5bf2a"
+    },
+    {
+      "framework": "stride",
+      "node": "analyze_stride_information_disclosure",
+      "tokens": 9998,
+      "sha256": "8f2a7fd7884143a6a06b8c22417ad05c53c463e588cca4d5da56c2aeefbe2582"
+    },
+    {
+      "framework": "stride",
+      "node": "analyze_stride_repudiation",
+      "tokens": 11034,
+      "sha256": "7424143a1c1bf01fdeb17443ebcdcad7075c544593be1e469d772e7b9664640b"
+    },
+    {
+      "framework": "stride",
+      "node": "analyze_stride_spoofing",
+      "tokens": 10396,
+      "sha256": "bb41e06023985b80b3de58c9407121326352baf7ff349a4f481c18dbae2b5d4b"
+    },
+    {
+      "framework": "stride",
+      "node": "analyze_stride_tampering",
+      "tokens": 10270,
+      "sha256": "af80c15386e53a92b3c766ff807270b26525252bed05573a14f3c81c9b429b27"
+    },
+    {
+      "framework": "stride",
+      "node": "critic_stride",
+      "tokens": 6310,
+      "sha256": "139e5289315ab100c91dcf3e2a468562c3ddec0c9f0368a94e8bcfe9dd06887f"
+    },
+    {
+      "framework": "stride",
+      "node": "recritic_stride",
+      "tokens": 4687,
+      "sha256": "f495efb3183d6ef03b98cd16a0c5499bb4461f1efefe7efa0e60e14053cfa654"
+    }
+  ],
+  "instruction_totals": {
+    "stride": {
+      "nodes": 8,
+      "tokens": 73233,
+      "largest": 11034
+    }
+  },
+  "applicability": [],
+  "applicability_aggregate": null,
+  "applicability_exemplar_delta": null,
+  "applicability_holdout_split": null,
+  "over_applied_for_promotion": [],
+  "disposition": [],
+  "disposition_aggregate": null,
+  "applicability_yield": [],
+  "applicability_yield_aggregate": null,
+  "attribution": [],
+  "attribution_aggregate": null,
+  "scores": [
+    {
+      "case": "16-library-lending-interview",
+      "exemplar_proximity": "far",
+      "holdout": false,
+      "counts": {
+        "produced": 27,
+        "references": 13,
+        "matched": 12,
+        "missed": 1,
+        "must_find_total": 5,
+        "must_find_matched": 5,
+        "foreign": 0,
+        "eligible": 15,
+        "reviewed": 0,
+        "lane_errors": 0,
+        "rejected": 0,
+        "pooled": 0,
+        "open": 0,
+        "unvoted": 15,
+        "stale": 0
+      },
+      "metrics": {
+        "must_find_coverage": 1.0,
+        "expected_coverage": 0.875,
+        "reference_coverage": 0.923,
+        "lane_accuracy": 1.0,
+        "element_agreement": 1.0,
+        "element_jaccard": 0.565,
+        "rejected_rate": 0.0,
+        "rejected_rate_of_reviewed": 0.0,
+        "severity_exact_rate": 0.167
+      },
+      "severity_confusion": {
+        "high->critical": 3,
+        "high->high": 1,
+        "low->critical": 1,
+        "low->high": 1,
+        "low->medium": 1,
+        "medium->high": 4,
+        "medium->medium": 1
+      },
+      "matched": [
+        {
+          "reference_index": 0,
+          "threat_id": "S-01",
+          "tier": "must-find",
+          "element_overlap": true,
+          "element_jaccard": 0.667,
+          "reference_level": "medium",
+          "produced_level": "high",
+          "likelihood_agrees": true,
+          "impact_agrees": false
+        },
+        {
+          "reference_index": 1,
+          "threat_id": "S-02",
+          "tier": "expected",
+          "element_overlap": true,
+          "element_jaccard": 0.667,
+          "reference_level": "medium",
+          "produced_level": "high",
+          "likelihood_agrees": true,
+          "impact_agrees": false
+        },
+        {
+          "reference_index": 2,
+          "threat_id": "S-03",
+          "tier": "expected",
+          "element_overlap": true,
+          "element_jaccard": 0.667,
+          "reference_level": "medium",
+          "produced_level": "high",
+          "likelihood_agrees": true,
+          "impact_agrees": false
+        },
+        {
+          "reference_index": 3,
+          "threat_id": "T-01",
+          "tier": "expected",
+          "element_overlap": true,
+          "element_jaccard": 0.5,
+          "reference_level": "low",
+          "produced_level": "high",
+          "likelihood_agrees": false,
+          "impact_agrees": false
+        },
+        {
+          "reference_index": 4,
+          "threat_id": "R-04",
+          "tier": "must-find",
+          "element_overlap": true,
+          "element_jaccard": 0.667,
+          "reference_level": "high",
+          "produced_level": "critical",
+          "likelihood_agrees": true,
+          "impact_agrees": false
+        },
+        {
+          "reference_index": 5,
+          "threat_id": "R-01",
+          "tier": "expected",
+          "element_overlap": true,
+          "element_jaccard": 0.667,
+          "reference_level": "low",
+          "produced_level": "critical",
+          "likelihood_agrees": false,
+          "impact_agrees": false
+        },
+        {
+          "reference_index": 6,
+          "threat_id": "I-05",
+          "tier": "expected",
+          "element_overlap": true,
+          "element_jaccard": 1.0,
+          "reference_level": "medium",
+          "produced_level": "high",
+          "likelihood_agrees": false,
+          "impact_agrees": true
+        },
+        {
+          "reference_index": 7,
+          "threat_id": "I-01",
+          "tier": "expected",
+          "element_overlap": true,
+          "element_jaccard": 0.333,
+          "reference_level": "medium",
+          "produced_level": "medium",
+          "likelihood_agrees": true,
+          "impact_agrees": true
+        },
+        {
+          "reference_index": 8,
+          "threat_id": "D-01",
+          "tier": "must-find",
+          "element_overlap": true,
+          "element_jaccard": 0.5,
+          "reference_level": "high",
+          "produced_level": "critical",
+          "likelihood_agrees": true,
+          "impact_agrees": false
+        },
+        {
+          "reference_index": 9,
+          "threat_id": "E-01",
+          "tier": "must-find",
+          "element_overlap": true,
+          "element_jaccard": 0.667,
+          "reference_level": "high",
+          "produced_level": "critical",
+          "likelihood_agrees": false,
+          "impact_agrees": true
+        },
+        {
+          "reference_index": 10,
+          "threat_id": "T-04",
+          "tier": "must-find",
+          "element_overlap": true,
+          "element_jaccard": 0.25,
+          "reference_level": "high",
+          "produced_level": "high",
+          "likelihood_agrees": true,
+          "impact_agrees": true
+        },
+        {
+          "reference_index": 12,
+          "threat_id": "I-02",
+          "tier": "expected",
+          "element_overlap": true,
+          "element_jaccard": 0.2,
+          "reference_level": "low",
+          "produced_level": "medium",
+          "likelihood_agrees": false,
+          "impact_agrees": true
+        }
+      ],
+      "missed": [
+        11
+      ],
+      "lane_errors": [],
+      "unlisted": [
+        {
+          "threat_id": "E-03",
+          "category": "elevation-of-privilege",
+          "claim": "The shared desk credential lets a branch-network attacker gain circulation authority",
+          "fingerprint": "v6:39adc780bb95c056",
+          "standing": "unvoted"
+        },
+        {
+          "threat_id": "I-08",
+          "category": "information-disclosure",
+          "claim": "The shared desk password can be recovered from the branch workspace",
+          "fingerprint": "v6:e37ee2ff68f97414",
+          "standing": "unvoted"
+        },
+        {
+          "threat_id": "E-02",
+          "category": "elevation-of-privilege",
+          "claim": "A branch-network attacker may use the kiosk path to act on member loans",
+          "fingerprint": "v6:6735d5c00c961dae",
+          "standing": "unvoted"
+        },
+        {
+          "threat_id": "I-06",
+          "category": "information-disclosure",
+          "claim": "A compromised lending API may read the full member and loan corpus",
+          "fingerprint": "v6:9c5b2d4c77fd2841",
+          "standing": "unvoted"
+        },
+        {
+          "threat_id": "R-02",
+          "category": "repudiation",
+          "claim": "A kiosk transaction may be deniable because the submitting kiosk is not identified",
+          "fingerprint": "v6:fd275e7ef819462b",
+          "standing": "unvoted"
+        },
+        {
+          "threat_id": "R-03",
+          "category": "repudiation",
+          "claim": "Database writes may lose the originating actor behind the lending API",
+          "fingerprint": "v6:cba4857c762d220c",
+          "standing": "unvoted"
+        },
+        {
+          "threat_id": "T-02",
+          "category": "tampering",
+          "claim": "On-path alteration of kiosk loan and return messages",
+          "fingerprint": "v6:b18cce213659a909",
+          "standing": "unvoted"
+        },
+        {
+          "threat_id": "T-03",
+          "category": "tampering",
+          "claim": "On-path alteration of desk circulation changes",
+          "fingerprint": "v6:8db22fedaf6f7fa1",
+          "standing": "unvoted"
+        },
+        {
+          "threat_id": "I-03",
+          "category": "information-disclosure",
+          "claim": "Desk circulation traffic may expose account and loan activity",
+          "fingerprint": "v6:41eb18fca57e77e4",
+          "standing": "unvoted"
+        },
+        {
+          "threat_id": "I-04",
+          "category": "information-disclosure",
+          "claim": "The API-to-database connection may expose the loans corpus to a local observer",
+          "fingerprint": "v6:51ca07410024853d",
+          "standing": "unvoted"
+        },
+        {
+          "threat_id": "I-09",
+          "category": "information-disclosure",
+          "claim": "API error handling may elicit internal details from internet callers",
+          "fingerprint": "v6:93f62721b3d7fb1a",
+          "standing": "unvoted"
+        },
+        {
+          "threat_id": "S-04",
+          "category": "spoofing",
+          "claim": "An on-path attacker may impersonate the lending API to a member",
+          "fingerprint": "v6:9c78d0a74ddfb21d",
+          "standing": "unvoted"
+        },
+        {
+          "threat_id": "S-06",
+          "category": "spoofing",
+          "claim": "A branch-network attacker may impersonate the lending API to desk staff",
+          "fingerprint": "v6:fbbcf52a55917835",
+          "standing": "unvoted"
+        },
+        {
+          "threat_id": "T-05",
+          "category": "tampering",
+          "claim": "Offline tampering of the confidential loans database",
+          "fingerprint": "v6:0b649dd4d37dd049",
+          "standing": "unvoted"
+        },
+        {
+          "threat_id": "S-05",
+          "category": "spoofing",
+          "claim": "A branch-network attacker may impersonate the lending API to a kiosk",
+          "fingerprint": "v6:43611ef59e949638",
+          "standing": "unvoted"
+        }
+      ],
+      "foreign": [],
+      "rulings": [
+        {
+          "reference_index": 0,
+          "threat_id": "S-01",
+          "category": "spoofing",
+          "cross_lane": false,
+          "match": true,
+          "rationale": "one element set contains the other; impersonate vs impersonate is one action"
+        },
+        {
+          "reference_index": 0,
+          "threat_id": "S-02",
+          "category": "spoofing",
+          "cross_lane": false,
+          "match": false,
+          "rationale": "neither element set contains the other; impersonate vs impersonate is one action"
+        },
+        {
+          "reference_index": 0,
+          "threat_id": "S-03",
+          "category": "spoofing",
+          "cross_lane": false,
+          "match": false,
+          "rationale": "neither element set contains the other; impersonate vs use-credential are two actions"
+        },
+        {
+          "reference_index": 0,
+          "threat_id": "S-04",
+          "category": "spoofing",
+          "cross_lane": false,
+          "match": true,
+          "rationale": "one element set contains the other; impersonate vs impersonate is one action"
+        },
+        {
+          "reference_index": 0,
+          "threat_id": "S-06",
+          "category": "spoofing",
+          "cross_lane": false,
+          "match": false,
+          "rationale": "neither element set contains the other; impersonate vs impersonate is one action"
+        },
+        {
+          "reference_index": 0,
+          "threat_id": "S-05",
+          "category": "spoofing",
+          "cross_lane": false,
+          "match": false,
+          "rationale": "neither element set contains the other; impersonate vs impersonate is one action"
+        },
+        {
+          "reference_index": 1,
+          "threat_id": "S-01",
+          "category": "spoofing",
+          "cross_lane": false,
+          "match": false,
+          "rationale": "neither element set contains the other; impersonate vs impersonate is one action"
+        },
+        {
+          "reference_index": 1,
+          "threat_id": "S-02",
+          "category": "spoofing",
+          "cross_lane": false,
+          "match": true,
+          "rationale": "one element set contains the other; impersonate vs impersonate is one action"
+        },
+        {
+          "reference_index": 1,
+          "threat_id": "S-03",
+          "category": "spoofing",
+          "cross_lane": false,
+          "match": false,
+          "rationale": "neither element set contains the other; impersonate vs use-credential are two actions"
+        },
+        {
+          "reference_index": 1,
+          "threat_id": "S-04",
+          "category": "spoofing",
+          "cross_lane": false,
+          "match": false,
+          "rationale": "neither element set contains the other; impersonate vs impersonate is one action"
+        },
+        {
+          "reference_index": 1,
+          "threat_id": "S-06",
+          "category": "spoofing",
+          "cross_lane": false,
+          "match": false,
+          "rationale": "neither element set contains the other; impersonate vs impersonate is one action"
+        },
+        {
+          "reference_index": 1,
+          "threat_id": "S-05",
+          "category": "spoofing",
+          "cross_lane": false,
+          "match": true,
+          "rationale": "one element set contains the other; impersonate vs impersonate is one action"
+        },
+        {
+          "reference_index": 2,
+          "threat_id": "S-01",
+          "category": "spoofing",
+          "cross_lane": false,
+          "match": false,
+          "rationale": "neither element set contains the other; use-credential vs impersonate are two actions"
+        },
+        {
+          "reference_index": 2,
+          "threat_id": "S-02",
+          "category": "spoofing",
+          "cross_lane": false,
+          "match": false,
+          "rationale": "neither element set contains the other; use-credential vs impersonate are two actions"
+        },
+        {
+          "reference_index": 2,
+          "threat_id": "S-03",
+          "category": "spoofing",
+          "cross_lane": false,
+          "match": true,
+          "rationale": "one element set contains the other; use-credential vs use-credential is one action"
+        },
+        {
+          "reference_index": 2,
+          "threat_id": "S-04",
+          "category": "spoofing",
+          "cross_lane": false,
+          "match": false,
+          "rationale": "neither element set contains the other; use-credential vs impersonate are two actions"
+        },
+        {
+          "reference_index": 2,
+          "threat_id": "S-06",
+          "category": "spoofing",
+          "cross_lane": false,
+          "match": false,
+          "rationale": "one element set contains the other; use-credential vs impersonate are two actions"
+        },
+        {
+          "reference_index": 2,
+          "threat_id": "S-05",
+          "category": "spoofing",
+          "cross_lane": false,
+          "match": false,
+          "rationale": "neither element set contains the other; use-credential vs impersonate are two actions"
+        },
+        {
+          "reference_index": 3,
+          "threat_id": "T-01",
+          "category": "tampering",
+          "cross_lane": false,
+          "match": true,
+          "rationale": "one element set contains the other; alter-in-transit vs alter-in-transit is one action"
+        },
+        {
+          "reference_index": 3,
+          "threat_id": "T-02",
+          "category": "tampering",
+          "cross_lane": false,
+          "match": false,
+          "rationale": "neither element set contains the other; alter-in-transit vs alter-in-transit is one action"
+        },
+        {
+          "reference_index": 3,
+          "threat_id": "T-03",
+          "category": "tampering",
+          "cross_lane": false,
+          "match": false,
+          "rationale": "neither element set contains the other; alter-in-transit vs alter-in-transit is one action"
+        },
+        {
+          "reference_index": 3,
+          "threat_id": "T-04",
+          "category": "tampering",
+          "cross_lane": false,
+          "match": false,
+          "rationale": "neither element set contains the other; alter-in-transit vs alter are two actions"
+        },
+        {
+          "reference_index": 3,
+          "threat_id": "T-05",
+          "category": "tampering",
+          "cross_lane": false,
+          "match": false,
+          "rationale": "neither element set contains the other; alter-in-transit vs alter are two actions"
+        },
+        {
+          "reference_index": 4,
+          "threat_id": "R-01",
+          "category": "repudiation",
+          "cross_lane": false,
+          "match": false,
+          "rationale": "neither element set contains the other; unattributable vs unattributable is one action"
+        },
+        {
+          "reference_index": 4,
+          "threat_id": "R-04",
+          "category": "repudiation",
+          "cross_lane": false,
+          "match": true,
+          "rationale": "one element set contains the other; unattributable vs unattributable is one action"
+        },
+        {
+          "reference_index": 4,
+          "threat_id": "R-02",
+          "category": "repudiation",
+          "cross_lane": false,
+          "match": false,
+          "rationale": "neither element set contains the other; unattributable vs unattributable is one action"
+        },
+        {
+          "reference_index": 4,
+          "threat_id": "R-03",
+          "category": "repudiation",
+          "cross_lane": false,
+          "match": false,
+          "rationale": "neither element set contains the other; unattributable vs unattributable is one action"
+        },
+        {
+          "reference_index": 5,
+          "threat_id": "R-01",
+          "category": "repudiation",
+          "cross_lane": false,
+          "match": true,
+          "rationale": "one element set contains the other; unattributable vs unattributable is one action"
+        },
+        {
+          "reference_index": 5,
+          "threat_id": "R-04",
+          "category": "repudiation",
+          "cross_lane": false,
+          "match": false,
+          "rationale": "neither element set contains the other; unattributable vs unattributable is one action"
+        },
+        {
+          "reference_index": 5,
+          "threat_id": "R-02",
+          "category": "repudiation",
+          "cross_lane": false,
+          "match": false,
+          "rationale": "neither element set contains the other; unattributable vs unattributable is one action"
+        },
+        {
+          "reference_index": 5,
+          "threat_id": "R-03",
+          "category": "repudiation",
+          "cross_lane": false,
+          "match": false,
+          "rationale": "neither element set contains the other; unattributable vs unattributable is one action"
+        },
+        {
+          "reference_index": 6,
+          "threat_id": "I-08",
+          "category": "information-disclosure",
+          "cross_lane": false,
+          "match": false,
+          "rationale": "neither element set contains the other; read vs recover-credential are two actions"
+        },
+        {
+          "reference_index": 6,
+          "threat_id": "I-05",
+          "category": "information-disclosure",
+          "cross_lane": false,
+          "match": true,
+          "rationale": "one element set contains the other; read vs read is one action"
+        },
+        {
+          "reference_index": 6,
+          "threat_id": "I-06",
+          "category": "information-disclosure",
+          "cross_lane": false,
+          "match": true,
+          "rationale": "one element set contains the other; read vs read is one action"
+        },
+        {
+          "reference_index": 6,
+          "threat_id": "I-01",
+          "category": "information-disclosure",
+          "cross_lane": false,
+          "match": false,
+          "rationale": "neither element set contains the other; read vs intercept are two actions"
+        },
+        {
+          "reference_index": 6,
+          "threat_id": "I-02",
+          "category": "information-disclosure",
+          "cross_lane": false,
+          "match": false,
+          "rationale": "neither element set contains the other; read vs intercept are two actions"
+        },
+        {
+          "reference_index": 6,
+          "threat_id": "I-03",
+          "category": "information-disclosure",
+          "cross_lane": false,
+          "match": false,
+          "rationale": "neither element set contains the other; read vs intercept are two actions"
+        },
+        {
+          "reference_index": 6,
+          "threat_id": "I-04",
+          "category": "information-disclosure",
+          "cross_lane": false,
+          "match": false,
+          "rationale": "one element set contains the other; read vs intercept are two actions"
+        },
+        {
+          "reference_index": 6,
+          "threat_id": "I-09",
+          "category": "information-disclosure",
+          "cross_lane": false,
+          "match": false,
+          "rationale": "neither element set contains the other; read vs elicit are two actions"
+        },
+        {
+          "reference_index": 7,
+          "threat_id": "I-08",
+          "category": "information-disclosure",
+          "cross_lane": false,
+          "match": false,
+          "rationale": "neither element set contains the other; intercept vs recover-credential are two actions"
+        },
+        {
+          "reference_index": 7,
+          "threat_id": "I-05",
+          "category": "information-disclosure",
+          "cross_lane": false,
+          "match": false,
+          "rationale": "neither element set contains the other; intercept vs read are two actions"
+        },
+        {
+          "reference_index": 7,
+          "threat_id": "I-06",
+          "category": "information-disclosure",
+          "cross_lane": false,
+          "match": false,
+          "rationale": "neither element set contains the other; intercept vs read are two actions"
+        },
+        {
+          "reference_index": 7,
+          "threat_id": "I-01",
+          "category": "information-disclosure",
+          "cross_lane": false,
+          "match": true,
+          "rationale": "one element set contains the other; intercept vs intercept is one action"
+        },
+        {
+          "reference_index": 7,
+          "threat_id": "I-02",
+          "category": "information-disclosure",
+          "cross_lane": false,
+          "match": false,
+          "rationale": "neither element set contains the other; intercept vs intercept is one action"
+        },
+        {
+          "reference_index": 7,
+          "threat_id": "I-03",
+          "category": "information-disclosure",
+          "cross_lane": false,
+          "match": false,
+          "rationale": "neither element set contains the other; intercept vs intercept is one action"
+        },
+        {
+          "reference_index": 7,
+          "threat_id": "I-04",
+          "category": "information-disclosure",
+          "cross_lane": false,
+          "match": false,
+          "rationale": "neither element set contains the other; intercept vs intercept is one action"
+        },
+        {
+          "reference_index": 7,
+          "threat_id": "I-09",
+          "category": "information-disclosure",
+          "cross_lane": false,
+          "match": false,
+          "rationale": "one element set contains the other; intercept vs elicit are two actions"
+        },
+        {
+          "reference_index": 8,
+          "threat_id": "D-01",
+          "category": "denial-of-service",
+          "cross_lane": false,
+          "match": true,
+          "rationale": "one element set contains the other; flood vs flood is one action"
+        },
+        {
+          "reference_index": 9,
+          "threat_id": "E-01",
+          "category": "elevation-of-privilege",
+          "cross_lane": false,
+          "match": true,
+          "rationale": "one element set contains the other; escalate vs escalate is one action"
+        },
+        {
+          "reference_index": 9,
+          "threat_id": "E-03",
+          "category": "elevation-of-privilege",
+          "cross_lane": false,
+          "match": false,
+          "rationale": "neither element set contains the other; escalate vs escalate is one action"
+        },
+        {
+          "reference_index": 9,
+          "threat_id": "E-02",
+          "category": "elevation-of-privilege",
+          "cross_lane": false,
+          "match": false,
+          "rationale": "neither element set contains the other; escalate vs escalate is one action"
+        },
+        {
+          "reference_index": 10,
+          "threat_id": "T-01",
+          "category": "tampering",
+          "cross_lane": false,
+          "match": false,
+          "rationale": "neither element set contains the other; alter vs alter-in-transit are two actions"
+        },
+        {
+          "reference_index": 10,
+          "threat_id": "T-02",
+          "category": "tampering",
+          "cross_lane": false,
+          "match": false,
+          "rationale": "neither element set contains the other; alter vs alter-in-transit are two actions"
+        },
+        {
+          "reference_index": 10,
+          "threat_id": "T-03",
+          "category": "tampering",
+          "cross_lane": false,
+          "match": false,
+          "rationale": "one element set contains the other; alter vs alter-in-transit are two actions"
+        },
+        {
+          "reference_index": 10,
+          "threat_id": "T-04",
+          "category": "tampering",
+          "cross_lane": false,
+          "match": true,
+          "rationale": "one element set contains the other; alter vs alter is one action"
+        },
+        {
+          "reference_index": 10,
+          "threat_id": "T-05",
+          "category": "tampering",
+          "cross_lane": false,
+          "match": true,
+          "rationale": "one element set contains the other; alter vs alter is one action"
+        },
+        {
+          "reference_index": 11,
+          "threat_id": "S-01",
+          "category": "spoofing",
+          "cross_lane": false,
+          "match": false,
+          "rationale": "neither element set contains the other; use-credential vs impersonate are two actions"
+        },
+        {
+          "reference_index": 11,
+          "threat_id": "S-02",
+          "category": "spoofing",
+          "cross_lane": false,
+          "match": false,
+          "rationale": "neither element set contains the other; use-credential vs impersonate are two actions"
+        },
+        {
+          "reference_index": 11,
+          "threat_id": "S-03",
+          "category": "spoofing",
+          "cross_lane": false,
+          "match": false,
+          "rationale": "neither element set contains the other; use-credential vs use-credential is one action"
+        },
+        {
+          "reference_index": 11,
+          "threat_id": "S-04",
+          "category": "spoofing",
+          "cross_lane": false,
+          "match": false,
+          "rationale": "neither element set contains the other; use-credential vs impersonate are two actions"
+        },
+        {
+          "reference_index": 11,
+          "threat_id": "S-06",
+          "category": "spoofing",
+          "cross_lane": false,
+          "match": false,
+          "rationale": "neither element set contains the other; use-credential vs impersonate are two actions"
+        },
+        {
+          "reference_index": 11,
+          "threat_id": "S-05",
+          "category": "spoofing",
+          "cross_lane": false,
+          "match": false,
+          "rationale": "neither element set contains the other; use-credential vs impersonate are two actions"
+        },
+        {
+          "reference_index": 12,
+          "threat_id": "I-08",
+          "category": "information-disclosure",
+          "cross_lane": false,
+          "match": false,
+          "rationale": "one element set contains the other; intercept vs recover-credential are two actions"
+        },
+        {
+          "reference_index": 12,
+          "threat_id": "I-05",
+          "category": "information-disclosure",
+          "cross_lane": false,
+          "match": false,
+          "rationale": "one element set contains the other; intercept vs read are two actions"
+        },
+        {
+          "reference_index": 12,
+          "threat_id": "I-06",
+          "category": "information-disclosure",
+          "cross_lane": false,
+          "match": false,
+          "rationale": "one element set contains the other; intercept vs read are two actions"
+        },
+        {
+          "reference_index": 12,
+          "threat_id": "I-01",
+          "category": "information-disclosure",
+          "cross_lane": false,
+          "match": false,
+          "rationale": "neither element set contains the other; intercept vs intercept is one action"
+        },
+        {
+          "reference_index": 12,
+          "threat_id": "I-02",
+          "category": "information-disclosure",
+          "cross_lane": false,
+          "match": true,
+          "rationale": "one element set contains the other; intercept vs intercept is one action"
+        },
+        {
+          "reference_index": 12,
+          "threat_id": "I-03",
+          "category": "information-disclosure",
+          "cross_lane": false,
+          "match": true,
+          "rationale": "one element set contains the other; intercept vs intercept is one action"
+        },
+        {
+          "reference_index": 12,
+          "threat_id": "I-04",
+          "category": "information-disclosure",
+          "cross_lane": false,
+          "match": true,
+          "rationale": "one element set contains the other; intercept vs intercept is one action"
+        },
+        {
+          "reference_index": 12,
+          "threat_id": "I-09",
+          "category": "information-disclosure",
+          "cross_lane": false,
+          "match": false,
+          "rationale": "neither element set contains the other; intercept vs elicit are two actions"
+        },
+        {
+          "reference_index": 11,
+          "threat_id": "E-03",
+          "category": "spoofing",
+          "cross_lane": true,
+          "match": false,
+          "rationale": "neither element set contains the other; use-credential vs escalate are two actions"
+        },
+        {
+          "reference_index": 11,
+          "threat_id": "I-08",
+          "category": "spoofing",
+          "cross_lane": true,
+          "match": false,
+          "rationale": "neither element set contains the other; use-credential vs recover-credential are two actions"
+        },
+        {
+          "reference_index": 11,
+          "threat_id": "E-02",
+          "category": "spoofing",
+          "cross_lane": true,
+          "match": false,
+          "rationale": "neither element set contains the other; use-credential vs escalate are two actions"
+        },
+        {
+          "reference_index": 11,
+          "threat_id": "I-06",
+          "category": "spoofing",
+          "cross_lane": true,
+          "match": false,
+          "rationale": "neither element set contains the other; use-credential vs read are two actions"
+        },
+        {
+          "reference_index": 11,
+          "threat_id": "R-02",
+          "category": "spoofing",
+          "cross_lane": true,
+          "match": false,
+          "rationale": "neither element set contains the other; use-credential vs unattributable are two actions"
+        },
+        {
+          "reference_index": 11,
+          "threat_id": "R-03",
+          "category": "spoofing",
+          "cross_lane": true,
+          "match": false,
+          "rationale": "neither element set contains the other; use-credential vs unattributable are two actions"
+        },
+        {
+          "reference_index": 11,
+          "threat_id": "T-02",
+          "category": "spoofing",
+          "cross_lane": true,
+          "match": false,
+          "rationale": "neither element set contains the other; use-credential vs alter-in-transit are two actions"
+        },
+        {
+          "reference_index": 11,
+          "threat_id": "T-03",
+          "category": "spoofing",
+          "cross_lane": true,
+          "match": false,
+          "rationale": "neither element set contains the other; use-credential vs alter-in-transit are two actions"
+        },
+        {
+          "reference_index": 11,
+          "threat_id": "I-03",
+          "category": "spoofing",
+          "cross_lane": true,
+          "match": false,
+          "rationale": "neither element set contains the other; use-credential vs intercept are two actions"
+        },
+        {
+          "reference_index": 11,
+          "threat_id": "I-04",
+          "category": "spoofing",
+          "cross_lane": true,
+          "match": false,
+          "rationale": "neither element set contains the other; use-credential vs intercept are two actions"
+        },
+        {
+          "reference_index": 11,
+          "threat_id": "I-09",
+          "category": "spoofing",
+          "cross_lane": true,
+          "match": false,
+          "rationale": "neither element set contains the other; use-credential vs elicit are two actions"
+        },
+        {
+          "reference_index": 11,
+          "threat_id": "T-05",
+          "category": "spoofing",
+          "cross_lane": true,
+          "match": false,
+          "rationale": "neither element set contains the other; use-credential vs alter are two actions"
+        }
+      ]
+    }
+  ],
+  "exemplar_delta": {
+    "near_coverage": 0.0,
+    "far_coverage": 0.923,
+    "delta": -0.923
+  },
+  "holdout_split": null,
+  "unlisted_for_promotion": [],
+  "critic_yield": [
+    {
+      "case": "16-library-lending-interview",
+      "counts": {
+        "drafts_in": 28,
+        "threats_out": 27,
+        "killed": 1,
+        "rejected_before": 0,
+        "rejected_after": 0,
+        "rejected_killed": 0,
+        "matched_before": 12,
+        "matched_after": 12,
+        "matched_killed": 0,
+        "must_find_before": 5,
+        "must_find_after": 5,
+        "must_find_total": 5,
+        "must_find_killed": 0,
+        "matched_lost": 0,
+        "must_find_lost": 0
+      },
+      "metrics": {
+        "kill_rate": 0.036,
+        "rejected_kill_rate": 0.0,
+        "matched_kill_rate": 0.0,
+        "kill_precision": 0.0
+      },
+      "killed_by_cause": {
+        "lane": {
+          "killed": 1,
+          "matched": 0,
+          "must_find": 0
+        }
+      },
+      "killed": [
+        {
+          "threat_id": "I-07",
+          "category": "information-disclosure",
+          "claim": "The internet-facing API may disclose other members' records through missing object authorization",
+          "disposition": "unvoted",
+          "reference_index": null,
+          "cause": "lane"
+        }
+      ]
+    }
+  ],
+  "critic_yield_aggregate": {
+    "cases": 1,
+    "drafts_in": 28,
+    "threats_out": 27,
+    "killed": 1,
+    "rejected_killed": 0,
+    "matched_killed": 0,
+    "must_find_killed": 0,
+    "matched_lost": 0,
+    "must_find_lost": 0,
+    "kill_rate": 0.036,
+    "rejected_kill_rate": 0.0,
+    "matched_kill_rate": 0.0,
+    "kill_precision": 0.0,
+    "killed_by_cause": {
+      "lane": {
+        "killed": 1,
+        "matched": 0,
+        "must_find": 0
+      }
+    }
+  },
+  "losses": [
+    {
+      "case": "16-library-lending-interview",
+      "proposals_read": true,
+      "by_cause": {
+        "verb": 0,
+        "merged": 0,
+        "misfiled": 0,
+        "critic": 0,
+        "fan-in": 0,
+        "place": 1,
+        "unled": 0
+      },
+      "re_asked_by_cause": {
+        "verb": 0,
+        "merged": 0,
+        "misfiled": 0,
+        "critic": 0,
+        "fan-in": 0,
+        "place": 0,
+        "unled": 0
+      },
+      "displaced_by_cause": {
+        "verb": 0,
+        "merged": 0,
+        "misfiled": 0,
+        "critic": 0,
+        "fan-in": 0,
+        "place": 1,
+        "unled": 0
+      },
+      "assertion_backed": {
+        "resting": 0,
+        "matched": 0,
+        "must_find": 0
+      },
+      "losses": [
+        {
+          "reference_index": 11,
+          "lane": "spoofing",
+          "must_find": false,
+          "cause": "place",
+          "reference_verb": "use-credential",
+          "draft_id": null,
+          "draft_verb": null,
+          "place_relation": null,
+          "re_ask": [],
+          "displaced_draft_id": "S-01",
+          "displaced_standing": null,
+          "proposal_title": null,
+          "fan_in_effect": null,
+          "fan_in_reasons": []
+        }
+      ]
+    }
+  ],
+  "losses_aggregate": {
+    "cases": 1,
+    "proposals_read": 1,
+    "losses": 1,
+    "fan_in_by_effect": {
+      "removed": 0,
+      "narrowed": 0
+    },
+    "by_cause": {
+      "verb": 0,
+      "merged": 0,
+      "misfiled": 0,
+      "critic": 0,
+      "fan-in": 0,
+      "place": 1,
+      "unled": 0
+    },
+    "must_find_by_cause": {
+      "verb": 0,
+      "merged": 0,
+      "misfiled": 0,
+      "critic": 0,
+      "fan-in": 0,
+      "place": 0,
+      "unled": 0
+    },
+    "re_asked_by_cause": {
+      "verb": 0,
+      "merged": 0,
+      "misfiled": 0,
+      "critic": 0,
+      "fan-in": 0,
+      "place": 0,
+      "unled": 0
+    },
+    "re_asked": 0,
+    "displaced_by_cause": {
+      "verb": 0,
+      "merged": 0,
+      "misfiled": 0,
+      "critic": 0,
+      "fan-in": 0,
+      "place": 1,
+      "unled": 0
+    },
+    "displaced": 1,
+    "assertion_backed": {
+      "resting": 0,
+      "matched": 0,
+      "must_find": 0
+    },
+    "displaced_standing": {
+      "matched": 1
+    },
+    "displaced_standing_must_find": {
+      "matched": 0
+    },
+    "by_re_ask_kind": {},
+    "verb_by_relation": {
+      "equal": 0,
+      "reference-contains": 0,
+      "draft-contains": 0,
+      "overlap": 0
+    },
+    "verb_must_find_by_relation": {
+      "equal": 0,
+      "reference-contains": 0,
+      "draft-contains": 0,
+      "overlap": 0
+    },
+    "verb_pairs": []
+  },
+  "writing": [
+    {
+      "case": "16-library-lending-interview",
+      "framework": "stride",
+      "produced": 27,
+      "answered": 0,
+      "objections": 0,
+      "carried": 0,
+      "objection_rate": 0.0,
+      "by_reason": {}
+    }
+  ],
+  "writing_aggregate": {
+    "answered": 0,
+    "objections": 0,
+    "carried": 0,
+    "objection_rate": 0.0,
+    "by_framework": {
+      "stride": {
+        "produced": 27,
+        "answered": 0,
+        "objections": 0,
+        "carried": 0
+      }
+    },
+    "by_reason": {}
+  }
+}

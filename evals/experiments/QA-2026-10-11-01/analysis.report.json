@@ -1,0 +1,3280 @@
+{
+  "schema_version": "3.0",
+  "disclaimer": "AI-generated security analysis. Not reviewed by a human security analyst.",
+  "job": {
+    "id": "eval-16-library-lending-interview",
+    "status": "completed",
+    "created_at": "2026-10-10T17:06:39.129963Z",
+    "completed_at": "2026-10-10T17:06:39.129963Z",
+    "revise_rounds": 1,
+    "frameworks": [
+      {
+        "name": "stride",
+        "options": {}
+      }
+    ]
+  },
+  "input": {
+    "system_name": "A library lending service, from a written note and a later interview that contradicts it",
+    "sources": [
+      {
+        "kind": "description",
+        "label": "Lending service note",
+        "sha256": "8bc51704b4514584c02f95f04048086a70f43a3dbb2c40af53afe13b3f79e6a9"
+      },
+      {
+        "kind": "transcript",
+        "label": "Interview transcript",
+        "sha256": "c48f8b9e53090b42971ffb548ed2302d0021a8c2b8539552973211c21df3f765"
+      }
+    ],
+    "source_sha256": "d084a9d7e77ec50c1662c495072e511258f765e4f5d6de64f8fa40b33f7e6b5a"
+  },
+  "nodes": [
+    {
+      "node": "prepare",
+      "model": null,
+      "requested_model": null,
+      "instruction_sha256": null,
+      "execution_fingerprint": null,
+      "duration_ms": 12,
+      "usage": null,
+      "attempts": 1,
+      "reasks": 0,
+      "schema_path": null,
+      "schema_fallback": null,
+      "reported_charge_usd": null,
+      "served_upstream": null,
+      "served_trust": null
+    },
+    {
+      "node": "analyze_stride_repudiation",
+      "model": "openrouter/openai/gpt-5.6-luna-pro",
+      "requested_model": "openrouter/openai/gpt-5.6-luna-pro",
+      "instruction_sha256": "6a59f7bd1a336696d092cbb2f249103900cfc6f1a442547e0343514eea67b43e",
+      "execution_fingerprint": "d4c0563792f71247616a2b2e39be3ee3df854630401401128fef0b61662a5d4a",
+      "duration_ms": 38756,
+      "usage": {
+        "prompt_tokens": 87925,
+        "cached_prompt_tokens": 15140,
+        "cache_write_tokens": 0,
+        "completion_tokens": 9166,
+        "reasoning_tokens": 3320,
+        "total_tokens": 97091
+      },
+      "attempts": 1,
+      "reasks": 0,
+      "schema_path": "native",
+      "schema_fallback": null,
+      "reported_charge_usd": 0.0129295,
+      "served_upstream": "OpenAI",
+      "served_trust": "requested_echo"
+    },
+    {
+      "node": "analyze_stride_denial_of_service",
+      "model": "openrouter/openai/gpt-5.6-luna-pro",
+      "requested_model": "openrouter/openai/gpt-5.6-luna-pro",
+      "instruction_sha256": "6a59f7bd1a336696d092cbb2f249103900cfc6f1a442547e0343514eea67b43e",
+      "execution_fingerprint": "d4c0563792f71247616a2b2e39be3ee3df854630401401128fef0b61662a5d4a",
+      "duration_ms": 41779,
+      "usage": {
+        "prompt_tokens": 85950,
+        "cached_prompt_tokens": 13770,
+        "cache_write_tokens": 0,
+        "completion_tokens": 8736,
+        "reasoning_tokens": 5141,
+        "total_tokens": 94686
+      },
+      "attempts": 1,
+      "reasks": 0,
+      "schema_path": "native",
+      "schema_fallback": null,
+      "reported_charge_usd": 0.0125973,
+      "served_upstream": "OpenAI",
+      "served_trust": "requested_echo"
+    },
+    {
+      "node": "analyze_stride_tampering",
+      "model": "openrouter/openai/gpt-5.6-luna-pro",
+      "requested_model": "openrouter/openai/gpt-5.6-luna-pro",
+      "instruction_sha256": "6a59f7bd1a336696d092cbb2f249103900cfc6f1a442547e0343514eea67b43e",
+      "execution_fingerprint": "d4c0563792f71247616a2b2e39be3ee3df854630401401128fef0b61662a5d4a",
+      "duration_ms": 48543,
+      "usage": {
+        "prompt_tokens": 91148,
+        "cached_prompt_tokens": 13530,
+        "cache_write_tokens": 6765,
+        "completion_tokens": 11519,
+        "reasoning_tokens": 5020,
+        "total_tokens": 102667
+      },
+      "attempts": 1,
+      "reasks": 0,
+      "schema_path": "native",
+      "schema_fallback": null,
+      "reported_charge_usd": 0.014977625,
+      "served_upstream": "OpenAI",
+      "served_trust": "requested_echo"
+    },
+    {
+      "node": "analyze_stride_spoofing",
+      "model": "openrouter/openai/gpt-5.6-luna-pro",
+      "requested_model": "openrouter/openai/gpt-5.6-luna-pro",
+      "instruction_sha256": "6a59f7bd1a336696d092cbb2f249103900cfc6f1a442547e0343514eea67b43e",
+      "execution_fingerprint": "d4c0563792f71247616a2b2e39be3ee3df854630401401128fef0b61662a5d4a",
+      "duration_ms": 53182,
+      "usage": {
+        "prompt_tokens": 91471,
+        "cached_prompt_tokens": 13502,
+        "cache_write_tokens": 0,
+        "completion_tokens": 13196,
+        "reasoning_tokens": 5108,
+        "total_tokens": 104667
+      },
+      "attempts": 1,
+      "reasks": 0,
+      "schema_path": "native",
+      "schema_fallback": null,
+      "reported_charge_usd": 0.01584952,
+      "served_upstream": "OpenAI",
+      "served_trust": "requested_echo"
+    },
+    {
+      "node": "analyze_stride_elevation_of_privilege",
+      "model": "openrouter/openai/gpt-5.6-luna-pro",
+      "requested_model": "openrouter/openai/gpt-5.6-luna-pro",
+      "instruction_sha256": "6a59f7bd1a336696d092cbb2f249103900cfc6f1a442547e0343514eea67b43e",
+      "execution_fingerprint": "d4c0563792f71247616a2b2e39be3ee3df854630401401128fef0b61662a5d4a",
+      "duration_ms": 57871,
+      "usage": {
+        "prompt_tokens": 85110,
+        "cached_prompt_tokens": 13822,
+        "cache_write_tokens": 0,
+        "completion_tokens": 13306,
+        "reasoning_tokens": 7561,
+        "total_tokens": 98416
+      },
+      "attempts": 1,
+      "reasks": 0,
+      "schema_path": "native",
+      "schema_fallback": null,
+      "reported_charge_usd": 0.01525062,
+      "served_upstream": "OpenAI",
+      "served_trust": "requested_echo"
+    },
+    {
+      "node": "analyze_stride_information_disclosure",
+      "model": "openrouter/openai/gpt-5.6-luna-pro",
+      "requested_model": "openrouter/openai/gpt-5.6-luna-pro",
+      "instruction_sha256": "6a59f7bd1a336696d092cbb2f249103900cfc6f1a442547e0343514eea67b43e",
+      "execution_fingerprint": "d4c0563792f71247616a2b2e39be3ee3df854630401401128fef0b61662a5d4a",
+      "duration_ms": 63198,
+      "usage": {
+        "prompt_tokens": 92161,
+        "cached_prompt_tokens": 13490,
+        "cache_write_tokens": 0,
+        "completion_tokens": 14485,
+        "reasoning_tokens": 5345,
+        "total_tokens": 106646
+      },
+      "attempts": 1,
+      "reasks": 0,
+      "schema_path": "native",
+      "schema_fallback": null,
+      "reported_charge_usd": 0.016693,
+      "served_upstream": "OpenAI",
+      "served_trust": "requested_echo"
+    },
+    {
+      "node": "join_stride",
+      "model": null,
+      "requested_model": null,
+      "instruction_sha256": null,
+      "execution_fingerprint": null,
+      "duration_ms": 1,
+      "usage": null,
+      "attempts": 1,
+      "reasks": 0,
+      "schema_path": null,
+      "schema_fallback": null,
+      "reported_charge_usd": null,
+      "served_upstream": null,
+      "served_trust": null
+    },
+    {
+      "node": "merge_stride",
+      "model": null,
+      "requested_model": null,
+      "instruction_sha256": null,
+      "execution_fingerprint": null,
+      "duration_ms": 100,
+      "usage": null,
+      "attempts": 1,
+      "reasks": 0,
+      "schema_path": null,
+      "schema_fallback": null,
+      "reported_charge_usd": null,
+      "served_upstream": null,
+      "served_trust": null
+    },
+    {
+      "node": "critic_stride",
+      "model": "openrouter/openai/gpt-5.6-luna-pro",
+      "requested_model": "openrouter/openai/gpt-5.6-luna-pro",
+      "instruction_sha256": "6a59f7bd1a336696d092cbb2f249103900cfc6f1a442547e0343514eea67b43e",
+      "execution_fingerprint": "d4c0563792f71247616a2b2e39be3ee3df854630401401128fef0b61662a5d4a",
+      "duration_ms": 51358,
+      "usage": {
+        "prompt_tokens": 128527,
+        "cached_prompt_tokens": 10164,
+        "cache_write_tokens": 5082,
+        "completion_tokens": 15953,
+        "reasoning_tokens": 4440,
+        "total_tokens": 144480
+      },
+      "attempts": 1,
+      "reasks": 0,
+      "schema_path": "native",
+      "schema_fallback": null,
+      "reported_charge_usd": 0.02163679,
+      "served_upstream": "OpenAI",
+      "served_trust": "requested_echo"
+    },
+    {
+      "node": "router_stride",
+      "model": null,
+      "requested_model": null,
+      "instruction_sha256": null,
+      "execution_fingerprint": null,
+      "duration_ms": 4,
+      "usage": null,
+      "attempts": 1,
+      "reasks": 0,
+      "schema_path": null,
+      "schema_fallback": null,
+      "reported_charge_usd": null,
+      "served_upstream": null,
+      "served_trust": null
+    },
+    {
+      "node": "recritic_stride",
+      "model": "openrouter/openai/gpt-5.6-luna-pro",
+      "requested_model": "openrouter/openai/gpt-5.6-luna-pro",
+      "instruction_sha256": "6a59f7bd1a336696d092cbb2f249103900cfc6f1a442547e0343514eea67b43e",
+      "execution_fingerprint": "d4c0563792f71247616a2b2e39be3ee3df854630401401128fef0b61662a5d4a",
+      "duration_ms": 6622,
+      "usage": {
+        "prompt_tokens": 67006,
+        "cached_prompt_tokens": 9758,
+        "cache_write_tokens": 4879,
+        "completion_tokens": 1102,
+        "reasoning_tokens": 566,
+        "total_tokens": 68108
+      },
+      "attempts": 1,
+      "reasks": 0,
+      "schema_path": "native",
+      "schema_fallback": null,
+      "reported_charge_usd": 0.006605555,
+      "served_upstream": "OpenAI",
+      "served_trust": "requested_echo"
+    },
+    {
+      "node": "rereview_stride",
+      "model": null,
+      "requested_model": null,
+      "instruction_sha256": null,
+      "execution_fingerprint": null,
+      "duration_ms": 3,
+      "usage": null,
+      "attempts": 1,
+      "reasks": 0,
+      "schema_path": null,
+      "schema_fallback": null,
+      "reported_charge_usd": null,
+      "served_upstream": null,
+      "served_trust": null
+    },
+    {
+      "node": "assemble",
+      "model": null,
+      "requested_model": null,
+      "instruction_sha256": null,
+      "execution_fingerprint": null,
+      "duration_ms": 5,
+      "usage": null,
+      "attempts": 1,
+      "reasks": 0,
+      "schema_path": null,
+      "schema_fallback": null,
+      "reported_charge_usd": null,
+      "served_upstream": null,
+      "served_trust": null
+    }
+  ],
+  "sampling": {
+    "base": {
+      "temperature": null,
+      "top_p": null,
+      "seed": null,
+      "max_output_tokens": 16384,
+      "candidate_count": 1,
+      "presence_penalty": null,
+      "frequency_penalty": null,
+      "thinking": null,
+      "constrain_output": true,
+      "structured_output": "auto"
+    },
+    "strong": {
+      "temperature": null,
+      "top_p": null,
+      "seed": null,
+      "max_output_tokens": 64000,
+      "candidate_count": 1,
+      "presence_penalty": null,
+      "frequency_penalty": null,
+      "thinking": null,
+      "constrain_output": true,
+      "structured_output": "auto"
+    },
+    "review": {
+      "temperature": null,
+      "top_p": null,
+      "seed": null,
+      "max_output_tokens": 64000,
+      "candidate_count": 1,
+      "presence_penalty": null,
+      "frequency_penalty": null,
+      "thinking": null,
+      "constrain_output": true,
+      "structured_output": "auto"
+    }
+  },
+  "system_model": {
+    "external_entities": [
+      {
+        "id": "entity:member",
+        "name": "member",
+        "description": "A library member who borrows, renews and reserves books through the library app on their phone, and scans their card and books at a branch kiosk.",
+        "assets": [
+          "pii"
+        ],
+        "source_excerpt": "Members borrow, renew and reserve books through the library app on their phones.",
+        "source_label": "Lending service note",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "human",
+        "trust_zone": "boundary:internet"
+      },
+      {
+        "id": "entity:desk-staff",
+        "name": "desk staff",
+        "description": "Staff at a branch desk who extend loans, clear blocks on member accounts and mark books as returned by hand through the circulation page.",
+        "assets": [],
+        "source_excerpt": "Desk staff work on the branch network.",
+        "source_label": "Lending service note",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "human",
+        "trust_zone": "boundary:branch-network"
+      }
+    ],
+    "processes": [
+      {
+        "id": "process:lending-api",
+        "name": "lending API",
+        "description": "The one service that reads and changes loans and reservations, with no queue in front of it. It also serves the circulation page desk staff use.",
+        "assets": [
+          "pii",
+          "business-critical-data"
+        ],
+        "source_excerpt": "The lending API is a plain REST service and it is the only way anything touches loans.",
+        "source_label": "Lending service note",
+        "source_speaker": "",
+        "notes": "The transcript corrects the note on exposure. Lending service note: \"The lending API is internal-only.\" Interview transcript, Dan quotes that line and Priya answers: \"That is one of the wrong bits. The phones talk straight to the lending API over the internet. We opened it up last year when the app moved off the council's old portal, and nobody updated the note because nobody owns the note.\" The note describes the service before that change, so exposure is internet-facing. Neither source states which operations a call from the internet can reach. Priya on load: \"the API is one service with no queue in front of it\"; it went down twice last summer on the reading challenge launch day.",
+        "technology": "a plain REST service, JSON in and JSON out",
+        "trust_zone": "boundary:council-data-centre",
+        "exposure": "internet-facing",
+        "interface_kind": "web"
+      },
+      {
+        "id": "process:self-service-kiosk",
+        "name": "self-service kiosk",
+        "description": "A kiosk in every branch where a member scans their library card and the books they borrow or return. It sends each loan and each return to the lending API.",
+        "assets": [
+          "pii",
+          "business-critical-data"
+        ],
+        "source_excerpt": "Every branch has self-service kiosks where a member scans their library card and the books they are borrowing or returning.",
+        "source_label": "Lending service note",
+        "source_speaker": "",
+        "notes": "What else the kiosks talk to was asked and not answered. Dan asked: \"Do the kiosks still write straight into the loans database, the way the old ones did?\" Priya: \"The kiosks are Dev's team's area. I couldn't tell you what they talk to these days.\" A question states no fact, so the model holds no kiosk-to-database flow.",
+        "technology": "unknown",
+        "trust_zone": "boundary:branch-network",
+        "exposure": "unknown",
+        "interface_kind": "unknown"
+      }
+    ],
+    "data_stores": [
+      {
+        "id": "store:loans-database",
+        "name": "loans database",
+        "description": "Holds members, loans and reservations: names, email addresses, home addresses and every member's full borrowing history. The old reservations database was merged into it.",
+        "assets": [
+          "pii",
+          "business-critical-data"
+        ],
+        "source_excerpt": "Names, email addresses, home addresses and every member's full borrowing history live in the loans database.",
+        "source_label": "Interview transcript",
+        "source_speaker": "Priya",
+        "notes": "Priya corrected herself in one turn: \"It writes to the two databases— actually, no. We merged those in the spring. It's one loans database now.\" The later statement stands, so the model holds one database.",
+        "technology": "unknown",
+        "trust_zone": "boundary:council-data-centre",
+        "data_classification": "confidential",
+        "encryption_at_rest": "unknown"
+      }
+    ],
+    "data_flows": [
+      {
+        "id": "flow:entity:member>process:lending-api>borrow-renew-and-reserve",
+        "name": "borrow, renew and reserve",
+        "description": "The library app on the member's phone names a book and a member; the lending API checks the loan rules and writes the change, or puts the member in the queue for a title.",
+        "assets": [
+          "pii",
+          "business-critical-data"
+        ],
+        "source_excerpt": "The app on their phone calls the lending API.",
+        "source_label": "Interview transcript",
+        "source_speaker": "Priya",
+        "notes": "Authentication was asked about and answered with a hedge, so it stays unknown. Priya: \"I think it checks a token the app gets at sign-in, but I'd have to look.\" and \"Honestly I could not tell you today what it accepts, or what it does with a call it does not like.\"",
+        "source": "entity:member",
+        "destination": "process:lending-api",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "which book and which member, for loans, renewals and reservations",
+        "encryption_in_transit": "unknown",
+        "operations": "read-write"
+      },
+      {
+        "id": "flow:process:self-service-kiosk>process:lending-api>record-loans-and-returns",
+        "name": "record loans and returns",
+        "description": "Each loan and each return is sent to the lending API as it is scanned at the kiosk.",
+        "assets": [
+          "pii",
+          "business-critical-data"
+        ],
+        "source_excerpt": "The kiosks send each loan and each return to the lending API.",
+        "source_label": "Lending service note",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:self-service-kiosk",
+        "destination": "process:lending-api",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "the scanned library card and the books borrowed or returned",
+        "encryption_in_transit": "unknown",
+        "operations": "write"
+      },
+      {
+        "id": "flow:entity:desk-staff>process:lending-api>change-loans-by-hand",
+        "name": "change loans by hand",
+        "description": "A member of desk staff opens the circulation page and extends a loan, clears a block on an account or marks a book as returned.",
+        "assets": [
+          "credentials",
+          "business-critical-data"
+        ],
+        "source_excerpt": "Everyone at the desk uses the same shared login for the circulation page.",
+        "source_label": "Interview transcript",
+        "source_speaker": "Priya",
+        "notes": "Priya: \"You can tell it was the desk. You cannot tell who, or even which branch.\" The history records only that the loan was closed by hand.",
+        "source": "entity:desk-staff",
+        "destination": "process:lending-api",
+        "protocol": "unknown",
+        "authentication": "password authentication using one login shared by all desk staff in every branch; the password is on a card taped under the desk",
+        "data_description": "loan extensions, cleared account blocks and loans closed by hand",
+        "encryption_in_transit": "unknown",
+        "operations": "read-write"
+      },
+      {
+        "id": "flow:process:lending-api>store:loans-database>read-and-write-loans",
+        "name": "read and write loans",
+        "description": "The lending API reads and writes members, loans and reservations; it is the only thing that touches the database.",
+        "assets": [
+          "pii",
+          "business-critical-data"
+        ],
+        "source_excerpt": "The API is the only thing that reads or writes it.",
+        "source_label": "Interview transcript",
+        "source_speaker": "Priya",
+        "notes": "",
+        "source": "process:lending-api",
+        "destination": "store:loans-database",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "members, loans, reservations and borrowing history",
+        "encryption_in_transit": "unknown",
+        "operations": "read-write"
+      }
+    ],
+    "trust_boundaries": [
+      {
+        "id": "boundary:internet",
+        "name": "internet",
+        "description": "Where members' phones reach the lending API from.",
+        "assets": [],
+        "source_excerpt": "The phones talk straight to the lending API over the internet.",
+        "source_label": "Interview transcript",
+        "source_speaker": "Priya",
+        "notes": "",
+        "kind": "network"
+      },
+      {
+        "id": "boundary:branch-network",
+        "name": "branch network",
+        "description": "The network in each branch that the kiosks and desk staff are on.",
+        "assets": [],
+        "source_excerpt": "The kiosks sit on the branch network.",
+        "source_label": "Lending service note",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "network"
+      },
+      {
+        "id": "boundary:council-data-centre",
+        "name": "council data centre",
+        "description": "Where the lending API and the loans database run.",
+        "assets": [],
+        "source_excerpt": "The lending API and the loans database run in the council data centre.",
+        "source_label": "Lending service note",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "network"
+      }
+    ],
+    "assumptions": [
+      {
+        "assumption": "Members are placed on the internet because the schema requires a zone.",
+        "element_id": "entity:member",
+        "attribute": "trust_zone",
+        "basis": "Their phones reach the lending API over the internet; neither source states where members are."
+      }
+    ],
+    "capabilities": []
+  },
+  "boundary_crossings": [
+    {
+      "flow_id": "flow:entity:member>process:lending-api>borrow-renew-and-reserve",
+      "source_zone": "boundary:internet",
+      "destination_zone": "boundary:council-data-centre",
+      "decided": true,
+      "assumed_endpoints": [
+        "entity:member"
+      ]
+    },
+    {
+      "flow_id": "flow:process:self-service-kiosk>process:lending-api>record-loans-and-returns",
+      "source_zone": "boundary:branch-network",
+      "destination_zone": "boundary:council-data-centre",
+      "decided": true,
+      "assumed_endpoints": []
+    },
+    {
+      "flow_id": "flow:entity:desk-staff>process:lending-api>change-loans-by-hand",
+      "source_zone": "boundary:branch-network",
+      "destination_zone": "boundary:council-data-centre",
+      "decided": true,
+      "assumed_endpoints": []
+    }
+  ],
+  "shared_element_names": [],
+  "elements_analyzed": 12,
+  "model_repair": null,
+  "assertions": null,
+  "analysis_context": {
+    "instruction_sha256": "6a59f7bd1a336696d092cbb2f249103900cfc6f1a442547e0343514eea67b43e",
+    "domain_packs": [
+      "http-api",
+      "databases"
+    ]
+  },
+  "execution": {
+    "identity_version": 2,
+    "build": {
+      "analysis-service": "0.1.0",
+      "google-adk": "2.5.0",
+      "google-genai": "2.11.0",
+      "litellm": "1.104.0"
+    },
+    "review_independence": "shared",
+    "extraction_format": null,
+    "extraction_strategy": null
+  },
+  "analyses": [
+    {
+      "framework": "stride",
+      "framework_version": "1.0",
+      "disclaimer": "AI-generated STRIDE threat model. Each claim asserts that an attacker action against the named elements is credible against what the submitted text stated. Where the text says a control is not there, a claim says so and cites that sentence; where the text is silent, the claim is conditional on a fact nobody supplied, and the service never reads silence as absence. Nothing not listed here is thereby safe. Not reviewed by a human security analyst.",
+      "claims": [
+        {
+          "id": "D-01",
+          "framework": "stride",
+          "framework_version": "1.0",
+          "title": "Flooding the lending API exhausts the shared service and halts branch-wide circulation",
+          "description": "An internet attacker can drive `process:lending-api` through `flow:entity:member>process:lending-api>borrow-renew-and-reserve`; the flow crosses from `boundary:internet`, carries an unknown authentication control, and each request causes loan-rule processing plus a read-write against `store:loans-database`. If the unknown authentication or unstated request-throttling controls do not prevent anonymous or cheaply repeatable calls, the attacker spends far less per request than the API spends processing it. The same chokepoint is also reachable through `flow:process:self-service-kiosk>process:lending-api>record-loans-and-returns` and `flow:entity:desk-staff>process:lending-api>change-loans-by-hand`; an attacker who gains access to `boundary:branch-network` can use the kiosk path subject to its unknown authentication, or use the shared desk credential on the staff path. Second-order: `process:lending-api` is the only process touching `store:loans-database`, and all three caller populations depend on it, so saturation prevents members from borrowing, renewing or reserving, kiosks from recording loans and returns, and desk staff from changing loans. The API has no queue in front of it, so a burst is handled at the shared service rather than absorbed elsewhere. This draft is conditional where the member and kiosk authentication attributes are unknown; the desk path is additionally exposed to anyone who obtains the stated shared credential.",
+          "affected_element_ids": [
+            "process:lending-api",
+            "flow:entity:member>process:lending-api>borrow-renew-and-reserve",
+            "flow:process:self-service-kiosk>process:lending-api>record-loans-and-returns",
+            "flow:entity:desk-staff>process:lending-api>change-loans-by-hand"
+          ],
+          "verb": "flood",
+          "grounds": [
+            {
+              "kind": "quote",
+              "text": "The phones talk straight to the lending API over the internet.",
+              "source_label": "Interview transcript",
+              "element_id": "",
+              "attribute": "",
+              "flow_id": "",
+              "term": "",
+              "assertion": ""
+            },
+            {
+              "kind": "quote",
+              "text": "The kiosks are in every branch and they send each loan and each return to the lending API as it is scanned.",
+              "source_label": "Interview transcript",
+              "element_id": "",
+              "attribute": "",
+              "flow_id": "",
+              "term": "",
+              "assertion": ""
+            },
+            {
+              "kind": "quote",
+              "text": "Everyone at the desk uses the same shared login for the circulation page. The password is on a card taped under the desk.",
+              "source_label": "Interview transcript",
+              "element_id": "",
+              "attribute": "",
+              "flow_id": "",
+              "term": "",
+              "assertion": ""
+            },
+            {
+              "kind": "quote",
+              "text": "Every school sends its classes in the same week, every kiosk and every phone hits us at once, and the API is one service with no queue in front of it.",
+              "source_label": "Interview transcript",
+              "element_id": "",
+              "attribute": "",
+              "flow_id": "",
+              "term": "",
+              "assertion": ""
+            },
+            {
+              "kind": "quote",
+              "text": "When it goes down nobody can borrow or return anything, and the branches get the complaints.",
+              "source_label": "Interview transcript",
+              "element_id": "",
+              "attribute": "",
+              "flow_id": "",
+              "term": "",
+              "assertion": ""
+            },
+            {
+              "kind": "derived-fact",
+              "text": "",
+              "source_label": "",
+              "element_id": "",
+              "attribute": "",
+              "flow_id": "flow:entity:member>process:lending-api>borrow-renew-and-reserve",
+              "term": "",
+              "assertion": ""
+            },
+            {
+              "kind": "derived-fact",
+              "text": "",
+              "source_label": "",
+              "element_id": "",
+              "attribute": "",
+              "flow_id": "flow:process:self-service-kiosk>process:lending-api>record-loans-and-returns",
+              "term": "",
+              "assertion": ""
+            },
+            {
+              "kind": "derived-fact",
+              "text": "",
+              "source_label": "",
+              "element_id": "",
+              "attribute": "",
+              "flow_id": "flow:entity:desk-staff>process:lending-api>change-loans-by-hand",
+              "term": "",
+              "assertion": ""
+            },
+            {
+              "kind": "unknown-attribute",
+              "text": "",
+              "source_label": "",
+              "element_id": "flow:entity:member>process:lending-api>borrow-renew-and-reserve",
+              "attribute": "authentication",
+              "flow_id": "",
+              "term": "",
+              "assertion": ""
+            },
+            {
+              "kind": "unknown-attribute",
+              "text": "",
+              "source_label": "",
+              "element_id": "flow:process:self-service-kiosk>process:lending-api>record-loans-and-returns",
+              "attribute": "authentication",
+              "flow_id": "",
+              "term": "",
+              "assertion": ""
+            }
+          ],
+          "verdict": {
+            "reason": "The availability argument follows from the internet-facing shared chokepoint, no queue, and stated outage impact, but rate limiting, admission control, and related exhaustion controls are unresolved.",
+            "related_unknowns": [
+              {
+                "element_id": "process:lending-api",
+                "attribute": "",
+                "subject": "",
+                "assertion": "",
+                "question": "capacity-limits",
+                "facets": [
+                  "rate",
+                  "size",
+                  "concurrency",
+                  "quota"
+                ],
+                "capability": ""
+              },
+              {
+                "element_id": "flow:entity:member>process:lending-api>borrow-renew-and-reserve",
+                "attribute": "authentication",
+                "subject": "",
+                "assertion": "",
+                "question": "",
+                "facets": [],
+                "capability": ""
+              },
+              {
+                "element_id": "flow:process:self-service-kiosk>process:lending-api>record-loans-and-returns",
+                "attribute": "authentication",
+                "subject": "",
+                "assertion": "",
+                "question": "",
+                "facets": [],
+                "capability": ""
+              }
+            ],
+            "immaterial_unknowns": [],
+            "rejected_because": null,
+            "status": "needs-info"
+          },
+          "category": "denial-of-service",
+          "severity": {
+            "likelihood": "high",
+            "impact": "high",
+            "level": "critical",
+            "justification": "Likelihood is high because `process:lending-api` is reached from `boundary:internet` through `flow:entity:member>process:lending-api>borrow-renew-and-reserve`, and the member authentication is unknown; the branch paths provide additional entry points, including a shared desk credential. Impact is high because three distinct callers depend on the same API, it is the only path to `store:loans-database`, and the source states that when it goes down nobody can borrow or return anything."
+          },
+          "mitigations": [
+            {
+              "summary": "Authenticate and rate-limit the internet path before expensive work",
+              "detail": "Resolve the unknown authentication on `flow:entity:member>process:lending-api>borrow-renew-and-reserve`, require verified caller identity before loan-rule and database work, and apply per-identity and source rate limits, concurrency caps, request-size limits and bounded timeouts on `process:lending-api`."
+            },
+            {
+              "summary": "Bound and isolate branch-originated load",
+              "detail": "Resolve the unknown authentication on `flow:process:self-service-kiosk>process:lending-api>record-loans-and-returns`, apply per-kiosk and per-branch quotas, and separate kiosk, member and desk-staff capacity so one caller population cannot consume the shared service."
+            },
+            {
+              "summary": "Replace the shared desk login",
+              "detail": "Issue individual desk-staff identities and remove the shared password from the branch, then apply per-account and per-branch limits so a compromised branch credential cannot generate unbounded circulation work."
+            },
+            {
+              "summary": "Add load shedding and graceful degradation",
+              "detail": "Place bounded queueing or admission control in front of `process:lending-api`, use request and database timeouts, and fail fast under saturation rather than allowing all three caller populations to exhaust the service together."
+            }
+          ],
+          "confidence": "low",
+          "recommendation": {
+            "sound": false,
+            "note": "Rate limiting, isolation, and load shedding are complementary; no single listed mitigation closes all described exhaustion paths."
+          }
+        },
+        {
+          "id": "E-01",
+          "framework": "stride",
+          "framework_version": "1.0",
+          "title": "An internet caller may renew or reserve for another member",
+          "description": "An attacker starting as an internet caller uses `flow:entity:member>process:lending-api>borrow-renew-and-reserve`, which crosses from `boundary:internet` to `process:lending-api` and carries a caller-supplied book and member identifier. The flow's `authentication` is unknown, and the interview does not establish whether `process:lending-api` binds that identifier to the verified caller. If the API does not perform server-side object-level authorization, the attacker can renew, borrow or reserve against another member's account, escalating from the attacker's own member context to another member's loan and reservation authority. Second-order: the API writes the resulting changes through `flow:process:lending-api>store:loans-database>read-and-write-loans`, reaching the shared database's member records and borrowing histories. This draft is conditional on the unknown authentication and authorization behavior; it does not assert that the checks are absent.",
+          "affected_element_ids": [
+            "entity:member",
+            "flow:entity:member>process:lending-api>borrow-renew-and-reserve",
+            "process:lending-api"
+          ],
+          "verb": "escalate",
+          "grounds": [
+            {
+              "kind": "quote",
+              "text": "Priya: The app on their phone calls the lending API. It says which book and which member, and the API checks the loan rules and writes the change.",
+              "source_label": "Interview transcript",
+              "element_id": "",
+              "attribute": "",
+              "flow_id": "",
+              "term": "",
+              "assertion": ""
+            },
+            {
+              "kind": "quote",
+              "text": "Priya: I think it checks a token the app gets at sign-in, but I'd have to look.",
+              "source_label": "Interview transcript",
+              "element_id": "",
+              "attribute": "",
+              "flow_id": "",
+              "term": "",
+              "assertion": ""
+            },
+            {
+              "kind": "unknown-attribute",
+              "text": "",
+              "source_label": "",
+              "element_id": "flow:entity:member>process:lending-api>borrow-renew-and-reserve",
+              "attribute": "authentication",
+              "flow_id": "",
+              "term": "",
+              "assertion": ""
+            },
+            {
+              "kind": "derived-fact",
+              "text": "",
+              "source_label": "",
+              "element_id": "",
+              "attribute": "",
+              "flow_id": "flow:entity:member>process:lending-api>borrow-renew-and-reserve",
+              "term": "",
+              "assertion": ""
+            }
+          ],
+          "verdict": {
+            "reason": "The threat follows if the API does not authenticate the caller and enforce object-level authorization for the supplied member identifier. Authentication and authorization scope are unresolved.",
+            "related_unknowns": [
+              {
+                "element_id": "flow:entity:member>process:lending-api>borrow-renew-and-reserve",
+                "attribute": "authentication",
+                "subject": "",
+                "assertion": "",
+                "question": "",
+                "facets": [],
+                "capability": ""
+              },
+              {
+                "element_id": "process:lending-api",
+                "attribute": "",
+                "subject": "",
+                "assertion": "",
+                "question": "authorization-scope",
+                "facets": [
+                  "checks-each-request",
+                  "checks-ownership"
+                ],
+                "capability": ""
+              }
+            ],
+            "immaterial_unknowns": [],
+            "rejected_because": null,
+            "status": "needs-info"
+          },
+          "category": "elevation-of-privilege",
+          "severity": {
+            "likelihood": "high",
+            "impact": "high",
+            "level": "critical",
+            "justification": "Likelihood is high because `process:lending-api` is internet-facing and the crossing from `boundary:internet` has unknown authentication, while the request supplies the member identifier. Impact is high because the API writes member loans and reservations through `flow:process:lending-api>store:loans-database>read-and-write-loans`, whose store contains every member's PII and full borrowing history."
+          },
+          "mitigations": [
+            {
+              "summary": "Enforce server-side object authorization",
+              "detail": "At `process:lending-api`, derive the permitted member from the verified token subject and check ownership or delegated authority on every loan, renewal and reservation operation; reject caller-supplied identifiers that do not match."
+            },
+            {
+              "summary": "Resolve the unknown authentication and authorization behavior",
+              "detail": "Document and test the token validation, denial behavior and cross-member access controls on `flow:entity:member>process:lending-api>borrow-renew-and-reserve`, including negative tests for another member's identifiers."
+            }
+          ],
+          "confidence": "low",
+          "recommendation": {
+            "sound": false,
+            "note": "Both server-side authorization and resolved authentication behavior are needed to close the cross-member escalation."
+          }
+        },
+        {
+          "id": "E-03",
+          "framework": "stride",
+          "framework_version": "1.0",
+          "title": "The shared desk credential lets a branch-network attacker gain circulation authority",
+          "description": "An attacker who reaches the branch network and obtains the shared desk password can present it on `flow:entity:desk-staff>process:lending-api>change-loans-by-hand`, crossing into `process:lending-api` as the desk account. Because the same credential is used by all desk staff across branches, the attacker gains the circulation authority to extend loans, clear account blocks and mark loans returned without first holding an individual staff authorization. The model does not state any additional per-person or per-operation authorization on this flow. Second-order: those actions are written by `process:lending-api` through `flow:process:lending-api>store:loans-database>read-and-write-loans`, so the attacker can alter member loan and borrowing-history records across the service's reachable scope.",
+          "affected_element_ids": [
+            "entity:desk-staff",
+            "flow:entity:desk-staff>process:lending-api>change-loans-by-hand",
+            "process:lending-api"
+          ],
+          "verb": "escalate",
+          "grounds": [
+            {
+              "kind": "quote",
+              "text": "account. Everyone at the desk uses the same shared login for the circulation page. The password is on a card taped under the desk.",
+              "source_label": "Interview transcript",
+              "element_id": "",
+              "attribute": "",
+              "flow_id": "",
+              "term": "",
+              "assertion": ""
+            },
+            {
+              "kind": "quote",
+              "text": "Priya: Desk staff can. When a member says they returned a book and the record says they did not, someone at the desk opens the circulation page and marks it returned, or clears the block on the account.",
+              "source_label": "Interview transcript",
+              "element_id": "",
+              "attribute": "",
+              "flow_id": "",
+              "term": "",
+              "assertion": ""
+            },
+            {
+              "kind": "derived-fact",
+              "text": "",
+              "source_label": "",
+              "element_id": "",
+              "attribute": "",
+              "flow_id": "flow:entity:desk-staff>process:lending-api>change-loans-by-hand",
+              "term": "",
+              "assertion": ""
+            }
+          ],
+          "verdict": {
+            "reason": "",
+            "related_unknowns": [],
+            "immaterial_unknowns": [],
+            "rejected_because": null,
+            "status": "confirmed"
+          },
+          "category": "elevation-of-privilege",
+          "severity": {
+            "likelihood": "high",
+            "impact": "high",
+            "level": "critical",
+            "justification": "Likelihood is high for an attacker able to enter or observe a branch because the credential is shared, physically exposed under the desk, and the flow crosses from `boundary:branch-network` into `process:lending-api` without a stated individual authentication control. Impact is high because the account can change loan status and account blocks through `process:lending-api`, with consequences persisted in the confidential, PII-bearing `store:loans-database`."
+          },
+          "mitigations": [
+            {
+              "summary": "Replace the shared desk login with individual staff identities",
+              "detail": "Require named, individually authenticated staff accounts with branch and role-based permissions on the circulation functions, and remove the taped shared password."
+            },
+            {
+              "summary": "Authorize and audit each circulation operation",
+              "detail": "Enforce server-side checks for the staff member's branch and permitted action on every loan or account change, and record the verified individual identity with the affected member and operation."
+            }
+          ],
+          "confidence": "high",
+          "recommendation": {
+            "sound": true,
+            "note": "Replacing the shared credential with individually authorized staff identities directly closes the stated escalation path."
+          }
+        },
+        {
+          "id": "I-08",
+          "framework": "stride",
+          "framework_version": "1.0",
+          "title": "The shared desk password can be recovered from the branch workspace",
+          "description": "Anyone who can access a desk workspace, including an unauthorized branch visitor or an over-privileged insider, can recover the circulation-page credential from the card taped under the desk. That credential is used on `flow:entity:desk-staff>process:lending-api>change-loans-by-hand` to reach `process:lending-api`, where it can expose or change members' loan extensions, account blocks and return records. Second-order: because every branch desk staff member shares one login, the recovered credential provides a reusable path to member account and circulation data across the desk population, while actions cannot be attributed to an individual branch worker.",
+          "affected_element_ids": [
+            "flow:entity:desk-staff>process:lending-api>change-loans-by-hand",
+            "process:lending-api",
+            "entity:desk-staff"
+          ],
+          "verb": "recover-credential",
+          "grounds": [
+            {
+              "kind": "quote",
+              "text": "Everyone at the desk uses the same shared login for the circulation page. The password is on a card taped under the desk.",
+              "source_label": "Interview transcript",
+              "element_id": "",
+              "attribute": "",
+              "flow_id": "",
+              "term": "",
+              "assertion": ""
+            },
+            {
+              "kind": "derived-fact",
+              "text": "",
+              "source_label": "",
+              "element_id": "",
+              "attribute": "",
+              "flow_id": "flow:entity:desk-staff>process:lending-api>change-loans-by-hand",
+              "term": "",
+              "assertion": ""
+            }
+          ],
+          "verdict": {
+            "reason": "",
+            "related_unknowns": [],
+            "immaterial_unknowns": [],
+            "rejected_because": null,
+            "status": "confirmed"
+          },
+          "category": "information-disclosure",
+          "severity": {
+            "likelihood": "high",
+            "impact": "high",
+            "level": "critical",
+            "justification": "Likelihood is high because the password is physically exposed at every desk and the credential is shared across all desk staff. Impact is high because the credential reaches the lending API's member-account and circulation operations, and the database contains confidential PII and full borrowing histories."
+          },
+          "mitigations": [
+            {
+              "summary": "Remove the shared desk credential",
+              "detail": "Issue individually attributable accounts with MFA or phishing-resistant authentication and deny shared logins."
+            },
+            {
+              "summary": "Move secrets out of physical workspaces",
+              "detail": "Use managed credential issuance, rotate the exposed password immediately, and require short-lived session credentials for the circulation page."
+            }
+          ],
+          "confidence": "high",
+          "recommendation": {
+            "sound": false,
+            "note": "Removing the shared credential closes the threat; moving secrets and rotating the password alone does not remove the shared-account exposure."
+          }
+        },
+        {
+          "id": "R-01",
+          "framework": "stride",
+          "framework_version": "1.0",
+          "title": "A member can deny a loan change because caller identity is unverified",
+          "description": "A member can borrow, renew, or reserve through `flow:entity:member>process:lending-api>borrow-renew-and-reserve`, which crosses from `boundary:internet` to `boundary:council-data-centre`, but the flow's `authentication` is unknown. If the token or other control does not bind the request to an individual and the lending API does not retain that binding with the loan or reservation change, a member can dispute the action and the system may be unable to produce evidence identifying who made it. This is conditional on the unresolved authentication and record-handling details, not an assertion that the member flow is unauthenticated. The disputed changes reach `store:loans-database` through `flow:process:lending-api>store:loans-database>read-and-write-loans`, where they affect member records, loans, reservations, and borrowing history.",
+          "affected_element_ids": [
+            "entity:member",
+            "process:lending-api",
+            "flow:entity:member>process:lending-api>borrow-renew-and-reserve"
+          ],
+          "verb": "unattributable",
+          "grounds": [
+            {
+              "kind": "quote",
+              "text": "I think it checks a token the app gets at sign-in, but I'd have to look.",
+              "source_label": "Interview transcript",
+              "element_id": "",
+              "attribute": "",
+              "flow_id": "",
+              "term": "",
+              "assertion": ""
+            },
+            {
+              "kind": "quote",
+              "text": "Honestly I could not tell you today what it accepts, or what it does with a call it does not like.",
+              "source_label": "Interview transcript",
+              "element_id": "",
+              "attribute": "",
+              "flow_id": "",
+              "term": "",
+              "assertion": ""
+            },
+            {
+              "kind": "derived-fact",
+              "text": "",
+              "source_label": "",
+              "element_id": "",
+              "attribute": "",
+              "flow_id": "flow:entity:member>process:lending-api>borrow-renew-and-reserve",
+              "term": "",
+              "assertion": ""
+            },
+            {
+              "kind": "unknown-attribute",
+              "text": "",
+              "source_label": "",
+              "element_id": "flow:entity:member>process:lending-api>borrow-renew-and-reserve",
+              "attribute": "authentication",
+              "flow_id": "",
+              "term": "",
+              "assertion": ""
+            }
+          ],
+          "verdict": {
+            "reason": "The threat follows if requests are not individually authenticated and the resulting identity is not retained with the change. Authentication and audit attribution are unresolved.",
+            "related_unknowns": [
+              {
+                "element_id": "flow:entity:member>process:lending-api>borrow-renew-and-reserve",
+                "attribute": "authentication",
+                "subject": "",
+                "assertion": "",
+                "question": "",
+                "facets": [],
+                "capability": ""
+              },
+              {
+                "element_id": "process:lending-api",
+                "attribute": "",
+                "subject": "",
+                "assertion": "",
+                "question": "audit-evidence",
+                "facets": [
+                  "records-actor"
+                ],
+                "capability": ""
+              }
+            ],
+            "immaterial_unknowns": [],
+            "rejected_because": null,
+            "status": "needs-info"
+          },
+          "category": "repudiation",
+          "severity": {
+            "likelihood": "high",
+            "impact": "high",
+            "level": "critical",
+            "justification": "Likelihood is high and conditional on the unknown authentication control: `process:lending-api` is internet-facing and the member flow crosses from `boundary:internet`, so ordinary members can make disputed requests without a prior internal foothold. Impact is high because the flow changes `pii` and `business-critical-data`, and the lending API writes the shared loans and borrowing-history store."
+          },
+          "mitigations": [
+            {
+              "summary": "Verify and retain the member identity with each change",
+              "detail": "Resolve the authentication behavior on `flow:entity:member>process:lending-api>borrow-renew-and-reserve`; require an individual authenticated subject and record that subject, target book, action, timestamp, and outcome with the corresponding loan or reservation change."
+            }
+          ],
+          "confidence": "low",
+          "recommendation": {
+            "sound": true,
+            "note": "Verifying and retaining the member identity directly addresses the stated repudiation threat."
+          }
+        },
+        {
+          "id": "R-04",
+          "framework": "stride",
+          "framework_version": "1.0",
+          "title": "A desk staff member can deny a manual loan change because all branches share one login",
+          "description": "A desk staff member can extend a loan, clear an account block, or mark a book returned through `flow:entity:desk-staff>process:lending-api>change-loans-by-hand`, which crosses from `boundary:branch-network` into `boundary:council-data-centre`. The flow uses one password login shared by all desk staff in every branch, and the resulting history records only that the loan was closed by hand. A staff member can therefore deny making a disputed manual change: the record narrows the possible actor to the shared population and does not identify the individual or branch. The change is applied by `process:lending-api` and reaches `store:loans-database`, where it changes loans, account blocks, or return history.",
+          "affected_element_ids": [
+            "entity:desk-staff",
+            "process:lending-api",
+            "flow:entity:desk-staff>process:lending-api>change-loans-by-hand"
+          ],
+          "verb": "unattributable",
+          "grounds": [
+            {
+              "kind": "quote",
+              "text": "Everyone at the desk uses the same shared login for the circulation page. The password is on a card taped under the desk.",
+              "source_label": "Interview transcript",
+              "element_id": "",
+              "attribute": "",
+              "flow_id": "",
+              "term": "",
+              "assertion": ""
+            },
+            {
+              "kind": "quote",
+              "text": "You can tell it was the desk. You cannot tell who, or even which branch.",
+              "source_label": "Interview transcript",
+              "element_id": "",
+              "attribute": "",
+              "flow_id": "",
+              "term": "",
+              "assertion": ""
+            },
+            {
+              "kind": "quote",
+              "text": "the history just records that the loan was closed by hand",
+              "source_label": "Interview transcript",
+              "element_id": "",
+              "attribute": "",
+              "flow_id": "",
+              "term": "",
+              "assertion": ""
+            },
+            {
+              "kind": "derived-fact",
+              "text": "",
+              "source_label": "",
+              "element_id": "",
+              "attribute": "",
+              "flow_id": "flow:entity:desk-staff>process:lending-api>change-loans-by-hand",
+              "term": "",
+              "assertion": ""
+            }
+          ],
+          "verdict": {
+            "reason": "",
+            "related_unknowns": [],
+            "immaterial_unknowns": [],
+            "rejected_because": null,
+            "status": "confirmed"
+          },
+          "category": "repudiation",
+          "severity": {
+            "likelihood": "high",
+            "impact": "high",
+            "level": "critical",
+            "justification": "Likelihood is high: the shared credential is explicitly available to every desk staff member in every branch, and normal manual changes use the crossing flow without requiring an individual credential. Impact is high because the action changes `business-critical-data` in `store:loans-database`, including loan status, account blocks, returns, and member borrowing history."
+          },
+          "mitigations": [
+            {
+              "summary": "Replace the shared desk login with individual accounts",
+              "detail": "Require a unique, individually authenticated desk-staff identity for every circulation action, and record the acting person and branch rather than the shared account."
+            },
+            {
+              "summary": "Protect the manual-change audit trail",
+              "detail": "Record the before-and-after loan or account state, action, timestamp, authenticated principal, and outcome in append-only or independently protected history so the lending API cannot be the sole authority over evidence of its own changes."
+            }
+          ],
+          "confidence": "high",
+          "recommendation": {
+            "sound": true,
+            "note": "Individual accounts and protected audit history directly close the stated attribution gap."
+          }
+        },
+        {
+          "id": "E-02",
+          "framework": "stride",
+          "framework_version": "1.0",
+          "title": "A branch-network attacker may use the kiosk path to act on member loans",
+          "description": "An attacker with control of or access to the branch-network kiosk path can send a scanned card and book action through `flow:process:self-service-kiosk>process:lending-api>record-loans-and-returns`, which crosses into `process:lending-api`. The flow's authentication is unknown, and the model does not establish whether the API verifies that the kiosk request is authorized to act for the identified member or book. If those checks are absent or insufficient, the attacker escalates from a branch-network position to the ability to create or return loans for other members. Second-order: the API persists those changes through `flow:process:lending-api>store:loans-database>read-and-write-loans`, affecting the shared loan and borrowing-history records. This is conditional on the unknown authentication and per-request authorization controls.",
+          "affected_element_ids": [
+            "process:self-service-kiosk",
+            "flow:process:self-service-kiosk>process:lending-api>record-loans-and-returns",
+            "process:lending-api"
+          ],
+          "verb": "escalate",
+          "grounds": [
+            {
+              "kind": "quote",
+              "text": "Priya: That is still true. The kiosks are in every branch and they send each loan and each return to the lending API as it is scanned.",
+              "source_label": "Interview transcript",
+              "element_id": "",
+              "attribute": "",
+              "flow_id": "",
+              "term": "",
+              "assertion": ""
+            },
+            {
+              "kind": "unknown-attribute",
+              "text": "",
+              "source_label": "",
+              "element_id": "flow:process:self-service-kiosk>process:lending-api>record-loans-and-returns",
+              "attribute": "authentication",
+              "flow_id": "",
+              "term": "",
+              "assertion": ""
+            },
+            {
+              "kind": "derived-fact",
+              "text": "",
+              "source_label": "",
+              "element_id": "",
+              "attribute": "",
+              "flow_id": "flow:process:self-service-kiosk>process:lending-api>record-loans-and-returns",
+              "term": "",
+              "assertion": ""
+            }
+          ],
+          "verdict": {
+            "reason": "The threat follows if kiosk requests are not authenticated and authorized for the identified member and item. Kiosk authentication and authorization scope are unresolved.",
+            "related_unknowns": [
+              {
+                "element_id": "flow:process:self-service-kiosk>process:lending-api>record-loans-and-returns",
+                "attribute": "authentication",
+                "subject": "",
+                "assertion": "",
+                "question": "",
+                "facets": [],
+                "capability": ""
+              },
+              {
+                "element_id": "process:lending-api",
+                "attribute": "",
+                "subject": "",
+                "assertion": "",
+                "question": "authorization-scope",
+                "facets": [
+                  "checks-each-request",
+                  "checks-ownership"
+                ],
+                "capability": ""
+              }
+            ],
+            "immaterial_unknowns": [],
+            "rejected_because": null,
+            "status": "needs-info"
+          },
+          "category": "elevation-of-privilege",
+          "severity": {
+            "likelihood": "medium",
+            "impact": "high",
+            "level": "high",
+            "justification": "Likelihood is medium because exploitation requires a branch-network position or kiosk compromise, but the crossing into `boundary:council-data-centre` has unknown authentication and the kiosk technology and exposure are themselves unknown. Impact is high because successful requests change member loans and returns and persist into `store:loans-database`, which contains PII and every member's borrowing history."
+          },
+          "mitigations": [
+            {
+              "summary": "Authenticate each kiosk request",
+              "detail": "Give each kiosk a distinct, rotated workload identity on `flow:process:self-service-kiosk>process:lending-api>record-loans-and-returns`, and authorize only the operations and branch scope assigned to that kiosk."
+            },
+            {
+              "summary": "Bind scanned actions to verified member and item state",
+              "detail": "Have `process:lending-api` validate the member relationship, item state and kiosk authority server-side rather than trusting card or book identifiers supplied by the kiosk."
+            }
+          ],
+          "confidence": "low",
+          "recommendation": {
+            "sound": false,
+            "note": "Kiosk identity and per-request state authorization are complementary and both are needed to close the escalation."
+          }
+        },
+        {
+          "id": "I-05",
+          "framework": "stride",
+          "framework_version": "1.0",
+          "title": "Unverified at-rest protection could expose the entire loans database from storage copies",
+          "description": "`store:loans-database` is classified confidential and contains members, names, email addresses, home addresses, loans, reservations and full borrowing histories, but its `encryption_at_rest` is unknown. If storage-layer encryption is absent, an attacker who obtains a database volume, snapshot, backup or decommissioned storage copy can read the corpus without going through `process:lending-api` or its application authorization. Second-order: the copied records expose member identities and histories at scale for targeted fraud, profiling and later attacks. This is a conditional finding about the unknown attribute, not an assertion that the database is unencrypted.",
+          "affected_element_ids": [
+            "store:loans-database"
+          ],
+          "verb": "read",
+          "grounds": [
+            {
+              "kind": "unknown-attribute",
+              "text": "",
+              "source_label": "",
+              "element_id": "store:loans-database",
+              "attribute": "encryption_at_rest",
+              "flow_id": "",
+              "term": "",
+              "assertion": ""
+            }
+          ],
+          "verdict": {
+            "reason": "The threat follows if storage copies are accessible without effective protection. Encryption at rest is unknown, and storage-copy access controls have no stated model value.",
+            "related_unknowns": [
+              {
+                "element_id": "store:loans-database",
+                "attribute": "encryption_at_rest",
+                "subject": "",
+                "assertion": "",
+                "question": "",
+                "facets": [],
+                "capability": ""
+              },
+              {
+                "element_id": "store:loans-database",
+                "attribute": "",
+                "subject": "",
+                "assertion": "",
+                "question": "stored-copy-access",
+                "facets": [
+                  "encrypted",
+                  "restricted"
+                ],
+                "capability": ""
+              }
+            ],
+            "immaterial_unknowns": [],
+            "rejected_because": null,
+            "status": "needs-info"
+          },
+          "category": "information-disclosure",
+          "severity": {
+            "likelihood": "medium",
+            "impact": "high",
+            "level": "high",
+            "justification": "Likelihood is medium and conditional: storage copies or media can be obtained without application access, but the model has not established whether encryption at rest is present. Impact is high because the store is confidential, tagged `pii`, and contains every member's full borrowing history and home address."
+          },
+          "mitigations": [
+            {
+              "summary": "Verify and enforce encryption at rest",
+              "detail": "Establish the actual posture and require managed-key encryption for the primary database, backups, snapshots, replicas and decommissioned media."
+            },
+            {
+              "summary": "Separate key and storage access",
+              "detail": "Restrict key use and storage-copy export to separate, audited principals; use field-level protection for the most sensitive member fields."
+            }
+          ],
+          "confidence": "low",
+          "recommendation": {
+            "sound": false,
+            "note": "Encryption and separation of storage/key access are complementary; either alone may leave the corpus exposed."
+          }
+        },
+        {
+          "id": "I-06",
+          "framework": "stride",
+          "framework_version": "1.0",
+          "title": "A compromised lending API may read the full member and loan corpus",
+          "description": "`process:lending-api` is the only element stated to read or write `store:loans-database` through `flow:process:lending-api>store:loans-database>read-and-write-loans`, and that flow's authentication is unknown. If the API's database grant or server-side read authorization is broader than each caller's need, an attacker who compromises the internet-facing API, or a service operating with the same grant, can use the legitimate read path to enumerate members, addresses, loans, reservations and borrowing histories. Second-order: one compromised reader becomes a corpus-wide source of PII for profiling and targeted attacks; the unknown database authentication also prevents confirming whether a narrower principal is used. This is a conditional read-path finding, not an assertion that the grant is over-broad.",
+          "affected_element_ids": [
+            "store:loans-database",
+            "flow:process:lending-api>store:loans-database>read-and-write-loans",
+            "process:lending-api"
+          ],
+          "verb": "read",
+          "grounds": [
+            {
+              "kind": "quote",
+              "text": "The API is the only thing that reads or writes it.",
+              "source_label": "Lending service note",
+              "element_id": "",
+              "attribute": "",
+              "flow_id": "",
+              "term": "",
+              "assertion": ""
+            },
+            {
+              "kind": "quote",
+              "text": "Names, email addresses, home addresses and every member's full borrowing history live in the loans database.",
+              "source_label": "Interview transcript",
+              "element_id": "",
+              "attribute": "",
+              "flow_id": "",
+              "term": "",
+              "assertion": ""
+            },
+            {
+              "kind": "unknown-attribute",
+              "text": "",
+              "source_label": "",
+              "element_id": "flow:process:lending-api>store:loans-database>read-and-write-loans",
+              "attribute": "authentication",
+              "flow_id": "",
+              "term": "",
+              "assertion": ""
+            }
+          ],
+          "verdict": {
+            "reason": "After removing the unverified quotation, the stated database contents and API-only access support the threat if database authorization is broader than callers' needs. Authentication and authorization scope remain unresolved.",
+            "related_unknowns": [
+              {
+                "element_id": "flow:process:lending-api>store:loans-database>read-and-write-loans",
+                "attribute": "authentication",
+                "subject": "",
+                "assertion": "",
+                "question": "",
+                "facets": [],
+                "capability": ""
+              },
+              {
+                "element_id": "process:lending-api",
+                "attribute": "",
+                "subject": "",
+                "assertion": "",
+                "question": "authorization-scope",
+                "facets": [
+                  "least-privilege",
+                  "checks-each-request"
+                ],
+                "capability": ""
+              }
+            ],
+            "immaterial_unknowns": [],
+            "rejected_because": null,
+            "status": "needs-info"
+          },
+          "category": "information-disclosure",
+          "severity": {
+            "likelihood": "medium",
+            "impact": "high",
+            "level": "high",
+            "justification": "Likelihood is medium: `process:lending-api` is internet-facing and is the only database reader, but the breadth and authentication of its database access are unknown. Impact is high because the database contains confidential PII and the full borrowing history of every member."
+          },
+          "mitigations": [
+            {
+              "summary": "Enforce object- and field-level read authorization",
+              "detail": "Bind every API record lookup to the authenticated member or explicitly authorized desk operation, and prevent the API's database principal from reading unnecessary tables and columns."
+            },
+            {
+              "summary": "Use a narrowly scoped database identity",
+              "detail": "Replace an unspecified broad reader with separate, least-privileged service identities and short-lived credentials; monitor bulk reads."
+            }
+          ],
+          "confidence": "low",
+          "recommendation": {
+            "sound": false,
+            "note": "Object and field authorization and a narrowly scoped identity are complementary controls; either alone may leave broad corpus access."
+          }
+        },
+        {
+          "id": "R-02",
+          "framework": "stride",
+          "framework_version": "1.0",
+          "title": "A kiosk transaction may be deniable because the submitting kiosk is not identified",
+          "description": "Each kiosk sends loans and returns through `flow:process:self-service-kiosk>process:lending-api>record-loans-and-returns`, which crosses from `boundary:branch-network` to `boundary:council-data-centre`, while the flow's `authentication` is unknown. If the lending API cannot bind a scanned transaction to the originating member and kiosk, or cannot preserve that identity in its records, a member or branch can dispute a loan or return and the system may be unable to show who initiated it. This draft is conditional on the unknown authentication and evidence-retention behavior; it does not assert that kiosks are unverified. The resulting records reach `store:loans-database` through the lending API and can affect borrowing history, loans, and returns for members.",
+          "affected_element_ids": [
+            "process:self-service-kiosk",
+            "process:lending-api",
+            "flow:process:self-service-kiosk>process:lending-api>record-loans-and-returns"
+          ],
+          "verb": "unattributable",
+          "grounds": [
+            {
+              "kind": "derived-fact",
+              "text": "",
+              "source_label": "",
+              "element_id": "",
+              "attribute": "",
+              "flow_id": "flow:process:self-service-kiosk>process:lending-api>record-loans-and-returns",
+              "term": "",
+              "assertion": ""
+            },
+            {
+              "kind": "unknown-attribute",
+              "text": "",
+              "source_label": "",
+              "element_id": "flow:process:self-service-kiosk>process:lending-api>record-loans-and-returns",
+              "attribute": "authentication",
+              "flow_id": "",
+              "term": "",
+              "assertion": ""
+            }
+          ],
+          "verdict": {
+            "reason": "The threat follows if kiosk and member transactions are not bound to attributable identities and retained as evidence. Kiosk authentication and audit attribution are unresolved.",
+            "related_unknowns": [
+              {
+                "element_id": "flow:process:self-service-kiosk>process:lending-api>record-loans-and-returns",
+                "attribute": "authentication",
+                "subject": "",
+                "assertion": "",
+                "question": "",
+                "facets": [],
+                "capability": ""
+              },
+              {
+                "element_id": "process:lending-api",
+                "attribute": "",
+                "subject": "",
+                "assertion": "",
+                "question": "audit-evidence",
+                "facets": [
+                  "records-actor"
+                ],
+                "capability": ""
+              }
+            ],
+            "immaterial_unknowns": [],
+            "rejected_because": null,
+            "status": "needs-info"
+          },
+          "category": "repudiation",
+          "severity": {
+            "likelihood": "medium",
+            "impact": "high",
+            "level": "high",
+            "justification": "Likelihood is medium and conditional on the unknown kiosk authentication: kiosks operate across the branch-network boundary and routinely submit write transactions, but the model does not establish how easily an attacker can originate one. Impact is high because the kiosk flow changes `pii` and `business-critical-data` in the loans database, including borrowing history and return status."
+          },
+          "mitigations": [
+            {
+              "summary": "Give each kiosk and member transaction an attributable identity",
+              "detail": "Establish authenticated kiosk identities and bind each scan to the authenticated member subject where appropriate; retain kiosk, member, action, timestamp, and outcome in an independent audit record."
+            }
+          ],
+          "confidence": "low",
+          "recommendation": {
+            "sound": true,
+            "note": "Authenticated kiosk and member transaction records directly address attribution."
+          }
+        },
+        {
+          "id": "R-03",
+          "framework": "stride",
+          "framework_version": "1.0",
+          "title": "Database writes may lose the originating actor behind the lending API",
+          "description": "`process:lending-api` is the only component stated to read and write `store:loans-database` through `flow:process:lending-api>store:loans-database>read-and-write-loans`, but that flow's `authentication` is unknown. If the database records only the API's connection identity, or if the API does not propagate the original member, kiosk, or desk-staff identity into its change history, an actor can dispute a loan, reservation, block clearance, or return and the database evidence will identify only the service hop rather than the person or device that initiated it. This draft is conditional on the unknown database authentication and record propagation; it does not claim that the database lacks actor attribution. The consequence reaches every consumer of the shared loans, reservations, member, and borrowing-history records.",
+          "affected_element_ids": [
+            "process:lending-api",
+            "store:loans-database",
+            "flow:process:lending-api>store:loans-database>read-and-write-loans"
+          ],
+          "verb": "unattributable",
+          "grounds": [
+            {
+              "kind": "quote",
+              "text": "The API is the only thing that reads or writes it.",
+              "source_label": "Interview transcript",
+              "element_id": "",
+              "attribute": "",
+              "flow_id": "",
+              "term": "",
+              "assertion": ""
+            },
+            {
+              "kind": "unknown-attribute",
+              "text": "",
+              "source_label": "",
+              "element_id": "flow:process:lending-api>store:loans-database>read-and-write-loans",
+              "attribute": "authentication",
+              "flow_id": "",
+              "term": "",
+              "assertion": ""
+            }
+          ],
+          "verdict": {
+            "reason": "The threat follows if the database change history records only the service identity rather than the initiating actor. Database authentication and actor attribution are unresolved.",
+            "related_unknowns": [
+              {
+                "element_id": "flow:process:lending-api>store:loans-database>read-and-write-loans",
+                "attribute": "authentication",
+                "subject": "",
+                "assertion": "",
+                "question": "",
+                "facets": [],
+                "capability": ""
+              },
+              {
+                "element_id": "store:loans-database",
+                "attribute": "",
+                "subject": "",
+                "assertion": "",
+                "question": "audit-evidence",
+                "facets": [
+                  "records-actor"
+                ],
+                "capability": ""
+              }
+            ],
+            "immaterial_unknowns": [],
+            "rejected_because": null,
+            "status": "needs-info"
+          },
+          "category": "repudiation",
+          "severity": {
+            "likelihood": "medium",
+            "impact": "high",
+            "level": "high",
+            "justification": "Likelihood is medium and conditional on the unknown database authentication and identity propagation: all loan, reservation, and member changes pass through the single lending API, so a missing origin binding would affect normal operations broadly, but the model does not state how records are actually attributed. Impact is high because `store:loans-database` contains confidential `pii` and `business-critical-data`, including every member's full borrowing history."
+          },
+          "mitigations": [
+            {
+              "summary": "Propagate the original principal into database change records",
+              "detail": "Use a per-request identity context or token exchange from the lending API to the database and retain the originating member, kiosk, or staff identity alongside the service identity, action, target, timestamp, and outcome."
+            },
+            {
+              "summary": "Make change history independently defensible",
+              "detail": "Use append-only or protected change history with before-and-after values so the API or its callers cannot silently rewrite the evidence for loan and reservation changes."
+            }
+          ],
+          "confidence": "low",
+          "recommendation": {
+            "sound": false,
+            "note": "Identity propagation and protected history together address the threat; either recommendation alone leaves part of the attribution problem open."
+          }
+        },
+        {
+          "id": "S-01",
+          "framework": "stride",
+          "framework_version": "1.0",
+          "title": "An internet caller may be accepted as a library member",
+          "description": "An attacker on `boundary:internet` can send requests over `flow:entity:member>process:lending-api>borrow-renew-and-reserve` posing as `entity:member`. If the flow's unknown authentication does not verify and bind the caller to a member identity, `process:lending-api` may treat the attacker as that member and process borrowing, renewals or reservations. Second-order: the API reads and writes member records, loans and reservations in `store:loans-database`, including member PII and full borrowing history. This draft is conditional on the flow's `authentication` attribute; it does not assert that authentication is absent.",
+          "affected_element_ids": [
+            "entity:member",
+            "process:lending-api",
+            "flow:entity:member>process:lending-api>borrow-renew-and-reserve"
+          ],
+          "verb": "impersonate",
+          "grounds": [
+            {
+              "kind": "derived-fact",
+              "text": "",
+              "source_label": "",
+              "element_id": "",
+              "attribute": "",
+              "flow_id": "flow:entity:member>process:lending-api>borrow-renew-and-reserve",
+              "term": "",
+              "assertion": ""
+            },
+            {
+              "kind": "unknown-attribute",
+              "text": "",
+              "source_label": "",
+              "element_id": "flow:entity:member>process:lending-api>borrow-renew-and-reserve",
+              "attribute": "authentication",
+              "flow_id": "",
+              "term": "",
+              "assertion": ""
+            }
+          ],
+          "verdict": {
+            "reason": "The threat follows if the member-flow authentication control fails; that control is explicitly unknown, so the threat remains conditional.",
+            "related_unknowns": [
+              {
+                "element_id": "flow:entity:member>process:lending-api>borrow-renew-and-reserve",
+                "attribute": "authentication",
+                "subject": "",
+                "assertion": "",
+                "question": "",
+                "facets": [],
+                "capability": ""
+              }
+            ],
+            "immaterial_unknowns": [],
+            "rejected_because": null,
+            "status": "needs-info"
+          },
+          "category": "spoofing",
+          "severity": {
+            "likelihood": "medium",
+            "impact": "high",
+            "level": "high",
+            "justification": "Likelihood is medium and conditional: the flow crosses from `boundary:internet`, but the unknown authentication control may prevent the attack. Impact is high because the flow is read-write and reaches `store:loans-database`, which contains `pii` and full borrowing history."
+          },
+          "mitigations": [
+            {
+              "summary": "Require verified member authentication on the app flow",
+              "detail": "Record and enforce a strong, member-bound authentication mechanism on `flow:entity:member>process:lending-api>borrow-renew-and-reserve`, such as short-lived audience-bound tokens with phishing-resistant sign-in for sensitive actions."
+            },
+            {
+              "summary": "Bind every operation to the authenticated member",
+              "detail": "Have `process:lending-api` derive the member identity from the verified credential rather than trusting the member identifier in the request."
+            }
+          ],
+          "confidence": "low",
+          "recommendation": {
+            "sound": true,
+            "note": "Both recommendations directly address preventing impersonation on this flow."
+          }
+        },
+        {
+          "id": "S-02",
+          "framework": "stride",
+          "framework_version": "1.0",
+          "title": "A branch-network attacker may send requests as a self-service kiosk",
+          "description": "An attacker with a foothold in `boundary:branch-network`, including a compromised kiosk or neighboring branch host, can send requests over `flow:process:self-service-kiosk>process:lending-api>record-loans-and-returns` posing as `process:self-service-kiosk`. If the flow's unknown authentication does not verify the kiosk identity, `process:lending-api` may accept fabricated loan or return events as genuine kiosk activity. Second-order: those events alter member loans and returns in `store:loans-database`, affecting PII and business-critical circulation records. This draft is conditional on the flow's `authentication` attribute; it does not assert that the control is absent.",
+          "affected_element_ids": [
+            "process:self-service-kiosk",
+            "process:lending-api",
+            "flow:process:self-service-kiosk>process:lending-api>record-loans-and-returns"
+          ],
+          "verb": "impersonate",
+          "grounds": [
+            {
+              "kind": "derived-fact",
+              "text": "",
+              "source_label": "",
+              "element_id": "",
+              "attribute": "",
+              "flow_id": "flow:process:self-service-kiosk>process:lending-api>record-loans-and-returns",
+              "term": "",
+              "assertion": ""
+            },
+            {
+              "kind": "unknown-attribute",
+              "text": "",
+              "source_label": "",
+              "element_id": "flow:process:self-service-kiosk>process:lending-api>record-loans-and-returns",
+              "attribute": "authentication",
+              "flow_id": "",
+              "term": "",
+              "assertion": ""
+            }
+          ],
+          "verdict": {
+            "reason": "The threat follows if the kiosk flow does not authenticate the sending kiosk; that control is unknown.",
+            "related_unknowns": [
+              {
+                "element_id": "flow:process:self-service-kiosk>process:lending-api>record-loans-and-returns",
+                "attribute": "authentication",
+                "subject": "",
+                "assertion": "",
+                "question": "",
+                "facets": [],
+                "capability": ""
+              }
+            ],
+            "immaterial_unknowns": [],
+            "rejected_because": null,
+            "status": "needs-info"
+          },
+          "category": "spoofing",
+          "severity": {
+            "likelihood": "medium",
+            "impact": "high",
+            "level": "high",
+            "justification": "Likelihood is medium and conditional: the attacker needs a foothold in `boundary:branch-network`, while the flow's authentication is unknown. Impact is high because the flow writes business-critical loan and return records through `process:lending-api` into the PII-bearing `store:loans-database`."
+          },
+          "mitigations": [
+            {
+              "summary": "Use per-kiosk workload identity",
+              "detail": "Require mutually authenticated, per-kiosk credentials on `flow:process:self-service-kiosk>process:lending-api>record-loans-and-returns`, with individual revocation and scope limited to the kiosk's permitted operations."
+            },
+            {
+              "summary": "Reject unauthenticated kiosk events",
+              "detail": "Make the flow's authentication explicit and verifiable, and have `process:lending-api` validate the kiosk identity and permitted branch before accepting a loan or return."
+            }
+          ],
+          "confidence": "low",
+          "recommendation": {
+            "sound": true,
+            "note": "Both recommendations directly address authenticating and authorizing kiosk-originated requests."
+          }
+        },
+        {
+          "id": "S-03",
+          "framework": "stride",
+          "framework_version": "1.0",
+          "title": "An attacker can use the shared desk credential as any desk staff member",
+          "description": "An attacker who obtains the shared desk password can present it over `flow:entity:desk-staff>process:lending-api>change-loans-by-hand` and use `process:lending-api` as an apparently legitimate member of `entity:desk-staff`. The same credential is used by all desk staff, so the attacker can extend loans, clear account blocks or mark books returned, and the service cannot distinguish the individual or branch. Second-order: those actions change member and loan records in `store:loans-database`, including PII and business-critical borrowing history.",
+          "affected_element_ids": [
+            "entity:desk-staff",
+            "process:lending-api",
+            "flow:entity:desk-staff>process:lending-api>change-loans-by-hand"
+          ],
+          "verb": "use-credential",
+          "grounds": [
+            {
+              "kind": "quote",
+              "text": "Everyone at the desk uses the same shared login for the circulation page. The password is on a card taped under the desk.",
+              "source_label": "Interview transcript",
+              "element_id": "",
+              "attribute": "",
+              "flow_id": "",
+              "term": "",
+              "assertion": ""
+            },
+            {
+              "kind": "derived-fact",
+              "text": "",
+              "source_label": "",
+              "element_id": "",
+              "attribute": "",
+              "flow_id": "flow:entity:desk-staff>process:lending-api>change-loans-by-hand",
+              "term": "",
+              "assertion": ""
+            }
+          ],
+          "verdict": {
+            "reason": "",
+            "related_unknowns": [],
+            "immaterial_unknowns": [],
+            "rejected_because": null,
+            "status": "confirmed"
+          },
+          "category": "spoofing",
+          "severity": {
+            "likelihood": "medium",
+            "impact": "high",
+            "level": "high",
+            "justification": "Likelihood is medium: the credential is shared across all branches and its storage is directly described, although the attacker must obtain or use it. Impact is high because the read-write flow permits changes to member accounts and loan records in the PII-bearing, business-critical `store:loans-database`."
+          },
+          "mitigations": [
+            {
+              "summary": "Replace the shared login with individual staff identities",
+              "detail": "Require each desk staff member to authenticate separately on `flow:entity:desk-staff>process:lending-api>change-loans-by-hand`, using phishing-resistant MFA and branch-scoped authorization where appropriate."
+            },
+            {
+              "summary": "Rotate and remove the exposed shared password",
+              "detail": "Retire the password stored under the desk, revoke the shared account, and require short-lived individual credentials so a compromise is attributable and containable."
+            }
+          ],
+          "confidence": "high",
+          "recommendation": {
+            "sound": true,
+            "note": "Both recommendations directly remove the shared identity and restore individual attribution."
+          }
+        },
+        {
+          "id": "T-01",
+          "framework": "stride",
+          "framework_version": "1.0",
+          "title": "On-path alteration of member loan and reservation requests",
+          "description": "`flow:entity:member>process:lending-api>borrow-renew-and-reserve` crosses from `boundary:internet` into `boundary:council-data-centre`, carries loan, renewal and reservation instructions, and has `encryption_in_transit: unknown` and `protocol: unknown`. Conditionally, if the unknown transport state means the request lacks authenticated integrity protection, an on-path attacker between the member's phone and `process:lending-api` can alter the selected member, book, renewal or reservation before the API applies its loan rules. The API then writes the altered result to `store:loans-database` through `flow:process:lending-api>store:loans-database>read-and-write-loans`; the resulting corruption can affect the member and the corresponding borrowing or reservation record. This is conditional on the unresolved transport attributes, not an assertion that the channel is plaintext.",
+          "affected_element_ids": [
+            "flow:entity:member>process:lending-api>borrow-renew-and-reserve",
+            "process:lending-api"
+          ],
+          "verb": "alter-in-transit",
+          "grounds": [
+            {
+              "kind": "derived-fact",
+              "text": "",
+              "source_label": "",
+              "element_id": "",
+              "attribute": "",
+              "flow_id": "flow:entity:member>process:lending-api>borrow-renew-and-reserve",
+              "term": "",
+              "assertion": ""
+            },
+            {
+              "kind": "unknown-attribute",
+              "text": "",
+              "source_label": "",
+              "element_id": "flow:entity:member>process:lending-api>borrow-renew-and-reserve",
+              "attribute": "protocol",
+              "flow_id": "",
+              "term": "",
+              "assertion": ""
+            },
+            {
+              "kind": "unknown-attribute",
+              "text": "",
+              "source_label": "",
+              "element_id": "flow:entity:member>process:lending-api>borrow-renew-and-reserve",
+              "attribute": "encryption_in_transit",
+              "flow_id": "",
+              "term": "",
+              "assertion": ""
+            }
+          ],
+          "verdict": {
+            "reason": "The threat follows if the member transport lacks authenticated integrity protection; both cited transport attributes are unknown.",
+            "related_unknowns": [
+              {
+                "element_id": "flow:entity:member>process:lending-api>borrow-renew-and-reserve",
+                "attribute": "protocol",
+                "subject": "",
+                "assertion": "",
+                "question": "",
+                "facets": [],
+                "capability": ""
+              },
+              {
+                "element_id": "flow:entity:member>process:lending-api>borrow-renew-and-reserve",
+                "attribute": "encryption_in_transit",
+                "subject": "",
+                "assertion": "",
+                "question": "",
+                "facets": [],
+                "capability": ""
+              }
+            ],
+            "immaterial_unknowns": [],
+            "rejected_because": null,
+            "status": "needs-info"
+          },
+          "category": "tampering",
+          "severity": {
+            "likelihood": "medium",
+            "impact": "high",
+            "level": "high",
+            "justification": "Likelihood is medium and conditional on the unknown protocol and transport protection for a flow crossing from the internet to the council data centre; an on-path position is required. Impact is high because the flow changes loans and reservations and the destination API writes members, loans and reservations into the confidential borrowing database."
+          },
+          "mitigations": [
+            {
+              "summary": "Require authenticated transport integrity on the member flow",
+              "detail": "Set `encryption_in_transit` to an authenticated TLS configuration for `flow:entity:member>process:lending-api>borrow-renew-and-reserve`, and reject downgrade or unauthenticated connections."
+            },
+            {
+              "summary": "Validate request ownership and business fields server-side",
+              "detail": "Bind member and book identifiers to the authenticated caller and validate renewal and reservation state before `process:lending-api` writes the change."
+            }
+          ],
+          "confidence": "low",
+          "recommendation": {
+            "sound": false,
+            "note": "Authenticated transport closes the on-path alteration; request validation alone does not prevent alteration in transit."
+          }
+        },
+        {
+          "id": "T-02",
+          "framework": "stride",
+          "framework_version": "1.0",
+          "title": "On-path alteration of kiosk loan and return messages",
+          "description": "`flow:process:self-service-kiosk>process:lending-api>record-loans-and-returns` crosses from `boundary:branch-network` into `boundary:council-data-centre`, carries scanned library cards and books borrowed or returned, and has `encryption_in_transit: unknown` and `protocol: unknown`. Conditionally, if those unknowns conceal an unauthenticated or non-integrity-protected channel, an attacker positioned on the branch-network path can alter the card, book, loan or return state before `process:lending-api` accepts it. The API writes the altered loan or return into `store:loans-database` via `flow:process:lending-api>store:loans-database>read-and-write-loans`, so a forged return or loan can become authoritative borrowing history.",
+          "affected_element_ids": [
+            "flow:process:self-service-kiosk>process:lending-api>record-loans-and-returns",
+            "process:lending-api"
+          ],
+          "verb": "alter-in-transit",
+          "grounds": [
+            {
+              "kind": "derived-fact",
+              "text": "",
+              "source_label": "",
+              "element_id": "",
+              "attribute": "",
+              "flow_id": "flow:process:self-service-kiosk>process:lending-api>record-loans-and-returns",
+              "term": "",
+              "assertion": ""
+            },
+            {
+              "kind": "unknown-attribute",
+              "text": "",
+              "source_label": "",
+              "element_id": "flow:process:self-service-kiosk>process:lending-api>record-loans-and-returns",
+              "attribute": "protocol",
+              "flow_id": "",
+              "term": "",
+              "assertion": ""
+            },
+            {
+              "kind": "unknown-attribute",
+              "text": "",
+              "source_label": "",
+              "element_id": "flow:process:self-service-kiosk>process:lending-api>record-loans-and-returns",
+              "attribute": "encryption_in_transit",
+              "flow_id": "",
+              "term": "",
+              "assertion": ""
+            }
+          ],
+          "verdict": {
+            "reason": "The threat follows if the kiosk transport lacks authenticated integrity protection; its protocol and transport encryption are unknown.",
+            "related_unknowns": [
+              {
+                "element_id": "flow:process:self-service-kiosk>process:lending-api>record-loans-and-returns",
+                "attribute": "protocol",
+                "subject": "",
+                "assertion": "",
+                "question": "",
+                "facets": [],
+                "capability": ""
+              },
+              {
+                "element_id": "flow:process:self-service-kiosk>process:lending-api>record-loans-and-returns",
+                "attribute": "encryption_in_transit",
+                "subject": "",
+                "assertion": "",
+                "question": "",
+                "facets": [],
+                "capability": ""
+              }
+            ],
+            "immaterial_unknowns": [],
+            "rejected_because": null,
+            "status": "needs-info"
+          },
+          "category": "tampering",
+          "severity": {
+            "likelihood": "medium",
+            "impact": "high",
+            "level": "high",
+            "justification": "Likelihood is medium and conditional on the unknown transport attributes; the attacker needs a position on a branch-network-to-data-centre path, but the crossing is established. Impact is high because altered returns and loans change confidential member borrowing history and business-critical circulation records."
+          },
+          "mitigations": [
+            {
+              "summary": "Protect kiosk messages with authenticated encryption",
+              "detail": "Use mutually authenticated TLS or equivalent message authentication on `flow:process:self-service-kiosk>process:lending-api>record-loans-and-returns`."
+            },
+            {
+              "summary": "Validate kiosk-originated state transitions",
+              "detail": "Require server-side checks that the scanned member, book and current loan state permit the requested loan or return before persisting it."
+            }
+          ],
+          "confidence": "low",
+          "recommendation": {
+            "sound": false,
+            "note": "Authenticated transport closes the on-path alteration; state-transition validation alone does not protect the message in transit."
+          }
+        },
+        {
+          "id": "T-03",
+          "framework": "stride",
+          "framework_version": "1.0",
+          "title": "On-path alteration of desk circulation changes",
+          "description": "`flow:entity:desk-staff>process:lending-api>change-loans-by-hand` crosses from `boundary:branch-network` into `boundary:council-data-centre` and carries loan extensions, cleared account blocks and hand-closed loans. Its `protocol` and `encryption_in_transit` are unknown. Conditionally, if the transport is not protected against modification, an attacker on the branch-network path can alter which member or loan is changed and whether a block is cleared before `process:lending-api` handles the request. The API persists the altered result in `store:loans-database` through `flow:process:lending-api>store:loans-database>read-and-write-loans`, changing confidential member records and circulation state.",
+          "affected_element_ids": [
+            "flow:entity:desk-staff>process:lending-api>change-loans-by-hand",
+            "process:lending-api"
+          ],
+          "verb": "alter-in-transit",
+          "grounds": [
+            {
+              "kind": "derived-fact",
+              "text": "",
+              "source_label": "",
+              "element_id": "",
+              "attribute": "",
+              "flow_id": "flow:entity:desk-staff>process:lending-api>change-loans-by-hand",
+              "term": "",
+              "assertion": ""
+            },
+            {
+              "kind": "unknown-attribute",
+              "text": "",
+              "source_label": "",
+              "element_id": "flow:entity:desk-staff>process:lending-api>change-loans-by-hand",
+              "attribute": "protocol",
+              "flow_id": "",
+              "term": "",
+              "assertion": ""
+            },
+            {
+              "kind": "unknown-attribute",
+              "text": "",
+              "source_label": "",
+              "element_id": "flow:entity:desk-staff>process:lending-api>change-loans-by-hand",
+              "attribute": "encryption_in_transit",
+              "flow_id": "",
+              "term": "",
+              "assertion": ""
+            }
+          ],
+          "verdict": {
+            "reason": "The threat follows if the desk transport lacks modification protection; its protocol and transport encryption are unknown.",
+            "related_unknowns": [
+              {
+                "element_id": "flow:entity:desk-staff>process:lending-api>change-loans-by-hand",
+                "attribute": "protocol",
+                "subject": "",
+                "assertion": "",
+                "question": "",
+                "facets": [],
+                "capability": ""
+              },
+              {
+                "element_id": "flow:entity:desk-staff>process:lending-api>change-loans-by-hand",
+                "attribute": "encryption_in_transit",
+                "subject": "",
+                "assertion": "",
+                "question": "",
+                "facets": [],
+                "capability": ""
+              }
+            ],
+            "immaterial_unknowns": [],
+            "rejected_because": null,
+            "status": "needs-info"
+          },
+          "category": "tampering",
+          "severity": {
+            "likelihood": "medium",
+            "impact": "high",
+            "level": "high",
+            "justification": "Likelihood is medium and conditional on the unknown transport attributes; exploiting it requires a position on the branch-network path. Impact is high because altered staff operations can clear account blocks or rewrite loan status in the confidential database, affecting member histories and lending decisions."
+          },
+          "mitigations": [
+            {
+              "summary": "Require authenticated integrity protection for circulation traffic",
+              "detail": "Use TLS with server authentication and, where appropriate, client authentication for `flow:entity:desk-staff>process:lending-api>change-loans-by-hand`."
+            },
+            {
+              "summary": "Use per-staff identities and authorize each operation",
+              "detail": "Replace the shared desk login with individually attributable accounts and enforce server-side authorization for loan extensions, block clearing and returns."
+            }
+          ],
+          "confidence": "low",
+          "recommendation": {
+            "sound": false,
+            "note": "Transport integrity closes the on-path alteration; individual staff authorization does not by itself protect the channel."
+          }
+        },
+        {
+          "id": "T-04",
+          "framework": "stride",
+          "framework_version": "1.0",
+          "title": "Unauthorized alteration through the lending API's database write path",
+          "description": "`flow:process:lending-api>store:loans-database>read-and-write-loans` is a read-write path for members, loans, reservations and borrowing history, but its `authentication` is unknown. Conditionally, if the database accepts an unverified or overbroad caller on this path, an attacker who gains the ability to invoke or compromise `process:lending-api` can alter records in `store:loans-database` without a verified write principal. The lending API subsequently reads those records through the same read-write relationship and acts on them as authoritative loan and reservation state; the corruption can therefore affect the full member, loan and reservation corpus rather than a single request. The unresolved condition is the database-flow authentication, not an assertion that it is absent.",
+          "affected_element_ids": [
+            "store:loans-database",
+            "flow:process:lending-api>store:loans-database>read-and-write-loans",
+            "process:lending-api"
+          ],
+          "verb": "alter",
+          "grounds": [
+            {
+              "kind": "quote",
+              "text": "Members, loans and reservations live in the loans database.",
+              "source_label": "Lending service note",
+              "element_id": "",
+              "attribute": "",
+              "flow_id": "",
+              "term": "",
+              "assertion": ""
+            },
+            {
+              "kind": "unknown-attribute",
+              "text": "",
+              "source_label": "",
+              "element_id": "flow:process:lending-api>store:loans-database>read-and-write-loans",
+              "attribute": "authentication",
+              "flow_id": "",
+              "term": "",
+              "assertion": ""
+            },
+            {
+              "kind": "unknown-attribute",
+              "text": "",
+              "source_label": "",
+              "element_id": "flow:process:lending-api>store:loans-database>read-and-write-loans",
+              "attribute": "protocol",
+              "flow_id": "",
+              "term": "",
+              "assertion": ""
+            }
+          ],
+          "verdict": {
+            "reason": "The threat follows if the database path accepts an unverified or overbroad writer. Database authentication and protocol are unresolved.",
+            "related_unknowns": [
+              {
+                "element_id": "flow:process:lending-api>store:loans-database>read-and-write-loans",
+                "attribute": "authentication",
+                "subject": "",
+                "assertion": "",
+                "question": "",
+                "facets": [],
+                "capability": ""
+              },
+              {
+                "element_id": "flow:process:lending-api>store:loans-database>read-and-write-loans",
+                "attribute": "protocol",
+                "subject": "",
+                "assertion": "",
+                "question": "",
+                "facets": [],
+                "capability": ""
+              }
+            ],
+            "immaterial_unknowns": [],
+            "rejected_because": null,
+            "status": "needs-info"
+          },
+          "category": "tampering",
+          "severity": {
+            "likelihood": "medium",
+            "impact": "high",
+            "level": "high",
+            "justification": "Likelihood is medium and conditional on the unknown database authentication: the attacker needs access through or a compromise of the internet-facing `process:lending-api`, but the write caller's control is unverified. Impact is high because the store is tagged with PII and business-critical data and contains every member's loans, reservations and borrowing history."
+          },
+          "mitigations": [
+            {
+              "summary": "Authenticate the database workload and restrict its grant",
+              "detail": "Require a short-lived workload identity for `process:lending-api` and grant only the required database operations, tables and columns; do not accept anonymous or shared broad write access."
+            },
+            {
+              "summary": "Enforce record-level integrity checks in the API",
+              "detail": "Validate ownership, legal state transitions and permitted fields in `process:lending-api` before writes, and maintain versioning or reconciliation for recovery from unauthorized changes."
+            }
+          ],
+          "confidence": "low",
+          "recommendation": {
+            "sound": false,
+            "note": "A narrowly authenticated database workload addresses the threat; API-side integrity checks alone do not prevent unauthorized database writes."
+          }
+        },
+        {
+          "id": "I-01",
+          "framework": "stride",
+          "framework_version": "1.0",
+          "title": "Member activity may be readable on the internet-facing API connection",
+          "description": "An attacker positioned on the path between `entity:member` in `boundary:internet` and the internet-facing `process:lending-api` could intercept `flow:entity:member>process:lending-api>borrow-renew-and-reserve`. The flow carries member identifiers, book choices, loans, renewals and reservations, and its `encryption_in_transit` and `protocol` are unknown; if transport protection is absent or inadequate, the attacker reads member activity and PII in transit. Second-order: the observed member and book identifiers enable targeted requests against that member's records through `process:lending-api` and help correlate a member's borrowing history over time. This finding is conditional on the unknown transport controls, not an assertion that the flow is cleartext.",
+          "affected_element_ids": [
+            "flow:entity:member>process:lending-api>borrow-renew-and-reserve",
+            "entity:member",
+            "process:lending-api"
+          ],
+          "verb": "intercept",
+          "grounds": [
+            {
+              "kind": "unknown-attribute",
+              "text": "",
+              "source_label": "",
+              "element_id": "flow:entity:member>process:lending-api>borrow-renew-and-reserve",
+              "attribute": "encryption_in_transit",
+              "flow_id": "",
+              "term": "",
+              "assertion": ""
+            },
+            {
+              "kind": "unknown-attribute",
+              "text": "",
+              "source_label": "",
+              "element_id": "flow:entity:member>process:lending-api>borrow-renew-and-reserve",
+              "attribute": "protocol",
+              "flow_id": "",
+              "term": "",
+              "assertion": ""
+            },
+            {
+              "kind": "derived-fact",
+              "text": "",
+              "source_label": "",
+              "element_id": "",
+              "attribute": "",
+              "flow_id": "flow:entity:member>process:lending-api>borrow-renew-and-reserve",
+              "term": "",
+              "assertion": ""
+            }
+          ],
+          "verdict": {
+            "reason": "The threat follows if the member connection lacks effective transport confidentiality; protocol and encryption in transit are unknown.",
+            "related_unknowns": [
+              {
+                "element_id": "flow:entity:member>process:lending-api>borrow-renew-and-reserve",
+                "attribute": "encryption_in_transit",
+                "subject": "",
+                "assertion": "",
+                "question": "",
+                "facets": [],
+                "capability": ""
+              },
+              {
+                "element_id": "flow:entity:member>process:lending-api>borrow-renew-and-reserve",
+                "attribute": "protocol",
+                "subject": "",
+                "assertion": "",
+                "question": "",
+                "facets": [],
+                "capability": ""
+              }
+            ],
+            "immaterial_unknowns": [],
+            "rejected_because": null,
+            "status": "needs-info"
+          },
+          "category": "information-disclosure",
+          "severity": {
+            "likelihood": "medium",
+            "impact": "medium",
+            "level": "medium",
+            "justification": "Likelihood is medium: the flow crosses from `boundary:internet` to `boundary:council-data-centre`, so an attacker needs a path position but no application credential; the transport controls are unknown. Impact is medium because the flow carries `pii` and member borrowing and reservation activity, and captured data is not recoverable."
+          },
+          "mitigations": [
+            {
+              "summary": "Require TLS 1.2 or later on the member flow",
+              "detail": "Set and verify `encryption_in_transit` for `flow:entity:member>process:lending-api>borrow-renew-and-reserve`, with certificate validation and secure protocol configuration."
+            },
+            {
+              "summary": "Minimize identifiers carried by the API",
+              "detail": "Use opaque references and avoid returning more member or borrowing detail than the requested operation needs."
+            }
+          ],
+          "confidence": "low",
+          "recommendation": {
+            "sound": false,
+            "note": "Encrypted transport addresses interception; identifier minimization does not itself prevent reading the traffic."
+          }
+        },
+        {
+          "id": "I-02",
+          "framework": "stride",
+          "framework_version": "1.0",
+          "title": "Kiosk loan and return traffic may be readable across the branch boundary",
+          "description": "An attacker who can observe the branch-network path into `process:lending-api` could intercept `flow:process:self-service-kiosk>process:lending-api>record-loans-and-returns`. The flow crosses from `boundary:branch-network` to `boundary:council-data-centre`, carries scanned library cards and books borrowed or returned, and has unknown protocol and transport encryption. If the unknown transport protection is absent or ineffective, the observer reads member-linked lending activity. Second-order: the scanned card and book identifiers can be used to map branch activity to members and to target later calls to `process:lending-api`. This is conditional on the unknown transport attributes.",
+          "affected_element_ids": [
+            "flow:process:self-service-kiosk>process:lending-api>record-loans-and-returns",
+            "process:self-service-kiosk",
+            "process:lending-api"
+          ],
+          "verb": "intercept",
+          "grounds": [
+            {
+              "kind": "unknown-attribute",
+              "text": "",
+              "source_label": "",
+              "element_id": "flow:process:self-service-kiosk>process:lending-api>record-loans-and-returns",
+              "attribute": "encryption_in_transit",
+              "flow_id": "",
+              "term": "",
+              "assertion": ""
+            },
+            {
+              "kind": "unknown-attribute",
+              "text": "",
+              "source_label": "",
+              "element_id": "flow:process:self-service-kiosk>process:lending-api>record-loans-and-returns",
+              "attribute": "protocol",
+              "flow_id": "",
+              "term": "",
+              "assertion": ""
+            },
+            {
+              "kind": "derived-fact",
+              "text": "",
+              "source_label": "",
+              "element_id": "",
+              "attribute": "",
+              "flow_id": "flow:process:self-service-kiosk>process:lending-api>record-loans-and-returns",
+              "term": "",
+              "assertion": ""
+            }
+          ],
+          "verdict": {
+            "reason": "The threat follows if kiosk traffic lacks effective transport confidentiality; its protocol and encryption in transit are unknown.",
+            "related_unknowns": [
+              {
+                "element_id": "flow:process:self-service-kiosk>process:lending-api>record-loans-and-returns",
+                "attribute": "encryption_in_transit",
+                "subject": "",
+                "assertion": "",
+                "question": "",
+                "facets": [],
+                "capability": ""
+              },
+              {
+                "element_id": "flow:process:self-service-kiosk>process:lending-api>record-loans-and-returns",
+                "attribute": "protocol",
+                "subject": "",
+                "assertion": "",
+                "question": "",
+                "facets": [],
+                "capability": ""
+              }
+            ],
+            "immaterial_unknowns": [],
+            "rejected_because": null,
+            "status": "needs-info"
+          },
+          "category": "information-disclosure",
+          "severity": {
+            "likelihood": "medium",
+            "impact": "medium",
+            "level": "medium",
+            "justification": "Likelihood is medium: the flow crosses the branch-network/data-centre boundary and has no verified transport protection, although the attacker needs access to the branch path. Impact is medium because the flow carries PII-linked library-card and borrowing or return data."
+          },
+          "mitigations": [
+            {
+              "summary": "Protect kiosk traffic with mutually authenticated TLS",
+              "detail": "Use TLS 1.2+ and, where practical, mTLS between each kiosk and `process:lending-api`; record the protocol and encryption state in the model."
+            },
+            {
+              "summary": "Use opaque kiosk references",
+              "detail": "Avoid sending unnecessary member identifiers in clear application payloads and limit returned member information."
+            }
+          ],
+          "confidence": "low",
+          "recommendation": {
+            "sound": false,
+            "note": "Protected transport addresses interception; opaque references only reduce the impact and do not close the disclosure."
+          }
+        },
+        {
+          "id": "I-03",
+          "framework": "stride",
+          "framework_version": "1.0",
+          "title": "Desk circulation traffic may expose account and loan activity",
+          "description": "An attacker able to observe a branch-network path can conditionally intercept `flow:entity:desk-staff>process:lending-api>change-loans-by-hand`, which crosses from `boundary:branch-network` to `boundary:council-data-centre`. The flow's protocol and `encryption_in_transit` are unknown and it carries loan extensions, cleared account blocks and hand-closed loans. If the unknown transport controls do not protect the channel, the attacker reads member-account and circulation activity, including which accounts are blocked or manually changed. Second-order: those observations identify members and operational actions for later targeted abuse of `process:lending-api`; they do not by themselves establish that the desk password travels on this flow.",
+          "affected_element_ids": [
+            "flow:entity:desk-staff>process:lending-api>change-loans-by-hand",
+            "entity:desk-staff",
+            "process:lending-api"
+          ],
+          "verb": "intercept",
+          "grounds": [
+            {
+              "kind": "unknown-attribute",
+              "text": "",
+              "source_label": "",
+              "element_id": "flow:entity:desk-staff>process:lending-api>change-loans-by-hand",
+              "attribute": "encryption_in_transit",
+              "flow_id": "",
+              "term": "",
+              "assertion": ""
+            },
+            {
+              "kind": "unknown-attribute",
+              "text": "",
+              "source_label": "",
+              "element_id": "flow:entity:desk-staff>process:lending-api>change-loans-by-hand",
+              "attribute": "protocol",
+              "flow_id": "",
+              "term": "",
+              "assertion": ""
+            },
+            {
+              "kind": "derived-fact",
+              "text": "",
+              "source_label": "",
+              "element_id": "",
+              "attribute": "",
+              "flow_id": "flow:entity:desk-staff>process:lending-api>change-loans-by-hand",
+              "term": "",
+              "assertion": ""
+            }
+          ],
+          "verdict": {
+            "reason": "The threat follows if desk traffic lacks effective transport confidentiality; its protocol and encryption in transit are unknown.",
+            "related_unknowns": [
+              {
+                "element_id": "flow:entity:desk-staff>process:lending-api>change-loans-by-hand",
+                "attribute": "encryption_in_transit",
+                "subject": "",
+                "assertion": "",
+                "question": "",
+                "facets": [],
+                "capability": ""
+              },
+              {
+                "element_id": "flow:entity:desk-staff>process:lending-api>change-loans-by-hand",
+                "attribute": "protocol",
+                "subject": "",
+                "assertion": "",
+                "question": "",
+                "facets": [],
+                "capability": ""
+              }
+            ],
+            "immaterial_unknowns": [],
+            "rejected_because": null,
+            "status": "needs-info"
+          },
+          "category": "information-disclosure",
+          "severity": {
+            "likelihood": "medium",
+            "impact": "medium",
+            "level": "medium",
+            "justification": "Likelihood is medium because the flow crosses from the branch network into the council data centre and transport protection is unverified, while an attacker still needs a branch-network observation position. Impact is medium because the flow concerns member account blocks and loan history, and the source model tags the flow with business-critical data."
+          },
+          "mitigations": [
+            {
+              "summary": "Require authenticated encrypted transport for circulation pages",
+              "detail": "Use TLS 1.2+ with server authentication, and mTLS or an equivalent managed device control for branch clients where appropriate."
+            },
+            {
+              "summary": "Reduce sensitive response fields",
+              "detail": "Return only the loan or account fields required for the desk operation."
+            }
+          ],
+          "confidence": "low",
+          "recommendation": {
+            "sound": false,
+            "note": "Encrypted transport addresses interception; reducing response fields does not itself close the disclosure."
+          }
+        },
+        {
+          "id": "I-04",
+          "framework": "stride",
+          "framework_version": "1.0",
+          "title": "The API-to-database connection may expose the loans corpus to a local observer",
+          "description": "A local attacker or compromised component with a position inside `boundary:council-data-centre` could conditionally intercept `flow:process:lending-api>store:loans-database>read-and-write-loans`. The flow carries members, loans, reservations and borrowing history between `process:lending-api` and `store:loans-database`, while its protocol and `encryption_in_transit` are unknown. If that transport is unprotected, the observer can read the PII and confidential borrowing records as they are queried or written. Second-order: the captured records reveal member identities, addresses and histories that can be correlated across later API activity. This finding does not claim that the database link is cleartext.",
+          "affected_element_ids": [
+            "flow:process:lending-api>store:loans-database>read-and-write-loans",
+            "process:lending-api",
+            "store:loans-database"
+          ],
+          "verb": "intercept",
+          "grounds": [
+            {
+              "kind": "unknown-attribute",
+              "text": "",
+              "source_label": "",
+              "element_id": "flow:process:lending-api>store:loans-database>read-and-write-loans",
+              "attribute": "encryption_in_transit",
+              "flow_id": "",
+              "term": "",
+              "assertion": ""
+            },
+            {
+              "kind": "unknown-attribute",
+              "text": "",
+              "source_label": "",
+              "element_id": "flow:process:lending-api>store:loans-database>read-and-write-loans",
+              "attribute": "protocol",
+              "flow_id": "",
+              "term": "",
+              "assertion": ""
+            }
+          ],
+          "verdict": {
+            "reason": "The threat follows if the API-to-database connection lacks transport confidentiality; its protocol and encryption in transit are unknown.",
+            "related_unknowns": [
+              {
+                "element_id": "flow:process:lending-api>store:loans-database>read-and-write-loans",
+                "attribute": "encryption_in_transit",
+                "subject": "",
+                "assertion": "",
+                "question": "",
+                "facets": [],
+                "capability": ""
+              },
+              {
+                "element_id": "flow:process:lending-api>store:loans-database>read-and-write-loans",
+                "attribute": "protocol",
+                "subject": "",
+                "assertion": "",
+                "question": "",
+                "facets": [],
+                "capability": ""
+              }
+            ],
+            "immaterial_unknowns": [],
+            "rejected_because": null,
+            "status": "needs-info"
+          },
+          "category": "information-disclosure",
+          "severity": {
+            "likelihood": "low",
+            "impact": "high",
+            "level": "medium",
+            "justification": "Likelihood is low because the attacker needs a foothold or observation position inside `boundary:council-data-centre`, although the database transport controls are unknown. Impact is high because `store:loans-database` is confidential and contains PII, home addresses and every member's full borrowing history."
+          },
+          "mitigations": [
+            {
+              "summary": "Encrypt and authenticate the database connection",
+              "detail": "Use TLS for the database protocol with certificate validation, and use workload identity or mTLS so the database accepts only the intended API."
+            },
+            {
+              "summary": "Limit data on the connection",
+              "detail": "Constrain queries and returned fields to the operation's need, especially for member addresses and full borrowing history."
+            }
+          ],
+          "confidence": "low",
+          "recommendation": {
+            "sound": false,
+            "note": "Encrypted and authenticated database transport addresses interception; query minimization does not itself close it."
+          }
+        },
+        {
+          "id": "I-09",
+          "framework": "stride",
+          "framework_version": "1.0",
+          "title": "API error handling may elicit internal details from internet callers",
+          "description": "An attacker on `boundary:internet` can send requests to internet-facing `process:lending-api` through `flow:entity:member>process:lending-api>borrow-renew-and-reserve`. The source states that nobody can currently say what the API accepts or does with a call it rejects, so if error handling is verbose, the attacker can elicit member-enumeration signals, database or framework errors, internal paths, or implementation details. Second-order: those details help the attacker refine object-enumeration attempts against `store:loans-database` and target subsequent API attacks. This is conditional on the unresolved rejected-request and error-response behavior.",
+          "affected_element_ids": [
+            "process:lending-api",
+            "flow:entity:member>process:lending-api>borrow-renew-and-reserve",
+            "entity:member"
+          ],
+          "verb": "elicit",
+          "grounds": [
+            {
+              "kind": "quote",
+              "text": "Honestly I could not tell you today what it accepts, or what it does with a call it does not like.",
+              "source_label": "Interview transcript",
+              "element_id": "",
+              "attribute": "",
+              "flow_id": "",
+              "term": "",
+              "assertion": ""
+            },
+            {
+              "kind": "derived-fact",
+              "text": "",
+              "source_label": "",
+              "element_id": "",
+              "attribute": "",
+              "flow_id": "flow:entity:member>process:lending-api>borrow-renew-and-reserve",
+              "term": "",
+              "assertion": ""
+            }
+          ],
+          "verdict": {
+            "reason": "The threat follows if rejected requests produce verbose or otherwise revealing responses, but the model has no field stating that behavior.",
+            "related_unknowns": [
+              {
+                "element_id": "",
+                "attribute": "",
+                "subject": "What error responses and rejected-request behavior does process:lending-api expose to internet callers?",
+                "assertion": "",
+                "question": "",
+                "facets": [],
+                "capability": ""
+              }
+            ],
+            "immaterial_unknowns": [],
+            "rejected_because": null,
+            "status": "needs-info"
+          },
+          "category": "information-disclosure",
+          "severity": {
+            "likelihood": "medium",
+            "impact": "medium",
+            "level": "medium",
+            "justification": "Likelihood is medium: the process is internet-facing and rejected-call behavior is explicitly unresolved, so any attacker can probe it without a prior foothold. Impact is medium because disclosed errors would expose reconnaissance data and potentially member-account distinctions, although the model does not establish that stack traces or records are actually returned."
+          },
+          "mitigations": [
+            {
+              "summary": "Return generic production errors",
+              "detail": "Use stable generic responses with correlation IDs, suppress stack traces and storage errors from callers, and send detailed diagnostics only to an access-controlled internal log."
+            },
+            {
+              "summary": "Test rejected requests and enumeration behavior",
+              "detail": "Define and verify consistent authorization failures, avoid account-existence distinctions, and add automated tests for malformed and out-of-scope member requests."
+            }
+          ],
+          "confidence": "low",
+          "recommendation": {
+            "sound": false,
+            "note": "Generic production errors address the disclosure; testing alone does not close it unless corrective behavior is implemented."
+          }
+        },
+        {
+          "id": "S-04",
+          "framework": "stride",
+          "framework_version": "1.0",
+          "title": "An on-path attacker may impersonate the lending API to a member",
+          "description": "An attacker positioned between `entity:member` and `process:lending-api` may substitute a look-alike service for `process:lending-api` on `flow:entity:member>process:lending-api>borrow-renew-and-reserve`. If the flow's unknown protocol and transport-encryption controls do not provide server authentication, the member's app cannot verify that it reached the genuine API, allowing the attacker to solicit the member and book information sent on the flow. This draft is conditional on the unknown transport attributes; it does not assert that the endpoint lacks server authentication.",
+          "affected_element_ids": [
+            "process:lending-api",
+            "flow:entity:member>process:lending-api>borrow-renew-and-reserve"
+          ],
+          "verb": "impersonate",
+          "grounds": [
+            {
+              "kind": "derived-fact",
+              "text": "",
+              "source_label": "",
+              "element_id": "",
+              "attribute": "",
+              "flow_id": "flow:entity:member>process:lending-api>borrow-renew-and-reserve",
+              "term": "",
+              "assertion": ""
+            },
+            {
+              "kind": "unknown-attribute",
+              "text": "",
+              "source_label": "",
+              "element_id": "flow:entity:member>process:lending-api>borrow-renew-and-reserve",
+              "attribute": "protocol",
+              "flow_id": "",
+              "term": "",
+              "assertion": ""
+            },
+            {
+              "kind": "unknown-attribute",
+              "text": "",
+              "source_label": "",
+              "element_id": "flow:entity:member>process:lending-api>borrow-renew-and-reserve",
+              "attribute": "encryption_in_transit",
+              "flow_id": "",
+              "term": "",
+              "assertion": ""
+            }
+          ],
+          "verdict": {
+            "reason": "The threat follows if the member connection lacks server authentication and integrity protection; protocol and transport encryption are unknown.",
+            "related_unknowns": [
+              {
+                "element_id": "flow:entity:member>process:lending-api>borrow-renew-and-reserve",
+                "attribute": "protocol",
+                "subject": "",
+                "assertion": "",
+                "question": "",
+                "facets": [],
+                "capability": ""
+              },
+              {
+                "element_id": "flow:entity:member>process:lending-api>borrow-renew-and-reserve",
+                "attribute": "encryption_in_transit",
+                "subject": "",
+                "assertion": "",
+                "question": "",
+                "facets": [],
+                "capability": ""
+              }
+            ],
+            "immaterial_unknowns": [],
+            "rejected_because": null,
+            "status": "needs-info"
+          },
+          "category": "spoofing",
+          "severity": {
+            "likelihood": "medium",
+            "impact": "medium",
+            "level": "medium",
+            "justification": "Likelihood is medium and conditional: the flow crosses from `boundary:internet`, but the attacker also needs an on-path position and the protocol and transport protection are unknown. Impact is medium because the flow carries member and book information and the impersonated endpoint could harvest those submissions."
+          },
+          "mitigations": [
+            {
+              "summary": "Require authenticated HTTPS with certificate validation",
+              "detail": "Make `flow:entity:member>process:lending-api>borrow-renew-and-reserve` use TLS 1.2 or later with full certificate-chain validation and an explicitly recorded HTTPS protocol."
+            }
+          ],
+          "confidence": "low",
+          "recommendation": {
+            "sound": true,
+            "note": "Authenticated HTTPS directly closes the endpoint-impersonation threat."
+          }
+        },
+        {
+          "id": "S-06",
+          "framework": "stride",
+          "framework_version": "1.0",
+          "title": "A branch-network attacker may impersonate the lending API to desk staff",
+          "description": "An attacker positioned between `entity:desk-staff` and `process:lending-api` may substitute a look-alike endpoint on `flow:entity:desk-staff>process:lending-api>change-loans-by-hand`. If the flow's unknown protocol and transport-encryption controls do not authenticate the server, the attacker can present a false circulation page to collect the shared desk credential or mislead staff about loan actions. This draft is conditional on the unknown transport attributes; it does not assert that server authentication is absent.",
+          "affected_element_ids": [
+            "process:lending-api",
+            "flow:entity:desk-staff>process:lending-api>change-loans-by-hand"
+          ],
+          "verb": "impersonate",
+          "grounds": [
+            {
+              "kind": "derived-fact",
+              "text": "",
+              "source_label": "",
+              "element_id": "",
+              "attribute": "",
+              "flow_id": "flow:entity:desk-staff>process:lending-api>change-loans-by-hand",
+              "term": "",
+              "assertion": ""
+            },
+            {
+              "kind": "unknown-attribute",
+              "text": "",
+              "source_label": "",
+              "element_id": "flow:entity:desk-staff>process:lending-api>change-loans-by-hand",
+              "attribute": "protocol",
+              "flow_id": "",
+              "term": "",
+              "assertion": ""
+            },
+            {
+              "kind": "unknown-attribute",
+              "text": "",
+              "source_label": "",
+              "element_id": "flow:entity:desk-staff>process:lending-api>change-loans-by-hand",
+              "attribute": "encryption_in_transit",
+              "flow_id": "",
+              "term": "",
+              "assertion": ""
+            }
+          ],
+          "verdict": {
+            "reason": "The threat follows if the desk connection lacks server authentication; protocol and transport encryption are unknown.",
+            "related_unknowns": [
+              {
+                "element_id": "flow:entity:desk-staff>process:lending-api>change-loans-by-hand",
+                "attribute": "protocol",
+                "subject": "",
+                "assertion": "",
+                "question": "",
+                "facets": [],
+                "capability": ""
+              },
+              {
+                "element_id": "flow:entity:desk-staff>process:lending-api>change-loans-by-hand",
+                "attribute": "encryption_in_transit",
+                "subject": "",
+                "assertion": "",
+                "question": "",
+                "facets": [],
+                "capability": ""
+              }
+            ],
+            "immaterial_unknowns": [],
+            "rejected_because": null,
+            "status": "needs-info"
+          },
+          "category": "spoofing",
+          "severity": {
+            "likelihood": "low",
+            "impact": "high",
+            "level": "medium",
+            "justification": "Likelihood is low and conditional: an attacker needs an on-path position in `boundary:branch-network`, while the protocol and transport protection are unknown. Impact is high because the flow carries the `credentials` asset and the resulting credential could control loan and account changes through the PII-bearing `store:loans-database`."
+          },
+          "mitigations": [
+            {
+              "summary": "Use server-authenticated HTTPS for the circulation page",
+              "detail": "Require TLS with full certificate validation on `flow:entity:desk-staff>process:lending-api>change-loans-by-hand`, and make the expected protocol and transport protection explicit."
+            },
+            {
+              "summary": "Eliminate the shared credential even if transport is compromised",
+              "detail": "Replace the shared desk login with individual, phishing-resistant staff authentication so a captured session or password cannot impersonate every desk worker."
+            }
+          ],
+          "confidence": "low",
+          "recommendation": {
+            "sound": false,
+            "note": "Server-authenticated HTTPS addresses the threat, but eliminating the shared credential does not itself prevent endpoint impersonation."
+          }
+        },
+        {
+          "id": "T-05",
+          "framework": "stride",
+          "framework_version": "1.0",
+          "title": "Offline tampering of the confidential loans database",
+          "description": "`store:loans-database` has `encryption_at_rest: unknown` and contains members, addresses, loans, reservations and full borrowing history. Conditionally, if the store and its backups or snapshots lack encryption and integrity protection, an attacker who obtains offline media or an exported snapshot can alter stored records and have the modified database data reintroduced or trusted when the lending service next reads it. The lending API consumes the store through `flow:process:lending-api>store:loans-database>read-and-write-loans`, so altered member, loan or reservation records can propagate into circulation decisions and subsequent writes. The model does not identify a separate backup or snapshot element; the finding is against the database's unresolved at-rest protection.",
+          "affected_element_ids": [
+            "store:loans-database"
+          ],
+          "verb": "alter",
+          "grounds": [
+            {
+              "kind": "quote",
+              "text": "Names, email addresses, home addresses and every member's full borrowing history live in the loans database.",
+              "source_label": "Interview transcript",
+              "element_id": "",
+              "attribute": "",
+              "flow_id": "",
+              "term": "",
+              "assertion": ""
+            },
+            {
+              "kind": "unknown-attribute",
+              "text": "",
+              "source_label": "",
+              "element_id": "store:loans-database",
+              "attribute": "encryption_at_rest",
+              "flow_id": "",
+              "term": "",
+              "assertion": ""
+            }
+          ],
+          "verdict": {
+            "reason": "The threat follows if stored copies lack the stated at-rest and integrity protections. Encryption at rest is unknown, and integrity of backups, snapshots, restores, or media has no model field.",
+            "related_unknowns": [
+              {
+                "element_id": "store:loans-database",
+                "attribute": "encryption_at_rest",
+                "subject": "",
+                "assertion": "",
+                "question": "",
+                "facets": [],
+                "capability": ""
+              },
+              {
+                "element_id": "store:loans-database",
+                "attribute": "",
+                "subject": "",
+                "assertion": "",
+                "question": "stored-copy-integrity",
+                "facets": [],
+                "capability": ""
+              }
+            ],
+            "immaterial_unknowns": [],
+            "rejected_because": null,
+            "status": "needs-info"
+          },
+          "category": "tampering",
+          "severity": {
+            "likelihood": "low",
+            "impact": "high",
+            "level": "medium",
+            "justification": "Likelihood is low because the attacker needs access to offline media or an exported store representation and the at-rest control is unverified rather than stated absent. Impact is high because the affected store contains confidential PII and the complete borrowing history, and its records drive business-critical lending decisions."
+          },
+          "mitigations": [
+            {
+              "summary": "Encrypt database media and all restore artifacts",
+              "detail": "Use managed-key envelope encryption for the database, backups and snapshots, with access separated from the runtime database identity."
+            },
+            {
+              "summary": "Verify integrity before restore or import",
+              "detail": "Use signed snapshots or tamper-evident checksums and reject restores whose integrity verification fails before `process:lending-api` consumes the data."
+            }
+          ],
+          "confidence": "low",
+          "recommendation": {
+            "sound": false,
+            "note": "Encryption and integrity verification address different parts of the threat; neither mitigation alone closes both conditions."
+          }
+        },
+        {
+          "id": "S-05",
+          "framework": "stride",
+          "framework_version": "1.0",
+          "title": "A branch-network attacker may impersonate the lending API to a kiosk",
+          "description": "An attacker positioned on `boundary:branch-network` may substitute a look-alike for `process:lending-api` on `flow:process:self-service-kiosk>process:lending-api>record-loans-and-returns`. If the flow's unknown protocol and transport-encryption controls do not authenticate the server, `process:self-service-kiosk` can send scanned card and book data to the attacker instead of the genuine API, and the attacker may present fabricated API responses to the kiosk. This draft is conditional on the unknown transport attributes; it does not assert that server authentication is absent.",
+          "affected_element_ids": [
+            "process:lending-api",
+            "flow:process:self-service-kiosk>process:lending-api>record-loans-and-returns"
+          ],
+          "verb": "impersonate",
+          "grounds": [
+            {
+              "kind": "derived-fact",
+              "text": "",
+              "source_label": "",
+              "element_id": "",
+              "attribute": "",
+              "flow_id": "flow:process:self-service-kiosk>process:lending-api>record-loans-and-returns",
+              "term": "",
+              "assertion": ""
+            },
+            {
+              "kind": "unknown-attribute",
+              "text": "",
+              "source_label": "",
+              "element_id": "flow:process:self-service-kiosk>process:lending-api>record-loans-and-returns",
+              "attribute": "protocol",
+              "flow_id": "",
+              "term": "",
+              "assertion": ""
+            },
+            {
+              "kind": "unknown-attribute",
+              "text": "",
+              "source_label": "",
+              "element_id": "flow:process:self-service-kiosk>process:lending-api>record-loans-and-returns",
+              "attribute": "encryption_in_transit",
+              "flow_id": "",
+              "term": "",
+              "assertion": ""
+            }
+          ],
+          "verdict": {
+            "reason": "The threat follows if the kiosk connection lacks server authentication and integrity protection; protocol and transport encryption are unknown.",
+            "related_unknowns": [
+              {
+                "element_id": "flow:process:self-service-kiosk>process:lending-api>record-loans-and-returns",
+                "attribute": "protocol",
+                "subject": "",
+                "assertion": "",
+                "question": "",
+                "facets": [],
+                "capability": ""
+              },
+              {
+                "element_id": "flow:process:self-service-kiosk>process:lending-api>record-loans-and-returns",
+                "attribute": "encryption_in_transit",
+                "subject": "",
+                "assertion": "",
+                "question": "",
+                "facets": [],
+                "capability": ""
+              }
+            ],
+            "immaterial_unknowns": [],
+            "rejected_because": null,
+            "status": "needs-info"
+          },
+          "category": "spoofing",
+          "severity": {
+            "likelihood": "low",
+            "impact": "medium",
+            "level": "low",
+            "justification": "Likelihood is low and conditional: the attacker needs a position in `boundary:branch-network`, and the protocol and transport controls are unknown. Impact is medium because the flow carries scanned member and book information and a fake endpoint could interfere with kiosk transactions."
+          },
+          "mitigations": [
+            {
+              "summary": "Authenticate the API endpoint to every kiosk",
+              "detail": "Use TLS with full certificate validation, preferably with per-kiosk mutual TLS or workload identity, and record the protocol and encryption state explicitly on `flow:process:self-service-kiosk>process:lending-api>record-loans-and-returns`."
+            }
+          ],
+          "confidence": "low",
+          "recommendation": {
+            "sound": true,
+            "note": "Server-authenticated TLS directly addresses the impersonated API endpoint."
+          }
+        }
+      ],
+      "rejected_claims": [
+        {
+          "id": "I-07",
+          "framework": "stride",
+          "framework_version": "1.0",
+          "title": "The internet-facing API may disclose other members' records through missing object authorization",
+          "description": "A caller from `entity:member` can reach internet-facing `process:lending-api` over `flow:entity:member>process:lending-api>borrow-renew-and-reserve`, but the flow's authentication is unknown and the request names a member and a book. If the API does not verify that the authenticated caller owns or may access the named member record, an attacker can escalate from their own account or an unauthenticated request to read another member's loans, reservations or account information. Second-order: enumeration of member identifiers can build a cross-member borrowing profile and identify addresses or sensitive account conditions. The model and transcript leave the accepted authentication and rejected-call behavior unresolved, so this draft is conditional.",
+          "affected_element_ids": [
+            "flow:entity:member>process:lending-api>borrow-renew-and-reserve",
+            "entity:member",
+            "process:lending-api"
+          ],
+          "verb": "escalate",
+          "grounds": [
+            {
+              "kind": "quote",
+              "text": "I think it checks a token the app gets at sign-in, but I'd have to look. Honestly I could not tell you today what it accepts, or what it does with a call it does not like.",
+              "source_label": "Interview transcript",
+              "element_id": "",
+              "attribute": "",
+              "flow_id": "",
+              "term": "",
+              "assertion": ""
+            },
+            {
+              "kind": "unknown-attribute",
+              "text": "",
+              "source_label": "",
+              "element_id": "flow:entity:member>process:lending-api>borrow-renew-and-reserve",
+              "attribute": "authentication",
+              "flow_id": "",
+              "term": "",
+              "assertion": ""
+            },
+            {
+              "kind": "derived-fact",
+              "text": "",
+              "source_label": "",
+              "element_id": "",
+              "attribute": "",
+              "flow_id": "flow:entity:member>process:lending-api>borrow-renew-and-reserve",
+              "term": "",
+              "assertion": ""
+            }
+          ],
+          "verdict": {
+            "reason": "the verb 'escalate' is filed in information-disclosure, and it belongs to elevation-of-privilege",
+            "related_unknowns": [],
+            "immaterial_unknowns": [],
+            "rejected_because": "lane",
+            "status": "rejected"
+          },
+          "category": "information-disclosure",
+          "severity": {
+            "likelihood": "medium",
+            "impact": "high",
+            "level": "high",
+            "justification": "Likelihood is medium: the API is reachable from `boundary:internet`, and the flow's authentication and object-level authorization are not verified; exploitation still depends on the API accepting an out-of-scope identifier. Impact is high because the database contains confidential PII and every member's full borrowing history."
+          },
+          "mitigations": [
+            {
+              "summary": "Enforce server-side object authorization",
+              "detail": "Derive the allowed member scope from the authenticated principal and reject requests whose member identifier is outside that scope; never treat a path or body identifier as authorization."
+            },
+            {
+              "summary": "Minimize and rate-limit record enumeration",
+              "detail": "Return only fields needed for the operation, use opaque references, and detect repeated cross-member identifier attempts."
+            }
+          ],
+          "confidence": "high",
+          "recommendation": null
+        }
+      ],
+      "scope": [],
+      "applicability": [],
+      "coverage": [
+        {
+          "lane": "spoofing",
+          "drafts": 6,
+          "rules": 5,
+          "rules_fired": 1,
+          "candidates": 2,
+          "candidates_cited": 2,
+          "elements": 12,
+          "elements_cited": 10,
+          "boundary_crossings": 3,
+          "boundary_crossings_cited": 3,
+          "unknown_controls": 9,
+          "unknown_controls_cited": 5
+        },
+        {
+          "lane": "tampering",
+          "drafts": 5,
+          "rules": 4,
+          "rules_fired": 2,
+          "candidates": 4,
+          "candidates_cited": 1,
+          "elements": 12,
+          "elements_cited": 9,
+          "boundary_crossings": 3,
+          "boundary_crossings_cited": 3,
+          "unknown_controls": 9,
+          "unknown_controls_cited": 5
+        },
+        {
+          "lane": "repudiation",
+          "drafts": 4,
+          "rules": 3,
+          "rules_fired": 1,
+          "candidates": 3,
+          "candidates_cited": 3,
+          "elements": 12,
+          "elements_cited": 12,
+          "boundary_crossings": 3,
+          "boundary_crossings_cited": 3,
+          "unknown_controls": 9,
+          "unknown_controls_cited": 3
+        },
+        {
+          "lane": "information-disclosure",
+          "drafts": 9,
+          "rules": 4,
+          "rules_fired": 3,
+          "candidates": 6,
+          "candidates_cited": 6,
+          "elements": 12,
+          "elements_cited": 12,
+          "boundary_crossings": 3,
+          "boundary_crossings_cited": 3,
+          "unknown_controls": 9,
+          "unknown_controls_cited": 7
+        },
+        {
+          "lane": "denial-of-service",
+          "drafts": 1,
+          "rules": 2,
+          "rules_fired": 2,
+          "candidates": 2,
+          "candidates_cited": 1,
+          "elements": 12,
+          "elements_cited": 7,
+          "boundary_crossings": 3,
+          "boundary_crossings_cited": 3,
+          "unknown_controls": 9,
+          "unknown_controls_cited": 2
+        },
+        {
+          "lane": "elevation-of-privilege",
+          "drafts": 3,
+          "rules": 2,
+          "rules_fired": 0,
+          "candidates": 0,
+          "candidates_cited": 0,
+          "elements": 12,
+          "elements_cited": 9,
+          "boundary_crossings": 3,
+          "boundary_crossings_cited": 3,
+          "unknown_controls": 9,
+          "unknown_controls_cited": 2
+        }
+      ],
+      "unverified_grounds": [
+        {
+          "claim_id": "I-06",
+          "index": 0,
+          "reason": "not found in 'Lending service note'"
+        },
+        {
+          "claim_id": "I-07",
+          "index": 0,
+          "reason": "not found in 'Interview transcript'"
+        }
+      ],
+      "unreconciled_rulings": [
+        {
+          "claim_id": "T-05",
+          "kind": "unresolved-unknown",
+          "message": "claim 'T-05' asks question 'stored-copy-integrity' about ''; a question names a kind from the list and an element of this model, or the fact goes in `subject`"
+        }
+      ],
+      "repaired_quotes": [
+        {
+          "claim_id": "E-03",
+          "index": 0,
+          "written": "Priya: Everyone at the desk uses the same shared login for the circulation page. The password is on a card taped under the desk.",
+          "similarity": 0.953,
+          "moved": [],
+          "scan_complete": true
+        }
+      ],
+      "unresolved_references": [],
+      "unresolved_mentions": [],
+      "unresolved_evidence": [],
+      "unknown_claim_identities": [],
+      "dropped_claims": [],
+      "fired_rules": [
+        "denial-of-service-internet-exposed-process",
+        "denial-of-service-shared-dependency",
+        "information-disclosure-store-at-rest-unverified",
+        "information-disclosure-store-readers",
+        "information-disclosure-unprotected-sensitive-transit",
+        "repudiation-unattributable-action",
+        "spoofing-unverified-boundary-auth",
+        "tampering-unprotected-transit-crossing",
+        "tampering-unverified-write-to-store"
+      ],
+      "knowledge_docs": [
+        "cases/chained-benign-facts",
+        "cases/shared-credential-attribution",
+        "cases/stated-control-outside-the-model",
+        "cases/two-threats-one-flow",
+        "cases/unknown-is-not-absent",
+        "notes/attribution-and-audit",
+        "notes/compromise-inheritance",
+        "notes/cost-of-an-unauthenticated-request",
+        "notes/failure-coupling",
+        "notes/identity-at-a-boundary",
+        "notes/protection-at-rest",
+        "notes/transport-protection",
+        "notes/write-path-integrity"
+      ],
+      "catalog_leads": null,
+      "summary": {
+        "claim_count": 27,
+        "needs_info_count": 23,
+        "rejected_count": 1,
+        "by_category": {
+          "denial-of-service": 1,
+          "elevation-of-privilege": 3,
+          "information-disclosure": 8,
+          "repudiation": 4,
+          "spoofing": 6,
+          "tampering": 5
+        },
+        "by_severity": {
+          "critical": 6,
+          "high": 12,
+          "medium": 8,
+          "low": 1
+        },
+        "by_severity_confirmed": {
+          "critical": 3,
+          "high": 1
+        }
+      },
+      "missing_mitigations": []
+    }
+  ]
+}
