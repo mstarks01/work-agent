@@ -362,6 +362,12 @@ def test_a_negative_value_turns_the_assertion_pass_off(value):
     assert graph.ASSERT_NODE not in pipeline.node_models
 
 
+def test_an_empty_value_keeps_the_assertion_pass_on():
+    deployment = Deployment.from_env(env=VERTEX_ENV | {ASSERTIONS_VAR: ""})
+
+    assert deployment.assertions is True
+
+
 def test_the_flag_puts_the_pass_into_every_graph_that_prepares():
     env = VERTEX_ENV | {ASSERTIONS_VAR: "true"}
     deployment = Deployment.from_env(env=env)

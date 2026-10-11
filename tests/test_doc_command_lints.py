@@ -34,6 +34,7 @@ from pathlib import Path
 import pytest
 
 from evals.harness.run import COMMANDS
+from tests.source_tree import FROZEN_PROSE
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 
@@ -44,12 +45,11 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 #: notice that the line failed.
 SEARCHED = ("evals", "docs", "README.md", ".claude/skills")
 
-#: Trees whose prose records a state the repository has left, on the convention
-#: ``tests/test_doc_reference_lints.py`` states for ``docs/research/``. An audit
-#: report under ``evals/experiments/`` and an ADR under ``docs/adr/`` print the
-#: commands that produced their evidence on the day, and a command removed
-#: since is part of that record rather than a broken step.
-FROZEN: tuple[str, ...] = ("evals/experiments", "docs/adr", "docs/research")
+#: The frozen prose trees, plus ``docs/adr``: an ADR prints the commands that
+#: produced its evidence on the day, and a command removed since is part of
+#: that record rather than a broken step. Its paths and symbols stay live, so
+#: the reference lint does not freeze it.
+FROZEN: tuple[str, ...] = (*FROZEN_PROSE, "docs/adr")
 
 #: The module whose commands this lint knows how to check. Others are named in
 #: the prose too -- ``python -m analysis_service.smoke`` and friends -- and are

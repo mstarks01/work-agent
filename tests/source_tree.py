@@ -27,6 +27,13 @@ _SKIPPED = frozenset({"__pycache__", "research", ".venv"})
 #: ``runs`` stays under every lint.
 _SKIPPED_PATHS = ("evals/runs",)
 
+#: Trees whose prose records a state the repository has left, so no prose
+#: lint holds them to the live tree. ``.wayfinder/`` holds archived maps,
+#: ``docs/research/`` is frozen evidence, and an audit report under
+#: ``evals/experiments/`` names the artifacts it read on the day. A lint that
+#: reads a kind of prose these trees do not hold adds its own trees to this one.
+FROZEN_PROSE = (".wayfinder", "docs/research", "evals/experiments")
+
 
 def source_files(*roots: str, suffixes: tuple[str, ...] = (".py",)) -> list[Path]:
     """Every file under ``roots`` carrying one of ``suffixes``, in a stable order."""

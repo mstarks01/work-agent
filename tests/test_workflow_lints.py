@@ -15,11 +15,13 @@ does not need one.
 from __future__ import annotations
 
 import ast
+import re
 import subprocess
 from pathlib import Path
 
 import pytest
 
+from analysis_service.vendors import SECRET_FILE_SUFFIX
 from tests.source_tree import REPO_ROOT, parse, source_files
 
 PACKAGE = REPO_ROOT / "src" / "analysis_service"
@@ -408,3 +410,26 @@ def test_a_branch_name_cannot_satisfy_the_federation_condition():
     assert f"refs/heads/{hostile}" != trusted, (
         "the ref check refuses it, which is the fix"
     )
+
+
+#: How a workflow hands a vendor key to the registry: it writes the secret to a
+#: file and exports the variable that names the path. The suffix is the
+#: registry's, spelled in the shell as a literal, so a renamed suffix would
+#: leave CI exporting a variable the registry no longer reads.
+_KEY_FILE_EXPORT = re.compile(r'export "\$\{SECRET_NAME\}(?P<suffix>_[A-Z_]+)=')
+
+
+def _key_file_exports() -> list[tuple[str, str]]:
+    return [
+        (workflow.name, match.group("suffix"))
+        for workflow in _workflows()
+        for line in _code_lines(workflow)
+        for match in _KEY_FILE_EXPORT.finditer(line)
+    ]
+
+
+def test_every_key_file_export_uses_the_registry_suffix():
+    exports = _key_file_exports()
+
+    assert exports, "no workflow exports a key file; the scan is vacuous"
+    assert {suffix for _, suffix in exports} == {SECRET_FILE_SUFFIX}, exports

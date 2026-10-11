@@ -42,8 +42,9 @@ heads eval mode scores a catalog on it.
 
 - A deployment has one extraction order, selected by nothing.
 - `evals/emissions/20260917T-arms-luna-pro/` keeps the graph-first sweep only.
-  The other arms' sweeps are in git history, and the ledger rows that cite
-  them stay as the record of what was measured.
+  The other arms' sweeps are in git history: the arm C and D sweep sits at
+  `ec9ea7ed`, the commit before this removal. The ledger rows that cite them
+  stay as the record of what was measured.
 - The oracle and bottleneck instruments are gone with the resolver they read.
   A perfect-reading ceiling is read through `lane-replay --prepare-today
   signed`, which puts the signed facts through the shipped route.
