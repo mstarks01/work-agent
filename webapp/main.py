@@ -147,14 +147,12 @@ from analysis_service.answer_sets import NO_ANSWERS, AnswerSet
 from analysis_service.claims import UnknownKey
 from analysis_service.critic import SEVERITY_ORDER
 from analysis_service.deployment import Deployment
-from analysis_service.early_questions import EarlyQuestion
 from analysis_service.fact_answers import (
     MAX_FACT_ANSWERS,
     FactAnswer,
     SkipKey,
     answer_facets,
     fact_label,
-    key_ref,
     merged_facts,
 )
 from analysis_service.frameworks import PACKAGES, package_for
@@ -168,7 +166,6 @@ from analysis_service.jobs import (
 from analysis_service.links import (
     MAX_LINK_ANSWERS,
     LinkAnswer,
-    LinkQuestion,
     components,
 )
 from analysis_service.model_tiers import ModelTierConfig
@@ -178,7 +175,6 @@ from analysis_service.report_changes import report_changes
 from analysis_service.report_conditions import conditions, corrected_findings
 from analysis_service.selection import SelectionError, resolve_selection
 from analysis_service.sources import ANSWERS_LABEL
-from analysis_service.system_model import SystemModel
 from analysis_service.vendors import (
     CREDENTIAL_MODE_NOTES,
     VendorName,
@@ -1344,34 +1340,6 @@ async def _drive(
         await run.events.put(("", ""))  # sentinel: closes the SSE stream
 
 
-def _element_names(questions: QuestionSet) -> dict[str, str]:
-    return {element.id: element.name for element in questions.model.elements()}
-
-
-def _link_row(question: LinkQuestion, names: Mapping[str, str]) -> dict[str, object]:
-    return {
-        "principal": question.principal,
-        "rows": question.rows,
-        "options": [
-            {"id": option, "name": names.get(option, "")} for option in question.options
-        ],
-    }
-
-
-def _early_row(question: EarlyQuestion, model: SystemModel) -> dict[str, object]:
-    """The question as the form page shows it: each choice's element name, and
-    the words of the description the question's element was read from."""
-    element = model.get(key_ref(question.key).element_id)
-    return {
-        **question.to_json(),
-        "choices": [
-            {"id": choice, "name": getattr(model.get(choice), "name", "")}
-            for choice in question.choices
-        ],
-        "excerpt": "" if element is None else element.source_excerpt,
-    }
-
-
 _SKIPS: TypeAdapter[list[SkipKey]] = TypeAdapter(
     Annotated[list[SkipKey], Field(max_length=MAX_SKIPS)]
 )
@@ -1411,66 +1379,19 @@ def _fact_answer(raw: object, questions: QuestionSet) -> FactAnswer:
         raise RefusedAnswer(f"{lead} was refused: {reason}") from None
 
 
-def question_rows(questions: QuestionSet) -> list[dict[str, object]]:
-    """A run's link questions, with each option's element name beside it.
-
-    The form page has no report to look names up in, so they travel with the
-    questions. Every string is untrusted and lands on the page as text.
-    """
-    names = _element_names(questions)
-    return [_link_row(question, names) for question in questions.links]
-
-
-def early_rows(questions: QuestionSet) -> list[dict[str, object]]:
-    """A paused run's open facts, ranked before any finding, with choice names.
-
-    Every string is untrusted and lands on the page as text.
-    """
-    return [_early_row(question, questions.model) for question in questions.early]
-
-
 def paused_payload(run: Run, state: AnswerState) -> dict[str, object]:
     """What the form page shows for one round at the pause (ADR 0053).
 
-    This round's questions, how many each kind has left, and every earlier
-    answer with its question, so the page can show it and take a new one. A
-    run an amendment started also lists the carried answers its questions do
-    not take (ADR 0072).
+    The Question Set's own payload, as ``/v1`` serves it, with the run and
+    the revision a save names. A run an amendment started also lists the
+    carried answers its questions do not take (ADR 0072).
     """
     questions = state.questions
-    names = _element_names(questions)
-    return state.carried.dropped_json(questions.model) | {
-        "run": run.id,
-        "revision": run.revision,
-        "questions": question_rows(questions),
-        "facts": early_rows(questions),
-        "remaining": dict(questions.remaining),
-        "stop": questions.stop,
-        "withheld": questions.withheld,
-        "gates": dict(questions.gates),
-        "summary": None if questions.summary is None else questions.summary.to_json(),
-        "held_back": [
-            _early_row(question, questions.model) for question in questions.held_back
-        ],
-        "below_floor": [
-            _early_row(question, questions.model) for question in questions.below_floor
-        ],
-        "skipped": [
-            _early_row(question, questions.model) for question in questions.skipped
-        ],
-        "answered": [
-            _early_row(question, questions.model)
-            | {"answer": answer.model_dump(mode="json")}
-            for question, answer in questions.answered_early
-        ],
-        "skipped_links": [
-            _link_row(question, names) for question in questions.skipped_links
-        ],
-        "answered_links": [
-            _link_row(question, names) | {"answer": answer.model_dump(mode="json")}
-            for question, answer in questions.answered_links
-        ],
-    }
+    return (
+        questions.to_json()
+        | state.carried.dropped_json(questions.model)
+        | {"run": run.id, "revision": run.revision}
+    )
 
 
 def _ticker(run: Run):

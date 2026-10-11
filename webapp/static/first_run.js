@@ -144,15 +144,15 @@
   let updateQuestionProgress = () => {};
   const showQuestions = (data) => {
     // The service says whether the pause asks anything more (QuestionSet.stop).
-    const left = data.stop == null;
+    const left = data.early_stop == null;
     revision = data.revision;
-    const saved = (data.answered || []).length || (data.answered_links || []).length
-      || (data.skipped || []).length || (data.skipped_links || []).length;
+    const saved = (data.answered_early || []).length || (data.answered_links || []).length
+      || (data.skipped_early || []).length || (data.skipped_links || []).length;
     // Each selected analysis whose precondition does not hold yet
     // (QuestionSet.gates): it will not run as the model reads now.
-    const gates = Object.entries(data.gates || {}).filter(([, state]) => state !== "satisfied");
+    const gates = Object.entries(data.framework_gates || {}).filter(([, state]) => state !== "satisfied");
     // Questions no round asks, which the submitter may still choose to answer.
-    const optional = (data.held_back || []).length + (data.below_floor || []).length;
+    const optional = (data.early_held_back || []).length + (data.early_below_floor || []).length;
     // A pause with nothing to ask, nothing answered or skipped, no optional
     // question and no analysis to explain starts the analysis, with no page
     // between. After a save, only the start button starts it: a round of skips
@@ -183,7 +183,7 @@
     };
     // How much is left: an estimate, because an answer can add or take away
     // questions (ADR 0053).
-    const remaining = data.remaining || {};
+    const remaining = data.early_remaining || {};
     const parts = [];
     if (remaining.gate) {
       parts.push(`${remaining.gate} question(s) that decide whether an analysis runs`);
@@ -194,8 +194,8 @@
     if (remaining.field) {
       parts.push(`about ${remaining.field} question(s) about parts of your system`);
     }
-    if (data.questions.length) {
-      parts.push(`${data.questions.length} question(s) about which part of your system a name is`);
+    if (data.link_questions.length) {
+      parts.push(`${data.link_questions.length} question(s) about which part of your system a name is`);
     }
     // Why an analysis will not run, or what it waits on, from the service's
     // own reading of its precondition.
@@ -216,18 +216,18 @@
       // The service's own stop reason decides the sentence (QuestionSet.stop).
       // No stop says every fact is settled, so the page lists what stays open.
       const stops = {
-        "budget-exhausted": `The question limit is reached, so ${data.withheld} more question(s)`
+        "budget-exhausted": `The question limit is reached, so ${data.early_withheld} more question(s)`
           + " are not asked in a round. ",
         "below-floor": "No recommended question is left. ",
         "skipped": "You skipped every question that is left. ",
         "nothing-left": "No question is left to ask. ",
       };
-      ready.textContent = stops[data.stop]
+      ready.textContent = stops[data.early_stop]
         + "You can still change an answer below. Nothing runs until you choose Start the analysis.";
       questions.append(ready);
     }
     // What the pause leaves open (PauseSummary): never "everything is settled".
-    const summary = data.summary;
+    const summary = data.early_summary;
     if (summary) {
       const open = [];
       const count = (n, text) => { if (n) open.push(`${n} ${text}`); };
@@ -267,7 +267,7 @@
     const estimate = document.createElement("p");
     estimate.className = "hint";
     const choicesOf = (rows) => rows.reduce((sum, row) => sum + row.decisions, 0);
-    const shownChoices = () => choicesOf(counted.filter((row) => !row.hidden())) + data.questions.length;
+    const shownChoices = () => choicesOf(counted.filter((row) => !row.hidden())) + data.link_questions.length;
     const tally = () => {
       const shown = shownChoices();
       const later = choicesOf(counted.filter((row) => row.hidden()));
@@ -285,7 +285,7 @@
       explanation.append(title, estimate);
       questions.append(explanation);
     }
-    if (data.questions.length) {
+    if (data.link_questions.length) {
       heading("Which element is each of these?",
         "Your description states facts about these people or systems, but not"
         + " which element of the model each one is.");
@@ -301,7 +301,7 @@
       select.value = prefill || "";
       return select;
     };
-    for (const q of data.questions) {
+    for (const q of data.link_questions) {
       const row = document.createElement("p");
       const label = document.createElement("label");
       const name = document.createElement("b");
@@ -319,9 +319,9 @@
     // Rows are built in service order, so parents exist before their dependants.
     // An earlier answer by its key: a question with facets comes back while a
     // facet has no answer, and its answered facets are filled in.
-    const earlier = new Map((data.answered || []).map((a) => [JSON.stringify(a.key), a.answer]));
+    const earlier = new Map((data.answered_early || []).map((a) => [JSON.stringify(a.key), a.answer]));
     const groups = new Map();
-    for (const q of data.facts) {
+    for (const q of data.early_questions) {
       if (!groups.has(q.group)) {
         const box = document.createElement("details");
         // The workspace's index lists each box of this class as a group.
@@ -338,7 +338,7 @@
     // or kind about different elements in one form. A capability asks about
     // the whole application, so it never shares.
     const shareable = new Set([...groups.keys()].filter((name) => {
-      const rows = data.facts.filter((q) => q.group === name && q.form !== "facets");
+      const rows = data.early_questions.filter((q) => q.group === name && q.form !== "facets");
       const [first] = rows;
       return rows.length >= 2 && rows.every((q) => q.key[0]
         && q.key[1] === first.key[1] && q.key[4] === first.key[4] && q.form === first.form
@@ -451,7 +451,7 @@
     // Each choice row by its key, and the parts that follow each answer.
     const rows = new Map();
     const followers = new Map();
-    data.facts.forEach((q) => {
+    data.early_questions.forEach((q) => {
       const group = groups.get(q.group);
       group.count += 1;
       group.choices = (group.choices || 0) + (q.decisions || 1);
@@ -462,7 +462,7 @@
       const about = context(q);
       if (q.form === "facets") {
         // "Same for all" sets a column of two or more rows; one row needs none.
-        const rows = data.facts.filter((f) => f.group === q.group && f.form === "facets");
+        const rows = data.early_questions.filter((f) => f.group === q.group && f.form === "facets");
         group.grid = group.grid || facetTable(group.box, q, rows.length >= 2);
         const before = earlier.get(JSON.stringify(q.key));
         const who = document.createElement("span");
@@ -521,7 +521,7 @@
     tally();
     for (const [name, group] of groups) {
       if (group.rows.length) {
-        const shared = inputFor(data.facts.find((q) => q.group === name), null);
+        const shared = inputFor(data.early_questions.find((q) => q.group === name), null);
         const apply = document.createElement("button");
         apply.type = "button";
         apply.textContent = "Apply to the ticked rows";
@@ -552,9 +552,9 @@
     // answered in part and then skipped has its one editor under "Skipped for
     // now", so it is never sent twice.
     const answeredLinks = data.answered_links || [];
-    const skipped = data.skipped || [];
-    const elsewhere = new Set([...data.facts, ...skipped].map((q) => JSON.stringify(q.key)));
-    const answeredFacts = (data.answered || []).filter((a) => !elsewhere.has(JSON.stringify(a.key)));
+    const skipped = data.skipped_early || [];
+    const elsewhere = new Set([...data.early_questions, ...skipped].map((q) => JSON.stringify(q.key)));
+    const answeredFacts = (data.answered_early || []).filter((a) => !elsewhere.has(JSON.stringify(a.key)));
     earlierBox.hidden = !(answeredLinks.length || answeredFacts.length);
     const title = document.createElement("summary");
     title.textContent = `Your answers (${answeredLinks.length + answeredFacts.length})`;
@@ -662,8 +662,8 @@
     for (const q of skipped) answerLater(skippedBox, q);
     // Questions the rounds do not ask: past the question limit, or ranked
     // under the threshold. Answering one is the submitter's choice.
-    const heldBack = data.held_back || [];
-    const belowFloor = data.below_floor || [];
+    const heldBack = data.early_held_back || [];
+    const belowFloor = data.early_below_floor || [];
     moreBox.hidden = !(heldBack.length || belowFloor.length);
     const moreTitle = document.createElement("summary");
     moreTitle.textContent = `More questions (${heldBack.length + belowFloor.length},`

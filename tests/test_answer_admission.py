@@ -328,7 +328,11 @@ def _known_answer(question: dict) -> dict:
     if question["form"] == "facets":
         return {"key": question["key"], "facets": {question["facets"][0]["id"]: "yes"}}
     if question["choices"]:
-        return {"key": question["key"], "value": question["choices"][0]}
+        # An early question's choice is ``{id, name}``; a fact question's is
+        # the value itself.
+        first = question["choices"][0]
+        value = first["id"] if isinstance(first, dict) else first
+        return {"key": question["key"], "value": value}
     value = "none" if question["form"] == "control" else "the admins"
     return {"key": question["key"], "value": value}
 

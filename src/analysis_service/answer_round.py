@@ -46,7 +46,7 @@ from __future__ import annotations
 from collections import Counter
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field, replace
-from functools import cached_property
+from functools import cached_property, partial
 from types import MappingProxyType
 from typing import TYPE_CHECKING, Any, Literal, TypeVar
 
@@ -90,7 +90,7 @@ from analysis_service.links import (
 from analysis_service.open_facts import prepared_model
 from analysis_service.questions import FactQuestion, fact_questions
 from analysis_service.sources import LimitBreach, Source, SourceLimits
-from analysis_service.system_model import SystemModel
+from analysis_service.system_model import ModelIndex, SystemModel
 
 if TYPE_CHECKING:
     # ``jobs`` imports this module for the skip vocabulary.
@@ -300,6 +300,11 @@ class PauseSummary:
         }
 
 
+def _element_name(index: ModelIndex, element_id: str) -> str:
+    """The element's name, or empty where the ID names no element."""
+    return getattr(index.get(element_id), "name", "")
+
+
 @dataclass(frozen=True)
 class QuestionSet:
     """Every question one job asks, and the model and catalog they ask about."""
@@ -391,28 +396,62 @@ class QuestionSet:
         )
         return early | frozenset(question.key for question in self.facts)
 
+    @staticmethod
+    def _early_row(index: ModelIndex, question: EarlyQuestion) -> dict[str, object]:
+        """The question with each choice's element name and its element's source words.
+
+        A page has no report to look a name up in, so the names travel with
+        the question. Every string is untrusted and lands on a page as text.
+        """
+        element = index.get(key_ref(question.key).element_id)
+        return question.to_json() | {
+            "choices": [
+                {"id": choice, "name": _element_name(index, choice)}
+                for choice in question.choices
+            ],
+            "excerpt": "" if element is None else element.source_excerpt,
+        }
+
+    @staticmethod
+    def _link_row(index: ModelIndex, question: LinkQuestion) -> dict[str, object]:
+        """The question with each option's element name beside its ID."""
+        return question.to_json() | {
+            "options": [
+                {"id": option, "name": _element_name(index, option)}
+                for option in question.options
+            ]
+        }
+
     def to_json(self) -> dict[str, object]:
+        """Every question with what a page shows beside it.
+
+        **The one payload**: the ``/v1`` questions route and the form page
+        both serve it, so a question has one shape on every surface.
+        """
+        index = ModelIndex.of(self.model)
+        early = partial(self._early_row, index)
+        link = partial(self._link_row, index)
         return {
-            "link_questions": [question.to_json() for question in self.links],
+            "link_questions": [link(question) for question in self.links],
             "fact_questions": [question.to_json() for question in self.facts],
-            "early_questions": [question.to_json() for question in self.early],
+            "early_questions": [early(question) for question in self.early],
             "final": self.final,
             "resumed_by": self.resumed_by,
             "early_remaining": dict(self.remaining),
             "early_withheld": self.withheld,
             "early_stop": self.stop,
-            "early_held_back": [question.to_json() for question in self.held_back],
-            "early_below_floor": [question.to_json() for question in self.below_floor],
+            "early_held_back": [early(question) for question in self.held_back],
+            "early_below_floor": [early(question) for question in self.below_floor],
             "early_summary": None if self.summary is None else self.summary.to_json(),
             "framework_gates": dict(self.gates),
-            "skipped_early": [question.to_json() for question in self.skipped],
-            "skipped_links": [question.to_json() for question in self.skipped_links],
+            "skipped_early": [early(question) for question in self.skipped],
+            "skipped_links": [link(question) for question in self.skipped_links],
             "answered_early": [
-                question.to_json() | {"answer": answer.model_dump(mode="json")}
+                early(question) | {"answer": answer.model_dump(mode="json")}
                 for question, answer in self.answered_early
             ],
             "answered_links": [
-                question.to_json() | {"answer": answer.model_dump(mode="json")}
+                link(question) | {"answer": answer.model_dump(mode="json")}
                 for question, answer in self.answered_links
             ],
         }

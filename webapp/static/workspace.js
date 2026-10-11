@@ -128,10 +128,10 @@ const workspace = (() => {
     el("processing-empty").hidden = any;
   };
   const progress = (data, filled, total) => {
-    const saved = (data.answered || []).length + (data.answered_links || []).length;
-    const skipped = (data.skipped || []).length + (data.skipped_links || []).length;
-    const remaining = Object.values(data.remaining || {}).reduce((sum, n) => sum + n, 0) + data.questions.length;
-    const done = data.stop != null;
+    const saved = (data.answered_early || []).length + (data.answered_links || []).length;
+    const skipped = (data.skipped_early || []).length + (data.skipped_links || []).length;
+    const remaining = Object.values(data.early_remaining || {}).reduce((sum, n) => sum + n, 0) + data.link_questions.length;
+    const done = data.early_stop != null;
     el("round-progress-bar").max = total || 1;
     el("round-progress-bar").value = total ? filled : done ? 1 : 0;
     el("round-progress-label").textContent = done ? "No more questions in a round" : `This round: ${filled} of ${total} answers filled in`;
