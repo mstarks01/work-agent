@@ -44,7 +44,7 @@ from __future__ import annotations
 from collections import Counter
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from analysis_service.claims import (
     Claim,
@@ -58,6 +58,9 @@ from evals.harness.fingerprint import identifier_of, key_claim, lane_field
 from evals.harness.identity import FlowMap
 from evals.harness.ledger import STYLE_REASONS, Ledger
 from evals.harness.reference import GoldenCase
+
+if TYPE_CHECKING:
+    from evals.harness.instruments import Cases
 
 
 @dataclass(frozen=True)
@@ -192,13 +195,21 @@ def measure(
     return tuple(rows)
 
 
-def published(blocks: Mapping[str, Any], framework: str) -> float | None:
-    """This framework's objection count, for the comparison table."""
-    aggregate = blocks.get("writing_aggregate")
-    if not isinstance(aggregate, Mapping):
-        return None
-    totals = aggregate.get("by_framework", {}).get(framework)
-    return float(totals["objections"]) if isinstance(totals, Mapping) else None
+def published(blocks: Mapping[str, Any], framework: str, cases: Cases) -> float | None:
+    """This framework's objection count over the selected cases, for the table.
+
+    Summed from the per-case rows rather than read off ``writing_aggregate``,
+    because the aggregate pools every case and the table prints the held-out
+    cases apart. ``None`` where no selected case produced a row.
+    """
+    rows = [
+        row
+        for row in blocks.get("writing") or []
+        if isinstance(row, Mapping)
+        and row.get("framework") == framework
+        and cases.wanted(row.get("case"))
+    ]
+    return float(sum(row["objections"] for row in rows)) if rows else None
 
 
 def aggregate(rows: Sequence[CaseWriting]) -> dict[str, Any]:

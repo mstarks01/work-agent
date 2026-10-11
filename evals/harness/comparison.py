@@ -22,6 +22,11 @@ Rows group by ``(commit, corpus digest)``, and the file says that numbers across
 groups do not compare. A reference-set change moves every baseline, so the
 grouping makes the invalid comparison hard to make by accident.
 
+Held-out cases print apart. Each framework block has a table over the
+development cases and a table over the held-out ones, and no figure pools the
+two. A fix shaped by the tuned cases would otherwise borrow the held-out
+cases' credit, and the page could not show it (#1093).
+
 A spread prints beside every mean. ``TUNING.md`` records three findings
 retracted because they rested on single-run numbers, and a published table must
 not repeat that in public. Where a Baseline holds more than one sweep, the range
@@ -41,7 +46,7 @@ from analysis_service.claims import FrameworkName
 from evals.harness import baseline, standings
 from evals.harness.artifact import REPO_ROOT
 from evals.harness.baseline import BaselineError, artifact_filename
-from evals.harness.instruments import INSTRUMENTS, Column
+from evals.harness.instruments import INSTRUMENTS, Cases, Column
 from evals.harness.scorer import vote_coverage
 
 #: Where the generated table lives, beside the Baselines it reads. Relative,
@@ -55,6 +60,10 @@ TABLE_REL = Path("evals") / "baselines" / "README.md"
 #: measurement, and this is the distinction certification draws with
 #: "unexercised".
 NO_VOTES = "no votes yet"
+
+#: The two tables each framework block prints, keyed by the heading each
+#: carries, with whether it reads the held-out cases.
+PARTS: Mapping[str, bool] = {"development cases": False, "held-out cases": True}
 
 
 @dataclass(frozen=True)
@@ -71,11 +80,14 @@ class Row:
     #: to compute ``cost_usd`` from, so this is the only figure such a Baseline
     #: has and a row that printed ``cost_usd`` alone reported it as free.
     reported_usd: float | None
-    #: ``{series: {framework: {column label: cell}}}``, already rendered.
-    cells: dict[str, dict[str, dict[str, str]]]
+    #: ``{series: {framework: {part: {column label: cell}}}}``, already
+    #: rendered, where a part is a key of :data:`PARTS`.
+    cells: dict[str, dict[str, dict[str, dict[str, str]]]]
     #: (findings a person answered, findings offered) across every sweep, so
     #: a reader can weigh how much of the row rests on judgement.
     coverage: tuple[int, int]
+    #: Every case a sweep of this Baseline scored as held out.
+    held_out: frozenset[str] = frozenset()
 
     @property
     def voted(self) -> bool:
@@ -102,6 +114,24 @@ def _series_blocks(raw: dict[str, Any]) -> dict[str, dict[str, Any]]:
     for name, stored in (series.get("blocks") or {}).items():
         blocks[name] = stored
     return blocks
+
+
+def held_out_cases(blocks: Mapping[str, Any]) -> frozenset[str]:
+    """Every case a sweep scored as held out, by the flag on its own rows.
+
+    Read from the rows rather than from today's corpus, because a case can be
+    reclassified after the sweep ran, and the sweep's figure was taken under
+    the flag it carried then. Framework-neutral: any per-case block whose rows
+    carry ``holdout`` answers. A row written before the field existed carries
+    none, and no such sweep scored a holdout case.
+    """
+    return frozenset(
+        row["case"]
+        for block in blocks.values()
+        if isinstance(block, list)
+        for row in block
+        if isinstance(row, Mapping) and row.get("holdout") is True and "case" in row
+    )
 
 
 def _format(values: list[float]) -> str:
@@ -155,23 +185,37 @@ def read_baseline(directory: Path, root: Path = REPO_ROOT) -> Row | None:
     coverage = (sum(one for one, _ in counted), sum(all_ for _, all_ in counted))
     voted = coverage[0] > 0
 
-    cells: dict[str, dict[str, dict[str, str]]] = {}
+    held_out = frozenset(
+        case
+        for sweeps in per_series.values()
+        for blocks in sweeps
+        for case in held_out_cases(blocks)
+    )
+    cells: dict[str, dict[str, dict[str, dict[str, str]]]] = {}
     for series, sweeps in per_series.items():
         for framework in identity.get("frameworks", []):
-            for column in _columns_for(framework):
-                values = [
-                    value
-                    for blocks in sweeps
-                    if (value := column.read(blocks, framework)) is not None
-                ]
-                cell = (
-                    NO_VOTES
-                    if column.needs_votes and not voted
-                    else _format([float(value) for value in values])
-                )
-                cells.setdefault(series, {}).setdefault(framework, {})[column.label] = (
-                    cell
-                )
+            for part, holdout in PARTS.items():
+                for column in _columns_for(framework):
+                    values = [
+                        value
+                        for blocks in sweeps
+                        if (
+                            value := column.read(
+                                blocks,
+                                framework,
+                                Cases(held_out_cases(blocks), holdout),
+                            )
+                        )
+                        is not None
+                    ]
+                    cell = (
+                        NO_VOTES
+                        if column.needs_votes and not voted
+                        else _format([float(value) for value in values])
+                    )
+                    cells.setdefault(series, {}).setdefault(framework, {}).setdefault(
+                        part, {}
+                    )[column.label] = cell
 
     return Row(
         name=directory.name,
@@ -186,6 +230,7 @@ def read_baseline(directory: Path, root: Path = REPO_ROOT) -> Row | None:
         reported_usd=_reported(entries),
         cells=cells,
         coverage=coverage,
+        held_out=held_out,
     )
 
 
@@ -401,19 +446,30 @@ def _render_row(row: Row) -> str:
             "\nNobody has voted on this Baseline's findings, so every"
             f" vote-dependent number below reads `{NO_VOTES}`.\n"
         )
+    if row.held_out:
+        named = ", ".join(f"`{_inline(case)}`" for case in sorted(row.held_out))
+        lines.append(f"\nHeld-out cases, printed apart: {named}.\n")
+    else:
+        lines.append(
+            "\nNo sweep of this Baseline scored a held-out case, so every"
+            " figure below is over development cases.\n"
+        )
     for series in standings.SERIES:
         blocks = row.cells.get(series)
         if not blocks:
             continue
         included = ", ".join(standings.SERIES[series])
         lines.append(f"\n**Series `{series}`** — reads {included} votes.\n")
-        for framework, columns in sorted(blocks.items()):
-            lines += [
-                f"\n`{framework}`\n",
-                f"\n| {' | '.join(columns)} |\n",
-                f"|{' --- |' * len(columns)}\n",
-                f"| {' | '.join(columns.values())} |\n",
-            ]
+        for framework, parts in sorted(blocks.items()):
+            for part, columns in parts.items():
+                if PARTS[part] and not row.held_out:
+                    continue
+                lines += [
+                    f"\n`{framework}`, {part}\n",
+                    f"\n| {' | '.join(columns)} |\n",
+                    f"|{' --- |' * len(columns)}\n",
+                    f"| {' | '.join(columns.values())} |\n",
+                ]
     return "".join(lines)
 
 

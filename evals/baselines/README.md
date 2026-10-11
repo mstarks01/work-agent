@@ -34,9 +34,11 @@ Vote coverage: 0 of 110 unmatched finding(s) judged by a person.
 
 Nobody has voted on this Baseline's findings, so every vote-dependent number below reads `no votes yet`.
 
+No sweep of this Baseline scored a held-out case, so every figure below is over development cases.
+
 **Series `maintainer`** — reads maintainer votes.
 
-`stride`
+`stride`, development cases
 
 | reference coverage | must-find coverage | rejected rate | writing objections |
 | --- | --- | --- | --- |
@@ -44,7 +46,7 @@ Nobody has voted on this Baseline's findings, so every vote-dependent number bel
 
 **Series `all`** — reads maintainer, contributor votes.
 
-`stride`
+`stride`, development cases
 
 | reference coverage | must-find coverage | rejected rate | writing objections |
 | --- | --- | --- | --- |
@@ -62,9 +64,11 @@ Vote coverage: 0 of 72 unmatched finding(s) judged by a person.
 
 Nobody has voted on this Baseline's findings, so every vote-dependent number below reads `no votes yet`.
 
+No sweep of this Baseline scored a held-out case, so every figure below is over development cases.
+
 **Series `maintainer`** — reads maintainer votes.
 
-`stride`
+`stride`, development cases
 
 | reference coverage | must-find coverage | rejected rate | writing objections |
 | --- | --- | --- | --- |
@@ -72,7 +76,7 @@ Nobody has voted on this Baseline's findings, so every vote-dependent number bel
 
 **Series `all`** — reads maintainer, contributor votes.
 
-`stride`
+`stride`, development cases
 
 | reference coverage | must-find coverage | rejected rate | writing objections |
 | --- | --- | --- | --- |
@@ -90,9 +94,11 @@ Vote coverage: 0 of 103 unmatched finding(s) judged by a person.
 
 Nobody has voted on this Baseline's findings, so every vote-dependent number below reads `no votes yet`.
 
+No sweep of this Baseline scored a held-out case, so every figure below is over development cases.
+
 **Series `maintainer`** — reads maintainer votes.
 
-`stride`
+`stride`, development cases
 
 | reference coverage | must-find coverage | rejected rate | writing objections |
 | --- | --- | --- | --- |
@@ -100,7 +106,7 @@ Nobody has voted on this Baseline's findings, so every vote-dependent number bel
 
 **Series `all`** — reads maintainer, contributor votes.
 
-`stride`
+`stride`, development cases
 
 | reference coverage | must-find coverage | rejected rate | writing objections |
 | --- | --- | --- | --- |
@@ -118,9 +124,11 @@ Vote coverage: 0 of 16 unmatched finding(s) judged by a person.
 
 Nobody has voted on this Baseline's findings, so every vote-dependent number below reads `no votes yet`.
 
+No sweep of this Baseline scored a held-out case, so every figure below is over development cases.
+
 **Series `maintainer`** — reads maintainer votes.
 
-`stride`
+`stride`, development cases
 
 | reference coverage | must-find coverage | rejected rate | writing objections |
 | --- | --- | --- | --- |
@@ -128,7 +136,7 @@ Nobody has voted on this Baseline's findings, so every vote-dependent number bel
 
 **Series `all`** — reads maintainer, contributor votes.
 
-`stride`
+`stride`, development cases
 
 | reference coverage | must-find coverage | rejected rate | writing objections |
 | --- | --- | --- | --- |
