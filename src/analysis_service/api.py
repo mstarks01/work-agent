@@ -47,40 +47,47 @@ from starlette.types import Receive, Scope, Send
 
 from analysis_service import budgets
 from analysis_service.answer_round import (
-    ANSWER_LIMITS,
     MAX_SKIPS,
     AlreadyResumed,
     Answers,
-    AnswerState,
-    SavedDraft,
-    SavedRound,
     SkipKey,
     SourcesOverLimit,
     StaleRevision,
 )
 from analysis_service.answer_sets import AnswerSet
-from analysis_service.assertions import AssertionRecord
 from analysis_service.auth import (
     AuthenticationError,
     TokenVerifier,
     build_verifier,
 )
 from analysis_service.budgets import BudgetPolicy
-from analysis_service.claims import FrameworkAnalysis, FrameworkName
+from analysis_service.claims import FrameworkName
 from analysis_service.deployment import Deployment
 from analysis_service.errors import ConfigError
 from analysis_service.fact_answers import MAX_FACT_ANSWERS, FactAnswer
 from analysis_service.frameworks import PACKAGES
 from analysis_service.graph import ENTRY_EXTRACT
+from analysis_service.job_answers import (
+    JobAnswers,
+    JobDataMissing,
+    NoCatalog,
+    NoSuchJob,
+    NotAdmitted,
+    NotCompleted,
+    Refused,
+    RunnerUnavailable,
+    SaveConflict,
+    Start,
+    Started,
+    Withheld,
+)
 from analysis_service.jobs import (
     TERMINAL_STATUSES,
     Admission,
-    Checkpoint,
     JobRecord,
     JobStatus,
     JobStore,
     PipelineRunner,
-    Resumption,
     build_store,
     execute_job,
     is_follow_up,
@@ -92,14 +99,10 @@ from analysis_service.links import (
     with_link_answers,
 )
 from analysis_service.parsing import ascii_int
-from analysis_service.pipeline import entry_of
-from analysis_service.questions import question_fallback
 from analysis_service.report import FrameworkSelection
 from analysis_service.report_changes import report_changes
-from analysis_service.report_conditions import corrected_findings
 from analysis_service.selection import SelectionError, resolve_selection
 from analysis_service.sources import Source, SourceLimits, clean_system_name
-from analysis_service.system_model import SystemModel
 from analysis_service.validation import ValidationIssue
 
 logger = logging.getLogger(__name__)
@@ -434,195 +437,60 @@ def _resolve_selection(
         raise HTTPException(status_code=422, detail=str(exc)) from None
 
 
-async def _admit_and_start(
-    request: Request,
-    record: JobRecord,
-    background_tasks: BackgroundTasks,
-    subject: str,
-) -> JSONResponse:
-    """Admit one new job against the ceiling and the budget, and start it.
+def _answers(request: Request) -> JobAnswers:
+    """The job answer operations this app serves, under its deployment's bounds.
 
-    **The one admission.** A submission and a resumed job are both new jobs:
-    each takes an in-flight slot and a share of the token budget, and each is
-    refused the same way when it cannot have one.
+    Built from the app's state on each request rather than held once, so a
+    setting the state holds is read where it is, and a test that replaces
+    one replaces what the routes read.
     """
-    store: JobStore = request.app.state.store
-    ceiling: int = request.app.state.max_active_jobs
-    # The runner is looked up before the reservation. A graph is built on
-    # first use per selection, and a build that raised after the reservation
-    # would leave a slot held that no task ever releases.
-    try:
-        runner = request.app.state.runner_for(record.selection(), entry_of(record))
-    except ConfigError as exc:
-        # The deployment's configuration, such as a missing provider
-        # credential, and not the caller's request. The message names
-        # environment variables, so it goes to the log, and the caller gets a
-        # fixed message (OWASP A10).
-        logger.error("cannot build a runner for job %s: %s", record.id, exc)
-        raise HTTPException(
-            status_code=503,
-            detail="this deployment cannot run an analysis now: its configuration"
-            " is incomplete",
-        ) from None
-    budget = request.app.state.budget
-    admission = await store.reserve(record, ceiling=ceiling, budget=budget)
-    if admission.outcome in _REFUSALS:
-        # Every refusal is logged, because it is the only place these bounds
-        # are observable from outside the caller they refused: a caller
-        # sitting on one is either a client that needs a larger share or the
-        # consumption they exist to stop, and neither is visible from a 429
-        # nobody recorded. The log carries the deployment-wide figure the
-        # response withholds.
-        logger.warning(
-            "subject %s refused (%s): %d in flight of %d, %d tokens of %d"
-            " in this subject's window, %d of %d across the deployment",
-            subject,
-            admission.outcome,
-            admission.active,
-            ceiling,
-            admission.subject_tokens,
-            budget.max_tokens_per_window,
-            admission.global_tokens,
-            budget.global_max_tokens_per_window,
-        )
-        status, message = _REFUSALS[admission.outcome]
-        raise HTTPException(status_code=status, detail=message(admission, ceiling))
-    if admission.outcome != "admitted":
-        # A duplicate id, or an outcome the table above does not answer, is
-        # this service's defect and not something the caller can act on or
-        # provoke: the API mints the id, and the store's outcomes are held
-        # to the table by test. It gets the same opaque 500 every unhandled
-        # error gets, and the outcome goes to the log. Fails closed: only
-        # an admission starts a job.
-        logger.error("job %s was not admitted: %s", record.id, admission.outcome)
-        raise HTTPException(status_code=500, detail="an internal error occurred")
-    background_tasks.add_task(
-        execute_job,
-        store,
-        runner,
-        record.id,
-        deadline_seconds=request.app.state.job_deadline_seconds,
+    state = request.app.state
+    return JobAnswers(
+        store=state.store,
+        runner_for=state.runner_for,
+        limits=state.limits,
+        ceiling=state.max_active_jobs,
+        budget=state.budget,
+        carries_catalog=state.carries_catalog,
+        gate=state.certification,
     )
+
+
+def _starter(request: Request, background_tasks: BackgroundTasks) -> Start:
+    """Schedules an admitted job's run as this request's background task."""
+    store: JobStore = request.app.state.store
+    deadline: float = request.app.state.job_deadline_seconds
+
+    def start(record: JobRecord, runner: PipelineRunner) -> None:
+        background_tasks.add_task(
+            execute_job, store, runner, record.id, deadline_seconds=deadline
+        )
+
+    return start
+
+
+def _started(started: Started) -> JSONResponse:
+    """``201`` with the new job's ID, its status and where to read it."""
     return JSONResponse(
-        {"job_id": record.id, "status": record.status},
+        {"job_id": started.job_id, "status": started.status},
         status_code=201,
-        headers={"Location": f"/v1/jobs/{record.id}"},
+        headers={"Location": f"/v1/jobs/{started.job_id}"},
     )
-
-
-async def _answerable(
-    request: Request, job_id: str, subject: str
-) -> (
-    tuple[
-        JobRecord,
-        SystemModel,
-        AssertionRecord | None,
-        list[FrameworkAnalysis],
-        str | None,
-    ]
-    | JSONResponse
-):
-    """The model, catalog and findings this caller may ask or answer about.
-
-    **The one reader of "what does this job ask about".** A job waiting on
-    answers holds its checkpoint and has no findings yet; a finished job reads
-    its report through the rule that serves it. Any other job asks nothing yet.
-
-    Each heavy field is read by name, once. The envelope carries neither, so a
-    status read never pays for them, and the report is copied as an object
-    rather than serialized and validated again. The last value is the job
-    this one's answers started and that locks it
-    (:meth:`~analysis_service.jobs.JobStore.resumed_by`).
-    """
-    store: JobStore = request.app.state.store
-    record = await _owned_job(request, job_id, subject)
-    if record.status == "awaiting-answers":
-        # The questions are read off what the head built, so they answer to
-        # the head's verdict as a report answers to its run's.
-        refused = _withheld_report(request, record)
-        if refused is not None:
-            return refused
-        held = await store.checkpoint(job_id, subject)
-        if held is None:
-            logger.error("waiting job %s holds no checkpoint", record.id)
-            raise HTTPException(status_code=500, detail="an internal error occurred")
-        resumed_by = await store.resumed_by(job_id, subject)
-        return record, held.system_model, held.assertions, [], resumed_by
-    refused = _unservable(request, record)
-    if refused is not None:
-        return refused
-    report = await store.report(job_id, subject)
-    if report is None:
-        logger.error("completed job %s has no report attached", record.id)
-        raise HTTPException(status_code=500, detail="an internal error occurred")
-    # The envelope leaves the resumption out, and it says whether the report
-    # is final: a report its follow-up wrote asks nothing (ADR 0054).
-    record.resumption = await store.resumption(job_id, subject)
-    resumed_by = await store.resumed_by(job_id, subject)
-    return (
-        record,
-        report.system_model,
-        report.assertions,
-        list(report.analyses),
-        resumed_by,
-    )
-
-
-def _unservable(request: Request, record: JobRecord) -> JSONResponse | None:
-    """Why this job's report may not be served, or ``None`` if it may.
-
-    **The one reader of "may this report be served".** The report route and
-    every route derived from the report ask it, so a report the gate withholds
-    cannot reach a caller through a view of it.
-    """
-    if record.status != "completed":
-        raise HTTPException(
-            status_code=409,
-            detail=f"job status is {record.status!r};"
-            " the report exists only once the job is completed",
-        )
-    return _withheld_report(request, record)
 
 
 async def _servable_report(
     request: Request, job_id: str, subject: str
-) -> dict[str, Any] | JSONResponse:
-    """The report payload this caller may read, or the response that refuses it."""
-    record = await _owned_job(request, job_id, subject)
-    refused = _unservable(request, record)
-    if refused is not None:
-        return refused
+) -> dict[str, Any]:
+    """The report payload this caller may read, or the refusal that withholds it."""
+    answers = _answers(request)
+    record = await answers.owned(job_id, subject)
+    answers.servable(record)
     store: JobStore = request.app.state.store
     payload = await store.report_json(job_id, subject)
     if payload is None:
         logger.error("completed job %s has no report attached", record.id)
         raise HTTPException(status_code=500, detail="an internal error occurred")
     return payload
-
-
-def _withheld_report(request: Request, record: JobRecord) -> JSONResponse | None:
-    """Why this deployment must not serve a report or a waiting job, if it must not.
-
-    Withholding the report rather than failing the job is deliberate: a
-    ``failed`` job carries no report at all, and the fingerprints that *prove*
-    the drift live in the report, so failing would destroy the evidence an
-    operator needs. The job stays ``completed`` and the envelope refuses.
-
-    The body names the unblessed nodes and their hashes, never the report's
-    contents — enough to act on, nothing that leaks the analysis past a gate
-    that just decided not to serve it.
-    """
-    gate = getattr(request.app.state, "certification", None)
-    result = record.certification
-    if gate is None or result is None or not gate.withholds(result):
-        return None
-    return _problem_response(
-        409,
-        "the job's output is withheld: its execution identity is not blessed by"
-        " this deployment's manifest",
-        uncertified_nodes=[node.to_json() for node in result.uncertified],
-        unexercised_tiers=list(result.unexercised),
-    )
 
 
 class _CountedStream(StreamingResponse):
@@ -700,81 +568,6 @@ async def require_subject(
         return await anyio.to_thread.run_sync(verifier.verify, credentials.credentials)
     except AuthenticationError:
         raise _unauthorized() from None
-
-
-async def _owned_job(request: Request, job_id: str, subject: str) -> JobRecord:
-    """Fetch a job the subject owns; missing and foreign jobs are the same 404.
-
-    The record comes back without its report. Every route here reads the
-    envelope, and the one that serves the analysis asks the store for it
-    separately, so no read copies a report to decide something about it.
-    """
-    store: JobStore = request.app.state.store
-    record = await store.owned(job_id, subject)
-    if record is None:
-        raise HTTPException(status_code=404, detail="job not found")
-    return record
-
-
-def _answer_state(
-    record: JobRecord,
-    model: SystemModel,
-    assertions: AssertionRecord | None,
-    analyses: list[FrameworkAnalysis],
-    resumed_by: str | None,
-) -> AnswerState:
-    """What a job's questions and answers read, from what :func:`_answerable` read."""
-    return AnswerState(
-        checkpoint=Checkpoint(system_model=model, assertions=assertions),
-        frameworks={
-            selection.name: selection.options for selection in record.frameworks
-        },
-        analyses=analyses,
-        waiting=record.status == "awaiting-answers",
-        final=record.final(),
-        sources=record.sources,
-        answers=record.answers,
-        shown=record.shown_early,
-        skipped=record.skipped_early,
-        corrections=record.corrections,
-        revision=record.round_revision,
-        resumed_by=resumed_by,
-        draft=record.draft,
-        carried_in=record.carried,
-    )
-
-
-def _questions_payload(
-    record: JobRecord,
-    model: SystemModel,
-    assertions: AssertionRecord | None,
-    analyses: list[FrameworkAnalysis],
-    resumed_by: str | None,
-) -> dict[str, Any]:
-    """Every question a job asks, as the questions route serves them."""
-    state = _answer_state(record, model, assertions, analyses, resumed_by)
-    questions = state.questions
-    return (
-        questions.to_json()
-        | state.carried.dropped_json(model)
-        | {
-            "fallback": question_fallback(analyses).to_json(),
-            "revision": record.round_revision,
-            "draft_links": [
-                link.model_dump(mode="json") for link in record.draft.links
-            ],
-            "draft_facts": [
-                fact.model_dump(mode="json") for fact in record.draft.facts
-            ],
-            "answer_limits": dict(ANSWER_LIMITS),
-            "corrections": [
-                fact.model_dump(mode="json") for fact in record.corrections
-            ],
-            "corrected_findings": list(
-                corrected_findings(analyses, record.answers.facts, record.corrections)
-            ),
-        }
-    )
 
 
 def _status_view(record: JobRecord) -> JobStatusView:
@@ -857,6 +650,25 @@ _REFUSALS: dict[str, tuple[int, Callable[[Admission, int], str]]] = {
         ),
     ),
 }
+
+
+#: Each typed refusal of :mod:`analysis_service.job_answers` and of the answer
+#: rules, with the status it answers under. The message is the refusal's own.
+_REFUSAL_STATUS: dict[type[Exception], int] = {
+    NoSuchJob: 404,
+    NotCompleted: 409,
+    NoCatalog: 400,
+    Refused: 400,
+    SaveConflict: 409,
+    AlreadyResumed: 409,
+    NoCatalogError: 409,
+    JobDataMissing: 500,
+    RunnerUnavailable: 503,
+}
+
+
+async def _refusal_response(status: int, request: Request, exc: Exception):
+    return _problem_response(status, str(exc))
 
 
 T = TypeVar("T")
@@ -1003,6 +815,40 @@ def create_app(
         logger.exception("unhandled error %s", error_id)
         return _problem_response(500, "an internal error occurred", error_id=error_id)
 
+    for refusal, status in _REFUSAL_STATUS.items():
+        app.add_exception_handler(refusal, partial(_refusal_response, status))
+
+    @app.exception_handler(Withheld)
+    async def _withheld(request: Request, exc: Withheld):
+        # The body names the unblessed nodes and their hashes, never the
+        # report's contents.
+        return _problem_response(
+            409,
+            str(exc),
+            uncertified_nodes=[node.to_json() for node in exc.result.uncertified],
+            unexercised_tiers=list(exc.result.unexercised),
+        )
+
+    @app.exception_handler(NotAdmitted)
+    async def _not_admitted(request: Request, exc: NotAdmitted):
+        if exc.admission.outcome in _REFUSALS:
+            status, message = _REFUSALS[exc.admission.outcome]
+            return _problem_response(status, message(exc.admission, exc.ceiling))
+        # A duplicate id, or an outcome the table does not answer, is this
+        # service's defect and not something the caller can act on or
+        # provoke: the API mints the id, and the store's outcomes are held
+        # to the table by test. Fails closed: only an admission starts a job.
+        logger.error("job was not admitted: %s", exc.admission.outcome)
+        return _problem_response(500, "an internal error occurred")
+
+    @app.exception_handler(StaleRevision)
+    async def _stale(request: Request, exc: StaleRevision):
+        return _problem_response(409, f"{exc}; read the questions again")
+
+    @app.exception_handler(SourcesOverLimit)
+    async def _over_limit(request: Request, exc: SourcesOverLimit):
+        return _problem_response(_STATUS_BY_RUNG[exc.breach.rung], str(exc))
+
     app.add_middleware(BodyLimitMiddleware, max_bytes=max_body_bytes)
 
     @app.get("/healthz")
@@ -1059,7 +905,10 @@ def create_app(
             ask_questions=submission.questions,
             reserved_tokens=budgets.estimate(sources, selection),
         )
-        return await _admit_and_start(request, record, background_tasks, subject)
+        started = await _answers(request).admit(
+            record, start=_starter(request, background_tasks)
+        )
+        return _started(started)
 
     @app.post("/v1/jobs/{job_id}/answers", status_code=201)
     async def answer_job(
@@ -1084,95 +933,23 @@ def create_app(
         and every save, takes answers only against the current revision:
         ``400`` where none is sent, ``409`` where it has moved.
         """
-        if answers.links and not request.app.state.carries_catalog:
-            raise HTTPException(
-                status_code=400,
-                detail="this deployment builds no assertion catalog, so nothing"
-                " would read a link answer",
-            )
-        answerable = await _answerable(request, job_id, subject)
-        if isinstance(answerable, JSONResponse):
-            return answerable
-        parent = answerable[0]
-        state = _answer_state(*answerable)
-        # The questions are derived from the report, as the questions route
-        # derives its lists, so the answer runs off the event loop for the
-        # same reason.
-        try:
-            outcome = await anyio.to_thread.run_sync(
-                partial(
-                    state.answer,
-                    Answers(
-                        given=AnswerSet(
-                            links=tuple(answers.links), facts=tuple(answers.facts)
-                        ),
-                        save=answers.save,
-                        skips=answers.skip,
-                        revision=answers.revision,
-                    ),
-                    limits=request.app.state.limits,
-                )
-            )
-        except StaleRevision as exc:
-            raise HTTPException(
-                status_code=409, detail=f"{exc}; read the questions again"
-            ) from exc
-        except (NoCatalogError, AlreadyResumed) as exc:
-            raise HTTPException(status_code=409, detail=str(exc)) from exc
-        except SourcesOverLimit as exc:
-            raise HTTPException(
-                status_code=_STATUS_BY_RUNG[exc.breach.rung], detail=str(exc)
-            ) from exc
-        except ValueError as exc:
-            raise HTTPException(status_code=400, detail=str(exc)) from exc
-        if isinstance(outcome, SavedDraft):
-            if not await request.app.state.store.save_draft(
-                parent.id, subject, outcome.draft, outcome.revision
-            ):
-                raise HTTPException(
-                    status_code=409,
-                    detail="the report's follow-up has started, or another save"
-                    " landed first; read the questions again",
-                )
-            # A draft runs nothing and spends no follow-up (ADR 0070).
-            return JSONResponse(
-                {"job_id": parent.id, "saved": True, "revision": outcome.revision + 1}
-            )
-        if isinstance(outcome, SavedRound):
-            store: JobStore = request.app.state.store
-            if not await store.save_round(
-                parent.id,
-                subject,
-                outcome.answers,
-                outcome.shown,
-                outcome.skipped,
-                outcome.revision,
-            ):
-                raise HTTPException(
-                    status_code=409,
-                    detail="the job no longer waits on answers, or another save"
-                    " landed first; read the questions again",
-                )
-            # A saved round never starts the analysis: a continue does.
-            return JSONResponse({"job_id": parent.id, "saved": True})
-        record = JobRecord.create(
-            owner_subject=subject,
-            sources=outcome.sources,
-            frameworks=parent.frameworks,
-            system_name=parent.system_name,
-            answers=outcome.answers,
-            shown_early=outcome.shown,
-            skipped_early=list(outcome.skipped),
-            resumption=Resumption(
-                parent_id=parent.id,
-                checkpoint=outcome.checkpoint,
-                certification=parent.certification,
-                follow_up=outcome.follow_up,
+        outcome = await _answers(request).answer(
+            job_id,
+            subject,
+            Answers(
+                given=AnswerSet(links=tuple(answers.links), facts=tuple(answers.facts)),
+                save=answers.save,
+                skips=answers.skip,
+                revision=answers.revision,
             ),
-            parent_revision=parent.round_revision,
-            reserved_tokens=budgets.estimate(outcome.sources, parent.frameworks),
+            start=_starter(request, background_tasks),
         )
-        return await _admit_and_start(request, record, background_tasks, subject)
+        if isinstance(outcome, Started):
+            return _started(outcome)
+        body: dict[str, Any] = {"job_id": outcome.job_id, "saved": True}
+        if outcome.revision is not None:
+            body["revision"] = outcome.revision
+        return JSONResponse(body)
 
     @app.get(
         "/v1/jobs/{job_id}",
@@ -1182,15 +959,14 @@ def create_app(
     async def get_job(
         job_id: str, request: Request, subject: str = Depends(require_subject)
     ) -> JobStatusView:
-        record = await _owned_job(request, job_id, subject)
+        record = await _answers(request).owned(job_id, subject)
         return _status_view(record)
 
     @app.get("/v1/jobs/{job_id}/report")
     async def get_report(
         job_id: str, request: Request, subject: str = Depends(require_subject)
     ) -> JSONResponse:
-        served = await _servable_report(request, job_id, subject)
-        return served if isinstance(served, JSONResponse) else JSONResponse(served)
+        return JSONResponse(await _servable_report(request, job_id, subject))
 
     @app.get("/v1/jobs/{job_id}/changes")
     async def get_changes(
@@ -1203,9 +979,7 @@ def create_app(
         where the job is not a follow-up, or the store no longer holds the
         report its answers came from.
         """
-        served = await _servable_report(request, job_id, subject)
-        if isinstance(served, JSONResponse):
-            return served
+        await _servable_report(request, job_id, subject)
         store: JobStore = request.app.state.store
         # The envelope leaves the resumption out, so it is read by name.
         resumption = await store.resumption(job_id, subject)
@@ -1219,9 +993,7 @@ def create_app(
                 status_code=409,
                 detail="the report this follow-up's answers came from is no longer held",
             )
-        earlier = await _servable_report(request, resumption.parent_id, subject)
-        if isinstance(earlier, JSONResponse):
-            return earlier
+        await _servable_report(request, resumption.parent_id, subject)
         before = await store.report(resumption.parent_id, subject)
         after = await store.report(job_id, subject)
         if before is None or after is None:
@@ -1252,40 +1024,14 @@ def create_app(
         ``job_id``. ``400`` where the job does not wait on answers, ``409``
         where its revision has moved or a job already locks it.
         """
-        answerable = await _answerable(request, job_id, subject)
-        if isinstance(answerable, JSONResponse):
-            return answerable
-        parent = answerable[0]
-        state = _answer_state(*answerable)
-        try:
-            amended = await anyio.to_thread.run_sync(
-                partial(
-                    state.amend,
-                    body.text,
-                    revision=body.revision,
-                    limits=request.app.state.limits,
-                )
-            )
-        except (StaleRevision, AlreadyResumed) as exc:
-            raise HTTPException(status_code=409, detail=str(exc)) from exc
-        except SourcesOverLimit as exc:
-            raise HTTPException(
-                status_code=_STATUS_BY_RUNG[exc.breach.rung], detail=str(exc)
-            ) from exc
-        except ValueError as exc:
-            raise HTTPException(status_code=400, detail=str(exc)) from exc
-        record = JobRecord.create(
-            owner_subject=subject,
-            sources=amended.sources,
-            frameworks=parent.frameworks,
-            system_name=parent.system_name,
-            ask_questions=True,
-            amends=parent.id,
-            parent_revision=parent.round_revision,
-            carried=amended.answers,
-            reserved_tokens=budgets.estimate(amended.sources, parent.frameworks),
+        started = await _answers(request).amend(
+            job_id,
+            subject,
+            body.text,
+            revision=body.revision,
+            start=_starter(request, background_tasks),
         )
-        return await _admit_and_start(request, record, background_tasks, subject)
+        return _started(started)
 
     @app.post("/v1/jobs/{job_id}/corrections")
     async def correct_job(
@@ -1300,27 +1046,14 @@ def create_app(
         rewritten. ``400`` where the job's report is not final, a correction
         names no answer the report read, or changes none.
         """
-        answerable = await _answerable(request, job_id, subject)
-        if isinstance(answerable, JSONResponse):
-            return answerable
-        parent, _, _, analyses, _ = answerable
-        state = _answer_state(*answerable)
-        try:
-            corrections = await anyio.to_thread.run_sync(state.correct, body.facts)
-        except ValueError as exc:
-            raise HTTPException(status_code=400, detail=str(exc)) from exc
-        store: JobStore = request.app.state.store
-        if not await store.save_corrections(parent.id, subject, corrections):
-            raise HTTPException(
-                status_code=409, detail="the job's report is no longer final"
-            )
+        corrected = await _answers(request).correct(job_id, subject, body.facts)
         return JSONResponse(
             {
-                "job_id": parent.id,
-                "corrections": [fact.model_dump(mode="json") for fact in corrections],
-                "corrected_findings": list(
-                    corrected_findings(analyses, parent.answers.facts, corrections)
-                ),
+                "job_id": corrected.job_id,
+                "corrections": [
+                    fact.model_dump(mode="json") for fact in corrected.corrections
+                ],
+                "corrected_findings": corrected.corrected_findings,
             }
         )
 
@@ -1335,19 +1068,14 @@ def create_app(
         about its report, served under the report's own rule, so a report that
         is withheld withholds its questions too.
         """
-        answerable = await _answerable(request, job_id, subject)
-        if isinstance(answerable, JSONResponse):
-            return answerable
-        # The derivation grows with the report, and a read carries no
-        # admission bound, so it runs off the event loop.
-        payload = await anyio.to_thread.run_sync(_questions_payload, *answerable)
+        payload = await _answers(request).questions(job_id, subject)
         return JSONResponse({"job_id": job_id} | payload)
 
     @app.get("/v1/jobs/{job_id}/events")
     async def stream_events(
         job_id: str, request: Request, subject: str = Depends(require_subject)
     ) -> StreamingResponse:
-        await _owned_job(request, job_id, subject)
+        await _answers(request).owned(job_id, subject)
         streams: Counter[str] = request.app.state.event_streams
         if streams[subject] >= MAX_EVENT_STREAMS_PER_SUBJECT:
             raise HTTPException(

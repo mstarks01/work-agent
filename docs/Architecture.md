@@ -516,6 +516,7 @@ and the selection seam are in place for all of them.
 | --- | --- |
 | `analysis_service.engine` | In-process `Engine` facade. |
 | `analysis_service.api` | The `/v1` FastAPI app. |
+| `analysis_service.job_answers` | The one writer of a job's answers and the one starter of the job they start. It reads the job from the store, builds the Answer State, stores a round, a draft or a correction, or admits and starts the Resumed Job, and raises typed refusals each driver maps to its transport. |
 | `analysis_service.jobs` | Job lifecycle, `JobStore`, `PipelineRunner` seams. |
 | `analysis_service.sources` | `Source`: the untrusted text a job is built from, the per-deployment bounds both entry points enforce, and the fenced render that is the only way caller bytes reach a model (OWASP LLM01). |
 | `analysis_service.deployment` | One installation's config, resolved once: the files, the graph they configure, its runner and its certification gate. |
