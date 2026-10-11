@@ -1,12 +1,10 @@
 """Reading a head-only sweep back: which arm it ran, and what grades it.
 
-Two tables answer two questions that gave one answer while a mode's reading
-node and its kept emission moved together. #1003's head-only mode reads through
-`extract`, through `facts`, or through the split `inventory`/`rows` route —
-which of them is the very thing separating its arms — and keeps a catalog every
-way. These hold each table to its own
-question, and drive the reader that grades such a sweep off the catalog its own
-run gated rather than off the blessed model it was never shown.
+Two tables answer two questions. The head-only mode reads through `extract`
+and keeps a catalog, so the route that places it and the emission that grades
+it are read apart. These hold each table to its own question, and drive the
+reader that grades such a sweep off the catalog its own run gated rather than
+off the blessed model it was never shown.
 """
 
 from __future__ import annotations
@@ -63,12 +61,8 @@ def sweep(tmp_path: Path, corpus_case) -> Path:
 class TestTheTwoTables:
     """Which route places an arm, and which emission a replay grades."""
 
-    def test_the_head_only_mode_reads_through_three_routes(self) -> None:
-        assert replay.ROUTES_OF["heads"] == (
-            ("extract",),
-            ("facts",),
-            ("inventory", "rows"),
-        )
+    def test_the_head_only_mode_reads_through_extract(self) -> None:
+        assert replay.ROUTES_OF["heads"] == (("extract",),)
 
     def test_every_replayable_mode_says_what_it_keeps(self) -> None:
         """A mode in one table and not the other is a replay that reads nothing."""
@@ -84,12 +78,7 @@ class TestTheTwoTables:
         """A route node nothing runs would refuse every sweep that ran it."""
         named = {node for route in replay.ROUTES_OF["heads"] for node in route}
 
-        assert named == {
-            graph.EXTRACT_NODE,
-            graph.FACTS_NODE,
-            graph.INVENTORY_NODE,
-            graph.ROWS_NODE,
-        }
+        assert named == {graph.EXTRACT_NODE}
 
 
 class TestPlacingAHeadOnlySweep:
@@ -113,23 +102,10 @@ class TestPlacingAHeadOnlySweep:
 
         return Fake()
 
-    @pytest.mark.parametrize("node", ("extract", "facts"))
-    def test_it_is_placed_by_the_node_it_carried(self, node: str) -> None:
-        arm = replay.arm_of(self.artifact(node, "repair"))
-        assert arm.nodes == (node,)
-        assert arm.instructions == (f"{node}-digest",)
-
-    def test_a_split_reading_is_one_arm_over_two_prompts(self) -> None:
-        """#1003's arm E reads through two calls, and each carries its own prompt."""
-        arm = replay.arm_of(self.artifact("inventory", "rows", "resolve"))
-
-        assert arm.nodes == ("inventory", "rows")
-        assert arm.instructions == ("inventory-digest", "rows-digest")
-
-    def test_a_sweep_carrying_both_is_refused(self) -> None:
-        """Two reading routes is two arms, and a sweep is one."""
-        with pytest.raises(ValueError, match="cannot be placed on"):
-            replay.arm_of(self.artifact("extract", "facts"))
+    def test_it_is_placed_by_the_node_it_carried(self) -> None:
+        arm = replay.arm_of(self.artifact("extract", "repair"))
+        assert arm.nodes == ("extract",)
+        assert arm.instructions == ("extract-digest",)
 
     def test_a_sweep_carrying_neither_is_refused(self) -> None:
         with pytest.raises(ValueError, match="cannot be placed on"):
@@ -153,7 +129,7 @@ class TestGradingAHeadOnlySweep:
     def test_it_keeps_a_row_the_blessed_model_has_no_element_for(
         self, tmp_path: Path, corpus_case
     ) -> None:
-        """Re-resolving would bind nothing and read as an arm that found nothing."""
+        """Re-resolving would bind nothing and read as a head that found nothing."""
         artifact = sweep(tmp_path, corpus_case)
         found = heads_from_reports(artifact, [corpus_case])
         blessed = {element.id for element in corpus_case.model.elements()}

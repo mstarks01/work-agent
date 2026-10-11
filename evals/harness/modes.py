@@ -88,14 +88,10 @@ from analysis_service.graph import (
     ENTRY_PREPARE,
     STATE_ASSERTION_CATALOG,
     STATE_ASSERTION_PROPOSAL,
-    STATE_BUNDLE_DISPOSITIONS,
     STATE_EXTRACTED_MODEL,
     STATE_FIRST_PASS,
     STATE_FRAMEWORK_OPTIONS,
-    STATE_PATCH_OUTCOMES,
     STATE_REPAIR_BASELINE,
-    STATE_SOURCE_FACTS,
-    STATE_SOURCE_INVENTORY,
     STATE_SOURCE_TEXTS,
     STATE_VALID_MODEL,
     Entry,
@@ -1497,19 +1493,12 @@ def _first_pass(
 #: adding a row here rather than by editing a writer that lists what it knows
 #: about — and a key nothing wrote is absent rather than empty.
 #:
-#: Each one answers a question the catalog alone cannot. The raw bundle and
-#: inventory are what the model emitted, which resolving has already dropped
-#: rows from. The dispositions say what every input row came to. The extracted
-#: model is the graph the rows bound against, and the valid model is the graph
-#: after any repair. The patch outcomes say what a review pass changed, and
-#: whether its batch was discarded.
+#: Each one answers a question the catalog alone cannot. The extracted model is
+#: the graph the rows bound against, and the valid model is the graph after any
+#: repair.
 ARCHIVED_STATE: tuple[str, ...] = (
-    STATE_SOURCE_FACTS,
-    STATE_SOURCE_INVENTORY,
-    STATE_BUNDLE_DISPOSITIONS,
     STATE_EXTRACTED_MODEL,
     STATE_VALID_MODEL,
-    STATE_PATCH_OUTCOMES,
 )
 
 
@@ -1527,9 +1516,8 @@ class AssertionResult:
     catalog as no refusal.
 
     ``stages`` is what every earlier node of the run wrote, by
-    :data:`ARCHIVED_STATE`. A head that reads the sources facts-first composes
-    its proposal out of a bundle code resolved, so the proposal alone cannot say
-    what the model read or where a row was lost between the two.
+    :data:`ARCHIVED_STATE`, so a reader can see the graph the rows bound
+    against beside the catalog.
     """
 
     case_id: str
@@ -1696,12 +1684,12 @@ async def run_assertions(case: GoldenCase, pipeline: Pipeline) -> AssertionResul
 
 
 async def run_heads(case: GoldenCase, pipeline: Pipeline) -> AssertionResult:
-    """Mode 5: run one arm's head over the sources and stop at the catalog.
+    """Mode 5: run the head over the sources and stop at the catalog.
 
-    **What #1003's primary endpoint is scored on, and nothing else.** The arm
-    extracts its own model — that is the half the arms differ in — and the
-    graph stops at the terminal ``catalog`` node, so no lane agent and no
-    critic is billed for findings the endpoint never reads.
+    **What required-fact recall is scored on, and nothing else.** The head
+    extracts its own model, and the graph stops at the terminal ``catalog``
+    node, so no lane agent and no critic is billed for findings the endpoint
+    never reads.
 
     Nothing is seeded. The assertion mode seeds a blessed model because its
     question is what the sources state about one; this mode's question is what
@@ -2542,10 +2530,10 @@ MODE_ENTRIES: dict[str, Entry] = {
     # with those facts rather than calling a model.
     "direct-facts": ENTRY_PREPARE,
     "end-to-end": ENTRY_EXTRACT,
-    # #1003's arm mode: one arm's head, stopped at the catalog its endpoint is
-    # scored on. It is the end-to-end graph with the lanes left off rather than
-    # a route of its own, so an arm measured here ran the nodes an arm measured
-    # end to end would have run.
+    # The head, stopped at the catalog required-fact recall is scored on. It is
+    # the end-to-end graph with the lanes left off rather than a route of its
+    # own, so a head measured here ran the nodes an end-to-end run would have
+    # run.
     "heads": ENTRY_HEAD_ONLY,
     # The analysis mode with a case's signed answers, written in as a resumed
     # job writes them (#1225). Built by :func:`run_answered`.

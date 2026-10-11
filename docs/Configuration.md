@@ -1161,9 +1161,6 @@ restart.
 | --- | --- | --- |
 | `ANALYSIS_ASSERTIONS` | supported | Runs the assertion pass on every job. On by default; `false` turns it off (see below). |
 | `ANALYSIS_COMPACT_EXTRACTION` | experiment (#938) | Extraction writes a compact form that code expands into the same system model. |
-| `ANALYSIS_FACTS_FIRST_EXTRACTION` | experiment (#1003) | Extraction reads source facts first and code builds the model from them. It writes its own assertion rows, so a deployment that selects it runs no assertion pass. |
-| `ANALYSIS_FACTS_SPLIT_EXTRACTION` | experiment (#1003) | The facts-first reading, split over two calls. It replaces the variable above. |
-| `ANALYSIS_SOURCE_REVIEW` | experiment (#1003) | A bounded second read of the sources against the model and the catalog. It needs a route that produces a catalog: `ANALYSIS_ASSERTIONS` or `ANALYSIS_FACTS_FIRST_EXTRACTION`. |
 
 Use the experiments only to measure them. Their results are recorded on the
 issues named in the table.

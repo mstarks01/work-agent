@@ -62,9 +62,8 @@ def test_every_catalog_mode_archives_its_run(tmp_path: Path, mode: str) -> None:
 def test_a_run_keeps_every_stage_it_wrote(tmp_path: Path) -> None:
     """The catalog alone cannot say what the model emitted or what was lost.
 
-    A facts-first head composes its proposal out of a bundle code resolved, so
-    a replay holding the proposal alone cannot re-run the resolver over what
-    arrived, or attribute a missing fact to a stage.
+    A head's catalog is read beside the graph its rows bound against, so a
+    reader can attribute a missing fact to the reading or to the gate.
     """
     stages = {key: {"kept": key} for key in modes.ARCHIVED_STATE}
     out = str(tmp_path / "sweep.json")

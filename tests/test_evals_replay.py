@@ -406,8 +406,8 @@ class TestEveryReferenceRowTakesOneFate:
         """The reference calls the component internal; the run calls it exposed.
 
         The produced row carries the reference row's own fate, so a precision
-        figure reading :data:`~evals.harness.replay.ADJUDICATED_WRONG` counts
-        it. A row the reference disagrees with is not an answer to it.
+        figure counts it. A row the reference disagrees with is not an answer
+        to it.
         """
         row = next(
             e
@@ -419,7 +419,6 @@ class TestEveryReferenceRowTakesOneFate:
         graded = self.graded(golden, reference, [flipped])
 
         assert graded.produced == {assertion_id(flipped): "wrong_value"}
-        assert set(graded.produced.values()) <= replay.ADJUDICATED_WRONG
 
     def test_an_inferred_answer_to_a_stated_fact_is_not_found(self, golden, reference):
         """The source states the fact and the run says it worked it out."""
@@ -1235,7 +1234,7 @@ class TestTheArchivedEmissionsReplay:
         return load_corpus(CORPUS)
 
     def test_the_archive_is_not_empty(self):
-        assert len(ARTIFACTS) >= 21
+        assert len(ARTIFACTS) >= 19
 
     @pytest.mark.parametrize("path", ARTIFACTS, ids=[p.stem for p in ARTIFACTS])
     def test_every_artifact_carries_its_emissions_beside_it(self, path):

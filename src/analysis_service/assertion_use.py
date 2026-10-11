@@ -44,8 +44,7 @@ class AssertionUse:
     refused: int
     #: The principals the catalog states facts about and places on no element.
     open_links: int
-    #: The ``assert`` node's wall-clock; 0 where a facts-first reading wrote
-    #: the catalog and no such node ran.
+    #: The ``assert`` node's wall-clock; 0 where no such node ran.
     assert_ms: int
     #: What the provider reported it charged for the ``assert`` node, or
     #: ``None`` where it reported nothing.

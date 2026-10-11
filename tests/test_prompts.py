@@ -19,10 +19,7 @@ from analysis_service.prompts import (
     compose_assert_prompt,
     compose_critic_prompt,
     compose_extract_prompt,
-    compose_facts_prompt,
     compose_repair_prompt,
-    compose_reread_prompt,
-    compose_rows_prompt,
     render_predicates,
 )
 from analysis_service.skills import lane_exemplars_doc
@@ -173,21 +170,15 @@ def test_exemplar_name_is_relative_to_the_package_root(package_loader):
 class TestThePredicateTableSpeaksItsStageSpelling:
     """A ``reference`` value is a handle at one stage and an ID at another.
 
-    The rendered table said "the name of a component" at every stage, and no
-    resolver takes a display name: the bundle stages look the value up among
-    the handles that emission invented, and the catalog stage looks it up
-    among the subjects the catalog declares. A row following the table lost
-    its fact with ``dangling-value`` or ``dangling-reference`` and nothing
-    said why (#1082).
+    The rendered table said "the name of a component", and no resolver takes
+    a display name: the catalog stage looks the value up among the subjects
+    the catalog declares. A row following the table lost its fact with
+    ``dangling-value`` or ``dangling-reference`` and nothing said why (#1082).
     """
 
     @pytest.mark.parametrize(
         ("stage", "spelling"),
-        [
-            ("bundle", "the handle of a zone"),
-            ("catalog", "the ID of a zone"),
-            ("batch", "the handle or the element ID of a zone"),
-        ],
+        [("catalog", "the ID of a zone")],
     )
     def test_each_stage_names_the_form_its_resolver_reads(self, stage, spelling):
         rendered = render_predicates(stage)
@@ -207,12 +198,7 @@ class TestThePredicateTableSpeaksItsStageSpelling:
 
     def test_every_composer_renders_a_stage_the_table_holds(self, loader):
         """Each composer names its own stage, because there is no default."""
-        for compose in (
-            compose_facts_prompt,
-            compose_rows_prompt,
-            compose_reread_prompt,
-            compose_assert_prompt,
-        ):
+        for compose in (compose_assert_prompt,):
             assert "## The predicates" in compose(loader)
 
     def test_a_stated_only_predicate_says_so_in_its_own_row(self):

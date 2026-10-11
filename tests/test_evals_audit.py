@@ -104,7 +104,7 @@ class TestThePhaseTable:
             ("critic_stride", "criticism"),
             ("critic_failed_stride", "criticism"),
             ("merge_asvs", "fan-in"),
-            ("reading_inventory", "extraction"),
+            ("revalidate", "extraction"),
         ):
             assert audit.phase_of(node) == phase
 

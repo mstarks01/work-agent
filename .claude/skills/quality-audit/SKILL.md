@@ -80,8 +80,6 @@ inventory. The usual first pass:
 ```bash
 uv run python -m evals.harness.run score <artifact> --out /tmp/<name>-rescored.json
 uv run python -m evals.harness.run replay evals/emissions/*.json --out /tmp/replay.json
-uv run python -m evals.harness.run oracle
-uv run python -m evals.harness.run bottleneck
 uv run python evals/verify_corpus.py
 uv run pytest -q
 ```

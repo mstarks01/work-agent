@@ -34,7 +34,6 @@ therefore share the longest possible cacheable prefix.
 
 from __future__ import annotations
 
-import re
 from collections.abc import Mapping
 from types import MappingProxyType
 from typing import Literal
@@ -42,7 +41,6 @@ from typing import Literal
 from analysis_service.assertions import REGISTRY, Predicate, referent_type
 from analysis_service.claims import FrameworkName
 from analysis_service.compact import COMPACT_FORMAT, FULL_FORMAT
-from analysis_service.factbundle import ROLES
 from analysis_service.frameworks import LANE_CLOSING_DOC, OUTPUT_DOC
 from analysis_service.markdown_loader import MarkdownLoader
 from analysis_service.question_kinds import QUESTION_KINDS
@@ -57,35 +55,16 @@ ANALYZE_PROMPT_NAME = "analyze"
 CRITIC_PROMPT_NAME = "critic"
 RECRITIC_PROMPT_NAME = "recritic"
 EXTRACT_PROMPT_NAME = "extract"
-#: The facts-first extraction body (#1003 arm B). A prompt body of its own and
-#: not a delta on ``extract.md``: the two read the same sources and write
-#: different things, so there is no shared body for one to append to.
-EXTRACT_FACTS_PROMPT_NAME = "extract-facts"
-#: The split facts-first route's two bodies (#1003 arm E). The same reading in
-#: two calls: one names what the sources hold and one states what they say
-#: about it. Two bodies rather than one with a delta, because neither call is
-#: asked to do what the other does and a shared body would tell each of them
-#: about the other's job.
-EXTRACT_INVENTORY_PROMPT_NAME = "extract-inventory"
-EXTRACT_ROWS_PROMPT_NAME = "extract-rows"
 #: The compact transport's delta, appended after ``extract.md``. Not a prompt
 #: body: it carries no Role, Input or Procedure of its own, because the whole
 #: point is that both extraction routes read one body and differ only in what
 #: they are asked to write. See :mod:`analysis_service.compact`.
 EXTRACT_COMPACT_PROMPT_NAME = "extract-compact"
 REPAIR_PROMPT_NAME = "repair"
-#: The source-driven review body (#1003 arms C and D). It reads the sources
-#: against artifacts already built from them and proposes typed operations; see
-#: :mod:`analysis_service.patch` for what an operation may do.
-REREAD_PROMPT_NAME = "reread"
 ASSERT_PROMPT_NAME = "assert"
 PROMPT_BODY_NAMES: tuple[str, ...] = (
     EXTRACT_PROMPT_NAME,
-    EXTRACT_FACTS_PROMPT_NAME,
-    EXTRACT_INVENTORY_PROMPT_NAME,
-    EXTRACT_ROWS_PROMPT_NAME,
     REPAIR_PROMPT_NAME,
-    REREAD_PROMPT_NAME,
     ASSERT_PROMPT_NAME,
     ANALYZE_PROMPT_NAME,
     CRITIC_PROMPT_NAME,
@@ -223,64 +202,9 @@ def compose_extract_prompt(
     return "\n\n".join(part.strip() for part in parts) + "\n"
 
 
-def compose_facts_prompt(loader: MarkdownLoader) -> str:
-    """The facts-first prompt: the body, then the roles, then the predicates.
-
-    Both tables are rendered from the code that reads them, for the reason
-    :func:`compose_assert_prompt` renders one: a role's element and a
-    predicate's value form are facts
-    :data:`~analysis_service.factbundle.ROLES` and
-    :data:`~analysis_service.assertions.REGISTRY` already hold, and a second
-    copy in prose is the copy nothing checks.
-    """
-    parts = [
-        loader.load(EXTRACT_FACTS_PROMPT_NAME),
-        render_roles(),
-        render_predicates("bundle"),
-    ]
-    return "\n\n".join(part.strip() for part in parts) + "\n"
-
-
 def compose_repair_prompt(loader: MarkdownLoader) -> str:
     """The one-shot repair prompt: validator issues plus the original input."""
     return loader.load(REPAIR_PROMPT_NAME).strip() + "\n"
-
-
-def compose_inventory_prompt(loader: MarkdownLoader) -> str:
-    """The split route's first call: the body, then the roles.
-
-    No predicate table. This call writes no fact, so a table of what a fact may
-    say would be text it is paid for and told not to use — and #1003's split
-    only measures what it means to if each call is given one job.
-    """
-    parts = [loader.load(EXTRACT_INVENTORY_PROMPT_NAME), render_roles()]
-    return "\n\n".join(part.strip() for part in parts) + "\n"
-
-
-def compose_rows_prompt(loader: MarkdownLoader) -> str:
-    """The split route's second call: the body, then the predicates.
-
-    No role table, for the reason the first call carries no predicates: this
-    call names no mention and types nothing.
-    """
-    parts = [loader.load(EXTRACT_ROWS_PROMPT_NAME), render_predicates("bundle")]
-    return "\n\n".join(part.strip() for part in parts) + "\n"
-
-
-def compose_reread_prompt(loader: MarkdownLoader) -> str:
-    """The reread prompt: the body, then the roles, then the predicates.
-
-    The same two rendered tables the facts-first prompt carries, because an
-    operation that adds an element names a role and one that adds a statement
-    names a predicate. Rendered rather than restated, so a role or a predicate
-    added tomorrow reaches both prompts and neither file moves.
-    """
-    parts = [
-        loader.load(REREAD_PROMPT_NAME),
-        render_roles(),
-        render_predicates("batch"),
-    ]
-    return "\n\n".join(part.strip() for part in parts) + "\n"
 
 
 def compose_assert_prompt(loader: MarkdownLoader) -> str:
@@ -296,55 +220,16 @@ def compose_assert_prompt(loader: MarkdownLoader) -> str:
     return "\n\n".join(part.strip() for part in parts) + "\n"
 
 
-def render_roles() -> str:
-    """The structural role vocabulary as the table a model reads.
-
-    One row per role: what element it names, and which of that element's
-    required fields the role itself settles. The second column is what makes
-    eight roles out of five element types — an **External Entity** is a human
-    or an external system and a **Trust Boundary** separates by network,
-    privilege or tenancy, and neither field admits ``unknown``, so the role has
-    to say.
-    """
-    rows = [
-        "## The roles",
-        "",
-        ("One role where the text settles what a thing is, and two where it does not."),
-        "",
-        "| Role | Element | Settles |",
-        "| --- | --- | --- |",
-    ]
-    for role, rule in ROLES.items():
-        settled = (
-            ", ".join(
-                f"`{field}` is `{value}`" for field, value in sorted(rule.fixed.items())
-            )
-            or "nothing further"
-        )
-        rows.append(f"| `{role}` | {_element_words(rule.element)} | {settled} |")
-    return "\n".join(rows)
-
-
-def _element_words(element_type: type) -> str:
-    """One element class's name as the glossary writes it: ``Data Store``."""
-    return re.sub(r"(?<!^)(?=[A-Z])", " ", element_type.__name__)
-
-
 #: Which composer is rendering the predicate table. A closed set, so a stage
 #: nobody has written reads as a type error here rather than as a wrong sentence
 #: in a shipped prompt.
-Stage = Literal["bundle", "catalog", "batch"]
+Stage = Literal["catalog"]
 
 #: How a ``reference`` predicate's value is spelled, per stage that renders the
-#: table. **A table rather than one sentence**, because the answer differs by
-#: stage. No resolver takes a display name, so each stage states its spelling.
-#: A bundle stage
-#: writes the handle it invented in the same emission
-#: (:func:`~analysis_service.factbundle._referent` looks the value up among the
-#: bundle's own handles); a catalog stage writes the subject's identity, which
+#: table. No resolver takes a display name, so each stage states its spelling:
+#: the catalog stage writes the subject's identity, which
 #: :func:`~analysis_service.assertions.resolve_catalog` looks up among the
-#: subjects the catalog declares; and the re-read batch does either, because an
-#: operation may reach a thing it is adding or one the model already holds.
+#: subjects the catalog declares.
 #:
 #: Keyed by the composer that renders it, so a stage added tomorrow raises here
 #: rather than inheriting whichever sentence happened to be first. **No default
@@ -352,11 +237,7 @@ Stage = Literal["bundle", "catalog", "batch"]
 #: inherits one spelling in silence, which is the failure this table answers
 #: rather than a shorter way to call it.
 REFERENCE_FORMS: Mapping[Stage, str] = MappingProxyType(
-    {
-        "bundle": "the handle of a {referent}",
-        "catalog": "the ID of a {referent}",
-        "batch": "the handle or the element ID of a {referent}",
-    }
+    {"catalog": "the ID of a {referent}"}
 )
 
 

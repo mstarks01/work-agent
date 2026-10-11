@@ -21,8 +21,7 @@ A node covered by no phase fails there rather than being attributed by whoever
 is reading.
 
 **A phase is coarser than a node on purpose.** The audit's unit is the stage a
-fix would land in, and ``facts``, ``inventory`` and ``rows`` are one stage run
-three ways (#1003). Attribution below node granularity is the artifact's job.
+fix would land in. Attribution below node granularity is the artifact's job.
 
 ## The experiment ledger
 
@@ -162,10 +161,9 @@ class PhaseEntry:
 
 #: The six phases, each naming the graph nodes it owns.
 #:
-#: ``extraction`` carries the whole head — the reading calls, the deterministic
-#: resolver, the validity gate and the bounded repair — because a fact lost
-#: anywhere in it is lost before a lane can read it, and the head's own routes
-#: are what #1003 compares. ``preparation`` is the routing half: what reaches
+#: ``extraction`` carries the whole head — the reading call, the validity gate
+#: and the bounded repair — because a fact lost anywhere in it is lost before a
+#: lane can read it. ``preparation`` is the routing half: what reaches
 #: which lane. ``analysis`` is one lane agent writing a draft. ``fan-in`` is the
 #: join and the merge. ``criticism`` is the critic, its bounded re-ask and the
 #: rereview. ``reporting`` is ``assemble``, the terminal node that builds the
@@ -180,15 +178,7 @@ PHASES: Mapping[Phase, PhaseEntry] = MappingProxyType(
             nodes=frozenset(
                 {
                     "extract",
-                    "facts",
-                    "inventory",
-                    "rows",
-                    "reading_inventory",
-                    "resolve",
                     "assert",
-                    "reread",
-                    "reading",
-                    "apply",
                     "catalog",
                     "pause",
                     "read",
@@ -198,7 +188,7 @@ PHASES: Mapping[Phase, PhaseEntry] = MappingProxyType(
                     "reject",
                 }
             ),
-            instruments=("replay", "bind", "oracle", "bottleneck"),
+            instruments=("replay", "bind"),
         ),
         "preparation": PhaseEntry(
             question=(

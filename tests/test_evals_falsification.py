@@ -18,7 +18,6 @@ import pytest
 
 from analysis_service.assertions import GATE_REFUSALS
 from evals.harness import falsify
-from evals.harness.arms import ARMS
 from evals.harness.replay import ROW_FATES
 from evals.harness.run import COMMANDS
 
@@ -46,10 +45,6 @@ class TestTheTableAnswersTheAcceptanceList:
     @pytest.mark.parametrize("name", sorted(falsify.PROBES))
     def test_every_probe_declares_a_registered_refusal(self, name: str) -> None:
         assert set(falsify.PROBES[name].refuses) <= GATE_REFUSALS
-
-    def test_a_probe_is_never_an_arm(self) -> None:
-        """A probe reads the endpoint; it does not answer #1003's question."""
-        assert not set(falsify.PROBES) & set(ARMS)
 
     def test_the_command_is_registered(self) -> None:
         assert COMMANDS["falsify"].run is falsify.command_falsify

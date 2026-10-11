@@ -32,7 +32,6 @@ import pytest
 
 from analysis_service.assertions import QUALIFIED_SPELLING, UNKNOWN
 from analysis_service.claims import ATTRIBUTE_GROUNDS
-from analysis_service.factbundle import LANDED
 from analysis_service.sources import FORMATTING_CATEGORIES
 from analysis_service.system_model import Element, all_attribute_names
 from evals.harness.reference import CASE_FILES, MUST_FIND
@@ -456,13 +455,9 @@ def test_the_constant_interpolation_scan_finds_one_when_there_is_one(tmp_path):
 #: module's class: not a fact with no reader, but a rule with two, where each
 #: reader's own test agrees with it and neither moves when the rule does.
 #:
-#: See the checkpoint round over ``reviewed/2026-09-16b...main``. A module
-#: that writes ``("consumed", "preserved")`` again beside
-#: ``factbundle.LANDED`` would miss a sixth landing disposition.
 #: Read from the owner rather than written out here, so this table is not
 #: itself the second spelling it exists to forbid.
 OWNED_VOCABULARIES: dict[str, frozenset[str]] = {
-    "src/analysis_service/factbundle.py": LANDED,
     "src/analysis_service/claims.py": ATTRIBUTE_GROUNDS,
     "src/analysis_service/sources.py": FORMATTING_CATEGORIES,
     "evals/harness/roster.py": STANDINGS,
@@ -546,11 +541,12 @@ def test_the_respelling_scan_finds_one_when_there_is_one(tmp_path):
     """Positive control: a module that spells the landed set out again."""
     probe = tmp_path / "probe.py"
     probe.write_text(
-        'def landed(row):\n    return row.disposition in ("consumed", "preserved")\n',
+        "def grounded(row):\n"
+        '    return row.ground in ("unknown-attribute", "absent-attribute")\n',
         encoding="utf-8",
     )
 
-    found = _respelled(ast.parse(probe.read_text(encoding="utf-8")), LANDED)
+    found = _respelled(ast.parse(probe.read_text(encoding="utf-8")), ATTRIBUTE_GROUNDS)
 
     assert found == [2]
 

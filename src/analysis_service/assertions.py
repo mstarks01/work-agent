@@ -951,10 +951,10 @@ class AssertionRecord(BaseModel):
     ) -> AssertionRecord:
         """One record over a catalog something else built, with the gate run on it.
 
-        **The way a catalog nobody resolved here still answers the gate.** The
-        patch applicator merges rows into a catalog and #1003's review route
-        hands one to ``prepare``; each reaches a lane through this, so a catalog
-        an agent selects from answers the same rules whichever code built it.
+        **The way a catalog nobody resolved here still answers the gate.** A
+        resumed job hands the catalog its parent built to ``prepare``; it
+        reaches a lane through this, so a catalog an agent selects from answers
+        the same rules whichever job built it.
 
         ``issues`` is what its builder already refused, kept in front of what
         the gate says now, so a reader sees a row lost in construction apart
@@ -972,8 +972,8 @@ class AssertionRecord(BaseModel):
         **A contradiction is always the one this call finds.** It is a fact
         about the catalog and the model in front of the gate now, so one
         carried in ``issues`` from an earlier record is dropped: it is either
-        found again here or no longer true. A patch passes its record's issues
-        through, and each patch that landed added one more copy.
+        found again here or no longer true. A record passed through more than
+        once would otherwise carry one more copy each time.
         """
         found: list[CatalogIssue] = []
         removed = list(quarantined)
@@ -1252,9 +1252,9 @@ def gate_issues(
     """Everything the gate says about one catalog and the graph beside it.
 
     **The one reader of "does this catalog pass".**
-    :meth:`AssertionRecord.over` runs it on what a resolver built and
-    :mod:`analysis_service.patch` runs it on what a batch produced, so two
-    catalogs reaching one lane answered one set of rules. The two halves are
+    :meth:`AssertionRecord.over` runs it on what a resolver built and on a
+    record a resumed job carries, so two catalogs reaching one lane answered
+    one set of rules. The two halves are
     different questions — :func:`catalog_issues` reads the rows, and
     :func:`contradiction_issues` reads them against the graph's own attributes
     — and a caller that wants only one asks for it by name.
@@ -1410,9 +1410,8 @@ def ambiguous_quote(quote: str, haystack: str) -> bool:
     **The one reader of "does this quote name where it sits".** A submission
     that says one thing twice holds the quote in both places, and offsets into
     the first copy say nothing about which copy the row rests on. The gate asks
-    it of a span's fragment and :mod:`analysis_service.factbundle` asks it of a
-    mention's citation, so a repeated line is refused the same way whichever
-    route proposed it.
+    it of a span's fragment, so a repeated line is refused the same way
+    wherever it sits.
 
     ``haystack`` is the folded text — :attr:`SpanSource.indexed`'s or a
     :class:`_Checked`'s — because that is what

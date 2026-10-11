@@ -171,7 +171,7 @@ def write_assertions(
     """Persist every assertion run beside the artifact, so it can be re-read.
 
     :func:`write_extractions`'s counterpart for every mode that ends in a
-    catalog — the assertion mode and #1003's head-only mode — and it keeps the
+    catalog — the assertion mode and the head-only mode — and it keeps the
     same three things for the same reason: what the model emitted, what code
     built from it, and why each dropped row dropped.
 
@@ -191,11 +191,9 @@ def write_assertions(
       the rows that would not fit, and the counts in the artifact carry the
       totals without them.
     * ``stages`` — what every earlier node of the run wrote, by
-      :data:`~evals.harness.modes.ARCHIVED_STATE`. A head that reads the sources
-      facts-first composes its proposal out of a bundle code resolved, so a
-      replay that held the proposal alone could not re-run the resolver over
-      what the model actually emitted, or say where between the two a fact was
-      lost. It is empty for a run whose head wrote none of those keys.
+      :data:`~evals.harness.modes.ARCHIVED_STATE`: the graph the rows bound
+      against, beside the catalog. It is empty for a run whose head wrote none
+      of those keys.
 
     **These files are publishable** on the same reading the reports are: they
     carry quotes of corpus source text, which is in this repository. The same
@@ -568,8 +566,8 @@ def heads_from_reports(
     :func:`assertions_from_reports` re-resolves against ``case.model`` because
     an assertion sweep was *shown* that model; a head-only sweep extracted its
     own, and its rows name that model's element IDs. Resolving them against the
-    blessed model would bind almost nothing and read as an arm that recovered
-    almost nothing — a silent zero in the one number #1003 exists to compare.
+    blessed model would bind almost nothing and read as a head that recovered
+    almost nothing — a silent zero in required-fact recall.
 
     So the catalog the run's own terminal node gated is what a replay grades,
     and the rows are compared to the reference through the signed subject
@@ -601,11 +599,8 @@ def heads_from_reports(
                     for row in written.get("quarantined", ())
                 ],
             ),
-            # What every earlier node wrote, which for a facts-first head is
-            # the bundle and its dispositions. A charge that has to say whether
-            # a row was read and dropped or never read reads them, and reading
-            # the file a second time beside this one would be a second reader
-            # of one archive.
+            # What every earlier node wrote. Reading the file a second time
+            # beside this one would be a second reader of one archive.
             stages=written.get("stages", {}),
         )
     return results
