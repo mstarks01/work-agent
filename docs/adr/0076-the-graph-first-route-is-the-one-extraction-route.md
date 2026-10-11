@@ -33,7 +33,11 @@ of 2026-10-11). The facts-first reading, the split reading and the source
 review pass are removed from the tree, with their prompts, their resolver, their
 patch applicator, their deployment flags and the eval instruments that compared
 them. `execution.extraction_strategy` on a report keeps its field and admits
-`graph-first` only, so every archived report still loads.
+`graph-first` only. `ExecutionEnvelope` refuses an unknown key, and every
+archived report carries the field, so a report without it would refuse every
+archived run and every sealed Baseline, whose digests forbid a rewrite. The
+field stays for that reason alone; no reader decides anything on its one
+value.
 
 The head-only graph entry stays. A job that asks questions pauses on it, and the
 heads eval mode scores a catalog on it.

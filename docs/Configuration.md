@@ -1151,10 +1151,11 @@ misspelled *name* that passes unnoticed.
 
 ### Optional passes
 
-Five variables add a pass to the graph or change how the sources are read. All
-of them are off by default, so a deployment that sets none of them runs the
-graph it has always run. A variable is on only when it is `1`, `true`, `yes` or
-`on`; any other value, or no value, is off. A change takes effect at the next
+Two variables add a pass to the graph or change how extraction writes. The
+assertion pass is on by default and the compact form is off, so a deployment
+that sets neither runs the graph the table states. A variable is on only when
+it is `1`, `true`, `yes` or `on`. Any other non-empty value is off, and an
+unset or empty variable keeps the default. A change takes effect at the next
 restart.
 
 | Variable | Status | What it does |
@@ -1164,6 +1165,12 @@ restart.
 
 Use the experiments only to measure them. Their results are recorded on the
 issues named in the table.
+
+A retired experiment flag leaves the table and the code together, and a value
+left set is ignored. A retired variable is refused only when a value left set
+would leak a secret or would silently change a deployment's result, as the
+bare `ANALYSIS_<VENDOR>_API_KEY` is (see
+[Provider environment](#provider-environment)).
 
 **The assertion pass.** By default, an `assert` node runs after the model
 passes its validity check and before the lanes start. Set
