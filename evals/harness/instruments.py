@@ -287,6 +287,14 @@ class Cases:
     def wanted(self, case: object) -> bool:
         return (case in self.held_out) == self.holdout
 
+    def rows(self, blocks: Mapping[str, Any], key: str) -> list[Mapping[str, Any]]:
+        """The per-case rows of one artifact block, for the cases this selects."""
+        return [
+            row
+            for row in blocks.get(key) or []
+            if isinstance(row, Mapping) and self.wanted(row.get("case"))
+        ]
+
 
 @dataclass(frozen=True)
 class Column:

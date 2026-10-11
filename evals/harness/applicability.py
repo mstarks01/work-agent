@@ -815,7 +815,7 @@ def published(blocks: Mapping[str, Any], metric: str, cases: Cases) -> float | N
     sweep's own ``applicability_aggregate`` uses, because that aggregate pools
     every case and the table prints the held-out cases apart.
     """
-    rows = _selected(blocks, "applicability", cases)
+    rows = cases.rows(blocks, "applicability")
     value = pooled_rows(rows).get(metric) if rows else None
     return float(value) if isinstance(value, int | float) else None
 
@@ -824,7 +824,7 @@ def published_disposition(
     blocks: Mapping[str, Any], metric: str, cases: Cases
 ) -> float | None:
     """One routing number pooled over the selected cases, for the table."""
-    rows = _selected(blocks, "disposition", cases)
+    rows = cases.rows(blocks, "disposition")
     if not rows:
         return None
     rates = routing_rates(
@@ -834,16 +834,6 @@ def published_disposition(
         false_prose=sum(len(row["false_prose_requests"]) for row in rows),
     )
     return rates.get(metric)
-
-
-def _selected(
-    blocks: Mapping[str, Any], key: str, cases: Cases
-) -> list[Mapping[str, Any]]:
-    return [
-        row
-        for row in blocks.get(key) or []
-        if isinstance(row, Mapping) and cases.wanted(row.get("case"))
-    ]
 
 
 def routing_rates(

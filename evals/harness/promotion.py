@@ -575,7 +575,7 @@ def _ratio(measured: float, baseline: float) -> float | None:
     return None if not baseline else measured / baseline
 
 
-def _in_spreads(difference: float, spread: float) -> float:
+def in_spreads(difference: float, spread: float) -> float:
     """A difference in standard deviations of the repeat spread.
 
     **A measured spread of zero is a measurement**, not a missing one: repeats
@@ -643,7 +643,7 @@ def read_recall(repeats: Sequence[Sequence[Path]]) -> Reading:
                 f" and the baseline ran {RECALL_MODEL}"
             )
     measured = sum(pooled_recall(paths) for paths in repeats) / len(repeats)
-    value = _in_spreads(measured - baseline, RECALL_SPREAD)
+    value = in_spreads(measured - baseline, RECALL_SPREAD)
     passed = value >= gate.limit
     return Reading(name, "pass" if passed else "fail", measured, baseline, value)
 
@@ -688,7 +688,7 @@ def read_gate(
         value = _ratio(measured, baseline)
     elif spread is not None:
         assert baseline is not None
-        value = _in_spreads(measured - baseline, spread)
+        value = in_spreads(measured - baseline, spread)
     else:
         return Reading(
             name,

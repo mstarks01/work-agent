@@ -81,6 +81,7 @@ from evals.harness import (
     falsify,
     flow_ids,
     follow_up_policies,
+    gain,
     guard_cost,
     instruction,
     instruction_delta,
@@ -2676,6 +2677,12 @@ COMMANDS: dict[str, Command] = {
         " costs the gate and the endpoint (#926, no credentials)",
         run=falsify.command_falsify,
         arguments=corpus_argument,
+    ),
+    "gain": Command(
+        help="read whether a coverage gain rests on supported output: volume,"
+        " votes and rejected rate against a baseline (no credentials)",
+        run=gain.command_gain,
+        arguments=gain.arguments,
     ),
     "gates": Command(
         help="read #926's predeclared promotion gates against one treatment"
