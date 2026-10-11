@@ -27,7 +27,7 @@ def test_reopen_keeps_questions_revision_and_related_report(tiers):
             headers=SAME_ORIGIN,
         )
         run = response.json()["run"]
-        paused = web.event(client.get(f"/events/{run}").text, "questions")
+        paused = web.shown_round(client, run)
         listing = client.get("/workspace/runs")
         assert "no-store" in listing.headers["cache-control"]
         assert "Private system description" not in listing.text
@@ -71,21 +71,14 @@ def test_workspace_missing_run_and_cross_origin_write(tiers):
 
 
 def test_completed_processing_steps_survive_snapshot_reads(tiers):
-    import asyncio
+    from analysis_service import StubPipelineRunner
+    from tests.test_webapp import run_to_completion
 
-    from fastapi.testclient import TestClient
-
-    from tests.test_webapp import LOOPBACK
-    from webapp.main import Analyses, _ticker
-
-    analyses = Analyses()
-    run = analyses.claim()
-    assert run is not None
-    asyncio.run(_ticker(run)("extract"))
-    asyncio.run(_ticker(run)("prepare"))
-    with TestClient(
-        web.app_for(tiers, web.PausingRunner(), analyses=analyses), base_url=LOOPBACK
-    ) as client:
-        detail = client.get(f"/workspace/runs/{run.id}").json()
-        assert detail["completed_steps"] == ["extract", "prepare"]
-        assert run.events.qsize() == 2, "Snapshot reads must not consume live progress"
+    with web.client_for(tiers, StubPipelineRunner()) as client:
+        run = run_to_completion(client)
+        detail = client.get(f"/workspace/runs/{run}").json()
+        assert detail["completed_steps"] == list(StubPipelineRunner.nodes)
+        again = client.get(f"/workspace/runs/{run}").json()
+        assert again["completed_steps"] == detail["completed_steps"], (
+            "Snapshot reads must not consume progress"
+        )

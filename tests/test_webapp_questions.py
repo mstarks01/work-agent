@@ -8,17 +8,16 @@ questions a finished report asks and run it again.
 
 from __future__ import annotations
 
-import asyncio
 import json
 import re
 import shutil
 import subprocess
-from types import MappingProxyType, SimpleNamespace
+from types import MappingProxyType
 
 import pytest
 from fastapi.testclient import TestClient
 
-from analysis_service import Engine, StubPipelineRunner
+from analysis_service import StubPipelineRunner
 from analysis_service.analysis import ABSENT_WORD
 from analysis_service.answer_round import ANSWER_LIMITS
 from analysis_service.answer_sets import AnswerSet
@@ -44,15 +43,13 @@ from tests.factories import (
 )
 from tests.test_resume import parent_catalog
 from tests.test_webapp import (
-    CARRIED,
     LOOPBACK,
     PROJECT_ROOT,
     SAME_ORIGIN,
-    TEST_DEADLINE,
-    WEBAPP_LIMITS,
     posted,
+    startup_for,
 )
-from webapp.main import Run, Startup, create_app
+from webapp.main import create_app
 
 #: The shipped tier config, as the webapp tests build it: one fixture, used here.
 tiers = test_webapp.tiers
@@ -90,11 +87,21 @@ class PausingRunner(StubPipelineRunner):
             self.resumed_facts.append(list(job.answers.facts))
         outcome = await super().run(job, on_node)
         assert isinstance(outcome, PipelineCompleted)
+        # The report embeds the held model, and answers every framework the
+        # job selected, as the job record checks of a report it is given.
+        model = HELD.system_model
         report = outcome.report.model_copy(
             update={
                 "assertions": HELD.assertions if self.catalog else None,
-                "system_model": HELD.system_model,
-                "analyses": [sample_analysis([asking_threat(FACT_REF)])],
+                "system_model": model,
+                "boundary_crossings": model.boundary_crossings(),
+                "elements_analyzed": len(model.elements()),
+                "analyses": [
+                    sample_analysis([asking_threat(FACT_REF)])
+                    if selection.name == "stride"
+                    else self._stub_block(selection)
+                    for selection in job.frameworks
+                ],
             }
         )
         return PipelineCompleted(report=report)
@@ -105,22 +112,9 @@ def runner():
     return PausingRunner()
 
 
-def app_for(tiers, runner, catalog=True, analyses=None):
+def app_for(tiers, runner, catalog=True, workspace=None):
     """The first-run app over ``runner``, as the browser tests serve it too."""
-
-    def engine_for(selection):
-        return Engine(
-            runner,
-            limits=WEBAPP_LIMITS,
-            deadline_seconds=TEST_DEADLINE,
-            frameworks=selection,
-            carries_catalog=catalog,
-        )
-
-    startup = Startup(
-        engine_for=engine_for, frameworks=CARRIED, tiers=tiers, error=None
-    )
-    return create_app(startup, analyses)
+    return create_app(startup_for(tiers, runner, catalog), workspace)
 
 
 def client_for(tiers, runner, catalog=True):
@@ -137,10 +131,32 @@ def start(client, questions: bool) -> str:
     return started.json()["run"]
 
 
-def event(stream: str, name: str) -> dict:
-    match = re.search(rf"event: {name}\ndata: (.*)\n", stream)
-    assert match, stream
-    return json.loads(match.group(1))
+def statuses(stream: str) -> list[str]:
+    """Each status the stream carried, in order."""
+    return [
+        json.loads(line.removeprefix("data: "))["status"]
+        for line in stream.splitlines()
+        if line.startswith("data: ") and '"status"' in line
+    ]
+
+
+def ran(client, run_id: str) -> str:
+    """Read the run's stream to its end, and return its last status."""
+    seen = statuses(client.get(f"/events/{run_id}").text)
+    assert seen, "the stream carried no status"
+    return seen[-1]
+
+
+def shown_round(client, run_id: str) -> dict:
+    """The round a paused run shows: its stream read to the pause, then its questions."""
+    assert ran(client, run_id) == "awaiting-answers"
+    return client.get(f"/workspace/runs/{run_id}").json()["questions"]
+
+
+def report_url(client, run_id: str) -> dict:
+    """Where a finished run's report is, once its stream ends."""
+    assert ran(client, run_id) == "completed"
+    return {"url": f"/report/{run_id}"}
 
 
 def answer(client, run_id: str, *links) -> dict:
@@ -163,7 +179,7 @@ class TestTheToggle:
     def test_an_install_with_no_catalog_pauses_and_asks_early_questions(self, tiers):
         client = client_for(tiers, PausingRunner(catalog=False), catalog=False)
         paused = start(client, questions=True)
-        asked = event(client.get(f"/events/{paused}").text, "questions")
+        asked = shown_round(client, paused)
         assert asked["link_questions"] == []
         assert asked["early_questions"]
         answered = client.post(
@@ -185,7 +201,7 @@ class TestTheRounds:
         """The last save started the analysis by itself (#1289, item 7)."""
         client = client_for(tiers, PausingRunner(catalog=False), catalog=False)
         paused = start(client, questions=True)
-        shown = event(client.get(f"/events/{paused}").text, "questions")
+        shown = shown_round(client, paused)
         for _ in range(20):
             facts = [
                 {"key": q["key"], "value": "unknown"} for q in shown["early_questions"]
@@ -235,7 +251,7 @@ class TestTheRounds:
         """A page left open on an earlier round cannot save over a later one (#1289)."""
         client = client_for(tiers, PausingRunner(catalog=False), catalog=False)
         paused = start(client, questions=True)
-        shown = event(client.get(f"/events/{paused}").text, "questions")
+        shown = shown_round(client, paused)
         assert shown["revision"] == 0
         first, second = (q["key"] for q in shown["early_questions"][:2])
 
@@ -261,7 +277,7 @@ class TestTheRounds:
     def test_a_round_of_skips_alone_is_saved_and_listed(self, tiers):
         client = client_for(tiers, PausingRunner(catalog=False), catalog=False)
         paused = start(client, questions=True)
-        shown = event(client.get(f"/events/{paused}").text, "questions")
+        shown = shown_round(client, paused)
         keys = _presented(shown["early_questions"])
         saved = client.post(
             f"/answer/{paused}",
@@ -298,7 +314,7 @@ class TestTheRounds:
         """
         client = client_for(tiers, PausingRunner(catalog=False), catalog=False)
         paused = start(client, questions=True)
-        shown = event(client.get(f"/events/{paused}").text, "questions")
+        shown = shown_round(client, paused)
         skipped = client.post(
             f"/answer/{paused}",
             json={
@@ -323,15 +339,13 @@ class TestTheRounds:
             headers=SAME_ORIGIN,
         )
         assert started.status_code == 200, started.text
-        assert "event: done" in client.get(f"/events/{started.json()['run']}").text
+        assert ran(client, started.json()["run"]) == "completed"
 
     def test_a_refused_answer_names_its_question(self, tiers):
         """A refusal of a malformed answer names its question (#1289)."""
         client = client_for(tiers, PausingRunner(catalog=False), catalog=False)
         paused = start(client, questions=True)
-        first = event(client.get(f"/events/{paused}").text, "questions")[
-            "early_questions"
-        ][0]
+        first = shown_round(client, paused)["early_questions"][0]
         saved = client.post(
             f"/answer/{paused}",
             json={
@@ -364,7 +378,7 @@ class TestTheWholeFlow:
     def test_a_paused_run_asks_and_its_answers_reach_a_report(self, tiers, runner):
         client = client_for(tiers, runner)
         paused = start(client, questions=True)
-        asked = event(client.get(f"/events/{paused}").text, "questions")
+        asked = shown_round(client, paused)
 
         (question,) = asked["link_questions"]
         assert question["principal"] == "customer accounts"
@@ -372,7 +386,7 @@ class TestTheWholeFlow:
 
         resumed = answer(client, paused, LINK)
         assert resumed.status_code == 200, resumed.text
-        done = event(client.get(f"/events/{resumed.json()['run']}").text, "done")
+        done = report_url(client, resumed.json()["run"])
         assert client.get(done["url"]).status_code == 200
         assert [link.element for link in runner.resumed_links[0]] == ["entity:customer"]
 
@@ -382,12 +396,12 @@ class TestTheWholeFlow:
         client.get(f"/events/{paused}")
         resumed = answer(client, paused)
         assert resumed.status_code == 200
-        assert "event: done" in client.get(f"/events/{resumed.json()['run']}").text
+        assert ran(client, resumed.json()["run"]) == "completed"
 
     def test_without_the_toggle_the_run_never_pauses(self, tiers, runner):
         client = client_for(tiers, runner)
         run = start(client, questions=False)
-        assert "event: done" in client.get(f"/events/{run}").text
+        assert ran(client, run) == "completed"
 
     def test_a_finished_report_s_questions_run_it_again(self, tiers, runner):
         client = client_for(tiers, runner)
@@ -395,7 +409,7 @@ class TestTheWholeFlow:
         client.get(f"/events/{finished}")
         resumed = answer(client, finished, LINK)
         assert resumed.status_code == 200
-        assert "event: done" in client.get(f"/events/{resumed.json()['run']}").text
+        assert ran(client, resumed.json()["run"]) == "completed"
 
     def test_a_follow_up_s_page_compares_it_with_the_report_before(self, tiers, runner):
         """The follow-up keeps the report its answers came from (#561)."""
@@ -452,7 +466,7 @@ def test_the_report_page_may_reach_its_own_origin_and_nothing_else(tiers, runner
     """It posts answers to ``/answer/{run}``, so it needs ``connect-src 'self'``."""
     client = client_for(tiers, runner)
     finished = start(client, questions=False)
-    done = event(client.get(f"/events/{finished}").text, "done")
+    done = report_url(client, finished)
     policy = client.get(done["url"]).headers["content-security-policy"]
     assert "connect-src 'self'" in policy
     assert "frame-ancestors 'none'" in policy
@@ -664,7 +678,7 @@ class TestFactAnswers:
             headers=SAME_ORIGIN,
         )
         assert response.status_code == 200, response.text
-        assert "event: done" in client.get(f"/events/{response.json()['run']}").text
+        assert ran(client, response.json()["run"]) == "completed"
         assert [fact.value for fact in runner.resumed_facts[0]] == ["TLS 1.3"]
 
     def test_a_link_answer_is_refused_where_the_report_built_no_catalog(self, tiers):
@@ -695,7 +709,7 @@ class TestFactAnswers:
     def test_the_report_page_carries_its_fact_questions(self, tiers, runner):
         client = client_for(tiers, runner)
         finished = start(client, questions=False)
-        done = event(client.get(f"/events/{finished}").text, "done")
+        done = report_url(client, finished)
         page = client.get(done["url"]).text
         assert re.search(r'id="fact_questions"[^>]*>\[', page)
         assert re.search(r'id="question_fallback"[^>]*>\{"typed"', page)
@@ -808,7 +822,7 @@ def test_an_early_row_carries_its_element_s_source_words(tiers):
     """The owner sees what the service read about an element (#1289, B2)."""
     client = client_for(tiers, PausingRunner(catalog=False), catalog=False)
     paused = start(client, questions=True)
-    shown = event(client.get(f"/events/{paused}").text, "questions")
+    shown = shown_round(client, paused)
     model = valid_model()
     for row in shown["early_questions"]:
         element = model.get(row["key"][0])
@@ -1121,109 +1135,61 @@ calls.push(...box.all("div").map(d => d.textContent).filter(t => t.includes("fix
     ]
 
 
-def test_the_registry_removes_a_run_that_waits_for_answers_last():
+def _bounded(tiers, runner, max_jobs: int) -> TestClient:
+    """A client over a workspace that holds at most ``max_jobs`` jobs."""
+    from tests.test_webapp import stub_settings
+    from webapp.main import Workspace
+
+    workspace = Workspace(stub_settings(runner, catalog=False), max_jobs=max_jobs)
+    return TestClient(
+        app_for(tiers, runner, catalog=False, workspace=workspace), base_url=LOOPBACK
+    )
+
+
+def _paused(client) -> str:
+    run = start(client, questions=True)
+    assert ran(client, run) == "awaiting-answers"
+    return run
+
+
+def _completed(client) -> str:
+    run = start(client, questions=False)
+    assert ran(client, run) == "completed"
+    return run
+
+
+def _listed(client) -> set[str]:
+    return {row["run"] for row in client.get("/workspace/runs").json()}
+
+
+def test_the_workspace_deletes_a_run_that_waits_for_answers_last(tiers):
     """A paused run outlives later finished runs (#1289, Q7)."""
-    from analysis_service.jobs import Checkpoint
-    from tests.factories import sample_report, valid_model
-    from webapp.main import Analyses
+    with _bounded(tiers, PausingRunner(catalog=False), max_jobs=2) as client:
+        paused = _paused(client)
+        finished = [_completed(client) for _ in range(3)]
 
-    analyses = Analyses(max_runs=2)
-    paused = analyses.claim()
-    paused.checkpoint = Checkpoint(system_model=valid_model(), assertions=None)
-    analyses.release()
-    for _ in range(3):
-        run = analyses.claim()
-        run.report = sample_report()
-        analyses.release()
-
-    assert analyses.get(paused.id) is paused
-    assert analyses.get(run.id) is run
+        assert _listed(client) == {paused, finished[-1]}
 
 
-def _waiting_registry():
-    from analysis_service.jobs import Checkpoint
-    from tests.factories import valid_model
-    from webapp.main import Analyses
-
-    analyses = Analyses(max_runs=2)
-    held = []
-    for _ in range(2):
-        run = analyses.claim()
-        run.checkpoint = Checkpoint(system_model=valid_model(), assertions=None)
-        analyses.release()
-        held.append(run)
-    return analyses, held
-
-
-def test_a_full_registry_of_waiting_runs_refuses_a_new_one():
+def test_a_full_workspace_of_waiting_runs_refuses_a_new_one(tiers):
     """A third run evicted the oldest paused one while it still waited
-    (#1289, F4)."""
-    from webapp.main import RegistryFull
+    (#1289, F4). Now it is refused, and an answer to a held run still starts,
+    one place over the bound."""
+    with _bounded(tiers, PausingRunner(catalog=False), max_jobs=2) as client:
+        held = [_paused(client) for _ in range(2)]
 
-    analyses, held = _waiting_registry()
+        refused = client.post(
+            "/analyze", json=posted("C") | {"questions": True}, headers=SAME_ORIGIN
+        )
+        assert refused.status_code == 409
+        assert "wait for answers" in refused.json()["message"]
+        assert _listed(client) == set(held)
 
-    with pytest.raises(RegistryFull, match="wait for answers"):
-        analyses.claim()
-    assert [analyses.get(run.id) for run in held] == held
-    assert analyses.claim(answering=held[1]) is not None, "the refusal held the gate"
-
-
-def test_answers_to_a_full_registry_of_waiting_runs_still_start():
-    analyses, (first, second) = _waiting_registry()
-
-    run = analyses.claim(answering=first)
-
-    assert [analyses.get(held.id) for held in (first, second, run)] == [
-        first,
-        second,
-        run,
-    ]
-
-
-async def _deadline(on_node):
-    from analysis_service.engine import EngineDeadlineError
-
-    raise EngineDeadlineError("the deadline")
-
-
-async def _bad_config(on_node):
-    from analysis_service.errors import ConfigError
-
-    raise ConfigError("a setting")
-
-
-async def _rejected(on_node):
-    from analysis_service.jobs import PipelineRejected
-
-    return PipelineRejected(issues=[], nodes=[])
-
-
-async def _cancelled(on_node):
-    raise asyncio.CancelledError
-
-
-@pytest.mark.parametrize("start", [_deadline, _bad_config, _rejected, _cancelled])
-def test_a_failed_resumed_run_leaves_its_paused_run_to_answer_again(start):
-    """A full registry keeps the paused run a failed resumed run came from,
-    so its checkpoint stays for another answer (#1289, F1)."""
-    from webapp.main import _drive
-
-    analyses, (first, _) = _waiting_registry()
-    first.facts = [FactAnswer(key=FACT["key"], value="TLS")]
-    run = analyses.claim(answering=first)
-    first.resumed_run = run
-
-    async def drive():
-        run.task = asyncio.create_task(_drive(analyses, run, start))
-        await asyncio.wait([run.task])
-
-    asyncio.run(drive())
-
-    assert run.status == "failed"
-    assert analyses.get(first.id) is first
-    assert first.waiting and not first.resumed
-    assert first.facts[0].value == "TLS"
-    assert analyses.claim(answering=first) is not None
+        resumed = client.post(
+            f"/answer/{held[1]}", json={"links": [], "revision": 0}, headers=SAME_ORIGIN
+        )
+        assert resumed.status_code == 200, resumed.text
+        assert ran(client, resumed.json()["run"]) == "completed"
 
 
 class FailingOnceRunner(PausingRunner):
@@ -1242,62 +1208,55 @@ class FailingOnceRunner(PausingRunner):
         return await super().run(job, on_node)
 
 
-def test_a_full_registry_retries_a_failed_resumed_run_with_its_saved_answers(tiers):
-    """The retry runs through the answer route from the kept checkpoint
-    (#1289, F1)."""
-    from webapp.main import Analyses
-
+def test_a_failed_resumed_run_leaves_its_paused_run_to_answer_again(tiers):
+    """A resumed run that fails read nothing into a report, so its paused run
+    takes answers again from the kept checkpoint, with its saved answers
+    (#1289, F1). The workspace holds one job, so the retry also shows that
+    a paused run is never deleted to make room for its own retry."""
     runner = FailingOnceRunner()
-    client = TestClient(
-        app_for(tiers, runner, catalog=False, analyses=Analyses(1)), base_url=LOOPBACK
-    )
-    paused = start(client, questions=True)
-    shown = event(client.get(f"/events/{paused}").text, "questions")
-    saved_fact = {"key": shown["early_questions"][0]["key"], "value": "yes"}
-    saved = client.post(
-        f"/answer/{paused}",
-        json={"links": [], "facts": [saved_fact], "save": True, "revision": 0},
-        headers=SAME_ORIGIN,
-    )
-    assert saved.status_code == 200, saved.text
-
-    def resume():
-        started = client.post(
+    with _bounded(tiers, runner, max_jobs=1) as client:
+        paused = _paused(client)
+        shown = shown_round(client, paused)
+        saved_fact = {"key": shown["early_questions"][0]["key"], "value": "yes"}
+        saved = client.post(
             f"/answer/{paused}",
-            json={"links": [], "facts": [], "revision": saved.json()["revision"]},
+            json={"links": [], "facts": [saved_fact], "save": True, "revision": 0},
             headers=SAME_ORIGIN,
         )
-        assert started.status_code == 200, started.text
-        return client.get(f"/events/{started.json()['run']}").text
+        assert saved.status_code == 200, saved.text
 
-    assert "event: failed" in resume()
-    assert "event: done" in resume()
-    [retried] = runner.resumed_facts
-    assert saved_fact["key"] in [list(fact.key) for fact in retried]
+        def resume():
+            started = client.post(
+                f"/answer/{paused}",
+                json={"links": [], "facts": [], "revision": saved.json()["revision"]},
+                headers=SAME_ORIGIN,
+            )
+            assert started.status_code == 200, started.text
+            return ran(client, started.json()["run"])
 
-
-def test_a_paused_run_goes_once_its_resumed_run_has_a_report():
-    analyses, (first, second) = _waiting_registry()
-    run = analyses.claim(answering=first)
-    first.resumed_run = run
-    run.report = sample_report([])
-    analyses.release()
-
-    analyses.claim()
-
-    assert analyses.get(first.id) is None
-    assert analyses.get(second.id) is second
+        assert resume() == "failed"
+        detail = client.get(f"/workspace/runs/{paused}").json()
+        assert detail["run"] == paused, "the failed run frees its paused run"
+        assert detail["status"] == "awaiting-answers"
+        assert resume() == "completed"
+        [retried] = runner.resumed_facts
+        assert saved_fact["key"] in [list(fact.key) for fact in retried]
 
 
-def test_a_run_waits_until_the_run_its_answers_started_has_a_report():
-    """A paused run stays until the run its answers started has a report (#1289)."""
-    _, (paused, _) = _waiting_registry()
-    resumed = Run(id="resumed")
-    paused.resumed_run = resumed
+def test_a_paused_run_goes_once_its_resumed_run_has_a_report(tiers):
+    """A paused run waits until the run its answers started has a report
+    (#1289); then it is a finished analysis the workspace may delete."""
+    with _bounded(tiers, PausingRunner(catalog=False), max_jobs=2) as client:
+        paused = _paused(client)
+        resumed = client.post(
+            f"/answer/{paused}", json={"links": [], "revision": 0}, headers=SAME_ORIGIN
+        )
+        child = resumed.json()["run"]
+        assert ran(client, child) == "completed"
 
-    assert paused.waiting
-    resumed.report = sample_report([])
-    assert not paused.waiting
+        another = _completed(client)
+
+        assert _listed(client) == {child, another}, "the answered run went first"
 
 
 CONTROL = {
@@ -2402,10 +2361,10 @@ def test_a_paused_run_starts_one_analysis(tiers):
     (#1289, ADR 0054)."""
     client = client_for(tiers, PausingRunner(catalog=False), catalog=False)
     paused = start(client, questions=True)
-    event(client.get(f"/events/{paused}").text, "questions")
+    shown_round(client, paused)
     body = {"links": [], "facts": [], "revision": 0}
     first = client.post(f"/answer/{paused}", json=body, headers=SAME_ORIGIN)
-    assert "event: done" in client.get(f"/events/{first.json()['run']}").text
+    assert ran(client, first.json()["run"]) == "completed"
 
     again = client.post(f"/answer/{paused}", json=body, headers=SAME_ORIGIN)
 
@@ -2417,9 +2376,7 @@ def test_a_refused_answer_to_a_skipped_question_names_it(tiers):
     """The label map includes skipped questions, which still take answers."""
     client = client_for(tiers, PausingRunner(catalog=False), catalog=False)
     paused = start(client, questions=True)
-    first = event(client.get(f"/events/{paused}").text, "questions")["early_questions"][
-        0
-    ]
+    first = shown_round(client, paused)["early_questions"][0]
     body = {"links": [], "facts": [], "save": True, "skip": [first["key"]]}
     client.post(f"/answer/{paused}", json=body | {"revision": 0}, headers=SAME_ORIGIN)
 
@@ -2441,9 +2398,7 @@ def test_a_save_after_the_start_is_refused(tiers):
     """A save after the start is refused, because no run would read it."""
     client = client_for(tiers, PausingRunner(catalog=False), catalog=False)
     paused = start(client, questions=True)
-    first = event(client.get(f"/events/{paused}").text, "questions")["early_questions"][
-        0
-    ]
+    first = shown_round(client, paused)["early_questions"][0]
     body = {"links": [], "facts": [], "revision": 0}
     run = client.post(f"/answer/{paused}", json=body, headers=SAME_ORIGIN)
     client.get(f"/events/{run.json()['run']}")
@@ -2457,43 +2412,6 @@ def test_a_save_after_the_start_is_refused(tiers):
     assert saved.status_code == 409
 
 
-@pytest.mark.parametrize(
-    ("state", "status"),
-    [
-        ({"task": SimpleNamespace(done=lambda: False)}, "running"),
-        ({"task": SimpleNamespace(done=lambda: True)}, "failed"),
-        ({"task": SimpleNamespace(done=lambda: True), "report": "report"}, "completed"),
-    ],
-    ids=["running", "ended-without-a-report", "completed"],
-)
-def test_the_app_and_the_store_free_a_parent_alike(state, status):
-    """The first-run app and the job store each hold "a failed resumed run
-    frees its parent", so they are tested against each other (#1289)."""
-    import asyncio
-
-    from analysis_service.jobs import InMemoryJobStore, JobRecord, Resumption
-    from analysis_service.sources import Source
-    from tests.factories import SEEDING_BUDGET, sample_selection
-
-    if state.get("report"):
-        state = state | {"report": sample_report([])}
-    resumed = Run(id="resumed", **state)
-    paused = Run(id="paused", checkpoint=HELD, resumed_run=resumed)
-
-    store = InMemoryJobStore()
-    held = JobRecord.create(
-        owner_subject="idp|user-1",
-        sources=[Source.description("A web app talks to a database.")],
-        frameworks=sample_selection(),
-        resumption=Resumption(follow_up=False, parent_id="paused", checkpoint=HELD),
-    )
-    asyncio.run(store.reserve(held, ceiling=10, budget=SEEDING_BUDGET))
-    asyncio.run(store.save(held.model_copy(update={"status": resumed.status})))
-
-    assert resumed.status == status
-    assert paused.resumed is (store._resumed_by("paused") is not None)
-
-
 @pytest.mark.parametrize("save", [True, False], ids=["save", "start"])
 def test_answers_that_break_the_input_limits_are_refused_at_once(tiers, save):
     """The route refuses answers over the limits before a run can fail on them."""
@@ -2504,7 +2422,7 @@ def test_answers_that_break_the_input_limits_are_refused_at_once(tiers, save):
         "/analyze", json=posted(text) | {"questions": True}, headers=SAME_ORIGIN
     )
     paused = started.json()["run"]
-    shown = event(client.get(f"/events/{paused}").text, "questions")
+    shown = shown_round(client, paused)
     asked = next(q for q in shown["early_questions"] if q["form"] == "choice")
     fact = {"key": asked["key"], "value": asked["choices"][0]["id"]}
 
@@ -2645,7 +2563,7 @@ class TestEarlierAnswers:
         runner = PausingRunner()
         client = client_for(tiers, runner)
         paused = start(client, questions=True)
-        shown = event(client.get(f"/events/{paused}").text, "questions")
+        shown = shown_round(client, paused)
         key = next(
             fact["key"]
             for fact in shown["early_questions"]
@@ -2750,53 +2668,6 @@ class TestEarlierAnswers:
         assert started.status_code == 200, started.text
         client.get(f"/events/{started.json()['run']}")
         assert [fact.value for fact in runner.resumed_facts[-1]] == ["no"]
-
-    def test_a_save_while_a_run_reads_its_body_is_not_lost(self, tiers, monkeypatch):
-        """The route reads the state after the body, so a save that lands while
-        a run's body arrives moves the revision the run is checked against
-        (checkpoint review c1)."""
-        from starlette.requests import Request
-
-        from webapp.main import Analyses
-
-        client, _, report, key = self.first_report(tiers, "yes")
-        saved = client.post(
-            f"/answer/{report}",
-            json={
-                "links": [],
-                "facts": [{"key": key, "value": "no"}],
-                "save": True,
-                "revision": 0,
-            },
-            headers=SAME_ORIGIN,
-        )
-        assert saved.json() == {"saved": True, "revision": 1}
-        late = FactAnswer.model_validate({"key": key, "value": "late"})
-        got, read = Analyses.get, Request.json
-        seen = []
-
-        def get(self, run_id):
-            seen.append(got(self, run_id))
-            return seen[-1]
-
-        async def racing(self):
-            body = await read(self)
-            # A second tab's save, as the route writes one.
-            seen[-1].draft, seen[-1].revision = (
-                AnswerSet(facts=(late,)),
-                seen[-1].revision + 1,
-            )
-            return body
-
-        monkeypatch.setattr(Analyses, "get", get)
-        monkeypatch.setattr(Request, "json", racing)
-        started = client.post(
-            f"/answer/{report}",
-            json={"links": [], "facts": [], "revision": 1},
-            headers=SAME_ORIGIN,
-        )
-        assert started.status_code == 409, started.text
-        assert seen[-1].resumed_run is None, "no run started on the old draft"
 
     def test_a_request_over_the_limit_says_to_save_in_parts(self, tiers):
         client, _, report, _ = self.first_report(tiers, "yes")
@@ -3362,7 +3233,7 @@ class TestTheAmendment:
     def paused_with_an_answer(self, tiers, runner):
         client = client_for(tiers, runner, catalog=False)
         paused = start(client, questions=True)
-        shown = event(client.get(f"/events/{paused}").text, "questions")
+        shown = shown_round(client, paused)
         question = next(q for q in shown["early_questions"] if q["choices"])
         answer = {"key": question["key"], "value": question["choices"][0]["id"]}
         saved = client.post(
@@ -3383,7 +3254,7 @@ class TestTheAmendment:
         )
         assert amended.status_code == 200, amended.text
         run = amended.json()["run"]
-        again = event(client.get(f"/events/{run}").text, "questions")
+        again = shown_round(client, run)
 
         sources = runner.paused_sources[-1]
         assert sources[-1].text == AMENDMENT and sources[-1].label == "Amendment 1"

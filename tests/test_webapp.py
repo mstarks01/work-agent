@@ -13,6 +13,7 @@ can close the ``<script>`` block turns the route's payoff page into stored XSS.
 
 from __future__ import annotations
 
+import asyncio
 import json
 import re
 import shutil
@@ -26,16 +27,23 @@ import pytest
 from fastapi.testclient import TestClient
 
 from analysis_service import (
-    Engine,
     FrameworkName,
+    PipelineCompleted,
     Source,
     SourceLimits,
     StubPipelineRunner,
 )
+from analysis_service.budgets import BudgetPolicy
 from analysis_service.deployment import Deployment
+from analysis_service.jobs import JobRecord
 from analysis_service.vendors import ProviderAuthError
-from tests.factories import TEST_TIER_ENV, report_state, sample_selection, secret_env
-from webapp.main import Analyses, Startup, create_app, render_report
+from tests.factories import (
+    TEST_TIER_ENV,
+    report_state,
+    sample_selection,
+    secret_env,
+)
+from webapp.main import Settings, Startup, Workspace, create_app, render_report
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
@@ -70,41 +78,46 @@ CARRIED: tuple[FrameworkName, ...] = ("stride", "asvs")
 COMPLETE_OPTIONS: dict[FrameworkName, dict] = {"stride": {}, "asvs": {"level": 2}}
 
 
-def stub_engine_for(selection):
-    """Build a stub engine for one selection, as ``build_startup``'s factory does.
+def stub_settings(runner=None, catalog: bool = False) -> Settings:
+    """The deployment's settings over a stub runner, as ``build_startup`` reads
+    them off a real one.
 
-    The real factory is ``partial(Engine.from_deployment, deployment)``,
-    which composes a graph and binds credentials. This is the same signature
-    over a stub runner, so the whole selection path — allow-list, options
-    validation, one report block per picked framework — runs with no model and
-    no cost. The engine's own constructor is what refuses a missing option, so
-    that refusal is exercised here rather than mocked out.
+    The runner serves every selection, so the whole selection path —
+    allow-list, options validation, one report block per picked framework —
+    runs with no model and no cost. The selection's own resolver is what
+    refuses a missing option, so that refusal is exercised here rather than
+    mocked out.
     """
-    return Engine(
-        StubPipelineRunner(),
+    runner = StubPipelineRunner() if runner is None else runner
+    return Settings(
+        runner_for=lambda selection, entry: runner,
         limits=WEBAPP_LIMITS,
+        budget=WEBAPP_BUDGET,
         deadline_seconds=TEST_DEADLINE,
-        frameworks=selection,
+        carries_catalog=catalog,
+    )
+
+
+def startup_for(tiers, runner=None, catalog: bool = False) -> Startup:
+    return Startup(
+        settings=stub_settings(runner, catalog),
+        frameworks=CARRIED,
+        tiers=tiers,
+        error=None,
     )
 
 
 @pytest.fixture
 def client(tiers):
     """The app wired to a stub runner — no models, no credentials, no cost."""
-    startup = Startup(
-        engine_for=stub_engine_for,
-        frameworks=CARRIED,
-        tiers=tiers,
-        error=None,
-    )
-    return TestClient(create_app(startup), base_url=LOOPBACK)
+    return TestClient(create_app(startup_for(tiers)), base_url=LOOPBACK)
 
 
 @pytest.fixture
 def broken_client(tiers):
     """The app as it comes up when the vendor's credentials are missing."""
     startup = Startup(
-        engine_for=None,
+        settings=None,
         frameworks=(),
         tiers=tiers,
         error=ProviderAuthError(
@@ -117,6 +130,15 @@ def broken_client(tiers):
 # The demo app has one textarea, so it posts one description-kind source. Its
 # label is the app's, not the user's: the form asks for text, not a citation key.
 WEBAPP_LIMITS = SourceLimits(max_total_bytes=100 * 1024, max_sources=10)
+
+# The local operator's own spend: no test here is about a window, and the
+# descriptions some tests send are a hundred kilobytes.
+WEBAPP_BUDGET = BudgetPolicy(
+    window_seconds=3600,
+    max_jobs_per_window=10_000,
+    max_tokens_per_window=10**9,
+    global_max_tokens_per_window=10**9,
+)
 
 # Ample: no test here is exercising the deadline, and a tight one would make
 # an unrelated slow run flake. The bound itself is covered in test_engine.py.
@@ -147,7 +169,7 @@ def run_to_completion(client, text: str = "A web app talks to a database.") -> s
     run_id = started.json()["run"]
     # Draining the stream is what lets the background task make progress.
     events = client.get(f"/events/{run_id}").text
-    assert "event: done" in events, events
+    assert '"status":"completed"' in events, events
     return run_id
 
 
@@ -215,19 +237,45 @@ def test_a_run_streams_one_tick_per_node_then_redirects(client):
     ]
     # Verbatim as the graph emits them — no display-name mapping.
     assert ticked == list(StubPipelineRunner.nodes)
-    assert f'"url": "/report/{run_id}"' in events
+    assert '"status":"completed"' in events, "the stream ends on the terminal status"
 
 
-def test_the_run_gate_admits_one_at_a_time():
-    """The gate itself: claim, refuse, release, claim again."""
-    analyses = Analyses()
-    first = analyses.claim()
-    assert first is not None
-    assert analyses.claim() is None, "a second claim must be refused, not queued"
-    analyses.release()
-    second = analyses.claim()
-    assert second is not None
-    assert second.id != first.id
+class HoldingRunner(StubPipelineRunner):
+    """Holds every run until the test releases it, so a job stays in flight."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self._gate: asyncio.Event | None = None
+        self._loop: asyncio.AbstractEventLoop | None = None
+
+    async def run(self, job, on_node):
+        self._loop = asyncio.get_running_loop()
+        self._gate = asyncio.Event()
+        await self._gate.wait()
+        return await super().run(job, on_node)
+
+    def release(self) -> None:
+        assert self._gate is not None and self._loop is not None, "no run is held"
+        self._loop.call_soon_threadsafe(self._gate.set)
+
+
+def test_the_run_gate_admits_one_at_a_time(tiers):
+    """One job runs at a time (LLM10): a second submission is refused with a
+    message rather than queued, and admitted once the first run ends."""
+    runner = HoldingRunner()
+    with TestClient(
+        create_app(startup_for(tiers, runner)), base_url=LOOPBACK
+    ) as client:
+        first = client.post("/analyze", json=posted("A"), headers=SAME_ORIGIN)
+        assert first.status_code == 200, first.text
+        second = client.post("/analyze", json=posted("B"), headers=SAME_ORIGIN)
+        assert second.status_code == 409
+        assert "already running" in second.json()["message"]
+        runner.release()
+        events = client.get(f"/events/{first.json()['run']}").text
+        assert '"status":"completed"' in events, events
+        third = client.post("/analyze", json=posted("C"), headers=SAME_ORIGIN)
+        assert third.status_code == 200, third.text
 
 
 def report_of(client, run_id: str) -> dict:
@@ -247,7 +295,7 @@ def frameworks_of(client, body: dict) -> list[str]:
     started = client.post("/analyze", json=body, headers=SAME_ORIGIN)
     assert started.status_code == 200, started.text
     run_id = started.json()["run"]
-    assert "event: done" in client.get(f"/events/{run_id}").text
+    assert '"status":"completed"' in client.get(f"/events/{run_id}").text
     return [block["framework"] for block in report_of(client, run_id)["analyses"]]
 
 
@@ -355,7 +403,7 @@ def test_a_framework_this_install_does_not_carry_is_refused(tiers):
         base_url=LOOPBACK,
         app=create_app(
             Startup(
-                engine_for=stub_engine_for,
+                settings=stub_settings(),
                 frameworks=(narrow,),
                 tiers=tiers,
                 error=None,
@@ -444,34 +492,17 @@ def test_an_option_that_is_not_a_closed_set_fails_loudly(client):
         _option_control("stride", "budget", int)
 
 
-def test_the_registry_evicts_oldest_first_and_stays_bounded():
+def test_the_workspace_deletes_the_oldest_finished_job_and_stays_bounded(tiers):
     """Untrusted prose and its report never accumulate without bound."""
-    analyses = Analyses(max_runs=3)
-    claimed = []
-    for _ in range(5):
-        run = analyses.claim()
-        claimed.append(run)
-        analyses.release()
-
-    assert [analyses.get(run.id) for run in claimed[:2]] == [None, None]
-    assert all(analyses.get(run.id) is not None for run in claimed[2:])
-
-
-def test_a_second_submission_is_refused_while_one_is_running(tiers):
-    """LLM10, at the HTTP surface: refused with a message, not held open."""
-    analyses = Analyses()
-    startup = Startup(
-        engine_for=stub_engine_for,
-        frameworks=CARRIED,
-        tiers=tiers,
-        error=None,
-    )
-    client = TestClient(create_app(startup, analyses), base_url=LOOPBACK)
-
-    analyses.claim()  # stand in for a run already in flight
-    response = client.post("/analyze", json=posted("B"), headers=SAME_ORIGIN)
-    assert response.status_code == 409
-    assert "already running" in response.json()["message"]
+    workspace = Workspace(stub_settings(), max_jobs=3)
+    with TestClient(
+        create_app(startup_for(tiers), workspace), base_url=LOOPBACK
+    ) as client:
+        runs = [run_to_completion(client) for _ in range(5)]
+        listed = {row["run"] for row in client.get("/workspace/runs").json()}
+        assert listed == set(runs[2:])
+        assert client.get(f"/report/{runs[0]}").status_code == 404
+        assert client.get(f"/report/{runs[4]}").status_code == 200
 
 
 def test_the_gate_reopens_once_a_run_finishes(client):
@@ -508,15 +539,18 @@ def test_the_injection_point_escapes_every_angle_bracket():
 
     from webapp.main import VIEWER
 
-    engine = Engine(
-        StubPipelineRunner(),
-        limits=WEBAPP_LIMITS,
-        deadline_seconds=TEST_DEADLINE,
+    record = JobRecord.create(
+        owner_subject="local",
+        sources=[Source.description("A web app.")],
         frameworks=sample_selection(),
+        system_name=BREAKOUT,
     )
-    outcome = asyncio.run(
-        engine.analyze([Source.description("A web app.")], system_name=BREAKOUT)
-    )
+
+    async def ignore(node: str) -> None:
+        pass
+
+    outcome = asyncio.run(StubPipelineRunner().run(record, ignore))
+    assert isinstance(outcome, PipelineCompleted)
     page = render_report(outcome.report, report_state(outcome.report)).html
 
     payload = re.search(
@@ -1272,7 +1306,7 @@ def test_a_config_error_spelling_the_placeholder_is_not_substituted(tiers):
 
     page = diagnostic_page(
         Startup(
-            engine_for=None,
+            settings=None,
             frameworks=(),
             tiers=tiers,
             error=ConfigError("__CSP_NONCE__"),
@@ -1314,7 +1348,7 @@ def test_the_event_stream_still_streams_under_the_header_middleware(client):
     with client.stream("GET", f"/events/{started.json()['run']}") as response:
         assert response.headers["X-Content-Type-Options"] == "nosniff"
         assert response.headers["content-type"].startswith("text/event-stream")
-        assert "event: done" in "".join(response.iter_text())
+        assert '"status":"completed"' in "".join(response.iter_text())
 
 
 # --- the client scripts live in files ----------------------------------------
@@ -1540,30 +1574,29 @@ def test_a_ruling_that_a_unit_does_not_apply_sits_on_the_units_row():
     )
 
 
-def test_a_run_whose_runner_cannot_be_built_names_the_setting():
-    """A resumed run builds its graph on first use, after the route answered.
-
-    A missing credential then raises inside the run. The local app shows the
-    configuration message, as its start route and its diagnostic page do. A
-    :class:`~analysis_service.errors.ConfigError` names an environment variable
-    and never its value.
+def test_a_run_whose_runner_cannot_be_built_names_the_setting(tiers, caplog):
+    """A run's graph is built on first use. A missing credential then raises
+    before the job is admitted: the page gets a fixed message, and the log
+    names the setting and never its value (OWASP A10).
     """
-    import asyncio
-
-    from webapp.main import _drive
+    from dataclasses import replace
 
     message = "vendor 'vertex' needs ANALYSIS_VERTEX_PROJECT; it is unset or empty"
 
-    async def start(on_node):
+    def unconfigured(selection, entry):
         raise ProviderAuthError(message)
 
-    async def drive():
-        analyses = Analyses()
-        run = analyses.claim()
-        await _drive(analyses, run, start)
-        return await run.events.get()
+    startup = Startup(
+        settings=replace(stub_settings(), runner_for=unconfigured),
+        frameworks=CARRIED,
+        tiers=tiers,
+        error=None,
+    )
+    client = TestClient(create_app(startup), base_url=LOOPBACK)
+    response = client.post("/analyze", json=posted("A"), headers=SAME_ORIGIN)
 
-    event, data = asyncio.run(drive())
-
-    assert event == "failed"
-    assert message in json.loads(data)["message"]
+    assert response.status_code == 503
+    assert "configuration is incomplete" in response.json()["message"]
+    assert "ANALYSIS_VERTEX_PROJECT" not in response.text
+    assert message in caplog.text
+    assert client.get("/workspace/runs").json() == []

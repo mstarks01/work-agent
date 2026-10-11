@@ -13,8 +13,6 @@ import asyncio
 import pytest
 from pydantic import ValidationError
 
-from analysis_service.answer_round import ResumedJob
-from analysis_service.answer_sets import NO_ANSWERS
 from analysis_service.deployment import DEFAULT_RESILIENCE_PATH
 from analysis_service.engine import (
     DEFAULT_CALLER,
@@ -24,7 +22,6 @@ from analysis_service.engine import (
 )
 from analysis_service.graph import ENTRY_EXTRACT
 from analysis_service.jobs import (
-    Checkpoint,
     JobRecord,
     PipelineCompleted,
     PipelineOutcome,
@@ -38,7 +35,6 @@ from tests.factories import (
     DEFAULT_FRAMEWORKS,
     DESCRIPTION_TEXT,
     sample_selection,
-    valid_model,
 )
 from tests.test_pipeline import build, happy_replies
 
@@ -200,26 +196,6 @@ def test_too_many_sources_is_a_caller_error():
 
     with pytest.raises(EngineInputError, match="source limit"):
         asyncio.run(engine.analyze(sources))
-
-
-def test_a_resumed_job_is_held_to_the_source_limits_too():
-    """A caller can build a Resumed Job without the answer round, so the
-    engine bounds its sources as it bounds a submission's."""
-    engine = engine_for(StubPipelineRunner())
-    resumed = ResumedJob(
-        sources=[
-            Source.description("x", label=f"Doc {n}")
-            for n in range(TEST_LIMITS.max_sources + 1)
-        ],
-        answers=NO_ANSWERS,
-        shown=(),
-        skipped=(),
-        checkpoint=Checkpoint(system_model=valid_model(), assertions=None),
-        follow_up=False,
-    )
-
-    with pytest.raises(EngineInputError, match="source limit"):
-        asyncio.run(engine.resume(resumed))
 
 
 def test_over_budget_sources_are_a_caller_error_naming_every_label():

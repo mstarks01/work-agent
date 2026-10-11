@@ -42,7 +42,6 @@ from collections.abc import Callable, Mapping, Sequence
 from functools import partial
 from typing import Any, Self
 
-from analysis_service.answer_round import ResumedJob
 from analysis_service.claims import FrameworkName
 from analysis_service.deployment import Deployment
 from analysis_service.frameworks import PACKAGES
@@ -52,7 +51,6 @@ from analysis_service.jobs import (
     NodeCallback,
     PipelineOutcome,
     PipelineRunner,
-    Resumption,
 )
 from analysis_service.links import (
     with_link_answers,
@@ -263,47 +261,6 @@ class Engine:
     def framework_options(self) -> dict[FrameworkName, Mapping[str, Any]]:
         """Each framework a job here is analysed under, with its options."""
         return {selection.name: selection.options for selection in self._frameworks}
-
-    async def resume(
-        self,
-        resumed: ResumedJob,
-        *,
-        system_name: str | None = None,
-        caller: str = DEFAULT_CALLER,
-        on_node: NodeCallback | None = None,
-    ) -> PipelineOutcome:
-        """Run the Resumed Job an earlier run's answers started.
-
-        :meth:`~analysis_service.answer_round.AnswerState.answer` admits the
-        answers and returns ``resumed``. The run starts at ``prepare`` from its
-        checkpoint, so no extraction and no assertion pass runs again (#1252).
-        The sources are held to this engine's bounds again, as
-        :meth:`analyze` holds a submission's, because a caller can build
-        ``resumed`` without the answer round.
-        """
-        breach = self._limits.breach(resumed.sources)
-        if breach is not None:
-            raise EngineInputError(breach.message)
-        if resumed.answers.links and not self._carries_catalog:
-            raise EngineInputError(
-                "this deployment builds no assertion catalog, so nothing would"
-                " read a link answer"
-            )
-        job = JobRecord.create(
-            owner_subject=caller,
-            sources=resumed.sources,
-            frameworks=self._frameworks,
-            system_name=_engine_system_name(system_name),
-            answers=resumed.answers,
-            shown_early=resumed.shown,
-            skipped_early=list(resumed.skipped),
-            resumption=Resumption(
-                parent_id="in-process",
-                checkpoint=resumed.checkpoint,
-                follow_up=resumed.follow_up,
-            ),
-        )
-        return await self._run(job, on_node)
 
     async def _run(
         self, job: JobRecord, on_node: NodeCallback | None

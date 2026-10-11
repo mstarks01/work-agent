@@ -4,9 +4,11 @@ Start it from a clone, with model auth already configured::
 
     uv run python webapp/main.py
 
-It embeds :class:`~analysis_service.Engine` in process. It does not go through
-the ``/v1`` HTTP surface, so it needs no bearer token and no CORS, and it runs
-real models against real prose, because there is no credential-free path here.
+It embeds the service in process: its jobs live in the service's in-memory
+job store, and :mod:`analysis_service.job_answers` admits, stores and starts
+them for this app as it does for ``/v1``. It does not go through the ``/v1``
+HTTP surface, so it needs no bearer token and no CORS, and it runs real
+models against real prose, because there is no credential-free path here.
 The local workspace provides description entry, grouped questions, and a bounded
 session library of analyses and reports. Templates and native JavaScript keep
 the frontend dependency-free; the engine remains the reader of answer rules.
@@ -88,7 +90,6 @@ import asyncio
 import json
 import logging
 import os
-import secrets
 from collections.abc import (
     AsyncIterator,
     Awaitable,
@@ -97,7 +98,7 @@ from collections.abc import (
     Mapping,
     Sequence,
 )
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from functools import partial
 from pathlib import Path
 from typing import Annotated, get_args
@@ -115,14 +116,11 @@ from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from analysis_service import (
     ConfigError,
-    Engine,
-    EngineDeadlineError,
-    EngineInputError,
     FrameworkName,
     FrameworkSelection,
-    PipelineCompleted,
     Report,
     Source,
+    budgets,
 )
 from analysis_service.answer_forms import (
     answer_choices,
@@ -138,15 +136,16 @@ from analysis_service.answer_round import (
     Answers,
     AnswerState,
     QuestionSet,
-    SavedDraft,
-    SavedRound,
     SourcesOverLimit,
     StaleRevision,
 )
-from analysis_service.answer_sets import NO_ANSWERS, AnswerSet
+from analysis_service.answer_sets import AnswerSet
+from analysis_service.budgets import BudgetPolicy
+from analysis_service.certification import CertificationGate
 from analysis_service.claims import UnknownKey
 from analysis_service.critic import SEVERITY_ORDER
 from analysis_service.deployment import Deployment
+from analysis_service.engine import DEFAULT_CALLER
 from analysis_service.fact_answers import (
     MAX_FACT_ANSWERS,
     FactAnswer,
@@ -156,16 +155,33 @@ from analysis_service.fact_answers import (
     merged_facts,
 )
 from analysis_service.frameworks import PACKAGES, package_for
+from analysis_service.job_answers import (
+    JobAnswers,
+    JobDataMissing,
+    NoCatalog,
+    NoSuchJob,
+    NotAdmitted,
+    NotCompleted,
+    Refused,
+    RunnerFor,
+    RunnerUnavailable,
+    SaveConflict,
+    Started,
+    Withheld,
+)
 from analysis_service.jobs import (
-    Checkpoint,
+    TERMINAL_STATUSES,
+    InMemoryJobStore,
+    JobRecord,
     JobStatus,
-    PipelineAwaiting,
-    PipelineOutcome,
-    locks_its_parent,
+    JobStore,
+    PipelineRunner,
+    execute_job,
 )
 from analysis_service.links import (
     MAX_LINK_ANSWERS,
     LinkAnswer,
+    NoCatalogError,
     components,
 )
 from analysis_service.model_tiers import ModelTierConfig
@@ -174,7 +190,7 @@ from analysis_service.questions import question_fallback
 from analysis_service.report_changes import report_changes
 from analysis_service.report_conditions import conditions, corrected_findings
 from analysis_service.selection import SelectionError, resolve_selection
-from analysis_service.sources import ANSWERS_LABEL
+from analysis_service.sources import ANSWERS_LABEL, SourceLimits
 from analysis_service.vendors import (
     CREDENTIAL_MODE_NOTES,
     VendorName,
@@ -226,219 +242,185 @@ _FORM_GRANTS = Grants(script=True, style=True, connect=True)
 _DIAGNOSTIC_GRANTS = Grants(style=True)
 
 
-@dataclass
-class Run:
-    """One in-flight or finished analysis.
-
-    ``engine``, ``sources`` and ``links`` are what the run was given, and
-    ``checkpoint`` is the model and catalog it reached: a paused run's, or a
-    finished report's. Together they are what an answer resumes from.
-    """
-
-    id: str
-    completed_steps: list[str] = field(default_factory=list)
-    name: str = "Your system"
-    analysis_id: str = ""
-    events: asyncio.Queue[tuple[str, str]] = field(default_factory=asyncio.Queue)
-    report: Report | None = None
-    task: asyncio.Task | None = None
-    engine: Engine | None = None
-    sources: list[Source] = field(default_factory=list)
-    answers: AnswerSet = NO_ANSWERS
-    checkpoint: Checkpoint | None = None
-    #: True for a run the report's follow-up started: its report is final.
-    final: bool = False
-    #: Every early question the pause showed.
-    shown: list[UnknownKey] = field(default_factory=list)
-    #: A final report's corrections, kept beside it; no model reads them.
-    corrections: list[FactAnswer] = field(default_factory=list)
-    #: Every early question and link question the submitter skipped for now.
-    skipped: list[SkipKey] = field(default_factory=list)
-    #: How many rounds a paused run, or drafts a finished one, has saved. A page
-    #: sends the revision it read, so a page left open on an earlier save cannot
-    #: write over a later one.
-    revision: int = 0
-    #: A finished run's draft answers: what its report's follow-up saved in
-    #: batches and has not run (ADR 0070).
-    draft: AnswerSet = NO_ANSWERS
-    #: The answers a paused run held when its amendment started this run
-    #: (ADR 0072); this run's questions take each one they still ask.
-    carried: AnswerSet = NO_ANSWERS
-    #: The run a submitter's answers started from this one, in any status, if any.
-    resumed_run: Run | None = None
-    #: The report this run's answers came from, for a follow-up: what its own
-    #: report is compared with.
-    previous: Report | None = None
-
-    @property
-    def workspace_id(self) -> str:
-        """The analysis this run belongs to, including runs made by older callers."""
-        return self.analysis_id or self.id
-
-    @property
-    def waiting(self) -> bool:
-        """True while the run waits for answers before its analysis.
-
-        A run whose resumed run has not reached a report still waits: that
-        run can fail, and this one is then the only place its answers resume.
-        """
-        resumed = self.resumed_run is not None and self.resumed_run.report is not None
-        return self.checkpoint is not None and self.report is None and not resumed
-
-    @property
-    def locked_by(self) -> Run | None:
-        """The run these answers started, where it locks this one, or ``None``."""
-        return self.resumed_run if self.resumed else None
-
-    @property
-    def resumed(self) -> bool:
-        """True where a run this one's answers started is running or has a report.
-
-        Such a run takes no more answers, as a ``/v1`` job takes one resumed
-        job. A resumed run that failed read nothing into a report, so this one
-        takes answers again.
-        """
-        run = self.resumed_run
-        return run is not None and locks_its_parent(run.status)
-
-    @property
-    def status(self) -> JobStatus:
-        """The run's state as a ``/v1`` job's status reads it.
-
-        A run with a report is ``completed``, one still going is ``running``,
-        and one that stopped at its checkpoint is ``awaiting-answers``. A run
-        that ended with neither read nothing into a report, whether it failed
-        or was rejected, and reads as ``failed``.
-        """
-        if self.report is not None:
-            return "completed"
-        if self.task is None or not self.task.done():
-            return "running"
-        return "awaiting-answers" if self.checkpoint is not None else "failed"
-
-    def state(self) -> AnswerState:
-        """What this run's questions and answers read, from its engine and checkpoint."""
-        if self.engine is None or self.checkpoint is None:
-            raise RuntimeError(f"run {self.id} has reached no checkpoint")
-        locked_by = self.locked_by
-        return AnswerState(
-            checkpoint=self.checkpoint,
-            frameworks=self.engine.framework_options,
-            analyses=() if self.report is None else self.report.analyses,
-            waiting=self.report is None,
-            final=self.final,
-            sources=self.sources,
-            answers=self.answers,
-            shown=self.shown,
-            skipped=self.skipped,
-            corrections=self.corrections,
-            revision=self.revision,
-            resumed_by=None if locked_by is None else locked_by.id,
-            draft=self.draft,
-            carried_in=self.carried,
-        )
+#: The one owner of every job this app holds. The store keys each job by its
+#: owner, and this app has one local operator, so every job names the caller
+#: the engine names for an in-process run.
+OWNER = DEFAULT_CALLER
 
 
 class RegistryFull(Exception):
-    """Every run the registry holds waits for answers, so none can make room."""
+    """Every job the workspace holds waits for answers, so none can make room."""
 
 
-class Analyses:
-    """The bounded run registry, plus the one-run-at-a-time gate.
+@dataclass(frozen=True)
+class Settings:
+    """What the routes read of the deployment: its runner, and the bounds a
+    job is held to."""
 
-    The gate is a flag rather than an :class:`asyncio.Semaphore` because a
-    refused submission must be *refused*, not held open until the running one
-    finishes (LLM10). Check-and-set is safe unsynchronised: asyncio is
-    single-threaded and there is no ``await`` between the two.
+    runner_for: RunnerFor
+    limits: SourceLimits
+    budget: BudgetPolicy
+    deadline_seconds: float
+    carries_catalog: bool
+    gate: CertificationGate | None = None
+
+
+class Workspace:
+    """The jobs this process holds, and what runs them.
+
+    The jobs live in a job store, in memory, capped at ``max_jobs``. The
+    oldest job that waits for no answers is deleted first, and a job that
+    waits for answers is never deleted: where every job waits, a new one is
+    refused instead. One job runs at a time (LLM10): the store's admission
+    refuses a second while one is in flight, with a message rather than a
+    queue. A restart loses everything, which is correct here.
     """
 
-    def __init__(self, max_runs: int = MAX_RUNS) -> None:
-        self._runs: dict[str, Run] = {}
-        self._max_runs = max_runs
-        self._busy = False
+    def __init__(
+        self,
+        settings: Settings,
+        *,
+        store: JobStore | None = None,
+        max_jobs: int = MAX_RUNS,
+    ) -> None:
+        self.store: JobStore = InMemoryJobStore() if store is None else store
+        self.answers = JobAnswers(
+            store=self.store,
+            runner_for=settings.runner_for,
+            limits=settings.limits,
+            ceiling=1,
+            budget=settings.budget,
+            carries_catalog=settings.carries_catalog,
+            gate=settings.gate,
+        )
+        self._deadline = settings.deadline_seconds
+        self._max_jobs = max_jobs
+        self._tasks: set[asyncio.Task[None]] = set()
 
-    def claim(self, answering: Run | None = None) -> Run | None:
-        """Start a run, or ``None`` if one is already going.
+    def start(self, record: JobRecord, runner: PipelineRunner) -> None:
+        """Run an admitted job on this process's event loop."""
+        task = asyncio.create_task(
+            execute_job(self.store, runner, record.id, deadline_seconds=self._deadline)
+        )
+        # Held so the task is not garbage-collected mid-flight.
+        self._tasks.add(task)
+        task.add_done_callback(self._tasks.discard)
 
-        A full registry removes its oldest runs that wait for no answers. Where
-        every run waits for answers, it raises :class:`RegistryFull` rather
-        than remove one. A run that resumes ``answering`` may hold one place
-        over the bound: ``answering`` stays the place to retry from until that
-        run has a report, and a resumed run never pauses, so at most one such
-        place is held.
+    async def waiting(self, record: JobRecord) -> bool:
+        """True while the job waits for answers.
+
+        A job whose resumed job has not reached a report still waits: that
+        job can fail, and this one is then the only place its answers resume.
         """
-        if self._busy:
-            return None
-        limit = self._max_runs + (answering is not None)
-        removable = iter([key for key, held in self._runs.items() if not held.waiting])
-        while len(self._runs) >= limit:
-            key = next(removable, None)
-            if key is None:
+        if record.status != "awaiting-answers":
+            return False
+        locker = await self.store.resumed_by(record.id, OWNER)
+        if locker is None:
+            return True
+        child = await self.store.get(locker)
+        return child is None or child.status != "completed"
+
+    async def make_room(self, *, answering: bool = False) -> None:
+        """Delete the oldest jobs that wait for nothing, until a new job fits.
+
+        A job that answers a waiting one may hold one place over the bound:
+        the waiting job stays the place to retry from until that job has a
+        report. Raises :class:`RegistryFull` where every held job waits.
+        """
+        limit = self._max_jobs + answering
+        held = await self.store.owned_jobs(OWNER)
+        while len(held) >= limit:
+            removable = [
+                job
+                for job in held
+                if job.status in TERMINAL_STATUSES and not await self.waiting(job)
+            ]
+            if not removable:
                 raise RegistryFull(
-                    f"{len(self._runs)} analyses wait for answers. Answer or"
-                    " continue one of them before you start another."
+                    f"{len(held)} analyses wait for answers. Answer or continue"
+                    " one of them before you start another."
                 )
-            del self._runs[key]
-        self._busy = True
-        run = Run(id=secrets.token_urlsafe(16))
-        self._runs[run.id] = run
-        return run
+            await self.store.delete(removable[0].id, OWNER)
+            held = [job for job in held if job.id != removable[0].id]
 
-    def snapshots(self) -> list[dict[str, object]]:
-        """Latest retained run per analysis, with its retained reports."""
-        grouped: dict[str, list[Run]] = {}
-        for run in self._runs.values():
-            grouped.setdefault(run.workspace_id, []).append(run)
-        return [
-            self.snapshot(
-                next(
-                    (run for run in reversed(runs) if run.waiting and not run.resumed),
-                    runs[-1],
-                ),
-                runs,
-            )
-            for runs in reversed(list(grouped.values()))
-        ]
+    async def parent_of(self, record: JobRecord) -> str | None:
+        """The job this one resumes or amends, read by name: an envelope
+        leaves the resumption out for its weight."""
+        if record.amends is not None:
+            return record.amends
+        resumption = await self.store.resumption(record.id, OWNER)
+        return None if resumption is None else resumption.parent_id
 
-    def snapshot(self, run: Run, related: list[Run] | None = None) -> dict[str, object]:
+    async def workspace_id(self, record: JobRecord) -> str:
+        """The analysis this job belongs to: the root of its parent chain.
+
+        A parent deleted since still names the root, so the group holds.
+        """
+        current = record
+        while (parent := await self.parent_of(current)) is not None:
+            above = await self.store.owned(parent, OWNER)
+            if above is None:
+                return parent
+            current = above
+        return current.id
+
+    async def snapshots(self) -> list[dict[str, object]]:
+        """Latest retained job per analysis, with its retained reports, newest first."""
+        grouped: dict[str, list[JobRecord]] = {}
+        for record in await self.store.owned_jobs(OWNER):
+            grouped.setdefault(await self.workspace_id(record), []).append(record)
+        snapshots = []
+        for records in reversed(list(grouped.values())):
+            shown = records[-1]
+            for record in reversed(records):
+                if await self.waiting(record):
+                    shown = record
+                    break
+            snapshots.append(await self.snapshot(shown, records))
+        return snapshots
+
+    async def snapshot(
+        self, record: JobRecord, related: list[JobRecord] | None = None
+    ) -> dict[str, object]:
         """Public workspace metadata; descriptions only on the detail route."""
         if related is None:
+            group = await self.workspace_id(record)
             related = [
                 item
-                for item in self._runs.values()
-                if item.workspace_id == run.workspace_id
+                for item in await self.store.owned_jobs(OWNER)
+                if await self.workspace_id(item) == group
             ]
         return {
-            "run": run.id,
-            "name": run.name,
-            "status": run.status,
-            "frameworks": []
-            if run.engine is None
-            else list(run.engine.framework_options),
+            "run": record.id,
+            "name": _name_of(record),
+            "status": _page_status(record.status),
+            "frameworks": [selection.name for selection in record.frameworks],
             "reports": [
                 {
                     "run": item.id,
                     "url": f"/report/{item.id}",
-                    "name": item.name,
-                    "generated_at": item.report.job.completed_at.isoformat(),
+                    "name": _name_of(item),
+                    "generated_at": item.updated_at.isoformat(),
                 }
                 for item in related
-                if item.report is not None
+                if item.status == "completed"
             ],
         }
 
-    def release(self) -> None:
-        self._busy = False
 
-    def get(self, run_id: str) -> Run | None:
-        return self._runs.get(run_id)
+DEFAULT_NAME = "Your system"
 
 
-#: Builds the engine for one submission's selection. A factory rather than a
-#: built engine, because an engine is built *for* a selection and the selection
-#: is the submitter's: the options a package needs ride on it, and they are
-#: known only once a form has been filled in.
-EngineFactory = Callable[[Sequence[FrameworkSelection]], Engine]
+def _name_of(record: JobRecord) -> str:
+    return record.system_name or DEFAULT_NAME
+
+
+def _page_status(status: JobStatus) -> JobStatus:
+    """A job's status as the pages read it: a queued job is running, and a
+    rejected one stopped."""
+    if status == "queued":
+        return "running"
+    return "failed" if status == "rejected" else status
 
 
 @dataclass(frozen=True)
@@ -455,14 +437,14 @@ class Startup:
     form ships with every box ticked rather than with a default nobody chose.
     """
 
-    engine_for: EngineFactory | None
+    settings: Settings | None
     frameworks: tuple[FrameworkName, ...]
     tiers: ModelTierConfig | None
     error: ConfigError | None
 
     @property
     def ok(self) -> bool:
-        return self.engine_for is not None
+        return self.settings is not None
 
 
 def build_startup(env: Mapping[str, str] | None = None) -> Startup:
@@ -486,6 +468,9 @@ def build_startup(env: Mapping[str, str] | None = None) -> Startup:
     :meth:`~analysis_service.deployment.Deployment.runner` memoizes per
     selection, so a narrower pick composes its own graph once and no
     submission binds the adapters twice.
+
+    The bounds a job is held to are the deployment's own: the same source
+    limits, budget and deadline ``/v1`` enforces.
     """
     env = os.environ if env is None else env
     deployment = None
@@ -495,9 +480,16 @@ def build_startup(env: Mapping[str, str] | None = None) -> Startup:
     except ConfigError as exc:
         logger.error("config error at startup: %s", exc)
         tiers = deployment.tiers if deployment is not None else None
-        return Startup(engine_for=None, frameworks=(), tiers=tiers, error=exc)
+        return Startup(settings=None, frameworks=(), tiers=tiers, error=exc)
     return Startup(
-        engine_for=partial(Engine.from_deployment, deployment),
+        settings=Settings(
+            runner_for=deployment.runner,
+            limits=deployment.resilience.source_limits(),
+            budget=deployment.resilience.budget_policy(),
+            deadline_seconds=deployment.job_deadline_seconds(),
+            carries_catalog=deployment.carries_catalog,
+            gate=deployment.gate,
+        ),
         frameworks=deployment.frameworks,
         tiers=deployment.tiers,
         error=None,
@@ -757,20 +749,96 @@ def _earlier_payload(
     }
 
 
+#: Each typed refusal of the job operations and of the answer rules, with the
+#: status the page is answered under. The message is the refusal's own, which
+#: names the submitter's choices and never this deployment's configuration.
+_REFUSAL_STATUS: dict[type[Exception], int] = {
+    NoSuchJob: 404,
+    NotCompleted: 409,
+    Withheld: 409,
+    NoCatalog: 400,
+    NoCatalogError: 409,
+    Refused: 400,
+    SaveConflict: 409,
+    RegistryFull: 409,
+    RunnerUnavailable: 503,
+    JobDataMissing: 500,
+}
+
+#: What the page is told for each admission refusal, keyed by outcome.
+_ADMISSION_MESSAGES: dict[str, str] = {
+    "at_ceiling": "An analysis is already running. Wait for it to finish.",
+    "over_rate": "This workspace started too many analyses in the current"
+    " window. Wait for the window to roll past the earlier ones.",
+    "over_subject_budget": "This workspace has reached its consumption limit"
+    " for the current window. Retry later, or submit less text.",
+    "over_global_budget": "This workspace has reached its consumption limit"
+    " for the current window. Retry later, or submit less text.",
+    "resumed_already": "These answers already started an analysis. Open its"
+    " report, or answer again only if it fails.",
+}
+
+
+def _message(status: int, message: str) -> JSONResponse:
+    return JSONResponse({"message": message}, status_code=status)
+
+
+async def _refused(status: int, request: Request, exc: Exception) -> JSONResponse:
+    return _message(status, str(exc))
+
+
+async def _not_admitted(request: Request, exc: NotAdmitted) -> JSONResponse:
+    outcome = exc.admission.outcome
+    if outcome == "parent_moved":
+        return _message(409, _STALE_MESSAGE)
+    if outcome in _ADMISSION_MESSAGES:
+        return _message(409, _ADMISSION_MESSAGES[outcome])
+    logger.error("job was not admitted: %s", outcome)
+    return _message(500, "The analysis could not be started. Check the server log.")
+
+
+async def _already_resumed(request: Request, exc: AlreadyResumed) -> JSONResponse:
+    return _message(409, _ADMISSION_MESSAGES["resumed_already"])
+
+
+async def _stale(request: Request, exc: StaleRevision) -> JSONResponse:
+    return _message(409, _STALE_MESSAGE)
+
+
+async def _over_limit(request: Request, exc: SourcesOverLimit) -> JSONResponse:
+    return _message(400, exc.breach.message)
+
+
 def create_app(
-    startup: Startup | None = None, analyses: Analyses | None = None
+    startup: Startup | None = None, workspace: Workspace | None = None
 ) -> FastAPI:
     """The ASGI app.
 
     Both collaborators are injectable so the offline lane can drive the app
-    without credentials: ``startup`` supplies a stub engine, and ``analyses``
-    lets a test hold the run gate to observe a refusal deterministically.
+    without credentials: ``startup`` supplies a stub runner, and ``workspace``
+    lets a test bound the jobs held or hand the app a store of its own.
     """
     state = build_startup() if startup is None else startup
-    analyses = Analyses() if analyses is None else analyses
+    if workspace is None and state.settings is not None:
+        workspace = Workspace(state.settings)
     app = FastAPI(title="Work Agent", docs_url=None, redoc_url=None, openapi_url=None)
     app.add_middleware(TrustedHostMiddleware, allowed_hosts=LOOPBACK_HOSTS)
     app.add_middleware(SecurityHeaders)
+    for refusal, status in _REFUSAL_STATUS.items():
+        app.add_exception_handler(refusal, partial(_refused, status))
+    app.exception_handler(NotAdmitted)(_not_admitted)
+    app.exception_handler(AlreadyResumed)(_already_resumed)
+    app.exception_handler(StaleRevision)(_stale)
+    app.exception_handler(SourcesOverLimit)(_over_limit)
+
+    def unavailable() -> JSONResponse:
+        """The app came up without a runner: the diagnostic page says why."""
+        return _message(503, str(state.error))
+
+    def no_such_run() -> JSONResponse:
+        return _message(
+            404, "This analysis is no longer available in this server session."
+        )
 
     @app.get("/", response_class=HTMLResponse)
     async def form_page() -> Response:
@@ -801,112 +869,91 @@ def create_app(
 
     @app.get("/workspace/runs")
     async def workspace_runs() -> Response:
-        return JSONResponse(analyses.snapshots())
+        if workspace is None:
+            return JSONResponse([])
+        return JSONResponse(await workspace.snapshots())
 
     @app.get("/workspace/runs/{run_id}")
     async def workspace_run(run_id: str) -> Response:
-        run = analyses.get(run_id)
-        if run is None:
-            return JSONResponse(
-                {
-                    "message": "This analysis is no longer available in this server session."
-                },
-                status_code=404,
-            )
-        while run.locked_by is not None:
-            run = run.locked_by
-        payload = analyses.snapshot(run)
-        payload["completed_steps"] = list(run.completed_steps)
-        payload["selection"] = (
-            []
-            if run.engine is None
-            else [
-                {"name": name, "options": dict(options)}
-                for name, options in run.engine.framework_options.items()
-            ]
+        """One analysis as the page reopens it: its latest job, with its
+        questions where it waits, and its failure where it stopped."""
+        if workspace is None:
+            return no_such_run()
+        store = workspace.store
+        record = await store.owned(run_id, OWNER)
+        if record is None:
+            return no_such_run()
+        while (locker := await store.resumed_by(record.id, OWNER)) is not None:
+            locked = await store.owned(locker, OWNER)
+            if locked is None:
+                break
+            record = locked
+        payload = await workspace.snapshot(record)
+        payload["completed_steps"] = [
+            event.node for event in record.events if event.kind == "node"
+        ]
+        payload["selection"] = [
+            {"name": selection.name, "options": dict(selection.options)}
+            for selection in record.frameworks
+        ]
+        payload["description"] = "\n\n".join(
+            source.text for source in record.sources if source.kind != "answers"
         )
-        payload["description"] = "\n\n".join(source.text for source in run.sources)
-        if run.status == "awaiting-answers":
-            payload["questions"] = paused_payload(run, run.state())
+        payload["error"] = record.error
+        payload["issues"] = [
+            {"code": issue.code, "message": issue.message}
+            for issue in record.validation_issues
+        ]
+        if record.status == "awaiting-answers":
+            payload["questions"] = {
+                "run": record.id
+            } | await workspace.answers.questions(record.id, OWNER)
         return JSONResponse(payload)
 
     @app.post("/analyze")
     async def analyze(request: Request) -> Response:
         if not is_same_origin(request):
             logger.warning("refused a POST /analyze that was not same-origin")
-            return JSONResponse(
-                {"message": "This request did not come from the app's own page."},
-                status_code=403,
-            )
-        if not state.ok or state.engine_for is None:
-            return JSONResponse({"message": str(state.error)}, status_code=503)
+            return _message(403, "This request did not come from the app's own page.")
+        if workspace is None or state.settings is None:
+            return unavailable()
 
         try:
             body = await request.json()
             sources = [Source.model_validate(source) for source in body["sources"]]
             selection = _selection(state.frameworks, body["frameworks"])
             ask_questions = body.get("questions") is True
-            name = body.get("name", "Your system")
+            name = body.get("name", DEFAULT_NAME)
             if not isinstance(name, str) or not 1 <= len(name.strip()) <= 120:
-                return JSONResponse(
-                    {"message": "Use an analysis name between 1 and 120 characters."},
-                    status_code=400,
+                return _message(
+                    400, "Use an analysis name between 1 and 120 characters."
                 )
             name = name.strip()
         except SelectionError as exc:
             # Names the framework and the field it wanted, or the name the
             # install does not carry, and nothing about this deployment. Safe
             # to show, and the only way a submitter learns what to change.
-            return JSONResponse({"message": str(exc)}, status_code=400)
+            return _message(400, str(exc))
         except (ValidationError, ValueError, KeyError, TypeError):
-            return JSONResponse(
-                {
-                    "message": "Expected a JSON body with a 'sources' list and a"
-                    " 'frameworks' list naming frameworks this install carries."
-                },
-                status_code=400,
+            return _message(
+                400,
+                "Expected a JSON body with a 'sources' list and a 'frameworks'"
+                " list naming frameworks this install carries.",
             )
-
-        # Built here rather than at startup, and before the gate is claimed: an
-        # engine is built for one selection, and its constructor is where a
-        # package's options model refuses a submission missing a value it needs.
-        # Refusing before the gate is claimed keeps a bad option from locking
-        # out the next submitter, and refusing before any node runs is what
-        # stops the failure landing after the run has been paid for.
-        try:
-            engine = state.engine_for(selection)
-        except EngineInputError as exc:
-            # Names the framework and the field it wanted, and nothing about
-            # this deployment. Safe to show, and it is the only way a submitter
-            # learns which option they left out.
-            return JSONResponse({"message": str(exc)}, status_code=400)
-        except ConfigError as exc:
-            # The names passed the allow-list, so this is not the caller's: the
-            # config or the credentials went bad after startup proved them. Log
-            # it and answer as the diagnostic would.
-            logger.error("could not build an engine for %s: %s", selection, exc)
-            return JSONResponse({"message": str(exc)}, status_code=503)
-
-        try:
-            run = analyses.claim()
-        except RegistryFull as exc:
-            return JSONResponse({"message": str(exc)}, status_code=409)
-        if run is None:
-            return JSONResponse(
-                {"message": "An analysis is already running. Wait for it to finish."},
-                status_code=409,
-            )
-        run.name, run.analysis_id = name, run.id
-        run.engine, run.sources = engine, sources
-        start = partial(
-            engine.analyze,
-            sources,
-            system_name=run.name,
+        breach = state.settings.limits.breach(sources)
+        if breach is not None:
+            return _message(400, breach.message)
+        record = JobRecord.create(
+            owner_subject=OWNER,
+            sources=sources,
+            frameworks=selection,
+            system_name=name,
             ask_questions=ask_questions,
+            reserved_tokens=budgets.estimate(sources, selection),
         )
-        # Held on the run so the task is not garbage-collected mid-flight.
-        run.task = asyncio.create_task(_drive(analyses, run, start))
-        return JSONResponse({"run": run.id})
+        await workspace.make_room()
+        started = await workspace.answers.admit(record, start=workspace.start)
+        return JSONResponse({"run": started.job_id})
 
     @app.post("/answer/{run_id}")
     async def answer(run_id: str, request: Request) -> Response:
@@ -915,27 +962,19 @@ def create_app(
         The run answered is a paused one or a finished one. The new run starts
         at ``prepare`` from what that run reached, so nothing is extracted
         again. An empty answer list continues a paused run without answers; a
-        finished run has nothing to continue.
+        finished run has nothing to continue. A saved round answers with the
+        next round.
         """
         if not is_same_origin(request):
             logger.warning("refused a POST /answer that was not same-origin")
-            return JSONResponse(
-                {"message": "This request did not come from the app's own page."},
-                status_code=403,
-            )
-        parent = analyses.get(run_id)
-        if parent is None or parent.checkpoint is None or parent.engine is None:
-            return JSONResponse(
-                {"message": "That run asks no question, or no longer exists."},
-                status_code=404,
-            )
+            return _message(403, "This request did not come from the app's own page.")
+        if workspace is None:
+            return unavailable()
         try:
             body = await request.json()
         except ValueError:
             body = None  # refused below, as every other malformed body is
-        # Read after the body: nothing awaits from here to the write or the
-        # claim, so a save in another tab cannot land between them.
-        state = parent.state()
+        questions = _questions_of(workspace, run_id)
         try:
             raw = body["links"]
             raw_facts = body.get("facts", [])
@@ -944,20 +983,18 @@ def create_app(
                 and isinstance(raw_facts, list)
                 and (len(raw) > MAX_LINK_ANSWERS or len(raw_facts) > MAX_FACT_ANSWERS)
             ):
-                return JSONResponse(
-                    {
-                        "message": f"One request takes at most {MAX_FACT_ANSWERS}"
-                        f" answers and {MAX_LINK_ANSWERS} element choices. Save"
-                        " your answers in parts, then run the follow-up."
-                    },
-                    status_code=400,
+                return _message(
+                    400,
+                    f"One request takes at most {MAX_FACT_ANSWERS} answers and"
+                    f" {MAX_LINK_ANSWERS} element choices. Save your answers in"
+                    " parts, then run the follow-up.",
                 )
             if not isinstance(raw, list):
                 raise TypeError
             links = [LinkAnswer.model_validate(link) for link in raw]
             if not isinstance(raw_facts, list):
                 raise TypeError
-            facts = [_fact_answer(fact, state.questions) for fact in raw_facts]
+            facts = [await _fact_answer(fact, questions) for fact in raw_facts]
             save = body.get("save", False)
             if not isinstance(save, bool):
                 raise TypeError
@@ -968,75 +1005,36 @@ def create_app(
             ):
                 raise TypeError
         except RefusedAnswer as exc:
-            return JSONResponse({"message": str(exc)}, status_code=400)
+            return _message(400, str(exc))
         except (ValidationError, ValueError, KeyError, TypeError):
-            return JSONResponse(
-                {
-                    "message": "Expected a JSON body with a 'links' list and a"
-                    " 'facts' list of answers this report asked for."
-                },
-                status_code=400,
+            return _message(
+                400,
+                "Expected a JSON body with a 'links' list and a 'facts' list of"
+                " answers this report asked for.",
             )
-        try:
-            outcome = state.answer(
-                Answers(
-                    given=AnswerSet(links=tuple(links), facts=tuple(facts)),
-                    save=save,
-                    skips=skips,
-                    revision=revision,
-                ),
-                limits=parent.engine.limits,
-            )
-        except StaleRevision:
-            return JSONResponse({"message": _STALE_MESSAGE}, status_code=409)
-        except AlreadyResumed:
-            return JSONResponse(
-                {
-                    "message": "These answers already started an analysis. Open"
-                    " its report, or answer again only if it fails."
-                },
-                status_code=409,
-            )
-        except SourcesOverLimit as exc:
-            return JSONResponse({"message": exc.breach.message}, status_code=400)
-        except ValueError as exc:
-            # The answer rules' own refusals name the submitter's choices, so
-            # they are safe to show.
-            return JSONResponse({"message": str(exc)}, status_code=400)
-        if isinstance(outcome, SavedDraft):
+        if not save:
+            await workspace.make_room(answering=True)
+        outcome = await workspace.answers.answer(
+            run_id,
+            OWNER,
+            Answers(
+                given=AnswerSet(links=tuple(links), facts=tuple(facts)),
+                save=save,
+                skips=skips,
+                revision=revision,
+            ),
+            start=workspace.start,
+        )
+        if isinstance(outcome, Started):
+            return JSONResponse({"run": outcome.job_id})
+        if outcome.revision is not None:
             # A draft runs nothing and spends no follow-up (ADR 0070).
-            parent.draft = outcome.draft
-            parent.revision += 1
-            return JSONResponse({"saved": True, "revision": parent.revision})
-        if isinstance(outcome, SavedRound):
-            # A saved round runs no model: the answers go onto the paused run,
-            # and the next round is read off the model with them in. Where
-            # none is left, the page says so and waits for its start button.
-            parent.answers = outcome.answers
-            parent.shown = list(outcome.shown)
-            parent.skipped = list(outcome.skipped)
-            parent.revision += 1
-            return JSONResponse(paused_payload(parent, parent.state()))
-        try:
-            run = analyses.claim(answering=parent)
-        except RegistryFull as exc:
-            return JSONResponse({"message": str(exc)}, status_code=409)
-        if run is None:
-            return JSONResponse(
-                {"message": "An analysis is already running. Wait for it to finish."},
-                status_code=409,
-            )
-        parent.resumed_run = run
-        run.name, run.analysis_id = parent.name, parent.workspace_id
-        run.previous = parent.report
-        run.engine, run.sources = parent.engine, parent.sources
-        run.answers = outcome.answers
-        run.final = outcome.follow_up
-        run.shown = list(outcome.shown)
-        run.skipped = list(outcome.skipped)
-        start = partial(parent.engine.resume, outcome, system_name=run.name)
-        run.task = asyncio.create_task(_drive(analyses, run, start))
-        return JSONResponse({"run": run.id})
+            return JSONResponse({"saved": True, "revision": outcome.revision})
+        # A saved round runs no model: the answers go onto the paused run, and
+        # the next round is read off the model with them in.
+        return JSONResponse(
+            {"run": run_id} | await workspace.answers.questions(run_id, OWNER)
+        )
 
     @app.post("/amend/{run_id}")
     async def amend(run_id: str, request: Request) -> Response:
@@ -1047,23 +1045,9 @@ def create_app(
         """
         if not is_same_origin(request):
             logger.warning("refused a POST /amend that was not same-origin")
-            return JSONResponse(
-                {"message": "This request did not come from the app's own page."},
-                status_code=403,
-            )
-        parent = analyses.get(run_id)
-        if (
-            parent is None
-            or parent.checkpoint is None
-            or parent.engine is None
-            or parent.report is not None
-        ):
-            return JSONResponse(
-                {
-                    "message": "Only a run that waits for your answers takes an amendment."
-                },
-                status_code=404,
-            )
+            return _message(403, "This request did not come from the app's own page.")
+        if workspace is None:
+            return unavailable()
         try:
             body = await request.json()
             text = body["text"]
@@ -1071,101 +1055,68 @@ def create_app(
             if not isinstance(text, str) or not isinstance(revision, int):
                 raise TypeError
         except (ValueError, KeyError, TypeError):
-            return JSONResponse(
-                {"message": "Expected a JSON body with a 'text' and a 'revision'."},
-                status_code=400,
-            )
-        try:
-            amended = parent.state().amend(
-                text, revision=revision, limits=parent.engine.limits
-            )
-        except StaleRevision:
-            return JSONResponse({"message": _STALE_MESSAGE}, status_code=409)
-        except AlreadyResumed:
-            return JSONResponse(
-                {
-                    "message": "These answers already started an analysis. Open"
-                    " it, or amend the description again only if it fails."
-                },
-                status_code=409,
-            )
-        except SourcesOverLimit as exc:
-            return JSONResponse({"message": exc.breach.message}, status_code=400)
-        except ValueError as exc:
-            return JSONResponse({"message": str(exc)}, status_code=400)
-        try:
-            run = analyses.claim(answering=parent)
-        except RegistryFull as exc:
-            return JSONResponse({"message": str(exc)}, status_code=409)
-        if run is None:
-            return JSONResponse(
-                {"message": "An analysis is already running. Wait for it to finish."},
-                status_code=409,
-            )
-        parent.resumed_run = run
-        run.name, run.analysis_id = parent.name, parent.workspace_id
-        run.engine, run.sources = parent.engine, amended.sources
-        run.carried = amended.answers
-        start = partial(
-            parent.engine.analyze,
-            amended.sources,
-            system_name=run.name,
-            ask_questions=True,
+            return _message(400, "Expected a JSON body with a 'text' and a 'revision'.")
+        await workspace.make_room(answering=True)
+        started = await workspace.answers.amend(
+            run_id, OWNER, text, revision=revision, start=workspace.start
         )
-        run.task = asyncio.create_task(_drive(analyses, run, start))
-        return JSONResponse({"run": run.id})
+        return JSONResponse({"run": started.job_id})
 
     @app.get("/events/{run_id}")
     async def events(run_id: str) -> Response:
-        run = analyses.get(run_id)
-        if run is None:
+        """The job's status and node events, as the store records them, until
+        the job reaches a terminal status."""
+        if workspace is None or await workspace.store.owned(run_id, OWNER) is None:
             return PlainTextResponse("no such run", status_code=404)
         return StreamingResponse(
-            _stream(run),
+            _stream(workspace, run_id),
             media_type="text/event-stream",
             headers={"Cache-Control": "no-store", "X-Accel-Buffering": "no"},
         )
 
     @app.get("/report/{run_id}", response_class=HTMLResponse)
     async def report_page(run_id: str) -> Response:
-        run = analyses.get(run_id)
-        if run is None or run.report is None:
+        if workspace is None:
             return PlainTextResponse("no such report", status_code=404)
-        return response(render_report(run.report, run.state(), run.previous))
+        try:
+            answerable = await workspace.answers.answerable(run_id, OWNER)
+        except (NoSuchJob, NotCompleted, Withheld):
+            return PlainTextResponse("no such report", status_code=404)
+        store = workspace.store
+        report = await store.report(run_id, OWNER)
+        if report is None:
+            return PlainTextResponse("no such report", status_code=404)
+        resumption = answerable.record.resumption
+        previous = (
+            None
+            if resumption is None
+            else await store.report(resumption.parent_id, OWNER)
+        )
+        return response(render_report(report, answerable.state(), previous))
 
     @app.post("/correct/{run_id}")
     async def correct(run_id: str, request: Request) -> Response:
         """Correct a final report's answers, and run nothing (ADR 0054)."""
         if not is_same_origin(request):
             logger.warning("refused a POST /correct that was not same-origin")
-            return JSONResponse(
-                {"message": "This request did not come from the app's own page."},
-                status_code=403,
-            )
-        run = analyses.get(run_id)
-        if run is None or run.report is None or run.engine is None:
-            return JSONResponse(
-                {"message": "That report no longer exists."}, status_code=404
-            )
-        state = run.state()
+            return _message(403, "This request did not come from the app's own page.")
+        if workspace is None:
+            return unavailable()
+        questions = _questions_of(workspace, run_id)
         try:
             body = await request.json()
             raw = body["facts"]
             if not isinstance(raw, list) or len(raw) > MAX_FACT_ANSWERS:
                 raise TypeError
-            facts = [_fact_answer(fact, state.questions) for fact in raw]
+            facts = [await _fact_answer(fact, questions) for fact in raw]
         except RefusedAnswer as exc:
-            return JSONResponse({"message": str(exc)}, status_code=400)
+            return _message(400, str(exc))
         except (ValidationError, ValueError, KeyError, TypeError):
-            return JSONResponse(
-                {"message": "Expected a JSON body with a 'facts' list of corrections."},
-                status_code=400,
+            return _message(
+                400, "Expected a JSON body with a 'facts' list of corrections."
             )
-        try:
-            run.corrections = state.correct(facts)
-        except ValueError as exc:
-            return JSONResponse({"message": str(exc)}, status_code=400)
-        return JSONResponse({"run": run.id})
+        corrected = await workspace.answers.correct(run_id, OWNER, facts)
+        return JSONResponse({"run": corrected.job_id})
 
     return app
 
@@ -1266,80 +1217,6 @@ def _option_control(name: FrameworkName, field: str, annotation: object) -> str:
     )
 
 
-async def _drive(
-    analyses: Analyses,
-    run: Run,
-    start: Callable[..., Awaitable[PipelineOutcome]],
-) -> None:
-    """Run one analysis to a terminal state, narrating it onto the run's queue.
-
-    ``start`` is the engine call, a fresh analysis or a resumption, still
-    waiting for its ``on_node``. Only a completed run reaches the viewer,
-    because the viewer renders reports. A paused run sends its questions to the
-    form page. A rejection, a bad submission and an internal failure all land
-    back on the form page, where the submitted text is still in the textarea.
-    """
-    try:
-        outcome = await start(on_node=_ticker(run))
-    except EngineInputError as exc:
-        # Raised before any model ran — no sources, too many, or more bytes
-        # than this deployment allows. The message is about the caller's input
-        # and is safe to show.
-        await _emit(run, "failed", {"message": str(exc)})
-    except ConfigError as exc:
-        # A resumed run builds its graph on first use, so a credential that
-        # went bad after startup raises here. The message names a setting and
-        # never its value, and the start route and the diagnostic page show
-        # it to the same local operator.
-        logger.error("run %s could not build its runner: %s", run.id, exc)
-        await _emit(
-            run,
-            "failed",
-            {"message": f"This app's configuration is incomplete: {exc}"},
-        )
-    except EngineDeadlineError as exc:
-        # Distinct from the generic failure for the reason
-        # ``jobs.DEADLINE_FAILURE_MESSAGE`` gives: a deadline is an operational
-        # fact about this deployment's bounds, and saying so beats sending the
-        # submitter to retry an identical description against an identical
-        # budget. It names no node and no model — those are in the server log.
-        logger.warning("run %s hit the deployment's time budget", run.id)
-        await _emit(run, "failed", {"message": str(exc)})
-    except Exception:
-        # The traceback goes to the server log and never to the browser (A10).
-        logger.exception("run %s failed in the pipeline", run.id)
-        await _emit(
-            run, "failed", {"message": "The analysis failed. Check the server log."}
-        )
-    else:
-        if isinstance(outcome, PipelineCompleted):
-            run.report = outcome.report
-            # Every finished report can be answered: its open facts need no
-            # catalog, and its link questions need the one it carries.
-            run.checkpoint = Checkpoint(
-                system_model=outcome.report.system_model,
-                assertions=outcome.report.assertions,
-            )
-            await _emit(run, "done", {"url": f"/report/{run.id}"})
-        elif isinstance(outcome, PipelineAwaiting):
-            run.checkpoint = outcome.checkpoint
-            await _emit(run, "questions", paused_payload(run, run.state()))
-        else:
-            await _emit(
-                run,
-                "rejected",
-                {
-                    "issues": [
-                        {"code": issue.code, "message": issue.message}
-                        for issue in outcome.issues
-                    ]
-                },
-            )
-    finally:
-        analyses.release()
-        await run.events.put(("", ""))  # sentinel: closes the SSE stream
-
-
 _SKIPS: TypeAdapter[list[SkipKey]] = TypeAdapter(
     Annotated[list[SkipKey], Field(max_length=MAX_SKIPS)]
 )
@@ -1357,66 +1234,91 @@ class RefusedAnswer(Exception):
     """One fact answer the page sent does not parse; the message names its question."""
 
 
-def _fact_answer(raw: object, questions: QuestionSet) -> FactAnswer:
+def _questions_of(
+    workspace: Workspace, run_id: str
+) -> Callable[[], Awaitable[QuestionSet]]:
+    """The run's Question Set, read only where a refusal needs a label."""
+
+    async def read() -> QuestionSet:
+        answerable = await workspace.answers.answerable(run_id, OWNER)
+        return answerable.state().questions
+
+    return read
+
+
+async def _fact_answer(
+    raw: object, questions: Callable[[], Awaitable[QuestionSet]]
+) -> FactAnswer:
     """The answer, or a :class:`RefusedAnswer` that names the question it answers.
 
     The message is the validator's own, which names the submitter's choices,
-    so it is safe to show.
+    so it is safe to show. The questions are read only for that message.
     """
     try:
         return FactAnswer.model_validate(raw)
     except ValidationError as error:
         reason = error.errors()[0]["msg"].removeprefix("Value error, ")
-        known = questions.asked | {q.key for q, _ in questions.answered_early}
         key = raw.get("key") if isinstance(raw, dict) else None
         parts = tuple(key) if isinstance(key, list) else ()
-        label = (
-            fact_label(parts, questions.model)
-            if all(isinstance(part, str) for part in parts) and parts in known
-            else None
-        )
+        label = None
+        if all(isinstance(part, str) for part in parts):
+            try:
+                asked = await questions()
+            except (NoSuchJob, NotCompleted, Withheld):
+                asked = None
+            if asked is not None:
+                known = asked.asked | {q.key for q, _ in asked.answered_early}
+                if parts in known:
+                    label = fact_label(parts, asked.model)
         lead = "An answer" if label is None else f'The answer to "{label}"'
         raise RefusedAnswer(f"{lead} was refused: {reason}") from None
 
 
-def paused_payload(run: Run, state: AnswerState) -> dict[str, object]:
-    """What the form page shows for one round at the pause (ADR 0053).
+_POLL_SECONDS = 0.2
 
-    The Question Set's own payload, as ``/v1`` serves it, with the run and
-    the revision a save names. A run an amendment started also lists the
-    carried answers its questions do not take (ADR 0072).
+
+def _frame(event: str, data: dict[str, object]) -> str:
+    return f"event: {event}\ndata: {json.dumps(data)}\n\n"
+
+
+async def _stream(workspace: Workspace, run_id: str) -> AsyncIterator[str]:
+    """Every event the store records for the job, as it records them, then
+    one frame for how it ended.
+
+    The store's event log is the one record of the run. The page acts on its
+    end, so the last frame carries what the page shows for it: the questions
+    a pause asks, where a report is, why a description was refused, or why a
+    run failed.
     """
-    questions = state.questions
-    return (
-        questions.to_json()
-        | state.carried.dropped_json(questions.model)
-        | {"run": run.id, "revision": run.revision}
-    )
-
-
-def _ticker(run: Run):
-    """The ``on_node`` callback: one SSE tick per completed node."""
-
-    async def on_node(node: str) -> None:
-        # Node names go out verbatim as graph.py emits them. A prettifying
-        # table here would be a second place for them to drift from the graph.
-        run.completed_steps.append(node)
-        await run.events.put(("node", json.dumps({"node": node})))
-
-    return on_node
-
-
-async def _emit(run: Run, event: str, data: dict) -> None:
-    await run.events.put((event, json.dumps(data)))
-
-
-async def _stream(run: Run) -> AsyncIterator[str]:
-    """Drain the run's queue as server-sent events until the sentinel."""
+    store = workspace.store
+    seen = 0
     while True:
-        event, data = await run.events.get()
-        if not event:
+        progress = await store.events_after(run_id, seen)
+        if progress is None:
             return
-        yield f"event: {event}\ndata: {data}\n\n"
+        status, events = progress
+        for event in events:
+            seen = event.seq
+            yield event.sse_frame()
+        if status in TERMINAL_STATUSES:
+            break
+        await asyncio.sleep(_POLL_SECONDS)
+    record = await store.owned(run_id, OWNER)
+    if record is None:
+        return
+    if status == "awaiting-answers":
+        payload = await workspace.answers.questions(run_id, OWNER)
+        yield _frame("questions", {"run": run_id} | payload)
+    elif status == "completed":
+        yield _frame("done", {"url": f"/report/{run_id}"})
+    elif status == "rejected":
+        issues = [
+            {"code": issue.code, "message": issue.message}
+            for issue in record.validation_issues
+        ]
+        yield _frame("rejected", {"issues": issues})
+    else:
+        yield _frame("failed", {"message": record.error or "The analysis failed."})
 
 
 def _tier_lines(tiers: ModelTierConfig | None) -> str:
