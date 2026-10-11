@@ -97,3 +97,40 @@ because an empty list says "none" and a missing field says nothing.
 
 **`supersedes`** names the row this one corrects. The corrected row stays in
 the ledger — it is the record of what was wrong.
+
+## The fields of the improvement loop
+
+Each of these is `null` or empty unless the experiment needs it. `--record`
+reads them against the audit's grants before it appends the row, and
+`admit` in `evals/harness/audit.py` holds every rule below.
+
+**`candidate`** is the change a candidate experiment made, on its own branch:
+
+```json
+"candidate": {
+  "branch": "qa/QA-2026-10-11-01-E4",
+  "commit": "<the candidate's commit>",
+  "verdict": "reverted",
+  "reason": "the lane still cited the neighbouring element on 3 of 3 replays"
+}
+```
+
+`verdict` is `kept` only where `outcome` is `supported`. Any other outcome
+means the change did not work, so it is `reverted`, and `reason` says why.
+`--record` fills `paths` from `git diff` between `revision` and `commit`, and
+refuses a candidate that touches a reference answer, a ruling, a vote, a
+Baseline, the scorer or a gate (`PROTECTED`). Record the candidate while its
+commit still exists.
+
+**`ticket`** is the extension ticket. A `blocked` row carries one. Its fields
+are the sections of `templates/extension-ticket.md`.
+
+**`resolves`** names the `blocked` row that an extension unblocks. Only the
+row of the extension's own candidate change sets it. The resumed experiment
+names the blocked row as `parent`.
+
+**`rule`** is a diagnostic rule. See `references/memory-and-extension.md`.
+
+**`rerun_reason`** says why this experiment repeats another audit's
+conclusion that still reads `current`. `--record` refuses the row without it.
+A row in your own audit's series is not a rerun.

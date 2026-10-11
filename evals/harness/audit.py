@@ -46,19 +46,31 @@ because they answer the same problems:
 Staleness is computed and never asserted. ``stale`` means one of the paths the
 record names changed between its revision and the tree now; it is a reason to
 re-read the record, not a verdict that the record is wrong.
+
+## The improvement loop's limits
+
+An audit that changes code needs limits that hold whoever writes the row. A
+:class:`Grant` records what the user authorised, in their words, and the
+grants of one audit add up. :func:`admit` is the one reader of those limits:
+``--record`` calls it before it appends, and it refuses a row that spends past
+the grants, makes a change no grant allows, touches a :data:`PROTECTED` path,
+extends past depth one, or repeats another audit's current conclusion without
+a reason. A failed candidate kept rather than reverted is refused at
+:func:`parse`, because that needs no other row to decide.
 """
 
 from __future__ import annotations
 
 import argparse
 import json
+import math
 import subprocess
 import sys
 from collections.abc import Iterable, Iterator, Mapping, Sequence
-from dataclasses import dataclass, field
+from dataclasses import asdict, dataclass, field, fields, replace
 from pathlib import Path
 from types import MappingProxyType
-from typing import Any, Literal
+from typing import Any, Literal, TypeGuard
 
 from analysis_service.claims import FrameworkName
 from analysis_service.frameworks import PACKAGES
@@ -143,6 +155,134 @@ class Condition:
     #: Where the outcome was read, one of the condition's
     #: :data:`CONDITION_STAGES`.
     stage: Stage
+
+
+Verdict = Literal["kept", "reverted"]
+Belongs = Literal["skill", "harness", "instrumentation", "scorer", "references"]
+Mode = Literal["audit", "implement", "extend"]
+
+#: What a grant lets an audit do, narrowest first. ``implement`` makes candidate
+#: changes; ``extend`` also builds a missing capability to unblock an
+#: experiment. Each mode includes the ones before it.
+MODES: tuple[Mode, ...] = ("audit", "implement", "extend")
+
+#: Where an extension ticket says the missing capability belongs. A missing
+#: measurement fixed in the wrong place changes what every past number meant.
+BELONGS: tuple[Belongs, ...] = (
+    "skill",
+    "harness",
+    "instrumentation",
+    "scorer",
+    "references",
+)
+
+#: The paths a candidate change may never touch, each with the reason. A
+#: candidate that edits a reference answer, a human ruling or a gate can make
+#: any output pass, so the ledger refuses its row. A correction to one of these
+#: is proposed on its own, with the before and after scores kept.
+PROTECTED: Mapping[str, str] = MappingProxyType(
+    {
+        "evals/corpus/": "reference answers, rulings, sources and holdout flags",
+        "evals/answers/": "signed answer sets",
+        "evals/review/": "human votes and submissions",
+        "evals/calibration_labels/": "human labels",
+        "evals/baselines/": "sealed Baselines",
+        "evals/experiments/": "the experiment ledger, which only --record appends to",
+        "evals/harness/scorer.py": "the scorer",
+        "evals/harness/promotion.py": "the promotion gates",
+        ".github/": "the CI gates",
+        ".githooks/": "the push gates",
+    }
+)
+
+
+def protected(paths: Iterable[str]) -> tuple[str, ...]:
+    """Each of ``paths`` that :data:`PROTECTED` covers, with the reason."""
+    return tuple(
+        f"{path} ({reason})"
+        for path in paths
+        for prefix, reason in PROTECTED.items()
+        if path == prefix or (prefix.endswith("/") and path.startswith(prefix))
+    )
+
+
+@dataclass(frozen=True)
+class Candidate:
+    """One candidate change an experiment made, and what became of it.
+
+    A candidate is one lever on one branch. A change that did not work is
+    reverted, and the row keeps the reason, so the next audit does not try it
+    again.
+    """
+
+    branch: str
+    commit: str
+    #: ``kept`` only where the experiment was ``supported``.
+    verdict: Verdict
+    #: Why it was kept or reverted. Required for a revert.
+    reason: str
+    #: The paths the change touched, from ``git diff`` between the row's
+    #: ``revision`` and ``commit``. ``--record`` fills it.
+    paths: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True)
+class Ticket:
+    """The extension ticket a ``blocked`` row carries.
+
+    Its fields are the sections of ``templates/extension-ticket.md``, and
+    :func:`render_ticket` writes the issue body from them.
+    """
+
+    title: str
+    question: str
+    evidence: str
+    missing: str
+    alternatives: str
+    belongs: Belongs
+    change: str
+    acceptance: str
+    cost: str
+    risk: str
+
+
+@dataclass(frozen=True)
+class Rule:
+    """A diagnostic rule distilled from several experiments.
+
+    A row that carries one states the rule's signature in ``signature`` and
+    its smallest intervention in ``intervention``. These are the other three
+    things a rule carries.
+    """
+
+    #: The checks that confirm or refute the suspected mechanism.
+    checks: str
+    #: The remedies that worked, and the conditions where they failed.
+    remedies: str
+    #: Where the rule stops applying, and whether one case or several hold it.
+    limits: str
+    #: The experiments the rule rests on. Each must be on record.
+    supporting: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class Grant:
+    """What the user authorised an audit to do, in their own words.
+
+    The grants of an audit add up. A resumed audit gets a further budget by a
+    new grant, never by an edit to an old one, so every widening has the
+    user's words beside it.
+    """
+
+    audit_id: str
+    recorded: str
+    #: The user's words, quoted. A grant nobody said is not a grant.
+    words: str
+    mode: Mode
+    #: Dollars added by this grant. Zero is a grant of no paid inference.
+    budget_usd: float
+    #: Improvement attempts added by this grant.
+    attempts: int
 
 
 @dataclass(frozen=True)
@@ -315,6 +455,19 @@ class Experiment:
     #: The diagnostic condition, for an experiment in the three-condition
     #: diagnostic, and ``None`` for every other experiment.
     condition: Condition | None = None
+    #: The candidate change, for an experiment that made one.
+    candidate: Candidate | None = None
+    #: The extension ticket. Every ``blocked`` row recorded through
+    #: ``--record`` carries one.
+    ticket: Ticket | None = None
+    #: The diagnostic rule, for a row that distils one.
+    rule: Rule | None = None
+    #: The ``blocked`` row this extension unblocks. Set only on the row that
+    #: records the extension's own candidate change.
+    resolves: str | None = None
+    #: Why this repeats a current conclusion from another audit. Required
+    #: where one exists, so a rerun is never silent.
+    rerun_reason: str = ""
 
     def to_json(self) -> dict[str, Any]:
         """The row as the ledger file carries it."""
@@ -349,6 +502,15 @@ class Experiment:
                 "exposure": self.condition.exposure,
                 "stage": self.condition.stage,
             },
+            "candidate": None
+            if self.candidate is None
+            else {**asdict(self.candidate), "paths": list(self.candidate.paths)},
+            "ticket": None if self.ticket is None else asdict(self.ticket),
+            "rule": None
+            if self.rule is None
+            else {**asdict(self.rule), "supporting": list(self.rule.supporting)},
+            "resolves": self.resolves,
+            "rerun_reason": self.rerun_reason,
         }
 
 
@@ -393,6 +555,23 @@ def parse(row: Mapping[str, Any], *, source: str) -> Experiment:
             f"{where}: framework {framework!r} is not one of"
             f" {', '.join(sorted(PACKAGES))}"
         )
+    for cost in ("estimated_usd", "actual_usd"):
+        if row.get(cost) is not None and not _is_dollars(row[cost]):
+            raise ExperimentError(
+                f"{where}: {cost} {row[cost]!r} is not a dollar amount; a negative"
+                " cost would widen the audit's budget"
+            )
+    candidate = _candidate(row.get("candidate"), where)
+    if candidate is not None and candidate.verdict == "kept" and outcome != "supported":
+        raise ExperimentError(
+            f"{where}: a {outcome} candidate is kept; a change that did not"
+            " work is reverted, and the row says why"
+        )
+    if row.get("resolves") and candidate is None:
+        raise ExperimentError(
+            f"{where}: resolves {row['resolves']!r} with no candidate;"
+            " an extension is a change and records one"
+        )
     return Experiment(
         experiment_id=row["experiment_id"],
         audit_id=row["audit_id"],
@@ -415,7 +594,95 @@ def parse(row: Mapping[str, Any], *, source: str) -> Experiment:
         supersedes=row.get("supersedes"),
         reconsider_when=row.get("reconsider_when", ""),
         condition=_condition(row.get("condition"), where),
+        candidate=candidate,
+        ticket=_ticket(row.get("ticket"), where),
+        rule=_rule(row.get("rule"), where),
+        resolves=row.get("resolves"),
+        rerun_reason=row.get("rerun_reason", ""),
     )
+
+
+def _is_dollars(value: object) -> TypeGuard[float]:
+    """Whether ``value`` is a finite amount of zero or more, and not a bool."""
+    return (
+        isinstance(value, int | float)
+        and not isinstance(value, bool)
+        and math.isfinite(value)
+        and value >= 0
+    )
+
+
+def _block(held: object, block: str, where: str) -> dict[str, Any] | None:
+    """One optional object of a row: ``None`` where absent, refused where not an object."""
+    if held is None:
+        return None
+    if not isinstance(held, dict):
+        raise ExperimentError(f"{where}: {block} is not an object")
+    return held
+
+
+def _texts(
+    held: Mapping[str, Any], names: Sequence[str], block: str, where: str
+) -> dict[str, str]:
+    """The named strings of one block, refusing the first that is missing or blank."""
+    for name in names:
+        if not isinstance(held.get(name), str) or not held[name].strip():
+            raise ExperimentError(f"{where}: {block} has no {name}")
+    return {name: held[name] for name in names}
+
+
+def _strings(
+    held: Mapping[str, Any], name: str, block: str, where: str
+) -> tuple[str, ...]:
+    value = held.get(name, [])
+    if not isinstance(value, list) or not all(isinstance(v, str) for v in value):
+        raise ExperimentError(f"{where}: {block}: {name} is not a list of strings")
+    return tuple(value)
+
+
+def _candidate(row: object, where: str) -> Candidate | None:
+    held = _block(row, "candidate", where)
+    if held is None:
+        return None
+    texts = _texts(held, ("branch", "commit"), "candidate", where)
+    verdict = held.get("verdict")
+    if verdict not in ("kept", "reverted"):
+        raise ExperimentError(
+            f"{where}: candidate verdict {verdict!r} is not kept or reverted"
+        )
+    reason = held.get("reason") or ""
+    if verdict == "reverted" and not reason.strip():
+        raise ExperimentError(f"{where}: a reverted candidate has no reason")
+    return Candidate(
+        **texts,
+        verdict=verdict,
+        reason=reason,
+        paths=_strings(held, "paths", "candidate", where),
+    )
+
+
+def _ticket(row: object, where: str) -> Ticket | None:
+    held = _block(row, "ticket", where)
+    if held is None:
+        return None
+    texts = _texts(held, [one.name for one in fields(Ticket)], "ticket", where)
+    if texts["belongs"] not in BELONGS:
+        raise ExperimentError(
+            f"{where}: ticket belongs {texts['belongs']!r} is not one of"
+            f" {', '.join(BELONGS)}"
+        )
+    return Ticket(**texts)  # type: ignore[arg-type]
+
+
+def _rule(row: object, where: str) -> Rule | None:
+    held = _block(row, "rule", where)
+    if held is None:
+        return None
+    texts = _texts(held, ("checks", "remedies", "limits"), "rule", where)
+    supporting = _strings(held, "supporting", "rule", where)
+    if not supporting:
+        raise ExperimentError(f"{where}: a rule names no supporting experiment")
+    return Rule(**texts, supporting=supporting)
 
 
 def _condition(held: object, where: str) -> Condition | None:
@@ -514,6 +781,7 @@ def relevant(
     signature: str = "",
     phase: Phase | None = None,
     framework: FrameworkName | None = None,
+    audit_id: str = "",
 ) -> tuple[Experiment, ...]:
     """The prior experiments an audit must read before it proposes anything.
 
@@ -526,10 +794,12 @@ def relevant(
     Superseded rows are kept — a correction says what was wrong, and dropping
     the row it corrects loses that — and :func:`superseded` marks them.
 
+    ``audit_id`` matches every row of one audit, which is what a resume reads.
+
     With no argument this returns everything, which is what an audit opening a
     cold ledger wants.
     """
-    if not signature and phase is None and framework is None:
+    if not signature and phase is None and framework is None and not audit_id:
         return tuple(experiments)
     return tuple(
         one
@@ -537,6 +807,7 @@ def relevant(
         if (signature and one.signature == signature)
         or (phase and one.phase == phase)
         or (framework and one.framework in (framework, None))
+        or (audit_id and one.audit_id == audit_id)
     )
 
 
@@ -599,6 +870,33 @@ def changed_since(revision: str, root: Path | None = None) -> tuple[str, ...] | 
     return tuple(line for line in done.stdout.splitlines() if line)
 
 
+def paths_between(
+    base: str, commit: str, root: Path | None = None
+) -> tuple[str, ...] | None:
+    """Every path ``commit`` changed against ``base``, or ``None`` where git cannot say."""
+    cwd = str(root if root is not None else REPO_ROOT)
+    try:
+        done = subprocess.run(
+            # Without renames, a file moved out of a protected path names
+            # both ends rather than only the new one.
+            [
+                "git",
+                "diff",
+                "--name-only",
+                "--no-renames",
+                current_commit(base),
+                commit,
+            ],
+            cwd=cwd,
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+    except (OSError, subprocess.CalledProcessError):
+        return None
+    return tuple(line for line in done.stdout.splitlines() if line)
+
+
 @dataclass
 class Lookup:
     """One prior experiment beside what the tree now says about it."""
@@ -613,6 +911,7 @@ def lookup(
     signature: str = "",
     phase: Phase | None = None,
     framework: FrameworkName | None = None,
+    audit_id: str = "",
     directory: Path | None = None,
     root: Path | None = None,
 ) -> list[Lookup]:
@@ -625,7 +924,11 @@ def lookup(
     experiments = load(directory)
     corrected = superseded(experiments)
     matches = relevant(
-        experiments, signature=signature, phase=phase, framework=framework
+        experiments,
+        signature=signature,
+        phase=phase,
+        framework=framework,
+        audit_id=audit_id,
     )
     diffs: dict[str, tuple[str, ...] | None] = {}
     found = []
@@ -646,6 +949,269 @@ def lookup(
             )
         )
     return found
+
+
+def _grants_dir(directory: Path | None) -> Path:
+    """Grants sit beside the rows, one file per audit, out of :func:`load`'s glob."""
+    return (EXPERIMENTS_DIR if directory is None else directory) / "grants"
+
+
+def parse_grant(row: Mapping[str, Any], *, source: str) -> Grant:
+    """One grant, checked before it is believed."""
+    where = f"{source}: grant"
+    texts = _texts(row, ("audit_id", "recorded", "words"), "grant", where)
+    mode = row.get("mode")
+    if mode not in MODES:
+        raise ExperimentError(
+            f"{where}: mode {mode!r} is not one of {', '.join(MODES)}"
+        )
+    budget = row.get("budget_usd")
+    if not _is_dollars(budget):
+        raise ExperimentError(f"{where}: budget_usd {budget!r} is not a dollar amount")
+    attempts = row.get("attempts")
+    if isinstance(attempts, bool) or not isinstance(attempts, int) or attempts < 0:
+        raise ExperimentError(f"{where}: attempts {attempts!r} is not a count")
+    return Grant(**texts, mode=mode, budget_usd=float(budget), attempts=attempts)
+
+
+def load_grants(audit_id: str, directory: Path | None = None) -> tuple[Grant, ...]:
+    """Every grant one audit holds, oldest first. None is a grant of nothing."""
+    path = _grants_dir(directory) / f"{audit_id}.jsonl"
+    if not path.is_file():
+        return ()
+    lines = path.read_text("utf-8").splitlines()
+    grants = tuple(
+        parse_grant(json.loads(line), source=f"{path.name}:{number}")
+        for number, line in enumerate(lines, start=1)
+        if line.strip()
+    )
+    for one in grants:
+        if one.audit_id != audit_id:
+            raise ExperimentError(
+                f"{path.name}: holds a grant for {one.audit_id!r}, not {audit_id!r}"
+            )
+    return grants
+
+
+def append_grant(grant: Grant, directory: Path | None = None) -> Path:
+    """Add one grant to its audit's file. Append-only, like the rows."""
+    root = _grants_dir(directory)
+    root.mkdir(parents=True, exist_ok=True)
+    path = root / f"{grant.audit_id}.jsonl"
+    with path.open("a", encoding="utf-8") as handle:
+        handle.write(json.dumps(asdict(grant), sort_keys=True) + "\n")
+    return path
+
+
+@dataclass(frozen=True)
+class Standing:
+    """What one audit holds and has used: the reading a resume starts from."""
+
+    audit_id: str
+    #: How many grants the audit holds. None is a grant of nothing.
+    grants: int
+    #: The widest mode any grant gave, or ``audit`` where none did.
+    mode: Mode
+    budget_usd: float
+    attempts: int
+    spent_usd: float
+    attempts_used: int
+    #: ``blocked`` rows that no extension has resolved yet.
+    open_blockers: tuple[str, ...]
+    #: Each resolved blocker, with the extension that resolved it and the rows
+    #: that resumed it.
+    resolved: Mapping[str, tuple[str, tuple[str, ...]]]
+
+
+def _cost(experiment: Experiment) -> float:
+    """What a row counts against its budget: the actual cost, else the estimate.
+
+    An estimate with no actual is a reservation, so a run that never reported
+    its usage still counts.
+    """
+    if experiment.actual_usd is not None:
+        return experiment.actual_usd
+    return experiment.estimated_usd or 0.0
+
+
+def standing(
+    audit_id: str, ledger: Sequence[Experiment], grants: Sequence[Grant]
+) -> Standing:
+    """The grants of one audit added up, beside what its rows have used."""
+    rows = [one for one in ledger if one.audit_id == audit_id]
+    mode = max((one.mode for one in grants), key=MODES.index, default=MODES[0])
+    extensions = {one.resolves: one.experiment_id for one in rows if one.resolves}
+    resolved = {
+        blocked: (
+            extension,
+            tuple(one.experiment_id for one in rows if one.parent == blocked),
+        )
+        for blocked, extension in extensions.items()
+    }
+    return Standing(
+        audit_id=audit_id,
+        grants=len(grants),
+        mode=mode,
+        budget_usd=sum(one.budget_usd for one in grants),
+        attempts=sum(one.attempts for one in grants),
+        spent_usd=sum(_cost(one) for one in rows),
+        attempts_used=sum(
+            1 for one in rows if one.candidate is not None and one.resolves is None
+        ),
+        open_blockers=tuple(
+            one.experiment_id
+            for one in rows
+            if one.outcome == "blocked" and one.experiment_id not in extensions
+        ),
+        resolved=MappingProxyType(resolved),
+    )
+
+
+def _raised_by_an_extension(
+    experiment: Experiment, by_id: Mapping[str, Experiment]
+) -> bool:
+    """Whether any row up ``experiment``'s parent chain is an extension."""
+    seen: set[str] = set()
+    current: Experiment | None = experiment
+    while current is not None and current.experiment_id not in seen:
+        if current.resolves:
+            return True
+        seen.add(current.experiment_id)
+        current = by_id.get(current.parent) if current.parent else None
+    return False
+
+
+def admit(
+    new: Experiment,
+    ledger: Sequence[Experiment],
+    grants: Sequence[Grant],
+    prior: Sequence[Lookup] = (),
+) -> None:
+    """Refuse a new row that widens what the audit was granted, or hides a rerun.
+
+    The one reader of the audit's limits. ``--record`` calls it before it
+    appends, so a limit holds whoever writes the row:
+
+    * the audit's spend, the new row's included, stays inside its grants;
+    * a candidate change needs an ``implement`` grant, an extension needs
+      ``extend``, and improvement attempts stay inside the granted count;
+    * a candidate touches no :data:`PROTECTED` path;
+    * an extension resolves one open ``blocked`` row of its own audit, and a
+      blocker an extension raised gets no further extension;
+    * a ``blocked`` row carries its extension ticket;
+    * a rule rests on experiments that are on record;
+    * a repeat of another audit's current conclusion says why it reran.
+
+    ``prior`` is :func:`lookup` for the new row's signature; the git reading
+    stays at the edge so a test can name it.
+    """
+    where = new.experiment_id
+    by_id = {one.experiment_id: one for one in ledger}
+    held = standing(new.audit_id, ledger, grants)
+
+    spent = held.spent_usd + _cost(new)
+    if spent > held.budget_usd + 1e-9:
+        raise ExperimentError(
+            f"{where}: the audit would spend ${spent:.4f} of ${held.budget_usd:.4f}"
+            " granted; a further amount is a new grant in the user's words"
+        )
+    if new.candidate is not None:
+        needed: Mode = "extend" if new.resolves else "implement"
+        if MODES.index(held.mode) < MODES.index(needed):
+            raise ExperimentError(
+                f"{where}: a {'extension' if new.resolves else 'candidate change'}"
+                f" needs an {needed!r} grant; {new.audit_id} holds {held.mode!r}"
+            )
+        if new.resolves is None and held.attempts_used >= held.attempts:
+            raise ExperimentError(
+                f"{where}: {new.audit_id} has used {held.attempts_used} of"
+                f" {held.attempts} granted attempts"
+            )
+        touched = protected(new.candidate.paths)
+        if touched:
+            raise ExperimentError(
+                f"{where}: the candidate touches {'; '.join(touched)}. Propose"
+                " that correction on its own, with the before and after scores"
+            )
+    if new.resolves:
+        blocked = by_id.get(new.resolves)
+        if (
+            blocked is None
+            or blocked.audit_id != new.audit_id
+            or blocked.outcome != "blocked"
+        ):
+            raise ExperimentError(
+                f"{where}: resolves {new.resolves!r}, which is not a blocked row"
+                f" of {new.audit_id}"
+            )
+        if new.resolves in held.resolved:
+            raise ExperimentError(
+                f"{where}: {new.resolves} is already resolved by"
+                f" {held.resolved[new.resolves][0]}"
+            )
+        if _raised_by_an_extension(blocked, by_id):
+            raise ExperimentError(
+                f"{where}: {new.resolves} was raised under an extension, and an"
+                " extension may not trigger another"
+            )
+    if new.outcome == "blocked" and new.ticket is None:
+        raise ExperimentError(
+            f"{where}: a blocked row carries its extension ticket"
+            " (templates/extension-ticket.md)"
+        )
+    if new.parent and new.parent not in by_id:
+        raise ExperimentError(f"{where}: parent {new.parent!r} is not on record")
+    if new.rule is not None:
+        missing = [one for one in new.rule.supporting if one not in by_id]
+        if missing:
+            raise ExperimentError(
+                f"{where}: the rule rests on {', '.join(missing)}, not on record"
+            )
+    repeated = [
+        one.experiment.experiment_id
+        for one in prior
+        if one.experiment.audit_id != new.audit_id
+        and one.staleness.state == "current"
+        and not one.superseded
+    ]
+    if repeated and not new.rerun_reason.strip():
+        raise ExperimentError(
+            f"{where}: {', '.join(repeated)} already answer this signature and"
+            " read current; say why this reruns them in rerun_reason"
+        )
+
+
+def render_ticket(experiment: Experiment) -> tuple[str, str]:
+    """The issue title and body for a ``blocked`` row's extension ticket."""
+    ticket = experiment.ticket
+    if ticket is None:
+        raise ExperimentError(f"{experiment.experiment_id}: carries no ticket")
+    # The order of ``templates/extension-ticket.md``, which a test holds.
+    sections = (
+        ("The blocked question", ticket.question),
+        ("Evidence", ticket.evidence),
+        ("The missing capability", ticket.missing),
+        ("Alternatives checked", ticket.alternatives),
+        ("Where the change belongs", ticket.belongs),
+        ("The smallest change", ticket.change),
+        ("Acceptance", ticket.acceptance),
+        ("Cost", ticket.cost),
+        ("Risk and rollback", ticket.risk),
+    )
+    lines: list[str] = []
+    for heading, text in sections:
+        lines += [f"## {heading}", "", text, ""]
+    lines += [
+        "## Resume",
+        "",
+        (
+            f"Audit `{experiment.audit_id}`, experiment"
+            f" `{experiment.experiment_id}` at `{experiment.revision}`. An"
+            f" extension records a row with `resolves: {experiment.experiment_id}`,"
+            " and the resumed experiment names it as `parent`."
+        ),
+    ]
+    return ticket.title, "\n".join(lines)
 
 
 @dataclass
@@ -690,7 +1256,41 @@ def render(found: Sequence[Lookup]) -> Report:
             report.lines.append(f"    changed:   {', '.join(one.staleness.changed)}")
         if experiment.reconsider_when:
             report.lines.append(f"    revisit:   {experiment.reconsider_when}")
+        if experiment.rerun_reason:
+            report.lines.append(f"    reran:     {experiment.rerun_reason}")
+        if experiment.candidate is not None:
+            report.lines.append(
+                f"    candidate: {experiment.candidate.verdict}"
+                f" {experiment.candidate.branch} @ {experiment.candidate.commit}"
+                f"{': ' + experiment.candidate.reason if experiment.candidate.reason else ''}"
+            )
+        if experiment.resolves:
+            report.lines.append(f"    resolves:  {experiment.resolves}")
+        if experiment.rule is not None:
+            report.lines.append(f"    rule:      checks: {experiment.rule.checks}")
+            report.lines.append(f"               remedies: {experiment.rule.remedies}")
+            report.lines.append(f"               limits: {experiment.rule.limits}")
+            report.lines.append(
+                f"               rests on: {', '.join(experiment.rule.supporting)}"
+            )
     return report
+
+
+def render_standing(held: Standing) -> Iterator[str]:
+    """One audit's grants beside what it has used, for a resume to start from."""
+    if not held.grants:
+        yield f"{held.audit_id}: no grant on record, so mode audit and $0 to spend"
+        yield f"    spent:     ${held.spent_usd:.4f}"
+    else:
+        yield f"{held.audit_id}: mode {held.mode}, {held.grants} grant(s)"
+        yield f"    spent:     ${held.spent_usd:.4f} of ${held.budget_usd:.4f} granted"
+        yield f"    attempts:  {held.attempts_used} of {held.attempts} granted"
+    yield f"    blocked:   {', '.join(held.open_blockers) or 'none open'}"
+    for blocked, (extension, resumed) in held.resolved.items():
+        yield (
+            f"    resolved:  {blocked} by {extension};"
+            f" resumed by {', '.join(resumed) or 'nothing yet'}"
+        )
 
 
 def phase_table() -> Iterator[str]:
@@ -723,6 +1323,26 @@ def arguments(parser: argparse.ArgumentParser) -> None:
         " matches every package.",
     )
     parser.add_argument(
+        "--audit",
+        default="",
+        metavar="AUDIT_ID",
+        help="every row of one audit, after its grants and what it has used:"
+        " the reading a resume starts from",
+    )
+    parser.add_argument(
+        "--grant",
+        default=None,
+        metavar="FILE",
+        help="a JSON file holding one grant to append: the user's words, the"
+        " mode, and the dollars and attempts it adds",
+    )
+    parser.add_argument(
+        "--ticket",
+        default=None,
+        metavar="EXPERIMENT_ID",
+        help="print the extension ticket of one blocked row as an issue title and body",
+    )
+    parser.add_argument(
         "--record",
         default=None,
         metavar="FILE",
@@ -732,26 +1352,69 @@ def arguments(parser: argparse.ArgumentParser) -> None:
     )
 
 
+def record(source: Path) -> str:
+    """Check one row from ``source`` against the ledger and its grants, then append it.
+
+    A candidate's paths come from git, not from the row, so the protected-path
+    check reads what the change did rather than what its author listed.
+    """
+    experiment = parse(json.loads(source.read_text("utf-8")), source=str(source))
+    ledger = load()
+    if experiment.experiment_id in {one.experiment_id for one in ledger}:
+        raise ExperimentError(
+            f"{source}: experiment_id {experiment.experiment_id!r} is already on record"
+        )
+    if experiment.candidate is not None:
+        paths = paths_between(experiment.revision, experiment.candidate.commit)
+        if paths is None:
+            raise ExperimentError(
+                f"{source}: git cannot diff {experiment.candidate.commit} against"
+                f" {experiment.revision}; record a candidate while its commit exists"
+            )
+        experiment = replace(
+            experiment, candidate=replace(experiment.candidate, paths=paths)
+        )
+    admit(
+        experiment,
+        ledger,
+        load_grants(experiment.audit_id),
+        lookup(signature=experiment.signature),
+    )
+    return f"recorded {experiment.experiment_id} in {append(experiment)}"
+
+
 def command_experiments(args: argparse.Namespace) -> int:
     """Read the experiment ledger, or append one row to it. No credentials."""
     try:
-        if args.record:
-            row = json.loads(Path(args.record).read_text("utf-8"))
-            experiment = parse(row, source=args.record)
-            known = {one.experiment_id for one in load()}
-            if experiment.experiment_id in known:
-                raise ExperimentError(
-                    f"{args.record}: experiment_id"
-                    f" {experiment.experiment_id!r} is already on record"
-                )
-            print(f"recorded {experiment.experiment_id} in {append(experiment)}")
+        if args.grant:
+            grant = parse_grant(
+                json.loads(Path(args.grant).read_text("utf-8")), source=args.grant
+            )
+            print(f"granted {grant.audit_id} in {append_grant(grant)}")
             return 0
+        if args.ticket:
+            found = {one.experiment_id: one for one in load()}
+            if args.ticket not in found:
+                raise ExperimentError(f"{args.ticket}: not on record")
+            title, body = render_ticket(found[args.ticket])
+            print(f"{title}\n\n{body}")
+            return 0
+        if args.record:
+            print(record(Path(args.record)))
+            return 0
+        if args.audit:
+            for line in render_standing(
+                standing(args.audit, load(), load_grants(args.audit))
+            ):
+                print(line)
+            print()
         print(
             render(
                 lookup(
                     signature=args.signature,
                     phase=args.phase,
                     framework=args.framework,
+                    audit_id=args.audit,
                 )
             )
         )

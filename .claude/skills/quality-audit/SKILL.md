@@ -46,6 +46,27 @@ default, and you print the effective settings before you start.
 Print these back as a short block before step 1, so a wrong default is caught
 before it costs anything.
 
+**Record each grant.** When the user authorises a budget, implementation,
+extension or attempts, write their words into a grant before you act on it:
+
+```json
+{"audit_id": "QA-2026-10-11-01", "recorded": "2026-10-11T09:00:00Z",
+ "words": "<the user's words, quoted>", "mode": "implement",
+ "budget_usd": 5, "attempts": 3}
+```
+
+```bash
+uv run python -m evals.harness.run experiments --grant /tmp/<audit-id>-grant.json
+```
+
+`mode` is `audit`, `implement` or `extend`. Grants add up, and `--record`
+holds each row to their sum. A row that needs more than the grants give is
+refused, so you ask the user, and a yes is a new grant.
+
+**Resume.** `experiments --audit <audit-id>` prints the audit's grants, what
+it has spent, the attempts it has used, its open blockers and every row it
+holds. Start from that.
+
 ## The loop
 
 Work the steps in order. A step that cannot run is a finding, not a reason to
@@ -127,6 +148,13 @@ takes that branch.
 ```bash
 uv run python -m evals.harness.run experiments --record /tmp/<experiment-id>.json
 ```
+
+**Implement mode.** With an `implement` grant, steps 8 and 9 take a candidate
+change. Make one lever on one branch, run the regressions it can reach, and
+record the row with a `candidate` block. A change that did not work is
+reverted, and its row says why. `references/experiment-protocol.md` under
+"Isolation" sets out the branch rules, and `templates/experiment-record.md`
+sets out the fields.
 
 **10. Report.** Use `templates/audit-report.md`. Lead with the ranked table, the
 evidence table and a one-screen summary. Report correctness and empirical

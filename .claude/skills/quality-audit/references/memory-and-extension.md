@@ -60,14 +60,20 @@ row with no `reads` can never be checked and reads `unanchored`.
 ## Diagnostic rules
 
 When the same finding holds across several experiments, distil it into a rule
-and record it as an experiment row whose `intervention` is the rule itself.
-State five things:
+and record it as a row with a `rule` block. The five parts of a rule go in
+these fields:
 
-1. the observable failure signature;
-2. the checks that confirm or refute the suspected mechanism;
-3. the smallest intervention;
-4. the remedies that worked, and the conditions where they failed;
-5. the supporting experiment IDs, and where the rule stops applying.
+1. the observable failure signature: `signature`;
+2. the checks that confirm or refute the suspected mechanism: `rule.checks`;
+3. the smallest intervention: `intervention`;
+4. the remedies that worked, and the conditions where they failed:
+   `rule.remedies`;
+5. the supporting experiment IDs: `rule.supporting`, and where the rule stops
+   applying: `rule.limits`.
+
+`--record` refuses a rule that names no supporting experiment, or names one
+that is not on record. List in `reads` the paths the rule depends on, so the
+rule goes `stale` when one of them changes.
 
 These are evidence-backed heuristics, not truths. Reassess every one after a
 scorer, reference or contract change. One case succeeding is not repeatable
@@ -95,7 +101,10 @@ Every audit names its capability blockers. A blocker is **not** model
 variability, an ordinary bug, a transient failure, an exhausted budget, or a
 disproved hypothesis. It is a question the tooling cannot answer.
 
-Use `templates/extension-ticket.md`. Say where the change belongs — the skill,
+Put the ticket in the `blocked` row's `ticket` block, as
+`templates/extension-ticket.md` sets out. `--record` refuses a `blocked` row
+without one, and `experiments --ticket <experiment-id>` prints the issue. Say
+where the change belongs — the skill,
 the harness, the instrumentation, the scorer, or the reference sets — because a
 missing measurement fixed in the wrong place corrupts the measurement.
 
@@ -117,19 +126,31 @@ necessary step needs fresh paid model output.
 
 ## Authorised extension
 
-Only under an explicit instruction. Then, in order:
+Only under a grant in mode `extend`, which only the user's words give. Then,
+in order:
 
 1. reproduce the blocker and classify it;
 2. check whether the capability already exists under another name;
-3. implement the smallest isolated change;
+3. implement the smallest isolated change, on its own branch;
 4. verify its acceptance fixture and the regressions it can reach;
-5. resume the original blocked experiment;
-6. keep the change only if it resolved the blocker without changing what any
+5. record the extension as a row with a `candidate` block and
+   `resolves: <the blocked row>`;
+6. resume the original experiment as a row with `parent: <the blocked row>`;
+7. keep the change only if it resolved the blocker without changing what any
    existing measurement means.
 
-Bound the depth: an extension may not raise its own authorisation, spend from
-outside the total budget, or trigger a further extension. Extension spend
-counts against the same cap.
+`experiments --audit <audit-id>` prints which blockers are open, which are
+resolved, and which rows resumed them.
+
+`--record` holds the bounds:
+
+- an extension needs an `extend` grant, and an improvement attempt needs
+  `implement`;
+- an extension resolves one open `blocked` row of its own audit, once;
+- a blocker raised under an extension gets no further extension, so the depth
+  is one;
+- extension spend counts against the same grants as the rest of the audit;
+- no candidate, extension or otherwise, touches a `PROTECTED` path.
 
 Never, under any authorisation: loosen an acceptance criterion, edit a
 reference answer or a human ruling to fit an output, expose a holdout answer to
