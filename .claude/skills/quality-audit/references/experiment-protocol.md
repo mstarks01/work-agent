@@ -49,6 +49,9 @@ a report that states a higher claim than its rung has reached is wrong.
 | 4 | a designed run on the shipped route | a downstream gain was measured | yes |
 | 5 | held-out confirmation | the gain holds on material the fix never saw | yes |
 
+Each rung-5 reading spends one of the holdout's `HOLDOUT_READS`, so confirm
+only a gain that rung 4 already measured. Record the read in `holdout_reads`.
+
 A reproduction is not a verification. Rung 1 shows that the defect exists;
 rung 2 shows that the fix removes it. Report both, and never collapse "fix
 verified" into "defect reproduced".
@@ -163,6 +166,7 @@ read, record the ambiguity rather than assuming it away.
 When implementation is authorised:
 
 - one candidate change per branch, and one lever per change;
+- a parity answer for every package in `PACKAGES`;
 - run the regressions the change can reach, and say which;
 - an unsuccessful change is reverted and its row keeps the reason;
 - the skill's own files are candidate changes too, with reviewable diffs.

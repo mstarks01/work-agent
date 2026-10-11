@@ -129,6 +129,24 @@ are the sections of `templates/extension-ticket.md`.
 row of the extension's own candidate change sets it. The resumed experiment
 names the blocked row as `parent`.
 
+`parity` answers for every package in `PACKAGES`, keyed by package:
+
+```json
+"parity": {
+  "stride": "the change: the spoofing lane's exemplar",
+  "asvs": "nothing: no ASVS lane reads the STRIDE exemplars"
+}
+```
+
+"Nothing" is an answer when it says why. `--record` refuses a candidate that
+leaves a package out. A change to code that both packages read is measured on
+each package, or the answer says why one needs no measurement. See
+`docs/agents/framework-parity.md`.
+
+**`holdout_reads`** lists the holdout cases whose figures or outputs the
+experiment read. Every read counts. `--record` refuses a case that is not a
+holdout, and a case already read `HOLDOUT_READS` times.
+
 **`rule`** is a diagnostic rule. See `references/memory-and-extension.md`.
 
 **`rerun_reason`** says why this experiment repeats another audit's

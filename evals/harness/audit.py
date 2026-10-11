@@ -76,6 +76,7 @@ from analysis_service.claims import FrameworkName
 from analysis_service.frameworks import PACKAGES
 from evals.harness.history import current_commit
 from evals.harness.provenance import REPO_ROOT
+from evals.harness.reference import DEFAULT_CORPUS, diagnosable, load_corpus
 
 #: Where the ledger lives: one JSONL file per audit, named by its audit ID.
 #: Per audit rather than one shared file for the reason the vote ledger is per
@@ -206,6 +207,29 @@ def protected(paths: Iterable[str]) -> tuple[str, ...]:
     )
 
 
+#: How many experiments may read a holdout case before it stops being held
+#: out. Every read leaks something about the case into the audit that read
+#: it, so a case read this often is reclassified as a tuned case, and a fresh
+#: holdout is authored in its place (#744).
+HOLDOUT_READS = 3
+
+
+def exposure(ledger: Iterable[Experiment]) -> dict[str, tuple[str, ...]]:
+    """Each holdout case on record, with the experiments that read it, oldest first."""
+    reads: dict[str, list[str]] = {}
+    for one in ledger:
+        for case in one.holdout_reads:
+            reads.setdefault(case, []).append(one.experiment_id)
+    return {case: tuple(ids) for case, ids in reads.items()}
+
+
+def holdout_cases() -> frozenset[str]:
+    """The cases the corpus holds out, read through the one reader of ``holdout``."""
+    return frozenset(
+        case.meta.id for case in load_corpus(DEFAULT_CORPUS) if not diagnosable(case)
+    )
+
+
 @dataclass(frozen=True)
 class Candidate:
     """One candidate change an experiment made, and what became of it.
@@ -224,6 +248,10 @@ class Candidate:
     #: The paths the change touched, from ``git diff`` between the row's
     #: ``revision`` and ``commit``. ``--record`` fills it.
     paths: tuple[str, ...] = ()
+    #: What the change means for each package in ``PACKAGES``, keyed by
+    #: package. "Nothing" is an answer when the row says why; silence is not
+    #: (``docs/agents/framework-parity.md``).
+    parity: Mapping[str, str] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)
@@ -468,6 +496,9 @@ class Experiment:
     #: Why this repeats a current conclusion from another audit. Required
     #: where one exists, so a rerun is never silent.
     rerun_reason: str = ""
+    #: The holdout cases whose figures or outputs this experiment read. Each
+    #: read counts against the case's :data:`HOLDOUT_READS`.
+    holdout_reads: tuple[str, ...] = ()
 
     def to_json(self) -> dict[str, Any]:
         """The row as the ledger file carries it."""
@@ -511,6 +542,7 @@ class Experiment:
             else {**asdict(self.rule), "supporting": list(self.rule.supporting)},
             "resolves": self.resolves,
             "rerun_reason": self.rerun_reason,
+            "holdout_reads": list(self.holdout_reads),
         }
 
 
@@ -599,6 +631,7 @@ def parse(row: Mapping[str, Any], *, source: str) -> Experiment:
         rule=_rule(row.get("rule"), where),
         resolves=row.get("resolves"),
         rerun_reason=row.get("rerun_reason", ""),
+        holdout_reads=_strings(row, "holdout_reads", "row", where),
     )
 
 
@@ -653,11 +686,19 @@ def _candidate(row: object, where: str) -> Candidate | None:
     reason = held.get("reason") or ""
     if verdict == "reverted" and not reason.strip():
         raise ExperimentError(f"{where}: a reverted candidate has no reason")
+    parity = held.get("parity", {})
+    if not isinstance(parity, dict) or not all(
+        isinstance(answer, str) and answer.strip() for answer in parity.values()
+    ):
+        raise ExperimentError(
+            f"{where}: candidate parity is not a non-blank answer per package"
+        )
     return Candidate(
         **texts,
         verdict=verdict,
         reason=reason,
         paths=_strings(held, "paths", "candidate", where),
+        parity=parity,
     )
 
 
@@ -1086,6 +1127,7 @@ def admit(
     ledger: Sequence[Experiment],
     grants: Sequence[Grant],
     prior: Sequence[Lookup] = (),
+    holdouts: frozenset[str] = frozenset(),
 ) -> None:
     """Refuse a new row that widens what the audit was granted, or hides a rerun.
 
@@ -1100,10 +1142,14 @@ def admit(
       blocker an extension raised gets no further extension;
     * a ``blocked`` row carries its extension ticket;
     * a rule rests on experiments that are on record;
-    * a repeat of another audit's current conclusion says why it reran.
+    * a repeat of another audit's current conclusion says why it reran;
+    * a candidate answers for every package in ``PACKAGES``;
+    * a row reads only holdout cases, and none already read
+      :data:`HOLDOUT_READS` times.
 
-    ``prior`` is :func:`lookup` for the new row's signature; the git reading
-    stays at the edge so a test can name it.
+    ``prior`` is :func:`lookup` for the new row's signature and ``holdouts``
+    is :func:`holdout_cases`; both readings stay at the edge so a test can
+    name them.
     """
     where = new.experiment_id
     by_id = {one.experiment_id: one for one in ledger}
@@ -1126,6 +1172,13 @@ def admit(
             raise ExperimentError(
                 f"{where}: {new.audit_id} has used {held.attempts_used} of"
                 f" {held.attempts} granted attempts"
+            )
+        unanswered = sorted(set(PACKAGES) - set(new.candidate.parity))
+        if unanswered:
+            raise ExperimentError(
+                f"{where}: the candidate gives no parity answer for"
+                f" {', '.join(unanswered)}; say what it means for each package,"
+                " even where the answer is nothing"
             )
         touched = protected(new.candidate.paths)
         if touched:
@@ -1166,6 +1219,18 @@ def admit(
         if missing:
             raise ExperimentError(
                 f"{where}: the rule rests on {', '.join(missing)}, not on record"
+            )
+    for case in new.holdout_reads:
+        if case not in holdouts:
+            raise ExperimentError(
+                f"{where}: holdout_reads names {case!r}, which is not a holdout case"
+            )
+        earlier = exposure(ledger).get(case, ())
+        if len(earlier) >= HOLDOUT_READS:
+            raise ExperimentError(
+                f"{where}: {case} was read by {', '.join(earlier)}, which is"
+                f" {HOLDOUT_READS} reads, so it is no longer unseen. Reclassify it"
+                " as a tuned case and author a fresh holdout (#744)"
             )
     repeated = [
         one.experiment.experiment_id
@@ -1266,6 +1331,8 @@ def render(found: Sequence[Lookup]) -> Report:
             )
         if experiment.resolves:
             report.lines.append(f"    resolves:  {experiment.resolves}")
+        if experiment.holdout_reads:
+            report.lines.append(f"    holdouts:  {', '.join(experiment.holdout_reads)}")
         if experiment.rule is not None:
             report.lines.append(f"    rule:      checks: {experiment.rule.checks}")
             report.lines.append(f"               remedies: {experiment.rule.remedies}")
@@ -1274,6 +1341,19 @@ def render(found: Sequence[Lookup]) -> Report:
                 f"               rests on: {', '.join(experiment.rule.supporting)}"
             )
     return report
+
+
+def render_exposure(
+    holdouts: Iterable[str], ledger: Iterable[Experiment]
+) -> Iterator[str]:
+    """Each holdout case beside the experiments that read it."""
+    reads = exposure(ledger)
+    for case in sorted(holdouts):
+        held = reads.get(case, ())
+        yield (
+            f"{case}: read {len(held)} of {HOLDOUT_READS} times"
+            f"{': ' + ', '.join(held) if held else ''}"
+        )
 
 
 def render_standing(held: Standing) -> Iterator[str]:
@@ -1330,6 +1410,11 @@ def arguments(parser: argparse.ArgumentParser) -> None:
         " the reading a resume starts from",
     )
     parser.add_argument(
+        "--holdouts",
+        action="store_true",
+        help="print each holdout case with the experiments that read it",
+    )
+    parser.add_argument(
         "--grant",
         default=None,
         metavar="FILE",
@@ -1379,6 +1464,7 @@ def record(source: Path) -> str:
         ledger,
         load_grants(experiment.audit_id),
         lookup(signature=experiment.signature),
+        holdout_cases(),
     )
     return f"recorded {experiment.experiment_id} in {append(experiment)}"
 
@@ -1391,6 +1477,10 @@ def command_experiments(args: argparse.Namespace) -> int:
                 json.loads(Path(args.grant).read_text("utf-8")), source=args.grant
             )
             print(f"granted {grant.audit_id} in {append_grant(grant)}")
+            return 0
+        if args.holdouts:
+            for line in render_exposure(holdout_cases(), load()):
+                print(line)
             return 0
         if args.ticket:
             found = {one.experiment_id: one for one in load()}

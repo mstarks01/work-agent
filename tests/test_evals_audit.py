@@ -182,6 +182,7 @@ class TestTheRowAndItsFieldsAreOneList:
                 verdict="reverted",
                 reason="the lane still cited the neighbour",
                 paths=("frameworks/stride/lanes/spoofing/skill.md",),
+                parity={"stride": "the change", "asvs": "nothing: no ASVS lane"},
             ),
             ticket=audit.Ticket(
                 title="no critic replay",
@@ -200,6 +201,7 @@ class TestTheRowAndItsFieldsAreOneList:
             ),
             resolves="QA-x-02",
             rerun_reason="the scorer moved",
+            holdout_reads=("15-multitenant-invoicing",),
         )
 
         assert audit.parse(filled.to_json(), source="test") == filled
