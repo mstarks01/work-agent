@@ -44,11 +44,11 @@ answer the facts a reviewer names differently on each run
 from __future__ import annotations
 
 from collections import Counter
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field, replace
 from functools import cached_property
 from types import MappingProxyType
-from typing import TYPE_CHECKING, Any, Literal
+from typing import TYPE_CHECKING, Any, Literal, TypeVar
 
 from analysis_service.answer_sets import NO_ANSWERS, AnswerSet, within_held_limits
 from analysis_service.assertions import UNKNOWN, AssertionCatalog
@@ -926,10 +926,11 @@ def next_round(
 def by_turn(questions: Sequence[EarlyQuestion]) -> list[EarlyQuestion]:
     """The questions with the selected frameworks taken in turn.
 
-    **The one reader of whose turn it is.** The next question is the first
-    one left that serves the framework charged the fewest choices so far, the
-    first by name on a tie, and every framework it serves is charged its
-    choices (:attr:`~analysis_service.early_questions.EarlyQuestion.frameworks`).
+    The frameworks take turns one question at a time, as :func:`_in_turn`
+    states: the next question is the first one left that serves the
+    framework charged the fewest choices so far, the first by name on a tie,
+    and every framework it serves is charged its choices
+    (:attr:`~analysis_service.early_questions.EarlyQuestion.frameworks`).
     So a question two frameworks share costs each of them, and asks once.
     Within one framework the list's order holds, so a parent still comes
     before its parts: a part serves no framework its parent does not.
@@ -938,20 +939,11 @@ def by_turn(questions: Sequence[EarlyQuestion]) -> list[EarlyQuestion]:
     another framework's turn (ADR 0053, ``QA-2026-10-06-01-E1``).
     With one framework selected the order is the list's order.
     """
-    charged: Counter[str] = Counter()
-    left = list(questions)
-    order: list[EarlyQuestion] = []
-    while left:
-        served = {name for question in left for name in question.frameworks}
-        if not served:
-            return order + left
-        name = min(served, key=lambda each: (charged[each], each))
-        question = next(question for question in left if name in question.frameworks)
-        left.remove(question)
-        order.append(question)
-        for holder in question.frameworks:
-            charged[holder] += question.decisions
-    return order
+    return _in_turn(
+        questions,
+        serves=lambda question: set(question.frameworks),
+        choices=lambda question: question.decisions,
+    )
 
 
 def in_boxes(questions: Sequence[EarlyQuestion]) -> tuple[EarlyQuestion, ...]:
@@ -987,30 +979,53 @@ def _boxes_in_turn(
 ) -> list[Sequence[EarlyQuestion]]:
     """The boxes with the frameworks in turn, as :func:`in_boxes` states."""
 
-    def serves(box: Sequence[EarlyQuestion]) -> set[str]:
-        return {name for question in box for name in question.frameworks}
-
     def choices(box: Sequence[EarlyQuestion]) -> int:
         return sum(question.decisions for question in box)
 
+    return _in_turn(
+        boxes,
+        serves=lambda box: {name for question in box for name in question.frameworks},
+        choices=choices,
+        tie=choices,
+    )
+
+
+_Item = TypeVar("_Item")
+
+
+def _in_turn(
+    items: Sequence[_Item],
+    *,
+    serves: Callable[[_Item], set[str]],
+    choices: Callable[[_Item], int],
+    tie: Callable[[_Item], int] = lambda item: 0,
+) -> list[_Item]:
+    """The items with the selected frameworks taking turns.
+
+    **The one reader of whose turn it is**, for a question (:func:`by_turn`)
+    and for a box (:func:`in_boxes`) alike. The next item is the first one
+    left that serves the framework charged the fewest choices so far. On a
+    tie the framework whose next item has the smaller ``tie`` value goes
+    first, then the first by name. Every framework the item serves is charged
+    its choices. An item that serves no framework keeps its place after
+    every item that does.
+    """
     charged: Counter[str] = Counter()
-    left = list(boxes)
-    order: list[Sequence[EarlyQuestion]] = []
+    left = list(items)
+    order: list[_Item] = []
     while left:
         served = set().union(*map(serves, left))
         if not served:
             return order + left
-        next_box = {
-            name: next(box for box in left if name in serves(box)) for name in served
+        next_item = {
+            name: next(item for item in left if name in serves(item)) for name in served
         }
-        name = min(
-            served, key=lambda each: (charged[each], choices(next_box[each]), each)
-        )
-        box = next_box[name]
-        left.remove(box)
-        order.append(box)
-        for holder in serves(box):
-            charged[holder] += choices(box)
+        name = min(served, key=lambda each: (charged[each], tie(next_item[each]), each))
+        item = next_item[name]
+        left.remove(item)
+        order.append(item)
+        for holder in serves(item):
+            charged[holder] += choices(item)
     return order
 
 
