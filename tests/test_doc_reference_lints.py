@@ -76,10 +76,11 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 
 #: Trees whose prose describes a state the repository has left, by convention
 #: recorded in ``AGENTS.md`` and ``docs/agents/``. ``.wayfinder/`` holds
-#: completed maps that are archived history rather than live, and
-#: ``docs/research/`` is frozen evidence — both name files that were real when
-#: they were written, and rewriting either would destroy the record.
-FROZEN: tuple[str, ...] = (".wayfinder", "docs/research")
+#: completed maps that are archived history rather than live, ``docs/research/``
+#: is frozen evidence, and an audit report under ``evals/experiments/`` names
+#: the artifacts it read on the day — each names files that were real when it
+#: was written, and rewriting any of them would destroy the record.
+FROZEN: tuple[str, ...] = (".wayfinder", "docs/research", "evals/experiments")
 
 #: Directories that hold no prose of this repository's own.
 SKIP_DIRS = frozenset(
