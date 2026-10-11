@@ -588,11 +588,6 @@ def _status_view(record: JobRecord) -> JobStatusView:
     )
 
 
-def _sse_frame(event) -> str:
-    data = event.model_dump_json(exclude={"seq", "kind"}, exclude_none=True)
-    return f"id: {event.seq}\nevent: {event.kind}\ndata: {data}\n\n"
-
-
 # What a caller is told for each refusal, keyed by outcome rather than branched
 # on. Every message names the bound that stopped them and what clears it, and
 # **none of them names another caller**: a global refusal reports the caller's
@@ -1097,7 +1092,7 @@ def create_app(
                 status, events = progress
                 for event in events:
                     seen = event.seq
-                    yield _sse_frame(event)
+                    yield event.sse_frame()
                 # A job that emits nothing sends nothing, so a send to a client
                 # that left never fails; asked here, the stream ends and gives
                 # its slot back.

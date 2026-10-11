@@ -28,9 +28,10 @@ import asyncio
 import json
 import logging
 import os
-from collections.abc import Awaitable, Callable, Mapping, Sequence
+from collections.abc import Awaitable, Callable, Iterator, Mapping, Sequence
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
+from itertools import chain
 from typing import Any, Literal, Protocol, Self, TypeGuard
 from uuid import uuid4
 
@@ -41,7 +42,7 @@ from analysis_service.assertion_use import assertion_use
 from analysis_service.assertions import AssertionRecord
 from analysis_service.budgets import BudgetPolicy, measured_tokens, spent_tokens
 from analysis_service.certification import CertifyResult
-from analysis_service.claims import FrameworkAnalysis, UnknownKey
+from analysis_service.claims import FrameworkAnalysis, FrameworkName, UnknownKey
 from analysis_service.execution import GraphFailed
 from analysis_service.fact_answers import MAX_HELD_FACTS, FactAnswer, SkipKey
 from analysis_service.links import MAX_HELD_LINKS
@@ -147,6 +148,12 @@ class JobEvent(BaseModel):
         if self.kind == "node" and (self.node is None or self.status is not None):
             raise ValueError("a node event carries exactly a node name")
         return self
+
+    def sse_frame(self) -> str:
+        """The event as one server-sent frame: ``seq`` as the id, the kind as
+        the event name, and the rest as data. Both apps' streams write it."""
+        data = self.model_dump_json(exclude={"seq", "kind"}, exclude_none=True)
+        return f"id: {self.seq}\nevent: {self.kind}\ndata: {data}\n\n"
 
 
 class Checkpoint(BaseModel):
@@ -344,7 +351,7 @@ class JobRecord(BaseModel):
         """Whether this job's report is final: the one follow-up wrote it (ADR 0054)."""
         return is_follow_up(self.resumption)
 
-    def selection(self) -> tuple[str, ...]:
+    def selection(self) -> tuple[FrameworkName, ...]:
         """This job's frameworks by name, in selection order.
 
         What a runner is looked up by. The options ride on the record and on the
@@ -550,12 +557,47 @@ class JobStore(Protocol):
         revision: int,
     ) -> bool: ...
 
+    async def owned_jobs(self, subject: str) -> list[JobRecord]: ...
+
+    async def delete(self, job_id: str, subject: str) -> bool: ...
+
+
+@dataclass(frozen=True)
+class UsageRow:
+    """What admission still reads of a deleted job (ADR 0066).
+
+    A delete removes a job's content and keeps this row, so an owner cannot
+    delete jobs to reset the rate limit, the token budgets or the rule that a
+    job takes one follow-up. No read serves it, and the job reads as missing.
+    """
+
+    job_id: str
+    owner_subject: str
+    created_at: datetime
+    reserved_tokens: int
+    measured_tokens: int | None
+    status: JobStatus
+    parent_id: str | None
+
+
+def _parent_id(row: JobRecord | UsageRow) -> str | None:
+    return parent_of(row) if isinstance(row, JobRecord) else row.parent_id
+
 
 class InMemoryJobStore:
-    """Dict-backed store; hands out copies so callers must ``save`` mutations."""
+    """Dict-backed store; hands out copies so callers must ``save`` mutations.
+
+    A deleted job leaves a :class:`UsageRow`, which this store keeps for the
+    life of the process: admission reads it, and no route does.
+    """
 
     def __init__(self) -> None:
         self._records: dict[str, JobRecord] = {}
+        self._usage: dict[str, UsageRow] = {}
+
+    def _rows(self) -> Iterator[JobRecord | UsageRow]:
+        """Every job admission counts: the records held, and the usage rows left."""
+        return chain(self._records.values(), self._usage.values())
 
     async def reserve(
         self, record: JobRecord, *, ceiling: int, budget: BudgetPolicy
@@ -602,9 +644,7 @@ class InMemoryJobStore:
 
         subject = record.owner_subject
         since = budget.window_start()
-        mine = [
-            held for held in self._records.values() if held.owner_subject == subject
-        ]
+        mine = [held for held in self._rows() if held.owner_subject == subject]
 
         active = sum(1 for held in mine if held.status not in TERMINAL_STATUSES)
         if active >= ceiling:
@@ -628,7 +668,7 @@ class InMemoryJobStore:
 
         global_tokens = spent_tokens(
             (held.reserved_tokens, held.measured_tokens)
-            for held in self._records.values()
+            for held in self._rows()
             if held.created_at >= since
         )
         if global_tokens + record.reserved_tokens > budget.global_max_tokens_per_window:
@@ -660,9 +700,9 @@ class InMemoryJobStore:
         """
         return next(
             (
-                child.id
-                for child in self._records.values()
-                if parent_of(child) == parent_id and locks_its_parent(child.status)
+                child.job_id if isinstance(child, UsageRow) else child.id
+                for child in self._rows()
+                if _parent_id(child) == parent_id and locks_its_parent(child.status)
             ),
             None,
         )
@@ -868,6 +908,43 @@ class InMemoryJobStore:
             return False
         record.corrections = list(corrections)
         record.updated_at = datetime.now(UTC)
+        return True
+
+    async def owned_jobs(self, subject: str) -> list[JobRecord]:
+        """Every job the subject owns, as envelopes, oldest first.
+
+        A deleted job is not listed: its usage row is admission's to read.
+        """
+        return [
+            await self.owned(record.id, subject)  # type: ignore[misc]
+            for record in self._records.values()
+            if record.owner_subject == subject
+        ]
+
+    async def delete(self, job_id: str, subject: str) -> bool:
+        """Remove the owned job's content, and keep its usage row (ADR 0066).
+
+        Only a job in a terminal status can be deleted: a job in flight holds
+        a slot its run releases. False where the job is not the subject's or
+        not terminal, and nothing changes.
+        """
+        record = self._records.get(job_id)
+        if (
+            record is None
+            or record.owner_subject != subject
+            or record.status not in TERMINAL_STATUSES
+        ):
+            return False
+        del self._records[job_id]
+        self._usage[job_id] = UsageRow(
+            job_id=job_id,
+            owner_subject=record.owner_subject,
+            created_at=record.created_at,
+            reserved_tokens=record.reserved_tokens,
+            measured_tokens=record.measured_tokens,
+            status=record.status,
+            parent_id=parent_of(record),
+        )
         return True
 
 

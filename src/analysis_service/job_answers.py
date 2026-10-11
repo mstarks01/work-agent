@@ -41,7 +41,7 @@ from analysis_service.answer_round import (
 from analysis_service.assertions import AssertionRecord
 from analysis_service.budgets import BudgetPolicy
 from analysis_service.certification import CertificationGate, CertifyResult
-from analysis_service.claims import FrameworkAnalysis
+from analysis_service.claims import FrameworkAnalysis, FrameworkName
 from analysis_service.errors import ConfigError
 from analysis_service.fact_answers import FactAnswer
 from analysis_service.graph import Entry
@@ -73,6 +73,7 @@ __all__ = [
     "NotAdmitted",
     "NotCompleted",
     "Refused",
+    "RunnerFor",
     "RunnerUnavailable",
     "SaveConflict",
     "Saved",
@@ -82,7 +83,7 @@ __all__ = [
 ]
 
 #: Looks a runner up for one framework selection and one graph entry.
-RunnerFor = Callable[[tuple[str, ...], Entry], PipelineRunner]
+RunnerFor = Callable[[Sequence[FrameworkName], Entry], PipelineRunner]
 #: Schedules an admitted job's run on its runner. The driver decides how: a
 #: request's background task, or a task on the process's event loop.
 Start = Callable[[JobRecord, PipelineRunner], None]

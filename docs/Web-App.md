@@ -10,7 +10,9 @@ uv run python webapp/main.py
 
 Then <http://127.0.0.1:8000>.
 
-It **embeds the engine in process**. It does not call the [`/v1` API](HTTP-API.md),
+It **embeds the service in process**: its jobs live in the service's in-memory job
+store, and the module that admits, stores and starts a job for the [`/v1` API](HTTP-API.md)
+does the same for this app. It does not call `/v1` over HTTP,
 so it needs no bearer token and no OIDC provider. It runs real models against
 whatever you type, and every analysis costs whatever your vendor charges.
 
@@ -178,11 +180,12 @@ credential case, which is the common one at this point.
   [`/v1`](HTTP-API.md) is for.
 - **One run at a time.** A second submission while one is running is refused with
   a message rather than queued.
-- **Nothing is persisted.** Runs are held in memory, capped, oldest evicted
-  first, and lost on restart. A run that waits for your answers is never
-  evicted. When every held run waits for answers, a new submission is refused
-  until you answer or continue one. This is an in-memory workspace, not a persistent job store —
-  `/v1` already is one.
+- **Nothing is persisted.** Jobs are held in the service's in-memory job store,
+  capped at 20, the oldest finished job deleted first, and lost on restart. A
+  job that waits for your answers is never deleted. When every held job waits
+  for answers, a new submission is refused until you answer or continue one.
+  A deleted job leaves the usage row the store's admission reads
+  ([ADR 0066](adr/0066-a-deleted-job-leaves-a-usage-row.md)).
 - **Session history only; no permanent storage or accounts.** If you want the JSON, take it from the
   engine directly; [`examples/embed.py`](../examples/embed.py) is four lines from
   `report.model_dump_json()`.

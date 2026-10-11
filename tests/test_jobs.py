@@ -7,6 +7,7 @@ import logging
 import pytest
 
 from analysis_service.assertions import AssertionCatalog, AssertionRecord
+from analysis_service.budgets import BudgetPolicy
 from analysis_service.execution import GraphFailed
 from analysis_service.jobs import (
     DEADLINE_FAILURE_MESSAGE,
@@ -705,3 +706,84 @@ class TestJobDeadline:
         record = TestExecuteJob.run_with(StubPipelineRunner(), deadline_seconds=30)
         assert record.status == "completed"
         assert record.report is not None
+
+
+class TestADeletedJobLeavesAUsageRow:
+    """ADR 0066: a delete removes the content and keeps what admission reads."""
+
+    @staticmethod
+    def completed(store, subject="alice"):
+        record = JobRecord.create(
+            owner_subject=subject,
+            sources=[Source.description("a web app storing orders")],
+            frameworks=sample_selection(),
+        )
+        record.transition("running")
+        record.report = sample_report()
+        record.transition("completed")
+        asyncio.run(admit(store, record))
+        return record.id
+
+    def test_no_read_serves_a_deleted_job(self):
+        store = InMemoryJobStore()
+        job = self.completed(store)
+        assert asyncio.run(store.delete(job, "alice"))
+        assert asyncio.run(store.get(job)) is None
+        assert asyncio.run(store.owned(job, "alice")) is None
+        assert asyncio.run(store.report(job, "alice")) is None
+        assert asyncio.run(store.events_after(job, 0)) is None
+        assert asyncio.run(store.owned_jobs("alice")) == []
+
+    def test_only_the_owner_deletes_and_only_a_terminal_job(self):
+        store = InMemoryJobStore()
+        job = self.completed(store)
+        queued = make_record()
+        asyncio.run(admit(store, queued))
+        assert not asyncio.run(store.delete(job, "mallory"))
+        assert not asyncio.run(store.delete(queued.id, "alice"))
+        assert asyncio.run(store.get(job)) is not None
+
+    def test_a_deleted_job_still_counts_toward_the_rate(self):
+        store = InMemoryJobStore()
+        job = self.completed(store)
+        asyncio.run(store.delete(job, "alice"))
+        one_a_window = BudgetPolicy(
+            window_seconds=3600,
+            max_jobs_per_window=1,
+            max_tokens_per_window=10**9,
+            global_max_tokens_per_window=10**9,
+        )
+        admission = asyncio.run(
+            store.reserve(make_record(), ceiling=100, budget=one_a_window)
+        )
+        assert admission.outcome == "over_rate"
+
+    def test_a_deleted_follow_up_still_locks_its_parent(self):
+        store = InMemoryJobStore()
+        parent = self.completed(store)
+        child = JobRecord.create(
+            owner_subject="alice",
+            sources=[Source.description("a web app storing orders")],
+            frameworks=sample_selection(),
+            resumption=Resumption(
+                parent_id=parent,
+                checkpoint=Checkpoint(system_model=valid_model(), assertions=None),
+                follow_up=True,
+            ),
+            parent_revision=0,
+        )
+        child.transition("running")
+        child.report = sample_report()
+        child.transition("completed")
+        asyncio.run(admit(store, child))
+        assert asyncio.run(store.delete(child.id, "alice"))
+        assert asyncio.run(store.resumed_by(parent, "alice")) == child.id
+
+    def test_the_listing_is_the_owner_s_jobs_oldest_first_as_envelopes(self):
+        store = InMemoryJobStore()
+        first = self.completed(store)
+        second = self.completed(store)
+        self.completed(store, subject="bob")
+        listed = asyncio.run(store.owned_jobs("alice"))
+        assert [record.id for record in listed] == [first, second]
+        assert all(record.report is None for record in listed)

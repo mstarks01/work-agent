@@ -1099,7 +1099,7 @@ def test_both_routes_refuse_one_set_of_odd_fields(odd, tiers):
         SAME_ORIGIN,
         PausingRunner,
         client_for,
-        event,
+        shown_round,
         start,
     )
 
@@ -1110,7 +1110,7 @@ def test_both_routes_refuse_one_set_of_odd_fields(odd, tiers):
 
     app = client_for(tiers, PausingRunner(catalog=False), catalog=False)
     paused = start(app, questions=True)
-    event(app.get(f"/events/{paused}").text, "questions")
+    shown_round(app, paused)
     page = app.post(f"/answer/{paused}", json=body | {"facts": []}, headers=SAME_ORIGIN)
 
     assert (api.status_code, page.status_code) == (422, 400)
