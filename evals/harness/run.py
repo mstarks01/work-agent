@@ -67,11 +67,9 @@ from analysis_service.report import (
     usage_by_node,
 )
 from evals.harness import (
-    arms,
     assembly,
     assertion_use,
     audit,
-    bottleneck,
     comparison,
     consent,
     critic_replay,
@@ -91,7 +89,6 @@ from evals.harness import (
     losses,
     modes,
     near_misses,
-    oracle,
     pairing,
     population,
     preflight,
@@ -102,7 +99,6 @@ from evals.harness import (
     roster,
     rule_applicability,
     schema_paths,
-    score_arms,
     standings,
     submit,
     verb_pricing,
@@ -2675,30 +2671,6 @@ COMMANDS: dict[str, Command] = {
         " (no credentials)",
         run=comparison.command_comparison,
     ),
-    "price-arms": Command(
-        help="what each of #1003's extraction arms is given, as a ratio between"
-        " them — not a cost, see input_report (no credentials)",
-        run=arms.command_price_arms,
-        arguments=arms.price_arguments,
-    ),
-    "score-arms": Command(
-        help="replay #1003's archived arm sweeps into the runs file the"
-        " comparison reads (no credentials)",
-        run=score_arms.command_score_arms,
-        arguments=score_arms.arguments,
-    ),
-    "compare-arms": Command(
-        help="recompute #1003's extraction-arm comparison from a saved runs"
-        " file (no credentials)",
-        run=arms.command_compare_arms,
-        arguments=arms.arguments,
-    ),
-    "bottleneck": Command(
-        help="put ten hand-authored shapes through the System Model and charge"
-        " every archived miss to a stage (#1033, no credentials)",
-        run=bottleneck.command_bottleneck,
-        arguments=bottleneck.arguments,
-    ),
     "falsify": Command(
         help="corrupt a perfect reading one way per probe and read what it"
         " costs the gate and the endpoint (#926, no credentials)",
@@ -2802,12 +2774,6 @@ COMMANDS: dict[str, Command] = {
         " pairings: values, crossings, candidates and must-finds (no credentials)",
         run=guard_cost.command_guard_cost,
         arguments=guard_cost.arguments,
-    ),
-    "oracle": Command(
-        help="put a perfect reading of every signed case through the"
-        " deterministic path and charge each loss to a stage (no credentials)",
-        run=oracle.command_oracle,
-        arguments=corpus_argument,
     ),
     "rule-applicability": Command(
         help="score the applicability rule against the labelled fixtures and"

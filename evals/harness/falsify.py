@@ -13,19 +13,14 @@ two instruments must then say:
 
 * **the gate** (:func:`~analysis_service.assertions.gate_issues`, the one
   reader of "does this catalog pass") refuses the row, by code; or
-* **the endpoint** (:class:`~evals.harness.arms.ArmRun`, the one reader of
-  required-fact recall) stops counting the row, and the matcher's fate says
-  why.
+* **the endpoint** (:attr:`~evals.harness.replay.AssertionReplay.recovered`,
+  the one reader of required-fact recall) stops counting the row, and the
+  matcher's fate says why.
 
 A falsification probe that costs nothing at either instrument is a hole in the
 measurement, and :data:`PROBES` is written so that the suite fails when one
 appears. A **positive control** costs nothing by design and is declared with
 ``loses=0`` and no refusal, so the two are never confused.
-
-**Nothing here is an arm.** :data:`PROBES` keys are held apart from
-:data:`~evals.harness.arms.ARMS`, and no probe writes a runs file: the
-``ArmRun`` a probe builds exists to read the endpoint through its one reader
-rather than to recompute recall beside it.
 
 **A criterion nothing probes says why**, in :data:`UNPROBED`. #926's acceptance
 list is the registry this table answers to, and a line with neither a probe nor
@@ -58,7 +53,6 @@ from analysis_service.system_model import (
     parse_flow_id,
 )
 from evals.harness.alignment import align
-from evals.harness.arms import ArmRun
 from evals.harness.modes import AssertionResult
 from evals.harness.reference import GoldenCase, load_corpus, tuning_cases
 from evals.harness.replay import (
@@ -733,7 +727,6 @@ def run_probe(name: str, case: GoldenCase, reference: SignedReference) -> Outcom
             case.id, {}, AssertionRecord(proposed=len(catalog.entries), catalog=catalog)
         ),
     )
-    run = ArmRun.of(graded, reference, arm=name)
     fates = {row.reference: row.fate for row in graded.rows}
     required = frozenset(required_rows(reference))
     element_fates = {
@@ -743,8 +736,8 @@ def run_probe(name: str, case: GoldenCase, reference: SignedReference) -> Outcom
     outcome = Outcome(
         probe=name,
         case_id=case.id,
-        required=run.required,
-        recovered=run.recovered,
+        required=len(graded.required),
+        recovered=graded.recovered,
         lost=tuple(
             sorted(row for row in required if fates.get(row, "omitted") != "found")
         ),

@@ -27,15 +27,9 @@ Before step 1, read what earlier work already settled:
 
 ```bash
 uv run python -m evals.harness.run experiments --signature "<the miss>"
-uv run python -m evals.harness.run bottleneck
-uv run python -m evals.harness.run oracle
 ```
 
-`bottleneck` and `oracle` already split extraction loss from representation
-loss on every signed case, at no cost.
-#1003's arm comparison is the facts-first evidence. `run.py compare-arms`
-re-reads it. If these already answer the question, report the answer and stop
-here.
+If the ledger already answers the question, report the answer and stop here.
 
 ## 1. Qualify the target and freeze the baseline
 

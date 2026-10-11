@@ -36,9 +36,8 @@ Two facts per failure, and they are different:
 - **A missing final output is not an extraction defect.** It is a missing final
   output. Anything more needs a reading of the stage artifacts.
 - **A whole-stage oracle substitution locates a broad bottleneck. It does not
-  prove a local mechanism.** `oracle` is exactly this: a perfect reading put
-  through the deterministic path. What it loses, no route can keep; what it
-  keeps says nothing about what a model would emit.
+  prove a local mechanism.** A perfect reading put through the deterministic
+  path says what no route can keep, and nothing about what a model would emit.
 - **One stochastic successful replay is suggestive, not causal.** Where the
   run-to-run spread could change the decision, use paired comparisons and
   repeat.
@@ -55,15 +54,15 @@ never production performance and never go in a scored comparison.
 
 | To test | Substitute | Then |
 | --- | --- | --- |
-| Extraction lost the fact | the signed reference fact, via the oracle bundle | replay the deterministic descendants |
+| Extraction lost the fact | the signed reference fact, as a signed catalog row | replay the deterministic descendants |
 | Preparation misrouted it | the omitted assessment unit into the lane's material | re-run that lane only |
 | Analysis never wrote it | a reviewed grounded candidate, injected | see whether it survives to the report |
 | Fan-in destroyed it | the candidate the merge dropped, restored | re-run the critic and the report |
 | Criticism killed it | the evidence missing from the critic's input | re-run the critic on the saved candidates |
 | Reporting dropped it | a correct adjudicated result | re-assemble the report |
 
-`oracle` and `bottleneck` implement the first of these. `lane-replay` is the
-seam for the second: it rebuilds one lane's request from the captured
+`lane-replay --prepare-today signed` implements the first of these, and it is
+the seam for the second: it rebuilds one lane's request from the captured
 `<case>.lanes.json`, so a substituted lead is one changed key and one call.
 `descendants` implements the third and fourth at no cost: it injects a
 candidate into a lane's archived proposals, runs the fan-in again, and bounds

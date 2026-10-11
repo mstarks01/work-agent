@@ -118,26 +118,6 @@ TOKEN_CAPS: dict[str, int] = {
     # what to write: the text's own distinguishing word in front, and the
     # shared name in `notes`.
     "prompts/extract": 4100,
-    # The facts-first body (#1003 arm B). It carries the reading rules a second
-    # time rather than appending to `extract.md`, because the two routes read
-    # the same sources and write different things: one emits a System Model and
-    # one emits handles, so there is no shared body for a delta to ride on. The
-    # role and predicate tables beside it are rendered from `factbundle.ROLES`
-    # and `assertions.REGISTRY`, so neither moves this number.
-    "prompts/extract-facts": 2600,
-    # The split facts-first route's two bodies (#1003 arm E), which together
-    # answer whether the gap between the arms is the reading order or the
-    # number of calls the work is spread over. Each carries one table: the
-    # inventory call writes no fact and the rows call names no mention, so
-    # neither is paid for the other's vocabulary.
-    #
-    # ``extract-inventory`` carries the reading rules (#1082). It is the pass
-    # that decides what exists, and `extract-rows.md` may not add a mention or
-    # take one away. Without the rules, a planned queue, a question and a
-    # withdrawn statement each reach the closed inventory with nothing later
-    # able to remove them.
-    "prompts/extract-inventory": 1900,
-    "prompts/extract-rows": 2000,
     # The compact transport's delta, appended after the body above. It is the
     # whole cost of the route on the input side, paid on every extraction call
     # and cacheable, against the output it removes — see
@@ -161,10 +141,6 @@ TOKEN_CAPS: dict[str, int] = {
     # not cite" the service enforces, because `restore_unimplicated` restores
     # whole elements and never a field on an implicated one.
     "prompts/repair": 1200,
-    # The source-driven review body (#1003 arms C and D). The role and predicate
-    # tables beside it are rendered, as they are for the facts-first body, so
-    # neither moves this number.
-    "prompts/reread": 1500,
     # The assertion body alone. The predicate table beside it is rendered from
     # `assertions.REGISTRY` rather than written here, so a predicate added
     # tomorrow moves the composed instruction and never this file.

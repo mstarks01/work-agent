@@ -761,10 +761,6 @@ NODE_OUTPUT_SCHEMAS: dict[str, str] = {
         "every extraction transport's schema, read from EXTRACTION_SCHEMAS"
     ),
     "CatalogProposal": "named directly: CatalogProposal",
-    "EmittedFactBundle": (
-        "named directly: EmittedFactBundle, by `facts`, `inventory` and `rows`"
-    ),
-    "PatchBatch": "named directly: PatchBatch, by `reread`",
     "schemas.proposals": "every package's `proposals`, read from SCHEMAS",
     "schemas.rulings": "every package's `rulings`, read from SCHEMAS",
 }
@@ -800,17 +796,13 @@ def _model_facing_schemas() -> dict[str, type[BaseModel]]:
     :func:`test_every_node_s_output_schema_is_one_the_enumerator_reaches`.
     """
     from analysis_service.assertions import CatalogProposal
-    from analysis_service.factbundle import EmittedFactBundle
     from analysis_service.frameworks import PACKAGES, schemas_for
     from analysis_service.graph import EXTRACTION_SCHEMAS
-    from analysis_service.patch import PatchBatch
 
     found: dict[str, type[BaseModel]] = {
         cls.__name__: cls for cls in EXTRACTION_SCHEMAS.values()
     }
     found["CatalogProposal"] = CatalogProposal
-    found["EmittedFactBundle"] = EmittedFactBundle
-    found["PatchBatch"] = PatchBatch
     for name in PACKAGES:
         schemas = schemas_for(name)
         for role in ("proposals", "rulings"):

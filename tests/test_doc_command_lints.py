@@ -44,6 +44,13 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 #: notice that the line failed.
 SEARCHED = ("evals", "docs", "README.md", ".claude/skills")
 
+#: Trees whose prose records a state the repository has left, on the convention
+#: ``tests/test_doc_reference_lints.py`` states for ``docs/research/``. An audit
+#: report under ``evals/experiments/`` and an ADR under ``docs/adr/`` print the
+#: commands that produced their evidence on the day, and a command removed
+#: since is part of that record rather than a broken step.
+FROZEN: tuple[str, ...] = ("evals/experiments", "docs/adr", "docs/research")
+
 #: The module whose commands this lint knows how to check. Others are named in
 #: the prose too -- ``python -m analysis_service.smoke`` and friends -- and are
 #: left alone rather than half-checked: they take their arguments from their own
@@ -83,6 +90,8 @@ def _documented() -> list[tuple[Path, int, str]]:
         base = REPO_ROOT / entry
         paths = [base] if base.is_file() else sorted(base.rglob("*.md"))
         for path in paths:
+            if any(path.is_relative_to(REPO_ROOT / tree) for tree in FROZEN):
+                continue
             for number, line in enumerate(
                 path.read_text(encoding="utf-8").splitlines(), start=1
             ):

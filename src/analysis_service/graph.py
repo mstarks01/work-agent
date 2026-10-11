@@ -116,7 +116,7 @@ import logging
 from collections.abc import Callable, Collection, Mapping, Sequence
 from dataclasses import dataclass
 from types import MappingProxyType
-from typing import TYPE_CHECKING, Any, Literal, get_args
+from typing import TYPE_CHECKING, Any, Literal
 
 import anyio.to_thread
 from google.adk.agents import LlmAgent
@@ -172,16 +172,8 @@ from analysis_service.evidence import (
     prepared_view,
     render_catalog,
     render_element_roster,
-    render_rows,
 )
 from analysis_service.fact_answers import FactAnswer
-from analysis_service.factbundle import (
-    DispositionRow,
-    EmittedFactBundle,
-    SourceFactBundle,
-    joined,
-    resolve_bundle,
-)
 from analysis_service.fan_in import fan_in
 from analysis_service.frameworks import (
     DISCLAIMER_DOC,
@@ -204,19 +196,14 @@ from analysis_service.knowledge import (
 from analysis_service.links import LinkAnswer, apply_answers
 from analysis_service.markdown_loader import MarkdownLoader, estimate_tokens
 from analysis_service.model_tiers import ReviewIndependence, TierName
-from analysis_service.patch import PatchBatch, apply_patch
 from analysis_service.prompt_cache import remember_stable_prefix, stable_prefix
 from analysis_service.prompts import (
     compose_analyze_prompt,
     compose_assert_prompt,
     compose_critic_prompt,
     compose_extract_prompt,
-    compose_facts_prompt,
-    compose_inventory_prompt,
     compose_recritic_prompt,
     compose_repair_prompt,
-    compose_reread_prompt,
-    compose_rows_prompt,
     lane_closing,
 )
 from analysis_service.report import (
@@ -270,30 +257,9 @@ logger = logging.getLogger(__name__)
 # preparation, one assembly. #162 ruled that one **Valid System Model** serves
 # every framework a job selects, so nothing here is per-framework.
 EXTRACT_NODE = "extract"
-#: The facts-first extraction node (#1003 arm B): the sources in, a **Source
-#: Fact Bundle** out, and no graph ID anywhere in it.
-FACTS_NODE = "facts"
-#: The split route's first call (#1003 arm E): what the sources name.
-INVENTORY_NODE = "inventory"
-#: The split route's second call: what the sources say about that inventory.
-ROWS_NODE = "rows"
-#: What turns that bundle into the artifacts the rest of the graph reads. Code,
-#: not a model: see :func:`~analysis_service.factbundle.resolve_bundle`.
-RESOLVE_NODE = "resolve"
-#: What renders the split route's inventory for its second call. Code.
-READ_INVENTORY_NODE = "reading_inventory"
 ASSERT_NODE = "assert"
-#: The source-driven review pass (#1003 arms C and D): the sources read once
-#: more against the artifacts built from them, out comes a ``PatchBatch``.
-REREAD_NODE = "reread"
-#: What renders the model and the catalog for that pass, and parks the record
-#: the applicator patches. Code, not a model.
-READ_CATALOG_NODE = "reading"
-#: What applies the batch, transactionally: see
-#: :func:`~analysis_service.patch.apply_patch`.
-APPLY_NODE = "apply"
 #: The head-only entry's terminal node: resolve the catalog this head produced
-#: and stop, so #1003's endpoint is scored without paying for the lanes.
+#: and stop, so the catalog is scored without paying for the lanes.
 CATALOG_NODE = "catalog"
 #: The head-only entry's terminal node on a graph that builds no catalog: the
 #: validity gate has put the model in state, so a paused job stops here.
@@ -542,23 +508,7 @@ def tier_node_by_graph_node(
     """
     return {
         EXTRACT_NODE: "extract",
-        # The facts-first node resolves on the **extraction** tier row, because
-        # it is the extraction stage under another order. #1003 asks that
-        # comparable semantic stages run the same model configuration, and one
-        # key for both is how that holds by construction rather than by an
-        # operator keeping two rows in step.
-        FACTS_NODE: "extract",
-        # Both calls of the split route sit on the extraction tier row, for the
-        # reason the single call does: they are the extraction stage under
-        # another division of labour, and #1003 asks that comparable semantic
-        # stages run one model configuration.
-        INVENTORY_NODE: "extract",
-        ROWS_NODE: "extract",
         REPAIR_NODE: "repair",
-        # The review pass resolves on the **repair** tier row, because it is a
-        # bounded repair pass: one call, over artifacts and the sources they
-        # came from, ending in a patch code applies or discards.
-        REREAD_NODE: "repair",
         ASSERT_NODE: "assert",
         **{
             node: tier
@@ -610,32 +560,28 @@ ENTRY_HEAD_ONLY: Entry = "head-only"
 whichever of the two passes this graph carries — then stop: after resolving
 the catalog where a pass built one, and at :data:`PAUSE_NODE` where none did.
 
-Two readers stop here. #1003's arms score the catalog, and a job that asks
-questions pauses with the valid model and whatever catalog it has
+Two readers stop here. The heads eval mode scores the catalog, and a job that
+asks questions pauses with the valid model and whatever catalog it has
 (ADR 0045, ADR 0048).
 
-**The primary endpoint is scored on the catalog, and no lane writes one.** An
+**Required-fact recall is scored on the catalog, and no lane writes one.** An
 end-to-end run would pay every lane agent and every critic on the judgement
 tier to produce findings the endpoint never reads: measured against a recorded
-STRIDE sweep, that is roughly seventeen times the spend of the head alone. So
-the comparison runs the half it grades.
+STRIDE sweep, that is roughly seventeen times the spend of the head alone.
 
 It is not the assertion eval mode. That one seeds a blessed model and asks what
-the sources state about it; this one extracts the model too, which is the half
-the arms differ in."""
+the sources state about it; this one extracts the model too."""
 
 #: The entries whose graph ends in a resolved catalog, and so the ones an
-#: assertion pass or a source review has a reader in. Derived from the two
-#: that end in one, because "would anything read this pass" is the question
-#: both guards ask and neither should answer twice.
+#: assertion pass has a reader in. Derived from the two that end in one,
+#: because "would anything read this pass" is the question the guard asks.
 CATALOGUING_ENTRIES: frozenset[Entry] = PREPARING_ENTRIES | {ENTRY_HEAD_ONLY}
 
 #: The entries whose graph builds a reading node, and so the ones a transport
-#: and a strategy are properties of. **One reader**: the builder asks it to
-#: decide what to build, and
-#: :meth:`~analysis_service.deployment.Deployment.pipeline` asks it to decide
-#: what to pass — and a deployment that answered it a second way would hand a
-#: graph a strategy the graph then refused to build for.
+#: is a property of. **One reader**: the builder asks it to decide what to
+#: build, and :meth:`~analysis_service.deployment.Deployment.pipeline` asks it
+#: to decide what to pass — and a deployment that answered it a second way
+#: would hand a graph a transport the graph then refused to build for.
 EXTRACTING_ENTRIES: frozenset[Entry] = frozenset(
     {ENTRY_EXTRACT, ENTRY_EXTRACT_ONLY, ENTRY_HEAD_ONLY}
 )
@@ -646,41 +592,6 @@ The model is seeded rather than extracted for the reason :data:`ENTRY_PREPARE`
 seeds one: a row this node could not bind to an element would otherwise be
 unattributable between the two readings, and the question this mode asks is
 what the sources *state*, not whether two calls named one component alike."""
-
-#: Which order a graph reads its sources in. ``graph-first`` is production and
-#: every arm-A run: ``extract`` emits a **System Model** in one pass.
-#: ``facts-first`` is #1003's arm B, where ``facts`` emits a **Source Fact
-#: Bundle** in local handles and ``resolve`` turns it into the same artifacts.
-#: Both end at the same validity gate and the same bounded repair, so what a
-#: comparison between them measures is the reading order.
-ExtractionStrategy = Literal["graph-first", "facts-first", "facts-split"]
-
-GRAPH_FIRST: ExtractionStrategy = "graph-first"
-FACTS_FIRST: ExtractionStrategy = "facts-first"
-
-FACTS_SPLIT: ExtractionStrategy = "facts-split"
-"""The facts-first reading, in two calls rather than one.
-
-``facts-first`` asks one call to name what the sources hold **and** state what
-they say about it. ``graph-first`` splits that same work across ``extract`` and
-``assert``. A comparison between those two therefore moves the reading order
-and the number of calls together, and #1003's own design cannot say which of
-them a difference belongs to.
-
-This route holds the order and splits the calls: ``inventory`` names the
-things, the interactions and the zones, and ``rows`` states the facts about
-them. Against the other two it is the cell that separates the confound."""
-
-#: Every strategy, derived from the literal so the two cannot disagree.
-EXTRACTION_STRATEGIES: frozenset[str] = frozenset(get_args(ExtractionStrategy))
-
-#: The strategies that read the sources facts-first, however many calls they
-#: spread the reading over. **The one reader of "does this graph carry its own
-#: assertion rows"**: both shapes do, so both refuse an appended assertion pass
-#: and both satisfy a source review's need for a catalog. A comparison that
-#: named one of them would have let the other quietly take a second pass.
-FACTS_STRATEGIES: frozenset[str] = frozenset({FACTS_FIRST, FACTS_SPLIT})
-
 
 ROUTE_VALID = "valid"
 ROUTE_INVALID = "invalid"
@@ -787,29 +698,6 @@ STATE_REPAIR_BASELINE = "repair_baseline"
 # What the repair pass was allowed to change and what it changed anyway,
 # written by ``revalidate`` and carried onto the report by ``assemble``.
 STATE_MODEL_REPAIR = "model_repair"
-
-# The catalog rendered for the review pass, beside the model it was built over.
-# A rendered key: written once, read by a model, never read back here.
-STATE_ASSERTION_ROWS = "assertion_rows"
-# What ``reread`` emits: a ``PatchBatch``, before code applies or discards it.
-STATE_PATCH_BATCH = "patch_batch"
-# What ``apply`` made of that batch: one ``OperationOutcome`` per operation, and
-# whether the batch was discarded whole. Written by ``apply``, read by a driver.
-STATE_PATCH_OUTCOMES = "patch_outcomes"
-
-# What the facts-first node emits: a ``SourceFactBundle``, in local handles,
-# before code resolves it into a model and a proposal.
-STATE_SOURCE_FACTS = "source_facts"
-# What the split route's first call emits, kept apart from the second's so the
-# join reads each call for the half it owns.
-STATE_SOURCE_INVENTORY = "source_inventory"
-# That inventory rendered for the second call. A rendered key: written once,
-# read by a model, never read back here.
-STATE_INVENTORY = "inventory"
-# What ``resolve`` made of every row of that bundle: one ``DispositionRow`` per
-# input row, so a fact that reached neither the graph nor the catalog is
-# attributable rather than missing. Written by ``resolve`` and read by a driver.
-STATE_BUNDLE_DISPOSITIONS = "bundle_dispositions"
 
 STATE_EXTRACTED_MODEL = "extracted_model"
 # What ``extract`` emitted, kept apart from the key it arrived in. ``repair``
@@ -933,8 +821,6 @@ SHARED_RENDERED_KEYS: frozenset[str] = frozenset(
         STATE_DOMAIN_SKILLS,
         STATE_PREVIOUS_MODEL,
         STATE_VALIDATION_ISSUES,
-        STATE_ASSERTION_ROWS,
-        STATE_INVENTORY,
     }
 )
 
@@ -943,11 +829,6 @@ SHARED_RENDERED_KEYS: frozenset[str] = frozenset(
 SHARED_STRUCTURED_KEYS: frozenset[str] = frozenset(
     {
         STATE_SOURCE_TEXTS,
-        STATE_SOURCE_FACTS,
-        STATE_SOURCE_INVENTORY,
-        STATE_BUNDLE_DISPOSITIONS,
-        STATE_PATCH_BATCH,
-        STATE_PATCH_OUTCOMES,
         STATE_EXTRACTED_MODEL,
         STATE_FIRST_PASS,
         STATE_ASSERTION_PROPOSAL,
@@ -1227,7 +1108,9 @@ class Analysis:
                 build=dict(build_identity()),
                 review_independence=pipeline.review_independence,
                 extraction_format=pipeline.extraction_format,
-                extraction_strategy=pipeline.extraction_strategy,
+                extraction_strategy=(
+                    "graph-first" if pipeline.extraction_format is not None else None
+                ),
             ),
             analyses=list(self.analyses),
         )
@@ -1816,14 +1699,13 @@ def prepare_analysis(
 def _resolve_assertions(state: SessionState, model: SystemModel) -> AssertionRecord:
     """The catalog this job runs on: built once, gated once, parked once.
 
-    **One seam, and two ways to reach it.** ``assert`` and ``resolve`` each
-    leave a proposal, which is resolved here against the model the validity
-    gate passed. A graph carrying the review pass leaves an
-    :class:`~analysis_service.assertions.AssertionRecord` instead, because
-    ``apply`` built it over the model it patched — and it is put through
+    **One seam, and two ways to reach it.** ``assert`` leaves a proposal, which
+    is resolved here against the model the validity gate passed. A resumed job
+    carries an :class:`~analysis_service.assertions.AssertionRecord` instead,
+    the one its parent built — and it is put through
     :meth:`~analysis_service.assertions.AssertionRecord.over` here rather than
     trusted, so a catalog a lane selects from answered the same rules whichever
-    node produced it. There is no path that reaches ``prepare`` ungated.
+    job produced it. There is no path that reaches ``prepare`` ungated.
     """
     sources = state.get(STATE_SOURCE_TEXTS) or {}
     held = state.get(STATE_ASSERTION_CATALOG)
@@ -2726,12 +2608,6 @@ class Pipeline:
     #: default of ``"full"`` there would be a fact with no reader: the report
     #: would name a transport nothing in that run used.
     extraction_format: ExtractionFormat | None = FULL_FORMAT
-    #: Which order the head of this graph reads its sources in, on the same
-    #: reasoning: a reader who worked it out from the report's own System Model
-    #: would find the two strategies identical by construction, because both
-    #: pass the same gate and produce the same shape. ``None`` on a graph with
-    #: no extraction node, for the reason the transport is ``None`` there.
-    extraction_strategy: ExtractionStrategy | None = GRAPH_FIRST
 
 
 def _generate_content_config(sampling: TierSampling) -> types.GenerateContentConfig:
@@ -2875,301 +2751,13 @@ def _extract_node(
     )
 
 
-def _facts_node(
-    prompt_loader: MarkdownLoader,
-    resolve_model: ModelResolver,
-    resolve_sampling: SamplingResolver,
-) -> LlmAgent:
-    """The facts-first extraction node: the sources in, one bundle out.
-
-    It sees no model and no graph ID, which is the whole of what #1003 arm B
-    changes at this end. Everything after :func:`resolve_source_facts` is the
-    route arm A runs.
-    """
-    return _llm_node(
-        name=FACTS_NODE,
-        tier_node="extract",
-        instruction=compose_facts_prompt(prompt_loader),
-        output_schema=EmittedFactBundle,
-        output_key=STATE_SOURCE_FACTS,
-        resolve_model=resolve_model,
-        resolve_sampling=resolve_sampling,
-    )
-
-
-def _inventory_node(
-    prompt_loader: MarkdownLoader,
-    resolve_model: ModelResolver,
-    resolve_sampling: SamplingResolver,
-) -> LlmAgent:
-    """The split route's first call: what the sources name, and nothing about it."""
-    return _llm_node(
-        name=INVENTORY_NODE,
-        tier_node="extract",
-        instruction=compose_inventory_prompt(prompt_loader),
-        output_schema=EmittedFactBundle,
-        output_key=STATE_SOURCE_INVENTORY,
-        resolve_model=resolve_model,
-        resolve_sampling=resolve_sampling,
-    )
-
-
-def _rows_node(
-    prompt_loader: MarkdownLoader,
-    resolve_model: ModelResolver,
-    resolve_sampling: SamplingResolver,
-) -> LlmAgent:
-    """The split route's second call: what the sources say about that inventory."""
-    return _llm_node(
-        name=ROWS_NODE,
-        tier_node="extract",
-        instruction=compose_rows_prompt(prompt_loader),
-        output_schema=EmittedFactBundle,
-        output_key=STATE_SOURCE_FACTS,
-        resolve_model=resolve_model,
-        resolve_sampling=resolve_sampling,
-    )
-
-
-def render_inventory(inventory: dict) -> str:
-    """The first call's emission as the second call reads it.
-
-    Fenced, for the reason a model is fenced: it is built from caller words and
-    handed straight back to a model. Its ``facts`` list is dropped rather than
-    shown — the second call owns that half, and showing it an empty one invites
-    it to read the absence as a gap to fill.
-    """
-    return render_fenced(
-        {
-            field: inventory.get(field, [])
-            for field in ("mentions", "interactions", "unresolved")
-        }
-    )
-
-
-def read_inventory(ctx, keys: GraphKeys, source_inventory: dict | None = None) -> dict:
-    """Render the inventory for the call that states facts about it."""
-    if source_inventory is None:
-        raise SilentNodeError(
-            f"nothing was written to {STATE_SOURCE_INVENTORY!r}, so the second"
-            f" call has no inventory to read. {_TRUNCATION_HINT}"
-        )
-    keys.state(ctx).prompt(STATE_INVENTORY, render_inventory(source_inventory))
-    return {
-        "mentions": len(source_inventory.get("mentions", [])),
-        "interactions": len(source_inventory.get("interactions", [])),
-    }
-
-
-def _read_inventory_func(keys: GraphKeys) -> Callable[..., Any]:
-    """The inventory renderer, with this graph's key families bound to it."""
-
-    def reading(ctx, source_inventory: dict | None = None) -> dict[str, Any]:
-        return read_inventory(ctx, keys, source_inventory)
-
-    return reading
-
-
-def resolve_source_facts(
-    ctx,
-    keys: GraphKeys,
-    source_facts: dict | None = None,
-    source_texts: dict | None = None,
-    source_inventory: dict | None = None,
-) -> dict[str, Any]:
-    """Turn one bundle into the artifacts the rest of the graph already reads.
-
-    Three writes, and none of them is new machinery. The model goes to
-    :data:`STATE_EXTRACTED_MODEL`, which is where ``extract`` puts its emission,
-    so the validity gate and the bounded repair behind it run unchanged. The
-    rows whose handles resolved go to :data:`STATE_ASSERTION_PROPOSAL`, which is
-    where the ``assert`` node puts its proposal, so ``prepare`` resolves them
-    through the seam it always used — **there is no second way to inject a
-    catalog**, and the gate cannot be stepped around. The dispositions go to
-    :data:`STATE_BUNDLE_DISPOSITIONS` for a driver that asks what every input
-    row came to.
-
-    The proposal rather than the resolved record, because a model that fails the
-    gate is repaired and the rows should bind to the model the gate passed. The
-    record this stage computed is what #1003's offline comparison reads; the
-    job's catalog is what ``prepare`` builds from the same rows.
-    """
-    if source_facts is None:
-        raise SilentNodeError(
-            f"nothing was written to {STATE_SOURCE_FACTS!r}, so there are no"
-            f" source facts to resolve. {_TRUNCATION_HINT}"
-        )
-    state = keys.state(ctx)
-    bundle = SourceFactBundle.model_validate(source_facts)
-    ignored: tuple[DispositionRow, ...] = ()
-    if source_inventory is not None:
-        # The split route: each call is read for the half it owns, and a call
-        # that answered the other half is reported rather than merged in.
-        bundle, ignored = joined(
-            SourceFactBundle.model_validate(source_inventory), bundle
-        )
-    resolution = resolve_bundle(bundle, source_texts or {})
-    state.put(STATE_EXTRACTED_MODEL, resolution.model.model_dump(mode="json"))
-    state.put(STATE_ASSERTION_PROPOSAL, resolution.proposal.model_dump(mode="json"))
-    state.put(
-        STATE_BUNDLE_DISPOSITIONS,
-        [row.model_dump(mode="json") for row in (*ignored, *resolution.dispositions)],
-    )
-    return {
-        "elements": len(resolution.model.elements()),
-        "assertions": len(resolution.proposal.assertions),
-        "gaps": len(resolution.gaps),
-    }
-
-
-def _resolve_node_func(keys: GraphKeys) -> Callable[..., Any]:
-    """The bundle resolver, with this graph's key families bound to it."""
-
-    def resolve(
-        ctx,
-        source_facts: dict | None = None,
-        source_texts: dict | None = None,
-        source_inventory: dict | None = None,
-    ) -> dict[str, Any]:
-        return resolve_source_facts(
-            ctx, keys, source_facts, source_texts, source_inventory
-        )
-
-    return resolve
-
-
-def _reread_node(
-    prompt_loader: MarkdownLoader,
-    resolve_model: ModelResolver,
-    resolve_sampling: SamplingResolver,
-) -> LlmAgent:
-    """The source-driven review node: the sources and the artifacts in, a batch out."""
-    return _llm_node(
-        name=REREAD_NODE,
-        tier_node="repair",
-        instruction=compose_reread_prompt(prompt_loader),
-        output_schema=PatchBatch,
-        output_key=STATE_PATCH_BATCH,
-        resolve_model=resolve_model,
-        resolve_sampling=resolve_sampling,
-    )
-
-
-def read_for_review(
-    ctx,
-    keys: GraphKeys,
-    valid_model: dict,
-    source_texts: dict | None = None,
-) -> dict[str, Any]:
-    """Render what the review pass reads, and park the record it will patch.
-
-    The model and the rows go to rendered keys, through the two functions every
-    other reader of them calls, so no agent is shown a model or a row another
-    agent would not recognise. The record itself is parked structurally,
-    because ``apply`` patches it and ``prepare`` gates whatever comes out.
-
-    It resolves the proposal here rather than leaving that to ``prepare``. The
-    review has to see identities it can retract, and an identity exists only
-    once the rows are resolved — so the resolution moves ahead of the pass that
-    reads it, and ``prepare`` then reads the record this produced.
-    """
-    state = keys.state(ctx)
-    proposed = state.get(STATE_ASSERTION_PROPOSAL)
-    if proposed is None:
-        raise SilentNodeError(
-            f"nothing was written to {STATE_ASSERTION_PROPOSAL!r}, so the review"
-            f" pass has no catalog to read. {_TRUNCATION_HINT}"
-        )
-    model = SystemModel.model_validate(valid_model)
-    record = AssertionRecord.of(
-        CatalogProposal.model_validate(proposed), model, source_texts or {}
-    )
-    state.prompt(STATE_SYSTEM_MODEL, render_model(valid_model))
-    state.prompt(STATE_ASSERTION_ROWS, render_rows(record.catalog))
-    state.put(STATE_ASSERTION_CATALOG, record.model_dump(mode="json"))
-    return {"elements": len(model.elements()), "rows": len(record.catalog.entries)}
-
-
-def apply_source_review(
-    ctx,
-    keys: GraphKeys,
-    valid_model: dict,
-    patch_batch: dict | None = None,
-    source_texts: dict | None = None,
-) -> dict[str, Any]:
-    """Apply what the review proposed, or leave the artifacts as they were.
-
-    :func:`~analysis_service.patch.apply_patch` decides both, and this node only
-    parks what it answered. A discarded batch writes the model and the record
-    back unchanged, which is what makes the failure cost visible rather than
-    silent: the outcomes say every operation was rolled back and why.
-    """
-    if patch_batch is None:
-        raise SilentNodeError(
-            f"nothing was written to {STATE_PATCH_BATCH!r}, so the review pass"
-            f" this deployment selected never ran. {_TRUNCATION_HINT}"
-        )
-    state = keys.state(ctx)
-    held = state.get(STATE_ASSERTION_CATALOG)
-    if held is None:
-        raise SilentNodeError(
-            f"nothing was written to {STATE_ASSERTION_CATALOG!r}, so there is no"
-            " record for the review to patch"
-        )
-    result = apply_patch(
-        PatchBatch.model_validate(patch_batch),
-        SystemModel.model_validate(valid_model),
-        AssertionRecord.model_validate(held),
-        source_texts or {},
-    )
-    state.put(STATE_VALID_MODEL, result.model.model_dump(mode="json"))
-    state.put(STATE_ASSERTION_CATALOG, result.record.model_dump(mode="json"))
-    state.put(
-        STATE_PATCH_OUTCOMES,
-        {
-            "rolled_back": result.rolled_back,
-            "outcomes": [
-                outcome.model_dump(mode="json") for outcome in result.outcomes
-            ],
-        },
-    )
-    return {"applied": len(result.applied), "rolled_back": result.rolled_back}
-
-
-def _read_for_review_func(keys: GraphKeys) -> Callable[..., Any]:
-    """The review's reading node, with this graph's key families bound to it."""
-
-    def reading(
-        valid_model: dict, ctx, source_texts: dict | None = None
-    ) -> dict[str, Any]:
-        return read_for_review(ctx, keys, valid_model, source_texts)
-
-    return reading
-
-
-def _apply_node_func(keys: GraphKeys) -> Callable[..., Any]:
-    """The patch applicator, with this graph's key families bound to it."""
-
-    def apply(
-        valid_model: dict,
-        ctx,
-        patch_batch: dict | None = None,
-        source_texts: dict | None = None,
-    ) -> dict[str, Any]:
-        return apply_source_review(ctx, keys, valid_model, patch_batch, source_texts)
-
-    return apply
-
-
 def park_catalog(ctx, keys: GraphKeys, valid_model: dict) -> dict[str, Any]:
     """Resolve the catalog this head produced, park it, and stop.
 
     The head-only entry's terminal node, and it decides nothing of its own:
     :func:`_resolve_assertions` is the seam every catalog reaches a reader
-    through, so an arm scored here answered the rules an arm that ran the lanes
-    would have answered. A graph carrying the review pass has its record parked
-    already and this re-gates it; one carrying only an extraction pass resolves
-    the proposal against the model the gate passed.
+    through, so a head scored here answered the rules a job that ran the lanes
+    would have answered.
     """
     record = _resolve_assertions(
         keys.state(ctx), SystemModel.model_validate(valid_model)
@@ -3451,9 +3039,7 @@ def build_pipeline(
     frameworks: Sequence[FrameworkName],
     entry: Entry = ENTRY_EXTRACT,
     extraction_format: ExtractionFormat = FULL_FORMAT,
-    extraction_strategy: ExtractionStrategy = GRAPH_FIRST,
     assertions: bool = False,
-    source_review: bool = False,
     name: str = "analysis_pipeline",
 ) -> Pipeline:
     """Wire the whole graph: prompts, skills, and models onto the topology.
@@ -3493,27 +3079,6 @@ def build_pipeline(
     property of the deployment (``ANALYSIS_ASSERTIONS``) for the reason the
     transport is, and it is refused on an entry that never prepares, because
     a pass nothing reads would spend a submitter's money.
-
-    ``extraction_strategy`` selects which order the head of the graph reads in.
-    ``graph-first`` is production and changes nothing. ``facts-first`` (#1003
-    arm B) replaces ``extract`` with ``facts`` and ``resolve``: the node emits a
-    **Source Fact Bundle** in local handles, and code turns it into the model
-    the validity gate reads and the proposal ``prepare`` resolves. Everything
-    from the gate onward is the same graph, which is what makes a comparison
-    between the two a comparison of reading order.
-
-    **A facts-first graph is refused an ``assert`` node.** Its bundle already
-    carries what the sources state, so a second pass over the model it built
-    would be a second extraction of one thing — the appended pass #1003 rules
-    out, and two readings of one question besides.
-
-    ``source_review`` puts the bounded repair pass (#1003 arms C and D) between
-    the catalog and ``prepare``: ``reading`` renders the model and the rows,
-    ``reread`` proposes typed operations over the sources, and ``apply`` applies
-    the batch or discards it whole. **One pass for both arms**, on either
-    strategy, so what a C-against-D comparison measures is the extraction order
-    and never two applicators. It is refused on a graph that produces no catalog
-    for it to read, and on one that never prepares.
     """
     if entry not in (
         ENTRY_EXTRACT,
@@ -3524,52 +3089,18 @@ def build_pipeline(
         ENTRY_RESUME,
     ):
         raise ValueError(f"unknown graph entry point: {entry!r}")
-    if entry == ENTRY_RESUME and (assertions or source_review):
+    if entry == ENTRY_RESUME and assertions:
         raise ValueError(
             "a resumed job reads the catalog its parent job built, so it runs no"
-            " assertion pass and no source review"
+            " assertion pass"
         )
     if extraction_format not in EXTRACTION_FORMATS:
         raise ValueError(f"unknown extraction format: {extraction_format!r}")
-    if extraction_strategy not in EXTRACTION_STRATEGIES:
-        raise ValueError(f"unknown extraction strategy: {extraction_strategy!r}")
     extracts = entry in EXTRACTING_ENTRIES
-    split = extraction_strategy == FACTS_SPLIT
     # Whether this graph runs the lanes. The head-only entry stops at the
     # catalog, so it builds no ``prepare``, no fan-out and no framework
     # subgraph — and every node below that line is absent rather than unfired.
     analyses = entry != ENTRY_HEAD_ONLY
-    # Both facts-first shapes: one call or two, the reading order is the same
-    # and everything after ``resolve`` is identical. Derived rather than listed,
-    # so a third facts-first spelling is covered by the strategy it names.
-    facts_first = extraction_strategy in (FACTS_FIRST, FACTS_SPLIT)
-    if facts_first and not extracts:
-        raise ValueError(
-            f"entry {entry!r} builds no extraction node, so it cannot be built"
-            f" for the {extraction_strategy!r} strategy"
-        )
-    if facts_first and extraction_format != FULL_FORMAT:
-        raise ValueError(
-            f"the {extraction_strategy!r} strategy writes a bundle rather than a"
-            f" model, so it has no {extraction_format!r} transport"
-        )
-    if facts_first and assertions:
-        raise ValueError(
-            f"the {extraction_strategy!r} strategy already reads what the"
-            " sources state, so an assertion pass over the model it built"
-            " would extract one thing twice"
-        )
-    # Every route that leaves a catalog behind, which is what the review reads.
-    catalogs = assertions or facts_first
-    if source_review and entry not in CATALOGUING_ENTRIES:
-        raise ValueError(
-            f"entry {entry!r} ends in no catalog, so nothing would read a source review"
-        )
-    if source_review and not catalogs:
-        raise ValueError(
-            "a source review reads the catalog beside the model, and this graph"
-            " builds no node that produces one"
-        )
     if not extracts and extraction_format != FULL_FORMAT:
         raise ValueError(
             f"entry {entry!r} builds no extract node, so it cannot be built for"
@@ -3600,13 +3131,9 @@ def build_pipeline(
             tier_nodes=tier_nodes,
             review_independence=binding.review_independence,
             extraction_format=extraction_format if extracts else None,
-            extraction_strategy=extraction_strategy if extracts else None,
         )
 
     if entry == ENTRY_EXTRACT_ONLY:
-        if facts_first:
-            facts = _facts_node(prompt_loader, resolve_model, resolve_sampling)
-            return pipeline(Workflow(name=name, edges=[(START, facts)]), [facts])
         extract = _extract_node(
             prompt_loader, resolve_model, resolve_sampling, extraction_format
         )
@@ -3654,7 +3181,7 @@ def build_pipeline(
             )
             for framework in frameworks
         ]
-    elif catalogs:
+    elif assertions:
         tail = _node(_catalog_node_func(keys), CATALOG_NODE)
     else:
         tail = _node(_pause, PAUSE_NODE)
@@ -3673,42 +3200,15 @@ def build_pipeline(
         assert_node = _assert_node(prompt_loader, resolve_model, resolve_sampling)
         assertion_nodes = [assert_node]
         passes.append((read, [read, assert_node]))
-    if source_review:
-        reading = _node(_read_for_review_func(keys), READ_CATALOG_NODE)
-        reread = _reread_node(prompt_loader, resolve_model, resolve_sampling)
-        apply_node = _node(_apply_node_func(keys), APPLY_NODE)
-        assertion_nodes = [*assertion_nodes, reread]
-        passes.append((reading, [reading, reread, apply_node]))
     chain = [node for _, nodes in passes for node in nodes]
     pass_edges: list[tuple[Any, ...]] = [(*chain, tail)] if chain else []
     first = passes[0][0] if passes else tail
 
     extraction_nodes: list[LlmAgent] = []
     if extracts:
-        # The head differs and nothing after it does. ``facts`` writes a bundle
-        # and ``resolve`` writes the model at the key ``extract`` writes it at,
-        # so one validity gate, one bounded repair and one rejection serve both
-        # strategies — which is the property #1003 needs to compare them.
-        # What sits between the reading node and ``resolve``. Empty on every
-        # route but the split one, which renders its inventory and then states
-        # facts about it.
-        between: list[Any] = []
-        second: LlmAgent | None = None
-        if split:
-            extract = _inventory_node(prompt_loader, resolve_model, resolve_sampling)
-            second = _rows_node(prompt_loader, resolve_model, resolve_sampling)
-            between = [
-                _node(_read_inventory_func(keys), READ_INVENTORY_NODE),
-                second,
-            ]
-            resolve = _node(_resolve_node_func(keys), RESOLVE_NODE)
-        elif facts_first:
-            extract = _facts_node(prompt_loader, resolve_model, resolve_sampling)
-            resolve = _node(_resolve_node_func(keys), RESOLVE_NODE)
-        else:
-            extract = _extract_node(
-                prompt_loader, resolve_model, resolve_sampling, extraction_format
-            )
+        extract = _extract_node(
+            prompt_loader, resolve_model, resolve_sampling, extraction_format
+        )
         repair = _llm_node(
             name=REPAIR_NODE,
             tier_node="repair",
@@ -3724,15 +3224,11 @@ def build_pipeline(
         revalidate = _node(_validate_node_func(keys, FULL_FORMAT), REVALIDATE_NODE)
         reject = _node(_reject_node_func(keys), REJECT_NODE)
         extraction_nodes = [extract, repair]
-        if second is not None:
-            extraction_nodes.append(second)
         # ``list[tuple[Any, ...]]`` because ADK does not export the alias for
         # a chain element, and a routing-map literal only infers its declared
         # key type under an expected type -- which a bare local has none of.
         head_edges: list[tuple[Any, ...]] = [
-            (START, extract, *between, resolve, validate)
-            if facts_first
-            else (START, extract, validate),
+            (START, extract, validate),
             (
                 validate,
                 {

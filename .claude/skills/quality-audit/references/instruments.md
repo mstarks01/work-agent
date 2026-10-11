@@ -16,8 +16,6 @@ Run everything from the repository root, under `uv run`.
 | `python -m evals.harness.run bind --graphs <artifacts> <proposals>` | binds archived assertion proposals to archived graphs and names every binding the graphs refuse |
 | `python -m evals.harness.run assembly <artifact>` | assembles every archived block again from its drafts and the rulings its report carries, and names any ruled draft the report omits |
 | `python -m evals.harness.run descendants <artifact>` | runs the fan-in again over a sweep's archived proposals, with `--inject` proposals added, and bounds what the critic would keep |
-| `python -m evals.harness.run oracle` | puts a perfect reading of every signed case through the deterministic path and charges each loss to a stage |
-| `python -m evals.harness.run bottleneck` | puts ten hand-authored shapes through the **System Model** and charges every archived miss to a stage |
 | `python -m evals.harness.run stability <artifacts>` | the run-to-run band, from sweeps already paid for |
 | `python -m evals.harness.run compare <before> <after>` | what a prompt edit did: the instruction delta beside the score delta |
 | `python -m evals.harness.run price-verbs` | prices a verb equivalence on the frontier, with no run at all |

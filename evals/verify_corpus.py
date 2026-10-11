@@ -1150,15 +1150,19 @@ def _check_facts(
 def _unheld_issues(
     case_dir: Path, facts: ReferenceFacts, sources: Mapping[str, str]
 ) -> Iterator[str]:
-    """Each unheld fact quotes its source and names claims the case still holds.
+    """Each unheld fact is stated once, quotes its source and names held claims.
 
     A quote is located by :func:`~analysis_service.assertions.support_span`,
     the reader that locates a row's quote, so the two lists cannot disagree
     about what the source says. A claim is matched by its place and its
     digest, so an edit to either leaves the entry stale and fails here.
     """
+    stated: dict[str, int] = {}
     for number, entry in enumerate(facts.unheld):
         where = f"{FACTS_FILE}: unheld {number}"
+        if entry.fact in stated:
+            yield f"{where}: states what unheld {stated[entry.fact]} already states"
+        stated.setdefault(entry.fact, number)
         for quote in entry.quotes:
             text = sources.get(quote.source_label)
             if (

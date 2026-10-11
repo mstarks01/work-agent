@@ -76,12 +76,7 @@ from analysis_service.graph import (
     CATALOGUING_ENTRIES,
     ENTRY_EXTRACT,
     EXTRACTING_ENTRIES,
-    FACTS_FIRST,
-    FACTS_SPLIT,
-    FACTS_STRATEGIES,
-    GRAPH_FIRST,
     Entry,
-    ExtractionStrategy,
     ModelResolver,
     Pipeline,
     build_pipeline,
@@ -153,43 +148,6 @@ COMPACT_EXTRACTION_VAR = "ANALYSIS_COMPACT_EXTRACTION"
 #: other than an affirmative turns it off. A report built without the pass
 #: carries ``assertions: null`` and every other field it carries with it.
 ASSERTIONS_VAR = "ANALYSIS_ASSERTIONS"
-#: Read the sources facts-first (#1003 arm B): ``facts`` emits a **Source Fact
-#: Bundle** and ``resolve`` turns it into the model the validity gate reads and
-#: the proposal ``prepare`` resolves. Off by default, so an install that sets
-#: nothing runs the graph it always ran. It carries its own assertion rows, so
-#: it is refused together with ``ANALYSIS_ASSERTIONS``: a second pass over the
-#: model the bundle built would extract one thing twice.
-FACTS_FIRST_EXTRACTION_VAR = "ANALYSIS_FACTS_FIRST_EXTRACTION"
-#: Split the facts-first reading across two calls (#1003 arm E): ``inventory``
-#: names what the sources hold and ``rows`` states what they say about it. Off
-#: by default. It selects the facts-first *order* and differs only in how many
-#: calls the reading is spread over, so it is read instead of the variable
-#: above rather than beside it.
-FACTS_SPLIT_EXTRACTION_VAR = "ANALYSIS_FACTS_SPLIT_EXTRACTION"
-#: Run the bounded source review on every job (#1003 arms C and D): ``reread``
-#: reads the sources once more against the model and the catalog, and ``apply``
-#: applies the typed operations it proposes or discards the batch whole. Off by
-#: default. It reads a catalog, so it needs a route that produces one — either
-#: ``ANALYSIS_ASSERTIONS`` or ``ANALYSIS_FACTS_FIRST_EXTRACTION``.
-SOURCE_REVIEW_VAR = "ANALYSIS_SOURCE_REVIEW"
-
-
-def _strategy(env: Mapping[str, str]) -> ExtractionStrategy:
-    """Which reading order and division of labour this install selects.
-
-    A table read in order rather than a chain of conditions, so a strategy
-    added to the vocabulary is selected by a row here. The split route names
-    the facts-first *order* and differs only in how many calls it spreads the
-    reading over, so the two variables are alternatives: an install setting
-    both gets the split, which is the more specific of the two.
-    """
-    for var, strategy in (
-        (FACTS_SPLIT_EXTRACTION_VAR, FACTS_SPLIT),
-        (FACTS_FIRST_EXTRACTION_VAR, FACTS_FIRST),
-    ):
-        if env_flag(env, var):
-            return strategy
-    return GRAPH_FIRST
 
 
 def _path(env: Mapping[str, str], var: str, default: Path) -> Path:
@@ -269,17 +227,10 @@ class Deployment:
     #: everything else held fixed, so letting a submission pick one would make
     #: two reports incomparable for a reason neither of them records.
     extraction_format: ExtractionFormat = FULL_FORMAT
-    #: Which order this install asks the head of the graph to read in, on the
-    #: same reasoning as the transport: the two strategies are compared with
-    #: everything else held fixed.
-    extraction_strategy: ExtractionStrategy = GRAPH_FIRST
     #: Whether every job runs the assertion pass. A property of the deployment
     #: for the reason the transport is: a report with the pass and one without
     #: are compared with everything else held fixed.
     assertions: bool = True
-    #: Whether every job runs the bounded source review. A property of the
-    #: deployment for the reason the pass ahead of it is.
-    source_review: bool = False
     # Held only to derive each vendor's credentials when the adapters are built.
     # Out of repr and equality: a deployment in a log must not carry a key. A
     # copy taken by :meth:`from_env`, never the caller's live mapping: a
@@ -336,9 +287,7 @@ class Deployment:
             extraction_format=(
                 COMPACT_FORMAT if env_flag(env, COMPACT_EXTRACTION_VAR) else FULL_FORMAT
             ),
-            extraction_strategy=_strategy(env),
             assertions=env_flag(env, ASSERTIONS_VAR, default=True),
-            source_review=env_flag(env, SOURCE_REVIEW_VAR),
             env=MappingProxyType(dict(env)),
         )
 
@@ -441,42 +390,20 @@ class Deployment:
             # extract — so this install's choice reaches the graphs that have one
             # and the others are built for the route they actually run.
             extraction_format=self.extraction_format if extracts else FULL_FORMAT,
-            # The same rule as the transport: only a graph with an extraction
-            # node carries a strategy, and the builder refuses one on a graph
-            # that has none.
-            extraction_strategy=(self.extraction_strategy if extracts else GRAPH_FIRST),
             # The pass sits ahead of ``prepare``, so only an entry that builds
             # one carries it; the extraction and assertion eval entries run
             # their one node and stop.
-            # A facts-first graph carries its own rows, and the builder refuses
-            # the two together — so an install that sets both variables gets the
-            # strategy it asked for and no appended pass.
-            assertions=(
-                self.assertions
-                and entry in CATALOGUING_ENTRIES
-                and self.extraction_strategy not in FACTS_STRATEGIES
-            ),
-            # The review reads a catalog, so an install that asks for it on a
-            # route producing none gets the route it configured and no review —
-            # the same shape the assertion flag takes on an entry that never
-            # prepares. The builder refuses the pair outright; this is what
-            # keeps a deployment from asking for it.
-            source_review=(
-                self.source_review
-                and entry in CATALOGUING_ENTRIES
-                and (self.assertions or self.extraction_strategy in FACTS_STRATEGIES)
-            ),
+            assertions=self.assertions and entry in CATALOGUING_ENTRIES,
         )
 
     @property
     def carries_catalog(self) -> bool:
         """Whether a production job here builds an assertion catalog.
 
-        Either the assertion pass runs, or a facts-first reading carries its
-        own rows. A link answer writes into that catalog, so a deployment with
-        none has no reader for one and refuses it at submission.
+        A link answer writes into that catalog, so a deployment with none has
+        no reader for one and refuses it at submission.
         """
-        return self.assertions or self.extraction_strategy in FACTS_STRATEGIES
+        return self.assertions
 
     @cached_property
     def gate(self) -> CertificationGate:

@@ -1369,19 +1369,12 @@ class TestWhichElementsAGroundIsAbout:
 HOSTILE = "admins | x ## a heading\n```\nfenced\n```"
 
 
-@pytest.mark.parametrize("render", ["catalog", "rows"])
-def test_a_written_value_stays_inside_its_cell(render):
+def test_a_written_value_stays_inside_its_cell():
     """A line break or a ``|`` in a gloss ended the row, and the rest read as a
     heading or a fence of its own (run 11)."""
-    from analysis_service.evidence import render_rows
-
     hostile = row(value="required", scope=[Qualifier(kind="principal", value=HOSTILE)])
     held = assertions(hostile)
-    rendered = (
-        render_catalog(evidence_catalog(valid_model(), held), held)
-        if render == "catalog"
-        else render_rows(held)
-    )
+    rendered = render_catalog(evidence_catalog(valid_model(), held), held)
     table = rendered.split("\n\n", 1)[1].splitlines()
     assert all(line.startswith("| ") and line.endswith(" |") for line in table)
     assert all(line.count(" | ") == 1 for line in table)

@@ -730,6 +730,7 @@ class TestTheRunCompletesItself:
         )
 
         assert report.execution.extraction_format == FULL_FORMAT
+        assert report.execution.extraction_strategy == "graph-first"
 
     def test_the_re_ask_count_is_stamped_from_the_runs_own_nodes(self, graph_run):
         """A driver that built the Job forgot the count; the run cannot."""

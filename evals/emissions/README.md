@@ -34,16 +34,13 @@ wrote, and `evals/harness/archive.py` names the spelling each kind carries.
 | --- | --- | --- |
 | `20260914T2200Z-extract-*`, `20260914T2205Z-extract-sweep` | extraction | the `extract.md` edit of #925, five runs each side |
 | `20260914T201030Z-assert-model-benchmark` | assertions | three models on the `assert` node, #926 |
-| `20260917T-arms-luna-pro` | heads | #1003's arms A, B and E over 13 cases, one repeat each |
+| `20260917T-arms-luna-pro` | heads | the head over 13 cases, one repeat, on luna-pro |
 | `20260918T-placement-rule` | extraction | the placement rule of #1068, five runs each side |
 | `20260919T-naming-rule` | extraction | the `extract.md` edits of #1076 and #1078, three runs |
-| `20261010T-arms-CD-luna-pro` | heads | #1003's arms C and D over 13 cases, one repeat each; `preflight-C` holds C's case 01 |
 
-The arms sweep carries three reading routes: `arm-A` reads through `extract`,
-`arm-B2` through `facts`, and `arm-E` through the split `inventory` and `rows`
-calls. `evals/harness/replay.py`'s `ROUTES_OF` places each on its own arm, and
-`run.py bottleneck misses` charges every missed reference row of the three to
-the earliest stage that did not carry it.
+The heads sweep reads through `extract` and `assert` and keeps the catalog its
+own run gated, so `replay` grades it against the signed reference without
+re-resolving against the blessed model.
 
 The naming sweeps are one side. `r1..r3` ran on `d42e8f6` with rule 3's naming
 exception from #1076 and the shorter asset vocabulary from #1078; **the other

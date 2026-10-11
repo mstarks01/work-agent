@@ -66,7 +66,6 @@ from pydantic import ValidationError
 from analysis_service.assertions import AssertionRecord
 from analysis_service.sources import text_digest
 from evals.harness import falsify
-from evals.harness.arms import ArmRun
 from evals.harness.artifact import load_artifact
 from evals.harness.bundle import assertions_from_reports
 from evals.harness.modes import AssertionResult
@@ -322,9 +321,9 @@ def _required_fact_recall(
     already on the report, and an artifact key would move the artifact version
     and re-seal every Baseline for a figure the report can answer. Graded by
     the signed reference's own matcher through
-    :func:`~evals.harness.replay.replay_assertions` and counted by
-    :class:`~evals.harness.arms.ArmRun`, the one reader of the endpoint.
-    ``None`` for a job that ran no assertion pass or a case nobody signed.
+    :func:`~evals.harness.replay.replay_assertions`, whose ``recall`` is the
+    one reader of the endpoint. ``None`` for a job that ran no assertion pass
+    or a case nobody signed.
     """
     record = _record(report)
     case = _case_of(report)
@@ -334,7 +333,7 @@ def _required_fact_recall(
     if reference is None:
         return None
     graded = replay_assertions(case, reference, AssertionResult(case.id, {}, record))
-    return ArmRun.of(graded, reference, arm="treatment").recall
+    return graded.recall
 
 
 @dataclass(frozen=True)
@@ -593,7 +592,8 @@ def pooled_recall(paths: Sequence[Path]) -> float:
 
     Found rows over required rows across :data:`RECALL_CASES`, each case
     graded by its signed reference's matcher through
-    :class:`~evals.harness.arms.ArmRun`, the one reader of the endpoint.
+    :func:`~evals.harness.replay.replay_assertions`, the one reader of the
+    endpoint.
     Pooled by row rather than averaged by case, so case 11's three rows weigh
     three and case 01's fifteen weigh fifteen.
     """
@@ -606,11 +606,9 @@ def pooled_recall(paths: Sequence[Path]) -> float:
             reference = signed_reference(CORPUS, case)
             if reference is None:
                 raise ValueError(f"{case_id}: no signed reference to grade against")
-            run = ArmRun.of(
-                replay_assertions(case, reference, result), reference, arm="treatment"
-            )
-            found += run.recovered
-            required += run.required
+            graded = replay_assertions(case, reference, result)
+            found += graded.recovered
+            required += len(graded.required)
     if not required:
         raise ValueError("no required row in these files")
     return found / required

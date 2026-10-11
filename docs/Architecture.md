@@ -24,8 +24,7 @@ flowchart TD
     repair --> revalidate{{revalidate}}
     revalidate -- valid --> assert
     revalidate -- invalid --> reject([rejected])
-    assert --> reread["reread<br/>(base, ANALYSIS_SOURCE_REVIEW)"]
-    reread --> prepare[prepare]
+    assert --> prepare[prepare]
 
     prepare --> analyze["lane agents, in parallel<br/>one per lane of each framework<br/>(strong)"]
     analyze --> merge["merge<br/>(per framework)"]
@@ -172,50 +171,6 @@ one variable and a restart.
 | --- | --- |
 | `ANALYSIS_COMPACT_EXTRACTION` | Ask `extract` for the compact wire form. Off by default. |
 
-## The extraction strategy
-
-The transport above changes how `extract` spells one answer. A **strategy**
-changes what the reading node is asked for. `ANALYSIS_FACTS_FIRST_EXTRACTION`
-replaces `extract` with two nodes: `facts` reads the sources and writes a
-**Source Fact Bundle** — the things the text names, the interactions between
-them, one statement at a time, and the questions it leaves open, all under
-short handles the model invents — and `resolve` turns that bundle into the
-same `SystemModel` the validity gate reads and a catalog proposal `prepare`
-resolves. From the gate onward the graph is identical, which is what makes a
-comparison between the two strategies a comparison of reading order.
-
-| Strategy | What the reading node writes | Selected by |
-| --- | --- | --- |
-| graph-first | a `SystemModel` in one pass | the default |
-| facts-first | a `SourceFactBundle`, resolved in code | `ANALYSIS_FACTS_FIRST_EXTRACTION` |
-| facts-split | the same bundle, across two calls | `ANALYSIS_FACTS_SPLIT_EXTRACTION` |
-
-The third exists because the first two differ in **two** ways at once: the
-reading order, and how many calls the work is spread over — graph-first runs
-`extract` and `assert`, facts-first runs one node that does both. A comparison
-between them cannot say which of those a difference belongs to. `facts-split`
-holds the order and splits the calls: `inventory` names the things, the
-interactions and the zones, and `rows` states the facts about them. Each call is
-read only for the half it owns, and a call that answered the other half is
-reported rather than merged in.
-
-`facts` runs on the same tier row as `extract`, because it is the extraction
-stage under another order and the comparison needs both on one model. The
-report records which strategy ran, in
-[`execution.extraction_strategy`](Report-Schema.md#execution).
-
-The strategy carries its own assertion rows, so it is refused together with
-`ANALYSIS_ASSERTIONS`: a second pass over the model the bundle built would
-read one thing twice. It is refused with the compact transport for the same
-kind of reason — the bundle is not a model, so it has no compact wire form.
-
-This is an experiment ([#1003](https://github.com/mstarks01/work-agent/issues/1003)),
-disabled by default and unmeasured. No run has compared the two.
-
-| Variable | Effect |
-| --- | --- |
-| `ANALYSIS_FACTS_FIRST_EXTRACTION` | Read the sources facts-first. Off by default. |
-
 ## The assertion pass
 
 The assertion pass puts one more `base`-tier call into every job, between
@@ -235,48 +190,19 @@ what a lane may cite.
 
 An `assert` node that writes nothing fails the job, on the rule a silent lane
 fails it: a pass the deployment selected and a pass that never ran are not the
-same report. The pass is off by default, and a report built without it carries
-`assertions: null` and every other field it carried before.
+same report. A report built without the pass carries `assertions: null` and
+every other field it carried before.
 
 | Variable | Effect |
 | --- | --- |
 | `ANALYSIS_ASSERTIONS` | Run the assertion pass on every job. On by default; `false` turns it off. |
 
-## The source review
-
-`ANALYSIS_SOURCE_REVIEW` puts a bounded repair pass between the catalog and
-`prepare`. `reading` renders the model and every recorded statement, `reread`
-reads the sources once more against them and proposes typed operations — add an
-element, add an interaction, add a statement, retract one, or mark a question
-open — and `apply` applies the batch or discards it whole. A correction is a
-retraction and an addition, because a statement's identity is computed from its
-own parts.
-
-Nothing lands on a stale reading. Every operation names what it assumes about
-the artifacts it was written against, an operation that reaches a refused one is
-refused with it, and a batch whose result fails the validity or catalog gate is
-discarded entirely, with the artifacts the pass was shown left standing. The
-outcomes say which happened.
-
-The pass reads a catalog, so it needs a route that produces one — either
-`ANALYSIS_ASSERTIONS` or `ANALYSIS_FACTS_FIRST_EXTRACTION`. One pass serves
-both, on purpose: it is the same three nodes over either head, so a comparison
-between them measures the extraction order and never two applicators.
-
-This is an experiment ([#1003](https://github.com/mstarks01/work-agent/issues/1003)),
-disabled by default and unmeasured.
-
-| Variable | Effect |
-| --- | --- |
-| `ANALYSIS_SOURCE_REVIEW` | Read the sources once more and patch what they support. Off by default. |
-
-The experiment is scored on the catalog, and no lane writes one, so the eval
-harness carries a **head-only** entry: `run.py run --mode heads` runs one arm's
-reading node, the validity gate, the bounded repair and whichever passes the
-deployment selects, resolves the catalog through the seam `prepare` resolves
-through, and stops. Measured against a recorded STRIDE sweep, running the lanes
-as well would cost roughly seventeen times as much for findings the endpoint
-never reads.
+Required-fact recall is scored on the catalog, and no lane writes one, so the
+eval harness carries a **head-only** entry: `run.py run --mode heads` runs the
+reading node, the validity gate, the bounded repair and the assertion pass,
+resolves the catalog through the seam `prepare` resolves through, and stops.
+Measured against a recorded STRIDE sweep, running the lanes as well would cost
+roughly seventeen times as much for findings the endpoint never reads.
 
 ## Models
 

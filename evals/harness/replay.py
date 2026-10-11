@@ -67,10 +67,8 @@ sources state and not everything they do not, so a row outside it is a
 candidate for a ruling and never an error by inference. A row the resolver
 dropped is ``rejected``.
 
-**A row no reference row took is not a wrong one.** :data:`ADJUDICATED` is the
-only denominator a precision figure may use, and :data:`UNRULED` — the rows
-outside it — is reported beside that figure as the adjudication coverage. That
-holds for ``misattached`` as much as for ``unreviewed``: it fires where the
+**A row no reference row took is not a wrong one.** ``misattached`` and
+``unreviewed`` are leads for a ruling and never errors: each fires where the
 reference is silent on a subject and predicate, and silence is not disagreement.
 
 **A reference an agent drafted grades nothing.** A case whose facts file
@@ -230,28 +228,6 @@ PRODUCED_FATES: tuple[ProducedFate, ...] = (
     "misattached",
     "unreviewed",
 )
-
-#: The produced rows no reference row took. Both are **leads for a ruling and
-#: never errors**: ``misattached`` says a reference row carries this predicate
-#: and value on another subject, which is a reason to look and not a verdict;
-#: ``unreviewed`` says nothing signed mentions it at all.
-UNRULED: frozenset[str] = frozenset({"misattached", "unreviewed"})
-
-#: The produced rows a reference row took, right or wrong. The denominator of a
-#: precision figure, because a row no reference row took carries no adjudication
-#: and a rate that counted it would move when the reference grew.
-#:
-#: **``misattached`` is outside it.** That fate fires exactly where the
-#: reference holds no row on the produced row's subject and predicate — it is
-#: silence, and a reference lists what the sources state rather than everything
-#: they do not. Over three live arms, 49 of 50 such rows sat on a subject and
-#: predicate the reference says nothing about. Charging them as wrong claims
-#: charges a route for reading more than a reviewer ruled on.
-ADJUDICATED: frozenset[str] = frozenset(PRODUCED_FATES) - UNRULED
-
-#: The rows a reference row took and disagreed with: a wrong value, a wrong
-#: scope, or a value claimed with another force.
-ADJUDICATED_WRONG: frozenset[str] = ADJUDICATED - {"found", "worded"}
 
 
 @dataclass(frozen=True)
@@ -507,6 +483,13 @@ class AssertionReplay:
         )
 
     @property
+    def recall(self) -> float:
+        """Required-fact recall for one run. A case with no required row is 1.0."""
+        if not self.required:
+            return 1.0
+        return self.recovered / len(self.required)
+
+    @property
     def credited(self) -> frozenset[str]:
         """The rows only the looser key answered, which is the gap itself.
 
@@ -669,8 +652,8 @@ def required_rows(reference: SignedReference) -> tuple[str, ...]:
     question the source raised and left open, and a route that leaves it open
     has lost nothing.
 
-    A justified inference is out too. #1003's primary endpoint is stated facts
-    and so is #926's Phase 6 denominator, and inference recall is reported
+    A justified inference is out too. Required-fact recall counts stated facts
+    and so does #926's Phase 6 denominator, and inference recall is reported
     beside them rather than mixed into either.
 
     It sits here, beside the signed reference it reads, because it is a
@@ -1126,9 +1109,8 @@ class Arm:
     is exactly the per-phase model comparison #961 step 6 asks for.
 
     ``nodes`` and ``instructions`` are tuples because a reading route can be
-    more than one call: #1003's arm E splits the reading into ``inventory``
-    and ``rows``, and each call carries its own prompt. A single-call route
-    holds one of each, which is every archived sweep before that arm.
+    more than one call, and each call carries its own prompt. A single-call
+    route holds one of each, which is every archived sweep.
     """
 
     nodes: tuple[str, ...]
@@ -1155,28 +1137,24 @@ class Arm:
 #: repair's emission is archived and not graded here.
 #:
 #: **A route rather than a node**, because a reading can be more than one call.
-#: #1003's head-only mode builds its graph three ways: ``extract`` reads the
-#: sources into a graph, ``facts`` reads them into a bundle, and the split
-#: route reads them into a bundle over two calls. Which route a sweep ran is
-#: the very thing that separates its arms, so the reader takes the one route
-#: whose every node the sweep carries and refuses a sweep carrying two.
+#: The reader takes the one route whose every node the sweep carries and
+#: refuses a sweep carrying two.
 #:
-#: A table keyed by mode, listing routes: a fourth route added to a mode is one
+#: A table keyed by mode, listing routes: a second route added to a mode is one
 #: entry here, and a sweep that ran it is placed rather than refused.
 ROUTES_OF: Mapping[str, tuple[tuple[str, ...], ...]] = {
     "extraction": (("extract",),),
     "end-to-end": (("extract",),),
     "assertions": (("assert",),),
-    "heads": (("extract",), ("facts",), ("inventory", "rows")),
+    "heads": (("extract",),),
 }
 
 
 #: What each replayable mode keeps beside its artifact, and so which emission a
 #: replay grades. **Apart from** :data:`ROUTES_OF`, which answers a different
-#: question — which nodes' instructions place the sweep on an arm. The two gave
-#: one answer only while a mode's reading node and its kept emission moved
-#: together; #1003's head-only mode reads through ``extract``, through ``facts``
-#: or through the split route, and keeps a catalog every way.
+#: question — which nodes' instructions place the sweep on an arm. The head-only
+#: mode reads through ``extract`` and keeps a catalog, so the two tables answer
+#: apart.
 KEEPS: Mapping[str, str] = {
     "extraction": "extraction",
     "end-to-end": "extraction",
@@ -1605,7 +1583,7 @@ def _render_assertions(pool: dict[str, Any], targets: int) -> None:
         f"  found {pool['found']} strictly, +{pool['relabelled']} stated under"
         " another flow label"
     )
-    # Required-fact recall: the endpoint #926's Phase 6 and #1003 both read.
+    # Required-fact recall: the endpoint #926's Phase 6 reads.
     # ``found`` above counts every reference row, inferred and unknown ones
     # included; this counts only the stated rows the denominator holds.
     required, recovered = pool["required"], pool["recovered"]
