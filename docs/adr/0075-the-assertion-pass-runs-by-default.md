@@ -34,9 +34,14 @@ promotion needs. Their quality gates are not read.
 ## Decision
 
 **The assertion pass runs on every job by default** (maintainer's decision of
-2026-10-09). `ANALYSIS_ASSERTIONS` set to a value that is not an affirmative
-turns it off. A deployment that selects a facts-first reading runs no pass,
-because that reading writes its own rows.
+2026-10-09). `ANALYSIS_ASSERTIONS` set to a non-empty value that is not an
+affirmative turns it off. An unset or empty variable keeps the default. A
+deployment that selects a facts-first reading runs no pass, because that
+reading writes its own rows.
+
+> **Amended by [ADR 0076](0076-the-graph-first-route-is-the-one-extraction-route.md).**
+> The facts-first reading is removed, so no deployment selects it and the
+> pass runs on every job.
 
 The decision does not rest on the promotion gates, and it does not pass them.
 They stay as the record of what a measured promotion needs.

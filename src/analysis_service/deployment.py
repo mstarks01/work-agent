@@ -144,8 +144,9 @@ REQUIRE_CERTIFIED_VAR = "ANALYSIS_REQUIRE_CERTIFIED"
 COMPACT_EXTRACTION_VAR = "ANALYSIS_COMPACT_EXTRACTION"
 #: Run the assertion pass on every job: the ``assert`` node between the
 #: validity gate and ``prepare``, whose settled rows the evidence catalog
-#: offers and the report embeds (ADR 0036). On by default (ADR 0075); a value
-#: other than an affirmative turns it off. A report built without the pass
+#: offers and the report embeds (ADR 0036). On by default (ADR 0075); a
+#: non-empty value other than an affirmative turns it off, and an unset or
+#: empty variable keeps the default. A report built without the pass
 #: carries ``assertions: null`` and every other field it carries with it.
 ASSERTIONS_VAR = "ANALYSIS_ASSERTIONS"
 

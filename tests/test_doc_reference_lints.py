@@ -72,15 +72,9 @@ from pathlib import Path
 
 import pytest
 
-REPO_ROOT = Path(__file__).resolve().parents[1]
+from tests.source_tree import FROZEN_PROSE
 
-#: Trees whose prose describes a state the repository has left, by convention
-#: recorded in ``AGENTS.md`` and ``docs/agents/``. ``.wayfinder/`` holds
-#: completed maps that are archived history rather than live, ``docs/research/``
-#: is frozen evidence, and an audit report under ``evals/experiments/`` names
-#: the artifacts it read on the day — each names files that were real when it
-#: was written, and rewriting any of them would destroy the record.
-FROZEN: tuple[str, ...] = (".wayfinder", "docs/research", "evals/experiments")
+REPO_ROOT = Path(__file__).resolve().parents[1]
 
 #: Directories that hold no prose of this repository's own.
 SKIP_DIRS = frozenset(
@@ -159,7 +153,7 @@ def _sources() -> list[Path]:
             continue
         if SKIP_DIRS.intersection(path.parts):
             continue
-        if _relative(path).startswith(FROZEN):
+        if _relative(path).startswith(FROZEN_PROSE):
             continue
         found.append(path)
     return sorted(found)
