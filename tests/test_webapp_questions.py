@@ -164,13 +164,13 @@ class TestTheToggle:
         client = client_for(tiers, PausingRunner(catalog=False), catalog=False)
         paused = start(client, questions=True)
         asked = event(client.get(f"/events/{paused}").text, "questions")
-        assert asked["questions"] == []
-        assert asked["facts"]
+        assert asked["link_questions"] == []
+        assert asked["early_questions"]
         answered = client.post(
             f"/answer/{paused}",
             json={
                 "links": [],
-                "facts": [{"key": asked["facts"][0]["key"], "value": "yes"}],
+                "facts": [{"key": asked["early_questions"][0]["key"], "value": "yes"}],
                 "revision": 0,
             },
             headers=SAME_ORIGIN,
@@ -187,7 +187,9 @@ class TestTheRounds:
         paused = start(client, questions=True)
         shown = event(client.get(f"/events/{paused}").text, "questions")
         for _ in range(20):
-            facts = [{"key": q["key"], "value": "unknown"} for q in shown["facts"]]
+            facts = [
+                {"key": q["key"], "value": "unknown"} for q in shown["early_questions"]
+            ]
             saved = client.post(
                 f"/answer/{paused}",
                 json={
@@ -199,26 +201,26 @@ class TestTheRounds:
                 headers=SAME_ORIGIN,
             )
             assert saved.status_code == 200, saved.text
-            before = {tuple(q["key"]) for q in shown["facts"]}
+            before = {tuple(q["key"]) for q in shown["early_questions"]}
             shown = saved.json()
             assert shown["run"] == paused, "a save starts no run"
-            assert before <= {tuple(a["key"]) for a in shown["answered"]}
-            if not shown["facts"]:
+            assert before <= {tuple(a["key"]) for a in shown["answered_early"]}
+            if not shown["early_questions"]:
                 break
-            assert shown["stop"] is None
-            assert not before & {tuple(q["key"]) for q in shown["facts"]}
+            assert shown["early_stop"] is None
+            assert not before & {tuple(q["key"]) for q in shown["early_questions"]}
         else:
             pytest.fail("the rounds never ended")
         # The stop says why truthfully: the limits held questions back, or a
         # floor left questions out, exactly where it says so.
-        assert shown["stop"] == (
+        assert shown["early_stop"] == (
             "budget-exhausted"
-            if shown["held_back"]
+            if shown["early_held_back"]
             else "below-floor"
-            if shown["below_floor"]
+            if shown["early_below_floor"]
             else "nothing-left"
         )
-        assert shown["withheld"] == len(shown["held_back"])
+        assert shown["early_withheld"] == len(shown["early_held_back"])
 
         started = client.post(
             f"/answer/{paused}",
@@ -235,7 +237,7 @@ class TestTheRounds:
         paused = start(client, questions=True)
         shown = event(client.get(f"/events/{paused}").text, "questions")
         assert shown["revision"] == 0
-        first, second = (q["key"] for q in shown["facts"][:2])
+        first, second = (q["key"] for q in shown["early_questions"][:2])
 
         def save(key, revision):
             body = {"links": [], "facts": [], "save": True, "skip": [key]}
@@ -260,7 +262,7 @@ class TestTheRounds:
         client = client_for(tiers, PausingRunner(catalog=False), catalog=False)
         paused = start(client, questions=True)
         shown = event(client.get(f"/events/{paused}").text, "questions")
-        keys = _presented(shown["facts"])
+        keys = _presented(shown["early_questions"])
         saved = client.post(
             f"/answer/{paused}",
             json={"links": [], "facts": [], "save": True, "skip": keys, "revision": 0},
@@ -268,9 +270,11 @@ class TestTheRounds:
         )
         assert saved.status_code == 200, saved.text
         after = saved.json()
-        assert sorted(q["key"] for q in after["skipped"]) == sorted(keys)
-        assert not {tuple(k) for k in keys} & {tuple(q["key"]) for q in after["facts"]}
-        assert after["answered"] == []
+        assert sorted(q["key"] for q in after["skipped_early"]) == sorted(keys)
+        assert not {tuple(k) for k in keys} & {
+            tuple(q["key"]) for q in after["early_questions"]
+        }
+        assert after["answered_early"] == []
 
     @pytest.mark.parametrize(
         "skip", ["x", [["a", "b"]], [[1, 2, 3, 4, 5, 6]], [""], ["x" * 201], [7]]
@@ -301,12 +305,14 @@ class TestTheRounds:
                 "links": [],
                 "facts": [],
                 "save": True,
-                "skip": _presented(shown["facts"]),
+                "skip": _presented(shown["early_questions"]),
                 "revision": 0,
             },
             headers=SAME_ORIGIN,
         )
-        asked = next(q for q in skipped.json()["facts"] if q["form"] == "choice")
+        asked = next(
+            q for q in skipped.json()["early_questions"] if q["form"] == "choice"
+        )
         started = client.post(
             f"/answer/{paused}",
             json={
@@ -323,7 +329,9 @@ class TestTheRounds:
         """A refusal of a malformed answer names its question (#1289)."""
         client = client_for(tiers, PausingRunner(catalog=False), catalog=False)
         paused = start(client, questions=True)
-        first = event(client.get(f"/events/{paused}").text, "questions")["facts"][0]
+        first = event(client.get(f"/events/{paused}").text, "questions")[
+            "early_questions"
+        ][0]
         saved = client.post(
             f"/answer/{paused}",
             json={
@@ -358,7 +366,7 @@ class TestTheWholeFlow:
         paused = start(client, questions=True)
         asked = event(client.get(f"/events/{paused}").text, "questions")
 
-        (question,) = asked["questions"]
+        (question,) = asked["link_questions"]
         assert question["principal"] == "customer accounts"
         assert {"id": "entity:customer", "name": "Customer"} in question["options"]
 
@@ -533,9 +541,9 @@ def _run_form_script(steps: str, search: str = "") -> dict:
 def test_the_form_script_asks_answers_and_follows_to_the_report():
     steps = """
 await ids.analyze.listeners.submit({ preventDefault() {} }); await settle();
-streams[0].listeners.questions({ data: JSON.stringify({ run: "r1", questions: [
+streams[0].listeners.questions({ data: JSON.stringify({ run: "r1", link_questions: [
   { principal: "shopper accounts", rows: 2,
-    options: [{ id: "entity:shopper", name: "Shopper" }] }], facts: [] }) });
+    options: [{ id: "entity:shopper", name: "Shopper" }] }], early_questions: [] }) });
 const select = ids.questions.querySelectorAll("select")[0];
 select.value = "entity:shopper";
 await ids.continue.listeners.click(); await settle();
@@ -560,8 +568,8 @@ streams[1].listeners.done({ data: JSON.stringify({ url: "/report/r2" }) });
 def test_an_unanswered_question_is_left_out_of_the_answers():
     steps = """
 await ids.analyze.listeners.submit({ preventDefault() {} }); await settle();
-streams[0].listeners.questions({ data: JSON.stringify({ run: "r1", questions: [
-  { principal: "ml engineers", rows: 1, options: [] }], facts: [] }) });
+streams[0].listeners.questions({ data: JSON.stringify({ run: "r1", link_questions: [
+  { principal: "ml engineers", rows: 1, options: [] }], early_questions: [] }) });
 await ids.continue.listeners.click(); await settle();
 """
     seen = _run_form_script(steps)
@@ -589,8 +597,8 @@ def test_the_form_script_sends_an_early_answer_with_the_links():
     ]
     steps = f"""
 await ids.analyze.listeners.submit({{ preventDefault() {{}} }}); await settle();
-streams[0].listeners.questions({{ data: JSON.stringify({{ run: "r1", questions: [],
-  facts: {json.dumps(facts)} }}) }});
+streams[0].listeners.questions({{ data: JSON.stringify({{ run: "r1", link_questions: [],
+  early_questions: {json.dumps(facts)} }}) }});
 const [first] = ids.questions.querySelectorAll("input");
 first.value = "  TLS 1.3 ";
 await ids.continue.listeners.click(); await settle();
@@ -802,10 +810,12 @@ def test_an_early_row_carries_its_element_s_source_words(tiers):
     paused = start(client, questions=True)
     shown = event(client.get(f"/events/{paused}").text, "questions")
     model = valid_model()
-    for row in shown["facts"]:
+    for row in shown["early_questions"]:
         element = model.get(row["key"][0])
         assert row["excerpt"] == ("" if element is None else element.source_excerpt)
-    assert any(row["excerpt"] for row in shown["facts"]), "a control: some are read"
+    assert any(row["excerpt"] for row in shown["early_questions"]), (
+        "a control: some are read"
+    )
 
 
 def test_the_form_page_says_why_and_quotes_the_description():
@@ -821,9 +831,9 @@ def test_the_form_page_says_why_and_quotes_the_description():
     ]
     steps = f"""
 await ids.analyze.listeners.submit({{ preventDefault() {{}} }}); await settle();
-streams[0].listeners.questions({{ data: JSON.stringify({{ run: "r1", questions: [],
-  facts: {json.dumps(rows)}, remaining: {{ field: 1 }},
-  answered: [], answered_links: [], revision: 0 }}) }});
+streams[0].listeners.questions({{ data: JSON.stringify({{ run: "r1", link_questions: [],
+  early_questions: {json.dumps(rows)}, early_remaining: {{ field: 1 }},
+  answered_early: [], answered_links: [], revision: 0 }}) }});
 const walk = (n, out = []) => {{ for (const c of n.children || [])
   if (typeof c === "object") {{ if (c.className === "hint") out.push(c); walk(c, out); }}
   return out; }};
@@ -1243,7 +1253,7 @@ def test_a_full_registry_retries_a_failed_resumed_run_with_its_saved_answers(tie
     )
     paused = start(client, questions=True)
     shown = event(client.get(f"/events/{paused}").text, "questions")
-    saved_fact = {"key": shown["facts"][0]["key"], "value": "yes"}
+    saved_fact = {"key": shown["early_questions"][0]["key"], "value": "yes"}
     saved = client.post(
         f"/answer/{paused}",
         json={"links": [], "facts": [saved_fact], "save": True, "revision": 0},
@@ -1378,8 +1388,8 @@ def test_the_form_script_sends_a_control_s_state():
     ]
     steps = f"""
 await ids.analyze.listeners.submit({{ preventDefault() {{}} }}); await settle();
-streams[0].listeners.questions({{ data: JSON.stringify({{ run: "r1", questions: [],
-  facts: {json.dumps(facts)} }}) }});
+streams[0].listeners.questions({{ data: JSON.stringify({{ run: "r1", link_questions: [],
+  early_questions: {json.dumps(facts)} }}) }});
 const [state] = ids.questions.querySelectorAll("select");
 state.value = "none";
 state.listeners.change();
@@ -1426,8 +1436,8 @@ def _early_control_calls(steps: str) -> list:
     ]
     steps = f"""
 await ids.analyze.listeners.submit({{ preventDefault() {{}} }}); await settle();
-streams[0].listeners.questions({{ data: JSON.stringify({{ run: "r1", questions: [],
-  facts: {json.dumps(facts)} }}) }});
+streams[0].listeners.questions({{ data: JSON.stringify({{ run: "r1", link_questions: [],
+  early_questions: {json.dumps(facts)} }}) }});
 const [state] = ids.questions.querySelectorAll("select");
 const [input] = ids.questions.querySelectorAll("input");
 {steps}
@@ -1501,8 +1511,8 @@ def test_the_form_script_shows_what_the_service_is_doing():
     steps = """
 await ids.analyze.listeners.submit({ preventDefault() {} }); await settle();
 calls.push({ building: !ids.status.hidden, text: ids["status-text"].textContent });
-streams[0].listeners.questions({ data: JSON.stringify({ run: "r1", questions: [],
-  facts: [] }) });
+streams[0].listeners.questions({ data: JSON.stringify({ run: "r1", link_questions: [],
+  early_questions: [] }) });
 calls.push({ paused: ids.status.hidden });
 await ids.continue.listeners.click(); await settle();
 calls.push({ analysing: !ids.status.hidden, text: ids["status-text"].textContent });
@@ -1539,8 +1549,8 @@ def _control_row(flow, form="control"):
 
 _SHARED_STEPS = """
 await ids.analyze.listeners.submit({ preventDefault() {} }); await settle();
-streams[0].listeners.questions({ data: JSON.stringify({ run: "r1", questions: [],
-  facts: FACTS, remaining: {}, answered: [], answered_links: [], revision: 0 }) });
+streams[0].listeners.questions({ data: JSON.stringify({ run: "r1", link_questions: [],
+  early_questions: FACTS, early_remaining: {}, answered_early: [], answered_links: [], revision: 0 }) });
 const [group] = ids.questions.querySelectorAll("details");
 const child = (r, tag) => r.children.find(c => typeof c === "object" && c.tag === tag);
 const walk = (n, out = []) => { for (const c of n.children || [])
@@ -1616,8 +1626,8 @@ def test_the_form_script_collects_a_category_in_one_box_with_a_row_per_element()
     ]
     steps = f"""
 await ids.analyze.listeners.submit({{ preventDefault() {{}} }}); await settle();
-streams[0].listeners.questions({{ data: JSON.stringify({{ run: "r1", questions: [],
-  facts: {json.dumps(facts)} }}) }});
+streams[0].listeners.questions({{ data: JSON.stringify({{ run: "r1", link_questions: [],
+  early_questions: {json.dumps(facts)} }}) }});
 const groups = ids.questions.querySelectorAll("details").filter(g => g.className === "question-group");
 const rowsOf = g => g.children.filter(r => r.tag === "p");
 const child = (r, tag) => r.children.find(c => typeof c === "object" && c.tag === tag);
@@ -1674,8 +1684,8 @@ def test_the_pause_asks_facets_as_a_table_with_a_same_for_all_row():
     facts = [facet_fact(store), facet_fact(flow)]
     steps = f"""
 await ids.analyze.listeners.submit({{ preventDefault() {{}} }}); await settle();
-streams[0].listeners.questions({{ data: JSON.stringify({{ run: "r1", questions: [],
-  facts: {json.dumps(facts)} }}) }});
+streams[0].listeners.questions({{ data: JSON.stringify({{ run: "r1", link_questions: [],
+  early_questions: {json.dumps(facts)} }}) }});
 const [table] = ids.questions.querySelectorAll("table");
 const [head, all, ...rows] = table.children;
 calls.push({{ columns: head.children.map(c => c.textContent), rows: rows.length }});
@@ -1714,8 +1724,8 @@ def test_a_facet_table_sets_a_column_only_over_two_rows(rows, shared):
     facts = [facet_fact(element) for element in elements[:rows]]
     steps = f"""
 await ids.analyze.listeners.submit({{ preventDefault() {{}} }}); await settle();
-streams[0].listeners.questions({{ data: JSON.stringify({{ run: "r1", questions: [],
-  facts: {json.dumps(facts)} }}) }});
+streams[0].listeners.questions({{ data: JSON.stringify({{ run: "r1", link_questions: [],
+  early_questions: {json.dumps(facts)} }}) }});
 const [table] = ids.questions.querySelectorAll("table");
 calls.push({{ labels: table.children.map(row => row.children[0].textContent) }});
 """
@@ -1733,8 +1743,8 @@ def test_every_facet_answer_the_page_offers_is_one_the_service_takes(value):
     facts = [facet_fact(store)]
     steps = f"""
 await ids.analyze.listeners.submit({{ preventDefault() {{}} }}); await settle();
-streams[0].listeners.questions({{ data: JSON.stringify({{ run: "r1", questions: [],
-  facts: {json.dumps(facts)} }}) }});
+streams[0].listeners.questions({{ data: JSON.stringify({{ run: "r1", link_questions: [],
+  early_questions: {json.dumps(facts)} }}) }});
 const [table] = ids.questions.querySelectorAll("table");
 const select = table.children[1].children[1].children[0];
 calls.push({{ offered: select.children.map(o => o.value) }});
@@ -1813,8 +1823,8 @@ def test_the_report_page_offers_one_optional_follow_up():
 def test_a_pause_with_nothing_to_ask_starts_the_analysis_at_once():
     steps = """
 await ids.analyze.listeners.submit({ preventDefault() {} }); await settle();
-streams[0].listeners.questions({ data: JSON.stringify({ run: "r1", questions: [],
-  facts: [], remaining: {}, stop: "nothing-left", answered: [], answered_links: [] }) });
+streams[0].listeners.questions({ data: JSON.stringify({ run: "r1", link_questions: [],
+  early_questions: [], early_remaining: {}, early_stop: "nothing-left", answered_early: [], answered_links: [] }) });
 await settle();
 """
     seen = _run_form_script(steps)
@@ -1834,12 +1844,12 @@ def test_the_last_save_waits_for_the_start_button(withheld, said):
     ready = {
         "run": "r1",
         "revision": 4,
-        "questions": [],
-        "facts": [],
-        "remaining": {},
-        "stop": "budget-exhausted" if withheld else "nothing-left",
-        "withheld": withheld,
-        "answered": [],
+        "link_questions": [],
+        "early_questions": [],
+        "early_remaining": {},
+        "early_stop": "budget-exhausted" if withheld else "nothing-left",
+        "early_withheld": withheld,
+        "answered_early": [],
         "answered_links": [
             {
                 "principal": "shopper accounts",
@@ -1851,10 +1861,10 @@ def test_the_last_save_waits_for_the_start_button(withheld, said):
     }
     steps = f"""
 await ids.analyze.listeners.submit({{ preventDefault() {{}} }}); await settle();
-streams[0].listeners.questions({{ data: JSON.stringify({{ run: "r1", questions: [
+streams[0].listeners.questions({{ data: JSON.stringify({{ run: "r1", link_questions: [
   {{ principal: "shopper accounts", rows: 2,
-    options: [{{ id: "entity:shopper", name: "Shopper" }}] }}], facts: [],
-  remaining: {{}}, answered: [], answered_links: [], revision: 3 }}) }});
+    options: [{{ id: "entity:shopper", name: "Shopper" }}] }}], early_questions: [],
+  early_remaining: {{}}, answered_early: [], answered_links: [], revision: 3 }}) }});
 ids.questions.querySelectorAll("select")[0].value = "entity:shopper";
 const answered = fetch;
 globalThis.fetch = async (url, init) => {{
@@ -1922,8 +1932,8 @@ def test_the_round_size_counts_its_link_questions():
     steps = f"""
 await ids.analyze.listeners.submit({{ preventDefault() {{}} }}); await settle();
 streams[0].listeners.questions({{ data: JSON.stringify({{ run: "r1",
-  questions: [{json.dumps(link)}], facts: [{json.dumps(row)}],
-  remaining: {{ field: 1 }}, answered: [], answered_links: [], revision: 0 }}) }});
+  link_questions: [{json.dumps(link)}], early_questions: [{json.dumps(row)}],
+  early_remaining: {{ field: 1 }}, answered_early: [], answered_links: [], revision: 0 }}) }});
 const walk = (n, out = []) => {{ for (const c of n.children || [])
   if (typeof c === "object") {{ out.push(c); walk(c, out); }} return out; }};
 calls.push(walk(ids.questions).map(n => n.textContent).find(t => t.includes("This round asks")));
@@ -1951,8 +1961,8 @@ def test_the_round_size_leaves_out_a_part_until_its_parent_is_yes():
     steps = f"""
 await ids.analyze.listeners.submit({{ preventDefault() {{}} }}); await settle();
 streams[0].listeners.questions({{ data: JSON.stringify({{ run: "r1",
-  questions: [], facts: [{json.dumps(parent)}, {json.dumps(part)}],
-  remaining: {{ capability: 2 }}, answered: [], answered_links: [], revision: 0 }}) }});
+  link_questions: [], early_questions: [{json.dumps(parent)}, {json.dumps(part)}],
+  early_remaining: {{ capability: 2 }}, answered_early: [], answered_links: [], revision: 0 }}) }});
 const walk = (n, out = []) => {{ for (const c of n.children || [])
   if (typeof c === "object") {{ out.push(c); walk(c, out); }} return out; }};
 const said = () => walk(ids.questions).map(n => n.textContent)
@@ -1983,8 +1993,8 @@ def test_a_part_of_a_part_hides_with_its_parent():
     steps = f"""
 await ids.analyze.listeners.submit({{ preventDefault() {{}} }}); await settle();
 streams[0].listeners.questions({{ data: JSON.stringify({{ run: "r1",
-  questions: [], facts: {json.dumps(rows)},
-  remaining: {{ capability: 3 }}, answered: [], answered_links: [], revision: 0 }}) }});
+  link_questions: [], early_questions: {json.dumps(rows)},
+  early_remaining: {{ capability: 3 }}, answered_early: [], answered_links: [], revision: 0 }}) }});
 const walk = (n, out = []) => {{ for (const c of n.children || [])
   if (typeof c === "object") {{ out.push(c); walk(c, out); }} return out; }};
 const [a, b] = walk(ids.questions).filter(n => n.tag === "select");
@@ -2012,8 +2022,8 @@ def test_a_capability_says_it_decides_what_an_analysis_covers():
     steps = f"""
 await ids.analyze.listeners.submit({{ preventDefault() {{}} }}); await settle();
 streams[0].listeners.questions({{ data: JSON.stringify({{ run: "r1",
-  questions: [], facts: [{json.dumps(row)}],
-  remaining: {{ capability: 1 }}, answered: [], answered_links: [], revision: 0 }}) }});
+  link_questions: [], early_questions: [{json.dumps(row)}],
+  early_remaining: {{ capability: 1 }}, answered_early: [], answered_links: [], revision: 0 }}) }});
 const walk = (n, out = []) => {{ for (const c of n.children || [])
   if (typeof c === "object") {{ out.push(c); walk(c, out); }} return out; }};
 calls.push(walk(ids.questions).map(n => n.textContent).find(t => t.startsWith("Why:")));
@@ -2026,8 +2036,8 @@ def test_a_link_only_round_says_what_it_asks():
     steps = f"""
 await ids.analyze.listeners.submit({{ preventDefault() {{}} }}); await settle();
 streams[0].listeners.questions({{ data: JSON.stringify({{ run: "r1",
-  questions: [{json.dumps(_LINK)}], facts: [], remaining: {{}},
-  answered: [], answered_links: [], revision: 0 }}) }});
+  link_questions: [{json.dumps(_LINK)}], early_questions: [], early_remaining: {{}},
+  answered_early: [], answered_links: [], revision: 0 }}) }});
 const walk = (n, out = []) => {{ for (const c of n.children || [])
   if (typeof c === "object") {{ out.push(c); walk(c, out); }} return out; }};
 calls.push(walk(ids.questions).map(n => n.textContent).find(t => t.includes("This round asks")));
@@ -2042,9 +2052,9 @@ def test_skip_the_rest_skips_only_the_blank_questions():
     rows = [_text_row(answered, "who?"), _text_row(blank, "when?")]
     steps = f"""
 await ids.analyze.listeners.submit({{ preventDefault() {{}} }}); await settle();
-streams[0].listeners.questions({{ data: JSON.stringify({{ run: "r1", questions: [],
-  facts: {json.dumps(rows)}, remaining: {{ field: 2 }},
-  answered: [], answered_links: [] }}) }});
+streams[0].listeners.questions({{ data: JSON.stringify({{ run: "r1", link_questions: [],
+  early_questions: {json.dumps(rows)}, early_remaining: {{ field: 2 }},
+  answered_early: [], answered_links: [] }}) }});
 ids.questions.querySelectorAll("input")[0].value = "the admins";
 globalThis.fetch = async (url, init) => {{
   calls.push({{ url, body: JSON.parse(init.body) }});
@@ -2074,9 +2084,9 @@ def test_skip_the_rest_sets_aside_a_question_answered_in_part():
     }
     steps = f"""
 await ids.analyze.listeners.submit({{ preventDefault() {{}} }}); await settle();
-streams[0].listeners.questions({{ data: JSON.stringify({{ run: "r1", questions: [],
-  facts: [{json.dumps(row)}], remaining: {{ field: 1 }},
-  answered: [], answered_links: [], revision: 0 }}) }});
+streams[0].listeners.questions({{ data: JSON.stringify({{ run: "r1", link_questions: [],
+  early_questions: [{json.dumps(row)}], early_remaining: {{ field: 1 }},
+  answered_early: [], answered_links: [], revision: 0 }}) }});
 const selects = ids.questions.querySelectorAll("select");
 selects[0].value = "yes";
 globalThis.fetch = async (url, init) => {{
@@ -2094,10 +2104,10 @@ def test_a_skipped_question_can_be_answered_from_its_list():
     kept, skipped = (["", "", "", name, "", ""] for name in ("who?", "when?"))
     steps = f"""
 await ids.analyze.listeners.submit({{ preventDefault() {{}} }}); await settle();
-streams[0].listeners.questions({{ data: JSON.stringify({{ run: "r1", questions: [],
-  facts: [{json.dumps(_text_row(kept, "who?"))}], remaining: {{ field: 1 }},
-  skipped: [{json.dumps(_text_row(skipped, "when?"))}],
-  answered: [], answered_links: [] }}) }});
+streams[0].listeners.questions({{ data: JSON.stringify({{ run: "r1", link_questions: [],
+  early_questions: [{json.dumps(_text_row(kept, "who?"))}], early_remaining: {{ field: 1 }},
+  skipped_early: [{json.dumps(_text_row(skipped, "when?"))}],
+  answered_early: [], answered_links: [] }}) }});
 calls.push({{ listed: !ids.skipped.hidden }});
 const [open] = ids.skipped.querySelectorAll("button");
 open.listeners.click();
@@ -2127,8 +2137,8 @@ def _skip_the_rest(links, facts) -> dict:
     steps = f"""
 await ids.analyze.listeners.submit({{ preventDefault() {{}} }}); await settle();
 streams[0].listeners.questions({{ data: JSON.stringify({{ run: "r1",
-  questions: {json.dumps(links)}, facts: {json.dumps(facts)},
-  remaining: {{ field: 1 }}, answered: [], answered_links: [], revision: 0 }}) }});
+  link_questions: {json.dumps(links)}, early_questions: {json.dumps(facts)},
+  early_remaining: {{ field: 1 }}, answered_early: [], answered_links: [], revision: 0 }}) }});
 globalThis.fetch = async (url, init) => {{
   calls.push({{ url, body: JSON.parse(init.body) }});
   return {{ ok: false, json: async () => ({{ message: "stop here" }}) }};
@@ -2155,9 +2165,9 @@ def test_skip_the_rest_skips_the_blank_links_and_facts_together():
 def test_a_skipped_link_can_be_answered_from_its_list():
     steps = f"""
 await ids.analyze.listeners.submit({{ preventDefault() {{}} }}); await settle();
-streams[0].listeners.questions({{ data: JSON.stringify({{ run: "r1", questions: [],
-  facts: [], remaining: {{}}, skipped: [], skipped_links: [{json.dumps(_LINK)}],
-  answered: [], answered_links: [], revision: 1 }}) }});
+streams[0].listeners.questions({{ data: JSON.stringify({{ run: "r1", link_questions: [],
+  early_questions: [], early_remaining: {{}}, skipped_early: [], skipped_links: [{json.dumps(_LINK)}],
+  answered_early: [], answered_links: [], revision: 1 }}) }});
 const [open] = ids.skipped.querySelectorAll("button");
 open.listeners.click();
 ids.skipped.querySelectorAll("select")[0].value = "entity:shopper";
@@ -2190,9 +2200,9 @@ def test_a_question_answered_in_part_and_skipped_has_one_editor():
     }
     steps = f"""
 await ids.analyze.listeners.submit({{ preventDefault() {{}} }}); await settle();
-streams[0].listeners.questions({{ data: JSON.stringify({{ run: "r1", questions: [],
-  facts: [], remaining: {{}}, skipped: [{json.dumps(question)}],
-  answered: [{json.dumps(answered)}], answered_links: [], revision: 1 }}) }});
+streams[0].listeners.questions({{ data: JSON.stringify({{ run: "r1", link_questions: [],
+  early_questions: [], early_remaining: {{}}, skipped_early: [{json.dumps(question)}],
+  answered_early: [{json.dumps(answered)}], answered_links: [], revision: 1 }}) }});
 calls.push({{ earlier: ids.earlier.querySelectorAll("button").length }});
 const [open] = ids.skipped.querySelectorAll("button");
 open.listeners.click();
@@ -2231,9 +2241,9 @@ def test_an_earlier_answer_can_be_changed():
     del pending["answer"]
     steps = f"""
 await ids.analyze.listeners.submit({{ preventDefault() {{}} }}); await settle();
-streams[0].listeners.questions({{ data: JSON.stringify({{ run: "r1", questions: [],
-  facts: [{json.dumps(pending)}], remaining: {{ field: 1 }},
-  answered: [{json.dumps(answered)}], answered_links: [] }}) }});
+streams[0].listeners.questions({{ data: JSON.stringify({{ run: "r1", link_questions: [],
+  early_questions: [{json.dumps(pending)}], early_remaining: {{ field: 1 }},
+  answered_early: [{json.dumps(answered)}], answered_links: [] }}) }});
 const walk = (n, tag, out = []) => {{ for (const c of n.children || [])
   if (typeof c === "object") {{ if (c.tag === tag) out.push(c); walk(c, tag, out); }}
   return out; }};
@@ -2256,8 +2266,8 @@ def test_a_table_that_comes_back_keeps_its_earlier_facets():
     earlier = {**fact, "answer": {"key": fact["key"], "facets": {"rate": "yes"}}}
     steps = f"""
 await ids.analyze.listeners.submit({{ preventDefault() {{}} }}); await settle();
-streams[0].listeners.questions({{ data: JSON.stringify({{ run: "r1", questions: [],
-  facts: [{json.dumps(fact)}], answered: [{json.dumps(earlier)}] }}) }});
+streams[0].listeners.questions({{ data: JSON.stringify({{ run: "r1", link_questions: [],
+  early_questions: [{json.dumps(fact)}], answered_early: [{json.dumps(earlier)}] }}) }});
 await ids.continue.listeners.click(); await settle();
 """
     seen = _run_form_script(steps)["calls"]
@@ -2407,7 +2417,9 @@ def test_a_refused_answer_to_a_skipped_question_names_it(tiers):
     """The label map includes skipped questions, which still take answers."""
     client = client_for(tiers, PausingRunner(catalog=False), catalog=False)
     paused = start(client, questions=True)
-    first = event(client.get(f"/events/{paused}").text, "questions")["facts"][0]
+    first = event(client.get(f"/events/{paused}").text, "questions")["early_questions"][
+        0
+    ]
     body = {"links": [], "facts": [], "save": True, "skip": [first["key"]]}
     client.post(f"/answer/{paused}", json=body | {"revision": 0}, headers=SAME_ORIGIN)
 
@@ -2429,7 +2441,9 @@ def test_a_save_after_the_start_is_refused(tiers):
     """A save after the start is refused, because no run would read it."""
     client = client_for(tiers, PausingRunner(catalog=False), catalog=False)
     paused = start(client, questions=True)
-    first = event(client.get(f"/events/{paused}").text, "questions")["facts"][0]
+    first = event(client.get(f"/events/{paused}").text, "questions")["early_questions"][
+        0
+    ]
     body = {"links": [], "facts": [], "revision": 0}
     run = client.post(f"/answer/{paused}", json=body, headers=SAME_ORIGIN)
     client.get(f"/events/{run.json()['run']}")
@@ -2491,7 +2505,7 @@ def test_answers_that_break_the_input_limits_are_refused_at_once(tiers, save):
     )
     paused = started.json()["run"]
     shown = event(client.get(f"/events/{paused}").text, "questions")
-    asked = next(q for q in shown["facts"] if q["form"] == "choice")
+    asked = next(q for q in shown["early_questions"] if q["form"] == "choice")
     fact = {"key": asked["key"], "value": asked["choices"][0]["id"]}
 
     sent = client.post(
@@ -2582,7 +2596,6 @@ def test_the_page_opens_a_round_with_the_questions_the_service_counts(case):
     level 2 round is given to both (#1378)."""
     from analysis_service.answer_round import question_set
     from analysis_service.system_model import SystemModel
-    from webapp.main import early_rows
 
     path = PROJECT_ROOT / "evals/corpus" / case / "model.json"
     model = SystemModel.model_validate_json(path.read_text())
@@ -2608,9 +2621,9 @@ def test_the_page_opens_a_round_with_the_questions_the_service_counts(case):
         return
     steps = f"""
 await ids.analyze.listeners.submit({{ preventDefault() {{}} }}); await settle();
-streams[0].listeners.questions({{ data: JSON.stringify({{ run: "r1", questions: [],
-  facts: {json.dumps(early_rows(asked))}, remaining: {{}}, answered: [],
-  answered_links: [], revision: 0 }}) }});
+streams[0].listeners.questions({{ data: JSON.stringify({{ run: "r1", link_questions: [],
+  early_questions: {json.dumps(asked.to_json()["early_questions"])},
+  early_remaining: {{}}, answered_early: [], answered_links: [], revision: 0 }}) }});
 const walk = (n, out = []) => {{ for (const c of n.children || [])
   if (typeof c === "object") {{ out.push(c); walk(c, out); }} return out; }};
 const asked = new Set({json.dumps(capabilities)}.map(k => JSON.stringify(k)));
@@ -2634,7 +2647,9 @@ class TestEarlierAnswers:
         paused = start(client, questions=True)
         shown = event(client.get(f"/events/{paused}").text, "questions")
         key = next(
-            fact["key"] for fact in shown["facts"] if fact["key"][5] == "authentication"
+            fact["key"]
+            for fact in shown["early_questions"]
+            if fact["key"][5] == "authentication"
         )
         started = client.post(
             f"/answer/{paused}",
@@ -3083,9 +3098,9 @@ def test_a_pause_whose_framework_will_not_run_explains_it_and_waits():
     says why instead of starting the analysis unseen (#1542 F1, ADR 0067)."""
     steps = """
 await ids.analyze.listeners.submit({ preventDefault() {} }); await settle();
-streams[0].listeners.questions({ data: JSON.stringify({ run: "r1", questions: [],
-  facts: [], remaining: {gate: 0, capability: 0, field: 0}, stop: "nothing-left",
-  gates: {asvs: "refuted"}, answered: [], answered_links: [], revision: 0 }) });
+streams[0].listeners.questions({ data: JSON.stringify({ run: "r1", link_questions: [],
+  early_questions: [], early_remaining: {gate: 0, capability: 0, field: 0}, early_stop: "nothing-left",
+  framework_gates: {asvs: "refuted"}, answered_early: [], answered_links: [], revision: 0 }) });
 await settle();
 const text = (n) => typeof n === "string" ? n
   : [n.textContent || "", ...(n.children || []).map(text)].join("");
@@ -3109,9 +3124,9 @@ def test_a_question_that_decides_a_framework_says_so():
     }
     steps = f"""
 await ids.analyze.listeners.submit({{ preventDefault() {{}} }}); await settle();
-streams[0].listeners.questions({{ data: JSON.stringify({{ run: "r1", questions: [],
-  facts: [{json.dumps(row)}], remaining: {{gate: 1, capability: 0, field: 0}},
-  gates: {{asvs: "undecidable"}}, answered: [], answered_links: [], revision: 0 }}) }});
+streams[0].listeners.questions({{ data: JSON.stringify({{ run: "r1", link_questions: [],
+  early_questions: [{json.dumps(row)}], early_remaining: {{gate: 1, capability: 0, field: 0}},
+  framework_gates: {{asvs: "undecidable"}}, answered_early: [], answered_links: [], revision: 0 }}) }});
 const text = (n) => typeof n === "string" ? n
   : [n.textContent || "", ...(n.children || []).map(text)].join("");
 calls.push({{ said: text(ids.questions) }});
@@ -3149,17 +3164,17 @@ def test_a_finished_pause_lists_what_stays_open_and_takes_a_held_back_answer():
     ready = {
         "run": "r1",
         "revision": 1,
-        "questions": [],
-        "facts": [],
-        "remaining": {"gate": 0, "capability": 0, "field": 0},
-        "stop": "below-floor",
-        "withheld": 0,
-        "summary": summary,
-        "held_back": [],
-        "below_floor": [low],
-        "answered": [],
+        "link_questions": [],
+        "early_questions": [],
+        "early_remaining": {"gate": 0, "capability": 0, "field": 0},
+        "early_stop": "below-floor",
+        "early_withheld": 0,
+        "early_summary": summary,
+        "early_held_back": [],
+        "early_below_floor": [low],
+        "answered_early": [],
         "answered_links": [],
-        "skipped": [],
+        "skipped_early": [],
     }
     steps = f"""
 await ids.analyze.listeners.submit({{ preventDefault() {{}} }}); await settle();
@@ -3348,7 +3363,7 @@ class TestTheAmendment:
         client = client_for(tiers, runner, catalog=False)
         paused = start(client, questions=True)
         shown = event(client.get(f"/events/{paused}").text, "questions")
-        question = next(q for q in shown["facts"] if q["choices"])
+        question = next(q for q in shown["early_questions"] if q["choices"])
         answer = {"key": question["key"], "value": question["choices"][0]["id"]}
         saved = client.post(
             f"/answer/{paused}",
@@ -3372,7 +3387,7 @@ class TestTheAmendment:
 
         sources = runner.paused_sources[-1]
         assert sources[-1].text == AMENDMENT and sources[-1].label == "Amendment 1"
-        assert answer["key"] in [a["key"] for a in again["answered"]]
+        assert answer["key"] in [a["key"] for a in again["answered_early"]]
         assert again["carried_dropped"] == []
         assert again["carried_dropped_links"] == []
         held = client.post(
@@ -3396,9 +3411,9 @@ class TestTheAmendment:
     def test_the_page_sends_the_correction_and_follows_the_new_run(self):
         steps = """
 await ids.analyze.listeners.submit({ preventDefault() {} }); await settle();
-streams[0].listeners.questions({ data: JSON.stringify({ run: "r1", questions: [],
-  facts: [], remaining: {}, stop: "nothing-left", gates: {asvs: "refuted"},
-  answered: [], answered_links: [], revision: 2 }) });
+streams[0].listeners.questions({ data: JSON.stringify({ run: "r1", link_questions: [],
+  early_questions: [], early_remaining: {}, early_stop: "nothing-left", framework_gates: {asvs: "refuted"},
+  answered_early: [], answered_links: [], revision: 2 }) });
 const box = ids.questions.querySelectorAll("details").find(d => d.className === "amend");
 box.querySelectorAll("textarea")[0].value = "  A loader writes nightly.  ";
 await box.querySelectorAll("button")[0].listeners.click(); await settle();
@@ -3411,9 +3426,9 @@ await box.querySelectorAll("button")[0].listeners.click(); await settle();
     def test_the_page_lists_a_carried_answer_that_does_not_fit(self):
         steps = """
 await ids.analyze.listeners.submit({ preventDefault() {} }); await settle();
-streams[0].listeners.questions({ data: JSON.stringify({ run: "r1", questions: [],
-  facts: [], remaining: {}, stop: "nothing-left", gates: {asvs: "refuted"},
-  answered: [], answered_links: [], revision: 0,
+streams[0].listeners.questions({ data: JSON.stringify({ run: "r1", link_questions: [],
+  early_questions: [], early_remaining: {}, early_stop: "nothing-left", framework_gates: {asvs: "refuted"},
+  answered_early: [], answered_links: [], revision: 0,
   carried_dropped: [{ label: "Old DB: encryption at rest", value: "AES",
     key: ["store:old", "encryption_at_rest", "", "", "", ""] }],
   carried_dropped_links: [{ principal: "batch loader", element: "none" }] }) });
@@ -3492,8 +3507,8 @@ await followUp().listeners.click();
         row = _text_row(["", "", "", "", "", "authentication"], "Sign-in?") | shape
         steps = f"""
 await ids.analyze.listeners.submit({{ preventDefault() {{}} }}); await settle();
-streams[0].listeners.questions({{ data: JSON.stringify({{ run: "r1", questions: [],
-  facts: {json.dumps([row])}, remaining: {{capability: 1}}, answered: [],
+streams[0].listeners.questions({{ data: JSON.stringify({{ run: "r1", link_questions: [],
+  early_questions: {json.dumps([row])}, early_remaining: {{capability: 1}}, answered_early: [],
   answered_links: [], revision: 0 }}) }});
 ids.questions.querySelectorAll("select")[0].value = "yes";
 ids.questions.querySelectorAll("input").find(i => i.className === "answer-detail")

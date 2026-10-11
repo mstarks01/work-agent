@@ -155,8 +155,8 @@ these principals, such as "no MFA for shopper accounts", but never say which
 element each one is, so no rule can place those facts.
 `GET /v1/jobs/{id}/questions` lists the questions, and the report page shows
 the same list. Each entry is `{key, principal, rows, options}`: `rows` is how
-many stated facts an answer would place, and `options` are the element IDs an
-answer may name. The most rows come first.
+many stated facts an answer would place, and `options` lists the elements an
+answer may name, each as `{id, name}`. The most rows come first.
 
 **Ask before the analysis runs.** Submit with `"questions": true` beside the
 sources. The job stops after extraction, and after the assertion pass where
@@ -170,8 +170,12 @@ asks no link question, and asks its early questions.
 A waiting job also lists `early_questions`: the open facts of its model, most
 likely needed first, before any finding exists. Each entry is
 `{key, kind, label, reasons, choices, form, suggestions, facets, max_length,
-group, group_heading, element}`. `kind`, `choices`, `form`, `suggestions`,
-`facets` and `max_length` are as they are for a report's open facts below. `group` is the question kind or the attribute, and
+group, group_heading, element, excerpt}`. `kind`, `form`, `suggestions`,
+`facets` and `max_length` are as they are for a report's open facts below.
+`choices` lists each choice as `{id, name}`: `name` is the element's name
+where the choice is an element, and empty otherwise. `excerpt` is the words
+of the source the question's element was read from, and empty where the
+question names no element. `group` is the question kind or the attribute, and
 `group_heading` is its question with no element named, so a page can ask each
 once and list the elements under it by their `element` name. The list keeps
 its order within and across groups.

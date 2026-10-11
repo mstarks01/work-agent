@@ -275,7 +275,10 @@ class TestTheRoute:
             if passes_floor(question, listed) and question.kind != "capability"
         ]
         expected = eligible[: EARLY_RULES["field"].per_round]
-        assert body["early_questions"] == [q.to_json() for q in expected]
+        # The route's row adds each choice's element name and the excerpt.
+        assert [q["key"] for q in body["early_questions"]] == [
+            list(q.key) for q in expected
+        ]
         assert body["early_questions"]
 
     def test_a_finished_job_asks_nothing_early(self):

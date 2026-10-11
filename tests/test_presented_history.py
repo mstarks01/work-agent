@@ -68,8 +68,8 @@ def _sent_by_the_page(parent_value):
     steps = f"""
 await ids.analyze.listeners.submit({{ preventDefault() {{}} }}); await settle();
 streams[0].listeners.questions({{ data: JSON.stringify({{ run: "r1",
-  questions: [], facts: {json.dumps(rows)}, remaining: {{capability: 2}},
-  answered: [], answered_links: [], revision: 0 }}) }});
+  link_questions: [], early_questions: {json.dumps(rows)}, early_remaining: {{capability: 2}},
+  answered_early: [], answered_links: [], revision: 0 }}) }});
 const parent = ids.questions.querySelectorAll("select")[0];
 parent.value = {json.dumps(parent_value)}; parent.listeners.change();
 globalThis.fetch = async (url, init) => {{
