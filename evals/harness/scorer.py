@@ -54,7 +54,7 @@ from __future__ import annotations
 from collections import Counter
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
-from typing import Any, Literal
+from typing import TYPE_CHECKING, Any, Literal
 
 from analysis_service.claims import (
     SeverityLevel,
@@ -68,6 +68,9 @@ from evals.harness.fingerprint import key_claim
 from evals.harness.identity import ClaimPair, ClaimRuling, Matcher
 from evals.harness.ledger import Ledger, Vote
 from evals.harness.reference import MUST_FIND, GoldenCase, ReferenceThreat
+
+if TYPE_CHECKING:
+    from evals.harness.instruments import Cases
 
 
 def candidate_claim(threat: DraftThreat) -> str:
@@ -924,8 +927,8 @@ def render(scores: Sequence[CaseScore]) -> None:
             )
 
 
-def published(blocks: Mapping[str, Any], metric: str) -> float | None:
-    """One metric's mean across the cases that **finished**, for the table.
+def published(blocks: Mapping[str, Any], metric: str, cases: Cases) -> float | None:
+    """One metric's mean across the selected cases that **finished**, for the table.
 
     The knowledge that a STRIDE number lives at ``scores[].metrics`` stays
     here rather than in the generator, so a change to the block's shape is one
@@ -942,7 +945,9 @@ def published(blocks: Mapping[str, Any], metric: str) -> float | None:
     values = [
         row["metrics"][metric]
         for row in rows
-        if isinstance(row, Mapping) and metric in row.get("metrics", {})
+        if isinstance(row, Mapping)
+        and metric in row.get("metrics", {})
+        and cases.wanted(row.get("case"))
     ]
     return sum(values) / len(values) if values else None
 
