@@ -549,6 +549,27 @@ class TestExecuteJob:
 
         return asyncio.run(scenario())
 
+    def test_a_report_the_record_refuses_fails_the_job(self, caplog):
+        """A report that does not answer the job's selection is refused by the
+        record. The job ends ``failed`` with the generic message, so it frees
+        its slot and its stream ends, rather than staying ``running``."""
+
+        class ForeignReportRunner(StubPipelineRunner):
+            async def run(self, job, on_node):
+                outcome = await super().run(job, on_node)
+                return PipelineCompleted(
+                    report=outcome.report.model_copy(update={"analyses": []})
+                )
+
+        with caplog.at_level(logging.ERROR, logger="analysis_service.jobs"):
+            record = self.run_with(ForeignReportRunner())
+
+        assert record is not None
+        assert record.status == "failed"
+        assert record.error == GENERIC_FAILURE_MESSAGE
+        assert record.report is None
+        assert "refused its outcome" in caplog.text
+
     def test_a_completed_job_logs_its_use_of_the_catalog(self, caplog):
         """The job store keeps no history, so the log is where the figures go."""
 

@@ -34,7 +34,7 @@ from datetime import UTC, datetime
 from typing import Any, Literal, Protocol, Self, TypeGuard
 from uuid import uuid4
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_validator
 
 from analysis_service.answer_sets import NO_ANSWERS, AnswerSet, HeldAnswerSet
 from analysis_service.assertion_use import assertion_use
@@ -1107,6 +1107,22 @@ async def execute_job(
         await store.save(record)
         return
 
+    try:
+        _attach(record, outcome)
+    except ValidationError:
+        # The record checks what it is given: a report that does not answer
+        # the job's selection, or does not match its own model, is refused.
+        # That is this service's defect and never the caller's. The job ends
+        # ``failed`` rather than staying ``running``, so it frees its slot and
+        # its stream ends; the refusal goes to the log, never to the record.
+        logger.exception("job %s refused its outcome from the runner", job_id)
+        record.transition("failed")
+        record.error = GENERIC_FAILURE_MESSAGE
+    await store.save(record)
+
+
+def _attach(record: JobRecord, outcome: PipelineOutcome) -> None:
+    """Attach a run's outcome to its record and move it to the terminal status."""
     if isinstance(outcome, PipelineCompleted):
         # The report first, then the transition: settling reads the report, and
         # a transition that ran before it was attached would settle to zero and
@@ -1118,7 +1134,9 @@ async def execute_job(
         # these figures from later. Counts only: no source text, no claim.
         use = assertion_use(outcome.report)
         if use is not None:
-            logger.info("job %s assertion use: %s", job_id, json.dumps(use.to_json()))
+            logger.info(
+                "job %s assertion use: %s", record.id, json.dumps(use.to_json())
+            )
     elif isinstance(outcome, PipelineAwaiting):
         # The node runs first, for the settling reason below.
         record.checkpoint = outcome.checkpoint
@@ -1133,4 +1151,3 @@ async def execute_job(
         record.unreported_nodes = outcome.nodes
         record.transition("rejected")
         record.validation_issues = outcome.issues
-    await store.save(record)
