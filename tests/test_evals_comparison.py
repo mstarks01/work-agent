@@ -4,7 +4,7 @@ The properties #330 settled, one test each. The generator names no framework
 and no column — it walks the instruments table, so a package that brings its
 own columns is printed without an edit. Rows sort by merge date and never by
 score. Numbers group by the corpus they ran against. And a Baseline nobody has
-voted on reads "no votes yet" rather than zero, because a zero reads as a
+voted on reads "no votes when sealed" rather than zero, because a zero reads as a
 measured failure and an absent vote is not a measurement.
 
 The last test is the staleness gate: the committed file must equal what the
@@ -176,7 +176,8 @@ class TestAnUnvotedBaseline:
         merged(tmp_path, "one", scores=[score_row(rejected=0.0, unvoted=3)])
         text = build(tmp_path)
         assert NO_VOTES in text
-        assert "Nobody has voted on this Baseline's findings" in text
+        assert "No vote on this Baseline's findings was recorded when it" in text
+        assert "run.py score <artifact>" in text
 
     def test_a_rule_based_number_still_prints(self, tmp_path):
         """Recall is measured whether or not anybody voted; hiding it would lie."""
