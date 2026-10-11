@@ -15,7 +15,8 @@ group against a number in another measures the corpus change, not the model.
 
 **Every number is rule-and-ledger-relative.** Recall is measured against
 reference sets an agent wrote, and the vote-dependent columns rest on however
-many findings a person has judged — the coverage column says how many. Read
+many findings a person had judged when the Baseline was sealed — the coverage
+line says how many. Read
 [`../README.md`](../README.md) before quoting any of it.
 
 **Rows are sorted by merge date, never by score.** A leaderboard over a corpus
@@ -30,9 +31,9 @@ manifest records it.
 
 `strong`: `openrouter/openai/gpt-5.6-terra` via `OpenAI` · frameworks stride · 1 sweep(s) · $2.41 reported by the provider · submitted by mstarks01
 
-Vote coverage: 0 of 110 unmatched finding(s) judged by a person.
+Vote coverage when sealed: 0 of 110 unmatched finding(s) judged by a person.
 
-Nobody has voted on this Baseline's findings, so every vote-dependent number below reads `no votes yet`.
+No vote on this Baseline's findings was recorded when it was sealed, so every vote-dependent number below reads `no votes when sealed`. A vote cast after the seal is not in these figures: `run.py score <artifact>` reads today's vote ledger.
 
 No sweep of this Baseline scored a held-out case, so every figure below is over development cases.
 
@@ -42,7 +43,7 @@ No sweep of this Baseline scored a held-out case, so every figure below is over 
 
 | reference coverage | must-find coverage | rejected rate | writing objections |
 | --- | --- | --- | --- |
-| 0.527 | 0.634 | no votes yet | no votes yet |
+| 0.527 | 0.634 | no votes when sealed | no votes when sealed |
 
 **Series `all`** — reads maintainer, contributor votes.
 
@@ -50,7 +51,7 @@ No sweep of this Baseline scored a held-out case, so every figure below is over 
 
 | reference coverage | must-find coverage | rejected rate | writing objections |
 | --- | --- | --- | --- |
-| 0.527 | 0.634 | no votes yet | no votes yet |
+| 0.527 | 0.634 | no votes when sealed | no votes when sealed |
 
 ## Commit `6bff71720140`, corpus `d5f345c2eedb`
 
@@ -60,9 +61,9 @@ No sweep of this Baseline scored a held-out case, so every figure below is over 
 
 `strong`: `openrouter/openai/gpt-5.6-terra` via `OpenAI` pinned to `openai` · frameworks stride · 1 sweep(s) · $7.34 reported by the provider · submitted by mstarks01
 
-Vote coverage: 0 of 72 unmatched finding(s) judged by a person.
+Vote coverage when sealed: 0 of 72 unmatched finding(s) judged by a person.
 
-Nobody has voted on this Baseline's findings, so every vote-dependent number below reads `no votes yet`.
+No vote on this Baseline's findings was recorded when it was sealed, so every vote-dependent number below reads `no votes when sealed`. A vote cast after the seal is not in these figures: `run.py score <artifact>` reads today's vote ledger.
 
 No sweep of this Baseline scored a held-out case, so every figure below is over development cases.
 
@@ -72,7 +73,7 @@ No sweep of this Baseline scored a held-out case, so every figure below is over 
 
 | reference coverage | must-find coverage | rejected rate | writing objections |
 | --- | --- | --- | --- |
-| 0.434 | 0.563 | no votes yet | no votes yet |
+| 0.434 | 0.563 | no votes when sealed | no votes when sealed |
 
 **Series `all`** — reads maintainer, contributor votes.
 
@@ -80,7 +81,7 @@ No sweep of this Baseline scored a held-out case, so every figure below is over 
 
 | reference coverage | must-find coverage | rejected rate | writing objections |
 | --- | --- | --- | --- |
-| 0.434 | 0.563 | no votes yet | no votes yet |
+| 0.434 | 0.563 | no votes when sealed | no votes when sealed |
 
 ## Commit `d3f1898c8959`, corpus `b09805c6726d`
 
@@ -90,9 +91,9 @@ No sweep of this Baseline scored a held-out case, so every figure below is over 
 
 `strong`: `openrouter/openai/gpt-5.6-terra` via `OpenAI` · frameworks stride · 1 sweep(s) · $3.10 reported by the provider · submitted by mstarks01
 
-Vote coverage: 0 of 103 unmatched finding(s) judged by a person.
+Vote coverage when sealed: 0 of 103 unmatched finding(s) judged by a person.
 
-Nobody has voted on this Baseline's findings, so every vote-dependent number below reads `no votes yet`.
+No vote on this Baseline's findings was recorded when it was sealed, so every vote-dependent number below reads `no votes when sealed`. A vote cast after the seal is not in these figures: `run.py score <artifact>` reads today's vote ledger.
 
 No sweep of this Baseline scored a held-out case, so every figure below is over development cases.
 
@@ -102,7 +103,7 @@ No sweep of this Baseline scored a held-out case, so every figure below is over 
 
 | reference coverage | must-find coverage | rejected rate | writing objections |
 | --- | --- | --- | --- |
-| 0.473 | 0.518 | no votes yet | no votes yet |
+| 0.473 | 0.518 | no votes when sealed | no votes when sealed |
 
 **Series `all`** — reads maintainer, contributor votes.
 
@@ -110,7 +111,7 @@ No sweep of this Baseline scored a held-out case, so every figure below is over 
 
 | reference coverage | must-find coverage | rejected rate | writing objections |
 | --- | --- | --- | --- |
-| 0.473 | 0.518 | no votes yet | no votes yet |
+| 0.473 | 0.518 | no votes when sealed | no votes when sealed |
 
 ## Commit `d4edd642b781`, corpus `09772afde754`
 
@@ -120,9 +121,9 @@ No sweep of this Baseline scored a held-out case, so every figure below is over 
 
 `strong`: `openai/gpt-5.6-terra` · frameworks stride · 1 sweep(s) · $5.68 recorded · submitted by mstarks01
 
-Vote coverage: 0 of 16 unmatched finding(s) judged by a person.
+Vote coverage when sealed: 0 of 16 unmatched finding(s) judged by a person.
 
-Nobody has voted on this Baseline's findings, so every vote-dependent number below reads `no votes yet`.
+No vote on this Baseline's findings was recorded when it was sealed, so every vote-dependent number below reads `no votes when sealed`. A vote cast after the seal is not in these figures: `run.py score <artifact>` reads today's vote ledger.
 
 No sweep of this Baseline scored a held-out case, so every figure below is over development cases.
 
@@ -132,7 +133,7 @@ No sweep of this Baseline scored a held-out case, so every figure below is over 
 
 | reference coverage | must-find coverage | rejected rate | writing objections |
 | --- | --- | --- | --- |
-| 0.467 | 0.479 | no votes yet | no votes yet |
+| 0.467 | 0.479 | no votes when sealed | no votes when sealed |
 
 **Series `all`** — reads maintainer, contributor votes.
 
@@ -140,4 +141,4 @@ No sweep of this Baseline scored a held-out case, so every figure below is over 
 
 | reference coverage | must-find coverage | rejected rate | writing objections |
 | --- | --- | --- | --- |
-| 0.467 | 0.479 | no votes yet | no votes yet |
+| 0.467 | 0.479 | no votes when sealed | no votes when sealed |

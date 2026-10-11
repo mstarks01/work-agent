@@ -55,11 +55,15 @@ from evals.harness.scorer import vote_coverage
 #: the first of them.
 TABLE_REL = Path("evals") / "baselines" / "README.md"
 
-#: What a cell says when the number would be zero only because nobody has
-#: voted. A zero reads as a measured failure; an absent vote is not a
-#: measurement, and this is the distinction certification draws with
-#: "unexercised".
-NO_VOTES = "no votes yet"
+#: What a cell says when the number would be zero only because nobody had
+#: voted when the Baseline was sealed. A zero reads as a measured failure; an
+#: absent vote is not a measurement, and this is the distinction certification
+#: draws with "unexercised".
+#:
+#: The page reads the vote counts each sealed artifact carries, so a vote cast
+#: after the seal is not in it. The words say "when sealed" for that reason:
+#: ``run.py score`` re-reads an artifact against today's ledger.
+NO_VOTES = "no votes when sealed"
 
 #: The two tables each framework block prints, keyed by the heading each
 #: carries, with whether it reads the held-out cases.
@@ -282,7 +286,8 @@ group against a number in another measures the corpus change, not the model.
 
 **Every number is rule-and-ledger-relative.** Recall is measured against
 reference sets an agent wrote, and the vote-dependent columns rest on however
-many findings a person has judged — the coverage column says how many. Read
+many findings a person had judged when the Baseline was sealed — the coverage
+line says how many. Read
 [`../README.md`](../README.md) before quoting any of it.
 
 **Rows are sorted by merge date, never by score.** A leaderboard over a corpus
@@ -437,14 +442,16 @@ def _render_row(row: Row) -> str:
         f"\n{models} · frameworks {frameworks} · {row.sweeps} sweep(s)"
         f" · {_spend(row)}"
         f" · submitted by {', '.join(_inline(who) for who in row.submitters) or 'nobody'}\n"
-        f"\nVote coverage: {row.coverage[0]} of {row.coverage[1]} unmatched"
-        f" finding(s) judged by a person.\n"
+        f"\nVote coverage when sealed: {row.coverage[0]} of {row.coverage[1]}"
+        f" unmatched finding(s) judged by a person.\n"
     )
     lines = [f"\n### `{_inline(row.name)}`\n", summary]
     if not row.voted:
         lines.append(
-            "\nNobody has voted on this Baseline's findings, so every"
-            f" vote-dependent number below reads `{NO_VOTES}`.\n"
+            "\nNo vote on this Baseline's findings was recorded when it was"
+            f" sealed, so every vote-dependent number below reads `{NO_VOTES}`."
+            " A vote cast after the seal is not in these figures:"
+            " `run.py score <artifact>` reads today's vote ledger.\n"
         )
     if row.held_out:
         named = ", ".join(f"`{_inline(case)}`" for case in sorted(row.held_out))

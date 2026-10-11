@@ -300,7 +300,7 @@ class Column:
 
     ``needs_votes`` marks a number that reads zero on a cold ledger rather
     than being measured. #330: a zero reads as a measured failure, and an
-    absent vote is not a measurement, so the table prints "no votes yet"
+    absent vote is not a measurement, so the table prints "no votes when sealed"
     instead.
     """
 
