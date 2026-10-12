@@ -251,9 +251,8 @@ def key_ref(key: UnknownKey) -> UnknownRef:
 
     **The one reader of "which part of a key is which".** A caller reads the
     key's parts by name, or its :attr:`~analysis_service.claims.UnknownRef.spellings`.
-    The reference is shared between callers and read, never written: building
-    the early list reads each key many times over, and the build of one
-    question set called this thousands of times.
+    The reference is shared between callers and read, never written: one
+    build of the early list reads each key many times over.
     """
     element_id, attribute, assertion, subject, question, capability = key
     return UnknownRef.model_construct(

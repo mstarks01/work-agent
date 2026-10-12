@@ -702,7 +702,7 @@ class QuestionSet:
         question the service returned and the page never showed, is not
         skipped. A question with facets answered in part may be skipped with
         it: the facets given are kept, and the rest are set aside for now, so
-        a question the owner can answer only in part does not stay first in
+        a question the submitter can answer only in part does not stay first in
         the list.
         """
         if not skips:
@@ -1164,6 +1164,9 @@ def recommended(
     )
     shown: list[EarlyQuestion] = []
     held_back: list[EarlyQuestion] = []
+    # What a question answered in part costs again where it is placed. The
+    # saved answers charged it already, so its place charges it once.
+    again: Counter[str] = Counter()
     place = {question.key: index for index, question in enumerate(listed)}
     # What the saved answers charged each framework: a question's choices,
     # to every framework it served. The turns start from here, not from zero.
@@ -1173,18 +1176,16 @@ def recommended(
             spent[name] += len(answer_facets(key)) or 1
 
     def rank(question: EarlyQuestion) -> tuple[float, float, float, int, int]:
-        # The list's own order first: a capability's band and the units it
-        # could settle (its score), a field question's prior per choice. The
+        # The list's own order first: a capability's standing, a field
+        # question's prior per choice, which its place in the list holds. The
         # effects break a tie, and the list's place breaks the rest.
         if question.kind != "capability":
-            return (0.0, 0.0, 0.0, 0, place[question.key])
+            return (0, 0.0, 0.0, 0, place[question.key])
         effect = effects.get(question.key)
-        band = max((band for _, band in question.framework_bands), default=0)
         if effect is None:
-            return (-band, -question.score, 0.0, 0, place[question.key])
+            return (*question.standing, 0.0, 0, place[question.key])
         return (
-            -band,
-            -question.score,
+            *question.standing,
             -effect.potential / question.decisions,
             -effect.least,
             place[question.key],
@@ -1219,7 +1220,9 @@ def recommended(
             else:
                 held_back.append(question)
         shown += [*started, *taken]
-    return (*gates, *by_turn(shown, spent)), blocked, tuple(held_back)
+        for question in started:
+            again.update(dict.fromkeys(question.frameworks, question.decisions))
+    return (*gates, *by_turn(shown, spent - again)), blocked, tuple(held_back)
 
 
 def by_turn(
@@ -1241,9 +1244,9 @@ def by_turn(
     With one framework selected the order is the list's order.
 
     ``charged`` is what each framework was charged by the saved answers, so
-    the turns carry over the saves: an owner who answers the first question
+    the turns carry over the saves: a submitter who answers the first question
     and saves meets the other framework's question next, not the same
-    framework's again (``QA-2026-10-12-02-E1``).
+    framework's again (``QA-2026-10-12-02-E2``).
     """
     return _in_turn(
         questions,

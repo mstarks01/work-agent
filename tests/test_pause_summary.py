@@ -87,7 +87,7 @@ class TestTheStopSaysWhatIsLeft:
         band is counted on its own. Thirty "yes" answers leave 18 level 1
         requirements unknown: the effects break ties toward the parents with
         the most parts, whose "yes" lists parts that take the thirty places
-        (ADR 0078); the depth-and-name tiebreak left 7."""
+        (ADR 0078). The summary discloses them."""
         asked = _all_yes(2)
         assert asked.stop == "budget-exhausted"
         bands = _bands(asked)

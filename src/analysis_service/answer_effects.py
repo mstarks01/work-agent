@@ -35,15 +35,11 @@ from typing import Any
 
 from analysis_service.answer_forms import YES_NO
 from analysis_service.claims import FrameworkName, UnknownKey
-from analysis_service.early_questions import (
-    EarlyQuestion,
-    digest,
-    remembered,
-    waiting_parts,
-)
+from analysis_service.early_questions import EarlyQuestion, waiting_parts
 from analysis_service.fact_answers import FactAnswer, key_ref
 from analysis_service.fact_writes import capability_statements
 from analysis_service.frameworks import PACKAGES
+from analysis_service.memo import Memo, remembered
 from analysis_service.system_model import SystemModel
 
 __all__ = ["AnswerEffect", "Effect", "capability_effects"]
@@ -54,7 +50,7 @@ class AnswerEffect:
     """What one possible answer proves about the other questions."""
 
     #: Other open questions the answer proves settled or unnecessary: each
-    #: one a choice the owner no longer makes.
+    #: one a choice the submitter no longer makes.
     settles: int
     #: Questions the answer brings into the recommended list, such as the
     #: parts of a capability its "yes" shows.
@@ -106,7 +102,7 @@ def _listed(pool: frozenset[str], settled: Collection[str]) -> frozenset[str]:
     return pool - waiting_parts(pool, settled)
 
 
-_effects: OrderedDict[str, dict[UnknownKey, Effect]] = OrderedDict()
+_effects: Memo[dict[UnknownKey, Effect]] = OrderedDict()
 
 
 def capability_effects(
@@ -123,20 +119,19 @@ def capability_effects(
     capabilities a save answered or skipped, which say which parts are listed
     now. Each effect is read against the pool as it stands, so a part an
     earlier answer settled is not counted again. The table is kept by the
-    content it was read from (:func:`~analysis_service.early_questions.remembered`),
+    content it was read from (:func:`~analysis_service.memo.remembered`),
     so a read that changes no answer reads it again for nothing.
     """
-    key = digest(
-        prepared.model_dump_json(),
-        json.dumps(frameworks, sort_keys=True, default=str),
-        json.dumps([list(question.key) for question in questions]),
-        json.dumps(sorted(settled)),
-        str(id(PACKAGES)),
-    )
     return remembered(
         _effects,
-        key,
+        (
+            prepared.model_dump_json(),
+            json.dumps(frameworks, sort_keys=True, default=str),
+            json.dumps([list(question.key) for question in questions]),
+            json.dumps(sorted(settled)),
+        ),
         lambda: _capability_effects(prepared, frameworks, questions, settled),
+        held=(PACKAGES,),
     )
 
 
