@@ -108,7 +108,7 @@ calls.push({{ status: ids["save-status"].textContent, saveHidden: ids.save.hidde
     }
     assert seen[1] == {"status": "Not saved yet"}, "before the save is sent"
     end = seen[-1]
-    assert end["status"] == "Saved" and end["saveHidden"]
+    assert end["status"] == "" and end["saveHidden"]
     # The answered row is first, compact, with "Change"; the open row follows.
     assert end["rows"][0].startswith("Sign-in? — yes Change")
     assert end["rows"][1].startswith("OAuth?")
@@ -154,13 +154,13 @@ calls.push({ status: ids["save-status"].textContent });
     posts = [c["body"]["facts"] for c in seen if c.get("url") == "/answer/r1"]
     assert next(c for c in seen if "inFlight" in c) == {
         "inFlight": 1,
-        "status": "Saving…",
+        "status": "",
     }
     assert posts == [
         [{"key": AUTH["key"], "value": "yes"}],
         [{"key": OAUTH["key"], "value": "no"}],
     ]
-    assert seen[-1] == {"status": "Saved"}
+    assert seen[-1] == {"status": ""}
 
 
 def test_a_stale_save_reads_the_answers_again_and_keeps_only_what_does_not_contradict_them():
@@ -199,7 +199,7 @@ calls.push({{ status: ids["save-status"].textContent, value: auth.value,
     assert shown["status"].startswith("Not saved: an answer changed elsewhere")
     assert "Changed elsewhere to “no”" in shown["conflict"]
     assert shown["buttons"] == ["Keep mine", "Take theirs"]
-    assert seen[-1] == {"status": "Saved", "value": "no", "gone": True}
+    assert seen[-1] == {"status": "", "value": "no", "gone": True}
 
 
 def test_a_failed_save_keeps_the_answer_and_save_now_retries():
@@ -225,7 +225,7 @@ calls.push({ status: ids["save-status"].textContent, saveShown: !ids.save.hidden
     assert len(posts) == 2 and posts[1]["body"]["facts"] == [
         {"key": AUTH["key"], "value": "yes"}
     ]
-    assert seen[-1] == {"status": "Saved", "saveShown": False}
+    assert seen[-1] == {"status": "", "saveShown": False}
 
 
 def test_a_refused_answer_is_not_sent_again_until_it_changes():
@@ -337,7 +337,7 @@ calls.push({{ status: ids["save-status"].textContent,
 """
     seen = run(first, steps)["calls"]
     assert len([c for c in seen if c.get("url") == "/answer/r1"]) == 1
-    assert seen[-1] == {"status": "Saved", "conflict": False}
+    assert seen[-1] == {"status": "", "conflict": False}
 
 
 def test_a_lost_start_response_follows_the_run_that_started():
@@ -397,14 +397,12 @@ def test_a_no_lists_the_parts_as_no_longer_needed_and_says_so():
     steps = f"""
 globalThis.fetch = async (url, init) => {{ record(url, init);
   return {{ ok: true, json: async () => ({json.dumps(after)}) }}; }};
-calls.push({{ said: text(ids.questions).includes("1 more question(s) appear if you answer") }});
 const [oauth] = selects();
 oauth.value = "no"; oauth.listeners.change();
 await settle(); await settle();
 calls.push({{ note: ids.changes.textContent, drawn: selects().length }});
 """
     seen = run(first, steps)["calls"]
-    assert next(c for c in seen if "said" in c) == {"said": True}
     # The part was never listed, so it is not "no longer needed" on this page.
     assert seen[-1] == {"note": "", "drawn": 1}
 
@@ -451,7 +449,7 @@ calls.push({ hidden: row.hidden, status: ids["save-status"].textContent });
         "presented": [AUTH["key"], OAUTH["key"]],
         "revision": 0,
     }
-    assert seen[-1] == {"hidden": True, "status": "Saved"}
+    assert seen[-1] == {"hidden": True, "status": ""}
 
 
 def test_the_page_names_no_round():

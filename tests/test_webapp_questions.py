@@ -1644,17 +1644,17 @@ await ids.continue.listeners.click(); await settle();
 
     assert layout["groups"] == [
         {
-            "title": "stored-copy-integrity heading? (2 question(s), 2 choice(s))",
+            "title": "stored-copy-integrity heading?",
             "rows": [store.name, flow.name],
             "open": True,
         },
         {
-            "title": "audit-evidence heading? (2 question(s), 2 choice(s))",
+            "title": "audit-evidence heading?",
             "rows": [flow.name, store.name],
             "open": True,
         },
         {
-            "title": "stored-copy-integrity heading? (1 question(s), 1 choice(s))",
+            "title": "stored-copy-integrity heading?",
             "rows": [process.name],
             "open": True,
         },
@@ -1927,61 +1927,6 @@ def _text_row(key, label):
     }
 
 
-def test_the_list_size_counts_its_link_questions():
-    """The line that says how many choices a round asks counts its link
-    questions, 1 to 3 a pause on the archived reports with a catalog (#1289)."""
-    row = _text_row(["", "", "", "who?", "", ""], "who?")
-    link = {
-        "principal": "shopper accounts",
-        "rows": 2,
-        "options": [{"id": "entity:shopper", "name": "Shopper"}],
-    }
-    steps = f"""
-await ids.analyze.listeners.submit({{ preventDefault() {{}} }}); await settle();
-streams[0].listeners.questions({{ data: JSON.stringify({{ run: "r1",
-  link_questions: [{json.dumps(link)}], early_questions: [{json.dumps(row)}],
-  early_remaining: {{ field: 1 }}, answered_early: [], answered_links: [], revision: 0 }}) }});
-const walk = (n, out = []) => {{ for (const c of n.children || [])
-  if (typeof c === "object") {{ out.push(c); walk(c, out); }} return out; }};
-calls.push(walk(ids.questions).map(n => n.textContent).find(t => t.includes("This list asks")));
-"""
-    said = _run_form_script(steps)["calls"][-1]
-    assert "This list asks 2 choice(s)." in said
-
-
-def test_the_list_size_counts_a_blocked_part_from_the_service_s_list():
-    """A part that waits on its parent is not in the list and not counted in
-    its choices. The line says how many such parts the service lists, and
-    the page draws no part of its own (ADR 0078)."""
-    parent_key = ["", "", "", "", "", "oauth"]
-    choices = [{"id": "yes", "name": ""}, {"id": "no", "name": ""}]
-    parent = _text_row(parent_key, "OAuth?") | {
-        "kind": "capability",
-        "form": "choice",
-        "choices": choices,
-    }
-    part = _text_row(["", "", "", "", "", "oauth-client"], "A client?") | {
-        "kind": "capability",
-        "form": "choice",
-        "choices": choices,
-        "parent": parent_key,
-        "reason": "parent-undecided",
-    }
-    steps = f"""
-await ids.analyze.listeners.submit({{ preventDefault() {{}} }}); await settle();
-streams[0].listeners.questions({{ data: JSON.stringify({{ run: "r1",
-  link_questions: [], early_questions: [{json.dumps(parent)}],
-  early_blocked: [{json.dumps(part)}], answered_early: [], answered_links: [], revision: 0 }}) }});
-const walk = (n, out = []) => {{ for (const c of n.children || [])
-  if (typeof c === "object") {{ out.push(c); walk(c, out); }} return out; }};
-calls.push(walk(ids.questions).map(n => n.textContent).find(t => t.includes("This list asks")));
-calls.push(walk(ids.questions).filter(n => n.tag === "select").length);
-"""
-    said, selects = _run_form_script(steps)["calls"][-2:]
-    assert "This list asks 1 choice(s). 1 more question(s) appear if you answer" in said
-    assert selects == 1, "the part is not drawn"
-
-
 def test_a_capability_says_it_decides_what_an_analysis_covers():
     row = _text_row(["", "", "", "", "", "oauth"], "OAuth?") | {
         "kind": "capability",
@@ -2001,21 +1946,6 @@ calls.push(walk(ids.questions).map(n => n.textContent).find(t => t.startsWith("W
 """
     said = _run_form_script(steps)["calls"][-1]
     assert "Decides what the asvs analysis covers" in said
-
-
-def test_a_link_only_list_says_what_it_asks():
-    steps = f"""
-await ids.analyze.listeners.submit({{ preventDefault() {{}} }}); await settle();
-streams[0].listeners.questions({{ data: JSON.stringify({{ run: "r1",
-  link_questions: [{json.dumps(_LINK)}], early_questions: [], early_remaining: {{}},
-  answered_early: [], answered_links: [], revision: 0 }}) }});
-const walk = (n, out = []) => {{ for (const c of n.children || [])
-  if (typeof c === "object") {{ out.push(c); walk(c, out); }} return out; }};
-calls.push(walk(ids.questions).map(n => n.textContent).find(t => t.includes("This list asks")));
-"""
-    said = _run_form_script(steps)["calls"][-1]
-    assert "1 question(s) about which part of your system a name is" in said
-    assert "This list asks 1 choice(s)." in said
 
 
 def test_skip_the_rest_skips_only_the_blank_questions():
@@ -3004,7 +2934,6 @@ calls.push({{ said: text(ids.questions) }});
 
     assert "Decides whether the asvs analysis runs" in said
     assert "The asvs analysis runs only once the system model shows" in said
-    assert "1 question(s) that decide whether an analysis runs" in said
 
 
 def test_a_finished_pause_lists_what_stays_open_and_takes_a_held_back_answer():

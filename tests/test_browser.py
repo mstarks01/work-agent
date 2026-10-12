@@ -103,7 +103,7 @@ def _post_to_answer(response) -> bool:
 def saved(page) -> None:
     """Wait until the page says every answer is saved."""
     page.wait_for_function(
-        "() => document.querySelector('#save-status').textContent === 'Saved'"
+        "() => document.querySelector('#save-status').dataset.state === 'saved'"
     )
 
 
@@ -500,9 +500,6 @@ def test_question_progress_and_entry_guidance(page):
     control = page.locator('#questions select:has(option[value="yes"])').first
     control.select_option("yes")
     assert float(page.locator("#round-progress-bar").get_attribute("value")) >= 1
-    assert "Answers can add or remove questions" in page.inner_text(
-        "#round-progress-detail"
-    )
     assert "Is the connection Web App → Orders DB encrypted?" in page.inner_text(
         "#questions"
     )

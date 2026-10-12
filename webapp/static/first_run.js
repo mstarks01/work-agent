@@ -259,15 +259,15 @@
   let saveTimer = null;
   let saving = false;
   let again = false;
+  // A save that landed, or one in flight, says nothing; the other states do.
   const setStatus = (state, text) => {
     const words = {
-      saved: "Saved",
-      saving: "Saving…",
       unsaved: "Not saved yet",
       failed: "Not saved",
       conflict: "Not saved: an answer changed elsewhere",
     };
-    say(saveStatus, text ? `${words[state]}: ${text}` : words[state]);
+    const word = words[state] || "";
+    say(saveStatus, text ? `${word}: ${text}` : word);
     if (saveStatus) saveStatus.dataset.state = state;
     // "Save now" shows while something is unsaved, so a failed save can be
     // retried by hand.
@@ -718,10 +718,7 @@
     const heading = document.createElement("span");
     heading.className = "group-heading";
     heading.textContent = box.heading;
-    const count = document.createElement("small");
-    const choices = box.rows.reduce((sum, row) => sum + (row.q.decisions || 1), 0);
-    count.textContent = ` (${box.rows.length} question(s), ${choices} choice(s))`;
-    box.title.replaceChildren(heading, count);
+    box.title.replaceChildren(heading);
   };
   // Rows of one box take "Same for all" where two or more ask one attribute
   // or kind about different elements in one form. A capability asks about
@@ -922,8 +919,8 @@
     if (added) parts.push(`${added} relevant question(s) added`);
     say(changesNote, parts.join(". ") + (parts.length ? "." : ""));
   };
-  // The intro: what will not run, why the list ends, what stays open, and
-  // how the list is counted. Redrawn from each payload.
+  // The intro: what will not run, why the list ends, and what stays open.
+  // Redrawn from each payload.
   const drawIntro = (data) => {
     intro.replaceChildren();
     const left = data.early_stop == null;
@@ -990,45 +987,6 @@
         }
         intro.append(lead, items);
       }
-    }
-    // What the list holds, by kind, and the choices it asks. An answer can
-    // add questions as well as take them away, and the page says so.
-    const kinds = { gate: 0, capability: 0, field: 0 };
-    for (const q of data.early_questions) {
-      kinds[(q.gates || []).length ? "gate" : q.kind === "capability" ? "capability" : "field"] += 1;
-    }
-    const parts = [];
-    if (kinds.gate) parts.push(`${kinds.gate} question(s) that decide whether an analysis runs`);
-    if (kinds.capability) parts.push(`${kinds.capability} yes/no question(s) about the application`);
-    if (kinds.field) parts.push(`${kinds.field} question(s) about parts of your system`);
-    if (data.link_questions.length) {
-      parts.push(`${data.link_questions.length} question(s) about which part of your system a name is`);
-    }
-    if (parts.length) {
-      const choices = data.early_questions.reduce((sum, q) => sum + (q.decisions || 1), 0)
-        + data.link_questions.length;
-      const blocked = (data.early_blocked || []).length;
-      const estimate = document.createElement("p");
-      estimate.className = "hint";
-      estimate.textContent = `There are ${parts.join(" and ")} that can change the`
-        + ` analysis. This list asks ${choices} choice(s).`
-        + (blocked ? ` ${blocked} more question(s) appear if you answer “yes”`
-          + " to the question each one is part of." : "")
-        + (summary ? ` So far the page showed ${summary.introduced} question(s),`
-          + ` ${summary.choices} choice(s).` : "");
-      const explanation = document.createElement("details");
-      explanation.className = "round-estimate";
-      const title = document.createElement("summary");
-      title.textContent = "How this list is counted";
-      explanation.append(title, estimate);
-      intro.append(explanation);
-    }
-    if (data.link_questions.length) {
-      const note = document.createElement("p");
-      note.className = "hint";
-      note.textContent = "Your description states facts about some people or systems, but"
-        + " not which element of the model each one is. The first questions ask which.";
-      intro.append(note);
     }
   };
   // The tail: answers an amendment could not carry, and the amendment itself.
