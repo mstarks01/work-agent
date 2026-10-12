@@ -26,7 +26,6 @@ rather than 403 for a non-owner, so nobody can enumerate job IDs.
 
 from __future__ import annotations
 
-import asyncio
 import logging
 from collections import Counter
 from collections.abc import Callable, Mapping, Sequence
@@ -68,6 +67,7 @@ from analysis_service.fact_answers import MAX_FACT_ANSWERS, FactAnswer
 from analysis_service.frameworks import PACKAGES
 from analysis_service.graph import ENTRY_EXTRACT
 from analysis_service.job_answers import (
+    DraftSaved,
     JobAnswers,
     JobDataMissing,
     NoCatalog,
@@ -82,13 +82,13 @@ from analysis_service.job_answers import (
     Withheld,
 )
 from analysis_service.jobs import (
-    TERMINAL_STATUSES,
     Admission,
     JobRecord,
     JobStatus,
     JobStore,
     PipelineRunner,
     build_store,
+    event_frames,
     execute_job,
     is_follow_up,
 )
@@ -114,8 +114,6 @@ logger = logging.getLogger(__name__)
 # :class:`BodyLimitMiddleware`, which counts what arrives rather than trusting
 # what was declared.
 _BODY_SLACK = 2
-
-_SSE_POLL_SECONDS = 0.2
 
 #: How many event streams one subject may hold open at once. Each stream polls
 #: the store until its job is terminal, and a job that waits on answers is not,
@@ -942,7 +940,7 @@ def create_app(
         if isinstance(outcome, Started):
             return _started(outcome)
         body: dict[str, Any] = {"job_id": outcome.job_id, "saved": True}
-        if outcome.revision is not None:
+        if isinstance(outcome, DraftSaved):
             body["revision"] = outcome.revision
         return JSONResponse(body)
 
@@ -1082,27 +1080,11 @@ def create_app(
         last_event_id = request.headers.get("last-event-id", "")
         seen = ascii_int(last_event_id, max_digits=_LAST_EVENT_ID_DIGITS) or 0
         store: JobStore = request.app.state.store
-
-        async def event_stream():
-            nonlocal seen
-            while True:
-                progress = await store.events_after(job_id, seen)
-                if progress is None:
-                    return
-                status, events = progress
-                for event in events:
-                    seen = event.seq
-                    yield event.sse_frame()
-                # A job that emits nothing sends nothing, so a send to a client
-                # that left never fails; asked here, the stream ends and gives
-                # its slot back.
-                if status in TERMINAL_STATUSES or await request.is_disconnected():
-                    return
-                await asyncio.sleep(_SSE_POLL_SECONDS)
+        frames = event_frames(store, job_id, seen, gone=request.is_disconnected)
 
         return _CountedStream(
             partial(_release_stream, streams, subject),
-            event_stream(),
+            frames,
             media_type="text/event-stream",
             headers={"Cache-Control": "no-store"},
         )

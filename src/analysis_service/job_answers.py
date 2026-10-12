@@ -57,6 +57,7 @@ from analysis_service.jobs import (
 from analysis_service.links import NoCatalogError
 from analysis_service.pipeline import entry_of
 from analysis_service.questions import question_fallback
+from analysis_service.report import Report
 from analysis_service.report_conditions import corrected_findings
 from analysis_service.sources import SourceLimits
 from analysis_service.system_model import SystemModel
@@ -66,6 +67,7 @@ logger = logging.getLogger(__name__)
 __all__ = [
     "Answerable",
     "Corrected",
+    "DraftSaved",
     "JobAnswers",
     "JobDataMissing",
     "NoCatalog",
@@ -73,10 +75,10 @@ __all__ = [
     "NotAdmitted",
     "NotCompleted",
     "Refused",
+    "RoundSaved",
     "RunnerFor",
     "RunnerUnavailable",
     "SaveConflict",
-    "Saved",
     "Start",
     "Started",
     "Withheld",
@@ -190,6 +192,9 @@ class Answerable:
     assertions: AssertionRecord | None
     analyses: list[FrameworkAnalysis]
     resumed_by: str | None
+    #: The finished job's report, the gate's verdict already read; a waiting
+    #: job has none.
+    report: Report | None = None
 
     def state(self) -> AnswerState:
         """The job's **Answer State**: everything its questions and answers read."""
@@ -243,12 +248,19 @@ class Answerable:
 
 
 @dataclass(frozen=True)
-class Saved:
-    """A round or a draft the job keeps. No model ran. ``revision`` is the
-    revision a draft's next save names; a saved round carries none."""
+class DraftSaved:
+    """A finished report's draft the job keeps. No model ran. ``revision`` is
+    the revision the draft's next save names."""
 
     job_id: str
-    revision: int | None = None
+    revision: int
+
+
+@dataclass(frozen=True)
+class RoundSaved:
+    """A waiting job's round the job keeps. No model ran."""
+
+    job_id: str
 
 
 @dataclass(frozen=True)
@@ -360,6 +372,7 @@ class JobAnswers:
             report.assertions,
             list(report.analyses),
             resumed_by,
+            report,
         )
 
     async def questions(self, job_id: str, subject: str) -> dict[str, Any]:
@@ -373,7 +386,7 @@ class JobAnswers:
 
     async def answer(
         self, job_id: str, subject: str, answers: Answers, *, start: Start
-    ) -> Saved | Started:
+    ) -> DraftSaved | RoundSaved | Started:
         """Keep a round or a draft, or start the Resumed Job the answers start.
 
         A save keeps a waiting job's round or a finished report's draft, and
@@ -398,7 +411,7 @@ class JobAnswers:
                     " first; read the questions again"
                 )
             # A draft runs nothing and spends no follow-up (ADR 0070).
-            return Saved(job_id=parent.id, revision=outcome.revision + 1)
+            return DraftSaved(job_id=parent.id, revision=outcome.revision + 1)
         if isinstance(outcome, SavedRound):
             if not await self.store.save_round(
                 parent.id,
@@ -413,7 +426,7 @@ class JobAnswers:
                     " first; read the questions again"
                 )
             # A saved round never starts the analysis: a continue does.
-            return Saved(job_id=parent.id)
+            return RoundSaved(job_id=parent.id)
         record = JobRecord.create(
             owner_subject=subject,
             sources=outcome.sources,

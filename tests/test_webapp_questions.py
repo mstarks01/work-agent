@@ -3423,3 +3423,27 @@ await ids.save.listeners.click(); await settle();
         assert sent["facts"] == [
             {"key": row["key"], "value": "yes", "detail": "except the status endpoint"}
         ]
+
+
+def test_a_withheld_pause_ends_its_stream_with_a_frame_the_page_reads(
+    tiers, monkeypatch
+):
+    """A pause the deployment's gate withholds tells the page why, rather than
+    breaking the stream the page reads as an interrupted connection."""
+    from analysis_service.job_answers import JobAnswers
+    from tests.test_webapp import stub_settings
+    from webapp.main import Workspace
+
+    runner = PausingRunner(catalog=False)
+    workspace = Workspace(stub_settings(runner, catalog=False))
+    with TestClient(
+        app_for(tiers, runner, catalog=False, workspace=workspace), base_url=LOOPBACK
+    ) as client:
+        paused = _paused(client)
+        monkeypatch.setattr(JobAnswers, "withheld", lambda self, record: object())
+
+        stream = client.get(f"/events/{paused}").text
+
+        event, data = stream.rstrip().splitlines()[-2:]
+        assert event == "event: failed"
+        assert "withheld" in json.loads(data.removeprefix("data: "))["message"]

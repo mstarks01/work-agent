@@ -9,22 +9,29 @@ rule. The ``/v1`` route tests hold the HTTP mapping of each refusal.
 from __future__ import annotations
 
 import asyncio
+from dataclasses import replace
 
 import pytest
 
-from analysis_service.answer_round import Answers, StaleRevision
+from analysis_service.answer_round import (
+    AlreadyResumed,
+    Answers,
+    SourcesOverLimit,
+    StaleRevision,
+)
 from analysis_service.answer_sets import AnswerSet
 from analysis_service.errors import ConfigError
 from analysis_service.fact_answers import FactAnswer
 from analysis_service.job_answers import (
+    DraftSaved,
     JobAnswers,
     NoCatalog,
     NoSuchJob,
     NotAdmitted,
     NotCompleted,
     Refused,
+    RoundSaved,
     RunnerUnavailable,
-    Saved,
     Started,
 )
 from analysis_service.jobs import InMemoryJobStore, JobRecord, StubPipelineRunner
@@ -125,7 +132,7 @@ class TestAnsweringAWaitingJob:
                 start=starts,
             )
         )
-        assert outcome == Saved(job_id=job)
+        assert outcome == RoundSaved(job_id=job)
         assert starts.started == []
         record = asyncio.run(store.get(job))
         assert record is not None
@@ -207,6 +214,71 @@ class TestAnsweringAWaitingJob:
         assert starts.started == []
         assert asyncio.run(store.resumed_by(job, SUBJECT)) is None
 
+    def test_a_round_of_skips_alone_is_kept_and_listed(self):
+        store = InMemoryJobStore()
+        job = waiting(store)
+        answers = operations(store)
+        key = first_early_key(answers, job)
+        outcome = asyncio.run(
+            answers.answer(
+                job,
+                SUBJECT,
+                Answers(given=AnswerSet(), save=True, skips=(key,), revision=0),
+                start=Starts(),
+            )
+        )
+        assert outcome == RoundSaved(job_id=job)
+        payload = asyncio.run(answers.questions(job, SUBJECT))
+        assert [tuple(q["key"]) for q in payload["skipped_early"]] == [key]
+        assert key not in {tuple(q["key"]) for q in payload["early_questions"]}
+
+    def test_a_save_after_the_start_is_refused(self):
+        store = InMemoryJobStore()
+        job = waiting(store)
+        answers = operations(store)
+        key = first_early_key(answers, job)
+        asyncio.run(
+            answers.answer(
+                job,
+                SUBJECT,
+                Answers(given=AnswerSet(), save=False, skips=(), revision=0),
+                start=Starts(),
+            )
+        )
+        with pytest.raises(AlreadyResumed):
+            asyncio.run(
+                answers.answer(
+                    job,
+                    SUBJECT,
+                    Answers(given=AnswerSet(), save=True, skips=(key,), revision=0),
+                    start=Starts(),
+                )
+            )
+
+    def test_answers_over_the_input_limits_start_nothing(self):
+        store = InMemoryJobStore()
+        job = waiting(store)
+        tight = replace(
+            operations(store), limits=SourceLimits(max_total_bytes=10, max_sources=10)
+        )
+        key = first_early_key(tight, job)
+        starts = Starts()
+        with pytest.raises(SourcesOverLimit, match="bytes"):
+            asyncio.run(
+                tight.answer(
+                    job,
+                    SUBJECT,
+                    Answers(
+                        given=AnswerSet(facts=(FactAnswer(key=key, value="unknown"),)),
+                        save=False,
+                        skips=(),
+                        revision=0,
+                    ),
+                    start=starts,
+                )
+            )
+        assert starts.started == []
+
 
 class TestAnsweringAReport:
     def test_an_answer_starts_the_one_follow_up(self):
@@ -246,7 +318,7 @@ class TestAnsweringAReport:
                 start=Starts(),
             )
         )
-        assert outcome == Saved(job_id=job, revision=1)
+        assert outcome == DraftSaved(job_id=job, revision=1)
         record = asyncio.run(store.get(job))
         assert record is not None
         assert [fact.key for fact in record.draft.facts] == [ASKED]
@@ -258,6 +330,27 @@ class TestAnsweringAReport:
             asyncio.run(
                 operations(store).correct(
                     job, SUBJECT, [FactAnswer(key=ASKED, value="TLS 1.3")]
+                )
+            )
+
+    def test_a_fact_the_report_does_not_hold_is_refused(self):
+        store = InMemoryJobStore()
+        job = TestTheRoutes().completed(store)
+        wrong = (ASKED[0], "exposure", "", "", "", "")
+        with pytest.raises(Refused, match="exposure"):
+            asyncio.run(
+                operations(store).answer(
+                    job,
+                    SUBJECT,
+                    Answers(
+                        given=AnswerSet(
+                            facts=(FactAnswer(key=wrong, value="internal"),)
+                        ),
+                        save=False,
+                        skips=(),
+                        revision=None,
+                    ),
+                    start=Starts(),
                 )
             )
 
@@ -299,6 +392,26 @@ class TestAmending:
         assert record.ask_questions and record.resumption is None
         assert [fact.key for fact in record.carried.facts] == [key]
         assert record.sources[-1].label.startswith("Amendment")
+
+    def test_a_stale_amendment_is_refused(self):
+        store = InMemoryJobStore()
+        job = waiting(store)
+        answers = operations(store)
+        key = first_early_key(answers, job)
+        asyncio.run(
+            answers.answer(
+                job,
+                SUBJECT,
+                Answers(given=AnswerSet(), save=True, skips=(key,), revision=0),
+                start=Starts(),
+            )
+        )
+        starts = Starts()
+        with pytest.raises(StaleRevision):
+            asyncio.run(
+                answers.amend(job, SUBJECT, "More text.", revision=0, start=starts)
+            )
+        assert starts.started == []
 
 
 class TestTheOneAdmission:
