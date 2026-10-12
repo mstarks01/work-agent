@@ -106,7 +106,7 @@ calls.push({{ status: ids["save-status"].textContent, saveHidden: ids.save.hidde
         "presented": [AUTH["key"], OAUTH["key"]],
         "revision": 0,
     }
-    assert seen[1] == {"status": "Not saved yet"}, "before the save is sent"
+    assert seen[1] == {"status": ""}, "no message while the save waits"
     end = seen[-1]
     assert end["status"] == "" and end["saveHidden"]
     # The answered row is first, compact, with "Change"; the open row follows.
@@ -123,12 +123,13 @@ globalThis.fetch = async (url, init) => { record(url, init);
 const [input] = walk(ids.list).filter((n) => n.tag === "input");
 input.value = "the platform team"; input.listeners.input({ type: "input" });
 await settle(); await settle();
-calls.push({ sentYet: calls.some((c) => c.url === "/answer/r1"), status: ids["save-status"].textContent });
+calls.push({ sentYet: calls.some((c) => c.url === "/answer/r1"), status: ids["save-status"].textContent,
+  saveShown: !ids.save.hidden });
 await new Promise((r) => setTimeout(r, 450));
 """
     seen = run(first, steps)["calls"]
     marker = next(c for c in seen if "sentYet" in c)
-    assert marker == {"sentYet": False, "status": "Not saved yet"}
+    assert marker == {"sentYet": False, "status": "", "saveShown": False}
     sent = [c for c in seen if c.get("url") == "/answer/r1"]
     assert len(sent) == 1
     assert sent[0]["body"]["facts"] == [
