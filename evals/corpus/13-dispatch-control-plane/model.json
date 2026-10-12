@@ -288,6 +288,12 @@
   ],
   "assumptions": [
     {
+      "assumption": "The dispatch console is placed in the corporate network because the schema requires a zone; the source places the engineers' browsers there and the console runs in them.",
+      "element_id": "process:dispatch-console",
+      "attribute": "trust_zone",
+      "basis": "The console is a single-page JavaScript app executing in the browsers of engineers on the corporate network. This locates the browser execution, not the web host."
+    },
+    {
       "assumption": "The dispatch API is not reachable from the internet.",
       "element_id": "process:dispatch-api",
       "attribute": "exposure",

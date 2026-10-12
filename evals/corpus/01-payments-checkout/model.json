@@ -203,6 +203,18 @@
   ],
   "assumptions": [
     {
+      "assumption": "The shopper is placed on the public internet because the schema requires a zone; the source places shoppers nowhere.",
+      "element_id": "entity:shopper",
+      "attribute": "trust_zone",
+      "basis": "Shoppers reach the storefront API, the one component exposed to the internet. Reaching an exposed component says who can reach it and not where they sit."
+    },
+    {
+      "assumption": "The card processor is placed on the public internet because the schema requires a zone; the source places it nowhere.",
+      "element_id": "entity:card-processor",
+      "attribute": "trust_zone",
+      "basis": "A third party that calls back over the internet to the exposed component. The call says what it reaches and not where it runs."
+    },
+    {
       "assumption": "The order service is reachable only from inside the core network, not from the internet.",
       "element_id": "process:order-service",
       "attribute": "exposure",

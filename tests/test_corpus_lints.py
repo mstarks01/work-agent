@@ -31,6 +31,71 @@ def test_case_passes_every_mechanical_check(case_dir):
     assert verify_corpus.check_case(case_dir) == []
 
 
+class TestAPlacementsBasisAgreesOnBothSides:
+    """A signed inferred placement is a ``trust_zone`` assumption, and a stated one is not."""
+
+    CASE = "09-cookbook-sokify-retail"
+
+    @pytest.fixture
+    def case_dir(self, tmp_path):
+        target = tmp_path / self.CASE
+        shutil.copytree(verify_corpus.CORPUS_DIR / self.CASE, target)
+        return target
+
+    @staticmethod
+    def _model(case_dir):
+        return json.loads((case_dir / "model.json").read_text(encoding="utf-8"))
+
+    @staticmethod
+    def _write(case_dir, model):
+        (case_dir / "model.json").write_text(json.dumps(model), encoding="utf-8")
+
+    def test_the_corpus_case_agrees(self, case_dir):
+        assert verify_corpus.check_case(case_dir) == []
+
+    @pytest.mark.parametrize(
+        "subject", ["entity:customer", "process:web-api"], ids=["inferred", "unknown"]
+    )
+    def test_a_placement_the_source_does_not_give_needs_an_assumption(
+        self, case_dir, subject
+    ):
+        """The customer's row is inferred; the web API's is a stated unknown."""
+        model = self._model(case_dir)
+        model["assumptions"] = [
+            row
+            for row in model["assumptions"]
+            if (row["element_id"], row["attribute"]) != (subject, "trust_zone")
+        ]
+        self._write(case_dir, model)
+
+        assert verify_corpus.check_case(case_dir) == [
+            (
+                f"facts.json: the source does not place {subject}, and model.json"
+                " records no trust_zone assumption for it"
+            )
+        ]
+
+    def test_a_stated_placement_with_an_assumption_is_named(self, case_dir):
+        """The spreadsheet's row states the marketing office."""
+        model = self._model(case_dir)
+        model["assumptions"].append(
+            {
+                "assumption": "A probe: the spreadsheet is placed in the office.",
+                "element_id": "process:catalogue-spreadsheet",
+                "attribute": "trust_zone",
+                "basis": "A probe: the source states this placement.",
+            }
+        )
+        self._write(case_dir, model)
+
+        assert verify_corpus.check_case(case_dir) == [
+            (
+                "model.json records a trust_zone assumption for"
+                " process:catalogue-spreadsheet, and facts.json states its placement"
+            )
+        ]
+
+
 def test_severity_bands_are_derivable_everywhere():
     assert list(verify_corpus._severity_bands()) == []
 

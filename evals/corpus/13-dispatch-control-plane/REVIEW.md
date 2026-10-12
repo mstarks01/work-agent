@@ -124,6 +124,7 @@ Not part of the question, but the records cite these names, so you need them.
 
 **Assumptions**
 
+- `process:dispatch-console` — The dispatch console is placed in the corporate network because the schema requires a zone; the source places the engineers' browsers there and the console runs in them. (basis: The console is a single-page JavaScript app executing in the browsers of engineers on the corporate network. This locates the browser execution, not the web host.)
 - `process:dispatch-api` — The dispatch API is not reachable from the internet. (basis: The source states the control plane is not reachable from the internet, and places the dispatch API in it; the source states nothing about the API's own exposure.)
 - `store:dispatch-database` — The dispatch database is placed in the production control plane because the schema requires a zone; the source does not place it. (basis: The dispatch API, which runs in the control plane, reads and writes the database. Access does not entail co-location, and no statement locates the database; the value is a placement the schema requires, not a source-backed fact.)
 - `store:schedule-archive` — The schedule archive is placed on the corporate network because the schema requires a zone; the source states a folder on the corporate file store. (basis: 'A folder on the corporate file store' establishes affiliation and the folder-on-file-store relationship, not placement on the corporate network. The value is a placement the schema requires, not a source-backed fact.)
@@ -454,7 +455,7 @@ your missing list, your notes and a digest of each file you read:
       "notes": "<counts, and anything you would change>",
       "opened_digests": {
       "source.md": "7e370ab58f5a0138f9dd36d41cb6d3ef2b88e15594ab7995a9eb1488b157fec7",
-      "model.json": "b31bc54f80f1e972ebf62c0b2c380109a67034c38cc9c15f655d36992bea9b98",
+      "model.json": "7d6b0954ab6043050bb4f3a726aa40e7da3b02494e0430ff942375f10c4b14da",
       "claims/asvs.json": "e2a9c33f73e15df69bd2a4645afa0bb6070692516af24a275100775832359970",
       "claims/stride.json": "707f050fcada8b0089b8762bb210da900bde56c19e7652678b0f1de1af351b02"
       }

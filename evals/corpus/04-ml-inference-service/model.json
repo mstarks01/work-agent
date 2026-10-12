@@ -229,6 +229,12 @@
   ],
   "assumptions": [
     {
+      "assumption": "The calling services are placed on the public internet because the schema requires a zone; the source places them nowhere.",
+      "element_id": "entity:calling-service",
+      "attribute": "trust_zone",
+      "basis": "Two of the calling services are in a different cloud and the gateway is exposed to reach them. A different cloud is not a stated network, and reaching the gateway does not locate the caller."
+    },
+    {
       "assumption": "The ML engineer is placed in the model network because the schema requires a zone; the source places neither the engineer nor the registry bucket.",
       "element_id": "entity:ml-engineer",
       "attribute": "trust_zone",
