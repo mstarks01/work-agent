@@ -285,13 +285,24 @@ checks for every analysis and report before adding multi-user access.
 ### Question progress and reports
 
 The progress bar counts filled answers in the recommended list, including individual
-parts of multi-part questions. Saved and skipped totals appear separately. The
-number of recommended questions can rise as well as fall when an answer lists
-a part or removes a question, and the page says so. It is not a fixed percentage
-or an estimate of elapsed time. **How this list is counted** gives more detail.
+parts of multi-part questions. Answered, "I don't know" and skipped totals appear
+separately. The number of recommended questions can rise as well as fall when an
+answer lists a part or removes a question, and the page says so. It is not a fixed
+percentage or an estimate of elapsed time. **How this list is counted** gives more
+detail.
 
-When no recommended question remains, **Save answers** stays visible but disabled
-until an earlier answer changes. **Start the analysis** becomes the primary
+Each answer is saved as it is given, one request at a time for the run, with
+the revision the page read. A chosen option is sent at once; typed text waits
+400 ms after the last keystroke. The save line says **Saved**, **Saving** or
+**Not saved**; **Save now** shows only while something is unsaved. A stale
+revision makes the page read the answers again: an edit the other tab did not
+touch is sent again, and an edit over an answer that changed elsewhere is shown
+beside that answer with **Keep mine** and **Take theirs**. A lost response is
+read back the same way before anything is sent again, and **Start the analysis**
+saves what is pending first and starts once. Answers live in the server's
+memory for the session; the page never claims more.
+
+When no recommended question remains, **Start the analysis** becomes the primary
 action. Skipped questions remain open facts, not negative answers.
 
 Reopening a running analysis shows completed processing steps from its session

@@ -96,8 +96,28 @@ def page(browser, served):
     assert errors == [], f"the page raised: {errors}"
 
 
+def _post_to_answer(response) -> bool:
+    return "/answer/" in response.url and response.request.method == "POST"
+
+
+def saved(page) -> None:
+    """Wait until the page says every answer is saved."""
+    page.wait_for_function(
+        "() => document.querySelector('#save-status').textContent === 'Saved'"
+    )
+
+
+def choose(page, locator, value: str) -> None:
+    """Choose ``value`` in ``locator``, which the page saves at once, and wait
+    for the save to land."""
+    with page.expect_response(_post_to_answer) as done:
+        locator.select_option(value)
+    assert done.value.ok, done.value.text()
+    saved(page)
+
+
 def pause(page) -> None:
-    """Submit a description that asks questions, and wait for the first round."""
+    """Submit a description that asks questions, and wait for the list."""
     page.fill("#description", "A web app talks to a database.")
     page.check("#ask")
     if not page.locator('input[name="framework"]:checked').count():
@@ -111,35 +131,35 @@ def test_clearing_a_control_sends_no_answer_for_it(page):
     """Blank after "There is none" still sent ``none`` (#1289, B1)."""
     pause(page)
     control = page.locator('#questions select:has(option[value="mechanism"])').first
-    control.select_option("none")
+    choose(page, control, "none")
     control.select_option("")
     with page.expect_request("**/answer/*") as sent:
-        page.click("#save")
+        page.click("#continue")
     facts = sent.value.post_data_json["facts"]
     assert all(fact.get("value") != "none" for fact in facts)
 
 
-def test_an_owner_who_skips_every_round_reaches_a_report_that_says_what_is_open(
+def test_an_owner_who_skips_every_question_reaches_a_report_that_says_what_is_open(
     page,
 ):
     """Skip, the ready state, the start button and the report, end to end."""
     pause(page)
     for _ in range(20):
-        if page.is_disabled("#save"):
+        if page.is_disabled("#skip"):
             break
         before = page.inner_text("#questions")
         page.click("#skip")
-        # The response lands before the page draws the next round from it.
+        # The response lands before the page draws the list again from it.
         page.wait_for_function(
             "before => document.querySelector('#questions').innerText !== before",
             arg=before,
         )
     else:
-        pytest.fail("the rounds never ended")
+        pytest.fail("the list never ended")
     assert "Nothing runs until you choose Start the analysis" in page.inner_text(
         "#questions"
     )
-    assert page.is_disabled("#save")
+    assert page.is_disabled("#skip")
     assert "primary" in page.get_attribute("#continue", "class")
     page.click("#continue")
     page.wait_for_url("**/report/**")
@@ -157,30 +177,121 @@ def test_a_phone_sized_owner_answers_skips_corrects_and_starts(browser, served):
     errors: list[str] = []
     page.on("pageerror", lambda error: errors.append(str(error)))
     page.goto("/")
-    pause(page)
-    page.locator('#questions select:has(option[value="no"])').first.select_option("no")
-    page.click("#save")
-    page.wait_for_selector("#earlier", state="visible")
-    before = page.inner_text("#questions")
-    page.click("#skip")
-    page.wait_for_function(
-        "before => document.querySelector('#questions').innerText !== before",
-        arg=before,
+    posted: list[str] = []
+    page.on(
+        "request",
+        lambda request: (
+            posted.append(request.post_data or "")
+            if "/answer/" in request.url and request.method == "POST"
+            else None
+        ),
     )
-    page.click("#earlier summary")
-    page.locator("#earlier button", has_text="Change").first.click()
-    page.locator('#earlier select:has(option[value="yes"])').first.select_option("yes")
+    pause(page)
+    choose(page, page.locator('#questions select:has(option[value="no"])').first, "no")
+    with page.expect_response(_post_to_answer):
+        page.click("#skip")
+    saved(page)
+    # The answered row stays in the list, compact, and "Change" reopens it.
+    # A handle keeps the row while the list adds rows above it.
+    row = page.locator("#list p", has=page.locator("button", has_text="Change"))
+    held = row.first.element_handle()
+    held.query_selector("button").click()
+    with page.expect_response(_post_to_answer) as corrected:
+        held.query_selector("select").select_option("yes")
+    facts = corrected.value.request.post_data_json["facts"]
+    saved(page)
     wide = page.evaluate(
         "document.documentElement.scrollWidth - document.documentElement.clientWidth"
     )
-    with page.expect_request("**/answer/*") as sent:
-        page.click("#continue")
-    facts = sent.value.post_data_json["facts"]
+    page.click("#continue")
     page.wait_for_url("**/report/**")
     context.close()
     assert errors == [], f"the page raised: {errors}"
-    assert any("yes" in str(fact) for fact in facts)
+    assert any(fact.get("value") == "yes" for fact in facts), posted
     assert wide <= 0, f"the page scrolls sideways by {wide}px on a phone"
+
+
+def test_the_page_shows_no_round_control(page):
+    """No round counter, no next-round and no save-and-next step (#1632)."""
+    pause(page)
+    text = page.inner_text("#asked").lower()
+    assert "round" not in text and "next" not in text
+    assert not page.is_visible("#save"), "nothing is unsaved, so no save button"
+    assert page.locator("#list button", has_text="Skip for now").count() > 0
+
+
+def test_a_focused_editor_survives_another_answer_s_save(page):
+    """Typing in one row while another row's save brings the list back keeps
+    the node, the text and the focus (#1632)."""
+    pause(page)
+    typed = page.locator("#list input[list]").first
+    typed.click()
+    typed.type("the platform tea")
+    choose(page, page.locator('#list select:has(option[value="yes"])').first, "yes")
+    assert page.evaluate(
+        "document.activeElement === document.querySelector('#list input[list]')"
+    )
+    assert typed.input_value() == "the platform tea"
+
+
+def test_a_reload_shows_the_saved_answers(page):
+    pause(page)
+    control = page.locator('#list select:has(option[value="yes"])').first
+    choose(page, control, "yes")
+    page.reload()
+    page.wait_for_selector("#asked", state="visible")
+    page.click("#earlier summary")
+    assert "yes" in page.inner_text("#earlier")
+
+
+def test_a_double_click_on_start_starts_one_run(page):
+    pause(page)
+    starts: list[str] = []
+    page.on(
+        "request",
+        lambda request: (
+            starts.append(request.url)
+            if "/answer/" in request.url
+            and request.method == "POST"
+            and '"save"' not in (request.post_data or "")
+            else None
+        ),
+    )
+    page.dblclick("#continue")
+    page.wait_for_url("**/report/**")
+    assert len(starts) == 1
+
+
+def test_two_tabs_do_not_write_over_each_other_in_silence(browser, served):
+    """The second tab's stale save is refused; it reads the answers again and
+    shows the answer the first tab saved, for the owner to settle (#1632)."""
+    context = browser.new_context(base_url=served)
+    first = context.new_page()
+    errors: list[str] = []
+    first.on("pageerror", lambda error: errors.append(str(error)))
+    first.goto("/")
+    pause(first)
+    second = context.new_page()
+    second.on("pageerror", lambda error: errors.append(str(error)))
+    second.goto(first.url)
+    second.wait_for_selector("#asked", state="visible")
+    # A plain row's select: the first yes/no select in a STRIDE list can be a
+    # facet cell, whose row is a table row.
+    control = '#list p select:has(option[value="yes"])'
+    choose(first, first.locator(control).first, "yes")
+    with second.expect_response(lambda r: "/workspace/runs/" in r.url):
+        second.locator(control).first.select_option("no")
+    second.wait_for_selector("#list .conflict")
+    assert "Changed elsewhere" in second.inner_text("#list .conflict")
+    assert "changed elsewhere" in second.inner_text("#save-status")
+    # The row with the conflict keeps its place; the list has moved on above
+    # it, and "Take theirs" removes the note, so the row is held first.
+    row = second.locator("#list p:has(.conflict)").first.element_handle()
+    row.query_selector("button:has-text('Take theirs')").click()
+    assert row.query_selector("select").input_value() == "yes"
+    saved(second)
+    context.close()
+    assert errors == [], f"a page raised: {errors}"
 
 
 def test_a_first_report_offers_no_way_to_reopen_a_known_answer(page):
@@ -201,9 +312,7 @@ def test_a_first_report_offers_no_way_to_reopen_a_known_answer(page):
 def first_report(page) -> None:
     """Answer "no" to the first question, start, and wait for the report."""
     pause(page)
-    page.locator('#questions select:has(option[value="no"])').first.select_option("no")
-    page.click("#save")
-    page.wait_for_selector("#earlier", state="visible")
+    choose(page, page.locator('#questions select:has(option[value="no"])').first, "no")
     page.click("#continue")
     page.wait_for_url("**/report/**")
 

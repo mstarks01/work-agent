@@ -469,10 +469,16 @@ def test_the_report_page_may_reach_its_own_origin_and_nothing_else(tiers, runner
 _FORM_HARNESS = r"""
 const calls = [], streams = [];
 class Node {
-  constructor(tag) { this.tag = tag; this.children = []; this.dataset = {};
+  constructor(tag) { this.tag = tag; this.children = []; this.dataset = {}; this.parent = null;
     this.hidden = false; this.value = ""; this.textContent = ""; this.listeners = {}; }
-  append(...kids) { for (const k of kids) this.children.push(k); }
-  replaceChildren(...kids) { this.children = [...kids]; }
+  adopt(kid) { if (typeof kid === "object") { if (kid.parent) kid.parent.children = kid.parent.children.filter((c) => c !== kid); kid.parent = this; } }
+  append(...kids) { for (const k of kids) { this.adopt(k); this.children.push(k); } }
+  replaceChildren(...kids) { this.children = []; this.append(...kids); }
+  insertBefore(kid, ref) { this.adopt(kid); const at = ref ? this.children.indexOf(ref) : -1;
+    if (at < 0) this.children.push(kid); else this.children.splice(at, 0, kid); }
+  remove() { if (this.parent) { this.parent.children = this.parent.children.filter((c) => c !== this); this.parent = null; } }
+  contains(node) { return node === this || this.children.some((c) => typeof c === "object" && c.contains(node)); }
+  focus() { document.activeElement = this; }
   addEventListener(name, fn) { this.listeners[name] = fn; }
   setAttribute(name, value) { this[name] = value; }
   querySelectorAll(sel) {
@@ -486,16 +492,18 @@ class Node {
 }
 const ids = {};
 for (const id of ["analyze","description","ticks","problem","go","load","ask",
-                  "asked","questions","earlier","save","continue","status",
+                  "asked","questions","list","earlier","save","continue","status",
                   "status-text","answer-problem","skip","skipped","more",
-                  "answer_limits"])
+                  "answer_limits","save-status","changes"])
   ids[id] = new Node(id);
+ids.questions.append(ids.list);
 ids.ask.checked = true;
 ids.answer_limits.textContent = LIMITS;
 globalThis.document = {
   getElementById: (id) => ids[id] || null,
   createElement: (tag) => new Node(tag),
   querySelectorAll: () => [],
+  activeElement: null,
 };
 globalThis.location = { href: "", search: SEARCH };
 globalThis.window = { scrollTo() {} };
@@ -540,6 +548,9 @@ def _run_form_script(steps: str, search: str = "") -> dict:
         [node, "-e", program], capture_output=True, text=True, timeout=30, check=False
     )
     assert done.returncode == 0, done.stderr
+    # A step that threw inside the async run leaves no result line; the
+    # error is on stderr.
+    assert done.stdout.strip(), done.stderr
     return json.loads(done.stdout.strip().splitlines()[-1])
 
 
@@ -558,13 +569,21 @@ streams[1].listeners.done({ data: JSON.stringify({ url: "/report/r2" }) });
 
     assert seen["calls"][0]["url"] == "/analyze"
     assert seen["calls"][0]["body"]["questions"] is True
+    # The start saves what the page holds first, then starts at the
+    # revision the save returned.
     assert seen["calls"][1] == {
         "url": "/answer/r1",
         "body": {
             "links": [{"principal": "shopper accounts", "element": "entity:shopper"}],
             "facts": [],
+            "save": True,
+            "skip": [],
             "presented": [],
         },
+    }
+    assert seen["calls"][2] == {
+        "url": "/answer/r1",
+        "body": {"links": [], "facts": [], "presented": []},
     }
     assert seen["streams"] == ["/events/r1", "/events/r2"]
     assert seen["href"] == "/report/r2"
@@ -613,6 +632,13 @@ await ids.continue.listeners.click(); await settle();
     assert seen["calls"][1]["body"] == {
         "links": [],
         "facts": [{"key": key, "value": "TLS 1.3"}],
+        "save": True,
+        "skip": [],
+        "presented": [key, kind],
+    }
+    assert seen["calls"][2]["body"] == {
+        "links": [],
+        "facts": [],
         "presented": [key, kind],
     }
 
@@ -1364,6 +1390,8 @@ await ids.continue.listeners.click(); await settle();
     assert seen["calls"][1]["body"] == {
         "links": [],
         "facts": [{"key": key, "value": "none"}],
+        "save": True,
+        "skip": [],
         "presented": [key],
     }
 
@@ -1526,13 +1554,10 @@ calls.push({ shared: shared.length });
 """
 
 
-@pytest.mark.parametrize("interleaved", [False, True])
-def test_same_for_all_fills_only_the_ticked_rows(interleaved):
+def test_same_for_all_fills_only_the_ticked_rows():
     """One answer for several parts, with exceptions (#1289, design note C)."""
     first, second = valid_model().data_flows[:2]
     facts = [_control_row(first), _control_row(second)]
-    if interleaved:
-        facts.insert(1, _text_row(["", "", "", "Who operates it?", "", ""], "Owner"))
     steps = (
         _SHARED_STEPS.replace("FACTS", json.dumps(facts))
         + """
@@ -1548,24 +1573,33 @@ await ids.continue.listeners.click(); await settle();
     )
     seen = _run_form_script(steps)["calls"]
     assert seen[1] == {"shared": 1}
-    (sent,) = [c for c in seen if c.get("url") == "/answer/r1"]
+    sent = next(c for c in seen if c.get("url") == "/answer/r1")
     assert sent["body"]["facts"] == [{"key": facts[0]["key"], "value": "none"}]
 
 
-@pytest.mark.parametrize("case", ["one-row", "two-forms"])
+@pytest.mark.parametrize("case", ["one-row", "two-forms", "interleaved"])
 def test_same_for_all_is_offered_only_where_rows_share_a_question(case):
+    """Two rows share a box only where the service lists them together: a
+    row of another group between them keeps the list's order, so each sits
+    in its own box and neither offers "Same for all" (ADR 0078)."""
     first, second = valid_model().data_flows[:2]
-    facts = (
-        [_control_row(first)]
-        if case == "one-row"
-        else [_control_row(first), _control_row(second, form="text")]
-    )
+    facts = {
+        "one-row": [_control_row(first)],
+        "two-forms": [_control_row(first), _control_row(second, form="text")],
+        "interleaved": [
+            _control_row(first),
+            _text_row(["", "", "", "Who operates it?", "", ""], "Owner"),
+            _control_row(second),
+        ],
+    }[case]
     steps = _SHARED_STEPS.replace("FACTS", json.dumps(facts))
     assert _run_form_script(steps)["calls"][1] == {"shared": 0}
 
 
-def test_the_form_script_collects_a_category_in_one_box_with_a_row_per_element():
-    """Interleaved categories share one box each, in first-appearance order."""
+def test_the_form_script_keeps_the_list_s_order_with_a_box_for_each_run():
+    """A box holds each run of rows that share a group, in the service's
+    order. A group that comes back later opens a new box: a heading never
+    moves a row ahead of another (ADR 0078)."""
     store, flow = valid_model().data_stores[0], valid_model().data_flows[0]
     process = valid_model().processes[0]
 
@@ -1602,7 +1636,7 @@ calls.push({{ groups: groups.map(g => ({{
   rows: rowsOf(g).map(r => child(r, "b").textContent),
   open: g.open }})) }});
 child(rowsOf(groups[0])[0], "select").value = "no";
-child(rowsOf(groups[0])[2], "select").value = "yes";
+child(rowsOf(groups[2])[0], "select").value = "yes";
 await ids.continue.listeners.click(); await settle();
 """
     seen = _run_form_script(steps)["calls"]
@@ -1610,8 +1644,8 @@ await ids.continue.listeners.click(); await settle();
 
     assert layout["groups"] == [
         {
-            "title": "stored-copy-integrity heading? (3 question(s), 3 choice(s))",
-            "rows": [store.name, flow.name, process.name],
+            "title": "stored-copy-integrity heading? (2 question(s), 2 choice(s))",
+            "rows": [store.name, flow.name],
             "open": True,
         },
         {
@@ -1619,8 +1653,13 @@ await ids.continue.listeners.click(); await settle();
             "rows": [flow.name, store.name],
             "open": True,
         },
+        {
+            "title": "stored-copy-integrity heading? (1 question(s), 1 choice(s))",
+            "rows": [process.name],
+            "open": True,
+        },
     ]
-    (sent,) = [c for c in seen if c.get("url") == "/answer/r1"]
+    sent = next(c for c in seen if c.get("url") == "/answer/r1")
     assert sent["body"]["facts"] == [
         {"key": facts[0]["key"], "value": "no"},
         {"key": facts[4]["key"], "value": "yes"},
@@ -1664,7 +1703,7 @@ await ids.continue.listeners.click(); await settle();
 """
     seen = _run_form_script(steps)["calls"]
     (layout,) = [c for c in seen if "columns" in c]
-    (sent,) = [c for c in seen if c.get("url") == "/answer/r1"]
+    sent = next(c for c in seen if c.get("url") == "/answer/r1")
 
     facets = QUESTION_KINDS["capacity-limits"].facets
     assert layout == {
@@ -1719,7 +1758,7 @@ await ids.continue.listeners.click(); await settle();
 """
     seen = _run_form_script(steps)["calls"]
     (offered,) = [c["offered"] for c in seen if "offered" in c]
-    (sent,) = [c for c in seen if c.get("url") == "/answer/r1"]
+    sent = next(c for c in seen if c.get("url") == "/answer/r1")
 
     assert offered == ["", *FACET_ANSWERS, "unknown"]
     FactAnswer.model_validate(sent["body"]["facts"][0])
@@ -1862,12 +1901,8 @@ await ids.continue.listeners.click(); await settle();
         "revision": 3,
     }
     assert start["body"]["revision"] == 4, "the start sends the revision it read"
-    assert (
-        after["waiting"]
-        and after["asked"]
-        and after["saveShown"]
-        and after["saveDisabled"]
-    )
+    # Nothing is unsaved, so "Save now" is hidden; the page waits.
+    assert after["waiting"] and after["asked"] and not after["saveShown"]
     assert said in after["said"]
     assert "Nothing runs until you choose Start the analysis" in after["said"]
     assert start["url"] == "/answer/r1" and "save" not in start["body"]
@@ -1945,37 +1980,6 @@ calls.push(walk(ids.questions).filter(n => n.tag === "select").length);
     said, selects = _run_form_script(steps)["calls"][-2:]
     assert "This list asks 1 choice(s). 1 more question(s) appear if you answer" in said
     assert selects == 1, "the part is not drawn"
-
-
-def test_a_part_of_a_part_hides_with_its_parent():
-    """A part's own part hides when the part above it hides."""
-    choices = [{"id": "yes", "name": ""}, {"id": "no", "name": ""}]
-    keys = [["", "", "", "", "", name] for name in ("a", "b", "c")]
-    rows = [
-        _text_row(key, f"{key[5]}?")
-        | {"kind": "capability", "form": "choice", "choices": choices}
-        | ({"parent": keys[at - 1]} if at else {})
-        for at, key in enumerate(keys)
-    ]
-    steps = f"""
-await ids.analyze.listeners.submit({{ preventDefault() {{}} }}); await settle();
-streams[0].listeners.questions({{ data: JSON.stringify({{ run: "r1",
-  link_questions: [], early_questions: {json.dumps(rows)},
-  early_remaining: {{ capability: 3 }}, answered_early: [], answered_links: [], revision: 0 }}) }});
-const walk = (n, out = []) => {{ for (const c of n.children || [])
-  if (typeof c === "object") {{ out.push(c); walk(c, out); }} return out; }};
-const [a, b] = walk(ids.questions).filter(n => n.tag === "select");
-const shown = () => walk(ids.questions).filter(n => n.tag === "p" && n.children
-  .some(c => typeof c === "object" && c.tag === "select")).map(p => !p.hidden);
-a.value = "yes"; a.listeners.change();
-b.value = "yes"; b.listeners.change();
-calls.push(shown());
-a.value = "no"; a.listeners.change();
-calls.push(shown());
-"""
-    opened, closed = _run_form_script(steps)["calls"][-2:]
-    assert opened == [True, True, True]
-    assert closed == [True, False, False]
 
 
 def test_a_capability_says_it_decides_what_an_analysis_covers():
@@ -2236,12 +2240,19 @@ def test_a_table_that_comes_back_keeps_its_earlier_facets():
 await ids.analyze.listeners.submit({{ preventDefault() {{}} }}); await settle();
 streams[0].listeners.questions({{ data: JSON.stringify({{ run: "r1", link_questions: [],
   early_questions: [{json.dumps(fact)}], answered_early: [{json.dumps(earlier)}] }}) }});
+const [table] = ids.questions.querySelectorAll("table");
+const size = table.children[1].children[2].children[0];
+calls.push({{ rate: table.children[1].children[1].children[0].value }});
+size.value = "no";
 await ids.continue.listeners.click(); await settle();
 """
     seen = _run_form_script(steps)["calls"]
-    (sent,) = [c for c in seen if c.get("url") == "/answer/r1"]
+    sent = next(c for c in seen if c.get("url") == "/answer/r1")
 
-    assert sent["body"]["facts"] == [{"key": fact["key"], "facets": {"rate": "yes"}}]
+    assert {"rate": "yes"} in seen, "the earlier facet is filled in"
+    assert sent["body"]["facts"] == [
+        {"key": fact["key"], "facets": {"rate": "yes", "size": "no"}}
+    ]
 
 
 def test_a_follow_up_question_says_why_it_is_asked():

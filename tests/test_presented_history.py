@@ -53,8 +53,8 @@ def _round(*names):
 
 
 def _sent_by_the_page(parent_value):
-    """What the shipped script sends for "Skip the rest" with the parent at
-    ``parent_value`` and its part hidden or shown."""
+    """What the shipped script sends for "Skip the questions left blank" with
+    the parent at ``parent_value`` and its part listed or waiting."""
     parent_key = ["", "", "", "", "", "oauth"]
     child_key = ["", "", "", "", "", "oauth-client"]
     shape = {
@@ -62,14 +62,16 @@ def _sent_by_the_page(parent_value):
         "form": "choice",
         "choices": [{"id": "yes", "name": ""}, {"id": "no", "name": ""}],
     }
-    rows = [
-        _text_row(parent_key, "OAuth?") | shape,
-        _text_row(child_key, "A client?") | shape | {"parent": parent_key},
-    ]
+    # The service lists a part only once its parent is "yes"; until then it
+    # waits in ``early_blocked``, and the page draws what the service lists.
+    parent = _text_row(parent_key, "OAuth?") | shape
+    child = _text_row(child_key, "A client?") | shape | {"parent": parent_key}
+    listed = [parent, child] if parent_value == "yes" else [parent]
+    blocked = [] if parent_value == "yes" else [child | {"reason": "parent-undecided"}]
     steps = f"""
 await ids.analyze.listeners.submit({{ preventDefault() {{}} }}); await settle();
 streams[0].listeners.questions({{ data: JSON.stringify({{ run: "r1",
-  link_questions: [], early_questions: {json.dumps(rows)}, early_remaining: {{capability: 2}},
+  link_questions: [], early_questions: {json.dumps(listed)}, early_blocked: {json.dumps(blocked)},
   answered_early: [], answered_links: [], revision: 0 }}) }});
 const parent = ids.questions.querySelectorAll("select")[0];
 parent.value = {json.dumps(parent_value)}; parent.listeners.change();

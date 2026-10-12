@@ -76,11 +76,15 @@
   const ask = document.getElementById("ask");
   const asked = document.getElementById("asked");
   const questions = document.getElementById("questions");
+  const list = document.getElementById("list");
   const saveButton = document.getElementById("save");
   const skipButton = document.getElementById("skip");
   const skippedBox = document.getElementById("skipped");
   const moreBox = document.getElementById("more");
   const earlierBox = document.getElementById("earlier");
+  const saveStatus = document.getElementById("save-status");
+  const changesNote = document.getElementById("changes");
+  const startButton = document.getElementById("continue");
 
   form.addEventListener("submit", async (event) => {
     event.preventDefault();
@@ -118,90 +122,787 @@
     }
   });
 
-  // A paused run's questions: one select per principal. "" leaves a question
-  // unanswered; "none" says the principal is no element. Every label and
-  // option is untrusted and lands as text.
+  // ------------------------------------------------------------------------
+  // A paused run's questions: one adaptive list, saved as the owner answers
+  // (ADR 0078). The service decides what the list holds and in what order.
+  // This page draws each row once, by its key, keeps it in place while the
+  // list around it changes, and sends each change on its own. The service
+  // answers every save with the list again, and the page reconciles by key.
+  // Every label and option is untrusted and lands as text.
+  // ------------------------------------------------------------------------
   let pausedRun = null;
-  // The paused run's revision this page read. A save or a start sends it, so
-  // a page left open on an earlier revision cannot write over a later one.
+  // The revision this page last read. Every save and the start send it, so a
+  // page left open on an earlier revision cannot write over a later one.
   let revision = 0;
-  // One reader per question: its answer as the service takes it, or null.
-  let answers = [];
-  // The listed questions, each with its key and reader, so "Skip the rest"
-  // can name the ones left blank and a save can say which rows it showed.
-  let roundRows = [];
+  // The list as the service last served it.
+  let view = null;
+  // Every row the page has drawn, by its key as a string: the question, its
+  // node, its editor, and the answer the service last acknowledged for it.
+  const rows = new Map();
+  // The owner's edits the service has not acknowledged, by key string:
+  // { generation, answer, skip, refused, conflict }. A row's generation rises
+  // with every edit, and an acknowledgement clears only the generation sent.
+  const edits = new Map();
+  let generation = 0;
+  // How long the page waits after a keystroke before it saves. A chosen
+  // option is saved at once.
+  const AUTOSAVE_DELAY = 400;
   // How much of an element's source words a row shows; the rest is its title.
   const EXCERPT = 200;
+  const keyOf = (key) => JSON.stringify(key);
+  // A row's key as the page's maps hold it: a link question's key is a
+  // string, every other question's the JSON of its key tuple.
+  const rowKey = (row) => (row.kind === "link" ? row.q.key : keyOf(row.q.key));
+  const say = (node, text) => {
+    if (node) node.textContent = text;
+  };
   // The input for one early question, built by answerEditor. `prefill` is an
   // earlier answer, or null. A job waiting at its pause takes "I don't know"
-  // over a known answer, so every input offers it. The list, "Your answers"
-  // and the questions the list leaves out all build with this.
-  const inputFor = (q, prefill) => answerEditor(q, { choices: q.choices, prefill, reopen: true });
+  // over a known answer, so every input offers it.
+  const inputFor = (q, prefill, changed) =>
+    answerEditor(q, { choices: q.choices, prefill, reopen: true, changed });
+  // Whether `node` holds the focused element. A stand-in document has no
+  // focus, and a row then counts as not focused.
+  const focused = (node) => {
+    const active = document.activeElement;
+    return Boolean(active && typeof node.contains === "function" && node.contains(active));
+  };
+  const dirty = (row) => edits.has(rowKey(row));
+  // A row the page must not rebuild: the owner is editing it, or its edit is
+  // not acknowledged yet.
+  const busy = (row) => dirty(row) || focused(row.node);
 
-  // A paused run's list: the link questions, then one box per open-fact
-  // category in first-appearance order, and every earlier answer below them.
-  // Every label and option is untrusted and lands as text.
+  // The intro, the list and the tail of the question area. The intro and the
+  // tail are redrawn from each payload; the list is reconciled by key.
+  const intro = document.createElement("div");
+  intro.className = "list-intro";
+  const tail = document.createElement("div");
+  tail.className = "list-tail";
+  let framed = false;
+  const frame = () => {
+    if (framed) return;
+    questions.replaceChildren(intro, list, tail);
+    framed = true;
+  };
+
+  // Which analysis an answer serves: a capability decides what a framework
+  // covers, and every other fact is read by the analysis itself.
+  const serves = (q) => {
+    const names = q.frameworks || [];
+    if (!names.length) return null;
+    const which = `the ${names.join(" and ")} ${names.length > 1 ? "analyses" : "analysis"}`;
+    if ((q.gates || []).length) return `Decides whether ${which} runs`;
+    return q.kind === "capability" ? `Decides what ${which} covers` : `Used by ${which}`;
+  };
+  // What each answer to a yes/no question proves about the others, from the
+  // service's own figures (QuestionSet.effects). "May remove" and "lists",
+  // never "resolves": no finding exists yet. Neither answer is favoured.
+  const effectOf = (q) => {
+    const rank = q.rank;
+    if (!rank || !rank.answers) return null;
+    const parts = [];
+    for (const [answer, effect] of Object.entries(rank.answers)) {
+      const said = [];
+      if (effect.settles) said.push(`may remove ${effect.settles} follow-up question(s)`);
+      if (effect.unlocks) said.push(`lists ${effect.unlocks} more`);
+      if (said.length) parts.push(`“${answer}” ${said.join(" and ")}`);
+    }
+    return parts.length ? parts.join("; ") : null;
+  };
+  // Why a question is asked, which analysis it serves, what each answer
+  // does to the list, and the words of the description its element was read
+  // from. The words are what the service read, not an answer to the question.
+  const context = (q) => {
+    const parts = [];
+    if ((q.reasons || []).length) parts.push(`Why: ${q.reasons[0]}`);
+    const use = serves(q);
+    if (use) parts.push(use);
+    const effect = effectOf(q);
+    if (effect) parts.push(effect);
+    if (q.excerpt) {
+      const cut = q.excerpt.length > EXCERPT ? `${q.excerpt.slice(0, EXCERPT)}…` : q.excerpt;
+      parts.push(`Your description of this part, for reference: “${cut}”`);
+    }
+    if (!parts.length) return null;
+    const hint = document.createElement("div");
+    hint.className = "hint";
+    hint.textContent = parts.join(" · ");
+    hint.title = q.excerpt || "";
+    return hint;
+  };
+  const button = (text, onClick, className = "quiet") => {
+    const control = document.createElement("button");
+    control.type = "button";
+    control.className = className;
+    control.textContent = text;
+    control.addEventListener("click", onClick);
+    return control;
+  };
+
+  // ---- Saving -------------------------------------------------------------
+  // One request at a time, for this run. A request carries the edits as they
+  // stood when it was sent, by generation; an edit made while it was in
+  // flight keeps its newer generation and goes in the next request.
+  let saveTimer = null;
+  let saving = false;
+  let again = false;
+  const setStatus = (state, text) => {
+    const words = {
+      saved: "Saved",
+      saving: "Saving…",
+      unsaved: "Not saved yet",
+      failed: "Not saved",
+      conflict: "Not saved: an answer changed elsewhere",
+    };
+    say(saveStatus, text ? `${words[state]}: ${text}` : words[state]);
+    if (saveStatus) saveStatus.dataset.state = state;
+    // "Save now" shows while something is unsaved, so a failed save can be
+    // retried by hand.
+    saveButton.hidden = !(edits.size && state !== "saving");
+  };
+  // The status the edits warrant: a conflict first, then anything unsaved.
+  const showState = () => {
+    const conflict = [...edits.values()].some((edit) => edit.conflict !== undefined);
+    setStatus(conflict ? "conflict" : edits.size ? "unsaved" : "saved");
+  };
+  const scheduleSave = (delay) => {
+    clearTimeout(saveTimer);
+    saveTimer = setTimeout(() => flush(), delay);
+  };
+  // The listed early questions this page shows: every row drawn from the
+  // list the service serves now. The service records only these as shown,
+  // and takes a skip only of one of them (ADR 0078). A link row is not one.
+  const presented = () =>
+    [...rows.values()]
+      .filter((row) => row.kind === "fact" && row.listed)
+      .map((row) => row.q.key);
+  // The edits a request sends: every unacknowledged one that is not refused
+  // and not in conflict. Returns the request body, or null where nothing is
+  // left to send.
+  const bodyOf = (sent) => {
+    const facts = [];
+    const links = [];
+    const skip = [];
+    for (const [key, edit] of sent) {
+      const row = rows.get(key);
+      if (edit.skip) skip.push(row.q.key);
+      if (!edit.answer) continue;
+      if (row.kind === "link") links.push(edit.answer);
+      else facts.push(edit.answer);
+    }
+    if (!facts.length && !links.length && !skip.length) return null;
+    return { links, facts, save: true, skip, presented: presented(), revision };
+  };
+  const sendable = () =>
+    new Map([...edits].filter(([, edit]) => !edit.refused && !edit.conflict));
+  const flush = async () => {
+    clearTimeout(saveTimer);
+    if (saving) {
+      again = true;
+      return;
+    }
+    const sent = sendable();
+    const body = bodyOf(sent);
+    if (!body) {
+      showState();
+      return;
+    }
+    saving = true;
+    setStatus("saving");
+    try {
+      const response = await fetch("/answer/" + pausedRun, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      const data = await response.json();
+      if (response.ok) {
+        acknowledge(sent);
+        answerProblem.hidden = true;
+        // A save answers with the list again; a stand-in may answer less.
+        if (data.early_questions) reconcile(data);
+        showState();
+      } else if (response.status === 409) {
+        // Another tab saved first. Read the answers again, keep every edit
+        // that does not contradict them, and show the ones that do.
+        await resync();
+      } else {
+        for (const [key, edit] of sent) {
+          if (edits.get(key) === edit) edit.refused = true;
+        }
+        refuse(data.message);
+        setStatus("failed", data.message);
+      }
+    } catch {
+      // The response was lost, and the save may have landed. Read the
+      // answers back before anything is sent again.
+      setStatus("failed", "The connection was interrupted. Retry to save again.");
+      await resync();
+    } finally {
+      saving = false;
+      if (again) {
+        again = false;
+        flush();
+      }
+    }
+  };
+  // An acknowledgement clears each edit at the generation it was sent; an
+  // edit made since keeps its place and is sent next.
+  const acknowledge = (sent) => {
+    for (const [key, edit] of sent) {
+      if (edits.get(key) === edit) edits.delete(key);
+    }
+  };
+  // What the service holds for each answered question, by key string.
+  const answersOf = (data) => {
+    const held = new Map();
+    for (const a of data.answered_early || []) held.set(keyOf(a.key), a.answer);
+    for (const a of data.answered_links || []) {
+      held.set(a.key, { principal: a.principal, element: a.answer.element });
+    }
+    return held;
+  };
+  // Read the answers again, after a stale save or a lost response. An edit
+  // the service already holds is acknowledged; an edit over an answer that
+  // changed since this page read it is a conflict for the owner to settle;
+  // every other edit is kept and sent again.
+  const resync = async () => {
+    let payload;
+    try {
+      const response = await fetch("/workspace/runs/" + encodeURIComponent(pausedRun));
+      payload = await response.json();
+      if (!response.ok) throw new Error();
+    } catch {
+      setStatus("failed", "Could not read the saved answers. Retry.");
+      return;
+    }
+    if (!payload.questions) {
+      // The run no longer waits: its answers started a run, or it stopped.
+      refuse("This analysis no longer waits for answers. Open Analyses to see where it went.");
+      startButton.disabled = true;
+      return;
+    }
+    const latest = payload.questions;
+    const theirs = answersOf(latest);
+    for (const [key, edit] of edits) {
+      const row = rows.get(key);
+      const held = theirs.has(key) ? JSON.stringify(theirs.get(key)) : null;
+      if (edit.answer && held === JSON.stringify(edit.answer)) {
+        edits.delete(key);
+      } else if (held !== (row.saved ? JSON.stringify(row.saved) : null)) {
+        edit.conflict = theirs.has(key) ? theirs.get(key) : null;
+      }
+    }
+    reconcile(latest);
+    showState();
+    // The edits that stand are sent again: now, or once the request that
+    // met the conflict has returned.
+    if (sendable().size) {
+      if (saving) again = true;
+      else scheduleSave(0);
+    }
+  };
+  // "Save now": every editor's current value, and every refused edit again.
+  saveButton.addEventListener("click", () => {
+    collectEdits();
+    for (const edit of edits.values()) delete edit.refused;
+    if (sendable().size) flush();
+    else resync();
+  });
+
+  // ---- Edits --------------------------------------------------------------
+  // Register what a row's editor holds now. A value equal to the saved one is
+  // no edit; a blank sends nothing, and a saved answer stays as it was.
+  const registerEdit = (row) => {
+    const key = rowKey(row);
+    const answer = row.read();
+    const saved = row.saved ? JSON.stringify(row.saved) : null;
+    if (!answer || JSON.stringify(answer) === saved) {
+      edits.delete(key);
+      return false;
+    }
+    edits.set(key, { generation: ++generation, answer, skip: false });
+    return true;
+  };
+  const onEdit = (row, event) => {
+    const typed = Boolean(event && event.type === "input");
+    const changed = registerEdit(row);
+    if (row.conflict) clearConflict(row);
+    if (saving) setStatus("saving");
+    else showState();
+    if (changed) scheduleSave(typed ? AUTOSAVE_DELAY : 0);
+    updateQuestionProgress();
+  };
+  // Skip one listed question for now, with any part answer it holds. A skip
+  // is not an answer: the fact stays open, and "Answer it" opens it again.
+  const skipRow = (row) => {
+    const key = rowKey(row);
+    const answer = row.read();
+    const partial = answer && row.q.form === "facets" && row.open && row.open();
+    edits.set(key, {
+      generation: ++generation,
+      answer: partial ? answer : null,
+      skip: true,
+    });
+    row.node.hidden = true;
+    scheduleSave(0);
+    setStatus("unsaved");
+  };
+  const clearConflict = (row) => {
+    delete row.conflict;
+    const edit = edits.get(rowKey(row));
+    if (edit) delete edit.conflict;
+    if (row.conflictNode) {
+      row.conflictNode.remove();
+      row.conflictNode = null;
+    }
+  };
+  // The owner settles a conflict: keep this page's answer, or take the one
+  // saved elsewhere. Neither happens in silence.
+  const showConflict = (row, edit) => {
+    if (row.conflictNode) row.conflictNode.remove();
+    const note = document.createElement("div");
+    note.className = "conflict";
+    const theirs = edit.conflict;
+    const text = document.createElement("span");
+    text.textContent = theirs
+      ? `Changed elsewhere to “${answerText(theirs.element ? { value: theirs.element } : theirs)}”. `
+      : "Removed elsewhere. ";
+    const keep = button("Keep mine", () => {
+      row.saved = theirs;
+      clearConflict(row);
+      scheduleSave(0);
+    });
+    const take = button("Take theirs", () => {
+      edits.delete(rowKey(row));
+      clearConflict(row);
+      row.saved = theirs;
+      if (theirs) row.set(theirs);
+      showState();
+    });
+    note.append(text, keep, " ", take);
+    row.node.append(note);
+    row.conflictNode = note;
+    row.conflict = true;
+  };
+
+  // ---- Rows ---------------------------------------------------------------
+  // A fact row: label, context, editor, skip. `read` is the answer as the
+  // service takes it, or null; `set` writes an answer into the editor.
+  const drawFact = (row, prefill) => {
+    const q = row.q;
+    const label = document.createElement("b");
+    label.textContent = q.label;
+    label.title = (q.reasons || []).join(" ");
+    const { input, nodes, read, readDetail, set, answer } = inputFor(q, prefill, (event) =>
+      onEdit(row, event),
+    );
+    row.input = input;
+    row.read = answer;
+    row.set = (next) => set(next.value);
+    row.readValue = read;
+    row.readDetail = readDetail;
+    row.compact = false;
+    const skip = button("Skip for now", () => skipRow(row));
+    skip.className = "quiet skip";
+    const about = context(q);
+    row.node.replaceChildren(...(row.tick ? [row.tick, " "] : []), label, " ", ...nodes, " ", skip);
+    if (about) row.node.append(about);
+  };
+  // A saved answer, compact and in place, with "Change".
+  const drawCompact = (row, answer) => {
+    const q = row.q;
+    const label = document.createElement("b");
+    label.textContent = q.label;
+    const shown = document.createElement("span");
+    shown.textContent = ` — ${answerText(answer)}`;
+    row.compact = true;
+    row.read = () => null;
+    row.node.replaceChildren(label, shown, " ", button("Change", () => {
+      drawFact(row, answer);
+      if (row.input && typeof row.input.focus === "function") row.input.focus();
+    }));
+  };
+  // A link row: which element a principal is. A skipped link places nothing.
+  const linkSelect = (q, prefill) => {
+    const select = document.createElement("select");
+    select.dataset.principal = q.principal;
+    select.append(optionOf("(leave unanswered)", ""));
+    for (const option of q.options) {
+      select.append(optionOf(option.name ? `${option.name} (${option.id})` : option.id, option.id));
+    }
+    select.append(optionOf("None of these", "none"));
+    select.value = prefill || "";
+    return select;
+  };
+  const drawLink = (row, prefill) => {
+    const q = row.q;
+    const label = document.createElement("label");
+    const name = document.createElement("b");
+    name.textContent = q.principal;
+    const select = linkSelect(q, prefill);
+    select.addEventListener("change", (event) => onEdit(row, event));
+    row.input = select;
+    row.read = () =>
+      select.value ? { principal: q.principal, element: select.value } : null;
+    row.set = (next) => {
+      select.value = next.element;
+    };
+    row.compact = false;
+    label.append(name, ` — places ${q.rows} stated fact(s) `, select);
+    const skip = button("Skip for now", () => skipRow(row));
+    skip.className = "quiet skip";
+    row.node.replaceChildren(label, " ", skip);
+  };
+  const drawCompactLink = (row, answer) => {
+    const name = document.createElement("b");
+    name.textContent = row.q.principal;
+    const shown = document.createElement("span");
+    shown.textContent = ` — ${answer.element === "none" ? "none of these" : answer.element}`;
+    row.compact = true;
+    row.read = () => null;
+    row.node.replaceChildren(name, shown, " ", button("Change", () => drawLink(row, answer.element)));
+  };
+  // A question with facets is a table: a column per facet, a row per
+  // element, and a first row that sets the whole column where two or more
+  // rows share it.
+  const facetTable = (q) => {
+    const table = document.createElement("table");
+    const head = document.createElement("tr");
+    const corner = document.createElement("th");
+    corner.textContent = "Part of your system";
+    head.append(corner);
+    const columns = q.facets.map((facet) => {
+      const cell = document.createElement("th");
+      cell.textContent = facet.question;
+      head.append(cell);
+      return [];
+    });
+    const detailHead = document.createElement("th");
+    detailHead.textContent = "Exceptions or detail (optional)";
+    head.append(detailHead);
+    table.append(head);
+    const all = document.createElement("tr");
+    all.className = "same-for-all";
+    const allLabel = document.createElement("td");
+    allLabel.textContent = "Same for all";
+    all.append(allLabel);
+    q.facets.forEach((facet, column) => {
+      const cell = document.createElement("td");
+      const every = facetSelect("(set every row)", "", true);
+      every.addEventListener("change", () => {
+        for (const select of columns[column]) {
+          select.value = every.value;
+          const held = select.listeners && select.listeners.change;
+          if (held) held();
+          else select.dispatchEvent(new Event("change"));
+        }
+      });
+      cell.append(every);
+      all.append(cell);
+    });
+    // The detail column takes no shared answer: each row's are its own.
+    all.append(document.createElement("td"));
+    // The row joins the table once two rows share it (`shareAll`).
+    return { table, columns, all, count: 0 };
+  };
+  // "Same for all" sets a column of two or more rows; one row needs none.
+  const shareAll = (grid) => {
+    if (grid.count >= 2 && !grid.all.parent && !grid.attached) {
+      grid.table.insertBefore(grid.all, [...grid.table.children][1] || null);
+      grid.attached = true;
+    } else if (grid.count < 2 && grid.attached) {
+      grid.all.remove();
+      grid.attached = false;
+    }
+  };
+  const drawFacetRow = (row, prefill) => {
+    const q = row.q;
+    const grid = row.grid;
+    const name = document.createElement("td");
+    const who = document.createElement("b");
+    who.textContent = q.element;
+    name.append(who);
+    const about = context(q);
+    if (about) name.append(about);
+    const selects = q.facets.map((facet, column) => {
+      const select = facetSelect("(leave unanswered)", (prefill && prefill.facets && prefill.facets[facet.id]) || "", true);
+      select.dataset.key = keyOf(q.key);
+      select.dataset.facet = facet.id;
+      select.addEventListener("change", (event) => onEdit(row, event));
+      grid.columns[column].push(select);
+      const cell = document.createElement("td");
+      cell.append(select);
+      return cell;
+    });
+    const detail = answerDetail((prefill && prefill.detail) || "");
+    detail.addEventListener("input", (event) => onEdit(row, event));
+    const detailCell = document.createElement("td");
+    detailCell.append(detail, " ", (() => {
+      const skip = button("Skip for now", () => skipRow(row));
+      skip.className = "quiet skip";
+      return skip;
+    })());
+    const inputs = selects.map((cell) => cell.children[0]);
+    row.read = () => {
+      const given = {};
+      for (const select of inputs) {
+        if (select.value) given[select.dataset.facet] = select.value;
+      }
+      return Object.keys(given).length
+        ? withDetail({ key: q.key, facets: given }, detail.value.trim())
+        : null;
+    };
+    // Whether a facet is still blank, which a skip sets aside.
+    row.open = () => inputs.some((select) => !select.value);
+    row.set = (next) => {
+      for (const select of inputs) select.value = (next.facets || {})[select.dataset.facet] || "";
+      detail.value = next.detail || "";
+    };
+    row.input = inputs[0];
+    row.compact = false;
+    row.node.replaceChildren(name, ...selects, detailCell);
+  };
+  const drawCompactFacets = (row, answer) => {
+    const name = document.createElement("td");
+    const who = document.createElement("b");
+    who.textContent = row.q.element;
+    name.append(who);
+    const shown = document.createElement("td");
+    shown.textContent = answerText(answer);
+    const change = document.createElement("td");
+    change.append(button("Change", () => drawFacetRow(row, answer)));
+    row.compact = true;
+    row.read = () => null;
+    row.node.replaceChildren(name, shown, change);
+  };
+
+  // ---- Boxes --------------------------------------------------------------
+  // The list is a sequence of boxes, one for each run of rows that share a
+  // group, in the service's order. A box never moves a row ahead of another:
+  // a group that comes back later in the list opens a new box.
+  const newBox = (q) => {
+    const node = document.createElement("details");
+    node.className = "question-group";
+    node.open = true;
+    const title = document.createElement("summary");
+    const top = document.createElement("div");
+    node.append(title, top);
+    return { node, title, top, group: q.group, heading: q.group_heading, rows: [], grid: null, shared: null };
+  };
+  const titleBox = (box) => {
+    const heading = document.createElement("span");
+    heading.className = "group-heading";
+    heading.textContent = box.heading;
+    const count = document.createElement("small");
+    const choices = box.rows.reduce((sum, row) => sum + (row.q.decisions || 1), 0);
+    count.textContent = ` (${box.rows.length} question(s), ${choices} choice(s))`;
+    box.title.replaceChildren(heading, count);
+  };
+  // Rows of one box take "Same for all" where two or more ask one attribute
+  // or kind about different elements in one form. A capability asks about
+  // the whole application, so it never shares.
+  const shareable = (a, b) =>
+    a.key[0] && b.key[0] && a.key[1] === b.key[1] && a.key[4] === b.key[4]
+    && a.form === b.form && a.form !== "facets"
+    && JSON.stringify(a.choices) === JSON.stringify(b.choices);
+  const ensureShared = (box) => {
+    const plain = box.rows.filter((row) => row.kind === "fact" && row.q.form !== "facets");
+    if (box.shared || plain.length < 2 || !plain.every((row) => shareable(row.q, plain[0].q))) return;
+    const shared = inputFor(plain[0].q, null, () => {});
+    const apply = button("Apply to the ticked rows", () => {
+      for (const row of box.rows) {
+        if (row.tick && row.tick.checked && !row.compact) {
+          row.set({ value: shared.read() });
+          onEdit(row);
+        }
+      }
+    });
+    const line = document.createElement("p");
+    const title = document.createElement("b");
+    title.textContent = "Same for all";
+    line.append(title, " ", ...shared.nodes, " ", apply);
+    const hint = document.createElement("div");
+    hint.className = "hint";
+    hint.textContent = "Untick a row the answer does not fit. Each row is sent as its"
+      + " own answer, and you can still change it.";
+    box.top.className = "shared-controls";
+    box.top.replaceChildren(line, hint);
+    box.shared = shared;
+    for (const row of plain) addTick(row);
+  };
+  // Ticked rows take the shared answer; an unticked row is an exception.
+  const addTick = (row) => {
+    if (row.tick) return;
+    const tick = document.createElement("input");
+    tick.type = "checkbox";
+    tick.checked = true;
+    tick.title = "Take the answer under \"Same for all\"";
+    tick.className = "share-answer";
+    row.tick = tick;
+    if (!row.compact) row.node.replaceChildren(tick, " ", ...[...row.node.children]);
+  };
+  // Put a new row after `prev`, the listed row before it in the service's
+  // order, or first where there is none. A row joins `prev`'s box where the
+  // groups match, and a facet row joins its table; otherwise a new box opens
+  // right after `prev`'s box.
+  const insertAfter = (parent, node, after) => {
+    const children = [...parent.children];
+    const at = after ? children.indexOf(after) : -1;
+    const next = children[at + 1] || null;
+    parent.insertBefore(node, next);
+  };
+  const place = (row, before) => {
+    // A row opened from a box beside the list has no place in it.
+    const prev = before && before.box ? before : null;
+    let box = prev && prev.box.group === row.q.group ? prev.box : null;
+    if (!box) {
+      box = newBox(row.q);
+      insertAfter(list, box.node, prev ? prev.box.node : null);
+    }
+    row.box = box;
+    const at = prev && prev.box === box ? box.rows.indexOf(prev) : -1;
+    box.rows.splice(at + 1, 0, row);
+    if (row.q.form === "facets" && row.kind === "fact") {
+      if (!box.grid) {
+        box.grid = facetTable(row.q);
+        box.node.append(box.grid.table);
+      }
+      row.grid = box.grid;
+      row.node = document.createElement("tr");
+      row.node.dataset.key = keyOf(row.q.key);
+      const after = prev && prev.grid === box.grid ? prev.node : [...box.grid.table.children][box.grid.attached ? 1 : 0];
+      insertAfter(box.grid.table, row.node, after);
+      box.grid.count += 1;
+      shareAll(box.grid);
+    } else {
+      insertAfter(box.node, row.node, prev && prev.box === box ? prev.node : box.top);
+    }
+    titleBox(box);
+    ensureShared(box);
+  };
+  const removeRow = (row) => {
+    const box = row.box;
+    rows.delete(rowKey(row));
+    row.node.remove();
+    if (!box) return;
+    box.rows = box.rows.filter((other) => other !== row);
+    if (row.grid) {
+      row.grid.count -= 1;
+      shareAll(row.grid);
+    }
+    if (!box.rows.length) box.node.remove();
+    else titleBox(box);
+  };
+
+  // ---- Reconcile ----------------------------------------------------------
+  // The list the service serves now, drawn over the rows the page holds. A
+  // row the owner is editing, or whose edit is not acknowledged, stays as it
+  // is; everything else follows the service. Rows are matched by key and
+  // never moved: a new row is inserted where the service's order puts it.
+  let pass = 0;
   let updateQuestionProgress = () => {};
-  const showQuestions = (data) => {
-    // The service says whether the pause asks anything more (QuestionSet.stop).
-    const left = data.early_stop == null;
+  const reconcile = (data) => {
+    const before = view;
+    view = data;
     revision = data.revision;
-    const saved = (data.answered_early || []).length || (data.answered_links || []).length
-      || (data.skipped_early || []).length || (data.skipped_links || []).length;
+    pass += 1;
+    const held = answersOf(data);
+    const listed = [
+      ...data.link_questions.map((q) => ({
+        q: { ...q, group: "links", group_heading: "Which element is each of these?" },
+        kind: "link",
+      })),
+      ...data.early_questions.map((q) => ({ q, kind: "fact" })),
+    ];
+    let prev = null;
+    for (const { q, kind } of listed) {
+      const key = kind === "link" ? q.key : keyOf(q.key);
+      let row = rows.get(key);
+      if (!row) {
+        row = { q, kind, node: document.createElement("p"), saved: null, seen: 0, listed: true };
+        row.node.className = "question";
+        row.node.dataset.key = key;
+        rows.set(key, row);
+        place(row, prev);
+        const prefill = held.get(key) || null;
+        if (kind === "link") drawLink(row, prefill ? prefill.element : "");
+        else if (q.form === "facets") drawFacetRow(row, prefill);
+        else drawFact(row, prefill);
+        row.saved = prefill;
+      } else {
+        row.q = q;
+        row.listed = true;
+        row.node.hidden = false;
+        // A row answered in part comes back listed: its editor stays open.
+        if (row.compact && !busy(row)) {
+          const prefill = held.get(key) || null;
+          if (kind === "link") drawLink(row, prefill ? prefill.element : "");
+          else if (q.form === "facets") drawFacetRow(row, prefill);
+          else drawFact(row, prefill);
+          row.saved = prefill;
+        }
+      }
+      row.seen = pass;
+      prev = row;
+    }
+    for (const [key, row] of [...rows]) {
+      if (row.seen === pass) continue;
+      row.listed = false;
+      // What the service holds is what the row has saved, unless an edit is
+      // still on its way: a row kept open because it has the focus must not
+      // send an acknowledged answer again.
+      if (held.has(key) && !dirty(row)) row.saved = held.get(key);
+      if (busy(row)) {
+        // The edit goes with the next save; the service then says what
+        // became of the question.
+        const edit = edits.get(key);
+        if (edit && edit.conflict !== undefined && !row.conflict) showConflict(row, edit);
+        continue;
+      }
+      if (held.has(key)) {
+        // Answered: compact, in place, still editable.
+        const answer = held.get(key);
+        if (row.kind === "link") drawCompactLink(row, answer);
+        else if (row.q.form === "facets") drawCompactFacets(row, answer);
+        else drawCompact(row, answer);
+        continue;
+      }
+      removeRow(row);
+    }
+    for (const [key, row] of rows) {
+      if (row.seen === pass && held.has(key) && !dirty(row)) row.saved = held.get(key);
+      const edit = edits.get(key);
+      if (edit && edit.conflict !== undefined && !row.conflict) showConflict(row, edit);
+    }
+    drawIntro(data);
+    drawTail(data);
+    drawBoxes(data);
+    announce(before, data);
+    updateQuestionProgress();
+    if (typeof workspace !== "undefined") workspace.grouped(data);
+  };
+  // What changed in the list since the last payload, in one short line the
+  // page announces: questions no longer needed, and questions added.
+  const announce = (before, data) => {
+    if (!before) return;
+    const was = new Set(before.early_questions.map((q) => keyOf(q.key)));
+    const now = new Set(data.early_questions.map((q) => keyOf(q.key)));
+    const moot = (data.early_unnecessary || []).filter((q) => was.has(keyOf(q.key))).length;
+    const added = [...now].filter((key) => !was.has(key)).length;
+    const parts = [];
+    if (moot) parts.push(`${moot} question(s) are no longer needed`);
+    if (added) parts.push(`${added} relevant question(s) added`);
+    say(changesNote, parts.join(". ") + (parts.length ? "." : ""));
+  };
+  // The intro: what will not run, why the list ends, what stays open, and
+  // how the list is counted. Redrawn from each payload.
+  const drawIntro = (data) => {
+    intro.replaceChildren();
+    const left = data.early_stop == null;
     // Each selected analysis whose precondition does not hold yet
     // (QuestionSet.gates): it will not run as the model reads now.
     const gates = Object.entries(data.framework_gates || {}).filter(([, state]) => state !== "satisfied");
-    // Questions the list leaves out, which the submitter may still choose to answer.
-    const optional = (data.early_held_back || []).length + (data.early_below_floor || []).length;
-    // A pause with nothing to ask, nothing answered or skipped, no optional
-    // question and no analysis to explain starts the analysis, with no page
-    // between. After a save, only the start button starts it: a save of skips
-    // is a save too.
-    if (!left && !saved && !gates.length && !optional) {
-      pausedRun = data.run;
-      startAnalysis([], []);
-      return;
-    }
-    pausedRun = data.run;
-    saveButton.hidden = skipButton.hidden = false;
-    skipButton.disabled = !left;
-    answers = [];
-    roundRows = [];
-    questions.replaceChildren();
-    earlierBox.replaceChildren();
-    skippedBox.replaceChildren();
-    moreBox.replaceChildren();
-    const heading = (title, text) => {
-      const lead = document.createElement("p");
-      const bold = document.createElement("b");
-      bold.textContent = title;
-      const hint = document.createElement("div");
-      hint.className = "hint";
-      hint.textContent = text;
-      lead.append(bold, hint);
-      questions.append(lead);
-    };
-    // What the list holds, by kind. An answer can add questions as well as
-    // take them away, and the page says so (ADR 0078).
-    const kinds = { gate: 0, capability: 0, field: 0 };
-    for (const q of data.early_questions) {
-      kinds[(q.gates || []).length ? "gate" : q.kind === "capability" ? "capability" : "field"] += 1;
-    }
-    const parts = [];
-    if (kinds.gate) {
-      parts.push(`${kinds.gate} question(s) that decide whether an analysis runs`);
-    }
-    if (kinds.capability) {
-      parts.push(`${kinds.capability} yes/no question(s) about the application`);
-    }
-    if (kinds.field) {
-      parts.push(`${kinds.field} question(s) about parts of your system`);
-    }
-    if (data.link_questions.length) {
-      parts.push(`${data.link_questions.length} question(s) about which part of your system a name is`);
-    }
-    // Why an analysis will not run, or what it waits on, from the service's
-    // own reading of its precondition.
     for (const [name, state] of gates) {
       const note = document.createElement("p");
       note.className = "hint gate-note";
@@ -211,7 +912,7 @@
         : `The ${name} analysis runs only once the system model shows that it applies.`
           + " The questions that decide this come first; its other questions follow"
           + " once an answer settles it.";
-      questions.append(note);
+      intro.append(note);
     }
     if (!left) {
       const ready = document.createElement("p");
@@ -227,7 +928,7 @@
       };
       ready.textContent = stops[data.early_stop]
         + "You can still change an answer below. Nothing runs until you choose Start the analysis.";
-      questions.append(ready);
+      intro.append(ready);
     }
     // What the pause leaves open (PauseSummary): never "everything is settled".
     const summary = data.early_summary;
@@ -236,7 +937,7 @@
       const count = (n, text) => { if (n) open.push(`${n} ${text}`); };
       count(summary.skipped, "question(s) skipped for now");
       count(summary.partial, "question(s) answered in part");
-      count(summary.unknown, "answer(s) of \u201cI don't know\u201d");
+      count(summary.unknown, "answer(s) of “I don't know”");
       count(summary.held_back, "question(s) held back by the question limit");
       count(summary.below_floor, "question(s) ranked below the threshold for the list");
       for (const [name, bands] of Object.entries(summary.applicability || {})) {
@@ -253,440 +954,67 @@
         const lead = document.createElement("p");
         lead.className = "hint";
         lead.textContent = "Still open:";
-        const list = document.createElement("ul");
-        list.className = "still-open";
+        const items = document.createElement("ul");
+        items.className = "still-open";
         for (const line of open) {
           const item = document.createElement("li");
           item.textContent = line;
-          list.append(item);
+          items.append(item);
         }
-        questions.append(lead, list);
+        intro.append(lead, items);
       }
     }
-    // The list's choices as the page shows them: each link question is one,
-    // and a part counts only while it shows, after its parent's "yes". The
-    // line is told again each time a part shows or hides. The parts that
-    // wait on a parent's "yes" are counted from the service's own list of
-    // them (QuestionSet.blocked), never inferred here.
-    const counted = [];
-    const estimate = document.createElement("p");
-    estimate.className = "hint";
-    const choicesOf = (rows) => rows.reduce((sum, row) => sum + row.decisions, 0);
-    const shownChoices = () => choicesOf(counted.filter((row) => !row.hidden())) + data.link_questions.length;
-    const blocked = (data.early_blocked || []).length;
-    const tally = () => {
-      const shown = shownChoices();
+    // What the list holds, by kind, and the choices it asks. An answer can
+    // add questions as well as take them away, and the page says so.
+    const kinds = { gate: 0, capability: 0, field: 0 };
+    for (const q of data.early_questions) {
+      kinds[(q.gates || []).length ? "gate" : q.kind === "capability" ? "capability" : "field"] += 1;
+    }
+    const parts = [];
+    if (kinds.gate) parts.push(`${kinds.gate} question(s) that decide whether an analysis runs`);
+    if (kinds.capability) parts.push(`${kinds.capability} yes/no question(s) about the application`);
+    if (kinds.field) parts.push(`${kinds.field} question(s) about parts of your system`);
+    if (data.link_questions.length) {
+      parts.push(`${data.link_questions.length} question(s) about which part of your system a name is`);
+    }
+    if (parts.length) {
+      const choices = data.early_questions.reduce((sum, q) => sum + (q.decisions || 1), 0)
+        + data.link_questions.length;
+      const blocked = (data.early_blocked || []).length;
+      const estimate = document.createElement("p");
+      estimate.className = "hint";
       estimate.textContent = `There are ${parts.join(" and ")} that can change the`
-        + ` analysis. This list asks ${shown} choice(s).`
-        + (blocked ? ` ${blocked} more question(s) appear if you answer \u201cyes\u201d`
+        + ` analysis. This list asks ${choices} choice(s).`
+        + (blocked ? ` ${blocked} more question(s) appear if you answer “yes”`
           + " to the question each one is part of." : "")
         + (summary ? ` So far the page showed ${summary.introduced} question(s),`
           + ` ${summary.choices} choice(s).` : "");
-    };
-    if (parts.length) {
       const explanation = document.createElement("details");
       explanation.className = "round-estimate";
       const title = document.createElement("summary");
       title.textContent = "How this list is counted";
       explanation.append(title, estimate);
-      questions.append(explanation);
+      intro.append(explanation);
     }
     if (data.link_questions.length) {
-      heading("Which element is each of these?",
-        "Your description states facts about these people or systems, but not"
-        + " which element of the model each one is.");
+      const note = document.createElement("p");
+      note.className = "hint";
+      note.textContent = "Your description states facts about some people or systems, but"
+        + " not which element of the model each one is. The first questions ask which.";
+      intro.append(note);
     }
-    const linkSelect = (q, prefill) => {
-      const select = document.createElement("select");
-      select.dataset.principal = q.principal;
-      select.append(optionOf("(leave unanswered)", ""));
-      for (const option of q.options) {
-        select.append(optionOf(option.name ? `${option.name} (${option.id})` : option.id, option.id));
-      }
-      select.append(optionOf("None of these", "none"));
-      select.value = prefill || "";
-      return select;
-    };
-    for (const q of data.link_questions) {
-      const row = document.createElement("p");
-      const label = document.createElement("label");
-      const name = document.createElement("b");
-      name.textContent = q.principal;
-      const select = linkSelect(q, "");
-      label.append(name, ` — places ${q.rows} stated fact(s) `, select);
-      row.append(label);
-      questions.append(row);
-      // A skipped link places nothing: it is not "None of these".
-      roundRows.push({ key: q.key, read: () => select.value });
-    }
-    // One box per category, in the order each category first appears in the
-    // service's list (answer_round.recommended). A box holds its rows in the
-    // service's order, so parents exist before their dependants.
-    // An earlier answer by its key: a question with facets comes back while a
-    // facet has no answer, and its answered facets are filled in.
-    const earlier = new Map((data.answered_early || []).map((a) => [JSON.stringify(a.key), a.answer]));
-    const groups = new Map();
-    for (const q of data.early_questions) {
-      if (!groups.has(q.group)) {
-        const box = document.createElement("details");
-        // The workspace's index lists each box of this class as a group.
-        box.className = "question-group";
-        box.open = true;
-        const title = document.createElement("summary");
-        // "Same for all" goes here, above the rows, where a group takes one.
-        const top = document.createElement("div");
-        box.append(title, top);
-        groups.set(q.group, { box, title, top, heading: q.group_heading, count: 0, rows: [] });
-      }
-    }
-    // A group takes "Same for all" where two or more rows ask one attribute
-    // or kind about different elements in one form. A capability asks about
-    // the whole application, so it never shares.
-    const shareable = new Set([...groups.keys()].filter((name) => {
-      const rows = data.early_questions.filter((q) => q.group === name && q.form !== "facets");
-      const [first] = rows;
-      return rows.length >= 2 && rows.every((q) => q.key[0]
-        && q.key[1] === first.key[1] && q.key[4] === first.key[4] && q.form === first.form
-        && JSON.stringify(q.choices) === JSON.stringify(first.choices));
-    }));
-    // A question with facets is a table: a column per facet, a row per
-    // element, and a first row that sets the whole column.
-    const facetTable = (into, q, withAll) => {
-      const table = document.createElement("table");
-      const head = document.createElement("tr");
-      const corner = document.createElement("th");
-      corner.textContent = "Part of your system";
-      head.append(corner);
-      const columns = q.facets.map((facet) => {
-        const cell = document.createElement("th");
-        cell.textContent = facet.question;
-        head.append(cell);
-        return [];
-      });
-      const detailHead = document.createElement("th");
-      detailHead.textContent = "Exceptions or detail (optional)";
-      head.append(detailHead);
-      table.append(head);
-      if (withAll) {
-        const all = document.createElement("tr");
-        const allLabel = document.createElement("td");
-        allLabel.textContent = "Same for all";
-        all.append(allLabel);
-        q.facets.forEach((facet, column) => {
-          const cell = document.createElement("td");
-          const every = facetSelect("(set every row)", "", true);
-          every.addEventListener("change", () => {
-            for (const select of columns[column]) select.value = every.value;
-          });
-          cell.append(every);
-          all.append(cell);
-        });
-        // The detail column takes no shared answer: each row's are its own.
-        all.append(document.createElement("td"));
-        table.append(all);
-      }
-      into.append(table);
-      return { table, columns };
-    };
-    // One row of a facet table, filled in from `prefill`, and its reader.
-    const facetRow = (grid, q, label, prefill, prefillDetail) => {
-      const row = document.createElement("tr");
-      const name = document.createElement("td");
-      name.append(label);
-      row.append(name);
-      const selects = q.facets.map((facet, column) => {
-        const select = facetSelect("(leave unanswered)", (prefill && prefill[facet.id]) || "", true);
-        select.dataset.key = JSON.stringify(q.key);
-        select.dataset.facet = facet.id;
-        grid.columns[column].push(select);
-        const cell = document.createElement("td");
-        cell.append(select);
-        row.append(cell);
-        return select;
-      });
-      const detail = answerDetail(prefillDetail || "");
-      const detailCell = document.createElement("td");
-      detailCell.append(detail);
-      row.append(detailCell);
-      grid.table.append(row);
-      const read = () => {
-        const given = {};
-        for (const select of selects) {
-          if (select.value) given[select.dataset.facet] = select.value;
-        }
-        return Object.keys(given).length
-          ? withDetail({ key: q.key, facets: given }, detail.value.trim())
-          : null;
-      };
-      // Whether a facet is still blank, which "Skip the rest" sets aside.
-      read.open = () => selects.some((select) => !select.value);
-      return read;
-    };
-    // Which analysis an answer serves: a capability decides what a framework
-    // covers, and every other fact is read by the analysis itself.
-    const serves = (q) => {
-      const names = q.frameworks || [];
-      if (!names.length) return null;
-      const which = `the ${names.join(" and ")} ${names.length > 1 ? "analyses" : "analysis"}`;
-      if ((q.gates || []).length) return `Decides whether ${which} runs`;
-      return q.kind === "capability" ? `Decides what ${which} covers` : `Used by ${which}`;
-    };
-    // Why a question is asked, which analysis it serves, and the words of the
-    // description its element was read from. The words are what the service
-    // read, not an answer to the question.
-    const context = (q) => {
-      const parts = [];
-      if (q.reasons.length) parts.push(`Why: ${q.reasons[0]}`);
-      const use = serves(q);
-      if (use) parts.push(use);
-      if (q.excerpt) {
-        const cut = q.excerpt.length > EXCERPT ? `${q.excerpt.slice(0, EXCERPT)}\u2026` : q.excerpt;
-        parts.push(`Your description of this part, for reference: \u201c${cut}\u201d`);
-      }
-      if (!parts.length) return null;
-      const hint = document.createElement("div");
-      hint.className = "hint";
-      hint.textContent = parts.join(" \u00b7 ");
-      hint.title = q.excerpt;
-      return hint;
-    };
-    // Each answer's input by its key, so a capability that is part of another
-    // can follow its parent's answer.
-    const inputs = new Map();
-    // Each choice row by its key, and the parts that follow each answer.
-    const rows = new Map();
-    const followers = new Map();
-    data.early_questions.forEach((q) => {
-      const group = groups.get(q.group);
-      group.count += 1;
-      group.choices = (group.choices || 0) + (q.decisions || 1);
-      const label = document.createElement("b");
-      label.textContent = q.label;
-      // Why the fact matters: the questions of the rules that fire on it.
-      label.title = q.reasons.join(" ");
-      const about = context(q);
-      if (q.form === "facets") {
-        // "Same for all" sets a column of two or more rows; one row needs none.
-        const rows = data.early_questions.filter((f) => f.group === q.group && f.form === "facets");
-        group.grid = group.grid || facetTable(group.box, q, rows.length >= 2);
-        const before = earlier.get(JSON.stringify(q.key));
-        const who = document.createElement("span");
-        label.textContent = q.element;
-        who.append(label);
-        if (about) who.append(about);
-        const read = facetRow(group.grid, q, who, before && before.facets, before && before.detail);
-        answers.push(read);
-        roundRows.push({ key: q.key, read, open: read.open });
-        counted.push({ decisions: q.decisions || 1, hidden: () => false });
-        return;
-      }
-      const row = document.createElement("p");
-      const { input, nodes, set, answer: filled } = inputFor(q, null);
-      inputs.set(input.dataset.key, input);
-      if (shareable.has(q.group)) {
-        // Ticked rows take the shared answer; an unticked row is an exception.
-        const tick = document.createElement("input");
-        tick.type = "checkbox";
-        tick.checked = true;
-        tick.title = "Take the answer under \"Same for all\"";
-        tick.className = "share-answer";
-        row.append(tick, " ");
-        group.rows.push({ tick, set });
-      }
-      // A part of another capability is asked only once its parent is "yes".
-      // A hidden row sends no answer, so a "no" to the parent is never
-      // contradicted by an answer to its part.
-      const parent = q.parent ? inputs.get(JSON.stringify(q.parent)) : null;
-      counted.push({ decisions: q.decisions || 1, hidden: () => row.hidden });
-      rows.set(input.dataset.key, row);
-      if (parent) {
-        // A part of a hidden part hides too, whatever its parent's answer.
-        const above = rows.get(parent.dataset.key);
-        const follow = () => {
-          row.hidden = parent.value !== "yes" || above.hidden;
-          for (const next of followers.get(input.dataset.key) || []) next();
-          tally();
-        };
-        if (!followers.has(parent.dataset.key)) {
-          followers.set(parent.dataset.key, []);
-          parent.addEventListener("change", () => {
-            for (const next of followers.get(parent.dataset.key)) next();
-          });
-        }
-        followers.get(parent.dataset.key).push(follow);
-        follow();
-      }
-      const answer = () => (row.hidden ? null : filled());
-      answers.push(answer);
-      roundRows.push({ key: q.key, read: answer, hidden: () => row.hidden });
-      row.append(label, " ", ...nodes);
-      if (about) row.append(about);
-      group.box.append(row);
-    });
-    tally();
-    for (const [name, group] of groups) {
-      if (group.rows.length) {
-        const shared = inputFor(data.early_questions.find((q) => q.group === name), null);
-        const apply = document.createElement("button");
-        apply.type = "button";
-        apply.textContent = "Apply to the ticked rows";
-        apply.addEventListener("click", () => {
-          for (const row of group.rows) if (row.tick.checked) row.set(shared.read());
-        });
-        const line = document.createElement("p");
-        const title = document.createElement("b");
-        title.textContent = "Same for all";
-        line.append(title, " ", ...shared.nodes, " ", apply);
-        const hint = document.createElement("div");
-        hint.className = "hint";
-        hint.textContent = "Untick a row the answer does not fit. Each row is sent as its"
-          + " own answer, and you can still change it.";
-        group.top.className = "shared-controls";
-        group.top.append(line, hint);
-      }
-      const groupHeading = document.createElement("span");
-      groupHeading.className = "group-heading";
-      groupHeading.textContent = group.heading;
-      const groupCount = document.createElement("small");
-      groupCount.textContent = ` (${group.count} question(s), ${group.choices} choice(s))`;
-      group.title.replaceChildren(groupHeading, groupCount);
-      questions.append(group.box);
-    }
-    // Every earlier answer, each with a button that opens it again. An
-    // answer opened and changed is sent with the list's answers. A question
-    // answered in part and then skipped has its one editor under "Skipped for
-    // now", so it is never sent twice.
-    const answeredLinks = data.answered_links || [];
-    const skipped = data.skipped_early || [];
-    const elsewhere = new Set([...data.early_questions, ...skipped].map((q) => JSON.stringify(q.key)));
-    const answeredFacts = (data.answered_early || []).filter((a) => !elsewhere.has(JSON.stringify(a.key)));
-    earlierBox.hidden = !(answeredLinks.length || answeredFacts.length);
-    const title = document.createElement("summary");
-    title.textContent = `Your answers (${answeredLinks.length + answeredFacts.length})`;
-    earlierBox.append(title);
-    const change = (row, open) => {
-      const button = document.createElement("button");
-      button.type = "button";
-      button.textContent = "Change";
-      button.addEventListener("click", () => {
-        button.hidden = true;
-        open();
-      });
-      row.append(" ", button);
-    };
-    for (const a of answeredLinks) {
-      const row = document.createElement("p");
-      const name = document.createElement("b");
-      name.textContent = a.principal;
-      const shown = document.createElement("span");
-      shown.textContent = ` — ${a.answer.element === "none" ? "none of these" : a.answer.element}`;
-      row.append(name, shown);
-      change(row, () => { shown.replaceChildren(" — ", linkSelect(a, a.answer.element)); });
-      earlierBox.append(row);
-    }
-    for (const a of answeredFacts) {
-      const row = document.createElement("p");
-      const label = document.createElement("b");
-      label.textContent = a.label;
-      const shown = document.createElement("span");
-      shown.textContent = ` — ${answerText(a.answer)}`;
-      row.append(label, shown);
-      change(row, () => {
-        if (a.form === "facets") {
-          const grid = facetTable(row, a, false);
-          const name = document.createElement("b");
-          name.textContent = a.element;
-          answers.push(facetRow(grid, a, name, a.answer.facets, a.answer.detail));
-          shown.hidden = true;
-          return;
-        }
-        const { nodes, read, readDetail, answer } = inputFor(a, a.answer);
-        shown.replaceChildren(" — ", ...nodes);
-        answers.push(() => {
-          const changed = read() !== a.answer.value || readDetail() !== (a.answer.detail || "");
-          return changed ? answer() : null;
-        });
-      });
-      earlierBox.append(row);
-    }
-    // Every question skipped for now. A skip is not an answer: the list
-    // leaves it out, and "Answer it" opens it here, with any part answered before.
-    const skippedLinks = data.skipped_links || [];
-    skippedBox.hidden = !(skipped.length || skippedLinks.length);
-    const skippedTitle = document.createElement("summary");
-    skippedTitle.textContent = `Skipped for now (${skipped.length + skippedLinks.length},`
-      + " optional)";
-    skippedBox.append(skippedTitle);
-    for (const q of skippedLinks) {
-      const row = document.createElement("p");
-      const name = document.createElement("b");
-      name.textContent = q.principal;
-      row.append(name);
-      const open = document.createElement("button");
-      open.type = "button";
-      open.textContent = "Answer it";
-      open.addEventListener("click", () => {
-        open.hidden = true;
-        row.append(" \u2014 ", linkSelect(q, ""));
-      });
-      row.append(" ", open);
-      skippedBox.append(row);
-    }
-    // A question the list leaves out, which the submitter may still answer: a
-    // skipped one, or one a limit or a floor keeps out of the list.
-    // "Answer it" opens it, with any part answered before.
-    const answerLater = (box, q) => {
-      const row = document.createElement("p");
-      const label = document.createElement("b");
-      label.textContent = q.label;
-      row.append(label);
-      const before = earlier.get(JSON.stringify(q.key));
-      const kept = document.createElement("span");
-      if (before) kept.textContent = ` \u2014 ${answerText(before)}`;
-      row.append(kept);
-      const open = document.createElement("button");
-      open.type = "button";
-      open.textContent = "Answer it";
-      open.addEventListener("click", () => {
-        open.hidden = true;
-        if (q.form === "facets") {
-          const name = document.createElement("b");
-          name.textContent = q.element;
-          kept.hidden = true;
-          answers.push(facetRow(facetTable(row, q, false), q, name, before && before.facets,
-            before && before.detail));
-          return;
-        }
-        const { nodes, answer } = inputFor(q, null);
-        row.append(" ", ...nodes);
-        answers.push(answer);
-      });
-      row.append(" ", open);
-      box.append(row);
-    };
-    for (const q of skipped) answerLater(skippedBox, q);
-    // Questions the list leaves out: past the question limit, or ranked
-    // under the threshold. Answering one is the submitter's choice.
-    const heldBack = data.early_held_back || [];
-    const belowFloor = data.early_below_floor || [];
-    moreBox.hidden = !(heldBack.length || belowFloor.length);
-    const moreTitle = document.createElement("summary");
-    moreTitle.textContent = `More questions (${heldBack.length + belowFloor.length},`
-      + " optional, not in the list)";
-    moreBox.append(moreTitle);
-    const moreHint = document.createElement("p");
-    moreHint.className = "hint";
-    moreHint.textContent = "The list leaves these out: some are past the question limit,"
-      + " and others rank below the threshold for the list. An answer to one still"
-      + " reaches the analysis.";
-    moreBox.append(moreHint);
-    for (const q of [...heldBack, ...belowFloor]) answerLater(moreBox, q);
+  };
+  // The tail: answers an amendment could not carry, and the amendment itself.
+  let tailDrawn = false;
+  const drawTail = (data) => {
+    if (tailDrawn) return;
+    tailDrawn = true;
     // Answers the run an amendment started carried and could not take: each
     // names a part the amended model no longer has, or a fact it now states
     // (AnswerState.carried, ADR 0072).
     const dropped = [
-      ...(data.carried_dropped || []).map((a) => `${a.label} \u2014 ${answerText(a)}`),
-      ...(data.carried_dropped_links || []).map((a) => `${a.principal} \u2014 ${
+      ...(data.carried_dropped || []).map((a) => `${a.label} — ${answerText(a)}`),
+      ...(data.carried_dropped_links || []).map((a) => `${a.principal} — ${
         a.element === "none" ? "none of these" : a.element}`),
     ];
     if (dropped.length) {
@@ -694,13 +1022,13 @@
       lead.className = "hint";
       lead.textContent = `${dropped.length} earlier answer(s) do not fit the amended`
         + " system model, so they are not kept:";
-      const list = document.createElement("ul");
+      const items = document.createElement("ul");
       for (const line of dropped) {
         const item = document.createElement("li");
         item.textContent = line;
-        list.append(item);
+        items.append(item);
       }
-      questions.append(lead, list);
+      tail.append(lead, items);
     }
     // An amendment to the description itself: a part missing, or a fact read
     // wrongly. The service reads the description again with it, asks again,
@@ -716,13 +1044,15 @@
       + " are kept.";
     const fixText = document.createElement("textarea");
     fixText.rows = 3;
-    const fixButton = document.createElement("button");
-    fixButton.type = "button";
-    fixButton.textContent = "Read the description again with this";
-    fixButton.addEventListener("click", () => answerAction(async () => {
+    const fixButton = button("Read the description again with this", () => answerAction(async () => {
       const text = fixText.value.trim();
       if (!text) {
         refuse("Write the amendment first.");
+        return;
+      }
+      await flush();
+      if (edits.size) {
+        refuse("Some answers are not saved yet. Save them, then amend.");
         return;
       }
       const amended = await fetch("/amend/" + pausedRun, {
@@ -739,71 +1069,222 @@
       asked.hidden = true;
       follow(body.run, "Reading your description again with your amendment. The"
         + " service stops for your answers again before the threat analysis starts.");
-    }));
+    }), "");
     fix.append(fixTitle, fixHint, fixText, fixButton);
-    questions.append(fix);
-    updateQuestionProgress = () => {
-      const visible = shownChoices();
-      const filled = roundRows.reduce((sum, row) => {
-        const answer = row.read();
-        return sum + (!answer ? 0 : answer.facets ? Object.keys(answer.facets).length : 1);
-      }, 0);
-      const submitted = roundAnswers();
-      saveButton.disabled = !left && !submitted.facts.length && !submitted.links.length;
-      skipButton.disabled = !left;
-      document.getElementById("continue").className = left ? "" : "primary";
-      if (typeof workspace !== "undefined") workspace.progress(data, filled, visible);
+    tail.append(fix);
+  };
+  // The boxes beside the list: every earlier answer, every skipped question,
+  // and the questions the list leaves out. Each is redrawn from the payload
+  // unless the owner is editing inside it; then it waits for the next save.
+  // "Answer it" and "Change" build an editor only when pressed.
+  const drawBoxes = (data) => {
+    const held = answersOf(data);
+    // A question the list holds, compact or open, is not drawn in a box too.
+    const inList = (key) => {
+      const row = rows.get(key);
+      return Boolean(row && !row.lazyBox);
     };
-    updateQuestionProgress();
+    const lazyRow = (box, q, kind, before) => {
+      const key = kind === "link" ? q.key : keyOf(q.key);
+      const row = document.createElement("p");
+      const label = document.createElement("b");
+      label.textContent = kind === "link" ? q.principal : q.label;
+      row.append(label);
+      const kept = document.createElement("span");
+      if (before) {
+        kept.textContent = ` — ${kind === "link"
+          ? (before.element === "none" ? "none of these" : before.element)
+          : answerText(before)}`;
+      }
+      row.append(kept);
+      const open = button(before ? "Change" : "Answer it", () => {
+        open.hidden = true;
+        kept.hidden = true;
+        const entry = { q, kind, node: row, saved: before || null, listed: false, lazyBox: box };
+        rows.set(key, entry);
+        if (kind === "link") drawLink(entry, before ? before.element : "");
+        else if (q.form === "facets") {
+          entry.grid = facetTable(q);
+          entry.node = document.createElement("tr");
+          entry.grid.table.append(entry.node);
+          row.append(entry.grid.table);
+          drawFacetRow(entry, before);
+        } else drawFact(entry, before);
+        if (entry.input && typeof entry.input.focus === "function") entry.input.focus();
+      });
+      row.append(" ", open);
+      box.append(row);
+    };
+    const redraw = (box, title, entries) => {
+      if (holdsLazyBusy(box)) return;
+      for (const [key, row] of [...rows]) if (row.lazyBox === box) rows.delete(key);
+      box.replaceChildren();
+      box.hidden = !entries.length;
+      const summary = document.createElement("summary");
+      summary.textContent = title(entries.length);
+      box.append(summary);
+      for (const { q, kind, before } of entries) lazyRow(box, q, kind, before);
+    };
+    const outside = (entries) =>
+      entries.filter(({ q, kind }) => !inList(kind === "link" ? q.key : keyOf(q.key)));
+    // A question answered in part and skipped has its one editor under
+    // "Skipped for now", so the page cannot send two answers to one key.
+    const setAside = new Set([
+      ...(data.skipped_links || []).map((q) => q.key),
+      ...(data.skipped_early || []).map((q) => keyOf(q.key)),
+    ]);
+    const answered = outside([
+      ...(data.answered_links || []).map((a) => ({ q: a, kind: "link", before: { principal: a.principal, element: a.answer.element } })),
+      ...(data.answered_early || []).map((a) => ({ q: a, kind: "fact", before: a.answer })),
+    ]).filter(({ q, kind }) => !setAside.has(kind === "link" ? q.key : keyOf(q.key)));
+    redraw(earlierBox, (n) => `Your answers (${n})`, answered);
+    const skipped = outside([
+      ...(data.skipped_links || []).map((q) => ({ q, kind: "link", before: null })),
+      ...(data.skipped_early || []).map((q) => ({ q, kind: "fact", before: held.get(keyOf(q.key)) || null })),
+    ]);
+    redraw(skippedBox, (n) => `Skipped for now (${n}, optional)`, skipped);
+    const more = outside([...(data.early_held_back || []), ...(data.early_below_floor || [])]
+      .map((q) => ({ q, kind: "fact", before: held.get(keyOf(q.key)) || null })));
+    redraw(moreBox, (n) => `More questions (${n}, optional, not in the list)`, more);
+    if (!moreBox.hidden) {
+      const moreHint = document.createElement("p");
+      moreHint.className = "hint";
+      moreHint.textContent = "The list leaves these out: some are past the question limit,"
+        + " and others rank below the threshold for the list. An answer to one still"
+        + " reaches the analysis.";
+      moreBox.insertBefore(moreHint, [...moreBox.children][1] || null);
+    }
+  };
+  const holdsLazyBusy = (box) =>
+    [...rows.values()].some((row) => row.lazyBox === box && busy(row));
+
+  // ---- Showing the list ---------------------------------------------------
+  const showQuestions = (data) => {
+    // The service says whether the pause asks anything more (QuestionSet.stop).
+    const left = data.early_stop == null;
+    const saved = (data.answered_early || []).length || (data.answered_links || []).length
+      || (data.skipped_early || []).length || (data.skipped_links || []).length;
+    const gates = Object.entries(data.framework_gates || {}).filter(([, state]) => state !== "satisfied");
+    // Questions the list leaves out, which the submitter may still choose to answer.
+    const optional = (data.early_held_back || []).length + (data.early_below_floor || []).length;
+    // A pause with nothing to ask, nothing answered or skipped, no optional
+    // question and no analysis to explain starts the analysis, with no page
+    // between. After a save, only the start button starts it.
+    if (!left && !saved && !gates.length && !optional) {
+      pausedRun = data.run;
+      revision = data.revision;
+      startAnalysis();
+      return;
+    }
+    if (pausedRun !== data.run) {
+      // A different run: start the page afresh.
+      rows.clear();
+      edits.clear();
+      list.replaceChildren();
+      tailDrawn = false;
+      tail.replaceChildren();
+      view = null;
+    }
+    pausedRun = data.run;
+    frame();
+    skipButton.hidden = false;
+    reconcile(data);
+    setStatus(edits.size ? "unsaved" : "saved");
     asked.hidden = false;
-    if (typeof workspace !== "undefined") workspace.grouped(data);
+  };
+  // What the page says about progress: filled answers among the listed rows,
+  // the listed choices, and the start button's weight.
+  updateQuestionProgress = () => {
+    if (!view) return;
+    const listed = [...rows.values()].filter((row) => row.listed);
+    const visible = listed.reduce((sum, row) => sum + (row.q.decisions || 1), 0);
+    const filled = listed.reduce((sum, row) => {
+      const answer = row.read ? row.read() : null;
+      return sum + (!answer ? 0 : answer.facets ? Object.keys(answer.facets).length : 1);
+    }, 0);
+    const left = view.early_stop == null;
+    skipButton.disabled = !left;
+    startButton.className = left ? "" : "primary";
+    if (typeof workspace !== "undefined") workspace.progress(view, filled, visible);
   };
 
-  // The list's answers, as the service takes them.
-  const roundAnswers = () => ({
-    links: [questions, earlierBox, skippedBox].flatMap((box) => [...box.querySelectorAll("select")])
-      .filter((select) => select.dataset.principal && select.value)
-      .map((select) => ({ principal: select.dataset.principal, element: select.value })),
-    facts: answers.map((read) => read()).filter(Boolean),
-  });
-  // The early questions this page shows: every listed row that is not hidden
-  // under its parent's answer. The service records only these as shown, and
-  // takes a skip only of one of them (ADR 0078). A link row is not one.
-  const presented = () => roundRows
-    .filter((row) => Array.isArray(row.key) && !(row.hidden && row.hidden()))
-    .map((row) => row.key);
-
-  // A refused answer is shown beside the buttons that sent it, and every
-  // answer stays as it was, for the submitter to correct.
+  // A refused answer is shown beside the list, and every answer stays as it
+  // was, for the submitter to correct.
   const answerProblem = document.getElementById("answer-problem");
   const refuse = (message) => {
     answerProblem.textContent = message;
     answerProblem.hidden = false;
   };
 
-  const startAnalysis = async (links, facts) => {
-    const resumed = await fetch("/answer/" + pausedRun, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ links, facts, presented: presented(), revision }),
-    });
-    if (!resumed.ok) {
-      refuse((await resumed.json()).message);
-      return;
+  // Register every editor's current value, for a start or a skip that must
+  // not lose what the owner typed and did not commit.
+  const collectEdits = () => {
+    for (const row of rows.values()) {
+      if (!row.compact && row.read) registerEdit(row);
     }
-    answerProblem.hidden = true;
-    asked.hidden = true;
-    follow(
-      (await resumed.json()).run,
-      "Running the threat analysis with your answers. This takes a few minutes.",
-    );
+  };
+  // Start the analysis once: every unsaved answer is saved first, at the
+  // revision the save returns, and the start names that revision. A lost
+  // response is read back from the run, so a second click cannot start a
+  // second run.
+  let starting = false;
+  const startAnalysis = async () => {
+    if (starting) return;
+    starting = true;
+    startButton.disabled = true;
+    try {
+      collectEdits();
+      if (edits.size) {
+        await flush();
+        if (edits.size) {
+          // A refusal names the answer; anything else needs a retry.
+          if (![...edits.values()].some((edit) => edit.refused)) {
+            refuse("Some answers are not saved. Save them, then start the analysis.");
+          }
+          return;
+        }
+      }
+      let resumed;
+      try {
+        resumed = await fetch("/answer/" + pausedRun, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ links: [], facts: [], presented: presented(), revision }),
+        });
+      } catch {
+        // The response was lost. Where the start landed, the run now names
+        // the job it started; follow it instead of starting again.
+        const snapshot = await fetch("/workspace/runs/" + encodeURIComponent(pausedRun));
+        const payload = await snapshot.json();
+        if (snapshot.ok && payload.run !== pausedRun) {
+          asked.hidden = true;
+          follow(payload.run, "Running the threat analysis with your answers. This takes a few minutes.");
+          return;
+        }
+        refuse("The connection was interrupted. Reload this analysis to check whether it started.");
+        return;
+      }
+      if (!resumed.ok) {
+        refuse((await resumed.json()).message);
+        return;
+      }
+      answerProblem.hidden = true;
+      asked.hidden = true;
+      follow(
+        (await resumed.json()).run,
+        "Running the threat analysis with your answers. This takes a few minutes.",
+      );
+    } finally {
+      starting = false;
+      startButton.disabled = false;
+    }
   };
 
   let answerBusy = false;
   const answerAction = async (action) => {
     if (answerBusy) return;
     answerBusy = true;
-    const controls = [saveButton, skipButton, document.getElementById("continue")];
+    const controls = [skipButton, startButton];
     controls.forEach((control) => { control.disabled = true; });
     try { await action(); }
     catch { refuse("The connection was interrupted. Reload this analysis to check whether your answers were saved."); }
@@ -813,42 +1294,20 @@
       updateQuestionProgress();
     }
   };
-  document.getElementById("continue").addEventListener("click", () => {
-    const { links, facts } = roundAnswers();
-    answerAction(() => startAnalysis(links, facts));
-  });
+  startButton.addEventListener("click", () => answerAction(startAnalysis));
 
-  // Save the answers and show the list again. A save never starts the
-  // analysis; where nothing is left to ask, the page says so and waits.
-  // `skipAll` also skips every listed question left blank.
-  const saveRound = async (skipAll) => {
-    const { links, facts } = roundAnswers();
-    // A blank row is skipped, and so is a row with facets answered in part:
-    // its facets given are kept, and the rest are set aside for now. A part
-    // hidden under its parent's answer was never shown, so it is not skipped:
-    // the service asks it once it shows (QuestionSet.presented).
-    const skip = skipAll
-      ? roundRows
-        .filter((row) => !(row.hidden && row.hidden()))
-        .filter((row) => !row.read() || (row.open && row.open()))
-        .map((row) => row.key)
-      : [];
-    const saved = await fetch("/answer/" + pausedRun, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ links, facts, save: true, skip, presented: presented(), revision }),
-    });
-    const body = await saved.json();
-    if (!saved.ok) {
-      refuse(body.message);
-      return;
+  // Skip every listed question left blank, and every one with facets
+  // answered only in part: its facets given are kept, and the rest are set
+  // aside for now (QuestionSet.presented).
+  skipButton.addEventListener("click", () => answerAction(async () => {
+    collectEdits();
+    for (const row of [...rows.values()]) {
+      if (!row.listed || row.compact || row.node.hidden) continue;
+      const answer = row.read();
+      if (!answer || (row.open && row.open())) skipRow(row);
     }
-    answerProblem.hidden = true;
-    showQuestions(body);
-    window.scrollTo(0, 0);
-  };
-  saveButton.addEventListener("click", () => answerAction(() => saveRound(false)));
-  skipButton.addEventListener("click", () => answerAction(() => saveRound(true)));
+    await flush();
+  }));
 
   asked.addEventListener("input", () => updateQuestionProgress());
   asked.addEventListener("change", () => updateQuestionProgress());
@@ -887,15 +1346,15 @@
       stream.close();
       const lead = document.createElement("b");
       lead.textContent = "That description could not be modelled.";
-      const list = document.createElement("ul");
+      const issues = document.createElement("ul");
       for (const issue of JSON.parse(event.data).issues) {
         const item = document.createElement("li");
         const code = document.createElement("code");
         code.textContent = issue.code;
         item.append(code, " " + issue.message);
-        list.append(item);
+        issues.append(item);
       }
-      fail(lead, list);
+      fail(lead, issues);
     });
     stream.addEventListener("failed", (event) => {
       stream.close();
