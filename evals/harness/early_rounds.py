@@ -196,7 +196,7 @@ def _eligible(listed: Sequence[EarlyQuestion]) -> set[UnknownKey]:
     return {question.key for question in listed if passes_floor(question, listed)}
 
 
-def _state(
+def paused_state(
     model: SystemModel,
     frameworks: Mapping[FrameworkName, Mapping[str, Any]],
     answered: Sequence[FactAnswer],
@@ -288,7 +288,7 @@ def replay(
     skipped: tuple[SkipKey, ...] = ()
     saves = 0
     for saves in range(MAX_SAVES):
-        state = _state(extracted, frameworks, answered, skipped)
+        state = paused_state(extracted, frameworks, answered, skipped)
         asked = state.questions
         if asked.done:
             break

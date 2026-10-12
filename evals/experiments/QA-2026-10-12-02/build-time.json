@@ -1,0 +1,184 @@
+{
+  "conditions": "one process per run, STRIDE and ASVS level 3, 20 reads a row; the machine ran another session's work, load average 1.6 to 7.0 over the runs (uptime before and after each run)",
+  "after": {
+    "revision": "a1ec5d37817d530b1494fb421e4126246c000d09 (service code as dab7914b)",
+    "06-cookbook-online-game": [
+      {
+        "load": "1.64 before, 3.35 after the four runs",
+        "0 answers, nothing kept": {
+          "p50_ms": 168.0,
+          "p95_ms": 276.6,
+          "max_ms": 281.8
+        },
+        "0 answers, kept": {
+          "p50_ms": 13.5,
+          "p95_ms": 15.6,
+          "max_ms": 15.7
+        },
+        "30 answers, nothing kept": {
+          "p50_ms": 218.9,
+          "p95_ms": 336.3,
+          "max_ms": 336.6
+        },
+        "30 answers, kept": {
+          "p50_ms": 13.7,
+          "p95_ms": 15.0,
+          "max_ms": 15.0
+        }
+      },
+      {
+        "load": "2.61",
+        "0 answers, nothing kept": {
+          "p50_ms": 176.0,
+          "p95_ms": 296.6,
+          "max_ms": 302.8
+        },
+        "0 answers, kept": {
+          "p50_ms": 14.3,
+          "p95_ms": 14.8,
+          "max_ms": 14.8
+        },
+        "30 answers, nothing kept": {
+          "p50_ms": 230.5,
+          "p95_ms": 363.0,
+          "max_ms": 363.6
+        },
+        "30 answers, kept": {
+          "p50_ms": 14.6,
+          "p95_ms": 14.9,
+          "max_ms": 14.9
+        }
+      },
+      {
+        "load": "2.67",
+        "0 answers, nothing kept": {
+          "p50_ms": 165.5,
+          "p95_ms": 275.9,
+          "max_ms": 281.0
+        },
+        "0 answers, kept": {
+          "p50_ms": 13.3,
+          "p95_ms": 14.0,
+          "max_ms": 14.0
+        },
+        "30 answers, nothing kept": {
+          "p50_ms": 215.5,
+          "p95_ms": 332.9,
+          "max_ms": 333.1
+        },
+        "30 answers, kept": {
+          "p50_ms": 14.3,
+          "p95_ms": 16.0,
+          "max_ms": 16.0
+        }
+      },
+      {
+        "load": "1.97 before, 1.90 after",
+        "0 answers, nothing kept": {
+          "p50_ms": 165.2,
+          "p95_ms": 273.7,
+          "max_ms": 279.3
+        },
+        "0 answers, kept": {
+          "p50_ms": 13.5,
+          "p95_ms": 15.0,
+          "max_ms": 15.1
+        },
+        "30 answers, nothing kept": {
+          "p50_ms": 217.5,
+          "p95_ms": 333.4,
+          "max_ms": 333.4
+        },
+        "30 answers, kept": {
+          "p50_ms": 13.3,
+          "p95_ms": 13.7,
+          "max_ms": 13.7
+        }
+      }
+    ],
+    "02-iot-fleet-telemetry": [
+      {
+        "load": "1.64 before, 3.35 after the four runs",
+        "early": 30,
+        "0 answers, nothing kept": {
+          "p50_ms": 5.0,
+          "p95_ms": 5.5,
+          "max_ms": 5.5
+        },
+        "0 answers, kept": {
+          "p50_ms": 1.0,
+          "p95_ms": 1.1,
+          "max_ms": 1.1
+        }
+      }
+    ]
+  },
+  "before": {
+    "revision": "9fad621e1e9464d1ab6d76f5594acfb0bb479af1 (src only; no memo, so kept and nothing kept read the same code)",
+    "06-cookbook-online-game": [
+      {
+        "load": "1.64 before, 3.35 after the four runs",
+        "0 answers, nothing kept": {
+          "p50_ms": 693.7,
+          "p95_ms": 825.4,
+          "max_ms": 826.6
+        },
+        "0 answers, kept": {
+          "p50_ms": 690.0,
+          "p95_ms": 822.5,
+          "max_ms": 823.6
+        },
+        "30 answers, nothing kept": {
+          "p50_ms": 711.2,
+          "p95_ms": 862.2,
+          "max_ms": 863.4
+        },
+        "30 answers, kept": {
+          "p50_ms": 1075.9,
+          "p95_ms": 1459.9,
+          "max_ms": 1471.6
+        }
+      },
+      {
+        "load": "2.34 before, 7.01 after",
+        "0 answers, nothing kept": {
+          "p50_ms": 707.2,
+          "p95_ms": 911.1,
+          "max_ms": 914.7
+        },
+        "0 answers, kept": {
+          "p50_ms": 1061.3,
+          "p95_ms": 1346.4,
+          "max_ms": 1351.0
+        },
+        "30 answers, nothing kept": {
+          "p50_ms": 1084.3,
+          "p95_ms": 1300.4,
+          "max_ms": 1305.5
+        },
+        "30 answers, kept": {
+          "p50_ms": 1034.6,
+          "p95_ms": 1398.1,
+          "max_ms": 1400.6
+        }
+      }
+    ],
+    "02-iot-fleet-telemetry": [
+      {
+        "load": "1.64 before, 3.35 after the four runs",
+        "early": 30,
+        "0 answers, nothing kept": {
+          "p50_ms": 219.9,
+          "p95_ms": 342.7,
+          "max_ms": 348.5
+        },
+        "0 answers, kept": {
+          "p50_ms": 220.6,
+          "p95_ms": 233.1,
+          "max_ms": 233.3
+        }
+      }
+    ]
+  },
+  "command": "python evals/experiments/QA-2026-10-12-02/build_time.py CASE '{\"stride\": {}, \"asvs\": {\"level\": 3}}'"
+}

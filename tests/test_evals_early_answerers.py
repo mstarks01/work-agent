@@ -135,6 +135,10 @@ def test_readings_cover_every_policy_answerer_selection_and_budget():
         assert one.completed <= one.findings and one.decided <= one.units
         assert one.choices <= one.budget
         assert sum(one.finding_bands.values()) == one.findings
+        # A walk with no "yes" or "no" to turn moves nothing when it reverses.
+        if not one.reversed:
+            moved = (one.listed_reversed, one.withdrawn_reversed, one.reopened)
+            assert moved == (0, 0, 0) and one.decided_reversed == one.decided
         # A submitter who knows nothing answers "I don't know" to every question.
         if one.answerer == "unknown":
             assert one.unknown_answers == one.asked

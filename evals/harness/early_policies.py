@@ -2,8 +2,9 @@
 
 The pause asks early questions before any finding exists (ADR 0078). Where a
 job selects two frameworks, the shipped list takes the frameworks in turn, and
-within a turn the question whose answer settles the most other questions
-first. The #1289 review of 2026-10-01 asked which order serves each selected
+within a turn ranks a capability question by its band and the units it could
+settle, with what an answer settles as the tiebreak, and a field question by
+the prior per choice. The #1289 review of 2026-10-01 asked which order serves each selected
 framework best at the same submitter effort. This command answers that offline,
 for a submitter who answers from the top and stops after a number of choices.
 

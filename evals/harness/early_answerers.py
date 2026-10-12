@@ -10,7 +10,8 @@ worth depends on the answers: a "no" to a broad parent removes its parts, a
 answer "I don't know", which moves nothing. This command answers the first
 listed question, saves, and reads the list again, one question a save, with
 each of several answerers, under the shipped policy and under the order
-without the effects, where the depth and the name break the tie.
+without the effects, where the question's place in the early list breaks the
+tie.
 
 **What an order is worth is read off archived reports**, as `early-policies`
 reads it: a STRIDE report's conditional finding is complete when every open
@@ -31,8 +32,8 @@ how the list moves.
 
 **The order without the effects is the shipped code with one reader stubbed.**
 ``answer_round.capability_effects`` answers with no effect, so
-:func:`~analysis_service.answer_round.recommended` breaks a tie by the depth
-and the name. Everything else, the limits, the floors, the turns and the
+:func:`~analysis_service.answer_round.recommended` breaks a tie by the
+question's place in the early list. Everything else, the limits, the floors, the turns and the
 parts that wait on a parent, is the shipped code.
 """
 
@@ -59,12 +60,11 @@ from analysis_service.early_questions import EarlyQuestion
 from analysis_service.fact_answers import FactAnswer, SkipKey, key_ref
 from analysis_service.fact_writes import answered_model
 from analysis_service.frameworks import PACKAGES
-from analysis_service.jobs import Checkpoint
 from analysis_service.open_facts import prepared_model
 from analysis_service.report import Report
 from analysis_service.system_model import SystemModel
 from evals.harness.early_policies import Needs, Selection, needs_of, paired
-from evals.harness.early_rounds import dont_know
+from evals.harness.early_rounds import dont_know, paused_state
 from evals.harness.rule_applicability import TRUTH_ANSWERS, load_fixtures
 
 #: The submitter effort, in choices, at which each walk is read.
@@ -142,28 +142,6 @@ def policy(effects: bool) -> Iterator[None]:
         yield
 
 
-def _state(
-    model: SystemModel,
-    frameworks: Selection,
-    answered: Sequence[FactAnswer],
-    skipped: Sequence[SkipKey] = (),
-) -> AnswerState:
-    return AnswerState(
-        checkpoint=Checkpoint(system_model=model, assertions=None),
-        frameworks=frameworks,
-        analyses=(),
-        waiting=True,
-        final=False,
-        sources=(),
-        answers=AnswerSet(facts=tuple(answered)),
-        shown=(),
-        skipped=skipped,
-        corrections=(),
-        revision=0,
-        resumed_by=None,
-    )
-
-
 def _save(
     state: AnswerState,
     given: Sequence[FactAnswer],
@@ -227,7 +205,7 @@ def walk(
     spent = 0
     with policy(effects):
         while spent < budget:
-            state = _state(model, frameworks, answered, skipped)
+            state = paused_state(model, frameworks, answered, skipped)
             asked = state.questions
             if asked.done:
                 return Walk(steps=tuple(steps), ended=True)
@@ -354,7 +332,7 @@ def _read(
     turned = _reversal(answers)
     refused = False
     with policy(effects):
-        state = _state(model, frameworks, answers, skips)
+        state = paused_state(model, frameworks, answers, skips)
         before = after = state.questions
         decided_reversed = decided
         if turned:
@@ -366,7 +344,9 @@ def _read(
             except ValueError:
                 refused = True
                 saved = _save(state, turned)
-            after = _state(model, frameworks, saved.answers.facts, skips).questions
+            after = paused_state(
+                model, frameworks, saved.answers.facts, skips
+            ).questions
             decided_reversed = _decided(
                 model, frameworks, framework, saved.answers.facts
             )[1]
