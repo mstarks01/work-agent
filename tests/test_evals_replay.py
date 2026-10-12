@@ -108,13 +108,45 @@ class TestEveryBlessedElementTakesOneFate:
         assert row.fate == "renamed"
         assert row.produced == "process:spreadsheet"
 
-    def test_a_plural_reads_as_respelled_not_as_a_loss_to_rule_on(self, golden):
+    def test_a_plural_reads_as_renamed_on_the_respelled_rule(self, golden):
+        """Rule 3: the spelling is naming conformity, not a component the model lost."""
         model = renamed(golden.model, "entity:shopper", "Shoppers")
 
-        row = fates(golden, model)["entity:shopper"]
+        rows = fates(golden, model)
+        row = rows["entity:shopper"]
 
-        assert row.fate == "respelled"
-        assert row.candidates == ("entity:shoppers",)
+        assert row.fate == "renamed"
+        assert row.produced == "entity:shoppers"
+        assert row.evidence == "respelled"
+        # And the flows through it pair under their own label, so a plural is
+        # one loss nowhere.
+        assert all(
+            rows[flow.id].fate == "renamed"
+            for flow in golden.model.data_flows
+            if "entity:shopper" in (flow.source, flow.destination)
+        )
+
+    def test_two_plurals_of_one_slug_are_ambiguous_not_paired(self, golden):
+        """``cards-processor`` and ``card-processors`` singularise alike: listed, not chosen."""
+        model = renamed(golden.model, "entity:card-processor", "Card processors")
+        raw = model.model_dump(mode="json")
+        raw["external_entities"].append(
+            {
+                **next(
+                    e
+                    for e in raw["external_entities"]
+                    if e["id"] == "entity:card-processors"
+                ),
+                "id": "entity:cards-processor",
+                "name": "Cards processor",
+            }
+        )
+        model = SystemModel.model_validate(raw)
+
+        row = fates(golden, model)["entity:card-processor"]
+
+        assert row.fate == "ambiguous"
+        assert row.candidates == ("entity:card-processors", "entity:cards-processor")
 
     def test_a_store_written_as_a_process_reads_as_mistyped(self, golden):
         copy = golden.model.model_copy(deep=True)
@@ -1324,7 +1356,9 @@ class TestTheArchivedEmissionsReplay:
         # Six sweeps on the arm; the preflight ran one case and two ran eleven.
         assert spread["sweeps"] == 3
         assert spread["sd"]["found"] == 7.23
-        assert spread["by_type"]["entity"]["omitted"] == 0.0
+        # One run omits case 07's package registry outright: its only type-mate
+        # was the developers, which the plural rule pairs with the developer.
+        assert spread["by_type"]["entity"]["omitted"] == 0.58
 
     def test_one_sweep_has_no_spread(self, corpus):
         (sweep,) = [
