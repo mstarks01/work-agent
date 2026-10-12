@@ -5,6 +5,10 @@
 - **Effort**: [#1542](https://github.com/mstarks01/work-agent/issues/1542) (F4)
 - **Relates to**: [ADR 0053](0053-a-paused-job-asks-in-bounded-rounds.md),
   which introduced the skip and the part that waits on its parent
+- **Amended by**: [ADR 0078](0078-a-paused-job-asks-one-adaptive-list.md),
+  under which the page reports what it presented and the service checks the
+  report against the list; the rule that only a presented question is shown
+  or skipped is unchanged
 
 ## Context
 

@@ -48,6 +48,7 @@ from analysis_service.open_facts import open_attribute, prepared_model
 from analysis_service.question_kinds import QUESTION_KINDS
 from analysis_service.sources import ANSWERS_LABEL
 from analysis_service.system_model import (
+    CapabilityStatement,
     SystemModel,
     attribute_names,
 )
@@ -55,6 +56,7 @@ from analysis_service.validation import validate
 
 __all__ = [
     "answered_model",
+    "capability_statements",
     "check_fact_answers",
     "fact_rows",
 ]
@@ -281,25 +283,41 @@ def answered_model(model: SystemModel, answers: Sequence[FactAnswer]) -> SystemM
         for assumption in data.get("assumptions", [])
         if (assumption["element_id"], assumption["attribute"]) not in answered
     ]
+    data["capabilities"] = [
+        statement.model_dump(mode="json")
+        for statement in capability_statements(model.capabilities, answers)
+    ]
+    return SystemModel.model_validate(data)
+
+
+def capability_statements(
+    statements: Sequence[CapabilityStatement], answers: Sequence[FactAnswer]
+) -> list[CapabilityStatement]:
+    """The model's capability statements with every capability answer written in.
+
+    **The one writer of a capability answer.** :func:`answered_model` writes
+    the saved answers through it, and the effect of a possible answer is read
+    through it too (:mod:`analysis_service.answer_effects`), so what an answer
+    would do is what it does.
+    """
     capabilities = {
         key_ref(answer.key).capability: answer
         for answer in answers
         if answer.kind == "capability" and answer.known
     }
-    data["capabilities"] = [
+    return [
         statement
-        for statement in data.get("capabilities", [])
-        if statement["capability"] not in capabilities
+        for statement in statements
+        if statement.capability not in capabilities
     ] + [
-        {
-            "capability": key,
-            "state": "present" if answer.value == "yes" else "absent",
-            "source_excerpt": fact_line(answer),
-            "source_label": ANSWERS_LABEL,
-        }
+        CapabilityStatement(
+            capability=key,
+            state="present" if answer.value == "yes" else "absent",
+            source_excerpt=fact_line(answer),
+            source_label=ANSWERS_LABEL,
+        )
         for key, answer in capabilities.items()
     ]
-    return SystemModel.model_validate(data)
 
 
 def fact_rows(

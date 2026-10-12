@@ -185,7 +185,8 @@ Start at the places where a one-package assumption survives:
   the package to it on every corpus model. It needs a row in
   `question_prior.json`, which may count no run, and its field questions rank
   on the sum of every package's scores (ADR 0053). Its capability questions
-  share each kind's limit with the other packages. A capability's floor
+  rank by what an answer settles, read through its own `open_capabilities`
+  (ADR 0078), and it has its own limit of each kind (ADR 0074). A capability's floor
   exception reads only its own package's bands (ADR 0071), so a package with
   one band gets no exception.
   `tests/test_future_frameworks.py` drives a third package with three bands, a

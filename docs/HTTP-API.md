@@ -41,7 +41,7 @@ logged, never returned.
 | `GET` | `/v1/jobs/{id}/report` | The full [report](Report-Schema.md) once completed; `409` before, and `409` if the report is withheld (below). |
 | `GET` | `/v1/jobs/{id}/changes` | For a follow-up, how each finding moved since the report its answers came from: `new`, `unchanged`, `changed` (with the verdict before and after) or `gone`. Matched by claim identity, never by prose. `409` where the job is not a follow-up, where the earlier report is no longer held, or where either report is withheld. |
 | `POST` | `/v1/jobs/{id}/corrections` | Correct a final report's answers, as `{"facts": [...]}`: a changed value, or `unknown`. `200` with `{"job_id", "corrections", "corrected_findings"}`. No job starts, and the report is not rewritten. `400` where the report is not final, a correction names no answer the report read, or changes none. |
-| `POST` | `/v1/jobs/{id}/answers` | Answer the questions of a completed job or a job in `awaiting-answers`. Starts a **new** job that resumes from this one's model and catalog; `201` with its `job_id`. With `"save": true`, a waiting job keeps the round, and a completed job keeps a draft of its follow-up; either answers `200` with its own `job_id`, and a save never starts a job. `409` where a save moved the answers after this request read them. |
+| `POST` | `/v1/jobs/{id}/answers` | Answer the questions of a completed job or a job in `awaiting-answers`. Starts a **new** job that resumes from this one's model and catalog; `201` with its `job_id`. With `"save": true`, a waiting job keeps the answers, and a completed job keeps a draft of its follow-up; either answers `200` with its own `job_id`, and a save never starts a job. `409` where a save moved the answers after this request read them. |
 | `POST` | `/v1/jobs/{id}/amendments` | Amend a job in `awaiting-answers`, as `{"text", "revision"}`: what is true that its model misses or reads wrongly. Starts a **new** job that extracts the job's sources again with the amendment added, and pauses again; `201` with its `job_id`. `409` where the revision has moved, before or while the request reads it, or a job already locks this one. |
 | `GET` | `/v1/jobs/{id}/questions` | What the job asks you, as `{"job_id", "link_questions", "fact_questions", "early_questions", "fallback", "final", "early_remaining", "early_withheld", "early_stop", "early_held_back", "early_below_floor", "early_summary", "framework_gates", "skipped_early", "skipped_links", "answered_early", "answered_links", "revision", "resumed_by", "draft_links", "draft_facts", "answer_limits", "carried_dropped", "carried_dropped_links"}`: a finished report's questions, or a waiting job's link and early questions. `resumed_by` names the job this job's answers started while that job is in flight or has its report; the job then asks nothing until that job fails. Derived from the report when you ask, under the report's own rules: `409` before completion and `409` when the report is withheld. |
 | `GET` | `/healthz` | Unauthenticated liveness probe. |
@@ -185,42 +185,63 @@ assertion catalog applied, leaves it open: `unknown`, possibly with a
 qualification after it, or a zone the service inferred. Answer them as `facts` on the route below. The analysis then
 reads your answers, so the findings rest on them.
 
-**A waiting job asks in rounds.** `early_questions` holds one round: up to 10
-capability questions and up to 5 questions about the model's elements, so no
-round opens with more questions than the one before it. A capability question
-whose `parent` the round also asks takes no place: show it once the parent is
-answered "yes". Each question's `decisions`
-counts its choices: one a facet, else one.
-A field question needs a `score` of at least 1, and a capability question at
-least 2. One pause asks at most 30 of each kind for each selected
+**A waiting job asks one adaptive list**
+([ADR 0078](adr/0078-a-paused-job-asks-one-adaptive-list.md)).
+`early_questions` holds every recommended question of the pause at once, the
+most useful first, and `policy_version` names the policy that built it
+(`adaptive-1`). Each question's `decisions` counts its choices: one a facet,
+else one. A field question needs a `score` of at least 1, and a capability
+question at least 2. One pause asks at most 30 of each kind for each selected
 framework, and a question two frameworks share counts for each of them
-([ADR 0074](adr/0074-each-framework-has-its-own-question-limit.md)). `early_remaining`
-estimates how many of each kind are left, this round included; answers can
-add or take away questions. Send a round with `"save": true` to keep it: the
-answers are written onto the job, no model runs, and the response is `200`
-with `{"job_id", "saved": true}`. Ask for the questions again for the next
-round. A saved round may also send `"skip"`, a list of keys of this round's
-questions that you set aside for now. A skip is not an answer: the fact stays
-open, no later round shows it, and it takes no place under the limit.
-A link question is skipped by its `key`, a string; the skip places the
-principal nowhere and is not `"none"`. `skipped_early` lists every skipped
-early question and `skipped_links` every skipped link question, and an answer
-to one is still taken. A question with facets may be skipped beside a part answer to it: the
-facets sent are kept, and the rest are set aside. A skip beside a complete
-answer is refused. A saved round must answer or skip at least one question.
+([ADR 0074](adr/0074-each-framework-has-its-own-question-limit.md)). A
+capability question whose `parent` is still open is not in the list: it is in
+`early_blocked`, with the `reason` `parent-undecided`, takes no place, and
+joins the list once the parent is answered "yes". Within a framework's turn,
+the question whose answer settles the most other questions comes first. Each
+capability row carries `rank`: `settles_at_most` and `settles_at_least` over
+its answers, and for each answer what it `settles`, which is the other
+questions it proves settled or unnecessary, and what it `unlocks`, which is
+the questions it adds to the list. A field row's `rank` is `null`: no rule
+proves that a field answer removes another question. Answers can add
+questions as well as take them away. `early_unnecessary` lists each question
+of the first list that a saved answer proved unnecessary, with its
+`reason`: `parent-absent`, `gate-satisfied`, `gate-refuted`, `fact-settled`
+or `no-longer-needed-by-selected-units`.
+
+Send answers with `"save": true` to keep them: they are written onto the job,
+no model runs, and the response is `200` with `{"job_id", "saved": true}`.
+Ask for the questions again for the list with them in. A save may also send
+`"skip"`, a list of keys of listed questions that you set aside for now. A
+skip is not an answer: the fact stays open, the list leaves it out, and it
+takes no place under the limit. A link question is skipped by its `key`, a
+string; the skip places the principal nowhere and is not `"none"`.
+`skipped_early` lists every skipped early question and `skipped_links` every
+skipped link question, and an answer to one is still taken. A question with
+facets may be skipped beside a part answer to it: the facets sent are kept,
+and the rest are set aside. A skip beside a complete answer is refused. A
+save must answer or skip at least one question.
+
+**Say what you presented.** A save or a start to a waiting job sends
+`presented`, the keys of the early questions your page showed. The job records them as shown, and the
+report reads that record to tell a skipped question from one left blank or
+never shown ([ADR 0069](adr/0069-a-skip-is-of-a-question-the-page-presented.md)).
+A skip is taken only of a presented question. A key the list does not hold,
+or a part hidden under its parent's answer, is refused with `400`. A question
+the service returned and your page did not show is not recorded as shown, so
+send only what you rendered.
 
 **Send the revision you read.** `revision` counts a job's saves: a waiting
-job's saved rounds, or a finished report's saved drafts. Every answer to a
+job's saves, or a finished report's saved drafts. Every answer to a
 waiting job, and every save, carries the `revision` its questions were read
 with: `400` where it is missing, and `409` where another save landed first. Of
 two saves that read one revision, only the first lands, so a page left open on
-an earlier round cannot write over a later one. Read the questions again after
+an earlier revision cannot write over a later one. Read the questions again after
 a `409`. A finished report's run may send its `revision`, and is checked
 against it where it does. A save never starts
 the analysis: when the saved answers leave nothing to ask, the questions say
 so in `early_stop`, and a send without `"save"` starts it. `answered_early` and `answered_links` list each saved answer
 with its question, and you can send a new answer to any of them. A question
-with facets comes back while a facet has no answer, and it takes no place
+with facets stays listed while a facet has no answer, and it takes no place
 under the limit of 30.
 
 **A stop does not say every fact is settled**
@@ -229,15 +250,17 @@ under the limit of 30.
 hold questions back, `below-floor` when only questions under a floor are left,
 `skipped` when every question left was skipped, and `nothing-left` when no open
 question is left. `early_held_back` lists the
-questions the limits hold back, and `early_below_floor` the open questions
-under a floor; no round shows them, and an answer to one is still taken.
-`early_withheld` counts `early_held_back`. `early_summary` says what the
-pause leaves open: the questions the rounds showed (`introduced`) and their
-`choices`; the saved answers that are `settled`, `partial` or `unknown`; the
-questions `skipped`, `held_back` and `below_floor`; and, for each framework
-that will run and whose units apply by a rule over capabilities, its units by
-state and band (`applicability`), with the unknown units that no open question
-can settle (`unaskable`). These are units, not findings.
+questions the limits hold back (`reason` `answer-limit`), and
+`early_below_floor` the open questions under a floor (`below-floor`); the
+list leaves them out, and an answer to one is still taken. `early_summary`
+says what the list holds and what the pause leaves open: the questions
+`recommended` now and their `recommended_choices`; the questions your page
+reported as presented so far (`introduced`) and their `choices`; the saved
+answers that are `settled`, `partial` or `unknown`; the questions `skipped`,
+`held_back`, `below_floor`, `blocked` and `unnecessary`; and, for each
+framework that will run and whose units apply by a rule over capabilities,
+its units by state and band (`applicability`), with the unknown units that no
+open question can settle (`unaskable`). These are units, not findings.
 
 **A framework that will not run asks nothing**
 ([ADR 0067](adr/0067-a-paused-job-asks-what-decides-a-framework-first.md)).
@@ -245,7 +268,8 @@ can settle (`unaskable`). These are units, not findings.
 the saved answers in: `satisfied`, `refuted` or `undecidable`. A refuted
 framework asks no question. An undecidable one asks only the facts that
 decide it, first and outside the limits; each such question lists the
-framework in `gates`, and `early_remaining` counts them under `gate`.
+framework in `gates`. A question of a framework that a reopened answer left
+undecidable is in `early_blocked` with the `reason` `gate-undecided`.
 
 **An amendment corrects the model itself**
 ([ADR 0072](adr/0072-a-paused-job-s-description-can-be-amended.md)). An answer
@@ -259,11 +283,6 @@ job's answers: its own questions take each one they still ask, and
 flight or has a report, this job takes no answer; where it fails, this job
 takes answers again.
 
-**A skip is of a question you saw**
-([ADR 0069](adr/0069-a-skip-is-of-a-question-the-page-presented.md)). A
-capability question whose `parent` the round also asks is not presented until
-the parent's answer is "yes". A skip of it is refused with `400`; it is asked
-once it shows.
 **Limit:** a waiting job is held in the service's memory. A restart of the
 service loses it, with its extraction; submit it again.
 
@@ -352,7 +371,7 @@ Answer with `facts` beside or instead of `links`:
 ```
 
 A question kind with facets takes only a `facets` map, or the value `unknown`.
-A facet you leave out is not answered. In a later round, a facet answer adds to
+A facet you leave out is not answered. In a later save, a facet answer adds to
 the earlier answer: a facet you leave out keeps its earlier answer. An answer whose facets are all
 `unknown` says that you do not know. A finding counts as covered only when
 every facet of the kind has `yes`, `no` or `not applicable`, because the
@@ -360,14 +379,14 @@ reviewer names the kind a finding waits on, not a facet.
 
 A fact answer is accepted only for a fact that this job asked: a question in
 `early_questions` while the job waits at its pause, or in `fact_questions` once
-it is finished. A fact that an earlier round answered may be answered again.
+it is finished. A fact that an earlier save answered may be answered again.
 
 An attribute answer is accepted only where the model leaves the attribute open,
-or where an earlier round of answers answered it. The model is read with the
+or where an earlier save answered it. The model is read with the
 assertion catalog applied, as the analysis reads it, so a fact the catalog
 states takes no answer even while the job waits at its pause. An answer to an attribute that
 the sources state is refused with `400`. An `unknown` answer to a fact that an
-earlier round settled takes the earlier answer back while the job waits at its
+earlier save settled takes the earlier answer back while the job waits at its
 pause, and the fact is open again. A report's follow-up refuses it: send a
 value to change it.
 
@@ -399,15 +418,15 @@ spend model calls. It is a new job: it counts toward your jobs in flight and
 your token budget, and it is refused the same ways a submission is (`429`). An
 answer about a principal replaces the finished job's earlier answer about the
 same principal. A link answer may name only a principal that the job asked
-about, or one that an earlier round answered. The finished job's report is unchanged.
+about, or one that an earlier save answered. The finished job's report is unchanged.
 
 **A report offers one follow-up.** A report's questions are its follow-up.
 Answer them, and the analysis runs once more. The report that run writes is
 final: `final` is `true`, it asks no questions, and an answer to it is refused
-with `400`. A later round does not ask a fact that an earlier round answered,
+with `400`. The follow-up does not ask a fact that an earlier answer answered,
 and an "I don't know" answer counts. A question with facets is asked again
-only for the facets that no round answered. You can still send a new answer
-to a fact that an earlier round answered, to change it. Each fact question
+only for the facets that no answer answered. You can still send a new answer
+to a fact that an earlier save answered, to change it. Each fact question
 carries `needs`: each finding that waits on only some facets of the
 question, with the facets it needs; a finding not listed needs every facet
 ([ADR 0073](adr/0073-a-finding-can-wait-on-some-facets-and-an-answer-can-carry-a-detail.md)).
@@ -448,7 +467,7 @@ or waits on it. The analysis does not run again.
 | `404` | The job is not yours, or does not exist. |
 | `400` | `links` and `facts` are both empty and the job is not waiting on answers. Empty means "continue without answers". Or the job's report is final: its follow-up has run. |
 | `409` | The job is neither completed nor waiting on answers, its report is withheld, or its report carries no catalog. Or the job's answers already started a job that is in flight or finished: a job takes one resumed job, and takes answers again only where that job failed or was rejected. |
-| `413` | The job's sources with the answers composed in are over this deployment's size or count limit. A save is refused too, so no saved round holds a job that no start could run. |
+| `413` | The job's sources with the answers composed in are over this deployment's size or count limit. A save is refused too, so no saved answer holds a job that no start could run. |
 | `422` | An entry of `links` or `facts` is malformed, or a list holds more than its limit: 50 links, 200 facts. |
 
 **Or answer in a new submission** of the same system, beside the sources. That

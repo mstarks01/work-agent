@@ -1,4 +1,4 @@
-"""The answer round's interface: one Answer State in, a saved round or a Resumed Job out.
+"""The answer interface: one Answer State in, saved answers or a Resumed Job out.
 
 The ``/v1`` routes, the first-run app and the eval replay each build an
 :class:`~analysis_service.answer_round.AnswerState` from their own job record
@@ -30,7 +30,7 @@ ROOMY = SourceLimits(max_total_bytes=1_000_000, max_sources=10)
 
 
 def waiting(**changes) -> AnswerState:
-    """A job paused at its first round, with one source."""
+    """A job paused at its list, with one source."""
     state = AnswerState(
         checkpoint=held(),
         frameworks={"stride": {}},
@@ -83,20 +83,21 @@ class TestTheRevision:
 class TestTheOutcome:
     def test_a_continue_starts_a_resumed_job_from_the_checkpoint(self):
         state = waiting()
+        shown = [q.key for q in state.questions.early]
 
-        outcome = state.answer(Answers(revision=3), limits=ROOMY)
+        outcome = state.answer(Answers(revision=3, presented=shown), limits=ROOMY)
 
         assert isinstance(outcome, ResumedJob)
         assert outcome.checkpoint is state.checkpoint
         assert outcome.follow_up is False
-        assert set(outcome.shown) == {q.key for q in state.questions.early}
+        assert set(outcome.shown) == set(shown)
 
-    def test_a_save_keeps_the_round_at_the_revision_it_read(self):
+    def test_a_save_keeps_the_answers_at_the_revision_it_read(self):
         state = waiting()
         key = first_key(state)
 
         outcome = state.answer(
-            Answers(save=True, skips=[key], revision=3), limits=ROOMY
+            Answers(save=True, skips=[key], presented=[key], revision=3), limits=ROOMY
         )
 
         assert isinstance(outcome, SavedRound)
@@ -121,9 +122,11 @@ class TestTheSourceLimits:
         state = waiting()
         tight = SourceLimits(max_total_bytes=1, max_sources=10)
 
+        key = first_key(state)
         with pytest.raises(SourcesOverLimit):
             state.answer(
-                Answers(save=True, skips=[first_key(state)], revision=3), limits=tight
+                Answers(save=True, skips=[key], presented=[key], revision=3),
+                limits=tight,
             )
 
     def test_no_limits_checks_nothing(self):

@@ -22,7 +22,7 @@ import pytest
 from fastapi.routing import APIRoute
 
 from analysis_service import resilience
-from analysis_service.answer_round import EARLY_RULES
+from analysis_service.answer_round import EARLY_RULES, POLICY_VERSION
 from analysis_service.auth import (
     ALLOWED_ALGORITHMS,
     DEFAULT_ALGORITHMS,
@@ -411,11 +411,7 @@ def test_the_route_table_is_the_apps_routes():
 
 def test_the_question_limits_are_the_early_rules():
     text = flat(HTTP_API.read_text(encoding="utf-8"))
-    per_round = re.search(
-        r"up to (\d+) capability questions and up to (\d+) questions about the"
-        r" model's elements",
-        text,
-    )
+    policy = re.search(r"names the policy that built it \(`([a-z0-9-]+)`\)", text)
     floors = re.search(
         r"A field question needs a `score` of at least (\d+), and a capability"
         r" question at least (\d+)\.",
@@ -427,12 +423,9 @@ def test_the_question_limits_are_the_early_rules():
     limit_again = re.search(r"takes no place under the limit of (\d+)\.", text)
     links = re.search(r"or there are more than (\d+) entries", text)
 
-    assert per_round and floors and limit and limit_again and links
+    assert policy and floors and limit and limit_again and links
     capability, field = EARLY_RULES["capability"], EARLY_RULES["field"]
-    assert (int(per_round[1]), int(per_round[2])) == (
-        capability.per_round,
-        field.per_round,
-    )
+    assert policy[1] == POLICY_VERSION
     assert (float(floors[1]), float(floors[2])) == (field.floor, capability.floor)
     assert int(limit[1]) == int(limit_again[1]) == capability.limit == field.limit
     assert int(links[1]) == MAX_LINK_ANSWERS

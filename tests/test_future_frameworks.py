@@ -88,12 +88,13 @@ def third(monkeypatch):
     )
     carrying(monkeypatch, package)
     # The planner's modules read the registry by the name they imported.
-    from analysis_service import answer_round, early_questions
+    from analysis_service import answer_effects, answer_round, early_questions
     from analysis_service.frameworks import PACKAGES as registered
 
     held = {**registered, THIRD: package}
     monkeypatch.setattr(early_questions, "PACKAGES", held)
     monkeypatch.setattr(answer_round, "PACKAGES", held)
+    monkeypatch.setattr(answer_effects, "PACKAGES", held)
     return package
 
 
@@ -162,14 +163,17 @@ def test_its_gate_answer_lets_it_ask_and_shares_a_question_once(third):
     assert len(keys) == len(set(keys)), "a shared fact is asked once"
 
 
-def test_no_selected_package_is_starved_of_the_first_round(third):
-    """Each package with a question is served in the first round, though they
-    share one limit of each kind."""
+def test_no_selected_package_is_starved_of_the_list(third):
+    """Each package with a question is served in the list, and each has its
+    own limit of each kind."""
     asked = _paused(ALL, _answer_the_gate(ALL))
     served = Counter(name for q in asked.early for name in q.frameworks)
     assert served["stride"] and served["asvs"] and served[THIRD]
-    capabilities = [q for q in asked.early if q.kind == "capability" and not q.parent]
-    assert len(capabilities) <= EARLY_RULES["capability"].per_round
+    for name in ALL:
+        capabilities = [
+            q for q in asked.early if q.kind == "capability" and name in q.frameworks
+        ]
+        assert len(capabilities) <= EARLY_RULES["capability"].limit
 
 
 def test_a_package_with_an_empty_prior_asks_no_field_question(third):

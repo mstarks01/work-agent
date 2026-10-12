@@ -102,21 +102,20 @@ def test_the_simulation_asks_a_part_only_under_a_yes():
     assert run.conformance == 0
 
 
-def test_the_simulation_asks_in_the_rounds_a_pause_serves():
-    """#1291: a later round is read off the earlier answers, within the limit."""
+def test_the_simulation_asks_in_the_lists_a_pause_serves():
+    """#1291: each list is read off the earlier answers, within the limit."""
     truth = dict.fromkeys(CAPABILITIES, "present") | {
         "oauth-client": "absent",
         "oauth-authorization-server": "absent",
         "webrtc": "absent",
     }
     run = simulate_questions(_fixture(options={"level": 3}, truth=truth))
-    assert run.rounds > 1
+    assert run.saves >= 1
     assert run.asked <= EARLY_RULES["capability"].limit
-    # #1468: a question that settles nothing only opens the parts under it.
-    # The code flow sits under a role, so it is not asked beside two "no"s.
-    parents = {capability.parent for capability in CAPABILITIES.values()}
-    moot = [key for key, count in zip(run.keys, run.settled) if not count]
-    assert set(moot) <= parents
+    # #1468: a part is asked only under its parent's "yes". The code flow
+    # sits under a role, so it is not asked beside two "no"s.
+    for key in run.keys:
+        assert not any(truth.get(ancestor) == "absent" for ancestor in lineage(key))
 
 
 def test_the_simulation_settles_what_the_truth_answers():

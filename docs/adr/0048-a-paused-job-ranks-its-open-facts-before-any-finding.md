@@ -10,7 +10,10 @@
 - **Evidence**: `QA-2026-09-26-03-E5` and `-E13` in `evals/experiments/`
 - **Amended by**: [ADR 0049](0049-an-answer-binds-to-an-open-fact-and-the-order-completes-findings.md),
   which keeps the prior as the eligibility rule and shares the open-fact rule
-  with the answer check
+  with the answer check, and
+  [ADR 0078](0078-a-paused-job-asks-one-adaptive-list.md), which ranks a
+  question by what its answer settles before the prior and keeps the prior
+  as the eligibility rule
 
 ## Context
 

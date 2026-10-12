@@ -10,7 +10,6 @@ from __future__ import annotations
 
 import asyncio
 from dataclasses import replace
-from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
@@ -277,13 +276,18 @@ def asked_of(catalog, *, waiting):
     )
 
 
-def admit(questions, links=(), facts=(), save=False, skips=()):
+def admit(questions, links=(), facts=(), save=False, skips=(), presented=None):
+    """One submission. The page presents every listed row unless the test
+    says otherwise."""
+    if presented is None:
+        presented = [question.key for question in questions.early]
     return questions.admit(
         sources=[],
         earlier=NO_ANSWERS,
         given=AnswerSet(links=tuple(links), facts=tuple(facts)),
         save=save,
         skips=skips,
+        presented=presented,
     )
 
 
@@ -404,10 +408,10 @@ class TestTheRoundsEnd:
         assert follow_up.resumption.follow_up is True
 
 
-class TestTheBoundedRounds:
-    """A waiting job asks in rounds (ADR 0053)."""
+class TestTheAdaptiveList:
+    """A waiting job asks one adaptive list (ADR 0078)."""
 
-    def test_a_round_asks_at_most_its_questions_of_each_kind_above_the_floor(self):
+    def test_the_list_holds_each_kind_up_to_its_limit_above_the_floor(self):
         from analysis_service.answer_round import EARLY_RULES, passes_floor
         from analysis_service.early_questions import early_questions
 
@@ -422,12 +426,13 @@ class TestTheBoundedRounds:
                 for q in asked.early
                 if (q.kind == "capability") == (kind == "capability")
             ]
-            assert len(shown) <= EARLY_RULES[kind].per_round
+            assert len(shown) <= EARLY_RULES[kind].limit
             assert all(passes_floor(q, listed) for q in shown)
         assert asked.early, "a control: the waiting job asks something"
+        assert asked.to_json()["policy_version"] == "adaptive-1"
 
     def test_a_question_counts_as_one_whatever_its_facets(self):
-        from analysis_service.answer_round import next_round
+        from analysis_service.answer_round import recommended
 
         wide = SimpleNamespace(
             key=CAPACITY,
@@ -439,10 +444,10 @@ class TestTheBoundedRounds:
             gates=(),
             group="capacity-limits",
         )
-        shown, _, _ = next_round([wide], frozenset(), {})
-        assert shown == (wide,)
+        shown, blocked, held_back = recommended([wide], frozenset(), {}, {})
+        assert (shown, blocked, held_back) == ((wide,), (), ())
 
-    def test_a_saved_answer_leaves_the_round_and_is_listed_with_its_answer(self):
+    def test_a_saved_answer_leaves_the_list_and_is_listed_with_its_answer(self):
         first = _asked_after([]).early[0]
         answer = FactAnswer(key=first.key, value="unknown")
         after = _asked_after([answer])
@@ -450,23 +455,22 @@ class TestTheBoundedRounds:
         assert [(q.key, a) for q, a in after.answered_early] == [(first.key, answer)]
 
     def test_each_kind_stops_at_its_limit(self):
-        from analysis_service.answer_round import next_round
+        from analysis_service.answer_round import recommended
 
         listed = _asked_after([]).early
         answered_for = {
             ("", "", "", f"subject {n}", "", ""): ("stride",) for n in range(30)
         }
-        shown, remaining, withheld = next_round(
-            listed, frozenset(answered_for), answered_for
+        shown, _, withheld = recommended(
+            listed, frozenset(answered_for), answered_for, {}
         )
         assert not [q for q in shown if q.kind != "capability"]
-        assert remaining["field"] == 0
         assert len(withheld) == len([q for q in listed if q.kind != "capability"])
 
     def test_a_second_framework_takes_no_place_from_the_first(self):
         """Each framework has its own limit, so a joint pause asks STRIDE what
         it asks alone (QA-2026-10-09-01-E1)."""
-        from analysis_service.answer_round import EARLY_RULES, next_round
+        from analysis_service.answer_round import EARLY_RULES, recommended
 
         def field(n, framework):
             key = (f"process:{framework}{n}", "authentication", "", "", "", "")
@@ -484,22 +488,22 @@ class TestTheBoundedRounds:
         limit = EARLY_RULES["field"].limit
         stride = [field(n, "stride") for n in range(limit)]
         asvs = [field(n, "asvs") for n in range(5)]
-        _, remaining, withheld = next_round([*stride, *asvs], frozenset(), {})
-        assert remaining["field"] == limit + len(asvs)
+        shown, _, withheld = recommended([*stride, *asvs], frozenset(), {}, {})
+        assert len(shown) == limit + len(asvs)
         assert withheld == ()
 
         answered = {question.key: ("stride",) for question in stride[:limit]}
         rest = [field(limit + n, "stride") for n in range(3)]
-        _, remaining, withheld = next_round(
-            [*rest, *asvs], frozenset(answered), answered
+        shown, _, withheld = recommended(
+            [*rest, *asvs], frozenset(answered), answered, {}
         )
-        assert remaining["field"] == len(asvs)
+        assert len(shown) == len(asvs)
         assert [q.key for q in withheld] == [q.key for q in rest]
 
-    def test_a_question_answered_in_part_comes_back_outside_the_limit(self):
+    def test_a_question_answered_in_part_stays_listed_outside_the_limit(self):
         """A question with a partial answer stays outside the limit, so thirty
         partial answers do not hide every question (#1289, B3)."""
-        from analysis_service.answer_round import EARLY_RULES, next_round
+        from analysis_service.answer_round import recommended
 
         facets = QUESTION_KINDS["capacity-limits"].facets
 
@@ -520,12 +524,10 @@ class TestTheBoundedRounds:
         listed = [capacity_of(n) for n in range(31)]
         answers = [FactAnswer(key=q.key, facets={"rate": "yes"}) for q in listed[:30]]
         answered_for = {q.key: q.frameworks for q in listed[:30]}
-        shown, remaining, withheld = next_round(
-            listed, answered_keys(answers), answered_for
+        shown, _, withheld = recommended(
+            listed, answered_keys(answers), answered_for, {}
         )
-        per_round = EARLY_RULES["field"].per_round
-        assert [q.key for q in shown] == [q.key for q in listed[:per_round]]
-        assert remaining["field"] == 30
+        assert [q.key for q in shown] == [q.key for q in listed[:30]]
         assert [q.key for q in withheld] == [listed[-1].key]
 
     def test_a_stop_says_whether_the_limits_held_questions_back(self):
@@ -538,9 +540,12 @@ class TestTheBoundedRounds:
         held_back = replace(low, held_back=asked.early[:3])
         assert held_back.stop == "budget-exhausted"
         assert held_back.to_json()["early_stop"] == "budget-exhausted"
-        assert held_back.to_json()["early_withheld"] == 3
+        assert len(held_back.to_json()["early_held_back"]) == 3
+        assert {row["reason"] for row in held_back.to_json()["early_held_back"]} == {
+            "answer-limit"
+        }
 
-    def test_a_submitter_who_answers_one_facet_a_round_reaches_the_end(self):
+    def test_a_submitter_who_answers_one_facet_a_save_reaches_the_end(self):
         answered: list[FactAnswer] = []
         for _ in range(40):
             asked = _asked_after(answered)
@@ -560,7 +565,7 @@ class TestTheBoundedRounds:
         assert asked.links, "a control: the link questions still stand"
         assert asked.stop is None, "a job that still asks a link has not stopped"
 
-    def test_a_saved_round_must_answer_something_and_a_final_report_saves_nothing(
+    def test_a_save_must_answer_something_and_a_final_report_saves_nothing(
         self,
     ):
         with pytest.raises(ValueError, match="answers or skips at least one"):
@@ -570,12 +575,12 @@ class TestTheBoundedRounds:
         with pytest.raises(ValueError, match="this report is final"):
             admit(final, facts=[answer], save=True)
 
-    def test_the_route_saves_every_round_and_only_a_continue_starts(self):
+    def test_the_route_saves_every_list_and_only_a_continue_starts(self):
         """The last save started the analysis by itself (#1289, item 7)."""
         from analysis_service.sources import SourceLimits
 
         client, store = catalog_client()
-        # Room for the answers source every round's answers compose.
+        # Room for the answers source every save's answers compose.
         client.app.state.limits = SourceLimits(max_total_bytes=100_000, max_sources=3)
         job = waiting(store)
         for _ in range(20):
@@ -595,6 +600,7 @@ class TestTheBoundedRounds:
                     "facts": facts,
                     "links": links,
                     "save": True,
+                    "presented": [q["key"] for q in body["early_questions"]],
                     "revision": body["revision"],
                 },
                 headers=auth(),
@@ -603,7 +609,7 @@ class TestTheBoundedRounds:
             assert response.json() == {"job_id": job, "saved": True}
             assert asyncio.run(store.get(job)).checkpoint is not None
         else:
-            pytest.fail("the rounds never ended")
+            pytest.fail("the list never ended")
         # Every answer was "I don't know", so the questions under the floor
         # are what is left, and the stop says so.
         assert body["early_stop"] == "below-floor"
@@ -622,10 +628,10 @@ class TestTheBoundedRounds:
 
 
 class TestSkipForNow:
-    """A skipped question leaves the rounds, and a wholly blank round can be
+    """A skipped question leaves the list, and a wholly blank list can be
     saved, so a submitter who cannot answer can go on (#1289)."""
 
-    def test_a_skipped_question_leaves_the_rounds_and_is_listed(self):
+    def test_a_skipped_question_leaves_the_list_and_is_listed(self):
         first = _asked_after([]).early[0]
         admitted = admit(_asked_after([]), save=True, skips=[first.key])
         after = _asked_after([], skipped=admitted.skipped)
@@ -635,15 +641,13 @@ class TestSkipForNow:
         assert after.to_json()["skipped_early"][0]["key"] == list(first.key)
 
     def test_a_skip_writes_no_answer_and_leaves_one_question_fewer(self):
-        first = _asked_after([]).early[0]
-        after = _asked_after([], skipped=[first.key])
+        before = _asked_after([])
+        after = _asked_after([], skipped=[before.early[0].key])
         admitted = admit(after, save=True, skips=[after.early[0].key])
         assert admitted.answers.facts == ()
-        assert after.remaining == {
-            kind: count
-            - (kind == ("capability" if first.kind == "capability" else "field"))
-            for kind, count in _asked_after([]).remaining.items()
-        }
+        assert len(after.early) + len(after.held_back) == (
+            len(before.early) + len(before.held_back) - 1
+        )
 
     def test_a_skipped_question_can_still_be_answered_and_leaves_the_list(self):
         first = _asked_after([]).early[0]
@@ -653,7 +657,7 @@ class TestSkipForNow:
         assert admitted.skipped == ()
         assert admitted.answers.facts == (answer,)
 
-    def test_a_submitter_who_skips_every_round_reaches_the_end(self):
+    def test_a_submitter_who_skips_every_list_reaches_the_end(self):
         skipped: tuple = ()
         for _ in range(40):
             asked = _asked_after([], skipped=skipped)
@@ -668,8 +672,8 @@ class TestSkipForNow:
     @pytest.mark.parametrize(
         ("save", "which", "answer", "refusal"),
         [
-            (False, "shown", False, "only a saved round skips"),
-            (True, "unshown", False, "only a question this round shows"),
+            (False, "shown", False, "only a save skips"),
+            (True, "unshown", False, "only a question the page presented"),
             (True, "shown", True, "answered or skipped, not both"),
         ],
     )
@@ -680,8 +684,8 @@ class TestSkipForNow:
         with pytest.raises(ValueError, match=refusal):
             admit(asked, facts=facts, save=save, skips=[key])
 
-    def test_a_link_only_round_is_saved_as_a_skip_and_places_nothing(self):
-        """The "Skip the rest" button sent an empty save for a link round (#1289, A2)."""
+    def test_a_link_only_list_is_saved_as_a_skip_and_places_nothing(self):
+        """The "Skip the rest" button sent an empty save for a link list (#1289, A2)."""
         asked = _asked_after([])
         (link,) = asked.links
         admitted = admit(asked, save=True, skips=[link.key])
@@ -732,9 +736,15 @@ class TestSkipForNow:
         job = waiting(store)
         body = client.get(f"/v1/jobs/{job}/questions", headers=auth()).json()
         key = body["early_questions"][0]["key"]
-        response = client.post(
+        unreported = client.post(
             f"/v1/jobs/{job}/answers",
             json={"save": True, "skip": [key], "revision": 0},
+            headers=auth(),
+        )
+        assert unreported.status_code == 400, "a skip is of a presented question"
+        response = client.post(
+            f"/v1/jobs/{job}/answers",
+            json={"save": True, "skip": [key], "presented": [key], "revision": 0},
             headers=auth(),
         )
         assert response.status_code == 200, response.text
@@ -744,8 +754,8 @@ class TestSkipForNow:
         assert asyncio.run(store.get(job)).skipped_early == [tuple(key)]
 
 
-class TestTheRoundRevision:
-    """A page left open on an earlier round saved over a later one (#1289)."""
+class TestTheRevision:
+    """A page left open on an earlier revision saved over a later one (#1289)."""
 
     def post(self, client, job, **body):
         return client.post(f"/v1/jobs/{job}/answers", json=body, headers=auth())
@@ -755,8 +765,12 @@ class TestTheRoundRevision:
         job = waiting(store)
         body = client.get(f"/v1/jobs/{job}/questions", headers=auth()).json()
         first, second = (q["key"] for q in body["early_questions"][:2])
-        landed = self.post(client, job, save=True, skip=[first], revision=0)
-        stale = self.post(client, job, save=True, skip=[second], revision=0)
+        landed = self.post(
+            client, job, save=True, skip=[first], presented=[first], revision=0
+        )
+        stale = self.post(
+            client, job, save=True, skip=[second], presented=[second], revision=0
+        )
         assert landed.status_code == 200, landed.text
         assert stale.status_code == 409
         after = client.get(f"/v1/jobs/{job}/questions", headers=auth()).json()
@@ -768,7 +782,7 @@ class TestTheRoundRevision:
         job = waiting(store)
         body = client.get(f"/v1/jobs/{job}/questions", headers=auth()).json()
         key = body["early_questions"][0]["key"]
-        self.post(client, job, save=True, skip=[key], revision=0)
+        self.post(client, job, save=True, skip=[key], presented=[key], revision=0)
         assert self.post(client, job, links=[], revision=0).status_code == 409
 
     def test_a_waiting_job_requires_a_revision(self):
@@ -951,8 +965,8 @@ class TestAFollowUpMustAddSomething:
 
 
 class TestSkippingAPartAnswer:
-    """A question answered in part could not be skipped, and came back first
-    in every round (#1289)."""
+    """A question answered in part could not be skipped, and stayed first in
+    the list (#1289)."""
 
     def capacity(self, asked):
         question = next((q for q in asked.early if q.key == CAPACITY), None)
@@ -1002,7 +1016,7 @@ class TestARefusalNamesItsFactByLabel:
         asked = _asked_after([])
         shown = asked.early[0].key
         unshown = CAPACITY[:4] + ("x", "")
-        with pytest.raises(ValueError, match="only a question this round") as excinfo:
+        with pytest.raises(ValueError, match="only a question the page") as excinfo:
             admit(asked, save=True, skips=[unshown])
         self.assert_readable(excinfo, fact_label(unshown, asked.model))
         with pytest.raises(ValueError, match="not both") as excinfo:
@@ -1141,92 +1155,82 @@ def test_answers_that_break_the_input_limits_are_refused_at_once(save):
     assert asyncio.run(store.get(waited)).answers.empty
 
 
-#: The selections the round test runs over every corpus model, and the answer
-#: given to a yes-or-no question. STRIDE asks none, so one answer covers it;
-#: ASVS level 1 puts no part in its parent's round, so levels 2 and 3 do.
-_ROUND_RUNS = {
-    "stride": ({"stride": {}}, "yes"),
-    **{
-        f"asvs-{level}-{choice}": ({"asvs": {"level": level}}, choice)
-        for level in (2, 3)
-        for choice in ("yes", "no")
-    },
-}
+LEVEL_2 = {"asvs": {"level": 2}}
 
 
-def _answer_as_a_person(question, choice):
-    """What a person answers on the page: every facet, or ``choice`` where it is
-    one of the question's choices, else the first choice, else a mechanism."""
-    if question.facets:
-        return FactAnswer(
-            key=question.key, facets={facet.id: "yes" for facet in question.facets}
+def _listed(answers=()):
+    return question_set(
+        valid_model(),
+        None,
+        LEVEL_2,
+        [],
+        waiting=True,
+        answered=AnswerSet(facts=tuple(answers)),
+        final=False,
+        shown=[],
+    )
+
+
+class TestTheListRanksByWhatAnAnswerSettles:
+    """Within a framework's turn, the question whose answer proves the most
+    other questions settled or unnecessary comes first (ADR 0078)."""
+
+    def test_a_question_that_settles_more_comes_first(self):
+        asked = _listed()
+        fresh = [q for q in asked.early if q.kind == "capability"]
+        potentials = [asked.effects[q.key].potential for q in fresh]
+        assert potentials == sorted(potentials, reverse=True)
+        assert potentials[0] > potentials[-1], "a control: the effects differ"
+
+    def test_the_row_publishes_each_answer_s_effect(self):
+        asked = _listed()
+        row = asked.to_json()["early_questions"][0]
+        assert row["kind"] == "capability" and row["reason"] is None
+        assert set(row["rank"]) == {"settles_at_most", "settles_at_least", "answers"}
+        assert set(row["rank"]["answers"]) == {"yes", "no"}
+
+    def test_a_no_removes_what_the_effect_said_it_settles(self):
+        """The parts an absent parent rules out are listed as unnecessary,
+        with the rule that removed them; a part that waits on the parent is
+        listed as blocked, with no rule of the page's own."""
+        asked = _listed()
+        parent = next(
+            q for q in asked.early if asked.effects[q.key].answers["no"].settles
         )
-    if question.choices:
-        value = choice if choice in question.choices else question.choices[0]
-        return FactAnswer(key=question.key, value=value)
-    return FactAnswer(key=question.key, value="none")
+        waiting = {q.key for q, reason in asked.blocked if q.parent == parent.key}
+        assert waiting, "a control: a part waits on the parent"
+        assert {reason for _, reason in asked.blocked} == {"parent-undecided"}
+        after = _listed([FactAnswer(key=parent.key, value="no")])
+        moot = {q.key: reason for q, reason in after.unnecessary}
+        assert len(moot) == asked.effects[parent.key].answers["no"].settles
+        assert all(moot[key] == "parent-absent" for key in waiting)
+        assert after.summary.unnecessary == len(moot)
 
-
-@pytest.mark.parametrize("run", sorted(_ROUND_RUNS))
-@pytest.mark.parametrize(
-    "case", sorted(path.name for path in Path("evals/corpus").iterdir())
-)
-def test_no_round_opens_with_more_questions_than_the_one_before(case, run):
-    """A round bounded by choices asked 4 questions, then 6, then 5: a facet
-    table cost a choice per facet (2026-10-01). And at ASVS level 2 a part
-    hidden until its parent's "yes" took a place, so round 1 opened with 8
-    questions and round 2 with 10. Nothing a question depends on requires
-    either, so the questions a round opens with, of each kind, never grow."""
-    from analysis_service.system_model import SystemModel
-
-    path = Path("evals/corpus") / case / "model.json"
-    model = SystemModel.model_validate_json(path.read_text())
-    selection, choice = _ROUND_RUNS[run]
-    answered: list[FactAnswer] = []
-    opened: dict[bool, list[int]] = {True: [], False: []}
-    for _ in range(40):
-        asked = question_set(
-            model,
-            None,
-            selection,
-            [],
-            waiting=True,
-            answered=AnswerSet(facts=tuple(answered)),
-            final=False,
-            shown=[],
+    def test_a_yes_lists_the_parts_the_effect_said_it_unlocks(self):
+        """The list can grow, and the effect said by how much."""
+        asked = _listed()
+        parent = next(
+            q for q in asked.early if asked.effects[q.key].answers["yes"].unlocks
         )
-        if not asked.early:
-            break
-        keys = {q.key for q in asked.early}
-        # A question that decides a framework's precondition is asked outside
-        # the limits (ADR 0067), so a round that holds one counts no kind.
-        gated = any(q.gates for q in asked.early)
-        for capability, counts in opened.items():
-            if gated:
-                break
-            counts.append(
-                sum(
-                    1
-                    for q in asked.early
-                    if (q.kind == "capability") == capability and q.parent not in keys
-                )
-            )
-        given: dict = {}
-        for q in asked.early:
-            # The page shows a part only once its parent in the round is "yes".
-            if q.parent in keys and given.get(q.parent, None) is None:
-                continue
-            if q.parent in keys and given[q.parent].value != "yes":
-                continue
-            given[q.key] = _answer_as_a_person(q, choice)
-        answered = merged_facts(answered, list(given.values()))
-    if asked.gates and set(asked.gates.values()) == {"refuted"}:
-        # A selection whose one framework will not run asks nothing.
-        assert not any(opened[True]) and not any(opened[False])
-        return
-    assert any(opened[True]) or any(opened[False]), "a control: it asks something"
-    for counts in opened.values():
-        assert counts == sorted(counts, reverse=True), counts
+        after = _listed([FactAnswer(key=parent.key, value="yes")])
+        listed = (*after.early, *after.held_back, *after.below_floor)
+        parts = [q for q in listed if q.parent == parent.key]
+        assert len(parts) == asked.effects[parent.key].answers["yes"].unlocks
+        assert after.summary.recommended_choices > 0
+
+    def test_a_field_question_keeps_the_prior_s_order(self):
+        """No rule proves that a field answer removes another question, so a
+        field question has no effect and keeps its place."""
+        asked = _asked_after([])
+        assert asked.early and all(q.kind != "capability" for q in asked.early)
+        assert asked.effects == {}
+        listed = early_questions(asked.model, {"stride": {}}, held().assertions.catalog)
+        order = [q.key for q in listed if q.key in {e.key for e in asked.early}]
+        assert [q.key for q in asked.early] == order
+
+    def test_the_same_inputs_give_the_same_list(self):
+        assert _listed().early == _listed().early
+        assert _listed().to_json() == _listed().to_json()
 
 
 class TestAJobItsAnswersResumed:
@@ -1270,7 +1274,7 @@ BOTH = {"stride": {}, "asvs": {"level": 2}}
 
 
 class TestTheFrameworksTakeTurns:
-    """With ASVS and STRIDE selected, the frameworks take turns in a round. So
+    """With ASVS and STRIDE selected, the frameworks take turns in the list. So
     an owner who stops after ten choices still completes a STRIDE finding
     (#1289, QA-2026-09-26-03-E29)."""
 
@@ -1306,60 +1310,33 @@ class TestTheFrameworksTakeTurns:
         backward = dict(reversed(BOTH.items()))
         assert self.round_of(BOTH) == self.round_of(backward)
 
-    def test_one_framework_shows_the_list_s_order_in_boxes(self):
-        from analysis_service.answer_round import in_boxes
-
+    def test_one_framework_shows_the_list_s_order(self):
         shown = self.round_of({"stride": {}})
         listed = [
             q
             for q in early_questions(valid_model(), {"stride": {}}, None)
             if q.key in {s.key for s in shown}
         ]
-        assert [q.key for q in shown] == [q.key for q in in_boxes(listed)]
+        assert [q.key for q in shown] == [q.key for q in listed]
 
-    def test_each_group_shows_once_in_a_round(self):
-        """A page shows a group under one heading, so a round never comes
-        back to a group it has left (QA-2026-10-09-02)."""
-        groups = [q.group for q in self.round_of(BOTH)]
-        runs = [group for at, group in enumerate(groups) if group not in groups[:at]]
-        assert groups == sorted(groups, key=runs.index)
+    def test_a_gate_question_comes_first(self):
+        from analysis_service.answer_round import recommended
 
-    def test_a_tie_goes_to_the_framework_with_the_smaller_next_box(self):
-        """A large box waits for its framework's turn, so it does not push out
-        another framework's small boxes (QA-2026-10-09-02-E2)."""
-        from analysis_service.answer_round import in_boxes
-
-        def question(key, group, *frameworks, gates=()):
+        def question(key, gates=()):
             return SimpleNamespace(
-                key=(key,), group=group, frameworks=frameworks, decisions=1, gates=gates
+                key=(key,),
+                kind="attribute",
+                score=5.0,
+                decisions=1,
+                parent=None,
+                frameworks=("asvs",),
+                gates=gates,
             )
 
-        capabilities = [question(f"c{n}", "capabilities", "asvs") for n in range(5)]
-        field = question("f", "encryption", "stride")
-        later = question("g", "authentication", "stride")
-        order = in_boxes([*capabilities, field, later])
-        assert [q.key for q in order] == [
-            ("f",),
-            *[q.key for q in capabilities],
-            ("g",),
-        ]
-
-    def test_a_box_that_holds_a_gate_comes_first(self):
-        from analysis_service.answer_round import in_boxes
-
-        def question(key, group, gates=()):
-            return SimpleNamespace(
-                key=(key,), group=group, frameworks=("asvs",), decisions=1, gates=gates
-            )
-
-        field = question("f", "encryption")
-        gate = question("g", "capabilities", gates=("asvs",))
-        part = question("p", "capabilities")
-        assert [q.key for q in in_boxes([field, gate, part])] == [
-            ("g",),
-            ("p",),
-            ("f",),
-        ]
+        field = question("f")
+        gate = question("g", gates=("asvs",))
+        shown, _, _ = recommended([field, gate], frozenset(), {}, {})
+        assert [q.key for q in shown] == [("g",), ("f",)]
 
     def test_a_shared_question_is_charged_to_each_framework_it_serves(self):
         from analysis_service.answer_round import by_turn
@@ -1381,34 +1358,6 @@ class TestTheFrameworksTakeTurns:
             ("s",),
             ("shared",),
         ]
-
-    def test_the_question_order_and_the_box_order_read_one_turn_rule(self):
-        """`by_turn` and `in_boxes` take the frameworks in turn through one
-        reader, so with one question in each box, and every box asking the
-        same number of choices, the two orders agree on every input."""
-        from itertools import permutations
-
-        from analysis_service.answer_round import by_turn, in_boxes
-
-        def question(key, *frameworks):
-            return SimpleNamespace(
-                key=(key,),
-                group=key,
-                frameworks=frameworks,
-                decisions=1,
-                gates=(),
-                parent=None,
-            )
-
-        questions = [
-            question("shared", "asvs", "stride"),
-            question("a1", "asvs"),
-            question("a2", "asvs"),
-            question("s1", "stride"),
-            question("none"),
-        ]
-        for listed in permutations(questions):
-            assert [q.key for q in in_boxes(listed)] == [q.key for q in by_turn(listed)]
 
 
 AUDIT = (valid_model().data_stores[0].id, "", "", "", "audit-evidence", "")

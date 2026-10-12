@@ -149,6 +149,7 @@ from analysis_service.deployment import Deployment
 from analysis_service.engine import DEFAULT_CALLER
 from analysis_service.fact_answers import (
     MAX_FACT_ANSWERS,
+    MAX_HELD_FACTS,
     FactAnswer,
     SkipKey,
     answer_facets,
@@ -1014,6 +1015,7 @@ def create_app(
             if not isinstance(save, bool):
                 raise TypeError
             skips = _skips(body.get("skip", []))
+            presented = _presented(body.get("presented", []))
             revision = body.get("revision")
             if revision is not None and (
                 not isinstance(revision, int) or isinstance(revision, bool)
@@ -1037,6 +1039,7 @@ def create_app(
                     given=AnswerSet(links=tuple(links), facts=tuple(facts)),
                     save=save,
                     skips=skips,
+                    presented=presented,
                     revision=revision,
                 ),
                 start=workspace.start,
@@ -1046,8 +1049,8 @@ def create_app(
         if isinstance(outcome, DraftSaved):
             # A draft runs nothing and spends no follow-up (ADR 0070).
             return JSONResponse({"saved": True, "revision": outcome.revision})
-        # A saved round runs no model: the answers go onto the paused run, and
-        # the next round is read off the model with them in.
+        # A save runs no model: the answers go onto the paused run, and the
+        # list is read again off the model with them in.
         return JSONResponse(
             {"run": run_id} | await workspace.answers.questions(run_id, OWNER)
         )
@@ -1235,6 +1238,17 @@ def _option_control(name: FrameworkName, field: str, annotation: object) -> str:
 _SKIPS: TypeAdapter[list[SkipKey]] = TypeAdapter(
     Annotated[list[SkipKey], Field(max_length=MAX_SKIPS)]
 )
+_PRESENTED: TypeAdapter[list[UnknownKey]] = TypeAdapter(
+    Annotated[list[UnknownKey], Field(max_length=MAX_HELD_FACTS)]
+)
+
+
+def _presented(raw: object) -> list[UnknownKey]:
+    """The early questions the page says it showed, or a ``TypeError``."""
+    try:
+        return _PRESENTED.validate_python(raw)
+    except ValidationError as exc:
+        raise TypeError from exc
 
 
 def _skips(raw: object) -> list[SkipKey]:

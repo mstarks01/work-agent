@@ -1,10 +1,10 @@
 """Compare orders of early questions when a job selects more than one framework.
 
-The pause asks early questions before any finding exists (ADR 0053). Where a
-job selects two frameworks, the shipped rounds ask a fixed number of
-capability and field questions a round, with the frameworks taking turns. The
-#1289 review of 2026-10-01 asked which order serves each selected framework
-best at the same owner effort. This command answers that offline,
+The pause asks early questions before any finding exists (ADR 0078). Where a
+job selects two frameworks, the shipped list takes the frameworks in turn, and
+within a turn the question whose answer settles the most other questions
+first. The #1289 review of 2026-10-01 asked which order serves each selected
+framework best at the same owner effort. This command answers that offline,
 for an owner who answers from the top and stops after a number of choices.
 
 **What an order is worth is read off archived reports.** No archived report
@@ -22,7 +22,7 @@ for every other question (:attr:`~analysis_service.early_questions.EarlyQuestion
 The owner answers every question shown, the parts of a capability included.
 
 **Each order is a policy in** :data:`POLICIES`, built from the production
-readers: the early list, the floor and the round.
+readers: the early list, the floor and the list's selection.
 """
 
 from __future__ import annotations
@@ -45,7 +45,7 @@ from analysis_service.frameworks import PACKAGES
 from analysis_service.questions import fact_questions
 from analysis_service.report import Report
 from analysis_service.system_model import SystemModel
-from evals.harness.early_rounds import MAX_ROUNDS, dont_know
+from evals.harness.early_rounds import MAX_SAVES, dont_know
 
 #: The frameworks a job selects, each with its options.
 Selection = Mapping[FrameworkName, Mapping[str, Any]]
@@ -54,16 +54,16 @@ Selection = Mapping[FrameworkName, Mapping[str, Any]]
 BUDGETS = (5, 10, 15, 20, 30, 45, 60)
 
 
-def _rounds(model: SystemModel, frameworks: Selection) -> list[list[EarlyQuestion]]:
-    """Each round as the pause builds it, in turn.
+def _lists(model: SystemModel, frameworks: Selection) -> list[list[EarlyQuestion]]:
+    """The list after each save, in turn.
 
-    The owner answers "I don't know" to every question, which writes nothing,
-    so the model and the ranking stay as they started and only the round
-    moves on.
+    The owner answers "I don't know" to every listed question, which writes
+    nothing, so the model and the ranking stay as they started and only the
+    saved answers move the list on.
     """
     shown: list[list[EarlyQuestion]] = []
     answered: list[FactAnswer] = []
-    for _ in range(MAX_ROUNDS):
+    for _ in range(MAX_SAVES):
         asked = question_set(
             model,
             None,
@@ -81,10 +81,10 @@ def _rounds(model: SystemModel, frameworks: Selection) -> list[list[EarlyQuestio
     return shown
 
 
-def _shipped_rounds(model: SystemModel, frameworks: Selection) -> list[EarlyQuestion]:
-    """The shipped order: the rounds in turn, each in the order the page shows,
-    which takes the frameworks in turn (:func:`~analysis_service.answer_round.by_turn`)."""
-    return [question for shown in _rounds(model, frameworks) for question in shown]
+def _shipped_list(model: SystemModel, frameworks: Selection) -> list[EarlyQuestion]:
+    """The shipped order: the list after each save, in the order the page
+    shows it (:func:`~analysis_service.answer_round.recommended`)."""
+    return [question for shown in _lists(model, frameworks) for question in shown]
 
 
 def _own_lists(
@@ -140,7 +140,7 @@ def _merge(
 
 #: Every order compared, by name.
 POLICIES: Mapping[str, Callable[[SystemModel, Selection], list[EarlyQuestion]]] = {
-    "shipped-rounds": _shipped_rounds,
+    "shipped-list": _shipped_list,
     "framework-merge": lambda model, chosen: _merge(model, chosen, grouped=False),
     "grouped-merge": lambda model, chosen: _merge(model, chosen, grouped=True),
 }

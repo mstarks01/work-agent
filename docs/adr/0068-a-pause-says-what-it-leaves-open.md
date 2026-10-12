@@ -6,6 +6,9 @@
 - **Relates to**: [ADR 0053](0053-a-paused-job-asks-in-bounded-rounds.md),
   whose floors and limits this keeps and whose `nothing-left` stop it
   narrows, and [ADR 0067](0067-a-paused-job-asks-what-decides-a-framework-first.md)
+- **Amended by**: [ADR 0078](0078-a-paused-job-asks-one-adaptive-list.md),
+  which adds the list's own counts and words each stop for a list, not a
+  round
 
 ## Context
 

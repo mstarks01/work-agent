@@ -1,13 +1,14 @@
-"""Replay rounds of early questions on archived models, and count how the list moves.
+"""Replay the early questions on archived models, and count how the list moves.
 
-The bounded plan before the analysis asks a paused job's early questions in
-rounds (#1289). This command answers them offline, round after round, and
-records how many questions reach the floor at the start, how many a
-submitter answers in all, and how many the answers add or remove. No model
-runs: each round is built by
+A paused job asks its early questions in one adaptive list (ADR 0078). This
+command answers the list offline, save after save, and records how many
+questions reach the floor at the start, how many a submitter answers in all,
+and how many the answers add or remove. No model runs: each list is built by
 :func:`~analysis_service.answer_round.question_set`, admitted by
 :meth:`~analysis_service.answer_round.QuestionSet.admit` and written by
 :func:`~analysis_service.fact_writes.answered_model`, as the service does.
+A save is one request; the interactions a person makes are the ``asked``
+questions and their ``decisions``, counted apart from the saves.
 
 **The checkpoint is an archived report's extracted model**, with no catalog,
 because no archived run pairs an extracted model with its catalog.
@@ -15,10 +16,10 @@ because no archived run pairs an extracted model with its catalog.
 **The answerer reads the case's blessed model.** An attribute takes the blessed
 value where the blessed model holds the element and states the attribute, and
 "I don't know" otherwise. A question kind takes "I don't know": its answer
-writes nothing onto the model, so its content cannot move a later round. No
+writes nothing onto the model, so its content cannot move a later list. No
 blessed model states a capability, so the two answerers bound it: one answers
-every capability "yes", which shows every child, and one answers "no", which
-hides them.
+every capability "yes", which lists every part, and one answers "no", which
+removes them.
 
 **Two more answerers bound the attributes.** Few extracted elements carry the
 blessed model's IDs, so the blessed answerer leaves most attributes open. One
@@ -60,8 +61,8 @@ from analysis_service.jobs import Checkpoint
 from analysis_service.report import Report
 from analysis_service.system_model import SystemModel
 
-#: A replay that has not ended by this round is reported as not ending.
-MAX_ROUNDS = 50
+#: A replay that has not ended by this save is reported as not ending.
+MAX_SAVES = 50
 
 #: An answerer's answer to one question, or ``None`` to skip it for now.
 Answerer = Callable[[EarlyQuestion, SystemModel], FactAnswer | None]
@@ -151,7 +152,7 @@ ANSWERERS: Mapping[str, Answerer] = {
 
 @dataclass(frozen=True)
 class Replay:
-    """One archived model answered by one answerer, round after round."""
+    """One archived model answered by one answerer, save after save."""
 
     case: str
     framework: str
@@ -159,11 +160,12 @@ class Replay:
     #: Every early question at the start, and those at or above the floor.
     listed: int
     above_floor: int
-    #: How many questions the rounds showed and the submitter answered.
+    #: How many questions the list showed and the submitter answered, and how
+    #: many saves it took: an interaction is a question, a request is a save.
     asked: int
-    rounds: int
-    #: The choices the rounds asked of a person in all, and the most in one
-    #: round: a facet is one choice, and any other question one.
+    saves: int
+    #: The choices the list asked of a person in all, and the most in one
+    #: save: a facet is one choice, and any other question one.
     decisions: int
     widest: int
     #: Questions that reached the floor only after an answer, and questions at
@@ -173,7 +175,7 @@ class Replay:
     removed: int
     ended: bool
     #: Questions skipped for now, how many times a question already shown was
-    #: shown again, and why the rounds stopped (``QuestionSet.stop``).
+    #: shown again, and why the list stopped (``QuestionSet.stop``).
     skipped: int
     repeats: int
     stop: str
@@ -184,7 +186,7 @@ class Replay:
     held_back: int = 0
     units: Mapping[str, Mapping[str, Mapping[str, int]]] = field(default_factory=dict)
     #: For each selected framework, the questions that serve it: asked by the
-    #: rounds, and held back or under a floor at the stop. A question that
+    #: list, and held back or under a floor at the stop. A question that
     #: serves two frameworks counts once for each (#1562).
     packages: Mapping[str, Mapping[str, int]] = field(default_factory=dict)
 
@@ -200,7 +202,7 @@ def _state(
     answered: Sequence[FactAnswer],
     skipped: Sequence[SkipKey],
 ) -> AnswerState:
-    """A paused job with no sources and no catalog, after the rounds so far."""
+    """A paused job with no sources and no catalog, after the saves so far."""
     return AnswerState(
         checkpoint=Checkpoint(system_model=model, assertions=None),
         frameworks=frameworks,
@@ -220,18 +222,20 @@ def _state(
 def _saved(
     state: AnswerState, facts: list[FactAnswer], skips: Sequence[SkipKey] = ()
 ) -> SavedRound:
-    """One saved round. The replay holds no sources, so no source limit applies."""
+    """One save, which presents every listed question. The replay holds no
+    sources, so no source limit applies."""
     saved = state.answer(
         Answers(
             given=AnswerSet(facts=tuple(facts)),
             save=True,
             skips=skips,
+            presented=[question.key for question in state.questions.early],
             revision=state.revision,
         ),
         limits=None,
     )
     if not isinstance(saved, SavedRound):
-        raise TypeError("a saved round starts no job")
+        raise TypeError("a save starts no job")
     return saved
 
 
@@ -272,25 +276,25 @@ def replay(
     frameworks: Mapping[FrameworkName, Mapping[str, Any]],
     name: str,
 ) -> Replay:
-    """Answer ``extracted``'s early rounds, as the service shows them, with one answerer."""
+    """Answer ``extracted``'s early list, as the service shows it, with one answerer."""
     answerer = ANSWERERS[name]
     answered: list[FactAnswer] = []
     listed = early_questions(extracted, frameworks, None)
     first = _eligible(listed)
     seen: set[UnknownKey] = set()
     asked_keys: dict[UnknownKey, tuple[FrameworkName, ...]] = {}
-    per_round: list[int] = []
+    per_save: list[int] = []
     showings: Counter[UnknownKey] = Counter()
     skipped: tuple[SkipKey, ...] = ()
-    rounds = 0
-    for rounds in range(MAX_ROUNDS):
+    saves = 0
+    for saves in range(MAX_SAVES):
         state = _state(extracted, frameworks, answered, skipped)
         asked = state.questions
         if asked.done:
             break
         seen |= {question.key for question in asked.early}
         showings.update(question.key for question in asked.early)
-        per_round.append(sum(question.decisions for question in asked.early))
+        per_save.append(sum(question.decisions for question in asked.early))
         replies = {
             question.key: answerer(question, blessed) for question in asked.early
         }
@@ -311,7 +315,7 @@ def replay(
         answered = merged_facts(answered, kept)
         asked_keys |= {question.key: question.frameworks for question in asked.early}
     else:
-        rounds = MAX_ROUNDS
+        saves = MAX_SAVES
     return Replay(
         case=case,
         framework=",".join(frameworks),
@@ -319,17 +323,17 @@ def replay(
         listed=len(listed),
         above_floor=len(first),
         asked=len(asked_keys),
-        rounds=rounds,
-        decisions=sum(per_round),
-        widest=max(per_round, default=0),
+        saves=saves,
+        decisions=sum(per_save),
+        widest=max(per_save, default=0),
         added=len(seen - first),
         removed=len(first - asked_keys.keys()),
-        ended=rounds < MAX_ROUNDS,
+        ended=saves < MAX_SAVES,
         skipped=len(skipped),
         repeats=sum(count - 1 for count in showings.values()),
         stop=str(asked.stop),
         below_floor=len(asked.below_floor),
-        held_back=asked.withheld,
+        held_back=len(asked.held_back),
         units={}
         if asked.summary is None
         else {
@@ -352,7 +356,7 @@ def replays(root: Path, corpus: Path) -> list[Replay]:
     """Every archived report under ``root`` whose case has a blessed model.
 
     Each model is also replayed once with every framework the archive holds,
-    so a job whose frameworks share the rounds is measured too. A framework
+    so a job whose frameworks share the list is measured too. A framework
     the report selected keeps the report's options, and any other framework
     takes the options of an archived job that chose it.
     """
@@ -397,7 +401,7 @@ FIGURES: Mapping[str, Callable[[Replay], int]] = {
     "listed": lambda row: row.listed,
     "above_floor": lambda row: row.above_floor,
     "asked": lambda row: row.asked,
-    "rounds": lambda row: row.rounds,
+    "saves": lambda row: row.saves,
     "decisions": lambda row: row.decisions,
     "widest": lambda row: row.widest,
     "skipped": lambda row: row.skipped,
@@ -491,7 +495,7 @@ def arguments(parser: argparse.ArgumentParser) -> None:
 
 
 def command_early_rounds(args: argparse.Namespace) -> int:
-    """Replay the rounds on every archived model, and print the summary."""
+    """Replay the list on every archived model, and print the summary."""
     found = replays(args.root, args.corpus)
     if not found:
         print("no archived report has a case with a blessed model", file=sys.stderr)

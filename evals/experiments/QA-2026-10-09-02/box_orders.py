@@ -16,7 +16,7 @@ keep = [
     "capability-boxes",
 ]
 ep.POLICIES = {name: ep.POLICIES[name] for name in keep}
-built = ep._rounds
+built = ep._lists
 cache: dict[tuple, tuple] = {}
 
 
@@ -27,7 +27,7 @@ def rounds(model, frameworks):
     return cache[key][1]
 
 
-ep._rounds = rounds
+ep._lists = rounds
 inner = ep.readings
 
 

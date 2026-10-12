@@ -20,7 +20,7 @@ BASELINE = next(
 )
 
 
-def test_the_shipped_order_starts_with_the_pause_s_first_round():
+def test_the_shipped_order_starts_with_the_pause_s_first_list():
     first = question_set(
         valid_model(),
         None,
@@ -31,7 +31,7 @@ def test_the_shipped_order_starts_with_the_pause_s_first_round():
         final=False,
         shown=[],
     ).early
-    order = POLICIES["shipped-rounds"](valid_model(), BOTH)
+    order = POLICIES["shipped-list"](valid_model(), BOTH)
     assert order[: len(first)] == list(first)
 
 
@@ -83,5 +83,5 @@ def test_a_finding_completes_only_when_every_fact_it_waits_on_is_answered():
         asked = {q.key for q in build(report.system_model, {"stride": {}})}
         expected = sum(1 for _, keys in needs.findings.values() if keys <= asked)
         assert whole[policy].completed == expected
-    by_budget = [one.completed for one in found if one.policy == "shipped-rounds"]
+    by_budget = [one.completed for one in found if one.policy == "shipped-list"]
     assert by_budget == sorted(by_budget)

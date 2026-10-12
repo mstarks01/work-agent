@@ -349,18 +349,19 @@ The app can ask you questions before the analysis, and after the report.
   accounts", so that facts about the group reach the model. Rows you leave
   blank stay open.
 
-  The questions come in rounds of up to ten questions about the application
-  and five about parts of your system, the most useful first. No round asks
-  more questions than the one before it. Where one question asks about several
+  The page lists the recommended questions at once, the most useful first:
+  a question whose answer settles the most other questions comes before the
+  details. Where one question asks about several
   parts of your system, a **Same for all** row takes one answer, and **Apply
   to the ticked rows** copies it into each row still ticked. Untick a row the
   answer does not fit. Under each question, a line says why it is
   asked and quotes the words of your description that the part was read
   from. A line at the top says
-  about how many are left; your answers can change that number. Click **Save
-  and show more** for the next round. The app keeps your answers and runs no
-  model. A question you leave blank comes back in the next round. **Skip the
-  rest and show more** sets the blank questions aside instead. It also sets
+  what the list holds; your answers can add questions as well as remove
+  them, and the page says when they do. Click **Save answers** to keep your
+  answers. The app runs no model, and shows the list again with your answers
+  in. A question you leave blank stays in the list. **Skip the
+  rest** sets the blank questions aside instead. It also sets
   aside a question with parts that you answered only in part, and keeps the
   parts you gave. The questions set aside move to **Skipped for now**, where
   **Answer it** opens one again. A skipped question
@@ -411,7 +412,7 @@ The app can ask you questions before the analysis, and after the report.
   such as how often a key is rotated. The resumed run decides whether each answer
   settles its finding. Answer as far as you like, by choosing a value or typing
   one line, and run the follow-up. This works on every install, with or
-  without an assertion catalog. A later round does not ask a fact you
+  without an assertion catalog. The list does not ask a fact you
   already answered, "I don't know" included.
 
 An answer settles its fact, even where your description said otherwise. A run
