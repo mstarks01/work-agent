@@ -37,6 +37,14 @@ wrote, and `evals/harness/archive.py` names the spelling each kind carries.
 | `20260917T-arms-luna-pro` | heads | the head over 13 cases, one repeat, on luna-pro |
 | `20260918T-placement-rule` | extraction | the placement rule of #1068, five runs each side |
 | `20260919T-naming-rule` | extraction | the `extract.md` edits of #1076 and #1078, three runs |
+| `20261005T-revert` | extraction | `extract.md` and the extraction schema head as they stand since #1474, all 15 cases, five runs (QA-2026-10-05-01-E1) |
+
+The `20261005T-revert` sweeps are the arm to price an `extract.md` change
+against: the prompt they ran is the one in the tree. Replay them on their own:
+
+```sh
+python -m evals.harness.run replay evals/emissions/20261005T-revert/main-r*.json
+```
 
 The heads sweep reads through `extract` and `assert` and keeps the catalog its
 own run gated, so `replay` grades it against the signed reference without
