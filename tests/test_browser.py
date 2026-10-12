@@ -147,13 +147,10 @@ def test_an_owner_who_skips_every_question_reaches_a_report_that_says_what_is_op
     for _ in range(20):
         if page.is_disabled("#skip"):
             break
-        before = page.inner_text("#questions")
         page.click("#skip")
-        # The response lands before the page draws the list again from it.
-        page.wait_for_function(
-            "before => document.querySelector('#questions').innerText !== before",
-            arg=before,
-        )
+        # The skip hides its rows at once, before its save answers. The
+        # start button stays disabled until the whole skip has ended.
+        page.wait_for_function("() => !document.querySelector('#continue').disabled")
     else:
         pytest.fail("the list never ended")
     assert "Nothing runs until you choose Start the analysis" in page.inner_text(
@@ -525,3 +522,26 @@ def test_reopening_a_completed_analysis_displays_its_report(page):
     page.wait_for_selector("#report-list a")
     assert page.locator("#report-list a").inner_text().startswith("Your system")
     assert "Generated " in page.locator("#report-list a").inner_text()
+
+
+def test_a_320px_owner_answers_and_skips_without_sideways_scroll(browser, served):
+    """The narrowest layout the issue names: every control reachable, no
+    horizontal scroll, an answer saved and a question skipped (#1632)."""
+    context = browser.new_context(
+        base_url=served, viewport={"width": 320, "height": 568}
+    )
+    page = context.new_page()
+    errors: list[str] = []
+    page.on("pageerror", lambda error: errors.append(str(error)))
+    page.goto("/")
+    pause(page)
+    wide = page.evaluate(
+        "document.documentElement.scrollWidth - document.documentElement.clientWidth"
+    )
+    choose(page, page.locator('#list p select:has(option[value="yes"])').first, "yes")
+    with page.expect_response(_post_to_answer):
+        page.locator("#list button", has_text="Skip for now").first.click()
+    saved(page)
+    context.close()
+    assert errors == [], f"the page raised: {errors}"
+    assert wide <= 0, f"the page scrolls sideways by {wide}px at 320px"

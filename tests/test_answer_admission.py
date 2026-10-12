@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import asyncio
 from dataclasses import replace
+from itertools import pairwise
 from types import SimpleNamespace
 
 import pytest
@@ -442,6 +443,7 @@ class TestTheAdaptiveList:
             parent=None,
             frameworks=("stride",),
             gates=(),
+            framework_bands=(),
             group="capacity-limits",
         )
         shown, blocked, held_back = recommended([wide], frozenset(), {}, {})
@@ -482,6 +484,7 @@ class TestTheAdaptiveList:
                 parent=None,
                 frameworks=(framework,),
                 gates=(),
+                framework_bands=(),
                 group="authentication",
             )
 
@@ -518,6 +521,7 @@ class TestTheAdaptiveList:
                 parent=None,
                 frameworks=("stride",),
                 gates=(),
+                framework_bands=(),
                 group="capacity-limits",
             )
 
@@ -1175,12 +1179,25 @@ class TestTheListRanksByWhatAnAnswerSettles:
     """Within a framework's turn, the question whose answer proves the most
     other questions settled or unnecessary comes first (ADR 0078)."""
 
-    def test_a_question_that_settles_more_comes_first(self):
+    def test_the_list_s_order_holds_and_the_effects_break_a_tie(self):
+        """Band and units first (ADR 0055); where two capabilities tie on
+        both, the one whose answer settles more comes first (ADR 0078)."""
         asked = _listed()
         fresh = [q for q in asked.early if q.kind == "capability"]
-        potentials = [asked.effects[q.key].potential for q in fresh]
-        assert potentials == sorted(potentials, reverse=True)
-        assert potentials[0] > potentials[-1], "a control: the effects differ"
+        keys = [(-max(b for _, b in q.framework_bands), -q.score) for q in fresh]
+        assert keys == sorted(keys)
+        ties = 0
+        for before, after in pairwise(fresh):
+            if (
+                before.score == after.score
+                and before.framework_bands == after.framework_bands
+            ):
+                ties += 1
+                assert (
+                    asked.effects[before.key].potential
+                    >= asked.effects[after.key].potential
+                )
+        assert ties, "a control: the model has capabilities that tie"
 
     def test_the_row_publishes_each_answer_s_effect(self):
         asked = _listed()
@@ -1309,6 +1326,30 @@ class TestTheFrameworksTakeTurns:
     def test_the_selection_order_changes_nothing(self):
         backward = dict(reversed(BOTH.items()))
         assert self.round_of(BOTH) == self.round_of(backward)
+
+    def test_the_turns_carry_over_the_saved_answers(self):
+        """An owner who answers the first question and saves meets the other
+        framework's question next: the list's turns start from what the saved
+        answers charged, not from zero (QA-2026-10-12-02-E1)."""
+        first = self.round_of(BOTH)[0]
+        assert first.frameworks == ("asvs",), "a control: asvs wins the first tie"
+        after = question_set(
+            valid_model(),
+            None,
+            BOTH,
+            [],
+            waiting=True,
+            answered=AnswerSet(facts=(FactAnswer(key=first.key, value="yes"),)),
+            final=False,
+            shown=[],
+        ).early
+        assert "stride" in after[0].frameworks
+        served = []
+        for question in after[:6]:
+            served.append(set(question.frameworks))
+        assert any("asvs" in names for names in served) and any(
+            "stride" in names for names in served
+        )
 
     def test_one_framework_shows_the_list_s_order(self):
         shown = self.round_of({"stride": {}})

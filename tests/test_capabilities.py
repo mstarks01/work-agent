@@ -129,14 +129,30 @@ def test_resolve_answers_for_every_capability():
 
 
 def test_every_parent_is_a_capability_and_no_lineage_loops():
-    for key, capability in CAPABILITIES.items():
-        seen = {key}
-        parent = capability.parent
-        while parent:
-            assert parent in CAPABILITIES, (key, parent)
-            assert parent not in seen, f"{key} loops through {parent}"
-            seen.add(parent)
-            parent = CAPABILITIES[parent].parent
+    from analysis_service.capabilities import lineage_issues
+
+    assert lineage_issues(CAPABILITIES) == []
+
+
+def test_a_table_with_a_loop_or_a_stray_parent_fails_validation():
+    """A loop would make ``lineage`` walk for ever; the check names it and
+    the module refuses to load such a table (#1632)."""
+    from analysis_service.capabilities import Capability, lineage_issues
+
+    def row(parent):
+        return Capability(
+            meaning="m", question="Is it?", parent=parent, reviewed_by=None
+        )
+
+    looped = {"a": row("b"), "b": row("c"), "c": row("a"), "d": row("")}
+    assert lineage_issues(looped) == [
+        "'a' is its own ancestor through 'a'",
+        "'b' is its own ancestor through 'b'",
+        "'c' is its own ancestor through 'c'",
+    ]
+    assert lineage_issues({"a": row("missing")}) == [
+        "'a' names a parent 'missing' that is not a capability"
+    ]
 
 
 def test_every_question_is_a_yes_or_no_question():

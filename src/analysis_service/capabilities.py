@@ -1266,8 +1266,39 @@ class Decision:
     missing: tuple[str, ...] = ()
 
 
+def lineage_issues(table: Mapping[str, Capability]) -> list[str]:
+    """Everything that makes the parent links of ``table`` illegal, as messages.
+
+    A parent must be a capability of the table, and no key may be its own
+    ancestor: :func:`lineage` walks the links, and a loop would walk for
+    ever. The table is checked once, as the module loads, so a loop fails
+    the import and never a request.
+    """
+    issues = []
+    for key, capability in table.items():
+        seen = {key}
+        parent = capability.parent
+        while parent:
+            if parent not in table:
+                issues.append(
+                    f"{key!r} names a parent {parent!r} that is not a capability"
+                )
+                break
+            if parent in seen:
+                issues.append(f"{key!r} is its own ancestor through {parent!r}")
+                break
+            seen.add(parent)
+            parent = table[parent].parent
+    return issues
+
+
+if _lineage_issues := lineage_issues(CAPABILITIES):
+    raise ValueError("the capability table is illegal: " + "; ".join(_lineage_issues))
+
+
 def lineage(key: str) -> Iterator[str]:
-    """The key's ancestors, nearest first."""
+    """The key's ancestors, nearest first. The links are checked at import
+    (:func:`lineage_issues`), so the walk ends."""
     parent = CAPABILITIES[key].parent
     while parent:
         yield parent
@@ -1335,12 +1366,16 @@ def open_capability_needs(
     units: dict[str, int] = {}
     bands: dict[str, int] = {}
     for unit, decision in decisions.items():
+        if not decision.missing:
+            continue
         credited = {
             key for missing in decision.missing for key in (missing, *lineage(missing))
         }
+        # One read of the unit's band, however many keys it credits.
+        order = band(unit)
         for key in credited:
             units[key] = units.get(key, 0) + 1
-            bands[key] = max(bands.get(key, band(unit)), band(unit))
+            bands[key] = max(bands.get(key, order), order)
     return {key: CapabilityNeed(units=units[key], band=bands[key]) for key in units}
 
 
