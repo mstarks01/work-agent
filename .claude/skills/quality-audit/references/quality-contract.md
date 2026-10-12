@@ -23,9 +23,10 @@ precision, and the negative control below is what catches it.
 **Reads it:** the rejected rate and the writing objections, both from the vote
 ledger. `review --voter <login>` says what is waiting.
 
-**Does not say:** anything at all where nobody has voted. Most Baselines read
-`no votes yet`. Report the denominator every time, and never quote a precision
-figure without it.
+**Does not say:** anything at all where nobody has voted. The Baselines page
+reads the votes recorded when each Baseline was sealed, and most read
+`no votes when sealed`. `run.py score <artifact>` reads today's ledger. Report
+the denominator every time, and never quote a precision figure without it.
 
 **Unlisted is not wrong.** The reference sets are incomplete, so an output the
 corpus does not list may be a real finding. That is what the `valid-unlisted`

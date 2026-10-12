@@ -35,7 +35,7 @@ from __future__ import annotations
 from collections.abc import Collection, Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from types import MappingProxyType
-from typing import Any, Literal
+from typing import TYPE_CHECKING, Any, Literal
 
 from analysis_service.claims import (
     Claim,
@@ -55,6 +55,9 @@ from evals.harness.reference import (
     ReferenceRequirement,
     diagnosable,
 )
+
+if TYPE_CHECKING:
+    from evals.harness.instruments import Cases
 
 #: The verdicts that assert a requirement applies to this system. ``rejected``
 #: is the critic ruling it does not, which is the negative answer rather than a
@@ -723,7 +726,9 @@ def pooled_dispositions(scores: Sequence[DispositionScore]) -> Mapping[str, Any]
         "cases": len(scores),
         "judged": judged,
         "correct": correct,
-        "accuracy": round(correct / judged, 4) if judged else 0.0,
+        "accuracy": routing_rates(
+            judged=judged, correct=correct, reachable=reachable, false_prose=false_prose
+        )["accuracy"],
         # Correct over every judged record, reached or not: the unconditional
         # figure a headline should carry, beside the conditional one above.
         "correct_of_expected": (
@@ -736,9 +741,9 @@ def pooled_dispositions(scores: Sequence[DispositionScore]) -> Mapping[str, Any]
         "unjudged": sum(score.unjudged for score in scores),
         "needs_other_evidence": reachable,
         "false_prose_requests": false_prose,
-        "false_prose_request_rate": (
-            round(false_prose / reachable, 4) if reachable else 0.0
-        ),
+        "false_prose_request_rate": routing_rates(
+            judged=judged, correct=correct, reachable=reachable, false_prose=false_prose
+        )["false_prose_request_rate"],
         "false_confirmed": false_confirmed,
         "false_confirmed_rate": (
             round(false_confirmed / reachable, 4) if reachable else 0.0
@@ -803,24 +808,48 @@ def render_dispositions(scores: Sequence[DispositionScore]) -> None:
         )
 
 
-def published(blocks: Mapping[str, Any], metric: str) -> float | None:
-    """One pooled ASVS number, for the comparison table."""
-    return _published(blocks, "applicability_aggregate", metric)
+def published(blocks: Mapping[str, Any], metric: str, cases: Cases) -> float | None:
+    """One ASVS number pooled over the selected cases, for the comparison table.
 
-
-def published_disposition(blocks: Mapping[str, Any], metric: str) -> float | None:
-    """One pooled routing number, for the comparison table."""
-    return _published(blocks, "disposition_aggregate", metric)
-
-
-def _published(
-    blocks: Mapping[str, Any], aggregate_key: str, metric: str
-) -> float | None:
-    aggregate = blocks.get(aggregate_key)
-    if not isinstance(aggregate, Mapping):
-        return None
-    value = aggregate.get(metric)
+    Pooled again from the per-case rows by :func:`pooled_rows`, the rule the
+    sweep's own ``applicability_aggregate`` uses, because that aggregate pools
+    every case and the table prints the held-out cases apart.
+    """
+    rows = cases.rows(blocks, "applicability")
+    value = pooled_rows(rows).get(metric) if rows else None
     return float(value) if isinstance(value, int | float) else None
+
+
+def published_disposition(
+    blocks: Mapping[str, Any], metric: str, cases: Cases
+) -> float | None:
+    """One routing number pooled over the selected cases, for the table."""
+    rows = cases.rows(blocks, "disposition")
+    if not rows:
+        return None
+    rates = routing_rates(
+        judged=sum(row["judged"] for row in rows),
+        correct=sum(row["correct"] for row in rows),
+        reachable=sum(row["needs_other_evidence"] for row in rows),
+        false_prose=sum(len(row["false_prose_requests"]) for row in rows),
+    )
+    return rates.get(metric)
+
+
+def routing_rates(
+    *, judged: int, correct: int, reachable: int, false_prose: int
+) -> dict[str, float]:
+    """The two routing rates the table publishes, from their four counts.
+
+    The one rule :func:`pooled_dispositions` and :func:`published_disposition`
+    both read.
+    """
+    return {
+        "accuracy": round(correct / judged, 4) if judged else 0.0,
+        "false_prose_request_rate": (
+            round(false_prose / reachable, 4) if reachable else 0.0
+        ),
+    }
 
 
 def _rate(value: float | None) -> str:
@@ -844,31 +873,41 @@ def pooled(scores: Sequence[ApplicabilityScore]) -> Mapping[str, Any]:
     that denominator beside it: a figure over no case at all is ``None`` rather
     than a clean-reading zero.
     """
-    expected = sum(len(score.expected) for score in scores)
-    matched = sum(len(score.matched) for score in scores)
-    must_find = sum(len(score.must_find) for score in scores)
-    must_find_missed = sum(len(score.must_find_missed) for score in scores)
-    read = [score for score in scores if score.reference_set == "exhaustive"]
-    read_matched = sum(len(score.matched) for score in read)
+    return pooled_rows([score.to_json() for score in scores])
+
+
+def pooled_rows(rows: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
+    """:func:`pooled` over rows as :meth:`ApplicabilityScore.to_json` writes them.
+
+    The one rule for the pooled figures. The sweep pools its scores through it,
+    and the comparison table pools a sealed artifact's rows through it, so the
+    two can never count a case differently.
+    """
+    expected = sum(row["expected"] for row in rows)
+    matched = sum(len(row["matched"]) for row in rows)
+    must_find = sum(row["must_find"] for row in rows)
+    must_find_missed = sum(len(row["must_find_missed"]) for row in rows)
+    read = [row for row in rows if row["reference_set"] == "exhaustive"]
+    read_matched = sum(len(row["matched"]) for row in read)
     applied = read_matched + sum(
-        len(score.over_applied) + len(score.off_catalog) for score in read
+        len(row["over_applied"]) + len(row["off_catalog"]) for row in read
     )
     return {
-        "cases": len(scores),
+        "cases": len(rows),
         "expected": expected,
         "matched": matched,
-        "missed": sum(len(score.missed) for score in scores),
-        "matched_by_deferral": sum(len(score.matched_by_deferral) for score in scores),
+        "missed": sum(len(row["missed"]) for row in rows),
+        "matched_by_deferral": sum(len(row["matched_by_deferral"]) for row in rows),
         "recall": round(matched / expected, 4) if expected else 0.0,
         "must_find": must_find,
         "must_find_recall": (
             round((must_find - must_find_missed) / must_find, 4) if must_find else 0.0
         ),
-        "negatives": sum(len(score.negatives) for score in scores),
-        "negatives_applied": sum(len(score.negatives_applied) for score in scores),
+        "negatives": sum(len(row["negatives"]) for row in rows),
+        "negatives_applied": sum(len(row["negatives_applied"]) for row in rows),
         "precision": round(read_matched / applied, 4) if applied else None,
         "precision_cases": len(read),
-        "off_catalog": sum(len(score.off_catalog) for score in scores),
+        "off_catalog": sum(len(row["off_catalog"]) for row in rows),
     }
 
 

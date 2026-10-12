@@ -18,6 +18,7 @@ from pathlib import Path
 
 import pytest
 
+from analysis_service.frameworks import PACKAGES
 from evals.harness import audit
 
 REVISION = "0" * 40
@@ -51,6 +52,9 @@ def _candidate(**overrides) -> dict:
         "verdict": "reverted",
         "reason": "the lane still cited the neighbouring element",
         "paths": ["frameworks/stride/lanes/spoofing/skill.md"],
+        "parity": {
+            name: "nothing: the lane is this package's own" for name in PACKAGES
+        },
     }
     held.update(overrides)
     return held
@@ -201,9 +205,10 @@ class TestABlockedAuditWritesItsTicket:
 def _arguments(**fields) -> argparse.Namespace:
     parser = argparse.ArgumentParser()
     audit.arguments(parser)
-    return parser.parse_args(
-        [part for name, value in fields.items() for part in (f"--{name}", value)]
-    )
+    argv = []
+    for name, value in fields.items():
+        argv += [f"--{name}"] if value is None else [f"--{name}", value]
+    return parser.parse_args(argv)
 
 
 def _blocked() -> audit.Experiment:
@@ -502,3 +507,79 @@ class TestARuleIsARow:
 
     def test_a_well_formed_rule_is_admitted(self):
         audit.admit(_one(experiment_id="A-E2", rule=self._rule()), [_one()], ())
+
+
+class TestASharedChangeAnswersForEveryPackage:
+    """#1093: a candidate says what it means for each package in ``PACKAGES``."""
+
+    def test_a_package_left_unanswered_is_refused(self):
+        held = _candidate()
+        missing = min(PACKAGES)
+        del held["parity"][missing]
+        with pytest.raises(
+            audit.ExperimentError, match=f"no parity answer for {missing}"
+        ):
+            audit.admit(_one(outcome="refuted", candidate=held), [], [_grant()])
+
+    def test_a_blank_answer_is_not_an_answer(self):
+        held = _candidate()
+        held["parity"][min(PACKAGES)] = " "
+        with pytest.raises(audit.ExperimentError, match="parity"):
+            _one(outcome="refuted", candidate=held)
+
+
+HOLDOUT = "15-multitenant-invoicing"
+
+
+def _reader(n: int, case: str = HOLDOUT) -> audit.Experiment:
+    return _one(experiment_id=f"A-E{n}", holdout_reads=[case])
+
+
+class TestAHoldoutIsReadAFixedNumberOfTimes:
+    """#1093: a holdout's exposure is counted, and a case read too often is retired."""
+
+    def test_the_reads_are_counted_per_case(self):
+        ledger = [_reader(1), _reader(2), _reader(3, "14-loyalty-oauth-platform")]
+
+        assert audit.exposure(ledger) == {
+            HOLDOUT: ("A-E1", "A-E2"),
+            "14-loyalty-oauth-platform": ("A-E3",),
+        }
+
+    def test_the_last_permitted_read_is_admitted(self):
+        ledger = [_reader(n) for n in range(audit.HOLDOUT_READS - 1)]
+
+        audit.admit(_reader(9), ledger, (), holdouts=frozenset({HOLDOUT}))
+
+    def test_a_read_past_the_limit_is_refused(self):
+        ledger = [_reader(n) for n in range(audit.HOLDOUT_READS)]
+        with pytest.raises(audit.ExperimentError, match="no longer unseen"):
+            audit.admit(_reader(9), ledger, (), holdouts=frozenset({HOLDOUT}))
+
+    def test_a_tuned_case_is_not_a_holdout_read(self):
+        with pytest.raises(audit.ExperimentError, match="not a holdout case"):
+            audit.admit(
+                _reader(1, "01-payments-checkout"),
+                [],
+                (),
+                holdouts=frozenset({HOLDOUT}),
+            )
+
+    def test_the_corpus_names_its_holdouts(self):
+        """The reader is the corpus's own ``holdout`` flag, never a list here."""
+        found = audit.holdout_cases()
+
+        assert found
+        assert HOLDOUT in found
+        assert "01-payments-checkout" not in found
+
+    def test_the_command_prints_each_holdout_with_its_readers(
+        self, tmp_path, monkeypatch, capsys
+    ):
+        monkeypatch.setattr(audit, "EXPERIMENTS_DIR", tmp_path)
+        audit.append(_reader(1), tmp_path)
+
+        assert audit.command_experiments(_arguments(holdouts=None)) == 0
+        printed = capsys.readouterr().out
+        assert f"{HOLDOUT}: read 1 of {audit.HOLDOUT_READS} times: A-E1" in printed
+        assert "14-loyalty-oauth-platform: read 0 of" in printed

@@ -47,6 +47,9 @@ HOLDOUT_READERS = {
     "evals/harness/sitting.py": "a person holds a sitting on a holdout case too",
     "evals/harness/envelope.py": "the offline sitting reads every case",
     "evals/review_submission.py": "a sitting on a holdout case is checked too",
+    "evals/harness/audit.py:holdout_cases": (
+        "it reads which cases are held out, to count the reads of each"
+    ),
 }
 
 

@@ -201,6 +201,10 @@ Before any paid sweep, run one case first and read its provenance.
 - Never diagnose a **Holdout Case** (`holdout: true` in `case.json`). The
   diagnosis commands filter it out and the replays refuse it. Read only its
   figure in the holdout split, and only to confirm a fix measured elsewhere.
+  Name each holdout case you read in the row's `holdout_reads`.
+  `experiments --holdouts` prints how often each one was read. `--record`
+  refuses a read past `HOLDOUT_READS`: that case is no longer unseen, so ask
+  the user to reclassify it and author a fresh one (#744).
 - Never claim a report improved from an intermediate metric. The ladder in
   `references/experiment-protocol.md` says what each rung licenses.
 - Never credit a scripted or replayed response as new evidence about a model.

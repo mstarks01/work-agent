@@ -240,6 +240,11 @@ DECLARED: dict[str, str] = {
         " whose lane agents propose an open claim set has; a package whose"
         " claims carry a catalog identifier scores by applicability instead."
     ),
+    "evals/harness/gain.py": (
+        "A table keyed by framework: `READERS` holds each package's own reading"
+        " of an unmatched finding and of its vote standing, and a package"
+        " missing from it raises at the first read."
+    ),
     "evals/harness/losses.py": (
         "This code is STRIDE's, through `DraftThreat`, a category and a verb."
         " A miss lost to the verb is a cause only a package whose claims compose"

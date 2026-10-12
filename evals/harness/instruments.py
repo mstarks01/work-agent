@@ -269,22 +269,51 @@ class Sweep:
 
 
 @dataclass(frozen=True)
+class Cases:
+    """Which of a sweep's cases one published figure reads.
+
+    The table prints development figures and held-out figures apart (#1093).
+    A figure pooled over both would let a fix shaped by the tuned cases borrow
+    the held-out ones' credit, so every reader takes this and counts only the
+    cases it selects.
+    """
+
+    #: The sweep's held-out cases, by the flag each scored row carried when
+    #: the sweep ran.
+    held_out: frozenset[str]
+    #: ``True`` reads the held-out cases, ``False`` every other case.
+    holdout: bool
+
+    def wanted(self, case: object) -> bool:
+        return (case in self.held_out) == self.holdout
+
+    def rows(self, blocks: Mapping[str, Any], key: str) -> list[Mapping[str, Any]]:
+        """The per-case rows of one artifact block, for the cases this selects."""
+        return [
+            row
+            for row in blocks.get(key) or []
+            if isinstance(row, Mapping) and self.wanted(row.get("case"))
+        ]
+
+
+@dataclass(frozen=True)
 class Column:
     """One column an instrument contributes to the published comparison table.
 
-    ``read`` takes one sweep's artifact blocks and the framework whose block
-    is being printed, and answers ``None`` where the sweep measured nothing.
+    ``read`` takes one sweep's artifact blocks, the framework whose block is
+    being printed, and the :class:`Cases` it counts, and answers ``None``
+    where the sweep measured nothing on those cases.
     The reader lives in the module that owns the block's shape, so the
     generator names no framework and no column — it walks this table.
 
     ``needs_votes`` marks a number that reads zero on a cold ledger rather
     than being measured. #330: a zero reads as a measured failure, and an
-    absent vote is not a measurement, so the table prints "no votes yet"
+    absent vote is not a measurement, so the table prints "no votes when sealed"
     instead.
     """
 
     label: str
-    read: Callable[[Mapping[str, Any], FrameworkName], float | None]
+    read: Callable[[Mapping[str, Any], FrameworkName, Cases], float | None]
     needs_votes: bool = False
 
 
@@ -386,11 +415,16 @@ INSTRUMENTS: dict[str, Instrument] = {
         ),
         published=(
             Column(
-                "recall", lambda blocks, _: applicability.published(blocks, "recall")
+                "recall",
+                lambda blocks, _, cases: applicability.published(
+                    blocks, "recall", cases
+                ),
             ),
             Column(
                 "precision",
-                lambda blocks, _: applicability.published(blocks, "precision"),
+                lambda blocks, _, cases: applicability.published(
+                    blocks, "precision", cases
+                ),
             ),
         ),
     ),
@@ -410,14 +444,14 @@ INSTRUMENTS: dict[str, Instrument] = {
         published=(
             Column(
                 "disp_acc",
-                lambda blocks, _: applicability.published_disposition(
-                    blocks, "accuracy"
+                lambda blocks, _, cases: applicability.published_disposition(
+                    blocks, "accuracy", cases
                 ),
             ),
             Column(
                 "false_prose",
-                lambda blocks, _: applicability.published_disposition(
-                    blocks, "false_prose_request_rate"
+                lambda blocks, _, cases: applicability.published_disposition(
+                    blocks, "false_prose_request_rate", cases
                 ),
             ),
         ),
@@ -451,15 +485,21 @@ INSTRUMENTS: dict[str, Instrument] = {
         published=(
             Column(
                 "reference coverage",
-                lambda blocks, _: scorer.published(blocks, "reference_coverage"),
+                lambda blocks, _, cases: scorer.published(
+                    blocks, "reference_coverage", cases
+                ),
             ),
             Column(
                 "must-find coverage",
-                lambda blocks, _: scorer.published(blocks, "must_find_coverage"),
+                lambda blocks, _, cases: scorer.published(
+                    blocks, "must_find_coverage", cases
+                ),
             ),
             Column(
                 "rejected rate",
-                lambda blocks, _: scorer.published(blocks, "rejected_rate"),
+                lambda blocks, _, cases: scorer.published(
+                    blocks, "rejected_rate", cases
+                ),
                 needs_votes=True,
             ),
         ),
@@ -489,7 +529,9 @@ INSTRUMENTS: dict[str, Instrument] = {
         published=(
             Column(
                 "writing objections",
-                lambda blocks, framework: writing.published(blocks, framework),
+                lambda blocks, framework, cases: writing.published(
+                    blocks, framework, cases
+                ),
                 needs_votes=True,
             ),
         ),
