@@ -439,22 +439,22 @@ summary:hover {
   display:block;
   margin-top:4px
 }
-#questions>p {
+.list-intro>p {
   font-size:13px;
   color:var(--muted)
 }
-#questions>p:has(>b) {
+.list-intro>p:has(>b) {
   font-size:15px;
   color:var(--text);
   margin-top:20px
 }
-#questions>details {
+#list>details,#questions .amend {
   margin:0 0 24px;
   border-bottom:1px solid var(--line);
   padding-bottom:24px;
   scroll-margin-top:24px
 }
-#questions>details>summary {
+#list>details>summary {
   font-size:20px;
   line-height:1.4;
   color:var(--text);
@@ -462,13 +462,13 @@ summary:hover {
   padding:6px 0 14px;
   letter-spacing:-.015em
 }
-#questions>details>p,#earlier>p,#skipped>p {
+#list>details>p,#earlier>p,#skipped>p,#more>p {
   padding:16px 0;
   margin:0;
   border-top:1px solid var(--line);
   overflow-wrap:anywhere
 }
-#questions>details>p>b {
+#list>details>p>b {
   display:block;
   font-size:14px;
   margin-bottom:8px
@@ -767,7 +767,7 @@ code {
   .question-intro h2 {
     font-size:19px
   }
-  #questions>details>summary {
+  #list>details>summary {
     font-size:18px
   }
   #questions select {
@@ -866,6 +866,46 @@ a.analysis-row:hover {
   #questions .shared-controls { margin:12px 16px 0; }
 }
 
-#questions > details.round-estimate { border:0; border-radius:0; margin:0 0 16px; overflow:visible; }
-#questions > details.round-estimate > summary { padding:0; background:none; font-size:13px; font-weight:400; color:var(--muted); }
-#questions > details.round-estimate > p { border:0; margin:10px 0 0; padding:0; }
+.list-intro > details.round-estimate { border:0; border-radius:0; margin:0 0 16px; overflow:visible; }
+.list-intro > details.round-estimate > summary { padding:0; background:none; font-size:13px; font-weight:400; color:var(--muted); }
+.list-intro > details.round-estimate > p { border:0; margin:10px 0 0; padding:0; }
+
+.save-line {
+  margin:8px 0 0;
+  font-size:13px
+}
+#save-status[data-state=failed],#save-status[data-state=conflict] {
+  color:var(--error)
+}
+#changes:empty {
+  display:none
+}
+#list .skip {
+  font-size:12px;
+  margin-left:6px
+}
+#list .conflict {
+  margin-top:8px;
+  padding:10px 12px;
+  background:var(--error-bg);
+  color:var(--error);
+  border-radius:7px
+}
+#list .conflict button {
+  margin-left:8px;
+  font-size:13px
+}
+#list table {
+  max-width:100%;
+  overflow-x:auto;
+  display:block
+}
+@media (max-width:480px) {
+  #list>details>p {
+    padding:12px 0
+  }
+  #list .skip {
+    display:block;
+    margin:6px 0 0
+  }
+}

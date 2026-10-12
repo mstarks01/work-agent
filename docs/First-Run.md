@@ -358,14 +358,21 @@ The app can ask you questions before the analysis, and after the report.
   asked and quotes the words of your description that the part was read
   from. A line at the top says
   what the list holds; your answers can add questions as well as remove
-  them, and the page says when they do. Click **Save answers** to keep your
-  answers. The app runs no model, and shows the list again with your answers
-  in. A question you leave blank stays in the list. **Skip the
-  rest** sets the blank questions aside instead. It also sets
-  aside a question with parts that you answered only in part, and keeps the
-  parts you gave. The questions set aside move to **Skipped for now**, where
-  **Answer it** opens one again. A skipped question
-  is not an answer, and the analysis treats its fact as open.
+  them, and the page says when they do. Each answer is saved as you give
+  it: a chosen option at once, typed text a moment after you stop. The line
+  under the progress bar says **Saved**, **Saving** or **Not saved**, and
+  **Save now** sends again what a lost connection left unsaved. The app runs
+  no model, and shows the list again with your answers in. An answered
+  question stays where it was, compact, and **Change** opens it again. A
+  question you leave blank stays in the list. **Skip for now** beside a
+  question sets it aside, and **Skip the questions left blank** sets aside
+  every blank one. A skip also sets aside a question with parts that you
+  answered only in part, and keeps the parts you gave. The questions set
+  aside move to **Skipped for now**, where **Answer it** opens one again. A
+  skipped question is not an answer, and the analysis treats its fact as
+  open. Where another tab saved a different answer to a question you
+  changed, the page shows both and asks which to keep; nothing is written
+  over in silence.
   **Your answers** lists every answer you saved, and **Change** opens
   one again. If an answer was a guess, change it to "I don't know": the fact
   is open again, and the questions that rested on it come back. A question with parts comes back while a part has no answer, with
