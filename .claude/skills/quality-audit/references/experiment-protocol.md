@@ -50,7 +50,9 @@ a report that states a higher claim than its rung has reached is wrong.
 | 5 | held-out confirmation | the gain holds on material the fix never saw | yes |
 
 A coverage gain at rung 4 counts only when `run.py gain` passes every gate
-against the baseline. A run can raise coverage by saying more, because an
+against the baseline. The command refuses a pair whose figures do not compare:
+a different scoring corpus, artifact version, identity version or mode.
+Re-score both artifacts on one corpus with `run.py score` first. A run can raise coverage by saying more, because an
 unlisted finding is not counted wrong. The `volume` gate catches that offline,
 and the `reviewed` and `rejected-rate` gates wait for votes on what the
 candidate added. A gate that reads `inconclusive` leaves the gain unconfirmed.
@@ -164,7 +166,10 @@ read, record the ambiguity rather than assuming it away.
 - A changed upstream artifact invalidates its descendants. Unrelated branches
   stay reusable.
 - **A replay is not a repeat.** Re-scoring an archive under new code measures
-  the code. Only a new run measures the run-to-run spread.
+  the code. Only a new run measures the run-to-run spread. A row that repeats
+  an earlier experiment names it in `replicates`, and `--record` refuses that
+  row unless `actual_usd` shows a paid call. The lookup prints how many
+  independent repeats each experiment has.
 - An incomplete experiment that stopped on a budget is incomplete, not passing.
 
 ## Isolation

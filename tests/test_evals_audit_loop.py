@@ -583,3 +583,39 @@ class TestAHoldoutIsReadAFixedNumberOfTimes:
         printed = capsys.readouterr().out
         assert f"{HOLDOUT}: read 1 of {audit.HOLDOUT_READS} times: A-E1" in printed
         assert "14-loyalty-oauth-platform: read 0 of" in printed
+
+
+class TestAReplayIsNotARepeat:
+    """#1088: an independent repeat needs fresh model output; a replay has none."""
+
+    def _repeat(self, **overrides) -> audit.Experiment:
+        held = {"experiment_id": "A-E2", "replicates": "A-E1", "actual_usd": 0.3}
+        held.update(overrides)
+        return _one(**held)
+
+    def test_a_repeat_with_a_paid_call_is_admitted(self):
+        audit.admit(self._repeat(), [_one()], [_grant()])
+
+    @pytest.mark.parametrize("actual", [None, 0.0])
+    def test_a_replay_naming_a_repeat_is_refused(self, actual):
+        with pytest.raises(audit.ExperimentError, match="a replay is not a repeat"):
+            audit.admit(self._repeat(actual_usd=actual), [_one()], [_grant()])
+
+    def test_a_repeat_names_an_experiment_on_record(self):
+        with pytest.raises(audit.ExperimentError, match="not an earlier experiment"):
+            audit.admit(self._repeat(replicates="Z-E9"), [_one()], [_grant()])
+
+    def test_an_experiment_does_not_repeat_itself(self):
+        with pytest.raises(audit.ExperimentError, match="not an earlier experiment"):
+            audit.admit(self._repeat(experiment_id="A-E1"), [_one()], [_grant()])
+
+    def test_the_repeats_are_counted_and_printed(self, tmp_path):
+        audit.append(_one(), tmp_path)
+        audit.append(self._repeat(), tmp_path)
+        audit.append(self._repeat(experiment_id="A-E3"), tmp_path)
+
+        assert audit.repeats(audit.load(tmp_path)) == {"A-E1": ("A-E2", "A-E3")}
+        found = audit.lookup(audit_id="A", directory=tmp_path, root=tmp_path)
+        printed = str(audit.render(found))
+        assert "repeated:  2 independent repeat(s): A-E2, A-E3" in printed
+        assert "repeats:   A-E1" in printed
