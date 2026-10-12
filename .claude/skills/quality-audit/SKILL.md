@@ -151,7 +151,7 @@ uv run python -m evals.harness.run experiments --record /tmp/<experiment-id>.jso
 
 **Implement mode.** With an `implement` grant, steps 8 and 9 take a candidate
 change. Make one lever on one branch, run the regressions it can reach, and
-record the row with a `candidate` block. A change that did not work is
+record the row with a `candidate` block that lists them in `regressions`. A change that did not work is
 reverted, and its row says why. `references/experiment-protocol.md` under
 "Isolation" sets out the branch rules, and `templates/experiment-record.md`
 sets out the fields.
