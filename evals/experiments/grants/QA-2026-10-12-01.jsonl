@@ -1,1 +1,2 @@
 {"attempts": 5, "audit_id": "QA-2026-10-12-01", "budget_usd": 0.0, "mode": "implement", "recorded": "2026-10-12T02:10:00Z", "words": "Fix all of the issues identified"}
+{"attempts": 1, "audit_id": "QA-2026-10-12-01", "budget_usd": 0.3, "mode": "implement", "recorded": "2026-10-12T06:00:00Z", "words": "Yes to both (the reading: a process holds what it reads or writes, and a flow what it carries; the run: $0.30 for five extraction sweeps)"}
