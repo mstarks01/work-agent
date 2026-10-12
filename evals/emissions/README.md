@@ -38,6 +38,7 @@ wrote, and `evals/harness/archive.py` names the spelling each kind carries.
 | `20260918T-placement-rule` | extraction | the placement rule of #1068, five runs each side |
 | `20260919T-naming-rule` | extraction | the `extract.md` edits of #1076 and #1078, three runs |
 | `20261005T-revert` | extraction | `extract.md` and the extraction schema head as they stand since #1474, all 15 cases, five runs (QA-2026-10-05-01-E1) |
+| `20261012T-assets-rule6` | extraction | the rule 6 asset definitions of #1629, all 16 cases, five runs (QA-2026-10-12-01-E10); `20261005T-revert` is its before side |
 
 The `20261005T-revert` sweeps are the arm to price an `extract.md` change
 against: the prompt they ran is the one in the tree. Replay them on their own:
