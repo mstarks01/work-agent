@@ -181,4 +181,6 @@ know", STRIDE alone completes 946 and 1,488 of 2,796 findings at five and ten
 choices against 993 and 1,527 under the box order (critical or high 521 and
 772 against 541 and 799), and the same at twenty. With both frameworks
 selected it completes 1,009 against 1,103 at five choices, and 1,555 and
-2,019 against 1,154 and 1,375 at ten and twenty.
+2,019 against 1,154 and 1,375 at ten and twenty. The maintainer accepted this
+cost on 2026-10-12: #1632 forbids a group heading that moves a low-priority
+block ahead of the intended choice, and the box order did that.
