@@ -1,8 +1,9 @@
 """What an answer to one early question proves about the others (#1632).
 
-A paused job ranks the questions whose answer settles the most other questions
-first, so an owner resolves the broad dependencies early and spends less on
-the details. "Settles" means that a rule the service already runs proves it:
+A paused job publishes, for each listed capability question, what each of its
+answers would settle, so a page can say "a 'no' may remove 19 questions", and
+the list breaks a tie between two questions by it. "Settles" means that a
+rule the service already runs proves it:
 an absent capability makes each of its parts absent
 (:func:`~analysis_service.capabilities.resolve`), and a unit whose rule an
 answer decides no longer needs the other capabilities its rule reads
@@ -26,13 +27,20 @@ credit.
 
 from __future__ import annotations
 
+import json
+from collections import OrderedDict
 from collections.abc import Collection, Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any
 
 from analysis_service.answer_forms import YES_NO
 from analysis_service.claims import FrameworkName, UnknownKey
-from analysis_service.early_questions import EarlyQuestion, waiting_parts
+from analysis_service.early_questions import (
+    EarlyQuestion,
+    digest,
+    remembered,
+    waiting_parts,
+)
 from analysis_service.fact_answers import FactAnswer, key_ref
 from analysis_service.fact_writes import capability_statements
 from analysis_service.frameworks import PACKAGES
@@ -98,6 +106,9 @@ def _listed(pool: frozenset[str], settled: Collection[str]) -> frozenset[str]:
     return pool - waiting_parts(pool, settled)
 
 
+_effects: OrderedDict[str, dict[UnknownKey, Effect]] = OrderedDict()
+
+
 def capability_effects(
     prepared: SystemModel,
     frameworks: Mapping[FrameworkName, Mapping[str, Any]],
@@ -111,8 +122,31 @@ def capability_effects(
     ``questions`` the capability questions to read; and ``settled`` the
     capabilities a save answered or skipped, which say which parts are listed
     now. Each effect is read against the pool as it stands, so a part an
-    earlier answer settled is not counted again.
+    earlier answer settled is not counted again. The table is kept by the
+    content it was read from (:func:`~analysis_service.early_questions.remembered`),
+    so a read that changes no answer reads it again for nothing.
     """
+    key = digest(
+        prepared.model_dump_json(),
+        json.dumps(frameworks, sort_keys=True, default=str),
+        json.dumps([list(question.key) for question in questions]),
+        json.dumps(sorted(settled)),
+        str(id(PACKAGES)),
+    )
+    return remembered(
+        _effects,
+        key,
+        lambda: _capability_effects(prepared, frameworks, questions, settled),
+    )
+
+
+def _capability_effects(
+    prepared: SystemModel,
+    frameworks: Mapping[FrameworkName, Mapping[str, Any]],
+    questions: Sequence[EarlyQuestion],
+    settled: Collection[str],
+) -> dict[UnknownKey, Effect]:
+    """The rule :func:`capability_effects` keeps the result of."""
     before = _pool(prepared, frameworks)
     listed = _listed(before, settled)
     effects = {}

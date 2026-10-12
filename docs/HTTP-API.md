@@ -197,8 +197,9 @@ framework, and a question two frameworks share counts for each of them
 capability question whose `parent` is still open is not in the list: it is in
 `early_blocked`, with the `reason` `parent-undecided`, takes no place, and
 joins the list once the parent is answered "yes". Within a framework's turn,
-the question whose answer settles the most other questions comes first. Each
-capability row carries `rank`: `settles_at_most` and `settles_at_least` over
+the list ranks a capability by its band and the units it could settle, and a
+field question by the prior per choice; what an answer would settle breaks a
+tie. Each capability row carries `rank`: `settles_at_most` and `settles_at_least` over
 its answers, and for each answer what it `settles`, which is the other
 questions it proves settled or unnecessary, and what it `unlocks`, which is
 the questions it adds to the list. A field row's `rank` is `null`: no rule
@@ -268,8 +269,9 @@ open question can settle (`unaskable`). These are units, not findings.
 the saved answers in: `satisfied`, `refuted` or `undecidable`. A refuted
 framework asks no question. An undecidable one asks only the facts that
 decide it, first and outside the limits; each such question lists the
-framework in `gates`. A question of a framework that a reopened answer left
-undecidable is in `early_blocked` with the `reason` `gate-undecided`.
+framework in `gates`. The questions an undecidable framework would ask once
+its gate is satisfied, at or above the floor, are in `early_blocked` with the
+`reason` `gate-undecided`, so a client can say what a gate answer unlocks.
 
 **An amendment corrects the model itself**
 ([ADR 0072](adr/0072-a-paused-job-s-description-can-be-amended.md)). An answer

@@ -530,6 +530,33 @@ class TestTheFrameworkGates:
         assert bool(capabilities) == (state == "satisfied")
         assert [q.key for q, _ in after.answered_early] == [q.key for q in asked.early]
 
+    def test_an_undecidable_framework_lists_what_it_would_ask_as_waiting_on_the_gate(
+        self,
+    ):
+        """The gate question is the list; the framework's own questions wait
+        under ``gate-undecided``, at or above the floor, so a page can say
+        what a gate answer unlocks (ADR 0078)."""
+        from analysis_service.answer_round import passes_floor
+
+        model = _with_interfaces("unknown", protocols="unknown")
+        asked = _paused(model, LEVEL_2)
+        assert [q.gates for q in asked.early] == [("asvs",)]
+        waiting = [q for q, reason in asked.blocked if reason == "gate-undecided"]
+        assert waiting and len(waiting) == len(asked.blocked)
+        assert all(q.frameworks == ("asvs",) and not q.gates for q in waiting)
+        would = early_questions(model, LEVEL_2, None, assume=["asvs"])
+        assert all(passes_floor(q, would) for q in waiting)
+        assert asked.summary.blocked == len(waiting)
+        assert asked.to_json()["early_blocked"][0]["reason"] == "gate-undecided"
+        # Once an answer satisfies the gate, the same questions are listed.
+        web = _paused(
+            model, LEVEL_2, [FactAnswer(key=q.key, value="web") for q in asked.early]
+        )
+        listed = {q.key for q in (*web.early, *web.held_back)} | {
+            q.key for q, _ in web.blocked
+        }
+        assert {q.key for q in waiting} <= listed
+
     def test_an_unknown_answer_leaves_the_framework_undecidable_and_asks_no_more(
         self,
     ):
@@ -582,3 +609,25 @@ class TestTheFrameworkGates:
             UnknownRef(element_id=flow.id, attribute="protocol")
             for flow in flows.data_flows
         )
+
+
+class TestTheListIsKept:
+    """A list is built once for its content, and a changed answer builds a new
+    one (ADR 0078)."""
+
+    def test_the_same_content_gives_the_same_list_object(self):
+        first = early_questions(valid_model(), LEVEL_2, None)
+        assert early_questions(valid_model(), LEVEL_2, None) is first
+        assert early_questions(valid_model(), {"asvs": {"level": 1}}, None) is not first
+
+    def test_an_answer_written_in_gives_a_new_list(self):
+        from analysis_service.fact_writes import answered_model
+
+        before = early_questions(valid_model(), LEVEL_2, None)
+        capability = next(q for q in before if q.kind == "capability")
+        answered = answered_model(
+            valid_model(), [FactAnswer(key=capability.key, value="no")]
+        )
+        after = early_questions(answered, LEVEL_2, None)
+        assert after is not before
+        assert capability.key not in {q.key for q in after}

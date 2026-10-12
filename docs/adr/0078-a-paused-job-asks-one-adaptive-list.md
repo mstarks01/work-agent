@@ -1,4 +1,4 @@
-# 78. A paused job asks one adaptive list, ranked by what an answer settles
+# 78. A paused job asks one adaptive list, and says what an answer settles
 
 - **Status**: accepted
 - **Date**: 2026-10-12
@@ -30,12 +30,9 @@
   and [ADR 0073](0073-a-finding-can-wait-on-some-facets-and-an-answer-can-carry-a-detail.md),
   whose facets and details are unchanged; [ADR 0056](0056-the-findings-that-wait-decide-the-follow-up-order.md),
   whose post-report order this does not touch.
-- **Evidence**: `tests/test_answer_admission.py::TestTheListRanksByWhatAnAnswerSettles`
-  and `tests/test_pause_summary.py`. The replay of the list against the
-  archived baselines (`QA-2026-09-26-03-E33`, `-E35`, `QA-2026-10-09-01-E1`,
-  `QA-2026-10-09-02-E1` and `-E2`) at equal choice budgets is not run yet;
-  it is the evidence step of #1632, and until it runs the list's effect on
-  coverage is unmeasured.
+- **Evidence**: `QA-2026-10-12-02-E1` to `-E3` in `evals/experiments/`,
+  `tests/test_answer_admission.py::TestTheListRanksByWhatAnAnswerSettles`
+  and `tests/test_pause_summary.py`.
 
 ## Context
 
@@ -81,20 +78,31 @@ that a saved answer proved settled or unnecessary, with one of
 `answer-limit`, those under a floor `below-floor`, and the skipped ones
 `skipped`. A client maps each reason to its own words.
 
-**Within a framework's turn, the question whose answer settles the most other
-questions comes first.** For each listed capability question and each of its
-answers, the service writes the capability statement the answer would write
-onto a copy of the model, through the one writer
-(`fact_writes.capability_statements`), and reads each runnable framework's
-open capabilities again. The questions that leave the pool are what the
-answer settles; the questions that join the list are what it unlocks
+**Each listed capability question says what each of its answers would
+settle.** For each one and each of its answers, the service writes the
+capability statement the answer would write onto a copy of the model, through
+the one writer (`fact_writes.capability_statements`), and reads each runnable
+framework's open capabilities again. The questions that leave the pool are
+what the answer settles; the questions that join the list are what it unlocks
 (`answer_effects.capability_effects`). A question's potential is the most it
-settles over its answers; its least is the fewest. The order within a kind is
-the potential per choice left to answer, then the least, then the list's own
-order: the band and the units for a capability, the prior per choice for a
-field question. The row publishes `rank` with both bounds and each answer's
-effect, so a page can say "a 'no' may remove 19 questions" and "a 'yes' lists
-5 more", with the service's own figures.
+settles over its answers; its least is the fewest. The row publishes `rank`
+with both bounds and each answer's effect, so a page can say "a 'no' may
+remove 19 questions" and "a 'yes' lists 5 more", with the service's own
+figures. The ranking does not favour either answer.
+
+**Within a framework's turn, the list's own order holds, and the effects break
+a tie.** A capability ranks by its band and the units it could settle (ADR
+0055), a field question by the prior per choice (ADR 0049). Where two
+capabilities tie on both, the one with the higher potential per choice comes
+first, then the one with the higher least. The maintainer chose this on
+2026-10-12 after `QA-2026-10-12-02-E1` measured the order #1632 first asked
+for, the potential first: on 32 archived ASVS reports it decided 13% to 37%
+fewer units at five choices for every answerer, on 18 to 30 of the 32
+reports, and more units only past ten choices and only for an owner who
+answers "no" often. A "no" to a broad parent removes many questions and
+decides few units; the band-first order asks the capability that decides the
+most. The questions an order removes and the units it decides are two
+measures, and the second is what the analysis reads.
 
 **Only a rule that removes a question earns credit.** An absent parent makes
 its parts absent (`capabilities.resolve`), and a decided unit no longer needs
@@ -127,22 +135,20 @@ unchanged inputs changes nothing.
 
 ## Consequences
 
-**The order trades band for effect.** On the shared test model at ASVS
-level 2, thirty "yes" answers to the list leave 19 level 1 requirements
-unknown, where the band-first order of ADR 0055 left 7: a "yes" to a broad
-parent such as `authentication` settles no requirement, and the list asks
-that parent first because its "no" would settle 19 questions. Thirty "no"
-answers settle far more than the band-first order. Which owner the service
-meets more often is not known, so the list's effect on coverage at equal
-choice budgets is the next step of #1632, replayed per framework over every
-answerer, against the archived baselines; a coverage loss that the replay
-does not explain is a reason to change the order, not to keep it.
+**The turns carry over the saves.** The frameworks' turns start from what
+the saved answers charged each framework, not from zero on each build. Before
+that, an owner who answered the first question and saved met the same
+framework's next question every time, and STRIDE completed 96 of 2,796
+findings in ten choices with ASVS beside it, against 1,488 alone
+(`QA-2026-10-12-02-E2`).
 
-**A read costs the effects.** The question set builds in 310 ms at ASVS
-level 2 and 458 ms with STRIDE and ASVS level 3 on the shared test model,
-in one process on an idle machine with nothing cached; the effects are about
-170 ms of that at level 3. The issue's target is 500 ms for a save and its recalculation on
-the documented local setup. No cache is kept yet.
+**A read is kept by its content.** `early_questions` and
+`capability_effects` keep their results by a digest of what they read, so a
+read that changes nothing costs about 13 ms, and a read after a save builds
+only the list with the answers in. With nothing kept, the set builds in a p95
+of 180 ms (no answers) to 332 ms (thirty answers) on the largest corpus
+model with STRIDE and ASVS level 3, on an idle machine, under the 500 ms the
+issue proposed (`QA-2026-10-12-02-E3`).
 
 **The `/v1` questions payload changes shape.** `early_questions` holds the
 whole list, `early_blocked` and `early_unnecessary` are new, each row

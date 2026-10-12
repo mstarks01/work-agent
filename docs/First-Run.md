@@ -349,9 +349,8 @@ The app can ask you questions before the analysis, and after the report.
   accounts", so that facts about the group reach the model. Rows you leave
   blank stay open.
 
-  The page lists the recommended questions at once, the most useful first:
-  a question whose answer settles the most other questions comes before the
-  details. Where one question asks about several
+  The page lists the recommended questions at once, the most useful first,
+  and under each yes/no question says what each answer would settle. Where one question asks about several
   parts of your system, a **Same for all** row takes one answer, and **Apply
   to the ticked rows** copies it into each row still ticked. Untick a row the
   answer does not fit. Under each question, a line says why it is

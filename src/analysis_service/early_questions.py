@@ -57,13 +57,14 @@ job writes it (#1252).
 
 from __future__ import annotations
 
+import hashlib
 import json
-from collections import Counter
-from collections.abc import Collection, Container, Mapping
+from collections import Counter, OrderedDict
+from collections.abc import Callable, Collection, Container, Mapping
 from dataclasses import dataclass
 from pathlib import Path
 from types import MappingProxyType
-from typing import Any
+from typing import Any, TypeVar
 
 from analysis_service.answer_forms import (
     YES_NO,
@@ -103,14 +104,18 @@ __all__ = [
     "PriorRow",
     "asked_parent",
     "capability_questions",
+    "digest",
     "early_questions",
     "element_type",
     "framework_gates",
     "load_prior",
+    "remembered",
     "waiting_parts",
 ]
 
 QUESTION_PRIOR_PATH = Path(__file__).with_name("question_prior.json")
+
+_Built = TypeVar("_Built")
 
 #: The reason a field question gives where no rule reads its fact: the prior,
 #: which is why it is asked at all.
@@ -284,13 +289,76 @@ def _gates(
     }
 
 
+#: How many built lists and effect tables each memo keeps, newest last.
+REMEMBERED = 64
+
+
+def remembered(
+    memo: OrderedDict[str, _Built], key: str, build: Callable[[], _Built]
+) -> _Built:
+    """``build()`` once for ``key``, then the kept value (ADR 0078).
+
+    **A memo is keyed by content, never by a job.** The key is a digest of
+    everything the build reads, so a checkpoint, a selection, a policy and
+    the saved answers each give their own key, and a changed answer is a new
+    key with no invalidation to get wrong. A kept value is immutable and
+    shared. The memo holds :data:`REMEMBERED` values and drops the oldest.
+    """
+    if key in memo:
+        memo.move_to_end(key)
+        return memo[key]
+    built = build()
+    memo[key] = built
+    while len(memo) > REMEMBERED:
+        memo.popitem(last=False)
+    return built
+
+
+def digest(*parts: str) -> str:
+    """One key for ``parts``, which a memo reads."""
+    return hashlib.sha256("\x1f".join(parts).encode("utf-8")).hexdigest()
+
+
+_lists: OrderedDict[str, tuple[EarlyQuestion, ...]] = OrderedDict()
+
+
 def early_questions(
     model: SystemModel,
     frameworks: Mapping[FrameworkName, Mapping[str, Any]],
     catalog: AssertionCatalog | None,
     prior: Mapping[FrameworkName, PriorRow] = QUESTION_PRIOR,
+    *,
+    assume: Collection[FrameworkName] = (),
 ) -> tuple[EarlyQuestion, ...]:
     """Every open fact the prior names for this model, the most likely cited first.
+
+    The list is kept by the content it was built from (:func:`remembered`):
+    a paused job's checkpoint list is built once, and a read after a save
+    builds only the list with the answers in. The registry and the prior are
+    part of the key by identity, so a test that swaps either builds afresh.
+    See :func:`_early_questions` for the rule.
+    """
+    key = digest(
+        model.model_dump_json(),
+        "" if catalog is None else catalog.model_dump_json(),
+        json.dumps(frameworks, sort_keys=True, default=str),
+        json.dumps(sorted(assume)),
+        str(id(prior)),
+        str(id(PACKAGES)),
+    )
+    return remembered(
+        _lists, key, lambda: _early_questions(model, frameworks, catalog, prior, assume)
+    )
+
+
+def _early_questions(
+    model: SystemModel,
+    frameworks: Mapping[FrameworkName, Mapping[str, Any]],
+    catalog: AssertionCatalog | None,
+    prior: Mapping[FrameworkName, PriorRow],
+    assume: Collection[FrameworkName],
+) -> tuple[EarlyQuestion, ...]:
+    """The rule :func:`early_questions` keeps the result of.
 
     ``frameworks`` maps each framework the job selected to its options. Read
     off the model with the catalog applied, which is the model the lanes will
@@ -298,11 +366,16 @@ def early_questions(
     an undecidable framework come first (:func:`framework_gates`), then the
     capability questions (:func:`capability_questions`). Only a framework
     whose precondition is satisfied ranks the capability and field questions.
+    ``assume`` names undecidable frameworks to rank as if satisfied, which a
+    paused job reads to say what each one would ask (ADR 0078); a refuted
+    framework is never assumed.
     """
     model = prepared_model(model, catalog)
     gates = _gates(model, frameworks)
     runnable = {
-        name: frameworks[name] for name, state in gates.items() if state == "satisfied"
+        name: frameworks[name]
+        for name, state in gates.items()
+        if state == "satisfied" or (state == "undecidable" and name in assume)
     }
     names = element_names(model)
     deciding = _gate_questions(model, gates, catalog, names)

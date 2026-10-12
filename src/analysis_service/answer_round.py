@@ -19,9 +19,10 @@ recommended question of the pause at once: a question is listed only at or
 above its kind's floor, and one pause asks each kind at most its limit for
 each selected framework (:data:`EARLY_RULES` is the table). Where a job
 selects more than one framework, the frameworks take turns for the places
-(:func:`by_turn`), and within a framework's turn the question whose answer
-settles the most other questions comes first
-(:mod:`analysis_service.answer_effects`). A question answered in part is
+(:func:`by_turn`), and within a framework's turn the list's own order holds:
+the band and the units a capability could settle, the prior per choice for a
+field question. What each answer would settle breaks a tie, and is published
+on the row (:mod:`analysis_service.answer_effects`). A question answered in part is
 listed before any new question, outside the limit, and where the limits hold
 questions back the job says so (:attr:`QuestionSet.stop`). A question that
 decides whether a selected framework runs at all comes first, outside the
@@ -848,6 +849,28 @@ def question_set(
     for question in waiting_on.values():
         reason = _left_out(question, gates, facts, prepared)
         (held if reason == "gate-undecided" else moot).append((question, reason))
+    # What each undecidable framework would ask once its gate is satisfied:
+    # listed as waiting on the gate, so a page can say how much a gate answer
+    # unlocks. A question another framework lists already is not repeated.
+    undecided = [name for name, state in gates.items() if state == "undecidable"]
+    if undecided:
+        listed_keys = {question.key for question in listed} | {
+            question.key for question, _ in held
+        }
+        would_ask = early_questions(
+            view,
+            {name: frameworks[name] for name in undecided},
+            catalog,
+            assume=undecided,
+        )
+        held += [
+            (question, "gate-undecided")
+            for question in would_ask
+            if not question.gates
+            and question.key not in listed_keys
+            and question.key not in done
+            and passes_floor(question, would_ask)
+        ]
     settled = {
         key_ref(key).capability for key in aside | done if not isinstance(key, str)
     }
@@ -1115,13 +1138,15 @@ def recommended(
     is answered "yes", and leaves once the parent is "no". So the list shows
     no hidden row, and a page needs no rule of its own for which part shows.
 
-    **Within a kind, the question whose answer settles the most other
-    questions is taken first** (``effects``), then the one whose least answer
-    settles the most, then the list's own order: the band and the units a
-    capability could settle, or the prior per choice for a field question
-    (:mod:`analysis_service.early_questions`). A field question has no
-    proven effect on another question, so it keeps the list's order. The
-    selected frameworks then take turns over both kinds (:func:`by_turn`).
+    **Within a kind, the list's own order is taken first**: the band and the
+    units a capability could settle, or the prior per choice for a field
+    question (:mod:`analysis_service.early_questions`). Where two questions
+    tie, the one whose answer settles the most other questions comes first
+    (``effects``), then the one whose least answer settles the most. An
+    order that put the effects first decided 13% to 37% fewer units at five
+    choices on the archive (``QA-2026-10-12-02-E1``). A field question has
+    no proven effect on another question. The selected frameworks then take
+    turns over both kinds (:func:`by_turn`).
 
     **A question that decides a framework's precondition is listed first**,
     every one still open, outside the limits and the floor (ADR 0067).
@@ -1140,12 +1165,26 @@ def recommended(
     shown: list[EarlyQuestion] = []
     held_back: list[EarlyQuestion] = []
     place = {question.key: index for index, question in enumerate(listed)}
+    # What the saved answers charged each framework: a question's choices,
+    # to every framework it served. The turns start from here, not from zero.
+    spent: Counter[str] = Counter()
+    for key, served in answered_for.items():
+        for name in served:
+            spent[name] += len(answer_facets(key)) or 1
 
-    def rank(question: EarlyQuestion) -> tuple[float, int, int]:
+    def rank(question: EarlyQuestion) -> tuple[float, float, float, int, int]:
+        # The list's own order first: a capability's band and the units it
+        # could settle (its score), a field question's prior per choice. The
+        # effects break a tie, and the list's place breaks the rest.
+        if question.kind != "capability":
+            return (0.0, 0.0, 0.0, 0, place[question.key])
         effect = effects.get(question.key)
+        band = max((band for _, band in question.framework_bands), default=0)
         if effect is None:
-            return (0.0, 0, place[question.key])
+            return (-band, -question.score, 0.0, 0, place[question.key])
         return (
+            -band,
+            -question.score,
             -effect.potential / question.decisions,
             -effect.least,
             place[question.key],
@@ -1173,17 +1212,19 @@ def recommended(
             (question for question in eligible if question.key not in answered_for),
             key=rank,
         )
-        for question in by_turn(fresh):
+        for question in by_turn(fresh, spent):
             if any(counted[name] < rule.limit for name in question.frameworks):
                 taken.append(question)
                 counted.update(question.frameworks)
             else:
                 held_back.append(question)
         shown += [*started, *taken]
-    return (*gates, *by_turn(shown)), blocked, tuple(held_back)
+    return (*gates, *by_turn(shown, spent)), blocked, tuple(held_back)
 
 
-def by_turn(questions: Sequence[EarlyQuestion]) -> list[EarlyQuestion]:
+def by_turn(
+    questions: Sequence[EarlyQuestion], charged: Mapping[str, int] | None = None
+) -> list[EarlyQuestion]:
     """The questions with the selected frameworks taken in turn.
 
     The frameworks take turns one question at a time, as :func:`_in_turn`
@@ -1198,11 +1239,17 @@ def by_turn(questions: Sequence[EarlyQuestion]) -> list[EarlyQuestion]:
     their scores, so one framework's prior scale can move that question in
     another framework's turn (ADR 0053, ``QA-2026-10-06-01-E1``).
     With one framework selected the order is the list's order.
+
+    ``charged`` is what each framework was charged by the saved answers, so
+    the turns carry over the saves: an owner who answers the first question
+    and saves meets the other framework's question next, not the same
+    framework's again (``QA-2026-10-12-02-E1``).
     """
     return _in_turn(
         questions,
         serves=lambda question: set(question.frameworks),
         choices=lambda question: question.decisions,
+        charged=charged,
     )
 
 
@@ -1215,6 +1262,7 @@ def _in_turn(
     serves: Callable[[_Item], set[str]],
     choices: Callable[[_Item], int],
     tie: Callable[[_Item], int] = lambda item: 0,
+    charged: Mapping[str, int] | None = None,
 ) -> list[_Item]:
     """The items with the selected frameworks taking turns.
 
@@ -1225,7 +1273,7 @@ def _in_turn(
     item serves is charged its choices. An item that serves no framework
     keeps its place after every item that does.
     """
-    charged: Counter[str] = Counter()
+    charged = Counter(charged or {})
     left = list(items)
     order: list[_Item] = []
     while left:

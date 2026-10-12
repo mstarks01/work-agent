@@ -38,6 +38,7 @@ sources (the maintainer's decision of 2026-09-25 on #1225).
 from __future__ import annotations
 
 from collections.abc import Collection, Mapping, Sequence
+from functools import lru_cache
 from typing import Annotated, Any, Literal
 
 from pydantic import (
@@ -244,11 +245,15 @@ class FactAnswer(BaseModel):
         )
 
 
+@lru_cache(maxsize=8192)
 def key_ref(key: UnknownKey) -> UnknownRef:
     """The key as an unvalidated :class:`~analysis_service.claims.UnknownRef`.
 
     **The one reader of "which part of a key is which".** A caller reads the
     key's parts by name, or its :attr:`~analysis_service.claims.UnknownRef.spellings`.
+    The reference is shared between callers and read, never written: building
+    the early list reads each key many times over, and the build of one
+    question set called this thousands of times.
     """
     element_id, attribute, assertion, subject, question, capability = key
     return UnknownRef.model_construct(

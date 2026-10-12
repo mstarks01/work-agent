@@ -84,15 +84,15 @@ class TestTheStopSaysWhatIsLeft:
 
     def test_a_higher_level_still_shows_the_lower_levels_unknowns(self):
         """Selecting level 2 does not hide whether level 1 is settled: each
-        band is counted on its own. Thirty "yes" answers go to the questions
-        whose "no" would settle the most (ADR 0078), and a "yes" to a broad
-        parent settles no level 1 requirement, so 19 stay unknown where the
-        band-first order left 7. The summary discloses them."""
+        band is counted on its own. Thirty "yes" answers leave 18 level 1
+        requirements unknown: the effects break ties toward the parents with
+        the most parts, whose "yes" lists parts that take the thirty places
+        (ADR 0078); the depth-and-name tiebreak left 7."""
         asked = _all_yes(2)
         assert asked.stop == "budget-exhausted"
         bands = _bands(asked)
         assert list(bands) == ["level 1", "level 2"], "the highest band first"
-        assert bands["level 1"][0]["unknown"] == 19
+        assert bands["level 1"][0]["unknown"] == 18
 
     def test_a_question_under_the_floor_takes_an_answer(self):
         asked = _all_yes(1)

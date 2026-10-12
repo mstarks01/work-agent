@@ -74,6 +74,7 @@ from evals.harness import (
     consent,
     critic_replay,
     descendants,
+    early_answerers,
     early_policies,
     early_rounds,
     envelope,
@@ -2731,6 +2732,13 @@ COMMANDS: dict[str, Command] = {
         " than one framework, on archived reports (offline, no credentials)",
         run=early_policies.command_early_policies,
         arguments=early_policies.arguments,
+    ),
+    "early-answerers": Command(
+        help="answer the early list from the top with each answerer, under the"
+        " shipped order and the order without the effects, and read what each"
+        " settles at matched choices (offline, no credentials)",
+        run=early_answerers.command_early_answerers,
+        arguments=early_answerers.arguments,
     ),
     "follow-up-policies": Command(
         help="compare orders of a report's follow-up questions at a matched"

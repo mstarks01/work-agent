@@ -525,3 +525,26 @@ def test_reopening_a_completed_analysis_displays_its_report(page):
     page.wait_for_selector("#report-list a")
     assert page.locator("#report-list a").inner_text().startswith("Your system")
     assert "Generated " in page.locator("#report-list a").inner_text()
+
+
+def test_a_320px_owner_answers_and_skips_without_sideways_scroll(browser, served):
+    """The narrowest layout the issue names: every control reachable, no
+    horizontal scroll, an answer saved and a question skipped (#1632)."""
+    context = browser.new_context(
+        base_url=served, viewport={"width": 320, "height": 568}
+    )
+    page = context.new_page()
+    errors: list[str] = []
+    page.on("pageerror", lambda error: errors.append(str(error)))
+    page.goto("/")
+    pause(page)
+    wide = page.evaluate(
+        "document.documentElement.scrollWidth - document.documentElement.clientWidth"
+    )
+    choose(page, page.locator('#list p select:has(option[value="yes"])').first, "yes")
+    with page.expect_response(_post_to_answer):
+        page.locator("#list button", has_text="Skip for now").first.click()
+    saved(page)
+    context.close()
+    assert errors == [], f"the page raised: {errors}"
+    assert wide <= 0, f"the page scrolls sideways by {wide}px at 320px"
