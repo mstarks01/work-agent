@@ -59,6 +59,26 @@ from evals.review_submission import REPO_ROOT, unreviewed_cases
 #: merged submissions — so an entry here only ever says what an unread case
 #: leaves unchecked, and a case somebody has since read is spent.
 UNREVIEWED: dict[str, str] = {
+    "01-payments-checkout": (
+        "model.json gained trust_zone assumptions for the shopper and the card"
+        " processor, placements the signed facts already call inferred. No"
+        " element, attribute value or claim changed; the digest did."
+    ),
+    "04-ml-inference-service": (
+        "model.json gained a trust_zone assumption for the calling service, a"
+        " placement the signed facts already call inferred. No element,"
+        " attribute value or claim changed; the digest did."
+    ),
+    "09-cookbook-sokify-retail": (
+        "model.json gained a trust_zone assumption for the customer, a"
+        " placement the signed facts already call inferred. No element,"
+        " attribute value or claim changed; the digest did."
+    ),
+    "13-dispatch-control-plane": (
+        "model.json gained a trust_zone assumption for the dispatch console, a"
+        " placement the signed facts already call inferred. No element,"
+        " attribute value or claim changed; the digest did."
+    ),
     "14-loyalty-oauth-platform": (
         "Read in the confirming sitting of 2026-10-04. The PKCE claim's"
         " rationale was rewritten in the reader's words, so the case waits on"

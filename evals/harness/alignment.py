@@ -21,22 +21,29 @@ rather than guessing.
 2. **Alias.** A node or zone under a name a reader ruled supported, from the
    case's own ``aliases``. The alias keeps its element's type, and a produced
    element already paired exactly is not available to an alias.
-3. **Membership.** A zone under any name, when one unpaired produced zone
+3. **Respelled.** A node or zone whose slug differs from an unpaired produced
+   element's of the same type by a plural ``s`` alone — ``shoppers`` for
+   ``shopper`` — when exactly one element on each side carries that
+   singularised slug (:func:`slug_key`). Which spelling ``extract.md`` asks
+   for is naming conformity, measured by the strict figures, and not a
+   component the model failed to read. Two on either side are listed and
+   paired with nothing.
+4. **Membership.** A zone under any name, when one unpaired produced zone
    holds more of the reference zone's paired members than any other. A zone's
    name is a word the model coins for a partition; which elements sit in it
    is the fact, and the partition-agreement figure already reads it that way.
    A tie, or one produced zone that two reference zones both claim, is listed
    and paired with nothing.
-4. **Label.** A flow between aligned endpoints carrying the reference flow's
+5. **Label.** A flow between aligned endpoints carrying the reference flow's
    own label, or a label a reader ruled an alias for that flow. The endpoints
-   resolved through rules 1 to 3, so a flow whose endpoint was renamed under a
+   resolved through rules 1 to 4, so a flow whose endpoint was renamed under a
    ruling is still that flow.
-5. **Discriminated.** A flow between aligned endpoints under a different label,
+6. **Discriminated.** A flow between aligned endpoints under a different label,
    when exactly one reference flow and exactly one produced flow there agree
    on every discriminator in :data:`FLOW_DISCRIMINATORS`. A label is a word the
    model coins for an interaction; the operation and whether a protocol is
    stated are facts about it.
-6. **Sole.** The only reference flow and the only produced flow between an
+7. **Sole.** The only reference flow and the only produced flow between an
    aligned endpoint pair, when the labels and the discriminators both differ.
    One interaction on each side between two found elements is one interaction
    described twice, and the facts that differ are charged as wrong facts on
@@ -51,11 +58,13 @@ nothing, so a split or a merge is a listed fact rather than a silent choice.
 
 ## What this is not
 
-Not a fuzzy match. No rule reads name similarity. Rules 3 and 6 read
-structure — who sits in a zone, what sits between two endpoints — and each
-pair records which rule made it, so a figure can be read with or without
-them. A produced interaction beside a real one between the same endpoints is
-still an invention: rule 6 pairs only where each side holds one in all. The
+Not a fuzzy match. No rule reads name similarity: rule 3 reads one plural
+``s``, dropped on both sides by :func:`slug_key`, and nothing else about a
+name. Rules 4 and 7 read structure — who sits in a zone, what sits between
+two endpoints — and each pair records which rule made it, so a figure can be
+read with or without them. A produced interaction beside a real one between
+the same endpoints is still an invention: rule 7 pairs only where each side
+holds one in all. The
 strict figures stay beside the aligned ones, so nothing here rewrites a
 number an archived sweep reported.
 """
@@ -79,7 +88,9 @@ from analysis_service.system_model import (
 from evals.harness.reference import GoldenCase
 
 #: What a pair rests on, in the order the rules run.
-Evidence = Literal["exact", "alias", "membership", "label", "discriminated", "sole"]
+Evidence = Literal[
+    "exact", "alias", "respelled", "membership", "label", "discriminated", "sole"
+]
 
 
 def protocol_state(value: Any) -> str:
@@ -277,7 +288,7 @@ def _align_nodes(
     pairs: list[Pair],
     ambiguous: list[Ambiguity],
 ) -> None:
-    """Rules 1 and 2 over everything that is not a flow.
+    """Rules 1 to 3 over everything that is not a flow.
 
     **An alias is matched against a produced element's name, not its ID.** The
     two agree on any model the gate passed, because ``id-mismatch`` holds an ID
@@ -328,6 +339,38 @@ def _align_nodes(
                 (reference,), tuple(sorted(f for r, f in claims if r == reference))
             )
         )
+    _align_respelled(nodes, held, pairs, ambiguous)
+
+
+def _align_respelled(
+    nodes: frozenset[str],
+    held: frozenset[str],
+    pairs: list[Pair],
+    ambiguous: list[Ambiguity],
+) -> None:
+    """Rule 3: the one unpaired node on each side under one singularised slug.
+
+    Read off the IDs, which the gate holds to the names, and after the alias
+    rule, so a reader's ruling takes the produced element before a plural
+    can. A singularised slug that two references or two produced elements
+    share is listed and paired with nothing.
+    """
+    paired_reference = {pair.reference for pair in pairs}
+    paired_produced = {pair.produced for pair in pairs}
+    by_key: dict[str, list[str]] = defaultdict(list)
+    for element_id in sorted(held - paired_produced):
+        by_key[slug_key(element_id)].append(element_id)
+    # A singularised slug keeps its type prefix, so one key never crosses types.
+    claims: dict[str, list[str]] = defaultdict(list)
+    for reference in sorted(nodes - paired_reference):
+        if slug_key(reference) in by_key:
+            claims[slug_key(reference)].append(reference)
+    for key, references in sorted(claims.items()):
+        found = tuple(by_key[key])
+        if len(references) == 1 and len(found) == 1:
+            pairs.append(Pair(references[0], found[0], "respelled"))
+        else:
+            ambiguous.append(Ambiguity(tuple(references), found))
 
 
 def _nodes(element_ids: Iterable[str]) -> Iterable[str]:
@@ -391,7 +434,7 @@ def _align_flows(
     pairs: list[Pair],
     ambiguous: list[Ambiguity],
 ) -> None:
-    """Rules 3 and 4, over the endpoint pairs the node rules resolved.
+    """Rules 5 to 7, over the endpoint pairs the node rules resolved.
 
     A flow alias is another label a reader ruled supported for one blessed
     flow, and it is read between the same aligned endpoints the label rule

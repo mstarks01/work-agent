@@ -12,13 +12,10 @@ at and a ceiling it cannot exceed before anything is spent.
 Read off :mod:`evals.harness.alignment`, never off names:
 
 * ``found``: paired by exact ID.
-* ``renamed``: paired on a reader's alias, or a flow paired under its own
-  label or the discriminators between aligned endpoints.
-* ``respelled``: unpaired, and an unpaired produced element of its type
-  carries the same slug once each segment is singularised — ``shoppers``
-  for ``shopper``. The strict figures charge it as a miss and an extra;
-  which spelling ``extract.md`` asks for is naming conformity, not a
-  component the model failed to read.
+* ``renamed``: paired on a reader's alias, on a plural of its own slug
+  (``shoppers`` for ``shopper``), on a zone's membership, or as a flow under
+  its own label or the discriminators between aligned endpoints. The
+  alignment's evidence kind says which.
 * ``mistyped``: unpaired, and an unpaired produced element carries the same
   slug under another type. A store written as a process.
 * ``misattached``: an unpaired flow whose endpoints were both found, with no
@@ -138,7 +135,6 @@ from evals.reference_facts import facts_path, load_facts, reference_catalog
 Fate = Literal[
     "found",
     "renamed",
-    "respelled",
     "mistyped",
     "misattached",
     "endpoint_unaligned",
@@ -150,7 +146,6 @@ Fate = Literal[
 FATES: tuple[Fate, ...] = (
     "found",
     "renamed",
-    "respelled",
     "mistyped",
     "misattached",
     "endpoint_unaligned",
@@ -339,15 +334,17 @@ def classify_elements(
 
 
 def _node_fate(reference: str, loose: Sequence[str]) -> ElementFate:
-    """A node nothing stood for: the same slug elsewhere, a type-mate, or nothing."""
+    """A node nothing stood for: the same slug under another type, a type-mate, or nothing.
+
+    A plural of the same slug under the same type is the alignment's rule 3,
+    so one left here sits beside a second candidate and is already listed as
+    ambiguous.
+    """
     slug = slug_key(reference).partition(":")[2]
     same_slug = [one for one in loose if slug_key(one).partition(":")[2] == slug]
     same_type = tuple(
         one for one in loose if element_type(one) == element_type(reference)
     )
-    respelled = tuple(one for one in same_slug if one in same_type)
-    if respelled:
-        return ElementFate(reference, "respelled", candidates=respelled)
     mistyped = tuple(one for one in same_slug if one not in same_type)
     if mistyped:
         return ElementFate(reference, "mistyped", candidates=mistyped)

@@ -502,7 +502,7 @@ extraction sweep keeps what `extract` emitted and an assertion sweep keeps
 what `assert` proposed, and `evals/emissions/` holds every paid one. `replay`
 re-parses each emission under the code and the corpus that stand and gives
 every blessed element one fate: found, renamed under a reader's alias or a
-flow's own label, respelled, mistyped, misattached, lost with its endpoint,
+flow's own label or its plural, mistyped, misattached, lost with its endpoint,
 omitted outright, or unresolved because a candidate sits beside it that nobody
 has ruled on. The fates are split per element type, so a change aimed at the
 actors reads its ceiling off the `entity` column and nothing else. A signed

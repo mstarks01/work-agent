@@ -64,6 +64,7 @@ from analysis_service.report import (
 from analysis_service.sources import SourceKind, text_digest
 from analysis_service.system_model import (
     ELEMENT_GROUPS,
+    UNKNOWN,
     SystemModel,
     make_element_id,
     make_flow_id,
@@ -1145,6 +1146,38 @@ def _check_facts(
         yield f"{FACTS_FILE}: {exc}"
         return
     yield from _unheld_issues(case_dir, facts, sources)
+    yield from _placement_issues(facts, model)
+
+
+def _placement_issues(facts: ReferenceFacts, model: SystemModel) -> Iterator[str]:
+    """A signed placement agrees with the model's record of it.
+
+    A placement the source states carries no ``trust_zone`` assumption. One
+    the reference infers, or leaves ``unknown`` because the schema forced a
+    zone the source never gave, carries one.
+    :meth:`~analysis_service.system_model.SystemModel.assumed_zone_elements`
+    is the one reader of the model's side, and a signed ``network-membership``
+    row is the reference's own word on the same placement. The replay reads
+    the model's side alone, so a row the reference infers with no assumption
+    beside it charges a producer for a zone the placement rule tells it not
+    to draw.
+    """
+    assumed = model.assumed_zone_elements()
+    for row in facts.rows:
+        assertion = row.assertion
+        if assertion.predicate != "network-membership" or row.reviewed_by is None:
+            continue
+        source_places_it = assertion.basis == "stated" and assertion.value != UNKNOWN
+        if source_places_it and assertion.subject in assumed:
+            yield (
+                f"model.json records a trust_zone assumption for {assertion.subject},"
+                f" and {FACTS_FILE} states its placement"
+            )
+        if not source_places_it and assertion.subject not in assumed:
+            yield (
+                f"{FACTS_FILE}: the source does not place {assertion.subject},"
+                " and model.json records no trust_zone assumption for it"
+            )
 
 
 def _unheld_issues(

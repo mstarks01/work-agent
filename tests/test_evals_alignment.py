@@ -267,7 +267,7 @@ class TestInteractionsAlignOneToOne:
         assert set(ambiguity.produced) <= set(score.alignment.unaligned_produced)
 
     def test_a_flow_between_aliased_endpoints_is_paired_by_its_label(self):
-        """Rule 3: the endpoint resolved through rule 2, and the label is its own."""
+        """Rule 5: the endpoint resolved through rule 2, and the label is its own."""
         golden = case("03")
         model = renamed(golden.model, "process:ingest-scheduler", "Airflow scheduler")
         score = scored(golden, model)
@@ -294,7 +294,7 @@ class TestAFlowAliasIsReadBetweenItsEndpoints:
             golden, meta=golden.meta.model_copy(update={"aliases": [alias]})
         )
         # Under another label and with a discriminator that differs, so
-        # neither the label rule nor rule 4 pairs it: the alias is what does.
+        # neither the label rule nor rule 6 pairs it: the alias is what does.
         model = relabelled(golden.model, flow_id, "load artifacts")
         raw = model.model_dump(mode="json")
         next(f for f in raw["data_flows"] if flow_label(f["id"]) == "load-artifacts")[

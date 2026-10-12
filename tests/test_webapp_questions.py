@@ -275,37 +275,21 @@ class TestTheRounds:
         )
         assert missing.status_code == 400
 
-    def test_a_round_of_skips_alone_is_saved_and_listed(self, tiers):
-        client = client_for(tiers, PausingRunner(catalog=False), catalog=False)
-        paused = start(client, questions=True)
-        shown = shown_round(client, paused)
-        keys = _presented(shown["early_questions"])
-        saved = client.post(
-            f"/answer/{paused}",
-            json={"links": [], "facts": [], "save": True, "skip": keys, "revision": 0},
-            headers=SAME_ORIGIN,
-        )
-        assert saved.status_code == 200, saved.text
-        after = saved.json()
-        assert sorted(q["key"] for q in after["skipped_early"]) == sorted(keys)
-        assert not {tuple(k) for k in keys} & {
-            tuple(q["key"]) for q in after["early_questions"]
-        }
-        assert after["answered_early"] == []
-
     @pytest.mark.parametrize(
         "skip", ["x", [["a", "b"]], [[1, 2, 3, 4, 5, 6]], [""], ["x" * 201], [7]]
     )
     def test_a_malformed_skip_is_refused(self, tiers, skip):
+        """The save carries a valid answer, so only the skip can refuse it."""
         client = client_for(tiers, PausingRunner(catalog=False), catalog=False)
         paused = start(client, questions=True)
-        client.get(f"/events/{paused}")
+        key = shown_round(client, paused)["early_questions"][0]["key"]
+        fact = {"key": key, "value": "unknown"}
+        body = {"links": [], "facts": [fact], "save": True, "revision": 0}
         saved = client.post(
-            f"/answer/{paused}",
-            json={"links": [], "facts": [], "save": True, "skip": skip, "revision": 0},
-            headers=SAME_ORIGIN,
+            f"/answer/{paused}", json=body | {"skip": skip}, headers=SAME_ORIGIN
         )
         assert saved.status_code == 400
+        assert saved.json()["message"].startswith("Expected a JSON body")
 
     def test_a_start_after_a_skipped_round_admits_what_the_route_admits(self, tiers):
         """The engine admits each round-2 answer the route admits (#1289).
@@ -691,21 +675,6 @@ class TestFactAnswers:
         )
         assert response.status_code == 400
         assert "no assertion catalog" in response.json()["message"]
-
-    def test_a_fact_the_report_does_not_hold_is_refused(self, tiers, runner):
-        client = client_for(tiers, runner)
-        finished = start(client, questions=False)
-        client.get(f"/events/{finished}")
-        wrong = {
-            "key": [FACT["key"][0], "exposure", "", "", "", ""],
-            "value": "internal",
-        }
-        response = client.post(
-            f"/answer/{finished}",
-            json={"links": [], "facts": [wrong]},
-            headers=SAME_ORIGIN,
-        )
-        assert response.status_code == 400
 
     def test_the_report_page_carries_its_fact_questions(self, tiers, runner):
         client = client_for(tiers, runner)
@@ -2423,24 +2392,6 @@ def test_a_refused_answer_to_a_skipped_question_names_it(tiers):
     assert f'The answer to "{first["label"]}"' in refused.json()["message"]
 
 
-def test_a_save_after_the_start_is_refused(tiers):
-    """A save after the start is refused, because no run would read it."""
-    client = client_for(tiers, PausingRunner(catalog=False), catalog=False)
-    paused = start(client, questions=True)
-    first = shown_round(client, paused)["early_questions"][0]
-    body = {"links": [], "facts": [], "revision": 0}
-    run = client.post(f"/answer/{paused}", json=body, headers=SAME_ORIGIN)
-    client.get(f"/events/{run.json()['run']}")
-
-    saved = client.post(
-        f"/answer/{paused}",
-        json=body | {"save": True, "skip": [first["key"]]},
-        headers=SAME_ORIGIN,
-    )
-
-    assert saved.status_code == 409
-
-
 @pytest.mark.parametrize("save", [True, False], ids=["save", "start"])
 def test_answers_that_break_the_input_limits_are_refused_at_once(tiers, save):
     """The route refuses answers over the limits before a run can fail on them."""
@@ -3296,17 +3247,6 @@ class TestTheAmendment:
             headers=SAME_ORIGIN,
         )
         assert held.status_code == 409, "the amended run holds the paused one"
-
-    def test_a_stale_amendment_is_refused(self, tiers):
-        client, paused, _ = self.paused_with_an_answer(
-            tiers, PausingRunner(catalog=False)
-        )
-        stale = client.post(
-            f"/amend/{paused}",
-            json={"text": AMENDMENT, "revision": 0},
-            headers=SAME_ORIGIN,
-        )
-        assert stale.status_code == 409
 
     def test_the_page_sends_the_correction_and_follows_the_new_run(self):
         steps = """

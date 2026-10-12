@@ -105,6 +105,7 @@ Not part of the question, but the records cite these names, so you need them.
 
 **Assumptions**
 
+- `entity:calling-service` — The calling services are placed on the public internet because the schema requires a zone; the source places them nowhere. (basis: Two of the calling services are in a different cloud and the gateway is exposed to reach them. A different cloud is not a stated network, and reaching the gateway does not locate the caller.)
 - `entity:ml-engineer` — The ML engineer is placed in the model network because the schema requires a zone; the source places neither the engineer nor the registry bucket. (basis: No statement locates the engineer or the bucket, and publishing to a bucket does not locate the publisher. The value is a placement the schema requires, not a source-backed fact.)
 - `store:inference-log` — The inference log may contain personal data. (basis: Stated to hold raw prompts carrying "whatever the calling team's users typed"; whether that text is personal is not stated, so the tag records a possibility.)
 - `store:redis-feature-store` — The Redis feature store holds confidential data under the scheme in prompts/extract.md. (basis: The source says it holds account age and spend bands per customer, which is customer-specific information; the classification is inferred under the scheme, not quoted.)
@@ -441,7 +442,7 @@ your missing list, your notes and a digest of each file you read:
       "notes": "<counts, and anything you would change>",
       "opened_digests": {
       "source.md": "3da14d8d61e45baa73b0a7ee2b6935b0da3c1d47c62fdf9cb30ef4a09d6c67b6",
-      "model.json": "4f4193d4b0435635054b15c8671a2184acac80c9377c98a0b41ad0064e926f1a",
+      "model.json": "78c74d4f13767bb8ae4acdb04af4b44975a91fe074927e0c76a70c2f5214bd82",
       "claims/asvs.json": "0cb9e82391d0647fccc20a8d022b8e3a6287058ee2086b86999f1bab22cf7254",
       "claims/stride.json": "4a8a17637e863c3dfc81b84a252f1587ab25eb3d0841c2960c64619cf52266e5"
       }
