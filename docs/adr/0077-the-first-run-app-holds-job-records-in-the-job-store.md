@@ -39,8 +39,11 @@ module writes and starts a job for both surfaces.**
   deleted job leaves its usage row (ADR 0066).
 - The page's event stream is the store's event log for the job, followed by
   one frame for how the run ended: the questions a pause asks, where the
-  report is, why the description was refused, or why the run failed. The
-  store is the one record of the run.
+  report is, why the description was refused, or why the run failed. A
+  pause whose questions the app refuses to serve, such as one the gate
+  withholds, ends in a `failed` frame with the refusal's message. The
+  store is the one record of the run, and `jobs.event_frames` is the one
+  reader of when a stream ends, for this app and for `/v1`.
 - An analysis is the root of a job's parent chain, read through the
   resumption and amendment parents. No field names it.
 - Every job the app holds names the in-process caller as its owner.

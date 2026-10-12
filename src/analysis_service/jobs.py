@@ -28,7 +28,14 @@ import asyncio
 import json
 import logging
 import os
-from collections.abc import Awaitable, Callable, Iterator, Mapping, Sequence
+from collections.abc import (
+    AsyncIterator,
+    Awaitable,
+    Callable,
+    Iterator,
+    Mapping,
+    Sequence,
+)
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from itertools import chain
@@ -151,7 +158,7 @@ class JobEvent(BaseModel):
 
     def sse_frame(self) -> str:
         """The event as one server-sent frame: ``seq`` as the id, the kind as
-        the event name, and the rest as data. Both apps' streams write it."""
+        the event name, and the rest as data. :func:`event_frames` writes it."""
         data = self.model_dump_json(exclude={"seq", "kind"}, exclude_none=True)
         return f"id: {self.seq}\nevent: {self.kind}\ndata: {data}\n\n"
 
@@ -946,6 +953,39 @@ class InMemoryJobStore:
             parent_id=parent_of(record),
         )
         return True
+
+
+#: How long an event stream waits before it asks the store for new events.
+POLL_SECONDS = 0.2
+
+
+async def event_frames(
+    store: JobStore,
+    job_id: str,
+    seen: int = 0,
+    *,
+    gone: Callable[[], Awaitable[bool]] | None = None,
+) -> AsyncIterator[str]:
+    """The job's events past ``seen``, as server-sent frames, as the store
+    records them.
+
+    **The one reader of "when does a job's stream end".** It ends when the job
+    reaches a terminal status, when the store holds no such job, or when
+    ``gone`` says the client left. A job that emits nothing sends nothing, so
+    a send to a client that left never fails: ``gone`` is how such a stream
+    ends and gives its slot back.
+    """
+    while True:
+        progress = await store.events_after(job_id, seen)
+        if progress is None:
+            return
+        status, events = progress
+        for event in events:
+            seen = event.seq
+            yield event.sse_frame()
+        if status in TERMINAL_STATUSES or (gone is not None and await gone()):
+            return
+        await asyncio.sleep(POLL_SECONDS)
 
 
 class JobStoreConfigError(ValueError):

@@ -157,6 +157,7 @@ from analysis_service.fact_answers import (
 )
 from analysis_service.frameworks import PACKAGES, package_for
 from analysis_service.job_answers import (
+    DraftSaved,
     JobAnswers,
     JobDataMissing,
     NoCatalog,
@@ -177,6 +178,7 @@ from analysis_service.jobs import (
     JobStatus,
     JobStore,
     PipelineRunner,
+    event_frames,
     execute_job,
     parent_of,
 )
@@ -1017,7 +1019,7 @@ def create_app(
                 not isinstance(revision, int) or isinstance(revision, bool)
             ):
                 raise TypeError
-        except RefusedAnswer as exc:
+        except InvalidFactAnswer as exc:
             return _message(400, str(exc))
         except (ValidationError, ValueError, KeyError, TypeError):
             return _message(
@@ -1041,7 +1043,7 @@ def create_app(
             )
         if isinstance(outcome, Started):
             return JSONResponse({"run": outcome.job_id})
-        if outcome.revision is not None:
+        if isinstance(outcome, DraftSaved):
             # A draft runs nothing and spends no follow-up (ADR 0070).
             return JSONResponse({"saved": True, "revision": outcome.revision})
         # A saved round runs no model: the answers go onto the paused run, and
@@ -1096,15 +1098,14 @@ def create_app(
             answerable = await workspace.answers.answerable(run_id, OWNER)
         except (NoSuchJob, NotCompleted, Withheld):
             return PlainTextResponse("no such report", status_code=404)
-        store = workspace.store
-        report = await store.report(run_id, OWNER)
+        report = answerable.report
         if report is None:
             return PlainTextResponse("no such report", status_code=404)
         resumption = answerable.record.resumption
         previous = (
             None
             if resumption is None
-            else await store.report(resumption.parent_id, OWNER)
+            else await workspace.store.report(resumption.parent_id, OWNER)
         )
         return response(render_report(report, answerable.state(), previous))
 
@@ -1123,7 +1124,7 @@ def create_app(
             if not isinstance(raw, list) or len(raw) > MAX_FACT_ANSWERS:
                 raise TypeError
             facts = [await _fact_answer(fact, questions) for fact in raw]
-        except RefusedAnswer as exc:
+        except InvalidFactAnswer as exc:
             return _message(400, str(exc))
         except (ValidationError, ValueError, KeyError, TypeError):
             return _message(
@@ -1244,7 +1245,7 @@ def _skips(raw: object) -> list[SkipKey]:
         raise TypeError from exc
 
 
-class RefusedAnswer(Exception):
+class InvalidFactAnswer(Exception):
     """One fact answer the page sent does not parse; the message names its question."""
 
 
@@ -1263,7 +1264,7 @@ def _questions_of(
 async def _fact_answer(
     raw: object, questions: Callable[[], Awaitable[QuestionSet]]
 ) -> FactAnswer:
-    """The answer, or a :class:`RefusedAnswer` that names the question it answers.
+    """The answer, or an :class:`InvalidFactAnswer` that names the question it answers.
 
     The message is the validator's own, which names the submitter's choices,
     so it is safe to show. The questions are read only for that message.
@@ -1285,10 +1286,7 @@ async def _fact_answer(
                 if parts in known:
                     label = fact_label(parts, asked.model)
         lead = "An answer" if label is None else f'The answer to "{label}"'
-        raise RefusedAnswer(f"{lead} was refused: {reason}") from None
-
-
-_POLL_SECONDS = 0.2
+        raise InvalidFactAnswer(f"{lead} was refused: {reason}") from None
 
 
 def _frame(event: str, data: dict[str, object]) -> str:
@@ -1304,24 +1302,19 @@ async def _stream(workspace: Workspace, run_id: str) -> AsyncIterator[str]:
     a pause asks, where a report is, why a description was refused, or why a
     run failed.
     """
-    store = workspace.store
-    seen = 0
-    while True:
-        progress = await store.events_after(run_id, seen)
-        if progress is None:
-            return
-        status, events = progress
-        for event in events:
-            seen = event.seq
-            yield event.sse_frame()
-        if status in TERMINAL_STATUSES:
-            break
-        await asyncio.sleep(_POLL_SECONDS)
-    record = await store.owned(run_id, OWNER)
+    async for frame in event_frames(workspace.store, run_id):
+        yield frame
+    record = await workspace.store.owned(run_id, OWNER)
     if record is None:
         return
+    status = record.status
     if status == "awaiting-answers":
-        payload = await workspace.answers.questions(run_id, OWNER)
+        try:
+            payload = await workspace.answers.questions(run_id, OWNER)
+        except tuple(_REFUSAL_STATUS) as refusal:
+            # The response has started, so a refusal is a frame, never a status.
+            yield _frame("failed", {"message": str(refusal)})
+            return
         yield _frame("questions", {"run": run_id} | payload)
     elif status == "completed":
         yield _frame("done", {"url": f"/report/{run_id}"})
