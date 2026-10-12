@@ -664,7 +664,8 @@ _REFUSAL_STATUS: dict[type[Exception], int] = {
 
 
 async def _refusal_response(status: int, request: Request, exc: Exception):
-    return _problem_response(status, str(exc))
+    fields: dict[str, Any] = exc.fields() if isinstance(exc, Refused) else {}
+    return _problem_response(status, str(exc), **fields)
 
 
 T = TypeVar("T")

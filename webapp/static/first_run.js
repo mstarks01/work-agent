@@ -123,7 +123,7 @@
   });
 
   // ------------------------------------------------------------------------
-  // A paused run's questions: one adaptive list, saved as the owner answers
+  // A paused run's questions: one adaptive list, saved as the submitter answers
   // (ADR 0078). The service decides what the list holds and in what order.
   // This page draws each row once, by its key, keeps it in place while the
   // list around it changes, and sends each change on its own. The service
@@ -139,13 +139,17 @@
   // Every row the page has drawn, by its key as a string: the question, its
   // node, its editor, and the answer the service last acknowledged for it.
   const rows = new Map();
-  // The owner's edits the service has not acknowledged, by key string:
-  // { generation, answer, skip, refused, conflict }. A row's generation rises
-  // with every edit, and an acknowledgement clears only the generation sent.
+  // The submitter's edits the service has not acknowledged, by key string:
+  // { q, kind, base, answer, skip, refused, conflict }. `q` and `kind` name
+  // the question, and `base` is the saved answer the edit was made over.
+  // `conflict` is set only while another tab's save contradicts the edit:
+  // { theirs }, the answer saved there, or null where it was removed.
+  // Every edit is a new entry, and an acknowledgement clears an entry only
+  // while it is the one it sent.
   const edits = new Map();
-  let generation = 0;
   // How long the page waits after a keystroke before it saves. A chosen
-  // option is saved at once.
+  // option is saved at once. 400 ms is the initial target #1632 sets; no
+  // measurement of typing chose it.
   const AUTOSAVE_DELAY = 400;
   // How much of an element's source words a row shows; the rest is its title.
   const EXCERPT = 200;
@@ -153,7 +157,14 @@
   // A row's key as the page's maps hold it: a link question's key is a
   // string, every other question's the JSON of its key tuple.
   const rowKey = (row) => (row.kind === "link" ? row.q.key : keyOf(row.q.key));
-  // Two answers are one answer when the fields the owner gives agree. The
+  // Draw a row's open editor, with `prefill` as its saved answer or null.
+  const drawOpen = (row, prefill) => {
+    if (row.kind === "link") drawLink(row, prefill ? prefill.element : "");
+    else if (row.q.form === "facets") drawFacetRow(row, prefill);
+    else drawFact(row, prefill);
+    row.saved = prefill;
+  };
+  // Two answers are one answer when the fields the submitter gives agree. The
   // service serves every field, with its defaults and with the value it
   // writes from a facets answer; the page builds only the fields given.
   const sameAnswer = (a, b) => {
@@ -181,7 +192,7 @@
     return Boolean(active && typeof node.contains === "function" && node.contains(active));
   };
   const dirty = (row) => edits.has(rowKey(row));
-  // A row the page must not rebuild: the owner is editing it, or its edit is
+  // A row the page must not rebuild: the submitter is editing it, or its edit is
   // not acknowledged yet.
   const busy = (row) => dirty(row) || focused(row.node);
 
@@ -254,8 +265,8 @@
 
   // ---- Saving -------------------------------------------------------------
   // One request at a time, for this run. A request carries the edits as they
-  // stood when it was sent, by generation; an edit made while it was in
-  // flight keeps its newer generation and goes in the next request.
+  // stood when it was sent; an edit made while it was in flight is a new
+  // entry and goes in the next request.
   let saveTimer = null;
   let saving = false;
   let again = false;
@@ -275,7 +286,7 @@
   };
   // The status the edits warrant: a conflict first, then anything unsaved.
   const showState = () => {
-    const conflict = [...edits.values()].some((edit) => edit.conflict !== undefined);
+    const conflict = [...edits.values()].some((edit) => edit.conflict);
     setStatus(conflict ? "conflict" : edits.size ? "unsaved" : "saved");
   };
   const scheduleSave = (delay) => {
@@ -296,11 +307,10 @@
     const facts = [];
     const links = [];
     const skip = [];
-    for (const [key, edit] of sent) {
-      const row = rows.get(key);
-      if (edit.skip) skip.push(row.q.key);
+    for (const edit of sent.values()) {
+      if (edit.skip) skip.push(edit.q.key);
       if (!edit.answer) continue;
-      if (row.kind === "link") links.push(edit.answer);
+      if (edit.kind === "link") links.push(edit.answer);
       else facts.push(edit.answer);
     }
     if (!facts.length && !links.length && !skip.length) return null;
@@ -308,6 +318,22 @@
   };
   const sendable = () =>
     new Map([...edits].filter(([, edit]) => !edit.refused && !edit.conflict));
+  // The edits one request carries: the sendable ones, in order, up to the
+  // limits the service publishes for one request (ANSWER_LIMITS). The rest
+  // go in the next request.
+  const batch = () => {
+    const sent = new Map();
+    const count = { facts: 0, links: 0, skips: 0 };
+    for (const [key, edit] of sendable()) {
+      const need = { facts: 0, links: 0, skips: edit.skip ? 1 : 0 };
+      if (edit.answer) need[edit.kind === "link" ? "links" : "facts"] = 1;
+      const over = Object.keys(need).some((kind) => count[kind] + need[kind] > ANSWER_LIMITS[kind]);
+      if (over) continue;
+      for (const kind of Object.keys(need)) count[kind] += need[kind];
+      sent.set(key, edit);
+    }
+    return sent;
+  };
   // Save the edits that wait. While a request is in flight, the edits wait
   // for it, and the promise returned settles once they are sent too, so a
   // caller that awaits it sees every edit made before the call answered.
@@ -322,7 +348,7 @@
     return inFlight;
   };
   const send = async () => {
-    const sent = sendable();
+    const sent = batch();
     const body = bodyOf(sent);
     if (!body) {
       showState();
@@ -339,6 +365,8 @@
       const data = await response.json();
       if (response.ok) {
         acknowledge(sent);
+        // A batch that left edits behind is followed by the next one.
+        if (sendable().size) again = true;
         answerProblem.hidden = true;
         // A save answers with the list again; a stand-in may answer less.
         if (data.early_questions) reconcile(data);
@@ -353,6 +381,7 @@
         }
         refuse(data.message);
         setStatus("failed", data.message);
+        if (data.contradiction) offerCorrection(data.contradiction);
       }
     } catch {
       // The response was lost, and the save may have landed. Read the
@@ -367,8 +396,8 @@
       }
     }
   };
-  // An acknowledgement clears each edit at the generation it was sent; an
-  // edit made since keeps its place and is sent next.
+  // An acknowledgement clears each entry it sent; an edit made since is a new
+  // entry, which stays and is sent next.
   const acknowledge = (sent) => {
     for (const [key, edit] of sent) {
       if (edits.get(key) === edit) edits.delete(key);
@@ -385,7 +414,7 @@
   };
   // Read the answers again, after a stale save or a lost response. An edit
   // the service already holds is acknowledged; an edit over an answer that
-  // changed since this page read it is a conflict for the owner to settle;
+  // changed since this page read it is a conflict for the submitter to settle;
   // every other edit is kept and sent again.
   const resync = async () => {
     let payload;
@@ -406,12 +435,14 @@
     const latest = payload.questions;
     const theirs = answersOf(latest);
     for (const [key, edit] of edits) {
-      const row = rows.get(key);
       const held = theirs.get(key);
       if (edit.answer && sameAnswer(held, edit.answer)) {
         edits.delete(key);
-      } else if (!sameAnswer(held, row.saved)) {
-        edit.conflict = theirs.has(key) ? theirs.get(key) : null;
+      } else if (!sameAnswer(held, edit.base)) {
+        // An edit with no row on the page is the other half of a correction,
+        // and the answer it corrected changed: it is dropped, not shown.
+        if (rows.has(key)) edit.conflict = { theirs: theirs.get(key) || null };
+        else edits.delete(key);
       }
     }
     reconcile(latest);
@@ -423,6 +454,53 @@
       else scheduleSave(0);
     }
   };
+  // Leaving the page with an edit the service has not acknowledged sends it,
+  // and the browser asks the submitter to confirm.
+  window.addEventListener("beforeunload", (event) => {
+    if (!edits.size && !saving) return;
+    flush();
+    event.preventDefault();
+    event.returnValue = "";
+  });
+  // The service refused an answer that would leave a part present under an
+  // absent ancestor (a contradiction it names). The page offers to answer
+  // the other question the same way in one save: "no" to the part under a
+  // "no", or "yes" to the ancestor over a "yes". The service decides again.
+  const offerCorrection = ({ part, ancestor }) => {
+    const [partKey, ancestorKey] = [keyOf(part), keyOf(ancestor)];
+    const mine = [partKey, ancestorKey].find((key) => edits.has(key) && edits.get(key).refused);
+    const own = mine && edits.get(mine);
+    if (!own || !own.answer) return;
+    const otherKey = mine === partKey ? ancestorKey : partKey;
+    const other = questionOf(otherKey);
+    // The sources state the other side: nothing on the page answers it.
+    if (!other) return;
+    const value = own.answer.value;
+    const fix = button(`Answer “${other.label}” “${value}” too, in one save`, () => {
+      fix.remove();
+      delete own.refused;
+      edits.set(otherKey, {
+        q: other,
+        kind: "fact",
+        base: answersOf(view).get(otherKey) || null,
+        answer: { key: other.key, value },
+        skip: false,
+      });
+      flush();
+    });
+    answerProblem.append(" ", fix);
+  };
+  // A question the payload names, by key string: listed, waiting on its
+  // parent, answered, or set aside. Null where the payload names none.
+  const questionOf = (key) =>
+    [
+      ...(view.early_questions || []),
+      ...(view.early_blocked || []),
+      ...(view.answered_early || []),
+      ...(view.skipped_early || []),
+      ...(view.early_held_back || []),
+      ...(view.early_below_floor || []),
+    ].find((q) => keyOf(q.key) === key) || null;
   // "Save now": every editor's current value, and every refused edit again.
   saveButton.addEventListener("click", () => {
     collectEdits();
@@ -443,9 +521,9 @@
     }
     // The same answer already waits to be saved: it is sent once.
     const pending = edits.get(key);
-    if (pending && !pending.skip && !pending.refused && pending.conflict === undefined
+    if (pending && !pending.skip && !pending.refused && !pending.conflict
       && sameAnswer(pending.answer, answer)) return false;
-    edits.set(key, { generation: ++generation, answer, skip: false });
+    edits.set(key, { q: row.q, kind: row.kind, base: row.saved, answer, skip: false });
     return true;
   };
   const onEdit = (row, event) => {
@@ -464,13 +542,24 @@
     const answer = row.read();
     const partial = answer && row.q.form === "facets" && row.open && row.open();
     edits.set(key, {
-      generation: ++generation,
+      q: row.q,
+      kind: row.kind,
+      base: row.saved,
       answer: partial ? answer : null,
       skip: true,
     });
     row.node.hidden = true;
     scheduleSave(0);
     setStatus("unsaved");
+  };
+  // A row's "Skip for now". The service takes a skip only of a question the
+  // list holds, so a row the list no longer holds, such as one just answered
+  // or one opened from a box, shows none (`reconcile` keeps this current).
+  const skipControl = (row) => {
+    const skip = button("Skip for now", () => skipRow(row), "quiet skip");
+    skip.hidden = !row.listed;
+    row.skipButton = skip;
+    return skip;
   };
   const clearConflict = (row) => {
     delete row.conflict;
@@ -481,19 +570,20 @@
       row.conflictNode = null;
     }
   };
-  // The owner settles a conflict: keep this page's answer, or take the one
+  // The submitter settles a conflict: keep this page's answer, or take the one
   // saved elsewhere. Neither happens in silence.
   const showConflict = (row, edit) => {
     if (row.conflictNode) row.conflictNode.remove();
     const note = document.createElement("div");
     note.className = "conflict";
-    const theirs = edit.conflict;
+    const { theirs } = edit.conflict;
     const text = document.createElement("span");
     text.textContent = theirs
       ? `Changed elsewhere to “${answerText(theirs.element ? { value: theirs.element } : theirs)}”. `
       : "Removed elsewhere. ";
     const keep = button("Keep mine", () => {
       row.saved = theirs;
+      edit.base = theirs;
       clearConflict(row);
       scheduleSave(0);
     });
@@ -518,17 +608,14 @@
     const label = document.createElement("b");
     label.textContent = q.label;
     label.title = (q.reasons || []).join(" ");
-    const { input, nodes, read, readDetail, set, answer } = inputFor(q, prefill, (event) =>
+    const { input, nodes, set, answer } = inputFor(q, prefill, (event) =>
       onEdit(row, event),
     );
     row.input = input;
     row.read = answer;
     row.set = (next) => set(next.value);
-    row.readValue = read;
-    row.readDetail = readDetail;
     row.compact = false;
-    const skip = button("Skip for now", () => skipRow(row));
-    skip.className = "quiet skip";
+    const skip = skipControl(row);
     const about = context(q);
     row.node.replaceChildren(...(row.tick ? [row.tick, " "] : []), label, " ", ...nodes, " ", skip);
     if (about) row.node.append(about);
@@ -574,9 +661,7 @@
     };
     row.compact = false;
     label.append(name, ` — places ${q.rows} stated fact(s) `, select);
-    const skip = button("Skip for now", () => skipRow(row));
-    skip.className = "quiet skip";
-    row.node.replaceChildren(label, " ", skip);
+    row.node.replaceChildren(label, " ", skipControl(row));
   };
   const drawCompactLink = (row, answer) => {
     const name = document.createElement("b");
@@ -617,9 +702,7 @@
       every.addEventListener("change", () => {
         for (const select of columns[column]) {
           select.value = every.value;
-          const held = select.listeners && select.listeners.change;
-          if (held) held();
-          else select.dispatchEvent(new Event("change"));
+          select.dispatchEvent(new Event("change"));
         }
       });
       cell.append(every);
@@ -632,12 +715,11 @@
   };
   // "Same for all" sets a column of two or more rows; one row needs none.
   const shareAll = (grid) => {
-    if (grid.count >= 2 && !grid.all.parent && !grid.attached) {
+    const shared = Boolean(grid.all.parentNode);
+    if (grid.count >= 2 && !shared) {
       grid.table.insertBefore(grid.all, [...grid.table.children][1] || null);
-      grid.attached = true;
-    } else if (grid.count < 2 && grid.attached) {
+    } else if (grid.count < 2 && shared) {
       grid.all.remove();
-      grid.attached = false;
     }
   };
   const drawFacetRow = (row, prefill) => {
@@ -662,11 +744,7 @@
     const detail = answerDetail((prefill && prefill.detail) || "");
     detail.addEventListener("input", (event) => onEdit(row, event));
     const detailCell = document.createElement("td");
-    detailCell.append(detail, " ", (() => {
-      const skip = button("Skip for now", () => skipRow(row));
-      skip.className = "quiet skip";
-      return skip;
-    })());
+    detailCell.append(detail, " ", skipControl(row));
     const inputs = selects.map((cell) => cell.children[0]);
     row.read = () => {
       const given = {};
@@ -792,7 +870,7 @@
       row.grid = box.grid;
       row.node = document.createElement("tr");
       row.node.dataset.key = keyOf(row.q.key);
-      const after = prev && prev.grid === box.grid ? prev.node : [...box.grid.table.children][box.grid.attached ? 1 : 0];
+      const after = prev && prev.grid === box.grid ? prev.node : [...box.grid.table.children][box.grid.all.parentNode ? 1 : 0];
       insertAfter(box.grid.table, row.node, after);
       box.grid.count += 1;
       shareAll(box.grid);
@@ -818,7 +896,7 @@
 
   // ---- Reconcile ----------------------------------------------------------
   // The list the service serves now, drawn over the rows the page holds. A
-  // row the owner is editing, or whose edit is not acknowledged, stays as it
+  // row the submitter is editing, or whose edit is not acknowledged, stays as it
   // is; everything else follows the service. Rows are matched by key and
   // never moved: a new row is inserted where the service's order puts it.
   let pass = 0;
@@ -826,6 +904,8 @@
   // True while a skip, a start or an amendment runs. The skip and start
   // buttons stay disabled until it ends.
   let answerBusy = false;
+  // How many new rows wait above a focused editor (`reconcile`).
+  let queued = 0;
   const reconcile = (data) => {
     const before = view;
     view = data;
@@ -839,33 +919,35 @@
       })),
       ...data.early_questions.map((q) => ({ q, kind: "fact" })),
     ];
+    // A new row the service ranks above the editor the submitter is typing
+    // in waits until the focus leaves that editor, so the editor does not
+    // move. A new row below it is drawn at once.
+    const anchor = [...rows.values()].find((row) => row.listed && focused(row.node));
+    let above = Boolean(anchor) && listed.some((each) => rowKey(each) === rowKey(anchor));
+    queued = 0;
     let prev = null;
     for (const { q, kind } of listed) {
-      const key = kind === "link" ? q.key : keyOf(q.key);
+      const key = rowKey({ q, kind });
+      if (anchor && key === rowKey(anchor)) above = false;
       let row = rows.get(key);
+      if (!row && above) {
+        queued += 1;
+        continue;
+      }
       if (!row) {
         row = { q, kind, node: document.createElement("p"), saved: null, seen: 0, listed: true };
         row.node.className = "question";
         row.node.dataset.key = key;
         rows.set(key, row);
         place(row, prev);
-        const prefill = held.get(key) || null;
-        if (kind === "link") drawLink(row, prefill ? prefill.element : "");
-        else if (q.form === "facets") drawFacetRow(row, prefill);
-        else drawFact(row, prefill);
-        row.saved = prefill;
+        drawOpen(row, held.get(key) || null);
       } else {
         row.q = q;
         row.listed = true;
         row.node.hidden = false;
+        if (row.skipButton) row.skipButton.hidden = false;
         // A row answered in part comes back listed: its editor stays open.
-        if (row.compact && !busy(row)) {
-          const prefill = held.get(key) || null;
-          if (kind === "link") drawLink(row, prefill ? prefill.element : "");
-          else if (q.form === "facets") drawFacetRow(row, prefill);
-          else drawFact(row, prefill);
-          row.saved = prefill;
-        }
+        if (row.compact && !busy(row)) drawOpen(row, held.get(key) || null);
       }
       row.seen = pass;
       prev = row;
@@ -873,6 +955,7 @@
     for (const [key, row] of [...rows]) {
       if (row.seen === pass) continue;
       row.listed = false;
+      if (row.skipButton) row.skipButton.hidden = true;
       // What the service holds is what the row has saved, unless an edit is
       // still on its way: a row kept open because it has the focus must not
       // send an acknowledged answer again.
@@ -881,7 +964,7 @@
         // The edit goes with the next save; the service then says what
         // became of the question.
         const edit = edits.get(key);
-        if (edit && edit.conflict !== undefined && !row.conflict) showConflict(row, edit);
+        if (edit && edit.conflict && !row.conflict) showConflict(row, edit);
         continue;
       }
       if (held.has(key)) {
@@ -897,7 +980,7 @@
     for (const [key, row] of rows) {
       if (row.seen === pass && held.has(key) && !dirty(row)) row.saved = held.get(key);
       const edit = edits.get(key);
-      if (edit && edit.conflict !== undefined && !row.conflict) showConflict(row, edit);
+      if (edit && edit.conflict && !row.conflict) showConflict(row, edit);
     }
     drawIntro(data);
     drawTail(data);
@@ -908,17 +991,31 @@
   };
   // What changed in the list since the last payload, in one short line the
   // page announces: questions no longer needed, and questions added.
+  // The last change the note told; a redraw of the same list keeps it.
+  let noted = [];
   const announce = (before, data) => {
     if (!before) return;
-    const was = new Set(before.early_questions.map((q) => keyOf(q.key)));
-    const now = new Set(data.early_questions.map((q) => keyOf(q.key)));
-    const moot = (data.early_unnecessary || []).filter((q) => was.has(keyOf(q.key))).length;
-    const added = [...now].filter((key) => !was.has(key)).length;
-    const parts = [];
-    if (moot) parts.push(`${moot} question(s) are no longer needed`);
-    if (added) parts.push(`${added} relevant question(s) added`);
+    if (before !== data) {
+      const was = new Set(before.early_questions.map((q) => keyOf(q.key)));
+      const now = new Set(data.early_questions.map((q) => keyOf(q.key)));
+      const moot = (data.early_unnecessary || []).filter((q) => was.has(keyOf(q.key))).length;
+      const added = [...now].filter((key) => !was.has(key)).length;
+      noted = [];
+      if (moot) noted.push(`${moot} question(s) are no longer needed`);
+      if (added) noted.push(`${added} relevant question(s) added`);
+    }
+    const parts = queued
+      ? [...noted, `${queued} of them show when you leave the answer you are typing`]
+      : noted;
     say(changesNote, parts.join(". ") + (parts.length ? "." : ""));
   };
+  // The focus left an editor: draw the rows that waited above it.
+  list.addEventListener("focusout", () => {
+    if (!queued) return;
+    setTimeout(() => {
+      if (view && ![...rows.values()].some((row) => focused(row.node))) reconcile(view);
+    }, 0);
+  });
   // The intro: what will not run, why the list ends, and what stays open.
   // Redrawn from each payload.
   const drawIntro = (data) => {
@@ -1060,7 +1157,7 @@
   };
   // The boxes beside the list: every earlier answer, every skipped question,
   // and the questions the list leaves out. Each is redrawn from the payload
-  // unless the owner is editing inside it; then it waits for the next save.
+  // unless the submitter is editing inside it; then it waits for the next save.
   // "Answer it" and "Change" build an editor only when pressed.
   const drawBoxes = (data) => {
     const held = answersOf(data);
@@ -1070,7 +1167,7 @@
       return Boolean(row && !row.lazyBox);
     };
     const lazyRow = (box, q, kind, before) => {
-      const key = kind === "link" ? q.key : keyOf(q.key);
+      const key = rowKey({ q, kind });
       const row = document.createElement("p");
       const label = document.createElement("b");
       label.textContent = kind === "link" ? q.principal : q.label;
@@ -1111,7 +1208,7 @@
       for (const { q, kind, before } of entries) lazyRow(box, q, kind, before);
     };
     const outside = (entries) =>
-      entries.filter(({ q, kind }) => !inList(kind === "link" ? q.key : keyOf(q.key)));
+      entries.filter((entry) => !inList(rowKey(entry)));
     // A question answered in part and skipped has its one editor under
     // "Skipped for now", so the page cannot send two answers to one key.
     const setAside = new Set([
@@ -1121,7 +1218,7 @@
     const answered = outside([
       ...(data.answered_links || []).map((a) => ({ q: a, kind: "link", before: { principal: a.principal, element: a.answer.element } })),
       ...(data.answered_early || []).map((a) => ({ q: a, kind: "fact", before: a.answer })),
-    ]).filter(({ q, kind }) => !setAside.has(kind === "link" ? q.key : keyOf(q.key)));
+    ]).filter((entry) => !setAside.has(rowKey(entry)));
     redraw(earlierBox, (n) => `Your answers (${n})`, answered);
     const skipped = outside([
       ...(data.skipped_links || []).map((q) => ({ q, kind: "link", before: null })),
@@ -1202,7 +1299,7 @@
   };
 
   // Register every editor's current value, for a start or a skip that must
-  // not lose what the owner typed and did not commit.
+  // not lose what the submitter typed and did not commit.
   const collectEdits = () => {
     for (const row of rows.values()) {
       if (!row.compact && row.read) registerEdit(row);

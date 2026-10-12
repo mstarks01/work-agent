@@ -298,8 +298,16 @@ revision makes the page read the answers again: an edit the other tab did not
 touch is sent again, and an edit over an answer that changed elsewhere is shown
 beside that answer with **Keep mine** and **Take theirs**. A lost response is
 read back the same way before anything is sent again, and **Start the analysis**
-saves what is pending first and starts once. Answers live in the server's
-memory for the session; the page never claims more.
+saves what is pending first and starts once. An edit over an answer another tab
+removed waits for the submitter in the same way. A save larger than one request
+goes in batches at the `answer_limits` the service publishes. Leaving the page
+with an unsaved edit sends it, and the browser asks to confirm. A new row the
+service ranks above the editor that has the focus waits until the focus leaves
+it. Where the service refuses answers that would leave a part present under an
+absent ancestor, its refusal names both questions, and the page offers to answer
+the other one the same way in one save. A row the list no longer holds shows no
+**Skip for now**, because the service takes a skip only of a listed question.
+Answers live in the server's memory for the session; the page never claims more.
 
 When no recommended question remains, **Start the analysis** becomes the primary
 action. Skipped questions remain open facts, not negative answers.

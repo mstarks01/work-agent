@@ -196,13 +196,14 @@ POLICY_VERSION: PolicyVersion = "adaptive-1"
 MAX_SKIPS = MAX_FACT_ANSWERS + MAX_LINK_ANSWERS
 
 #: The answer ceilings a client is told, so a page can split its answers into
-#: batches the service admits: one request's facts and links, every answer one
-#: job holds across its saves (ADR 0070), and the longest detail one answer
-#: carries (ADR 0073).
+#: batches the service admits: one request's facts, links and skips, every
+#: answer one job holds across its saves (ADR 0070), and the longest detail
+#: one answer carries (ADR 0073).
 ANSWER_LIMITS: Mapping[str, int] = MappingProxyType(
     {
         "facts": MAX_FACT_ANSWERS,
         "links": MAX_LINK_ANSWERS,
+        "skips": MAX_SKIPS,
         "held_facts": MAX_HELD_FACTS,
         "held_links": MAX_HELD_LINKS,
         "detail": MAX_DETAIL_CHARS,

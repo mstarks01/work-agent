@@ -139,7 +139,7 @@ def test_clearing_a_control_sends_no_answer_for_it(page):
     assert all(fact.get("value") != "none" for fact in facts)
 
 
-def test_an_owner_who_skips_every_question_reaches_a_report_that_says_what_is_open(
+def test_a_submitter_who_skips_every_question_reaches_a_report_that_says_what_is_open(
     page,
 ):
     """Skip, the ready state, the start button and the report, end to end."""
@@ -165,7 +165,7 @@ def test_an_owner_who_skips_every_question_reaches_a_report_that_says_what_is_op
     assert "neither confirmed nor cleared" in report
 
 
-def test_a_phone_sized_owner_answers_skips_corrects_and_starts(browser, served):
+def test_a_phone_sized_submitter_answers_skips_corrects_and_starts(browser, served):
     """The #1289 review asked for a small-screen walk through every step."""
     context = browser.new_context(
         base_url=served, viewport={"width": 375, "height": 667}
@@ -261,7 +261,7 @@ def test_a_double_click_on_start_starts_one_run(page):
 
 def test_two_tabs_do_not_write_over_each_other_in_silence(browser, served):
     """The second tab's stale save is refused; it reads the answers again and
-    shows the answer the first tab saved, for the owner to settle (#1632)."""
+    shows the answer the first tab saved, for the submitter to settle (#1632)."""
     context = browser.new_context(base_url=served)
     first = context.new_page()
     errors: list[str] = []
@@ -521,7 +521,7 @@ def test_reopening_a_completed_analysis_displays_its_report(page):
     assert "Generated " in page.locator("#report-list a").inner_text()
 
 
-def test_a_320px_owner_answers_and_skips_without_sideways_scroll(browser, served):
+def test_a_320px_submitter_answers_and_skips_without_sideways_scroll(browser, served):
     """The narrowest layout the issue names: every control reachable, no
     horizontal scroll, an answer saved and a question skipped (#1632)."""
     context = browser.new_context(
@@ -542,3 +542,36 @@ def test_a_320px_owner_answers_and_skips_without_sideways_scroll(browser, served
     context.close()
     assert errors == [], f"the page raised: {errors}"
     assert wide <= 0, f"the page scrolls sideways by {wide}px at 320px"
+
+
+def _tab_to(page, reached: str, limit: int = 400) -> None:
+    """Press Tab until ``reached``, a script over the focused element, holds."""
+    for _ in range(limit):
+        page.keyboard.press("Tab")
+        if page.evaluate(
+            f"(active) => {reached}", page.evaluate_handle("document.activeElement")
+        ):
+            return
+    pytest.fail(f"Tab never reached: {reached}")
+
+
+def test_a_keyboard_answers_skips_and_starts_with_no_pointer(page):
+    """Tab reaches each control, an arrow key answers, and Enter skips and
+    starts (#1632)."""
+    pause(page)
+    _tab_to(
+        page,
+        "active.tagName === 'SELECT' && [...active.options].some((o) => o.value === 'yes')",
+    )
+    with page.expect_response(_post_to_answer) as answered:
+        page.keyboard.press("ArrowDown")
+    assert answered.value.ok, answered.value.text()
+    saved(page)
+    _tab_to(page, "active.textContent === 'Skip for now'")
+    with page.expect_response(_post_to_answer) as skipped:
+        page.keyboard.press("Enter")
+    assert skipped.value.request.post_data_json["skip"], "the skip names a question"
+    saved(page)
+    _tab_to(page, "active.id === 'continue'")
+    page.keyboard.press("Enter")
+    page.wait_for_url("**/report/**")

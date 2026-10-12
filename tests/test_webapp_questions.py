@@ -469,17 +469,18 @@ def test_the_report_page_may_reach_its_own_origin_and_nothing_else(tiers, runner
 _FORM_HARNESS = r"""
 const calls = [], streams = [];
 class Node {
-  constructor(tag) { this.tag = tag; this.children = []; this.dataset = {}; this.parent = null;
+  constructor(tag) { this.tag = tag; this.children = []; this.dataset = {}; this.parentNode = null;
     this.hidden = false; this.value = ""; this.textContent = ""; this.listeners = {}; }
-  adopt(kid) { if (typeof kid === "object") { if (kid.parent) kid.parent.children = kid.parent.children.filter((c) => c !== kid); kid.parent = this; } }
+  adopt(kid) { if (typeof kid === "object") { if (kid.parentNode) kid.parentNode.children = kid.parentNode.children.filter((c) => c !== kid); kid.parentNode = this; } }
   append(...kids) { for (const k of kids) { this.adopt(k); this.children.push(k); } }
   replaceChildren(...kids) { this.children = []; this.append(...kids); }
   insertBefore(kid, ref) { this.adopt(kid); const at = ref ? this.children.indexOf(ref) : -1;
     if (at < 0) this.children.push(kid); else this.children.splice(at, 0, kid); }
-  remove() { if (this.parent) { this.parent.children = this.parent.children.filter((c) => c !== this); this.parent = null; } }
+  remove() { if (this.parentNode) { this.parentNode.children = this.parentNode.children.filter((c) => c !== this); this.parentNode = null; } }
   contains(node) { return node === this || this.children.some((c) => typeof c === "object" && c.contains(node)); }
   focus() { document.activeElement = this; }
   addEventListener(name, fn) { this.listeners[name] = fn; }
+  dispatchEvent(event) { const fn = this.listeners[event.type]; if (fn) fn(event); return true; }
   setAttribute(name, value) { this[name] = value; }
   querySelectorAll(sel) {
     const out = [];
@@ -506,7 +507,7 @@ globalThis.document = {
   activeElement: null,
 };
 globalThis.location = { href: "", search: SEARCH };
-globalThis.window = { scrollTo() {} };
+globalThis.window = { scrollTo() {}, listeners: {}, addEventListener(name, fn) { this.listeners[name] = fn; } };
 globalThis.fetch = async (url, init) => {
   calls.push({ url, body: init && init.body ? JSON.parse(init.body) : null });
   const next = url === "/analyze" ? "r1" : "r2";
@@ -850,7 +851,7 @@ def test_the_form_page_says_why_and_quotes_the_description():
     steps = f"""
 await ids.analyze.listeners.submit({{ preventDefault() {{}} }}); await settle();
 streams[0].listeners.questions({{ data: JSON.stringify({{ run: "r1", link_questions: [],
-  early_questions: {json.dumps(rows)}, early_remaining: {{ field: 1 }},
+  early_questions: {json.dumps(rows)}, 
   answered_early: [], answered_links: [], revision: 0 }}) }});
 const walk = (n, out = []) => {{ for (const c of n.children || [])
   if (typeof c === "object") {{ if (c.className === "hint") out.push(c); walk(c, out); }}
@@ -1829,7 +1830,7 @@ def test_a_pause_with_nothing_to_ask_starts_the_analysis_at_once():
     steps = """
 await ids.analyze.listeners.submit({ preventDefault() {} }); await settle();
 streams[0].listeners.questions({ data: JSON.stringify({ run: "r1", link_questions: [],
-  early_questions: [], early_remaining: {}, early_stop: "nothing-left", answered_early: [], answered_links: [] }) });
+  early_questions: [], early_stop: "nothing-left", answered_early: [], answered_links: [] }) });
 await settle();
 """
     seen = _run_form_script(steps)
@@ -1874,7 +1875,7 @@ await ids.analyze.listeners.submit({{ preventDefault() {{}} }}); await settle();
 streams[0].listeners.questions({{ data: JSON.stringify({{ run: "r1", link_questions: [
   {{ principal: "shopper accounts", rows: 2,
     options: [{{ id: "entity:shopper", name: "Shopper" }}] }}], early_questions: [],
-  early_remaining: {{}}, answered_early: [], answered_links: [], revision: 3 }}) }});
+  answered_early: [], answered_links: [], revision: 3 }}) }});
 ids.questions.querySelectorAll("select")[0].value = "entity:shopper";
 const answered = fetch;
 globalThis.fetch = async (url, init) => {{
@@ -1939,7 +1940,7 @@ def test_a_capability_says_it_decides_what_an_analysis_covers():
 await ids.analyze.listeners.submit({{ preventDefault() {{}} }}); await settle();
 streams[0].listeners.questions({{ data: JSON.stringify({{ run: "r1",
   link_questions: [], early_questions: [{json.dumps(row)}],
-  early_remaining: {{ capability: 1 }}, answered_early: [], answered_links: [], revision: 0 }}) }});
+  answered_early: [], answered_links: [], revision: 0 }}) }});
 const walk = (n, out = []) => {{ for (const c of n.children || [])
   if (typeof c === "object") {{ out.push(c); walk(c, out); }} return out; }};
 calls.push(walk(ids.questions).map(n => n.textContent).find(t => t.startsWith("Why:")));
@@ -1954,7 +1955,7 @@ def test_skip_the_rest_skips_only_the_blank_questions():
     steps = f"""
 await ids.analyze.listeners.submit({{ preventDefault() {{}} }}); await settle();
 streams[0].listeners.questions({{ data: JSON.stringify({{ run: "r1", link_questions: [],
-  early_questions: {json.dumps(rows)}, early_remaining: {{ field: 2 }},
+  early_questions: {json.dumps(rows)}, 
   answered_early: [], answered_links: [] }}) }});
 ids.questions.querySelectorAll("input")[0].value = "the admins";
 globalThis.fetch = async (url, init) => {{
@@ -1987,7 +1988,7 @@ def test_skip_the_rest_sets_aside_a_question_answered_in_part():
     steps = f"""
 await ids.analyze.listeners.submit({{ preventDefault() {{}} }}); await settle();
 streams[0].listeners.questions({{ data: JSON.stringify({{ run: "r1", link_questions: [],
-  early_questions: [{json.dumps(row)}], early_remaining: {{ field: 1 }},
+  early_questions: [{json.dumps(row)}], 
   answered_early: [], answered_links: [], revision: 0 }}) }});
 const selects = ids.questions.querySelectorAll("select");
 selects[0].value = "yes";
@@ -2007,7 +2008,7 @@ def test_a_skipped_question_can_be_answered_from_its_list():
     steps = f"""
 await ids.analyze.listeners.submit({{ preventDefault() {{}} }}); await settle();
 streams[0].listeners.questions({{ data: JSON.stringify({{ run: "r1", link_questions: [],
-  early_questions: [{json.dumps(_text_row(kept, "who?"))}], early_remaining: {{ field: 1 }},
+  early_questions: [{json.dumps(_text_row(kept, "who?"))}], 
   skipped_early: [{json.dumps(_text_row(skipped, "when?"))}],
   answered_early: [], answered_links: [] }}) }});
 calls.push({{ listed: !ids.skipped.hidden }});
@@ -2040,7 +2041,7 @@ def _skip_the_rest(links, facts) -> dict:
 await ids.analyze.listeners.submit({{ preventDefault() {{}} }}); await settle();
 streams[0].listeners.questions({{ data: JSON.stringify({{ run: "r1",
   link_questions: {json.dumps(links)}, early_questions: {json.dumps(facts)},
-  early_remaining: {{ field: 1 }}, answered_early: [], answered_links: [], revision: 0 }}) }});
+  answered_early: [], answered_links: [], revision: 0 }}) }});
 globalThis.fetch = async (url, init) => {{
   calls.push({{ url, body: JSON.parse(init.body) }});
   return {{ ok: false, json: async () => ({{ message: "stop here" }}) }};
@@ -2068,7 +2069,7 @@ def test_a_skipped_link_can_be_answered_from_its_list():
     steps = f"""
 await ids.analyze.listeners.submit({{ preventDefault() {{}} }}); await settle();
 streams[0].listeners.questions({{ data: JSON.stringify({{ run: "r1", link_questions: [],
-  early_questions: [], early_remaining: {{}}, skipped_early: [], skipped_links: [{json.dumps(_LINK)}],
+  early_questions: [], skipped_early: [], skipped_links: [{json.dumps(_LINK)}],
   answered_early: [], answered_links: [], revision: 1 }}) }});
 const [open] = ids.skipped.querySelectorAll("button");
 open.listeners.click();
@@ -2103,7 +2104,7 @@ def test_a_question_answered_in_part_and_skipped_has_one_editor():
     steps = f"""
 await ids.analyze.listeners.submit({{ preventDefault() {{}} }}); await settle();
 streams[0].listeners.questions({{ data: JSON.stringify({{ run: "r1", link_questions: [],
-  early_questions: [], early_remaining: {{}}, skipped_early: [{json.dumps(question)}],
+  early_questions: [], skipped_early: [{json.dumps(question)}],
   answered_early: [{json.dumps(answered)}], answered_links: [], revision: 1 }}) }});
 calls.push({{ earlier: ids.earlier.querySelectorAll("button").length }});
 const [open] = ids.skipped.querySelectorAll("button");
@@ -2144,7 +2145,7 @@ def test_an_earlier_answer_can_be_changed():
     steps = f"""
 await ids.analyze.listeners.submit({{ preventDefault() {{}} }}); await settle();
 streams[0].listeners.questions({{ data: JSON.stringify({{ run: "r1", link_questions: [],
-  early_questions: [{json.dumps(pending)}], early_remaining: {{ field: 1 }},
+  early_questions: [{json.dumps(pending)}], 
   answered_early: [{json.dumps(answered)}], answered_links: [] }}) }});
 const walk = (n, tag, out = []) => {{ for (const c of n.children || [])
   if (typeof c === "object") {{ if (c.tag === tag) out.push(c); walk(c, tag, out); }}
@@ -2469,7 +2470,7 @@ def test_the_page_opens_the_list_with_the_questions_the_service_counts(case):
 await ids.analyze.listeners.submit({{ preventDefault() {{}} }}); await settle();
 streams[0].listeners.questions({{ data: JSON.stringify({{ run: "r1", link_questions: [],
   early_questions: {json.dumps(asked.to_json()["early_questions"])},
-  early_remaining: {{}}, answered_early: [], answered_links: [], revision: 0 }}) }});
+  answered_early: [], answered_links: [], revision: 0 }}) }});
 const walk = (n, out = []) => {{ for (const c of n.children || [])
   if (typeof c === "object") {{ out.push(c); walk(c, out); }} return out; }};
 const asked = new Set({json.dumps(capabilities)}.map(k => JSON.stringify(k)));
@@ -2898,7 +2899,7 @@ def test_a_pause_whose_framework_will_not_run_explains_it_and_waits():
     steps = """
 await ids.analyze.listeners.submit({ preventDefault() {} }); await settle();
 streams[0].listeners.questions({ data: JSON.stringify({ run: "r1", link_questions: [],
-  early_questions: [], early_remaining: {gate: 0, capability: 0, field: 0}, early_stop: "nothing-left",
+  early_questions: [], early_stop: "nothing-left",
   framework_gates: {asvs: "refuted"}, answered_early: [], answered_links: [], revision: 0 }) });
 await settle();
 const text = (n) => typeof n === "string" ? n
@@ -2924,7 +2925,7 @@ def test_a_question_that_decides_a_framework_says_so():
     steps = f"""
 await ids.analyze.listeners.submit({{ preventDefault() {{}} }}); await settle();
 streams[0].listeners.questions({{ data: JSON.stringify({{ run: "r1", link_questions: [],
-  early_questions: [{json.dumps(row)}], early_remaining: {{gate: 1, capability: 0, field: 0}},
+  early_questions: [{json.dumps(row)}], 
   framework_gates: {{asvs: "undecidable"}}, answered_early: [], answered_links: [], revision: 0 }}) }});
 const text = (n) => typeof n === "string" ? n
   : [n.textContent || "", ...(n.children || []).map(text)].join("");
@@ -2964,9 +2965,7 @@ def test_a_finished_pause_lists_what_stays_open_and_takes_a_held_back_answer():
         "revision": 1,
         "link_questions": [],
         "early_questions": [],
-        "early_remaining": {"gate": 0, "capability": 0, "field": 0},
         "early_stop": "below-floor",
-        "early_withheld": 0,
         "early_summary": summary,
         "early_held_back": [],
         "early_below_floor": [low],
@@ -3199,7 +3198,7 @@ class TestTheAmendment:
         steps = """
 await ids.analyze.listeners.submit({ preventDefault() {} }); await settle();
 streams[0].listeners.questions({ data: JSON.stringify({ run: "r1", link_questions: [],
-  early_questions: [], early_remaining: {}, early_stop: "nothing-left", framework_gates: {asvs: "refuted"},
+  early_questions: [], early_stop: "nothing-left", framework_gates: {asvs: "refuted"},
   answered_early: [], answered_links: [], revision: 2 }) });
 const box = ids.questions.querySelectorAll("details").find(d => d.className === "amend");
 box.querySelectorAll("textarea")[0].value = "  A loader writes nightly.  ";
@@ -3214,7 +3213,7 @@ await box.querySelectorAll("button")[0].listeners.click(); await settle();
         steps = """
 await ids.analyze.listeners.submit({ preventDefault() {} }); await settle();
 streams[0].listeners.questions({ data: JSON.stringify({ run: "r1", link_questions: [],
-  early_questions: [], early_remaining: {}, early_stop: "nothing-left", framework_gates: {asvs: "refuted"},
+  early_questions: [], early_stop: "nothing-left", framework_gates: {asvs: "refuted"},
   answered_early: [], answered_links: [], revision: 0,
   carried_dropped: [{ label: "Old DB: encryption at rest", value: "AES",
     key: ["store:old", "encryption_at_rest", "", "", "", ""] }],
@@ -3295,7 +3294,7 @@ await followUp().listeners.click();
         steps = f"""
 await ids.analyze.listeners.submit({{ preventDefault() {{}} }}); await settle();
 streams[0].listeners.questions({{ data: JSON.stringify({{ run: "r1", link_questions: [],
-  early_questions: {json.dumps([row])}, early_remaining: {{capability: 1}}, answered_early: [],
+  early_questions: {json.dumps([row])}, answered_early: [],
   answered_links: [], revision: 0 }}) }});
 ids.questions.querySelectorAll("select")[0].value = "yes";
 ids.questions.querySelectorAll("input").find(i => i.className === "answer-detail")

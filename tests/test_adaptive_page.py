@@ -1,4 +1,4 @@
-"""The adaptive question page saves as the owner answers (ADR 0078, #1632).
+"""The adaptive question page saves as the submitter answers (ADR 0078, #1632).
 
 These tests drive the shipped page script under ``node`` with the stand-in
 DOM of :mod:`tests.test_webapp_questions`, and mock each response the service
@@ -165,7 +165,7 @@ calls.push({ status: ids["save-status"].textContent });
 
 def test_a_stale_save_reads_the_answers_again_and_keeps_only_what_does_not_contradict_them():
     """Another tab saved first: the page resends the edit the other tab did
-    not touch, and shows the one it did for the owner to settle."""
+    not touch, and shows the one it did for the submitter to settle."""
     first = payload(early_questions=[AUTH, OAUTH])
     theirs = payload(
         revision=2, early_questions=[OAUTH], answered_early=[answer(AUTH, "no")]
@@ -200,6 +200,52 @@ calls.push({{ status: ids["save-status"].textContent, value: auth.value,
     assert "Changed elsewhere to “no”" in shown["conflict"]
     assert shown["buttons"] == ["Keep mine", "Take theirs"]
     assert seen[-1] == {"status": "", "value": "no", "gone": True}
+
+
+def test_an_edit_over_an_answer_removed_elsewhere_waits_for_the_submitter():
+    """Another tab removed the saved answer this edit changes. The edit is
+    shown as a conflict and is not sent until the submitter settles it."""
+    first = payload(early_questions=[OAUTH], answered_early=[answer(AUTH, "yes")])
+    theirs = payload(revision=2, early_questions=[AUTH, OAUTH])
+    steps = f"""
+globalThis.fetch = async (url, init) => {{ record(url, init);
+  if (url.startsWith("/workspace/runs/")) return {{ ok: true, json: async () => ({{ run: "r1", questions: {json.dumps(theirs)} }}) }};
+  return {{ ok: false, status: 409, json: async () => ({{ message: "another tab" }}) }}; }};
+walk(ids.earlier).find((n) => n.textContent === "Change").listeners.click();
+const select = walk(ids.earlier).find((n) => n.tag === "select");
+select.value = "no"; select.listeners.change();
+await settle(); await settle(); await settle(); await settle();
+const conflict = walk(ids.earlier).find((n) => n.className === "conflict");
+calls.push({{ state: ids["save-status"].dataset.state, conflict: conflict ? text(conflict) : null }});
+"""
+    seen = run(first, steps)["calls"]
+    assert [c["url"] for c in seen if "url" in c][1:] == [
+        "/answer/r1",
+        "/workspace/runs/r1",
+    ]
+    end = seen[-1]
+    assert end["state"] == "conflict"
+    assert end["conflict"].startswith("Removed elsewhere.")
+
+
+def test_an_answered_row_that_keeps_the_focus_offers_no_skip():
+    """The service takes a skip only of a listed question, so a row a save
+    answered shows no "Skip for now", even while its editor stays open."""
+    first = payload(early_questions=[AUTH, OAUTH])
+    after = payload(
+        revision=1, early_questions=[OAUTH], answered_early=[answer(AUTH, "yes")]
+    )
+    steps = f"""
+globalThis.fetch = async (url, init) => {{ record(url, init);
+  return {{ ok: true, json: async () => ({json.dumps(after)}) }}; }};
+const [auth] = selects();
+auth.focus(); auth.value = "yes"; auth.listeners.change();
+await settle(); await settle();
+const skips = walk(ids.list).filter((n) => n.textContent === "Skip for now");
+calls.push({{ shown: skips.map((s) => !s.hidden) }});
+"""
+    seen = run(first, steps)["calls"]
+    assert seen[-1] == {"shown": [False, True]}
 
 
 def test_a_failed_save_keeps_the_answer_and_save_now_retries():
@@ -277,7 +323,7 @@ await first; await second; await settle();
 
 
 def test_a_start_during_a_save_waits_for_it_and_starts_once():
-    """The owner chooses an option and starts before its save answers: the
+    """The submitter chooses an option and starts before its save answers: the
     start waits for that save, sends the answer once and starts once."""
     first = payload(early_questions=[AUTH])
     steps = """
@@ -319,7 +365,7 @@ calls.push({ after: ids.skip.disabled });
 
 def test_a_lost_response_whose_save_landed_is_acknowledged_not_a_conflict():
     """The service serves an answer with every field and its defaults. Read
-    back after a lost response, it is the owner's own answer, saved."""
+    back after a lost response, it is the submitter's own answer, saved."""
     first = payload(early_questions=[AUTH])
     held = AUTH | {
         "answer": {"key": AUTH["key"], "value": "yes", "facets": None, "detail": ""}
@@ -340,6 +386,81 @@ calls.push({{ status: ids["save-status"].textContent,
     assert seen[-1] == {"status": "", "conflict": False}
 
 
+def test_a_save_larger_than_one_request_goes_in_batches():
+    """One request carries at most the published limits. The start saves
+    the rest in the next request, then starts once."""
+    first = payload(early_questions=[AUTH, OAUTH])
+    steps = """
+ANSWER_LIMITS.facts = 1;
+globalThis.fetch = async (url, init) => { record(url, init);
+  return { ok: true, json: async () => ({ run: "r2" }) }; };
+const [auth, oauth] = selects();
+auth.value = "yes"; oauth.value = "no";
+await ids.continue.listeners.click(); await settle();
+"""
+    seen = run(first, steps)["calls"]
+    posts = [c["body"] for c in seen if c.get("url") == "/answer/r1"]
+    assert [post["facts"] for post in posts] == [
+        [{"key": AUTH["key"], "value": "yes"}],
+        [{"key": OAUTH["key"], "value": "no"}],
+        [],
+    ]
+    assert [post.get("save") for post in posts] == [True, True, None]
+
+
+def test_leaving_with_an_unsaved_edit_sends_it_and_asks_to_confirm():
+    first = payload(early_questions=[AUTH])
+    steps = """
+globalThis.fetch = (url, init) => { record(url, init); return new Promise(() => {}); };
+const leave = () => { const event = { returnValue: undefined, preventDefault() { this.asked = true; } };
+  window.listeners.beforeunload(event); return { asked: Boolean(event.asked), value: event.returnValue }; };
+calls.push({ clean: leave() });
+const [auth] = selects();
+auth.value = "yes"; auth.listeners.change();
+calls.push({ dirty: leave() });
+"""
+    seen = run(first, steps)["calls"]
+    assert next(c for c in seen if "clean" in c) == {"clean": {"asked": False}}
+    assert next(c for c in seen if "dirty" in c) == {
+        "dirty": {"asked": True, "value": ""}
+    }
+    posts = [c["body"]["facts"] for c in seen if c.get("url") == "/answer/r1"]
+    assert posts == [[{"key": AUTH["key"], "value": "yes"}]], "sent at once"
+
+
+def test_a_contradiction_the_service_names_is_corrected_in_one_save():
+    """A "no" to a parent over a saved "yes" to its part is refused, and the
+    refusal names both. The page offers to answer the part "no" too, and
+    sends the two answers in one save."""
+    first = payload(early_questions=[OAUTH], answered_early=[answer(PART, "yes")])
+    named = {"part": PART["key"], "ancestor": OAUTH["key"]}
+    steps = f"""
+globalThis.fetch = async (url, init) => {{ record(url, init);
+  const refused = calls.filter((c) => c.url === "/answer/r1").length === 1;
+  return refused
+    ? {{ ok: false, status: 400, json: async () => ({{ message: "answer both", contradiction: {json.dumps(named)} }}) }}
+    : {{ ok: true, json: async () => ({{ run: "r1" }}) }}; }};
+const [oauth] = selects();
+oauth.value = "no"; oauth.listeners.change();
+await settle(); await settle();
+const fix = walk(ids["answer-problem"]).find((n) => n.tag === "button");
+calls.push({{ offered: fix ? fix.textContent : null }});
+fix.listeners.click(); await settle(); await settle();
+calls.push({{ status: ids["save-status"].dataset.state }});
+"""
+    seen = run(first, steps)["calls"]
+    offered = next(c for c in seen if "offered" in c)["offered"]
+    assert (
+        offered == "Answer \u201cAn OAuth client?\u201d \u201cno\u201d too, in one save"
+    )
+    posts = [c["body"]["facts"] for c in seen if c.get("url") == "/answer/r1"]
+    assert posts == [
+        [{"key": OAUTH["key"], "value": "no"}],
+        [{"key": OAUTH["key"], "value": "no"}, {"key": PART["key"], "value": "no"}],
+    ]
+    assert seen[-1] == {"status": "saved"}
+
+
 def test_a_lost_start_response_follows_the_run_that_started():
     first = payload(early_questions=[AUTH])
     steps = """
@@ -354,7 +475,7 @@ await ids.continue.listeners.click(); await settle();
 
 
 def test_a_focused_editor_survives_another_answer_s_save():
-    """The owner is typing in one row while another row's save brings the
+    """The submitter is typing in one row while another row's save brings the
     list back changed: the typed row keeps its node, its text and the focus,
     and the new row goes where the service lists it."""
     first = payload(early_questions=[AUTH, WHO])
@@ -381,6 +502,41 @@ calls.push({{ same: who === whoAgain, value: whoAgain.value, focused: document.a
     assert end["same"] and end["value"] == "the platform tea" and end["focused"]
     assert end["order"] == [["Sign-in? \u2014 y"], ["Who runs it?"], ["OAuth? (leav"]]
     assert end["note"] == "1 relevant question(s) added."
+
+
+def test_a_new_row_ranked_above_a_focused_editor_waits_until_the_focus_leaves():
+    """The submitter is typing in one row while a save lists a new question
+    above it. The new row waits, so the typed row does not move, and it is
+    drawn where the service lists it once the focus leaves."""
+    first = payload(early_questions=[AUTH, WHO])
+    after = payload(
+        revision=1,
+        early_questions=[OAUTH, WHO],
+        answered_early=[answer(AUTH, "yes")],
+    )
+    steps = f"""
+globalThis.fetch = async (url, init) => {{ record(url, init);
+  return {{ ok: true, json: async () => ({json.dumps(after)}) }}; }};
+const [who] = walk(ids.list).filter((n) => n.tag === "input" && n.className !== "answer-detail");
+who.value = "the platform tea"; who.focus();
+const [auth] = selects();
+auth.value = "yes"; auth.listeners.change();
+await settle(); await settle();
+const order = () => ids.list.children.map((box) => box.children.filter((c) => c.tag === "p").map((p) => text(p).slice(0, 12)));
+calls.push({{ typing: order(), note: ids.changes.textContent }});
+document.activeElement = null; ids.list.listeners.focusout(); await settle();
+calls.push({{ left: order(), note: ids.changes.textContent }});
+"""
+    seen = run(first, steps)["calls"]
+    typing = next(c for c in seen if "typing" in c)
+    assert typing["typing"] == [["Sign-in? \u2014 y"], ["Who runs it?"]]
+    assert typing["note"] == (
+        "1 relevant question(s) added. 1 of them show when you leave the answer"
+        " you are typing."
+    )
+    left = seen[-1]
+    assert left["left"] == [["OAuth? (leav"], ["Sign-in? \u2014 y"], ["Who runs it?"]]
+    assert left["note"] == "1 relevant question(s) added."
 
 
 def test_a_no_lists_the_parts_as_no_longer_needed_and_says_so():
