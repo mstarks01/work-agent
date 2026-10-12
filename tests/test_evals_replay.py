@@ -1289,10 +1289,15 @@ class TestTheArchivedEmissionsReplay:
         ]
         pool = replay.pooled_extraction(sweeps)
 
+        # A holdout case's emission is kept beside the artifact and skipped by
+        # the replay (#744), so it is not among the emissions graded.
+        holdouts = {case.id for case in corpus if case.meta.holdout}
         assert pool["emissions"] == sum(
-            len(list(reports_dir(p).iterdir()))
+            1
             for p in ARTIFACTS
             if load_artifact(p).mode == "extraction"
+            for f in reports_dir(p).iterdir()
+            if f.name.split(".")[0] not in holdouts
         )
         assert sum(pool["fates"].values()) == sum(
             len(list(next(c for c in corpus if c.id == r.case_id).model.elements()))
