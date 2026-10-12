@@ -291,9 +291,9 @@ is not a fixed percentage or an estimate of elapsed time.
 
 Each answer is saved as it is given, one request at a time for the run, with
 the revision the page read. A chosen option is sent at once; typed text waits
-400 ms after the last keystroke. The save line says nothing while a save is in
-flight or landed; it says **Not saved** when one fails, and **Save now** shows
-only while something is unsaved. A stale
+400 ms after the last keystroke. The save line says something only on an error:
+**Not saved** when a save fails, with **Save now** to send it again, or **Not
+saved: an answer changed elsewhere** beside a conflict. A stale
 revision makes the page read the answers again: an edit the other tab did not
 touch is sent again, and an edit over an answer that changed elsewhere is shown
 beside that answer with **Keep mine** and **Take theirs**. A lost response is

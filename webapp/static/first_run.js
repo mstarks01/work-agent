@@ -271,18 +271,18 @@
   let saving = false;
   let again = false;
   // A save that landed, or one in flight, says nothing; the other states do.
+  // The save line says something only on an error: a failed save, or an
+  // answer that changed elsewhere. `state` is always on the line's data.
   const setStatus = (state, text) => {
     const words = {
-      unsaved: "Not saved yet",
       failed: "Not saved",
       conflict: "Not saved: an answer changed elsewhere",
     };
     const word = words[state] || "";
-    say(saveStatus, text ? `${word}: ${text}` : word);
+    say(saveStatus, word && text ? `${word}: ${text}` : word);
     if (saveStatus) saveStatus.dataset.state = state;
-    // "Save now" shows while something is unsaved, so a failed save can be
-    // retried by hand.
-    saveButton.hidden = !(edits.size && state !== "saving");
+    // "Save now" shows after a failed save, so it can be retried by hand.
+    saveButton.hidden = state !== "failed";
   };
   // The status the edits warrant: a conflict first, then anything unsaved.
   const showState = () => {
