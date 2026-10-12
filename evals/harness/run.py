@@ -1812,16 +1812,27 @@ def command_replay(args: argparse.Namespace) -> int:
 def replay_artifact(
     path: Path, cases: Sequence[GoldenCase], corpus_dir: Path
 ) -> replay.SweepReplay:
-    """One archived sweep, read through the loader and re-scored by its mode."""
+    """One archived sweep, read through the loader and re-scored by its mode.
+
+    A holdout case the sweep ran is skipped by name, through
+    :func:`~evals.harness.reference.diagnosable`: a replay names every element
+    a case lost, and no diagnosis reads a holdout's losses (#744).
+    """
     loaded = load_artifact(path)
     if loaded.mode not in replay.ROUTES_OF:
         raise modes.EvalRunError(
             f"{path}: a {loaded.mode} sweep keeps no emission this instrument reads;"
             f" it replays {sorted(replay.ROUTES_OF)}"
         )
-    held = [case for case in cases if case.id in loaded.cases]
-    if not held:
+    present = [case for case in cases if case.id in loaded.cases]
+    if not present:
         raise modes.EvalRunError(f"{path}: none of its cases are in {corpus_dir}")
+    held = [case for case in present if diagnosable(case)]
+    skipped = {
+        case.id: "holdout case: no diagnosis reads its losses (#744)"
+        for case in present
+        if not diagnosable(case)
+    }
     arm = replay.arm_of(loaded)
 
     def sweep(**graded: Any) -> replay.SweepReplay:
@@ -1841,7 +1852,8 @@ def replay_artifact(
                 replay.replay_extraction(case, extracted[case.id])
                 for case in held
                 if case.id in extracted
-            )
+            ),
+            skipped=skipped,
         )
     # A head-only sweep extracted its own model, so its rows name that model's
     # element IDs and the archived catalog is what a replay grades. Every other
@@ -1851,7 +1863,7 @@ def replay_artifact(
         if loaded.mode == "heads"
         else assertions_from_reports(path, held)
     )
-    graded, skipped = [], {}
+    graded = []
     for case in held:
         if case.id not in proposed:
             continue

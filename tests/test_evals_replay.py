@@ -1412,6 +1412,54 @@ class TestTheArchivedEmissionsReplay:
         (graded,) = sweep.extractions
         assert graded.counts["found"] == len(list(golden.model.elements()))
 
+    def test_a_holdout_case_is_skipped_by_name(
+        self,
+        corpus,
+        tmp_path,
+        sampling,  # noqa: F811
+    ):
+        """A replay names every element a case lost, and no diagnosis reads a holdout's (#744)."""
+        golden = next(c for c in corpus if c.id == CASE)
+        holdout = next(c for c in corpus if c.meta.holdout)
+        path = write_run(
+            tmp_path,
+            "e2e.json",
+            provenance(sampling),
+            [score(CASE, 4, [0]), score(holdout.id, 4, [0])],
+            mode="end-to-end",
+            instruction=[
+                {
+                    "framework": "(shared)",
+                    "node": "extract",
+                    "tokens": 1,
+                    "sha256": "a" * 64,
+                }
+            ],
+            models={
+                "tiers_config_version": 9,
+                "tiers": {
+                    "base": {"vendor": "openrouter", "model": "x", "upstreams": []}
+                },
+            },
+        )
+        write_extractions(
+            str(path),
+            "end-to-end",
+            {
+                case.id: ExtractionResult(
+                    case.id, None, (), raw=case.model.model_dump(mode="json")
+                )
+                for case in (golden, holdout)
+            },
+        )
+
+        sweep = replay_artifact(path, corpus, CORPUS)
+
+        assert [graded.case_id for graded in sweep.extractions] == [CASE]
+        assert sweep.skipped == {
+            holdout.id: "holdout case: no diagnosis reads its losses (#744)"
+        }
+
     def test_a_case_nobody_signed_is_skipped_by_name(self, corpus, tmp_path):
         bench = next(p for p in ARTIFACTS if "luna-r1" in p.name)
         old = tmp_path / "corpus"
