@@ -55,6 +55,7 @@ from analysis_service.system_model import (
 from analysis_service.validation import validate
 
 __all__ = [
+    "LineageConflict",
     "answered_model",
     "capability_statements",
     "check_fact_answers",
@@ -65,6 +66,22 @@ __all__ = [
 #: The fields a flow's ID is built from. An answer cannot move one, because the
 #: flow would then carry an ID its endpoints no longer derive.
 _ENDPOINTS = frozenset({"source", "destination"})
+
+
+class LineageConflict(ValueError):
+    """These answers would leave a capability present under an absent ancestor.
+
+    ``part`` and ``ancestor`` name the two capabilities, so a page can offer to
+    answer both in one save.
+    """
+
+    def __init__(self, part: str, ancestor: str) -> None:
+        self.part = part
+        self.ancestor = ancestor
+        super().__init__(
+            f"{part!r} is part of {ancestor!r}, and these answers would leave"
+            f" {part!r} present while {ancestor!r} is absent; answer both"
+        )
 
 
 def check_fact_answers(
@@ -197,11 +214,7 @@ def _check_capability_lineage(
         for ancestor in lineage(key):
             absent = ancestor in held and held[ancestor].state == "absent"
             if absent and answering & {key, ancestor}:
-                raise ValueError(
-                    f"{key!r} is part of {ancestor!r}, and these answers would"
-                    f" leave {key!r} present while {ancestor!r} is absent;"
-                    " answer both"
-                )
+                raise LineageConflict(key, ancestor)
 
 
 def _check_attribute_values(answers: Sequence[FactAnswer], model: SystemModel) -> None:

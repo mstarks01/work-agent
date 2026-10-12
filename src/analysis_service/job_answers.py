@@ -41,9 +41,15 @@ from analysis_service.answer_round import (
 from analysis_service.assertions import AssertionRecord
 from analysis_service.budgets import BudgetPolicy
 from analysis_service.certification import CertificationGate, CertifyResult
-from analysis_service.claims import FrameworkAnalysis, FrameworkName
+from analysis_service.claims import (
+    FrameworkAnalysis,
+    FrameworkName,
+    UnknownKey,
+    UnknownRef,
+)
 from analysis_service.errors import ConfigError
 from analysis_service.fact_answers import FactAnswer
+from analysis_service.fact_writes import LineageConflict
 from analysis_service.graph import Entry
 from analysis_service.jobs import (
     Admission,
@@ -147,7 +153,25 @@ class NoCatalog(ValueError):
 
 class Refused(ValueError):
     """The answer rules refused the submission. The message names the
-    submitter's own choices, so a driver may show it."""
+    submitter's own choices, so a driver may show it.
+
+    ``contradiction`` is set where the answers would leave a capability
+    present under an absent ancestor: the part's question key and the
+    ancestor's, so a page can offer to answer both in one save.
+    """
+
+    def __init__(
+        self, message: str, contradiction: tuple[UnknownKey, UnknownKey] | None = None
+    ) -> None:
+        super().__init__(message)
+        self.contradiction = contradiction
+
+    def fields(self) -> dict[str, object]:
+        """What a driver adds to the refusal's body beside its message."""
+        if self.contradiction is None:
+            return {}
+        part, ancestor = self.contradiction
+        return {"contradiction": {"part": list(part), "ancestor": list(ancestor)}}
 
 
 class RunnerUnavailable(Exception):
@@ -558,5 +582,11 @@ class JobAnswers:
             return rule(*args, **kwargs)
         except (AlreadyResumed, NoCatalogError):
             raise
+        except LineageConflict as exc:
+            contradiction = (
+                UnknownRef(capability=exc.part).key,
+                UnknownRef(capability=exc.ancestor).key,
+            )
+            raise Refused(str(exc), contradiction) from exc
         except ValueError as exc:
             raise Refused(str(exc)) from exc

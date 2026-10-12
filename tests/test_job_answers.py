@@ -9,6 +9,7 @@ rule. The ``/v1`` route tests hold the HTTP mapping of each refusal.
 from __future__ import annotations
 
 import asyncio
+import json
 from dataclasses import replace
 
 import pytest
@@ -20,8 +21,10 @@ from analysis_service.answer_round import (
     StaleRevision,
 )
 from analysis_service.answer_sets import AnswerSet
+from analysis_service.claims import UnknownRef
 from analysis_service.errors import ConfigError
 from analysis_service.fact_answers import FactAnswer
+from analysis_service.fact_writes import LineageConflict, check_fact_answers
 from analysis_service.job_answers import (
     DraftSaved,
     JobAnswers,
@@ -479,3 +482,44 @@ def valid_model_sources():
     from tests.factories import DESCRIPTION_TEXT
 
     return [Source.description(DESCRIPTION_TEXT, label="overview")]
+
+
+class TestAContradictionIsNamed:
+    """A refused lineage names the part and the ancestor, so a page can offer
+    to answer both in one save (#1632)."""
+
+    PART = UnknownRef(capability="oauth-client").key
+    ANCESTOR = UnknownRef(capability="oauth").key
+
+    def test_the_rule_names_the_part_and_the_ancestor(self):
+        answers = [
+            FactAnswer(key=self.ANCESTOR, value="no"),
+            FactAnswer(key=self.PART, value="yes"),
+        ]
+        with pytest.raises(LineageConflict) as refused:
+            check_fact_answers(answers, valid_model(), None)
+        assert (refused.value.part, refused.value.ancestor) == ("oauth-client", "oauth")
+
+    def test_the_refusal_carries_the_two_question_keys(self):
+        def rule():
+            raise LineageConflict("oauth-client", "oauth")
+
+        with pytest.raises(Refused) as refused:
+            JobAnswers._refusing(rule)
+        assert refused.value.contradiction == (self.PART, self.ANCESTOR)
+        assert "answer both" in str(refused.value)
+
+    def test_another_refusal_adds_no_field(self):
+        assert Refused("refused").fields() == {}
+
+    def test_both_drivers_add_the_same_field_to_the_body(self):
+        from analysis_service import api
+        from webapp import main
+
+        refused = Refused("refused", (self.PART, self.ANCESTOR))
+        page = asyncio.run(main._refused(400, None, refused))
+        problem = asyncio.run(api._refusal_response(400, None, refused))
+        named = {"part": list(self.PART), "ancestor": list(self.ANCESTOR)}
+        assert json.loads(page.body) == {"message": "refused", "contradiction": named}
+        assert json.loads(problem.body)["contradiction"] == named
+        assert json.loads(problem.body)["detail"] == "refused"

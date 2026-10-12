@@ -802,7 +802,8 @@ def _message(status: int, message: str) -> JSONResponse:
 
 
 async def _refused(status: int, request: Request, exc: Exception) -> JSONResponse:
-    return _message(status, str(exc))
+    fields = exc.fields() if isinstance(exc, Refused) else {}
+    return JSONResponse({"message": str(exc), **fields}, status_code=status)
 
 
 async def _not_admitted(request: Request, exc: NotAdmitted) -> JSONResponse:

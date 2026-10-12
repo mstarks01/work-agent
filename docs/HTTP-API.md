@@ -43,7 +43,7 @@ logged, never returned.
 | `POST` | `/v1/jobs/{id}/corrections` | Correct a final report's answers, as `{"facts": [...]}`: a changed value, or `unknown`. `200` with `{"job_id", "corrections", "corrected_findings"}`. No job starts, and the report is not rewritten. `400` where the report is not final, a correction names no answer the report read, or changes none. |
 | `POST` | `/v1/jobs/{id}/answers` | Answer the questions of a completed job or a job in `awaiting-answers`. Starts a **new** job that resumes from this one's model and catalog; `201` with its `job_id`. With `"save": true`, a waiting job keeps the answers, and a completed job keeps a draft of its follow-up; either answers `200` with its own `job_id`, and a save never starts a job. `409` where a save moved the answers after this request read them. |
 | `POST` | `/v1/jobs/{id}/amendments` | Amend a job in `awaiting-answers`, as `{"text", "revision"}`: what is true that its model misses or reads wrongly. Starts a **new** job that extracts the job's sources again with the amendment added, and pauses again; `201` with its `job_id`. `409` where the revision has moved, before or while the request reads it, or a job already locks this one. |
-| `GET` | `/v1/jobs/{id}/questions` | What the job asks you, as `{"job_id", "link_questions", "fact_questions", "early_questions", "fallback", "final", "early_remaining", "early_withheld", "early_stop", "early_held_back", "early_below_floor", "early_summary", "framework_gates", "skipped_early", "skipped_links", "answered_early", "answered_links", "revision", "resumed_by", "draft_links", "draft_facts", "answer_limits", "carried_dropped", "carried_dropped_links"}`: a finished report's questions, or a waiting job's link and early questions. `resumed_by` names the job this job's answers started while that job is in flight or has its report; the job then asks nothing until that job fails. Derived from the report when you ask, under the report's own rules: `409` before completion and `409` when the report is withheld. |
+| `GET` | `/v1/jobs/{id}/questions` | What the job asks you, as `{"job_id", "link_questions", "fact_questions", "early_questions", "early_blocked", "early_unnecessary", "policy_version", "fallback", "final", "early_stop", "early_held_back", "early_below_floor", "early_summary", "framework_gates", "skipped_early", "skipped_links", "answered_early", "answered_links", "revision", "resumed_by", "draft_links", "draft_facts", "answer_limits", "carried_dropped", "carried_dropped_links"}`: a finished report's questions, or a waiting job's link and early questions. `resumed_by` names the job this job's answers started while that job is in flight or has its report; the job then asks nothing until that job fails. Derived from the report when you ask, under the report's own rules: `409` before completion and `409` when the report is withheld. |
 | `GET` | `/healthz` | Unauthenticated liveness probe. |
 
 Errors are RFC 9457 `application/problem+json`.
@@ -445,8 +445,8 @@ available.
 
 **A follow-up larger than one request saves a draft**
 ([ADR 0070](adr/0070-a-follow-up-saves-a-draft-in-batches.md)). One request
-carries at most the `answer_limits` the questions route publishes: `facts` and
-`links` for one request, `held_facts` and `held_links` for every answer a job
+carries at most the `answer_limits` the questions route publishes: `facts`,
+`links` and `skips` for one request, `held_facts` and `held_links` for every answer a job
 holds, and `detail` for the characters one answer's detail carries. A report can ask more than one request carries. Send `"save": true`
 with your `revision` to keep a batch as a draft: no job starts, the follow-up
 is not spent, and the response is `200` with `{"job_id", "saved": true,
@@ -465,7 +465,7 @@ or waits on it. The analysis does not run again.
 
 | Status | Cause |
 | --- | --- |
-| `400` | `links` is sent and this deployment builds no assertion catalog; two answers name the same principal or the same fact; a link answer names a principal the job did not ask about; a fact answer names a fact the job did not ask, or a value the fact cannot take, or a line longer than 1,000 characters; or the answers would leave a capability present while an ancestor capability is absent. |
+| `400` | `links` is sent and this deployment builds no assertion catalog; two answers name the same principal or the same fact; a link answer names a principal the job did not ask about; a fact answer names a fact the job did not ask, or a value the fact cannot take, or a line longer than 1,000 characters; or the answers would leave a capability present while an ancestor capability is absent. That problem body carries `contradiction`, `{"part", "ancestor"}`: the two capability questions' keys, which a client can answer together in one request. |
 | `404` | The job is not yours, or does not exist. |
 | `400` | `links` and `facts` are both empty and the job is not waiting on answers. Empty means "continue without answers". Or the job's report is final: its follow-up has run. |
 | `409` | The job is neither completed nor waiting on answers, its report is withheld, or its report carries no catalog. Or the job's answers already started a job that is in flight or finished: a job takes one resumed job, and takes answers again only where that job failed or was rejected. |

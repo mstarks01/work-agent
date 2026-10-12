@@ -359,9 +359,12 @@ The app can ask you questions before the analysis, and after the report.
   what the list holds; your answers can add questions as well as remove
   them, and the page says when they do. Each answer is saved as you give
   it: a chosen option at once, typed text a moment after you stop. The line
-  under the progress bar says **Saved**, **Saving** or **Not saved**, and
-  **Save now** sends again what a lost connection left unsaved. The app runs
-  no model, and shows the list again with your answers in. An answered
+  under the progress bar says **Not saved** when a save fails, and **Save
+  now** sends again what a lost connection left unsaved. If you leave the page
+  before an answer is saved, the browser asks you to confirm. The app runs
+  no model, and shows the list again with your answers in. A new question
+  that ranks above the one you are typing in shows when you leave that
+  answer, so the answer does not move while you type. An answered
   question stays where it was, compact, and **Change** opens it again. A
   question you leave blank stays in the list. **Skip for now** beside a
   question sets it aside, and **Skip the questions left blank** sets aside
@@ -371,7 +374,10 @@ The app can ask you questions before the analysis, and after the report.
   skipped question is not an answer, and the analysis treats its fact as
   open. Where another tab saved a different answer to a question you
   changed, the page shows both and asks which to keep; nothing is written
-  over in silence.
+  over in silence. A "no" to a capability whose part you answered "yes" is
+  refused, because the part cannot be present without it. The page then
+  offers to answer the part "no" too, in one save. A "yes" to a part under a
+  "no" is offered the other way.
   **Your answers** lists every answer you saved, and **Change** opens
   one again. If an answer was a guess, change it to "I don't know": the fact
   is open again, and the questions that rested on it come back. A question with parts comes back while a part has no answer, with
