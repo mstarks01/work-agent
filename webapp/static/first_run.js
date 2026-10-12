@@ -153,6 +153,19 @@
   // A row's key as the page's maps hold it: a link question's key is a
   // string, every other question's the JSON of its key tuple.
   const rowKey = (row) => (row.kind === "link" ? row.q.key : keyOf(row.q.key));
+  // Two answers are one answer when the fields the owner gives agree. The
+  // service serves every field, with its defaults and with the value it
+  // writes from a facets answer; the page builds only the fields given.
+  const sameAnswer = (a, b) => {
+    if (!a || !b) return !a && !b;
+    if ("principal" in a) return a.principal === b.principal && a.element === b.element;
+    if ((a.detail || "") !== (b.detail || "")) return false;
+    if (!a.facets && !b.facets) return a.value === b.value;
+    if (!a.facets || !b.facets) return false;
+    const given = Object.entries(a.facets);
+    return given.length === Object.keys(b.facets).length
+      && given.every(([facet, value]) => b.facets[facet] === value);
+  };
   const say = (node, text) => {
     if (node) node.textContent = text;
   };
@@ -295,12 +308,20 @@
   };
   const sendable = () =>
     new Map([...edits].filter(([, edit]) => !edit.refused && !edit.conflict));
-  const flush = async () => {
+  // Save the edits that wait. While a request is in flight, the edits wait
+  // for it, and the promise returned settles once they are sent too, so a
+  // caller that awaits it sees every edit made before the call answered.
+  let inFlight = Promise.resolve();
+  const flush = () => {
     clearTimeout(saveTimer);
     if (saving) {
       again = true;
-      return;
+      return inFlight;
     }
+    inFlight = send();
+    return inFlight;
+  };
+  const send = async () => {
     const sent = sendable();
     const body = bodyOf(sent);
     if (!body) {
@@ -342,7 +363,7 @@
       saving = false;
       if (again) {
         again = false;
-        flush();
+        await flush();
       }
     }
   };
@@ -386,10 +407,10 @@
     const theirs = answersOf(latest);
     for (const [key, edit] of edits) {
       const row = rows.get(key);
-      const held = theirs.has(key) ? JSON.stringify(theirs.get(key)) : null;
-      if (edit.answer && held === JSON.stringify(edit.answer)) {
+      const held = theirs.get(key);
+      if (edit.answer && sameAnswer(held, edit.answer)) {
         edits.delete(key);
-      } else if (held !== (row.saved ? JSON.stringify(row.saved) : null)) {
+      } else if (!sameAnswer(held, row.saved)) {
         edit.conflict = theirs.has(key) ? theirs.get(key) : null;
       }
     }
@@ -416,11 +437,14 @@
   const registerEdit = (row) => {
     const key = rowKey(row);
     const answer = row.read();
-    const saved = row.saved ? JSON.stringify(row.saved) : null;
-    if (!answer || JSON.stringify(answer) === saved) {
+    if (!answer || sameAnswer(answer, row.saved)) {
       edits.delete(key);
       return false;
     }
+    // The same answer already waits to be saved: it is sent once.
+    const pending = edits.get(key);
+    if (pending && !pending.skip && !pending.refused && pending.conflict === undefined
+      && sameAnswer(pending.answer, answer)) return false;
     edits.set(key, { generation: ++generation, answer, skip: false });
     return true;
   };
@@ -802,6 +826,9 @@
   // never moved: a new row is inserted where the service's order puts it.
   let pass = 0;
   let updateQuestionProgress = () => {};
+  // True while a skip, a start or an amendment runs. The skip and start
+  // buttons stay disabled until it ends.
+  let answerBusy = false;
   const reconcile = (data) => {
     const before = view;
     view = data;
@@ -1203,7 +1230,7 @@
       return sum + (!answer ? 0 : answer.facets ? Object.keys(answer.facets).length : 1);
     }, 0);
     const left = view.early_stop == null;
-    skipButton.disabled = !left;
+    skipButton.disabled = answerBusy || !left;
     startButton.className = left ? "" : "primary";
     if (typeof workspace !== "undefined") workspace.progress(view, filled, visible);
   };
@@ -1280,7 +1307,6 @@
     }
   };
 
-  let answerBusy = false;
   const answerAction = async (action) => {
     if (answerBusy) return;
     answerBusy = true;

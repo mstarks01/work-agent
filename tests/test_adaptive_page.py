@@ -276,6 +276,70 @@ await first; await second; await settle();
     assert next(c for c in seen if "disabled" in c) == {"disabled": True}
 
 
+def test_a_start_during_a_save_waits_for_it_and_starts_once():
+    """The owner chooses an option and starts before its save answers: the
+    start waits for that save, sends the answer once and starts once."""
+    first = payload(early_questions=[AUTH])
+    steps = """
+globalThis.fetch = async (url, init) => { record(url, init);
+  await new Promise((r) => setTimeout(r, 5));
+  return { ok: true, json: async () => ({ run: "r2" }) }; };
+const [auth] = selects();
+auth.value = "yes"; auth.listeners.change(); await settle();
+await ids.continue.listeners.click(); await settle();
+calls.push({ problem: ids["answer-problem"].hidden ? null : ids["answer-problem"].textContent });
+"""
+    seen = run(first, steps)["calls"]
+    posts = [c["body"] for c in seen if c.get("url") == "/answer/r1"]
+    assert [post.get("save") for post in posts] == [True, None], "one save, one start"
+    assert posts[0]["facts"] == [{"key": AUTH["key"], "value": "yes"}]
+    assert seen[-1] == {"problem": None}
+
+
+def test_the_skip_button_stays_disabled_until_its_skip_ends():
+    """A click on the skip button reaches the question area too, and the
+    area redraws the progress. The button stays disabled until its save
+    answers."""
+    first = payload(early_questions=[AUTH])
+    steps = """
+let release = null;
+globalThis.fetch = (url, init) => { record(url, init);
+  return new Promise((r) => { release = () => r({ ok: true, json: async () => ({ run: "r1" }) }); }); };
+const skipped = ids.skip.listeners.click();
+ids.asked.listeners.click();
+await settle();
+calls.push({ during: ids.skip.disabled });
+release(); await skipped; await settle();
+calls.push({ after: ids.skip.disabled });
+"""
+    seen = run(first, steps)["calls"]
+    assert next(c for c in seen if "during" in c) == {"during": True}
+    assert seen[-1] == {"after": False}
+
+
+def test_a_lost_response_whose_save_landed_is_acknowledged_not_a_conflict():
+    """The service serves an answer with every field and its defaults. Read
+    back after a lost response, it is the owner's own answer, saved."""
+    first = payload(early_questions=[AUTH])
+    held = AUTH | {
+        "answer": {"key": AUTH["key"], "value": "yes", "facets": None, "detail": ""}
+    }
+    theirs = payload(revision=1, answered_early=[held])
+    steps = f"""
+globalThis.fetch = async (url, init) => {{ record(url, init);
+  if (url.startsWith("/workspace/runs/")) return {{ ok: true, json: async () => ({{ run: "r1", questions: {json.dumps(theirs)} }}) }};
+  throw new Error("lost"); }};
+const [auth] = selects();
+auth.value = "yes"; auth.listeners.change();
+await settle(); await settle(); await settle(); await settle();
+calls.push({{ status: ids["save-status"].textContent,
+  conflict: walk(ids.list).some((n) => n.className === "conflict") }});
+"""
+    seen = run(first, steps)["calls"]
+    assert len([c for c in seen if c.get("url") == "/answer/r1"]) == 1
+    assert seen[-1] == {"status": "Saved", "conflict": False}
+
+
 def test_a_lost_start_response_follows_the_run_that_started():
     first = payload(early_questions=[AUTH])
     steps = """

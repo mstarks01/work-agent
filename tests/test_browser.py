@@ -147,13 +147,10 @@ def test_an_owner_who_skips_every_question_reaches_a_report_that_says_what_is_op
     for _ in range(20):
         if page.is_disabled("#skip"):
             break
-        before = page.inner_text("#questions")
         page.click("#skip")
-        # The response lands before the page draws the list again from it.
-        page.wait_for_function(
-            "before => document.querySelector('#questions').innerText !== before",
-            arg=before,
-        )
+        # The skip hides its rows at once, before its save answers. The
+        # start button stays disabled until the whole skip has ended.
+        page.wait_for_function("() => !document.querySelector('#continue').disabled")
     else:
         pytest.fail("the list never ended")
     assert "Nothing runs until you choose Start the analysis" in page.inner_text(
