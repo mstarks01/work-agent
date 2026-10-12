@@ -11,12 +11,13 @@
   its framework turns stay.
 - **Amends**: [ADR 0048](0048-a-paused-job-ranks-its-open-facts-before-any-finding.md)
   and [ADR 0049](0049-an-answer-binds-to-an-open-fact-and-the-order-completes-findings.md),
-  whose order within a framework's turn now follows what an answer settles,
-  with the prior as the tiebreak; their eligibility rule is unchanged.
+  whose questions a pause asks in one list; a field question keeps the
+  prior's order, and their eligibility rule is unchanged.
   [ADR 0051](0051-a-requirement-applies-by-a-rule-over-capabilities.md) and
   [ADR 0055](0055-a-follow-up-asks-first-what-the-most-important-findings-wait-on.md),
-  whose early capability order now reads the effect first and the band and
-  the units as the tiebreak; a parent still comes before its parts.
+  whose early capability order keeps the band and the units first and takes
+  what an answer settles as the tiebreak; a parent still comes before its
+  parts.
   [ADR 0068](0068-a-pause-says-what-it-leaves-open.md), whose counts gain
   the list's own and whose copy says "the list", not "a round".
   [ADR 0069](0069-a-skip-is-of-a-question-the-page-presented.md), whose
@@ -30,8 +31,13 @@
   and [ADR 0073](0073-a-finding-can-wait-on-some-facets-and-an-answer-can-carry-a-detail.md),
   whose facets and details are unchanged; [ADR 0056](0056-the-findings-that-wait-decide-the-follow-up-order.md),
   whose post-report order this does not touch.
-- **Evidence**: `QA-2026-10-12-02-E1` to `-E3` in `evals/experiments/`,
-  `tests/test_answer_admission.py::TestTheListRanksByWhatAnAnswerSettles`
+- **Evidence**: `QA-2026-10-12-02-E1` and its correction `-E10`, and `-E2`
+  and `-E4` to `-E9`, in `evals/experiments/`. `-E9` reads the list beside
+  the earlier early-order baselines `QA-2026-09-26-03-E33` and `-E35`,
+  `QA-2026-10-09-01-E1` and `-E3`, and `QA-2026-10-09-02-E1` and `-E2`.
+  `-E5` corrects `-E3`, which timed a holdout case's model, and `-E6` times
+  tuned models.
+  `tests/test_answer_admission.py::TestTheListRanksByBandAndUnitsThenByWhatAnAnswerSettles`
   and `tests/test_pause_summary.py`.
 
 ## Context
@@ -45,11 +51,11 @@ answer would do to the other questions.
 
 The maintainer asked on 2026-10-12 for one page that lists the recommended
 questions at once, with no visible round, and that asks first the questions
-whose answer settles the most other questions, so an owner resolves the broad
+whose answer settles the most other questions, so a submitter resolves the broad
 dependencies early and spends less on the details. The safeguards that make
 an answer trustworthy stay: a save runs no model, a skip is explicit, the
 limits and the floors hold, the frameworks take fair turns, and a question
-hidden from the owner is never recorded as seen or skipped.
+hidden from the submitter is never recorded as seen or skipped.
 
 ## Decision
 
@@ -98,8 +104,10 @@ first, then the one with the higher least. The maintainer chose this on
 2026-10-12 after `QA-2026-10-12-02-E1` measured the order #1632 first asked
 for, the potential first: on 32 archived ASVS reports it decided 13% to 37%
 fewer units at five choices for every answerer, on 18 to 30 of the 32
-reports, and more units only past ten choices and only for an owner who
-answers "no" often. A "no" to a broad parent removes many questions and
+reports. It decided more units only for a submitter who answers "no" (3,752
+against 3,680 at ten choices, 4,022 against 3,914 at twenty) or "yes" and
+"no" by turns (3,794 against 3,542 at twenty), and fewer at every budget for
+one who answers "yes". A "no" to a broad parent removes many questions and
 decides few units; the band-first order asks the capability that decides the
 most. The questions an order removes and the units it decides are two
 measures, and the second is what the analysis reads.
@@ -136,19 +144,20 @@ unchanged inputs changes nothing.
 ## Consequences
 
 **The turns carry over the saves.** The frameworks' turns start from what
-the saved answers charged each framework, not from zero on each build. Before
-that, an owner who answered the first question and saved met the same
-framework's next question every time, and STRIDE completed 96 of 2,796
-findings in ten choices with ASVS beside it, against 1,488 alone
-(`QA-2026-10-12-02-E2`).
+the saved answers charged each framework, not from zero on each build. Turns
+that start from zero make a submitter who answers the first question and
+saves meet the same framework's next question every time: STRIDE then
+completes 96 of 2,796 findings in ten choices with ASVS beside it, against
+1,488 alone (`QA-2026-10-12-02-E2`).
 
 **A read is kept by its content.** `early_questions` and
 `capability_effects` keep their results by a digest of what they read, so a
-read that changes nothing costs about 13 ms, and a read after a save builds
+read that changes nothing costs about 14 ms, and a read after a save builds
 only the list with the answers in. With nothing kept, the set builds in a p95
-of 180 ms (no answers) to 332 ms (thirty answers) on the largest corpus
-model with STRIDE and ASVS level 3, on an idle machine, under the 500 ms the
-issue proposed (`QA-2026-10-12-02-E3`).
+of 274 to 297 ms (no answers) and 333 to 363 ms (thirty answers) on the
+corpus model with the longest early list, case 06, with STRIDE and ASVS
+level 3, under the 500 ms the issue proposed (`QA-2026-10-12-02-E6`). The
+machine ran another session's work during the measurement.
 
 **The `/v1` questions payload changes shape.** `early_questions` holds the
 whole list, `early_blocked` and `early_unnecessary` are new, each row
@@ -156,12 +165,20 @@ carries `reason` and `rank`, and `early_remaining` and `early_withheld` are
 gone. There is no round-shaped payload beside it: the first-run page and the
 eval replay are the callers, and both read the list.
 
-**The first-run page still saves by a button.** With this record the page
-shows the whole list, sends what it presented, and names no round. Keyed
-state, autosave, conflict handling and incremental rendering are the next
-change of #1632.
+**The first-run page saves each answer as the submitter gives it.** The page
+shows the whole list, sends what it presented, and names no round. A chosen
+option saves at once, and typed text saves 400 ms after the last keystroke.
+Each row is keyed by its question and stays in place when the list is read
+again. Where a save meets an answer that changed elsewhere, the row says so
+and offers "Keep mine" and "Take theirs"; neither choice happens in silence.
 
 **The box order's evidence no longer applies.** `QA-2026-10-09-02-E2` measured
 the box order against the question turn order inside rounds. The list has no
 round to box, and a group heading must not move a low-priority block ahead of
 the intended choice, so the page shows each group's rows in the list's order.
+The cost is measured (`QA-2026-10-12-02-E9`): with every answer "I don't
+know", STRIDE alone completes 946 and 1,488 of 2,796 findings at five and ten
+choices against 993 and 1,527 under the box order (critical or high 521 and
+772 against 541 and 799), and the same at twenty. With both frameworks
+selected it completes 1,009 against 1,103 at five choices, and 1,555 and
+2,019 against 1,154 and 1,375 at ten and twenty.

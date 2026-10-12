@@ -48,6 +48,7 @@ from analysis_service.system_model import CapabilityStatement, SystemModel
 
 __all__ = [
     "FIXTURES_DIR",
+    "TRUTH_ANSWERS",
     "Fixture",
     "FixtureScore",
     "QuestionRun",
@@ -64,7 +65,7 @@ FIXTURES_DIR = Path(__file__).resolve().parents[1] / "applicability"
 _LABEL = "Fixture source"
 
 #: How a truth state answers a yes-or-no capability question.
-_ANSWER = {"present": "yes", "absent": "no", "unknown": "unknown"}
+TRUTH_ANSWERS = {"present": "yes", "absent": "no", "unknown": "unknown"}
 
 
 @dataclass(frozen=True)
@@ -304,7 +305,7 @@ def simulate_questions(fixture: Fixture) -> QuestionRun:
                 answered_for[question.key] = question.frameworks
                 continue
             answer = FactAnswer(
-                key=question.key, value=_ANSWER[fixture.truth.get(key, "unknown")]
+                key=question.key, value=TRUTH_ANSWERS[fixture.truth.get(key, "unknown")]
             )
             given[question.key] = answer.value
             answered_for[question.key] = question.frameworks

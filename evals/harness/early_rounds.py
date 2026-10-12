@@ -116,12 +116,12 @@ def _every_control(stated: bool) -> Answerer:
 
 
 def _skip(question: EarlyQuestion, blessed: SystemModel) -> None:
-    """An owner who cannot answer: every question is skipped for now."""
+    """A submitter who cannot answer: every question is skipped for now."""
     del question, blessed
 
 
 def _in_part(rest: str | None) -> Answerer:
-    """An owner who knows one part of a question with parts: the first facet
+    """A submitter who knows one part of a question with parts: the first facet
     is "yes", and the rest are ``rest`` or left out where ``rest`` is None."""
 
     def answer(question: EarlyQuestion, blessed: SystemModel) -> FactAnswer:
@@ -196,7 +196,7 @@ def _eligible(listed: Sequence[EarlyQuestion]) -> set[UnknownKey]:
     return {question.key for question in listed if passes_floor(question, listed)}
 
 
-def _state(
+def paused_state(
     model: SystemModel,
     frameworks: Mapping[FrameworkName, Mapping[str, Any]],
     answered: Sequence[FactAnswer],
@@ -288,7 +288,7 @@ def replay(
     skipped: tuple[SkipKey, ...] = ()
     saves = 0
     for saves in range(MAX_SAVES):
-        state = _state(extracted, frameworks, answered, skipped)
+        state = paused_state(extracted, frameworks, answered, skipped)
         asked = state.questions
         if asked.done:
             break
@@ -300,7 +300,7 @@ def replay(
         }
         given = [reply for reply in replies.values() if reply is not None]
         # "Skip the rest" sets aside a blank question, and one with facets
-        # the owner answered only in part, among the questions the page shows:
+        # the submitter answered only in part, among the questions the page shows:
         # a part hidden under its parent's answer is not skipped.
         complete = answered_keys(merged_facts(answered, given))
         shows = set(asked.presented(merged_facts(answered, given)))

@@ -2232,7 +2232,7 @@ def _run_arguments(parser: argparse.ArgumentParser) -> None:
         type=int,
         metavar="N",
         help="with --mode answered, answer only the signed facts the pause asks"
-        " in its first N rounds, as an owner who stops after N rounds would",
+        " in its first N rounds, as a submitter who stops after N rounds would",
     )
     parser.add_argument(
         "--accept-cost",
