@@ -11,9 +11,9 @@
 - **Amended by**: [ADR 0049](0049-an-answer-binds-to-an-open-fact-and-the-order-completes-findings.md),
   which keeps the prior as the eligibility rule and shares the open-fact rule
   with the answer check, and
-  [ADR 0078](0078-a-paused-job-asks-one-adaptive-list.md), which ranks a
-  question by what its answer settles before the prior and keeps the prior
-  as the eligibility rule
+  [ADR 0078](0078-a-paused-job-asks-one-adaptive-list.md), which keeps the
+  prior's order and the prior as the eligibility rule, and breaks a tie
+  between two capability questions by what an answer settles
 
 ## Context
 

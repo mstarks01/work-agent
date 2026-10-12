@@ -178,7 +178,7 @@ Start at the places where a one-package assumption survives:
   every check goes green while the output says nothing.
 
 - **The questions a paused job asks.** The package declares
-  `precondition_facts`: the facts an owner answers to decide its
+  `precondition_facts`: the facts a submitter answers to decide its
   **Precondition** where it is undecidable (ADR 0067). A package whose
   precondition is total declares an empty answer.
   `test_every_undecidable_precondition_offers_an_answer_that_decides_it` binds

@@ -20,7 +20,7 @@ with the answer in hand.
 **The list ranks a question by its score per choice.** A question answered in
 facets costs a choice a facet, so a table of four facets must score four
 times a one-choice question to come before it. Ranked by score alone, a
-STRIDE-only pause opened with tables, and an owner's first ten choices
+STRIDE-only pause opened with tables, and a submitter's first ten choices
 completed 517 of 2,744 conditional findings on the archive; ranked per
 choice, 1,488 (``QA-2026-09-26-03-E33``). The floor still reads the score.
 
@@ -57,14 +57,13 @@ job writes it (#1252).
 
 from __future__ import annotations
 
-import hashlib
 import json
 from collections import Counter, OrderedDict
-from collections.abc import Callable, Collection, Container, Mapping
+from collections.abc import Collection, Container, Mapping
 from dataclasses import dataclass
 from pathlib import Path
 from types import MappingProxyType
-from typing import Any, TypeVar
+from typing import Any
 
 from analysis_service.answer_forms import (
     YES_NO,
@@ -85,6 +84,7 @@ from analysis_service.claims import (
 )
 from analysis_service.fact_answers import FactKind, answer_facets, fact_kind, key_ref
 from analysis_service.frameworks import PACKAGES, PreconditionResult, run_precondition
+from analysis_service.memo import Memo, remembered
 from analysis_service.open_facts import (
     element_names,
     group_of,
@@ -104,18 +104,15 @@ __all__ = [
     "PriorRow",
     "asked_parent",
     "capability_questions",
-    "digest",
     "early_questions",
     "element_type",
     "framework_gates",
     "load_prior",
-    "remembered",
     "waiting_parts",
 ]
 
 QUESTION_PRIOR_PATH = Path(__file__).with_name("question_prior.json")
 
-_Built = TypeVar("_Built")
 
 #: The reason a field question gives where no rule reads its fact: the prior,
 #: which is why it is asked at all.
@@ -213,8 +210,9 @@ class EarlyQuestion:
     #: capability, how many units it could settle. The list ranks a field
     #: question by this value per choice (:attr:`decisions`), capabilities
     #: first; the recommended list takes its places with the frameworks in
-    #: turn (:func:`~analysis_service.answer_round.by_turn`), and within a
-    #: turn by what an answer settles (:mod:`analysis_service.answer_effects`).
+    #: turn (:func:`~analysis_service.answer_round.by_turn`). Within a turn a
+    #: capability ranks by its :attr:`standing`, and what an answer settles
+    #: (:mod:`analysis_service.answer_effects`) breaks a tie.
     score: float = 0.0
     #: The key of the question this one depends on: a capability's parent,
     #: whose "no" makes this one moot. ``None`` for every other question.
@@ -235,6 +233,19 @@ class EarlyQuestion:
     def decisions(self) -> int:
         """The choices a person makes to answer it: one a facet, else one."""
         return len(self.facets) or 1
+
+    @property
+    def standing(self) -> tuple[int, float]:
+        """A capability's place: the band of its most important unit, then its units.
+
+        **The one reader of the band-and-units order** (ADR 0055). It sorts
+        ascending, the highest band and the most units first.
+        :func:`capability_questions` orders the list by it, and
+        :func:`~analysis_service.answer_round.recommended` ranks by it before
+        the effects break a tie.
+        """
+        band = max((band for _, band in self.framework_bands), default=0)
+        return (-band, -self.score)
 
     def to_json(self) -> dict[str, object]:
         return {
@@ -289,37 +300,7 @@ def _gates(
     }
 
 
-#: How many built lists and effect tables each memo keeps, newest last.
-REMEMBERED = 64
-
-
-def remembered(
-    memo: OrderedDict[str, _Built], key: str, build: Callable[[], _Built]
-) -> _Built:
-    """``build()`` once for ``key``, then the kept value (ADR 0078).
-
-    **A memo is keyed by content, never by a job.** The key is a digest of
-    everything the build reads, so a checkpoint, a selection, a policy and
-    the saved answers each give their own key, and a changed answer is a new
-    key with no invalidation to get wrong. A kept value is immutable and
-    shared. The memo holds :data:`REMEMBERED` values and drops the oldest.
-    """
-    if key in memo:
-        memo.move_to_end(key)
-        return memo[key]
-    built = build()
-    memo[key] = built
-    while len(memo) > REMEMBERED:
-        memo.popitem(last=False)
-    return built
-
-
-def digest(*parts: str) -> str:
-    """One key for ``parts``, which a memo reads."""
-    return hashlib.sha256("\x1f".join(parts).encode("utf-8")).hexdigest()
-
-
-_lists: OrderedDict[str, tuple[EarlyQuestion, ...]] = OrderedDict()
+_lists: Memo[tuple[EarlyQuestion, ...]] = OrderedDict()
 
 
 def early_questions(
@@ -338,16 +319,16 @@ def early_questions(
     part of the key by identity, so a test that swaps either builds afresh.
     See :func:`_early_questions` for the rule.
     """
-    key = digest(
-        model.model_dump_json(),
-        "" if catalog is None else catalog.model_dump_json(),
-        json.dumps(frameworks, sort_keys=True, default=str),
-        json.dumps(sorted(assume)),
-        str(id(prior)),
-        str(id(PACKAGES)),
-    )
     return remembered(
-        _lists, key, lambda: _early_questions(model, frameworks, catalog, prior, assume)
+        _lists,
+        (
+            model.model_dump_json(),
+            "" if catalog is None else catalog.model_dump_json(),
+            json.dumps(frameworks, sort_keys=True, default=str),
+            json.dumps(sorted(assume)),
+        ),
+        lambda: _early_questions(model, frameworks, catalog, prior, assume),
+        held=(prior, PACKAGES),
     )
 
 
@@ -540,7 +521,6 @@ def capability_questions(
     "yes", and the answer check refuses a "yes" under a "no".
     """
     counts: Counter[str] = Counter()
-    bands: dict[str, int] = {}
     helps: dict[str, list[FrameworkName]] = {}
     own: dict[str, list[tuple[FrameworkName, int]]] = {}
     for name in sorted(frameworks):
@@ -548,7 +528,6 @@ def capability_questions(
             PACKAGES[name].record.open_capabilities(model, frameworks[name]).items()
         ):
             counts[key] += need.units
-            bands[key] = max(bands.get(key, need.band), need.band)
             helps.setdefault(key, []).append(name)
             own.setdefault(key, []).append((name, need.band))
 
@@ -556,35 +535,30 @@ def capability_questions(
         parent = asked_parent(key, counts)
         return depth(parent) + 1 if parent else 0
 
-    order = sorted(
-        counts,
-        key=lambda key: (-bands[key], -counts[key], depth(key), key),
-    )
-    questions = []
-    for key in order:
+    questions: dict[str, EarlyQuestion] = {}
+    for key in counts:
         ref = UnknownRef(capability=key)
         group, heading = group_of(ref)
         parent = asked_parent(key, counts)
-        questions.append(
-            EarlyQuestion(
-                key=ref.key,
-                kind="capability",
-                label=CAPABILITIES[key].question,
-                reasons=(
-                    f"An answer settles whether up to {counts[key]} units apply.",
-                ),
-                choices=YES_NO,
-                form="choice",
-                suggestions=(),
-                facets=(),
-                max_length=answer_limit(ref.key, model),
-                group=group,
-                group_heading=heading,
-                element=CAPABILITIES[key].question,
-                frameworks=tuple(helps[key]),
-                score=float(counts[key]),
-                framework_bands=tuple(own[key]),
-                parent=UnknownRef(capability=parent).key if parent else None,
-            )
+        questions[key] = EarlyQuestion(
+            key=ref.key,
+            kind="capability",
+            label=CAPABILITIES[key].question,
+            reasons=(f"An answer settles whether up to {counts[key]} units apply.",),
+            choices=YES_NO,
+            form="choice",
+            suggestions=(),
+            facets=(),
+            max_length=answer_limit(ref.key, model),
+            group=group,
+            group_heading=heading,
+            element=CAPABILITIES[key].question,
+            frameworks=tuple(helps[key]),
+            score=float(counts[key]),
+            framework_bands=tuple(own[key]),
+            parent=UnknownRef(capability=parent).key if parent else None,
         )
-    return tuple(questions)
+    order = sorted(
+        questions, key=lambda key: (*questions[key].standing, depth(key), key)
+    )
+    return tuple(questions[key] for key in order)

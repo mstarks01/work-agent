@@ -534,6 +534,36 @@ class TestTheAdaptiveList:
         assert [q.key for q in shown] == [q.key for q in listed[:30]]
         assert [q.key for q in withheld] == [listed[-1].key]
 
+    def test_a_question_answered_in_part_is_charged_to_its_framework_once(self):
+        """The saved answers charge each framework, and so does a question's
+        place in the list. A question answered in part is charged once, so
+        its framework's turn is not passed over for it twice."""
+        from analysis_service.answer_round import recommended
+
+        def field(name, framework, facets=()):
+            return SimpleNamespace(
+                key=(f"process:{name}", "", "", "", "capacity-limits", ""),
+                kind="question",
+                score=5.0,
+                facets=facets,
+                decisions=len(facets) or 1,
+                parent=None,
+                frameworks=(framework,),
+                gates=(),
+                framework_bands=(),
+                group="capacity-limits",
+            )
+
+        part = field("part", "stride", QUESTION_KINDS["capacity-limits"].facets)
+        stride = field("s", "stride")
+        asvs = [field("a1", "asvs"), field("a2", "asvs")]
+        shown, _, _ = recommended(
+            [part, stride, *asvs], frozenset(), {part.key: part.frameworks}, {}
+        )
+        assert [q.key for q in shown] == [
+            q.key for q in (asvs[0], part, asvs[1], stride)
+        ]
+
     def test_a_stop_says_whether_the_limits_held_questions_back(self):
         asked = _asked_after([])
         assert asked.stop is None
@@ -1175,9 +1205,10 @@ def _listed(answers=()):
     )
 
 
-class TestTheListRanksByWhatAnAnswerSettles:
-    """Within a framework's turn, the question whose answer proves the most
-    other questions settled or unnecessary comes first (ADR 0078)."""
+class TestTheListRanksByBandAndUnitsThenByWhatAnAnswerSettles:
+    """Within a framework's turn, a capability ranks by its band and its units
+    (ADR 0055). Where two tie, the one whose answer proves the most other
+    questions settled or unnecessary comes first (ADR 0078)."""
 
     def test_the_list_s_order_holds_and_the_effects_break_a_tie(self):
         """Band and units first (ADR 0055); where two capabilities tie on
@@ -1292,7 +1323,7 @@ BOTH = {"stride": {}, "asvs": {"level": 2}}
 
 class TestTheFrameworksTakeTurns:
     """With ASVS and STRIDE selected, the frameworks take turns in the list. So
-    an owner who stops after ten choices still completes a STRIDE finding
+    a submitter who stops after ten choices still completes a STRIDE finding
     (#1289, QA-2026-09-26-03-E29)."""
 
     def round_of(self, frameworks):
@@ -1328,9 +1359,9 @@ class TestTheFrameworksTakeTurns:
         assert self.round_of(BOTH) == self.round_of(backward)
 
     def test_the_turns_carry_over_the_saved_answers(self):
-        """An owner who answers the first question and saves meets the other
+        """A submitter who answers the first question and saves meets the other
         framework's question next: the list's turns start from what the saved
-        answers charged, not from zero (QA-2026-10-12-02-E1)."""
+        answers charged, not from zero (QA-2026-10-12-02-E2)."""
         first = self.round_of(BOTH)[0]
         assert first.frameworks == ("asvs",), "a control: asvs wins the first tie"
         after = question_set(
