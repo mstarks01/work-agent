@@ -41,6 +41,7 @@ from types import MappingProxyType
 from typing import Any, Literal
 
 from analysis_service.claims import FrameworkName
+from evals.harness.artifact import figures_corpus
 from evals.harness.comparison import held_out_cases
 from evals.harness.instruments import Cases
 from evals.harness.promotion import Reading, in_spreads
@@ -48,6 +49,48 @@ from evals.harness.promotion import Reading, in_spreads
 #: One figure, read from one artifact over the cases a selector keeps, or
 #: ``None`` where the artifact carries no such figure.
 Reader = Callable[[Mapping[str, Any], Cases], float | None]
+
+
+class IncomparableError(ValueError):
+    """Two artifacts whose figures do not compare, naming what differs."""
+
+
+#: What two artifacts must share before a gain between them means anything,
+#: each with how it is read. The corpus is read through
+#: :func:`~evals.harness.artifact.figures_corpus`, because a re-scored
+#: artifact's figures follow the corpus it was scored on. A version or a mode
+#: that differs changes what the figures count. The repository commit is not
+#: here: the candidate's own change is what the gain measures.
+COMPARABLE: Mapping[str, Callable[[Mapping[str, Any]], object]] = MappingProxyType(
+    {
+        "corpus": figures_corpus,
+        "artifact_version": lambda raw: raw.get("artifact_version"),
+        "flow_identity_version": lambda raw: raw.get("flow_identity_version"),
+        "mode": lambda raw: raw.get("mode"),
+    }
+)
+
+
+def refuse_incomparable(
+    baseline: Mapping[str, Any], candidate: Mapping[str, Any]
+) -> None:
+    """Refuse a pair whose figures do not compare, before any gate is read.
+
+    A part that either artifact lacks is refused too: a pair nobody can show
+    to be comparable is read as not comparable.
+    """
+    differ = [
+        f"{name} {read(baseline)!r} against {read(candidate)!r}"
+        for name, read in COMPARABLE.items()
+        if read(baseline) is None or read(baseline) != read(candidate)
+    ]
+    if differ:
+        raise IncomparableError(
+            "the two artifacts do not compare: " + "; ".join(differ) + ". Read a"
+            " gain only between sweeps scored on one corpus, under one artifact"
+            " and identity version, in one mode; re-score both with `run.py"
+            " score` on one corpus first"
+        )
 
 
 def _mean(values: Sequence[float]) -> float | None:
@@ -164,7 +207,11 @@ def read(
     *,
     spread: Mapping[str, float] = MappingProxyType({}),
 ) -> tuple[Reading, ...]:
-    """Every gate, read on each artifact's development cases."""
+    """Every gate, read on each artifact's development cases.
+
+    Raises :class:`IncomparableError` first where the two do not compare.
+    """
+    refuse_incomparable(baseline, candidate)
     readings = []
     for name, gate in GATES.items():
         reader = _reader(framework, name)
@@ -277,6 +324,10 @@ def command_gain(args: argparse.Namespace) -> int:
     except (OSError, ValueError) as error:
         print(f"cannot read: {error}", file=sys.stderr)
         return 1
-    readings = read(baseline, candidate, args.framework, spread=spread)
+    try:
+        readings = read(baseline, candidate, args.framework, spread=spread)
+    except IncomparableError as error:
+        print(f"refused: {error}", file=sys.stderr)
+        return 1
     print(render(readings, args.framework), end="")
     return 0

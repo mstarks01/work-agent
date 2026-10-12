@@ -447,6 +447,20 @@ class ScoredAgainst(BaseModel):
     repo_commit: RepoCommit
 
 
+def figures_corpus(raw: Mapping[str, Any]) -> str | None:
+    """The corpus an artifact's figures were scored against.
+
+    A re-scored artifact records that corpus under ``scored`` and keeps the one
+    its run read in ``corpus_digest``, so the figures follow the first where it
+    exists. ``None`` where the artifact names neither.
+    """
+    scored = raw.get("scored")
+    if isinstance(scored, Mapping) and isinstance(scored.get("corpus_digest"), str):
+        return scored["corpus_digest"]
+    held = raw.get("corpus_digest")
+    return held if isinstance(held, str) else None
+
+
 def _completion(sweep: Sweep, cases: Sequence[str]) -> dict[str, int]:
     """The denominators every aggregate in the artifact is conditional on.
 
