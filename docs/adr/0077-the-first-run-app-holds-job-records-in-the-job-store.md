@@ -33,8 +33,10 @@ module writes and starts a job for both surfaces.**
   the deployment's own budget policy. "One run at a time" is that ceiling.
 - The app's retention cap stays the app's policy: it holds at most twenty
   jobs, deletes the oldest finished job first through `JobStore.delete`,
-  never deletes a job that waits for answers, and refuses a new job where
-  every held job waits. A deleted job leaves its usage row (ADR 0066).
+  never deletes a job that waits for answers or the job a request answers,
+  and refuses a new job where every held job waits. It deletes only after
+  the store admits the new job, so a refused submission deletes nothing. A
+  deleted job leaves its usage row (ADR 0066).
 - The page's event stream is the store's event log for the job, followed by
   one frame for how the run ended: the questions a pause asks, where the
   report is, why the description was refused, or why the run failed. The

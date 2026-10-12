@@ -20,6 +20,7 @@ import shutil
 import subprocess
 import tempfile
 from collections.abc import Sequence
+from dataclasses import replace
 from pathlib import Path
 from typing import get_args
 
@@ -35,7 +36,7 @@ from analysis_service import (
 )
 from analysis_service.budgets import BudgetPolicy
 from analysis_service.deployment import Deployment
-from analysis_service.jobs import JobRecord
+from analysis_service.jobs import AdmissionOutcome, JobRecord
 from analysis_service.vendors import ProviderAuthError
 from tests.factories import (
     TEST_TIER_ENV,
@@ -503,6 +504,32 @@ def test_the_workspace_deletes_the_oldest_finished_job_and_stays_bounded(tiers):
         assert listed == set(runs[2:])
         assert client.get(f"/report/{runs[0]}").status_code == 404
         assert client.get(f"/report/{runs[4]}").status_code == 200
+
+
+def test_the_admission_messages_and_the_literal_agree():
+    """Every outcome the store can answer has a page message, or is a defect
+    a page cannot cause."""
+    from webapp.main import _ADMISSION_MESSAGES
+
+    answered = set(_ADMISSION_MESSAGES) | {"admitted", "duplicate"}
+
+    assert answered == set(get_args(AdmissionOutcome))
+
+
+def test_a_refused_submission_deletes_no_finished_job(tiers):
+    """The bound deletes a job only for a job the store admitted."""
+    settings = replace(
+        stub_settings(),
+        budget=WEBAPP_BUDGET.model_copy(update={"max_jobs_per_window": 2}),
+    )
+    workspace = Workspace(settings, max_jobs=2)
+    with TestClient(
+        create_app(startup_for(tiers), workspace), base_url=LOOPBACK
+    ) as client:
+        runs = [run_to_completion(client) for _ in range(2)]
+        refused = client.post("/analyze", json=posted("C"), headers=SAME_ORIGIN)
+        assert refused.status_code == 409, refused.text
+        assert client.get(f"/report/{runs[0]}").status_code == 200
 
 
 def test_the_gate_reopens_once_a_run_finishes(client):
@@ -1600,3 +1627,26 @@ def test_a_run_whose_runner_cannot_be_built_names_the_setting(tiers, caplog):
     assert "ANALYSIS_VERTEX_PROJECT" not in response.text
     assert message in caplog.text
     assert client.get("/workspace/runs").json() == []
+
+
+def _driver_apps(tiers):
+    from tests.test_api import make_client
+
+    client, _ = make_client()
+    return {"api": client.app, "webapp": create_app(startup_for(tiers))}
+
+
+def test_both_drivers_answer_every_refusal_of_the_module(tiers):
+    """A refusal neither driver handles is answered as a 500, so each driver
+    holds a handler for every exception the module exports."""
+    import analysis_service.job_answers as module
+
+    refusals = {
+        held
+        for held in (getattr(module, name) for name in module.__all__)
+        if isinstance(held, type) and issubclass(held, Exception)
+    }
+    assert refusals, "the module exports no refusal: the scan read nothing"
+    for driver, app in _driver_apps(tiers).items():
+        missing = refusals - set(app.exception_handlers)
+        assert not missing, f"{driver} has no handler for {missing}"

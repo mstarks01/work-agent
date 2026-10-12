@@ -184,6 +184,7 @@ credential case, which is the common one at this point.
   capped at 20, the oldest finished job deleted first, and lost on restart. A
   job that waits for your answers is never deleted. When every held job waits
   for answers, a new submission is refused until you answer or continue one.
+  A refused submission deletes nothing.
   A deleted job leaves the usage row the store's admission reads
   ([ADR 0066](adr/0066-a-deleted-job-leaves-a-usage-row.md)).
 - **Session history only; no permanent storage or accounts.** If you want the JSON, take it from the
@@ -258,7 +259,7 @@ Reopening a running analysis polls a read-only snapshot, leaving its original
 progress stream alone. Names are limited to 120 characters. Search filters
 the current server session by name.
 
-The registry's existing retention limit still applies. Restarting the server
+The job store's retention cap still applies. Restarting the server
 clears everything. The UI does not write descriptions or answers to browser
 storage. Persistent reports, accounts and authorization between users require
 separate backend work; the workspace is still bound to loopback.

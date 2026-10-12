@@ -188,7 +188,9 @@ PROTECTED: Mapping[str, str] = MappingProxyType(
         "evals/review/": "human votes and submissions",
         "evals/calibration_labels/": "human labels",
         "evals/baselines/": "sealed Baselines",
-        "evals/experiments/": "the experiment ledger, which only --record appends to",
+        "evals/experiments/": (
+            "the experiment ledger, which only --record and --grant append to"
+        ),
         "evals/harness/scorer.py": "the scorer",
         "evals/harness/promotion.py": "the promotion gates",
         ".github/": "the CI gates",
@@ -629,8 +631,8 @@ def parse(row: Mapping[str, Any], *, source: str) -> Experiment:
         candidate=candidate,
         ticket=_ticket(row.get("ticket"), where),
         rule=_rule(row.get("rule"), where),
-        resolves=row.get("resolves"),
-        rerun_reason=row.get("rerun_reason", ""),
+        resolves=_text(row.get("resolves"), "resolves", where) or None,
+        rerun_reason=_text(row.get("rerun_reason"), "rerun_reason", where),
         holdout_reads=_strings(row, "holdout_reads", "row", where),
     )
 
@@ -652,6 +654,15 @@ def _block(held: object, block: str, where: str) -> dict[str, Any] | None:
     if not isinstance(held, dict):
         raise ExperimentError(f"{where}: {block} is not an object")
     return held
+
+
+def _text(value: object, name: str, where: str) -> str:
+    """One optional string: empty where absent, refused where not a string."""
+    if value is None:
+        return ""
+    if not isinstance(value, str):
+        raise ExperimentError(f"{where}: {name} is not a string")
+    return value
 
 
 def _texts(
@@ -683,7 +694,7 @@ def _candidate(row: object, where: str) -> Candidate | None:
         raise ExperimentError(
             f"{where}: candidate verdict {verdict!r} is not kept or reverted"
         )
-    reason = held.get("reason") or ""
+    reason = _text(held.get("reason"), "candidate: reason", where)
     if verdict == "reverted" and not reason.strip():
         raise ExperimentError(f"{where}: a reverted candidate has no reason")
     parity = held.get("parity", {})
