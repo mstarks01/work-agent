@@ -110,9 +110,9 @@ Not part of the question, but the records cite these names, so you need them.
 
 **Assumptions**
 
+- `entity:customer` — The customer sits in the customer-device zone with the mobile app because the schema requires a zone; the source places customers nowhere. (basis: Customers browse and order through the mobile app, so a customer-used device is inferred. A personal device is not a stated network segment.)
 - `process:web-api` — The web API is reachable from the internet. (basis: The mobile app is the only customer channel and talks to the web API over HTTP from customers' own devices.)
 - `process:mobile-app` — The customer and the mobile app sit outside Sokify's own systems, in a customer-device zone. (basis: The app is the channel through which customers browse and order, and it reaches the web API over HTTP; the source names no other placement for it.)
-- `process:catalogue-spreadsheet` — The marketing laptop and its spreadsheet sit in a separate office zone from the server-side systems. (basis: "The spreadsheet lives on a marketing laptop in the office", distinct from where the web API and SIMS are described as running.)
 - `store:user-database` — The user database holds confidential data under the scheme in prompts/extract.md. (basis: The source says it holds the customer's name, address, and the card they paid with, which is personal and payment data.)
 - `store:delivery-address-flat-file` — The delivery address file holds confidential data under the scheme in prompts/extract.md. (basis: The source says only delivery addresses go in the file. A postal address identifies where a named customer lives.)
 - `process:web-api` — The web API is placed in the Sokify internal systems zone because the schema requires a zone; the source names no network segment. (basis: Ownership, interaction and the absence of named segments do not establish shared network membership. The value is a placement the schema requires, not a source-backed fact.)
@@ -458,7 +458,7 @@ your missing list, your notes and a digest of each file you read:
       "notes": "<counts, and anything you would change>",
       "opened_digests": {
       "source.md": "603873a0d569ba3f0ac4a91a363086b54bae022cf432862d17be9eec9465e4ea",
-      "model.json": "d6c0f91a9ae04bdb237850d3aff9a13c7b5c206578658d4ea44e169d8323d14d",
+      "model.json": "d31cf0ff67c1b91da63c2973e0b21a57ae52dadbc55168073222882da6410ac2",
       "claims/asvs.json": "fbc32dc14ac8a90e9bbb2bab6801dc704f2468a03e056d992f41564c9d8de41c",
       "claims/stride.json": "3c6cc2581eae539e4ac135dd37a0f933a2a8082f6bcf9cdf65112ab58c0ce5d8"
       }

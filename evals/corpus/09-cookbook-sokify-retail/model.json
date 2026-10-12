@@ -307,6 +307,12 @@
   ],
   "assumptions": [
     {
+      "assumption": "The customer sits in the customer-device zone with the mobile app because the schema requires a zone; the source places customers nowhere.",
+      "element_id": "entity:customer",
+      "attribute": "trust_zone",
+      "basis": "Customers browse and order through the mobile app, so a customer-used device is inferred. A personal device is not a stated network segment."
+    },
+    {
       "assumption": "The web API is reachable from the internet.",
       "element_id": "process:web-api",
       "attribute": "exposure",
@@ -317,12 +323,6 @@
       "element_id": "process:mobile-app",
       "attribute": "trust_zone",
       "basis": "The app is the channel through which customers browse and order, and it reaches the web API over HTTP; the source names no other placement for it."
-    },
-    {
-      "assumption": "The marketing laptop and its spreadsheet sit in a separate office zone from the server-side systems.",
-      "element_id": "process:catalogue-spreadsheet",
-      "attribute": "trust_zone",
-      "basis": "\"The spreadsheet lives on a marketing laptop in the office\", distinct from where the web API and SIMS are described as running."
     },
     {
       "assumption": "The user database holds confidential data under the scheme in prompts/extract.md.",
