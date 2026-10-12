@@ -940,6 +940,9 @@ def create_app(
             sources = [Source.model_validate(source) for source in body["sources"]]
             selection = _selection(state.frameworks, body["frameworks"])
             ask_questions = body.get("questions") is True
+            answers_from = body.get("answers_from")
+            if answers_from is not None and not isinstance(answers_from, str):
+                raise TypeError
             name = body.get("name", DEFAULT_NAME)
             if not isinstance(name, str) or not 1 <= len(name.strip()) <= 120:
                 return _message(
@@ -960,11 +963,15 @@ def create_app(
         breach = state.settings.limits.breach(sources)
         if breach is not None:
             return _message(400, breach.message)
+        carried = await workspace.answers.carried_from(
+            answers_from, OWNER, asks=ask_questions
+        )
         record = JobRecord.create(
             owner_subject=OWNER,
             sources=sources,
             frameworks=selection,
             system_name=name,
+            carried=carried,
             ask_questions=ask_questions,
             reserved_tokens=budgets.estimate(sources, selection),
         )
@@ -1500,9 +1507,13 @@ _STYLE = """
 _FORM_PAGE = (Path(__file__).parent / "workspace.html").read_text(encoding="utf-8")
 
 #: The question toggle. Every install can pause: one with no catalog asks its
-#: early questions and no link question.
+#: early questions and no link question. The page lists the earlier analyses
+#: whose answers a new one can carry (ADR 0079), and shows the list only where
+#: there is one.
 _QUESTIONS_FIELD = """<p class="ask-option"><label><input type="checkbox" id="ask" name="ask" checked>
-    Ask me questions to make the report better.</label></p>"""
+    Ask me questions to make the report better.</label></p>
+<div id="answers-from-field" hidden><label class="field-label" for="answers-from">Reuse answers from</label>
+    <select id="answers-from"><option value="">No earlier analysis</option></select></div>"""
 
 _DIAGNOSTIC_PAGE = (
     """<!doctype html>

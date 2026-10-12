@@ -433,6 +433,14 @@ run, and the app never removes it to make room. When every run the app holds
 waits for answers, the app refuses a new run until you answer or continue
 one. A restart of the app loses it.
 
+**Reuse the answers of an earlier analysis.** With questions on, choose an
+earlier analysis under **Reuse answers from**, then click **Prepare
+analysis**. The new analysis takes each earlier answer that one of its own
+questions still asks. It lists the other answers as answers that do not fit
+this system model. An answer about a part of your system carries only where
+the new description gives that part the same name. The list holds the
+analyses of this app session, so a restart clears it.
+
 ## Next steps
 
 - Use the [Integration guide](Integration-Guide.md) to embed the in-process

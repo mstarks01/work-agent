@@ -200,15 +200,59 @@ def test_no_form_control_can_influence_which_model_runs(client, tiers):
 
 def test_the_only_controls_are_the_picker_and_the_description(client):
     """One textarea, a checkbox per carried framework and the question toggle,
-    and one select per option."""
+    one select per option, and the earlier analysis whose answers to reuse."""
     page = client.get("/").text
 
     assert page.count("<textarea") == 1
     assert page.count('type="checkbox"') == len(CARRIED) + 1
     assert 'id="ask"' in page
-    # ASVS declares a level and STRIDE declares nothing, so exactly one select.
-    assert page.count("<select") == 1
+    # ASVS declares a level and STRIDE declares nothing, so one option select.
+    assert page.count("<select") == 2
     assert 'data-option="level"' in page
+    assert 'id="answers-from"' in page
+
+
+def _reusing(tiers):
+    """A client, and a finished run of its own that holds one answer."""
+    from analysis_service.answer_sets import AnswerSet
+    from analysis_service.fact_answers import FactAnswer
+
+    startup = startup_for(tiers)
+    workspace = Workspace(startup.settings)
+    reusing = TestClient(create_app(startup, workspace), base_url=LOOPBACK)
+    earlier = run_to_completion(reusing)
+    record = asyncio.run(workspace.store.get(earlier))
+    answer = FactAnswer(
+        key=("store:orders-db", "encryption_at_rest", "", "", "", ""), value="AES"
+    )
+    asyncio.run(
+        workspace.store.save(
+            record.model_copy(update={"answers": AnswerSet(facts=(answer,))})
+        )
+    )
+    return reusing, workspace, earlier, answer
+
+
+def test_a_new_run_carries_the_answers_of_the_run_it_names(tiers):
+    client, workspace, earlier, answer = _reusing(tiers)
+    body = posted("A web app.") | {"questions": True, "answers_from": earlier}
+
+    started = client.post("/analyze", json=body, headers=SAME_ORIGIN)
+
+    assert started.status_code == 200, started.text
+    record = asyncio.run(workspace.store.get(started.json()["run"]))
+    assert record.carried.facts == (answer,)
+
+
+def test_a_run_that_names_an_earlier_run_is_refused_what_it_cannot_read(tiers):
+    client, _, earlier, _ = _reusing(tiers)
+    off = posted("A web app.") | {"answers_from": earlier}
+    missing = posted("A web app.") | {"questions": True, "answers_from": "job-x"}
+    shaped = posted("A web app.") | {"questions": True, "answers_from": 7}
+
+    assert client.post("/analyze", json=off, headers=SAME_ORIGIN).status_code == 400
+    assert client.post("/analyze", json=missing, headers=SAME_ORIGIN).status_code == 404
+    assert client.post("/analyze", json=shaped, headers=SAME_ORIGIN).status_code == 400
 
 
 def test_load_example_serves_the_same_file_the_examples_run(client):

@@ -340,6 +340,10 @@ class JobSubmission(BaseModel):
     #: person to answer them. Off by default, so an autonomous caller's job
     #: never waits (#1252).
     questions: bool = False
+    #: An earlier job of the caller's whose answers this job carries, and
+    #: whose questions take each one they still ask (ADR 0079). It needs
+    #: ``questions``: a job that does not pause never reads what it carries.
+    answers_from: str | None = Field(default=None, max_length=64)
 
     @field_validator("system_name")
     @classmethod
@@ -893,18 +897,21 @@ def create_app(
         # race this seam exists to close. What the caller loses is that a
         # submission which breaches a rung *and* sits on the ceiling hears
         # about the rung; both answers refuse it, and neither runs a model.
+        answers = _answers(request)
+        carried = await answers.carried_from(
+            submission.answers_from, subject, asks=submission.questions
+        )
         record = JobRecord.create(
             owner_subject=subject,
             sources=sources,
             frameworks=selection,
             system_name=submission.system_name,
             answers=AnswerSet(links=tuple(submission.links)),
+            carried=carried,
             ask_questions=submission.questions,
             reserved_tokens=budgets.estimate(sources, selection),
         )
-        started = await _answers(request).admit(
-            record, start=_starter(request, background_tasks)
-        )
+        started = await answers.admit(record, start=_starter(request, background_tasks))
         return _started(started)
 
     @app.post("/v1/jobs/{job_id}/answers", status_code=201)

@@ -285,6 +285,18 @@ job's answers: its own questions take each one they still ask, and
 flight or has a report, this job takes no answer; where it fails, this job
 takes answers again.
 
+**Carry the answers of an earlier job.** Submit with `"answers_from"` set to
+the ID of an earlier job of yours, beside `"questions": true`. The new job
+carries every answer that job holds: its saved answers, a report's draft and a
+final report's corrections, each later one over the earlier. Its own questions
+take each answer they still ask, and `carried_dropped` and
+`carried_dropped_links` list the others. An answer names an element by its ID,
+and an ID follows the element's name, so an answer carries where the new
+description gives the element the same name. A job you do not own reads as
+`404`. The service answers `400` where `questions` is off, or where the earlier
+job holds no answer. The earlier job does not change. See
+[ADR 0079](adr/0079-a-new-analysis-can-carry-an-earlier-job-s-answers.md).
+
 **Limit:** a waiting job is held in the service's memory. A restart of the
 service loses it, with its extraction; submit it again.
 
