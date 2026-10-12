@@ -502,7 +502,9 @@ class Experiment:
     #: where one exists, so a rerun is never silent.
     rerun_reason: str = ""
     #: The holdout cases whose figures or outputs this experiment read. Each
-    #: read counts against the case's :data:`HOLDOUT_READS`.
+    #: read counts against the case's :data:`HOLDOUT_READS`. A build timing
+    #: that loads a holdout case's input model, and reads none of its figures
+    #: or outputs, is not a read (``QA-2026-10-12-02-E5``).
     holdout_reads: tuple[str, ...] = ()
     #: The experiment this one repeats with fresh model output. Only a new
     #: run measures the run-to-run spread, so a row that sets this shows a
