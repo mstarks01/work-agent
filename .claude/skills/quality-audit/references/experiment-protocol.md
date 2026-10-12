@@ -173,7 +173,8 @@ When implementation is authorised:
 
 - one candidate change per branch, and one lever per change;
 - a parity answer for every package in `PACKAGES`;
-- run the regressions the change can reach, and say which;
+- run the regressions the change can reach, and list them in the candidate's
+  `regressions`;
 - an unsuccessful change is reverted and its row keeps the reason;
 - the skill's own files are candidate changes too, with reviewable diffs.
 

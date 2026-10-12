@@ -221,7 +221,11 @@ def _extension(**overrides) -> audit.Experiment:
         "outcome": "supported",
         "intervention": "added run.py critic-replay",
         "candidate": _candidate(
-            branch="qa/A-E2", verdict="kept", reason="", paths=["evals/harness/x.py"]
+            branch="qa/A-E2",
+            verdict="kept",
+            reason="",
+            paths=["evals/harness/x.py"],
+            regressions=["tests/test_evals_audit_loop.py"],
         ),
         "resolves": "A-E1",
     }
@@ -507,6 +511,32 @@ class TestARuleIsARow:
 
     def test_a_well_formed_rule_is_admitted(self):
         audit.admit(_one(experiment_id="A-E2", rule=self._rule()), [_one()], ())
+
+
+class TestAKeptChangeNamesItsRegressions:
+    """#1092: a kept change ran the regressions it can reach, and says which."""
+
+    @pytest.mark.parametrize("ran", [[], [" "]], ids=["none", "blank"])
+    def test_a_kept_change_with_no_regressions_is_refused(self, ran):
+        kept = _candidate(verdict="kept", reason="", regressions=ran)
+        with pytest.raises(audit.ExperimentError, match="regressions"):
+            audit.admit(_one(outcome="supported", candidate=kept), [], [_grant()])
+
+    def test_the_regressions_survive_a_write_and_a_read(self, tmp_path):
+        ran = ["tests/test_evals_audit_loop.py"]
+        kept = _one(
+            outcome="supported",
+            candidate=_candidate(verdict="kept", reason="", regressions=ran),
+        )
+        audit.admit(kept, [], [_grant()])
+        audit.append(kept, tmp_path)
+
+        (loaded,) = audit.load(tmp_path)
+        assert loaded.candidate is not None
+        assert loaded.candidate.regressions == tuple(ran)
+
+    def test_a_reverted_change_owes_none(self):
+        audit.admit(_one(outcome="refuted", candidate=_candidate()), [], [_grant()])
 
 
 class TestASharedChangeAnswersForEveryPackage:

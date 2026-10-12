@@ -111,12 +111,15 @@ reads them against the audit's grants before it appends the row, and
   "branch": "qa/QA-2026-10-11-01-E4",
   "commit": "<the candidate's commit>",
   "verdict": "reverted",
-  "reason": "the lane still cited the neighbouring element on 3 of 3 replays"
+  "reason": "the lane still cited the neighbouring element on 3 of 3 replays",
+  "regressions": ["tests/test_evals_lane_replay.py"]
 }
 ```
 
 `verdict` is `kept` only where `outcome` is `supported`. Any other outcome
 means the change did not work, so it is `reverted`, and `reason` says why.
+`regressions` lists the tests the change can reach, run on `commit`. `--record`
+refuses a `kept` candidate whose list is empty.
 `--record` fills `paths` from `git diff` between `revision` and `commit`, and
 refuses a candidate that touches a reference answer, a ruling, a vote, a
 Baseline, the scorer or a gate (`PROTECTED`). Record the candidate while its

@@ -254,6 +254,9 @@ class Candidate:
     #: package. "Nothing" is an answer when the row says why; silence is not
     #: (``docs/agents/framework-parity.md``).
     parity: Mapping[str, str] = field(default_factory=dict)
+    #: The tests the change can reach, run on ``commit``. A kept change names
+    #: at least one.
+    regressions: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -537,7 +540,11 @@ class Experiment:
             },
             "candidate": None
             if self.candidate is None
-            else {**asdict(self.candidate), "paths": list(self.candidate.paths)},
+            else {
+                **asdict(self.candidate),
+                "paths": list(self.candidate.paths),
+                "regressions": list(self.candidate.regressions),
+            },
             "ticket": None if self.ticket is None else asdict(self.ticket),
             "rule": None
             if self.rule is None
@@ -710,6 +717,7 @@ def _candidate(row: object, where: str) -> Candidate | None:
         reason=reason,
         paths=_strings(held, "paths", "candidate", where),
         parity=parity,
+        regressions=_strings(held, "regressions", "candidate", where),
     )
 
 
@@ -1155,6 +1163,7 @@ def admit(
     * a rule rests on experiments that are on record;
     * a repeat of another audit's current conclusion says why it reran;
     * a candidate answers for every package in ``PACKAGES``;
+    * a kept candidate names the regressions it ran;
     * a row reads only holdout cases, and none already read
       :data:`HOLDOUT_READS` times.
 
@@ -1190,6 +1199,14 @@ def admit(
                 f"{where}: the candidate gives no parity answer for"
                 f" {', '.join(unanswered)}; say what it means for each package,"
                 " even where the answer is nothing"
+            )
+        ran = new.candidate.regressions
+        if new.candidate.verdict == "kept" and not (
+            ran and all(one.strip() for one in ran)
+        ):
+            raise ExperimentError(
+                f"{where}: the kept candidate names no regressions; run the tests"
+                " the change can reach and list them in regressions"
             )
         touched = protected(new.candidate.paths)
         if touched:
