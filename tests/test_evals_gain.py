@@ -13,6 +13,8 @@ from __future__ import annotations
 import copy
 import json
 
+import pytest
+
 from analysis_service.frameworks import PACKAGES
 from evals.harness import gain
 from evals.harness.provenance import REPO_ROOT
@@ -22,6 +24,13 @@ SEALED = (
     REPO_ROOT / "evals/baselines/6bff717-gpt-5.6-terra-24dda4db/mstarks01-e32ad9c5.json"
 )
 SPREAD = {"volume": 1.5, "rejected-rate": 0.05}
+#: The parts two artifacts share, for a fixture that is not a sealed sweep.
+SAME = {
+    "corpus_digest": "d" * 64,
+    "artifact_version": 7,
+    "flow_identity_version": 2,
+    "mode": "end-to-end",
+}
 
 
 def _baseline() -> dict:
@@ -120,7 +129,9 @@ class TestAnUnreadGateIsNotAPass:
         assert _verdicts(gain.read(raw, raw, "stride"))["reviewed"] == "fail"
 
     def test_a_package_with_no_vote_reading_says_so(self):
-        readings = {one.gate: one for one in gain.read({}, {}, "asvs", spread=SPREAD)}
+        readings = {
+            one.gate: one for one in gain.read(SAME, SAME, "asvs", spread=SPREAD)
+        }
 
         assert readings["reviewed"].verdict == "inconclusive"
         assert "vote" in readings["reviewed"].why
@@ -147,10 +158,11 @@ def test_every_package_has_its_readers():
 
 def test_the_asvs_volume_reads_what_the_run_applied_unlisted():
     blocks = {
+        **SAME,
         "applicability": [
             {"case": "01", "over_applied": ["V1", "V2"], "off_catalog": ["X"]},
             {"case": "02", "over_applied": [], "off_catalog": []},
-        ]
+        ],
     }
 
     readings = gain.read(blocks, blocks, "asvs", spread=SPREAD)
@@ -170,3 +182,55 @@ def test_the_command_prints_the_table(tmp_path, capsys):
     printed = capsys.readouterr().out
     assert "| `volume` | fail |" in printed
     assert "is not a promotion" in printed
+
+
+class TestAnIncomparablePairIsRefused:
+    """A gain read across two corpora measures the corpus change, not the fix."""
+
+    @pytest.mark.parametrize(
+        ("part", "value"),
+        [
+            ("corpus_digest", "e" * 64),
+            ("artifact_version", 6),
+            ("flow_identity_version", 1),
+            ("mode", "analysis"),
+        ],
+    )
+    def test_a_part_that_differs_is_refused_by_name(self, part, value):
+        part_name = "corpus" if part == "corpus_digest" else part
+        with pytest.raises(gain.IncomparableError, match=part_name):
+            gain.read(SAME, {**SAME, part: value}, "stride", spread=SPREAD)
+
+    def test_a_pair_nobody_can_show_comparable_is_refused(self):
+        with pytest.raises(gain.IncomparableError, match="corpus None"):
+            gain.read({}, {}, "stride", spread=SPREAD)
+
+    def test_a_re_scored_artifact_compares_on_the_corpus_it_was_scored_on(self):
+        """The figures follow ``scored``, so a re-score on one corpus compares."""
+        moved = "e" * 64
+        rescored = {**SAME, "scored": {"corpus_digest": moved}}
+
+        gain.read(rescored, {**SAME, "corpus_digest": moved}, "stride", spread=SPREAD)
+        with pytest.raises(gain.IncomparableError, match="corpus"):
+            gain.read(rescored, SAME, "stride", spread=SPREAD)
+
+    def test_the_sealed_baselines_on_two_corpora_are_refused(self):
+        """The real case: two merged Baselines that sit in different groups."""
+        older = json.loads(
+            (
+                REPO_ROOT
+                / "evals/baselines/d3f1898-gpt-5.6-terra-29929443"
+                / "mstarks01-92560eb2.json"
+            ).read_text("utf-8")
+        )
+        with pytest.raises(gain.IncomparableError, match="corpus"):
+            gain.read(older, _baseline(), "stride", spread=SPREAD)
+
+    def test_the_command_refuses_and_exits_non_zero(self, tmp_path, capsys):
+        path = tmp_path / "candidate.json"
+        path.write_text(json.dumps({**_baseline(), "mode": "end-to-end"}), "utf-8")
+        parser = __import__("argparse").ArgumentParser()
+        COMMANDS["gain"].arguments(parser)
+
+        assert COMMANDS["gain"].run(parser.parse_args([str(SEALED), str(path)])) == 1
+        assert "refused: the two artifacts do not compare" in capsys.readouterr().err

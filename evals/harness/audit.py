@@ -504,6 +504,11 @@ class Experiment:
     #: The holdout cases whose figures or outputs this experiment read. Each
     #: read counts against the case's :data:`HOLDOUT_READS`.
     holdout_reads: tuple[str, ...] = ()
+    #: The experiment this one repeats with fresh model output. Only a new
+    #: run measures the run-to-run spread, so a row that sets this shows a
+    #: paid call in ``actual_usd``; a re-read of archived output is a replay,
+    #: and a replay never counts as a repeat.
+    replicates: str | None = None
 
     def to_json(self) -> dict[str, Any]:
         """The row as the ledger file carries it."""
@@ -552,6 +557,7 @@ class Experiment:
             "resolves": self.resolves,
             "rerun_reason": self.rerun_reason,
             "holdout_reads": list(self.holdout_reads),
+            "replicates": self.replicates,
         }
 
 
@@ -641,6 +647,7 @@ def parse(row: Mapping[str, Any], *, source: str) -> Experiment:
         resolves=_text(row.get("resolves"), "resolves", where) or None,
         rerun_reason=_text(row.get("rerun_reason"), "rerun_reason", where),
         holdout_reads=_strings(row, "holdout_reads", "row", where),
+        replicates=row.get("replicates"),
     )
 
 
@@ -828,6 +835,15 @@ def append(experiment: Experiment, directory: Path | None = None) -> Path:
     return path
 
 
+def repeats(experiments: Iterable[Experiment]) -> dict[str, tuple[str, ...]]:
+    """Each experiment with the independent repeats on record, oldest first."""
+    found: dict[str, list[str]] = {}
+    for one in experiments:
+        if one.replicates is not None:
+            found.setdefault(one.replicates, []).append(one.experiment_id)
+    return {experiment: tuple(ids) for experiment, ids in found.items()}
+
+
 def superseded(experiments: Iterable[Experiment]) -> frozenset[str]:
     """Every experiment ID a later row corrects."""
     return frozenset(
@@ -964,6 +980,9 @@ class Lookup:
     experiment: Experiment
     staleness: Staleness
     superseded: bool = False
+    #: The independent repeats of this experiment on record. A replay is
+    #: never among them.
+    repeated_by: tuple[str, ...] = ()
 
 
 def lookup(
@@ -983,6 +1002,7 @@ def lookup(
     """
     experiments = load(directory)
     corrected = superseded(experiments)
+    repeated = repeats(experiments)
     matches = relevant(
         experiments,
         signature=signature,
@@ -1006,6 +1026,7 @@ def lookup(
                 experiment=one,
                 staleness=read,
                 superseded=one.experiment_id in corrected,
+                repeated_by=repeated.get(one.experiment_id, ()),
             )
         )
     return found
@@ -1165,7 +1186,9 @@ def admit(
     * a candidate answers for every package in ``PACKAGES``;
     * a kept candidate names the regressions it ran;
     * a row reads only holdout cases, and none already read
-      :data:`HOLDOUT_READS` times.
+      :data:`HOLDOUT_READS` times;
+    * a repeat names an experiment on record and shows fresh paid output, so
+      a replay is never counted as a repeat.
 
     ``prior`` is :func:`lookup` for the new row's signature and ``holdouts``
     is :func:`holdout_cases`; both readings stay at the edge so a test can
@@ -1247,6 +1270,18 @@ def admit(
         if missing:
             raise ExperimentError(
                 f"{where}: the rule rests on {', '.join(missing)}, not on record"
+            )
+    if new.replicates is not None:
+        if new.replicates not in by_id or new.replicates == new.experiment_id:
+            raise ExperimentError(
+                f"{where}: replicates {new.replicates!r}, which is not an earlier"
+                " experiment on record"
+            )
+        if not new.actual_usd:
+            raise ExperimentError(
+                f"{where}: replicates {new.replicates} with no paid call in"
+                " actual_usd. A re-read of archived output is a replay, and a"
+                " replay is not a repeat: only a new run measures the spread"
             )
     for case in new.holdout_reads:
         if case not in holdouts:
@@ -1351,6 +1386,12 @@ def render(found: Sequence[Lookup]) -> Report:
             report.lines.append(f"    revisit:   {experiment.reconsider_when}")
         if experiment.rerun_reason:
             report.lines.append(f"    reran:     {experiment.rerun_reason}")
+        if experiment.replicates:
+            report.lines.append(f"    repeats:   {experiment.replicates}")
+        report.lines.append(
+            f"    repeated:  {len(one.repeated_by)} independent repeat(s)"
+            f"{': ' + ', '.join(one.repeated_by) if one.repeated_by else ''}"
+        )
         if experiment.candidate is not None:
             report.lines.append(
                 f"    candidate: {experiment.candidate.verdict}"

@@ -202,6 +202,7 @@ class TestTheRowAndItsFieldsAreOneList:
             resolves="QA-x-02",
             rerun_reason="the scorer moved",
             holdout_reads=("15-multitenant-invoicing",),
+            replicates="QA-x-03",
         )
 
         assert audit.parse(filled.to_json(), source="test") == filled

@@ -150,6 +150,10 @@ each package, or the answer says why one needs no measurement. See
 experiment read. Every read counts. `--record` refuses a case that is not a
 holdout, and a case already read `HOLDOUT_READS` times.
 
+**`replicates`** names the earlier experiment this one repeats with fresh
+model output. `--record` refuses it unless `actual_usd` shows a paid call,
+because a re-read of archived output is a replay and never a repeat.
+
 **`rule`** is a diagnostic rule. See `references/memory-and-extension.md`.
 
 **`rerun_reason`** says why this experiment repeats another audit's
