@@ -274,7 +274,7 @@ class TestTheRoute:
             for question in listed
             if passes_floor(question, listed) and question.kind != "capability"
         ]
-        expected = eligible[: EARLY_RULES["field"].per_round]
+        expected = eligible[: EARLY_RULES["field"].limit]
         # The route's row adds each choice's element name and the excerpt.
         assert [q["key"] for q in body["early_questions"]] == [
             list(q.key) for q in expected
@@ -466,7 +466,7 @@ class TestTheFrameworkGates:
     def test_a_refuted_framework_asks_nothing(self):
         asked = _paused(_with_interfaces("non-web"), LEVEL_2)
         assert dict(asked.gates) == {"asvs": "refuted"}
-        assert asked.early == () and asked.withheld == 0
+        assert asked.early == () and asked.held_back == ()
         assert asked.to_json()["framework_gates"] == {"asvs": "refuted"}
 
     def test_a_refuted_framework_leaves_the_other_frameworks_questions_as_they_are(
@@ -490,7 +490,6 @@ class TestTheFrameworkGates:
             )
             for process in model.processes
         ]
-        assert asked.remaining == {"gate": 1, "capability": 0, "field": 0}
         [gate] = asked.early
         assert gate.choices == ("web", "non-web")
         assert gate.reasons == ("Whether the asvs analysis runs depends on this fact.",)
@@ -542,7 +541,7 @@ class TestTheFrameworkGates:
         assert after.early == () and after.done
 
     def test_a_gate_answer_counts_toward_no_kinds_limit(self):
-        """Once an answer satisfies the gate, the rounds hold the questions a
+        """Once an answer satisfies the gate, the list holds the questions a
         model that stated the interface would hold. Twenty-nine earlier field
         answers leave one place, which a counted gate answer would take."""
         from analysis_service.answer_round import EARLY_RULES
@@ -562,8 +561,8 @@ class TestTheFrameworkGates:
         stated = _paused(
             _with_interfaces("web", protocols="unknown"), selection, filler
         )
-        assert after.remaining == stated.remaining
-        assert after.remaining["field"] == 1, "a control: one place is left"
+        fields = [q for q in after.early if q.kind != "capability"]
+        assert len(fields) == 1, "a control: one place is left"
         assert [q.key for q in after.early] == [q.key for q in stated.early]
 
     def test_a_framework_whose_precondition_is_total_asks_no_gate_question(self):

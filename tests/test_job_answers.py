@@ -223,7 +223,13 @@ class TestAnsweringAWaitingJob:
             answers.answer(
                 job,
                 SUBJECT,
-                Answers(given=AnswerSet(), save=True, skips=(key,), revision=0),
+                Answers(
+                    given=AnswerSet(),
+                    save=True,
+                    skips=(key,),
+                    presented=(key,),
+                    revision=0,
+                ),
                 start=Starts(),
             )
         )
@@ -250,7 +256,13 @@ class TestAnsweringAWaitingJob:
                 answers.answer(
                     job,
                     SUBJECT,
-                    Answers(given=AnswerSet(), save=True, skips=(key,), revision=0),
+                    Answers(
+                        given=AnswerSet(),
+                        save=True,
+                        skips=(key,),
+                        presented=(key,),
+                        revision=0,
+                    ),
                     start=Starts(),
                 )
             )
@@ -402,7 +414,13 @@ class TestAmending:
             answers.answer(
                 job,
                 SUBJECT,
-                Answers(given=AnswerSet(), save=True, skips=(key,), revision=0),
+                Answers(
+                    given=AnswerSet(),
+                    save=True,
+                    skips=(key,),
+                    presented=(key,),
+                    revision=0,
+                ),
                 start=Starts(),
             )
         )

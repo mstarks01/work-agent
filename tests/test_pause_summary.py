@@ -13,7 +13,7 @@ import pytest
 
 from analysis_service.answer_round import EARLY_RULES, question_set
 from analysis_service.answer_sets import AnswerSet
-from analysis_service.fact_answers import FactAnswer
+from analysis_service.fact_answers import FactAnswer, merged_facts
 from analysis_service.system_model import SystemModel
 from tests.factories import PROJECT_ROOT, valid_model
 
@@ -32,13 +32,18 @@ def _paused(model, selection, answers=(), shown=(), skipped=()):
     )
 
 
-def _save(asked, earlier=(), facts=(), skips=()):
+def _save(asked, earlier=(), facts=(), skips=(), presented=None):
+    """One save. The page presents every listed row the rule allows, unless
+    the test says what it presented."""
+    if presented is None:
+        presented = asked.presented(merged_facts(list(earlier), list(facts)))
     return asked.admit(
         sources=(),
         earlier=AnswerSet(facts=tuple(earlier)),
         given=AnswerSet(facts=tuple(facts)),
         save=True,
         skips=list(skips),
+        presented=list(presented),
     )
 
 
@@ -72,19 +77,22 @@ class TestTheStopSaysWhatIsLeft:
     def test_a_level_1_pause_discloses_the_requirements_it_leaves_unknown(self):
         asked = _all_yes(1)
         assert asked.stop == "below-floor", "not nothing-left: questions remain"
-        assert len(asked.below_floor) == 24 and asked.withheld == 0
+        assert len(asked.below_floor) == 24 and asked.held_back == ()
         assert _bands(asked) == {"level 1": ({"applicable": 48, "unknown": 22}, 0)}
         summary = asked.summary.to_json()
         assert (summary["settled"], summary["below_floor"]) == (14, 24)
 
     def test_a_higher_level_still_shows_the_lower_levels_unknowns(self):
         """Selecting level 2 does not hide whether level 1 is settled: each
-        band is counted on its own."""
+        band is counted on its own. Thirty "yes" answers go to the questions
+        whose "no" would settle the most (ADR 0078), and a "yes" to a broad
+        parent settles no level 1 requirement, so 19 stay unknown where the
+        band-first order left 7. The summary discloses them."""
         asked = _all_yes(2)
         assert asked.stop == "budget-exhausted"
         bands = _bands(asked)
         assert list(bands) == ["level 1", "level 2"], "the highest band first"
-        assert bands["level 1"][0]["unknown"] == 7
+        assert bands["level 1"][0]["unknown"] == 19
 
     def test_a_question_under_the_floor_takes_an_answer(self):
         asked = _all_yes(1)
@@ -105,7 +113,12 @@ class TestTheStopSaysWhatIsLeft:
         assert before[1] == 0
         unknown = [
             FactAnswer(key=q.key, value="unknown")
-            for q in (*first.early, *first.below_floor)
+            for q in (
+                *first.early,
+                *first.held_back,
+                *first.below_floor,
+                *(part for part, _ in first.blocked),
+            )
             if q.kind == "capability"
         ]
         after = _paused(model, selection, unknown)
@@ -121,8 +134,8 @@ class TestTheExposureIsCountedApartFromTheLimit:
     @pytest.mark.parametrize(
         "case", ["02-iot-fleet-telemetry", "08-sso-identity-broker"]
     )
-    def test_a_pause_skipped_round_by_round_counts_every_question_it_showed(self, case):
-        """Skips spend no limit, so the rounds can show more questions than the
+    def test_a_pause_skipped_save_by_save_counts_every_question_it_showed(self, case):
+        """Skips spend no limit, so the list can show more questions than the
         limit holds; ``introduced`` counts each one once, and ``choices`` a
         choice a facet."""
         path = PROJECT_ROOT / "evals/corpus" / case / "model.json"
@@ -145,13 +158,21 @@ class TestTheExposureIsCountedApartFromTheLimit:
         assert (summary.settled, summary.partial, summary.unknown) == (0, 0, 0)
 
 
-def test_the_first_round_counts_only_the_questions_it_presented():
-    """A part whose parent is unanswered is hidden, so it is not introduced
-    (ADR 0068, checkpoint review c3)."""
+def test_the_summary_counts_only_the_questions_the_page_presented():
+    """A listed question the page did not show is not introduced, and a part
+    that waits on its parent cannot be reported as shown (ADR 0078)."""
     asked = _paused(valid_model(), {"asvs": {"level": 2}})
-    presented = asked.presented([])
-    assert len(presented) < len(asked.early), "a control: the round hides a part"
-    assert asked.summary.introduced == len(presented)
+    assert asked.summary.introduced == 0
+    assert asked.blocked, "a control: a part waits on its parent"
+    shown = [q.key for q in asked.early[:2]]
+    saved = _save(asked, skips=shown, presented=shown)
+    after = _paused(
+        valid_model(), {"asvs": {"level": 2}}, (), saved.shown, saved.skipped
+    )
+    assert after.summary.introduced == 2
+    part, _ = asked.blocked[0]
+    with pytest.raises(ValueError, match="only a question this list holds"):
+        _save(asked, skips=shown, presented=[*shown, part.key])
 
 
 def test_a_pause_whose_questions_left_were_all_skipped_says_so():

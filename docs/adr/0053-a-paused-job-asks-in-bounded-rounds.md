@@ -1,6 +1,10 @@
 # 53. A paused job asks in bounded rounds
 
-- **Status**: accepted
+- **Status**: accepted; its rounds, the box order and the place a part takes
+  beside its parent are superseded by
+  [ADR 0078](0078-a-paused-job-asks-one-adaptive-list.md), which keeps the
+  save that runs no model, the skips, the revision check, the floors, the
+  limits and the framework turns
 - **Date**: 2026-09-29
 - **Effort**: [#1289](https://github.com/mstarks01/work-agent/issues/1289)
 - **Relates to**: [ADR 0048](0048-a-paused-job-ranks-its-open-facts-before-any-finding.md),

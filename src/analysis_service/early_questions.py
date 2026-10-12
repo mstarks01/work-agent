@@ -59,7 +59,7 @@ from __future__ import annotations
 
 import json
 from collections import Counter
-from collections.abc import Mapping
+from collections.abc import Collection, Container, Mapping
 from dataclasses import dataclass
 from pathlib import Path
 from types import MappingProxyType
@@ -101,11 +101,13 @@ __all__ = [
     "QUESTION_PRIOR_PATH",
     "EarlyQuestion",
     "PriorRow",
+    "asked_parent",
     "capability_questions",
     "early_questions",
     "element_type",
     "framework_gates",
     "load_prior",
+    "waiting_parts",
 ]
 
 QUESTION_PRIOR_PATH = Path(__file__).with_name("question_prior.json")
@@ -205,16 +207,16 @@ class EarlyQuestion:
     #: not a measured count of the findings an answer changes. For a
     #: capability, how many units it could settle. The list ranks a field
     #: question by this value per choice (:attr:`decisions`), capabilities
-    #: first; a round takes its places with the frameworks in turn
-    #: (:func:`~analysis_service.answer_round.by_turn`) and is shown in boxes
-    #: (:func:`~analysis_service.answer_round.in_boxes`).
+    #: first; the recommended list takes its places with the frameworks in
+    #: turn (:func:`~analysis_service.answer_round.by_turn`), and within a
+    #: turn by what an answer settles (:mod:`analysis_service.answer_effects`).
     score: float = 0.0
     #: The key of the question this one depends on: a capability's parent,
     #: whose "no" makes this one moot. ``None`` for every other question.
     parent: UnknownKey | None = None
     #: The selected frameworks whose undecidable precondition this fact can
-    #: decide, by name. A round asks every such question first, outside the
-    #: limits (:func:`~analysis_service.answer_round.next_round`). Empty for
+    #: decide, by name. The list asks every such question first, outside the
+    #: limits (:func:`~analysis_service.answer_round.recommended`). Empty for
     #: every other question.
     gates: tuple[FrameworkName, ...] = ()
     #: For a capability, each framework it serves with the band of the most
@@ -423,6 +425,29 @@ def _gate_questions(
     )
 
 
+def asked_parent(key: str, asked: Container[str]) -> str:
+    """The nearest ancestor of ``key`` among the capabilities ``asked``, or empty."""
+    return next((parent for parent in lineage(key) if parent in asked), "")
+
+
+def waiting_parts(pool: Collection[str], settled: Container[str]) -> frozenset[str]:
+    """The capabilities of ``pool`` that wait on a parent (ADR 0078).
+
+    **The one reader of when a part is listed.** A part waits while its
+    nearest ancestor in ``pool`` is not in ``settled``: the questions a save
+    answered, "I don't know" included, or skipped. The list leaves a waiting
+    part out (:func:`~analysis_service.answer_round.recommended`), and an
+    answer's effect reads the same rule to say what a "yes" lists
+    (:mod:`analysis_service.answer_effects`). A part whose parent is "no" is
+    absent, and not in the pool at all.
+    """
+    return frozenset(
+        key
+        for key in pool
+        if (parent := asked_parent(key, pool)) and parent not in settled
+    )
+
+
 def capability_questions(
     model: SystemModel, frameworks: Mapping[FrameworkName, Mapping[str, Any]]
 ) -> tuple[EarlyQuestion, ...]:
@@ -454,11 +479,8 @@ def capability_questions(
             helps.setdefault(key, []).append(name)
             own.setdefault(key, []).append((name, need.band))
 
-    def asked_parent(key: str) -> str:
-        return next((parent for parent in lineage(key) if parent in counts), "")
-
     def depth(key: str) -> int:
-        parent = asked_parent(key)
+        parent = asked_parent(key, counts)
         return depth(parent) + 1 if parent else 0
 
     order = sorted(
@@ -469,7 +491,7 @@ def capability_questions(
     for key in order:
         ref = UnknownRef(capability=key)
         group, heading = group_of(ref)
-        parent = asked_parent(key)
+        parent = asked_parent(key, counts)
         questions.append(
             EarlyQuestion(
                 key=ref.key,

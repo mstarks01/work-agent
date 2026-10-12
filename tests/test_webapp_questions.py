@@ -237,7 +237,6 @@ class TestTheRounds:
             if shown["early_below_floor"]
             else "nothing-left"
         )
-        assert shown["early_withheld"] == len(shown["early_held_back"])
 
         started = client.post(
             f"/answer/{paused}",
@@ -257,7 +256,13 @@ class TestTheRounds:
         first, second = (q["key"] for q in shown["early_questions"][:2])
 
         def save(key, revision):
-            body = {"links": [], "facts": [], "save": True, "skip": [key]}
+            body = {
+                "links": [],
+                "facts": [],
+                "save": True,
+                "skip": [key],
+                "presented": [key],
+            }
             return client.post(
                 f"/answer/{paused}",
                 json=body | {"revision": revision},
@@ -291,11 +296,11 @@ class TestTheRounds:
         assert saved.status_code == 400
         assert saved.json()["message"].startswith("Expected a JSON body")
 
-    def test_a_start_after_a_skipped_round_admits_what_the_route_admits(self, tiers):
-        """The engine admits each round-2 answer the route admits (#1289).
+    def test_a_start_after_a_skipped_list_admits_what_the_route_admits(self, tiers):
+        """The engine admits each later answer the route admits (#1289).
 
-        An engine that built its round again without the skipped list would ask
-        round 1 again, and the run would fail after the route returned 200.
+        An engine that built its list again without the skipped list would ask
+        the first list again, and the run would fail after the route returned 200.
         """
         client = client_for(tiers, PausingRunner(catalog=False), catalog=False)
         paused = start(client, questions=True)
@@ -307,6 +312,7 @@ class TestTheRounds:
                 "facts": [],
                 "save": True,
                 "skip": _presented(shown["early_questions"]),
+                "presented": _presented(shown["early_questions"]),
                 "revision": 0,
             },
             headers=SAME_ORIGIN,
@@ -557,6 +563,7 @@ streams[1].listeners.done({ data: JSON.stringify({ url: "/report/r2" }) });
         "body": {
             "links": [{"principal": "shopper accounts", "element": "entity:shopper"}],
             "facts": [],
+            "presented": [],
         },
     }
     assert seen["streams"] == ["/events/r1", "/events/r2"]
@@ -572,7 +579,7 @@ streams[0].listeners.questions({ data: JSON.stringify({ run: "r1", link_question
 await ids.continue.listeners.click(); await settle();
 """
     seen = _run_form_script(steps)
-    assert seen["calls"][1]["body"] == {"links": [], "facts": []}
+    assert seen["calls"][1]["body"] == {"links": [], "facts": [], "presented": []}
 
 
 def test_the_form_script_sends_an_early_answer_with_the_links():
@@ -606,6 +613,7 @@ await ids.continue.listeners.click(); await settle();
     assert seen["calls"][1]["body"] == {
         "links": [],
         "facts": [{"key": key, "value": "TLS 1.3"}],
+        "presented": [key, kind],
     }
 
 
@@ -1356,6 +1364,7 @@ await ids.continue.listeners.click(); await settle();
     assert seen["calls"][1]["body"] == {
         "links": [],
         "facts": [{"key": key, "value": "none"}],
+        "presented": [key],
     }
 
 
@@ -1507,8 +1516,8 @@ def _control_row(flow, form="control"):
 _SHARED_STEPS = """
 await ids.analyze.listeners.submit({ preventDefault() {} }); await settle();
 streams[0].listeners.questions({ data: JSON.stringify({ run: "r1", link_questions: [],
-  early_questions: FACTS, early_remaining: {}, answered_early: [], answered_links: [], revision: 0 }) });
-const [group] = ids.questions.querySelectorAll("details");
+  early_questions: FACTS, answered_early: [], answered_links: [], revision: 0 }) });
+const group = ids.questions.querySelectorAll("details").find((d) => d.className === "question-group");
 const child = (r, tag) => r.children.find(c => typeof c === "object" && c.tag === tag);
 const walk = (n, out = []) => { for (const c of n.children || [])
   if (typeof c === "object") { out.push(c); walk(c, out); } return out; };
@@ -1786,7 +1795,10 @@ await settle();
 """
     seen = _run_form_script(steps)
 
-    assert seen["calls"][1] == {"url": "/answer/r1", "body": {"links": [], "facts": []}}
+    assert seen["calls"][1] == {
+        "url": "/answer/r1",
+        "body": {"links": [], "facts": [], "presented": []},
+    }
     assert seen["streams"] == ["/events/r1", "/events/r2"]
     assert not seen["asked"]
 
@@ -1803,9 +1815,11 @@ def test_the_last_save_waits_for_the_start_button(withheld, said):
         "revision": 4,
         "link_questions": [],
         "early_questions": [],
-        "early_remaining": {},
         "early_stop": "budget-exhausted" if withheld else "nothing-left",
-        "early_withheld": withheld,
+        "early_held_back": [
+            _text_row(["", "", "", f"held {n}", "", ""], "held?")
+            for n in range(withheld)
+        ],
         "answered_early": [],
         "answered_links": [
             {
@@ -1844,6 +1858,7 @@ await ids.continue.listeners.click(); await settle();
         "facts": [],
         "save": True,
         "skip": [],
+        "presented": [],
         "revision": 3,
     }
     assert start["body"]["revision"] == 4, "the start sends the revision it read"
@@ -1877,7 +1892,7 @@ def _text_row(key, label):
     }
 
 
-def test_the_round_size_counts_its_link_questions():
+def test_the_list_size_counts_its_link_questions():
     """The line that says how many choices a round asks counts its link
     questions, 1 to 3 a pause on the archived reports with a catalog (#1289)."""
     row = _text_row(["", "", "", "who?", "", ""], "who?")
@@ -1893,15 +1908,16 @@ streams[0].listeners.questions({{ data: JSON.stringify({{ run: "r1",
   early_remaining: {{ field: 1 }}, answered_early: [], answered_links: [], revision: 0 }}) }});
 const walk = (n, out = []) => {{ for (const c of n.children || [])
   if (typeof c === "object") {{ out.push(c); walk(c, out); }} return out; }};
-calls.push(walk(ids.questions).map(n => n.textContent).find(t => t.includes("This round asks")));
+calls.push(walk(ids.questions).map(n => n.textContent).find(t => t.includes("This list asks")));
 """
     said = _run_form_script(steps)["calls"][-1]
-    assert "This round asks 2 choice(s)." in said
+    assert "This list asks 2 choice(s)." in said
 
 
-def test_the_round_size_leaves_out_a_part_until_its_parent_is_yes():
-    """A part hidden until its parent's "yes" is not counted in the round's
-    choices, so the line names only choices the page shows (#1289)."""
+def test_the_list_size_counts_a_blocked_part_from_the_service_s_list():
+    """A part that waits on its parent is not in the list and not counted in
+    its choices. The line says how many such parts the service lists, and
+    the page draws no part of its own (ADR 0078)."""
     parent_key = ["", "", "", "", "", "oauth"]
     choices = [{"id": "yes", "name": ""}, {"id": "no", "name": ""}]
     parent = _text_row(parent_key, "OAuth?") | {
@@ -1914,27 +1930,21 @@ def test_the_round_size_leaves_out_a_part_until_its_parent_is_yes():
         "form": "choice",
         "choices": choices,
         "parent": parent_key,
+        "reason": "parent-undecided",
     }
     steps = f"""
 await ids.analyze.listeners.submit({{ preventDefault() {{}} }}); await settle();
 streams[0].listeners.questions({{ data: JSON.stringify({{ run: "r1",
-  link_questions: [], early_questions: [{json.dumps(parent)}, {json.dumps(part)}],
-  early_remaining: {{ capability: 2 }}, answered_early: [], answered_links: [], revision: 0 }}) }});
+  link_questions: [], early_questions: [{json.dumps(parent)}],
+  early_blocked: [{json.dumps(part)}], answered_early: [], answered_links: [], revision: 0 }}) }});
 const walk = (n, out = []) => {{ for (const c of n.children || [])
   if (typeof c === "object") {{ out.push(c); walk(c, out); }} return out; }};
-const said = () => walk(ids.questions).map(n => n.textContent)
-  .find(t => t.includes("This round asks"));
-calls.push(said());
-const [yes] = walk(ids.questions).filter(n => n.tag === "select");
-yes.value = "yes"; yes.listeners.change();
-calls.push(said());
-yes.value = "no"; yes.listeners.change();
-calls.push(said());
+calls.push(walk(ids.questions).map(n => n.textContent).find(t => t.includes("This list asks")));
+calls.push(walk(ids.questions).filter(n => n.tag === "select").length);
 """
-    before, opened, closed = _run_form_script(steps)["calls"][-3:]
-    assert "This round asks 1 choice(s). Up to 1 more appear" in before
-    assert opened.endswith("This round asks 2 choice(s).")
-    assert closed == before
+    said, selects = _run_form_script(steps)["calls"][-2:]
+    assert "This list asks 1 choice(s). 1 more question(s) appear if you answer" in said
+    assert selects == 1, "the part is not drawn"
 
 
 def test_a_part_of_a_part_hides_with_its_parent():
@@ -1989,7 +1999,7 @@ calls.push(walk(ids.questions).map(n => n.textContent).find(t => t.startsWith("W
     assert "Decides what the asvs analysis covers" in said
 
 
-def test_a_link_only_round_says_what_it_asks():
+def test_a_link_only_list_says_what_it_asks():
     steps = f"""
 await ids.analyze.listeners.submit({{ preventDefault() {{}} }}); await settle();
 streams[0].listeners.questions({{ data: JSON.stringify({{ run: "r1",
@@ -1997,11 +2007,11 @@ streams[0].listeners.questions({{ data: JSON.stringify({{ run: "r1",
   answered_early: [], answered_links: [], revision: 0 }}) }});
 const walk = (n, out = []) => {{ for (const c of n.children || [])
   if (typeof c === "object") {{ out.push(c); walk(c, out); }} return out; }};
-calls.push(walk(ids.questions).map(n => n.textContent).find(t => t.includes("This round asks")));
+calls.push(walk(ids.questions).map(n => n.textContent).find(t => t.includes("This list asks")));
 """
     said = _run_form_script(steps)["calls"][-1]
     assert "1 question(s) about which part of your system a name is" in said
-    assert "This round asks 1 choice(s)." in said
+    assert "This list asks 1 choice(s)." in said
 
 
 def test_skip_the_rest_skips_only_the_blank_questions():
@@ -2025,6 +2035,7 @@ await ids.skip.listeners.click(); await settle();
         "facts": [{"key": answered, "value": "the admins"}],
         "save": True,
         "skip": [blank],
+        "presented": [answered, blank],
     }
 
 
@@ -2488,7 +2499,7 @@ def test_a_report_whose_follow_up_started_asks_nothing_and_says_where_it_went(ti
 @pytest.mark.parametrize(
     "case", sorted(path.name for path in (PROJECT_ROOT / "evals/corpus").iterdir())
 )
-def test_the_page_opens_a_round_with_the_questions_the_service_counts(case):
+def test_the_page_opens_the_list_with_the_questions_the_service_counts(case):
     """The page hides a part until its parent's "yes", and the service counts
     a round without such a part: two readers of one rule, so a real ASVS
     level 2 round is given to both (#1378)."""
@@ -2507,14 +2518,10 @@ def test_the_page_opens_a_round_with_the_questions_the_service_counts(case):
         final=False,
         shown=[],
     )
-    keys = {q.key for q in asked.early}
-    counted = [
-        q for q in asked.early if q.kind == "capability" and q.parent not in keys
-    ]
     capabilities = [list(q.key) for q in asked.early if q.kind == "capability"]
     if asked.gates["asvs"] != "satisfied":
         # A framework that will not run as the model reads now asks no
-        # capability (ADR 0067), so the round holds no part to hide.
+        # capability (ADR 0067), so the list holds none.
         assert not capabilities
         return
     steps = f"""
@@ -2531,8 +2538,8 @@ calls.push({{ shown: shown.length }});
 """
     seen = _run_form_script(steps)["calls"]
 
-    assert seen[-1]["shown"] == len(counted)
-    assert len(counted) < len(capabilities), "a control: the round holds a part"
+    assert seen[-1]["shown"] == len(capabilities)
+    assert asked.blocked, "a control: a part waits on its parent, apart from the list"
 
 
 class TestEarlierAnswers:
@@ -3051,7 +3058,7 @@ await ids.save.listeners.click(); await settle();
     assert ran["streams"] == ["/events/r1"], "an optional question keeps the page"
 
     assert "No recommended question is left." in page["said"]
-    assert "1 question(s) ranked below the threshold for a round" in page["said"]
+    assert "1 question(s) ranked below the threshold for the list" in page["said"]
     assert "2 answer(s) of “I don't know”" in page["said"]
     assert (
         "asvs, level 1: whether 22 of 70 unit(s) apply is still unknown, and no"

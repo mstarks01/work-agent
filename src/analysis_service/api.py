@@ -60,10 +60,10 @@ from analysis_service.auth import (
     build_verifier,
 )
 from analysis_service.budgets import BudgetPolicy
-from analysis_service.claims import FrameworkName
+from analysis_service.claims import FrameworkName, UnknownKey
 from analysis_service.deployment import Deployment
 from analysis_service.errors import ConfigError
-from analysis_service.fact_answers import MAX_FACT_ANSWERS, FactAnswer
+from analysis_service.fact_answers import MAX_FACT_ANSWERS, MAX_HELD_FACTS, FactAnswer
 from analysis_service.frameworks import PACKAGES
 from analysis_service.graph import ENTRY_EXTRACT
 from analysis_service.job_answers import (
@@ -354,11 +354,13 @@ class AnswersSubmission(BaseModel):
     open facts a report's conditional findings rest on. Both empty is legal
     only for a job waiting on answers, where it means "continue without
     answers"; against a finished report it runs the follow-up on the saved
-    draft alone. ``save`` keeps a waiting job's round without starting the
-    analysis (ADR 0053), or a finished report's draft without starting its
+    draft alone. ``save`` keeps a waiting job's answers without starting the
+    analysis (ADR 0078), or a finished report's draft without starting its
     follow-up (ADR 0070), and ``skip`` names questions of a waiting job's
-    round the submitter skips for now: a fact by its key, a link question by
-    its ``key`` (:data:`SkipKey`). ``revision`` is the revision the answers
+    list the submitter skips for now: a fact by its key, a link question by
+    its ``key`` (:data:`SkipKey`). ``presented`` names the early questions
+    the page showed: the job records them as shown, and a skip is taken only
+    of one of them (ADR 0069). ``revision`` is the revision the answers
     were read against, which a waiting job and every save require. One
     request carries at most the ``answer_limits`` the questions route
     publishes; a follow-up larger than that saves its draft in batches.
@@ -372,6 +374,7 @@ class AnswersSubmission(BaseModel):
     # ``"yes"`` is no save.
     save: bool = Field(default=False, strict=True)
     skip: list[SkipKey] = Field(default_factory=list, max_length=MAX_SKIPS)
+    presented: list[UnknownKey] = Field(default_factory=list, max_length=MAX_HELD_FACTS)
     revision: int | None = Field(default=None, ge=0, strict=True)
 
 
@@ -919,7 +922,7 @@ def create_app(
         is admitted as a new job, against the ceiling and the token budget,
         because its lanes and critics spend model calls.
 
-        With ``save``, a waiting job keeps the round's answers, and a finished
+        With ``save``, a waiting job keeps the answers, and a finished
         report keeps them as a draft; either answers ``200`` with its own ID,
         no model runs, and a save never starts the analysis. A report's run
         composes its draft with what it is sent (ADR 0070). A waiting job,
@@ -933,6 +936,7 @@ def create_app(
                 given=AnswerSet(links=tuple(answers.links), facts=tuple(answers.facts)),
                 save=answers.save,
                 skips=answers.skip,
+                presented=answers.presented,
                 revision=answers.revision,
             ),
             start=_starter(request, background_tasks),

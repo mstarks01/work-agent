@@ -47,7 +47,8 @@ def _chain(*names):
 
 
 def _round(*names):
-    """A round that asks exactly these capabilities, parents first."""
+    """A list that holds exactly these capabilities, parents first, as the
+    page held a part beside its parent before ADR 0078 listed it apart."""
     return replace(_paused(), early=_chain(*names))
 
 
@@ -98,18 +99,46 @@ class TestThePageSkipsOnlyWhatItShows:
         sent, _ = _sent_by_the_page(parent)
         facts = [FactAnswer.model_validate(fact) for fact in sent["facts"]]
         skips = [tuple(key) for key in sent["skip"]]
+        presented = [tuple(key) for key in sent["presented"]]
         if not (facts or skips):
             return
-        _save(_round("oauth", "oauth-client"), facts=facts, skips=skips)
+        _save(
+            _round("oauth", "oauth-client"),
+            facts=facts,
+            skips=skips,
+            presented=presented,
+        )
+
+    @pytest.mark.parametrize("parent", ["", "unknown", "no", "yes"])
+    def test_the_page_reports_only_the_rows_it_shows(self, parent):
+        sent, child = _sent_by_the_page(parent)
+        assert (child in sent["presented"]) == (parent == "yes")
 
 
 class TestTheServiceDecidesWhatWasPresented:
     @pytest.mark.parametrize("parent", [None, "unknown", "no"])
-    def test_a_skip_of_a_hidden_part_is_refused(self, parent):
+    def test_a_hidden_part_reported_as_shown_is_refused(self, parent):
+        """A page cannot record a part as shown while its parent hides it."""
         parent_q, child = _chain("oauth", "oauth-client")
         facts = [] if parent is None else [FactAnswer(key=parent_q.key, value=parent)]
         with pytest.raises(ValueError, match="hidden until its parent"):
-            _save(_round("oauth", "oauth-client"), facts=facts, skips=[child.key])
+            _save(
+                _round("oauth", "oauth-client"),
+                facts=facts,
+                skips=[child.key],
+                presented=[parent_q.key, child.key],
+            )
+
+    def test_a_skip_of_a_question_the_page_did_not_show_is_refused(self):
+        parent_q, child = _chain("oauth", "oauth-client")
+        yes = [FactAnswer(key=parent_q.key, value="yes")]
+        with pytest.raises(ValueError, match="only a question the page presented"):
+            _save(
+                _round("oauth", "oauth-client"),
+                facts=yes,
+                skips=[child.key],
+                presented=[parent_q.key],
+            )
 
     def test_a_hidden_part_is_not_recorded_as_shown(self):
         parent, child = _chain("oauth", "oauth-client")
@@ -129,7 +158,12 @@ class TestTheServiceDecidesWhatWasPresented:
         yes = [FactAnswer(key=top.key, value="yes")]
         assert asked.presented(yes) == (top.key, middle.key)
         with pytest.raises(ValueError, match="hidden until its parent"):
-            _save(asked, facts=yes, skips=[bottom.key])
+            _save(
+                asked,
+                facts=yes,
+                skips=[bottom.key],
+                presented=[top.key, middle.key, bottom.key],
+            )
         saved = _save(asked, facts=yes, skips=[middle.key])
         assert saved.skipped == (middle.key,)
 
@@ -151,11 +185,11 @@ class TestTheServiceDecidesWhatWasPresented:
             assert child.key not in {q.key for q in after.skipped}
             if child.key in {q.key for q in after.early}:
                 return
-            assert not after.done, "the rounds ended without asking the part"
-            # A later round: skip what it shows, which spends no limit.
+            assert not after.done, "the list ended without asking the part"
+            # A later list: skip what it shows, which spends no limit.
             saved = _save(after, held, skips=after.presented(held))
             held, skipped, shown = saved.answers.facts, saved.skipped, saved.shown
-        pytest.fail("the part never came to a round")
+        pytest.fail("the part never came to the list")
 
 
 def test_a_resumed_job_carries_the_skips_its_report_reads():

@@ -7,6 +7,9 @@
   whose limits this applies to each framework, and
   [ADR 0071](0071-the-floor-exception-reads-each-framework-s-own-bands.md),
   which removed the same coupling from the floor
+- **Amended by**: [ADR 0078](0078-a-paused-job-asks-one-adaptive-list.md),
+  under which the list takes a question while a framework has a place left;
+  the entitlement is unchanged
 - **Evidence**: `QA-2026-10-09-01-E1` in `evals/experiments/`
 
 ## Context

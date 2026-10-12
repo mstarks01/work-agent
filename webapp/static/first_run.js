@@ -122,23 +122,23 @@
   // unanswered; "none" says the principal is no element. Every label and
   // option is untrusted and lands as text.
   let pausedRun = null;
-  // The paused run's round revision this page read. A save or a start sends
-  // it, so a page left open on an earlier round cannot write over a later one.
+  // The paused run's revision this page read. A save or a start sends it, so
+  // a page left open on an earlier revision cannot write over a later one.
   let revision = 0;
   // One reader per question: its answer as the service takes it, or null.
   let answers = [];
-  // This round's questions, each with its key and reader, so "Skip the rest"
-  // can name the ones left blank.
+  // The listed questions, each with its key and reader, so "Skip the rest"
+  // can name the ones left blank and a save can say which rows it showed.
   let roundRows = [];
   // How much of an element's source words a row shows; the rest is its title.
   const EXCERPT = 200;
   // The input for one early question, built by answerEditor. `prefill` is an
   // earlier answer, or null. A job waiting at its pause takes "I don't know"
-  // over a known answer, so every input offers it. The round, "Your answers"
-  // and the questions no round shows all build with this.
+  // over a known answer, so every input offers it. The list, "Your answers"
+  // and the questions the list leaves out all build with this.
   const inputFor = (q, prefill) => answerEditor(q, { choices: q.choices, prefill, reopen: true });
 
-  // A paused run's round: the link questions, then one box per open-fact
+  // A paused run's list: the link questions, then one box per open-fact
   // category in first-appearance order, and every earlier answer below them.
   // Every label and option is untrusted and lands as text.
   let updateQuestionProgress = () => {};
@@ -151,11 +151,11 @@
     // Each selected analysis whose precondition does not hold yet
     // (QuestionSet.gates): it will not run as the model reads now.
     const gates = Object.entries(data.framework_gates || {}).filter(([, state]) => state !== "satisfied");
-    // Questions no round asks, which the submitter may still choose to answer.
+    // Questions the list leaves out, which the submitter may still choose to answer.
     const optional = (data.early_held_back || []).length + (data.early_below_floor || []).length;
     // A pause with nothing to ask, nothing answered or skipped, no optional
     // question and no analysis to explain starts the analysis, with no page
-    // between. After a save, only the start button starts it: a round of skips
+    // between. After a save, only the start button starts it: a save of skips
     // is a save too.
     if (!left && !saved && !gates.length && !optional) {
       pausedRun = data.run;
@@ -181,18 +181,21 @@
       lead.append(bold, hint);
       questions.append(lead);
     };
-    // How much is left: an estimate, because an answer can add or take away
-    // questions (ADR 0053).
-    const remaining = data.early_remaining || {};
+    // What the list holds, by kind. An answer can add questions as well as
+    // take them away, and the page says so (ADR 0078).
+    const kinds = { gate: 0, capability: 0, field: 0 };
+    for (const q of data.early_questions) {
+      kinds[(q.gates || []).length ? "gate" : q.kind === "capability" ? "capability" : "field"] += 1;
+    }
     const parts = [];
-    if (remaining.gate) {
-      parts.push(`${remaining.gate} question(s) that decide whether an analysis runs`);
+    if (kinds.gate) {
+      parts.push(`${kinds.gate} question(s) that decide whether an analysis runs`);
     }
-    if (remaining.capability) {
-      parts.push(`about ${remaining.capability} yes/no question(s) about the application`);
+    if (kinds.capability) {
+      parts.push(`${kinds.capability} yes/no question(s) about the application`);
     }
-    if (remaining.field) {
-      parts.push(`about ${remaining.field} question(s) about parts of your system`);
+    if (kinds.field) {
+      parts.push(`${kinds.field} question(s) about parts of your system`);
     }
     if (data.link_questions.length) {
       parts.push(`${data.link_questions.length} question(s) about which part of your system a name is`);
@@ -216,8 +219,8 @@
       // The service's own stop reason decides the sentence (QuestionSet.stop).
       // No stop says every fact is settled, so the page lists what stays open.
       const stops = {
-        "budget-exhausted": `The question limit is reached, so ${data.early_withheld} more question(s)`
-          + " are not asked in a round. ",
+        "budget-exhausted": `The question limit is reached, so ${(data.early_held_back || []).length}`
+          + " more question(s) are not in the list. ",
         "below-floor": "No recommended question is left. ",
         "skipped": "You skipped every question that is left. ",
         "nothing-left": "No question is left to ask. ",
@@ -235,7 +238,7 @@
       count(summary.partial, "question(s) answered in part");
       count(summary.unknown, "answer(s) of \u201cI don't know\u201d");
       count(summary.held_back, "question(s) held back by the question limit");
-      count(summary.below_floor, "question(s) ranked below the threshold for a round");
+      count(summary.below_floor, "question(s) ranked below the threshold for the list");
       for (const [name, bands] of Object.entries(summary.applicability || {})) {
         for (const band of bands) {
           const unknown = band.states.unknown || 0;
@@ -260,28 +263,31 @@
         questions.append(lead, list);
       }
     }
-    // The round's choices as the page shows them: each link question is one,
+    // The list's choices as the page shows them: each link question is one,
     // and a part counts only while it shows, after its parent's "yes". The
-    // line is told again each time a part shows or hides.
+    // line is told again each time a part shows or hides. The parts that
+    // wait on a parent's "yes" are counted from the service's own list of
+    // them (QuestionSet.blocked), never inferred here.
     const counted = [];
     const estimate = document.createElement("p");
     estimate.className = "hint";
     const choicesOf = (rows) => rows.reduce((sum, row) => sum + row.decisions, 0);
     const shownChoices = () => choicesOf(counted.filter((row) => !row.hidden())) + data.link_questions.length;
+    const blocked = (data.early_blocked || []).length;
     const tally = () => {
       const shown = shownChoices();
-      const later = choicesOf(counted.filter((row) => row.hidden()));
       estimate.textContent = `There are ${parts.join(" and ")} that can change the`
-        + ` analysis. This round asks ${shown} choice(s).`
-        + (later ? ` Up to ${later} more appear if you answer \u201cyes\u201d.` : "")
-        + (summary ? ` So far the rounds showed ${summary.introduced} question(s),`
+        + ` analysis. This list asks ${shown} choice(s).`
+        + (blocked ? ` ${blocked} more question(s) appear if you answer \u201cyes\u201d`
+          + " to the question each one is part of." : "")
+        + (summary ? ` So far the page showed ${summary.introduced} question(s),`
           + ` ${summary.choices} choice(s).` : "");
     };
     if (parts.length) {
       const explanation = document.createElement("details");
       explanation.className = "round-estimate";
       const title = document.createElement("summary");
-      title.textContent = "How this round is counted";
+      title.textContent = "How this list is counted";
       explanation.append(title, estimate);
       questions.append(explanation);
     }
@@ -313,10 +319,9 @@
       // A skipped link places nothing: it is not "None of these".
       roundRows.push({ key: q.key, read: () => select.value });
     }
-    // One box per category, in the order the service lists the round. The
-    // service sends each category's questions together and puts the boxes in
-    // order (answer_round.in_boxes), so a box here never moves a question.
-    // Rows are built in service order, so parents exist before their dependants.
+    // One box per category, in the order each category first appears in the
+    // service's list (answer_round.recommended). A box holds its rows in the
+    // service's order, so parents exist before their dependants.
     // An earlier answer by its key: a question with facets comes back while a
     // facet has no answer, and its answered facets are filled in.
     const earlier = new Map((data.answered_early || []).map((a) => [JSON.stringify(a.key), a.answer]));
@@ -548,7 +553,7 @@
       questions.append(group.box);
     }
     // Every earlier answer, each with a button that opens it again. An
-    // answer opened and changed is sent with this round's answers. A question
+    // answer opened and changed is sent with the list's answers. A question
     // answered in part and then skipped has its one editor under "Skipped for
     // now", so it is never sent twice.
     const answeredLinks = data.answered_links || [];
@@ -604,8 +609,8 @@
       });
       earlierBox.append(row);
     }
-    // Every question skipped for now. A skip is not an answer: no round shows
-    // it again, and "Answer it" opens it here, with any part answered before.
+    // Every question skipped for now. A skip is not an answer: the list
+    // leaves it out, and "Answer it" opens it here, with any part answered before.
     const skippedLinks = data.skipped_links || [];
     skippedBox.hidden = !(skipped.length || skippedLinks.length);
     const skippedTitle = document.createElement("summary");
@@ -627,8 +632,8 @@
       row.append(" ", open);
       skippedBox.append(row);
     }
-    // A question no round shows, which the submitter may still answer: a
-    // skipped one, or one a limit or a floor keeps out of the rounds.
+    // A question the list leaves out, which the submitter may still answer: a
+    // skipped one, or one a limit or a floor keeps out of the list.
     // "Answer it" opens it, with any part answered before.
     const answerLater = (box, q) => {
       const row = document.createElement("p");
@@ -660,19 +665,19 @@
       box.append(row);
     };
     for (const q of skipped) answerLater(skippedBox, q);
-    // Questions the rounds do not ask: past the question limit, or ranked
+    // Questions the list leaves out: past the question limit, or ranked
     // under the threshold. Answering one is the submitter's choice.
     const heldBack = data.early_held_back || [];
     const belowFloor = data.early_below_floor || [];
     moreBox.hidden = !(heldBack.length || belowFloor.length);
     const moreTitle = document.createElement("summary");
     moreTitle.textContent = `More questions (${heldBack.length + belowFloor.length},`
-      + " optional, not asked in a round)";
+      + " optional, not in the list)";
     moreBox.append(moreTitle);
     const moreHint = document.createElement("p");
     moreHint.className = "hint";
-    moreHint.textContent = "The rounds leave these out: some are past the question limit,"
-      + " and others rank below the threshold for a round. An answer to one still"
+    moreHint.textContent = "The list leaves these out: some are past the question limit,"
+      + " and others rank below the threshold for the list. An answer to one still"
       + " reaches the analysis.";
     moreBox.append(moreHint);
     for (const q of [...heldBack, ...belowFloor]) answerLater(moreBox, q);
@@ -754,13 +759,19 @@
     if (typeof workspace !== "undefined") workspace.grouped(data);
   };
 
-  // The round's answers, as the service takes them.
+  // The list's answers, as the service takes them.
   const roundAnswers = () => ({
     links: [questions, earlierBox, skippedBox].flatMap((box) => [...box.querySelectorAll("select")])
       .filter((select) => select.dataset.principal && select.value)
       .map((select) => ({ principal: select.dataset.principal, element: select.value })),
     facts: answers.map((read) => read()).filter(Boolean),
   });
+  // The early questions this page shows: every listed row that is not hidden
+  // under its parent's answer. The service records only these as shown, and
+  // takes a skip only of one of them (ADR 0078). A link row is not one.
+  const presented = () => roundRows
+    .filter((row) => Array.isArray(row.key) && !(row.hidden && row.hidden()))
+    .map((row) => row.key);
 
   // A refused answer is shown beside the buttons that sent it, and every
   // answer stays as it was, for the submitter to correct.
@@ -774,7 +785,7 @@
     const resumed = await fetch("/answer/" + pausedRun, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ links, facts, revision }),
+      body: JSON.stringify({ links, facts, presented: presented(), revision }),
     });
     if (!resumed.ok) {
       refuse((await resumed.json()).message);
@@ -807,9 +818,9 @@
     answerAction(() => startAnalysis(links, facts));
   });
 
-  // Save the round and show the next one. A save never starts the analysis;
-  // where nothing is left to ask, the page says so and waits.
-  // `skipAll` also skips every question of this round left blank.
+  // Save the answers and show the list again. A save never starts the
+  // analysis; where nothing is left to ask, the page says so and waits.
+  // `skipAll` also skips every listed question left blank.
   const saveRound = async (skipAll) => {
     const { links, facts } = roundAnswers();
     // A blank row is skipped, and so is a row with facets answered in part:
@@ -825,7 +836,7 @@
     const saved = await fetch("/answer/" + pausedRun, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ links, facts, save: true, skip, revision }),
+      body: JSON.stringify({ links, facts, save: true, skip, presented: presented(), revision }),
     });
     const body = await saved.json();
     if (!saved.ok) {

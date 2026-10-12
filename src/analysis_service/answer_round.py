@@ -14,23 +14,27 @@ serves and the list it accepts cannot differ.
 report's list.** Both ask the link questions its catalog raises. A waiting job
 may continue with no answers, and a finished one has nothing to continue.
 
-**A waiting job asks in rounds** (ADR 0053). A round shows a fixed number of
-questions of each kind, its ``per_round``, so every round asks as many
-questions as the one before it, and only the last asks fewer. A question is
-shown only at or above its kind's floor, and one pause asks each kind at most
-its limit for each selected framework: :data:`EARLY_RULES` is the table. Where a job selects
-more than one framework, the frameworks take turns for the places in a round
-(:func:`by_turn`), and by whole boxes for the order it is shown in, one box
-for each group (:func:`in_boxes`). A question answered in
-part is taken before any new question, outside the limit, and where the limits hold questions
-back the job says so (:attr:`QuestionSet.stop`). A question that decides whether a
-selected framework runs at all comes first in every round, outside the limits
-(ADR 0067), and the set says what each framework's precondition reads now
-(:attr:`QuestionSet.gates`). A submitter saves a round's answers, which writes
-them onto the job and runs no model, and the next round is read off the model
-with them in. So an
-answer can hide the parts of a capability it rules out, and a named mechanism
-lowers the questions that rested on its lead.
+**A waiting job asks one adaptive list** (ADR 0078). The list holds every
+recommended question of the pause at once: a question is listed only at or
+above its kind's floor, and one pause asks each kind at most its limit for
+each selected framework (:data:`EARLY_RULES` is the table). Where a job
+selects more than one framework, the frameworks take turns for the places
+(:func:`by_turn`), and within a framework's turn the question whose answer
+settles the most other questions comes first
+(:mod:`analysis_service.answer_effects`). A question answered in part is
+listed before any new question, outside the limit, and where the limits hold
+questions back the job says so (:attr:`QuestionSet.stop`). A question that
+decides whether a selected framework runs at all comes first, outside the
+limits (ADR 0067), and the set says what each framework's precondition reads
+now (:attr:`QuestionSet.gates`). A part of a capability waits on its parent
+(:attr:`QuestionSet.blocked`), and a question an answer made unnecessary is
+listed with the reason (:attr:`QuestionSet.unnecessary`). A submitter saves
+answers, which writes them onto the job and runs no model, and the list is
+read again off the model with them in. So an answer removes the parts of a
+capability it rules out, and a named mechanism lowers the questions that
+rested on its lead. A save records only the questions the page says it
+presented, checked against the list (:class:`Answers`), so a question the
+service returned and the page never showed is not recorded as shown.
 
 **A report offers one follow-up** (ADR 0054). A fact an earlier round
 answered is not asked again, and an answer of "I don't know" counts. A report
@@ -44,21 +48,23 @@ answer the facts a reviewer names differently on each run
 from __future__ import annotations
 
 from collections import Counter
-from collections.abc import Callable, Mapping, Sequence
+from collections.abc import Callable, Container, Mapping, Sequence
 from dataclasses import dataclass, field, replace
 from functools import cached_property, partial
 from types import MappingProxyType
 from typing import TYPE_CHECKING, Any, Literal, TypeVar
 
+from analysis_service.answer_effects import Effect, capability_effects
 from analysis_service.answer_sets import NO_ANSWERS, AnswerSet, within_held_limits
 from analysis_service.assertions import UNKNOWN, AssertionCatalog
 from analysis_service.bands import UNRANKED
-from analysis_service.capabilities import lineage
+from analysis_service.capabilities import CapabilityFact, lineage, resolve
 from analysis_service.claims import FrameworkAnalysis, FrameworkName, UnknownKey
 from analysis_service.early_questions import (
     EarlyQuestion,
     early_questions,
     framework_gates,
+    waiting_parts,
 )
 from analysis_service.fact_answers import (
     MAX_DETAIL_CHARS,
@@ -87,7 +93,7 @@ from analysis_service.links import (
     link_questions,
     resumed_sources,
 )
-from analysis_service.open_facts import prepared_model
+from analysis_service.open_facts import open_attribute, prepared_model
 from analysis_service.questions import FactQuestion, fact_questions
 from analysis_service.sources import LimitBreach, Source, SourceLimits
 from analysis_service.system_model import ModelIndex, SystemModel
@@ -101,6 +107,7 @@ __all__ = [
     "ANSWER_LIMITS",
     "EARLY_RULES",
     "MAX_SKIPS",
+    "POLICY_VERSION",
     "AdmittedRound",
     "AlreadyResumed",
     "AmendedJob",
@@ -111,7 +118,9 @@ __all__ = [
     "EarlyRule",
     "MissingRevision",
     "PauseSummary",
+    "PolicyVersion",
     "QuestionSet",
+    "Reason",
     "ResumedJob",
     "SavedDraft",
     "SavedRound",
@@ -119,28 +128,26 @@ __all__ = [
     "StaleRevision",
     "Stop",
     "by_turn",
-    "in_boxes",
-    "next_round",
     "passes_floor",
     "question_set",
+    "recommended",
 ]
 
 
 @dataclass(frozen=True)
 class EarlyRule:
-    """Which early questions of one kind a round may show.
+    """Which early questions of one kind the list may hold.
 
-    ``floor`` is the score a question needs, ``limit`` how many of the kind
-    one pause asks for each selected framework, and ``per_round`` how many one
-    round asks. A question counts toward the limit of every framework it
-    serves, so a second framework takes no place from the first. The two
-    kinds' scores are not on one scale: a field question's is a ranking value
-    read off the prior, and a capability question's is units it could settle.
+    ``floor`` is the score a question needs, and ``limit`` how many of the
+    kind one pause asks for each selected framework. A question counts toward
+    the limit of every framework it serves, so a second framework takes no
+    place from the first. The two kinds' scores are not on one scale: a field
+    question's is a ranking value read off the prior, and a capability
+    question's is units it could settle.
     """
 
     floor: float
     limit: int
-    per_round: int
 
 
 #: The rule for each kind of early question: ``capability`` and ``field``,
@@ -149,18 +156,40 @@ class EarlyRule:
 #: an answer under it changes. The top 30 of a STRIDE list hold 99% of the
 #: ranking score at that floor, which is not a share of the report's value. A
 #: capability question under 2 settles one unit, and at ASVS level 2 that
-#: leaves 28 of 51. A capability question is one yes or no, so a round asks
-#: 10. A field question can be a table of facets, and 5 a round asks a median
-#: of 10 choices over the corpus's STRIDE models, and at most 15, in a median
-#: of 6 rounds (ADR 0053).
+#: leaves 28 of 51.
 EARLY_RULES: Mapping[str, EarlyRule] = {
-    "capability": EarlyRule(floor=2.0, limit=30, per_round=10),
-    "field": EarlyRule(floor=1.0, limit=30, per_round=5),
+    "capability": EarlyRule(floor=2.0, limit=30),
+    "field": EarlyRule(floor=1.0, limit=30),
 }
 
 
 #: Why a waiting job asks nothing more (:attr:`QuestionSet.stop`, ADR 0068).
 Stop = Literal["budget-exhausted", "below-floor", "skipped", "nothing-left"]
+
+#: Why a question is not in the recommended list (ADR 0078). A client maps
+#: each one to its own words. ``parent-undecided`` and ``gate-undecided``
+#: hold a question back until an answer shows it; ``parent-absent``,
+#: ``gate-satisfied``, ``gate-refuted``, ``fact-settled`` and
+#: ``no-longer-needed-by-selected-units`` say why an answer made it
+#: unnecessary; ``skipped``, ``answer-limit`` and ``below-floor`` name the
+#: lists a submitter may still answer from.
+Reason = Literal[
+    "parent-undecided",
+    "gate-undecided",
+    "parent-absent",
+    "gate-satisfied",
+    "gate-refuted",
+    "fact-settled",
+    "no-longer-needed-by-selected-units",
+    "skipped",
+    "answer-limit",
+    "below-floor",
+]
+
+#: The selection policy a question set was built by, which a client reads to
+#: know what the list's order and counts mean.
+PolicyVersion = Literal["adaptive-1"]
+POLICY_VERSION: PolicyVersion = "adaptive-1"
 
 #: The most skips one save names: every fact and link answer it could carry.
 MAX_SKIPS = MAX_FACT_ANSWERS + MAX_LINK_ANSWERS
@@ -258,21 +287,30 @@ class PauseSummary:
     """What a waiting job asked, and what it leaves open (#1542 F2, F5).
 
     **No count here says a fact is settled that is not.** A stop of
-    :attr:`QuestionSet.stop` says why no round asks more; this says what
-    remains. The counts are of different things, kept apart:
+    :attr:`QuestionSet.stop` says why the list asks nothing more; this says
+    what remains. The counts are of different things, kept apart:
 
-    * ``introduced`` is the distinct early questions the rounds showed, this
-      one's included, and ``choices`` the choices they ask: one a facet, else
-      one. Neither is bounded by a limit, which counts answers.
+    * ``recommended`` is the questions the list holds now, and
+      ``recommended_choices`` the choices left to answer them: one a facet
+      not yet answered, else one. An answer can raise either count, where it
+      shows a part or satisfies a gate, and the page says so instead of
+      claiming the work only shrinks.
+    * ``introduced`` is the distinct early questions the page presented so
+      far, and ``choices`` the choices they ask. Neither is bounded by a
+      limit, which counts answers.
     * ``settled``, ``partial`` and ``unknown`` count the saved early answers:
       every facet known, some facets known, or "I don't know".
     * ``skipped``, ``held_back`` and ``below_floor`` count the open questions
-      no round shows: skipped for now, held back by a limit, or under a floor.
+      the list leaves out: skipped for now, held back by a limit, or under a
+      floor. ``blocked`` counts the questions that wait on a parent or a
+      gate, and ``unnecessary`` the ones an answer made unnecessary.
     * ``applicability`` counts each runnable framework's units by state and
       band, where its units apply by a rule over capabilities. These are
       units, not findings.
     """
 
+    recommended: int
+    recommended_choices: int
     introduced: int
     choices: int
     settled: int
@@ -281,10 +319,14 @@ class PauseSummary:
     skipped: int
     held_back: int
     below_floor: int
+    blocked: int
+    unnecessary: int
     applicability: Mapping[FrameworkName, tuple[BandApplicability, ...]]
 
     def to_json(self) -> dict[str, object]:
         return {
+            "recommended": self.recommended,
+            "recommended_choices": self.recommended_choices,
             "introduced": self.introduced,
             "choices": self.choices,
             "settled": self.settled,
@@ -293,6 +335,8 @@ class PauseSummary:
             "skipped": self.skipped,
             "held_back": self.held_back,
             "below_floor": self.below_floor,
+            "blocked": self.blocked,
+            "unnecessary": self.unnecessary,
             "applicability": {
                 name: [band.to_json() for band in bands]
                 for name, bands in self.applicability.items()
@@ -318,22 +362,18 @@ class QuestionSet:
     #: True for a report the follow-up wrote: it asks nothing and admits no
     #: answer.
     final: bool
-    #: Every early question the pause showed before this round.
+    #: Every early question the page presented before this read.
     shown: tuple[UnknownKey, ...]
-    #: For a waiting job, how many questions of each kind the rounds are still
-    #: expected to ask, this round's included. An estimate: answers can add
-    #: or take away questions.
-    remaining: Mapping[str, int]
-    #: For a waiting job, each early question an earlier round answered, with
+    #: For a waiting job, each early question an earlier save answered, with
     #: its answer, so a page can show it and take a new answer.
     answered_early: tuple[tuple[EarlyQuestion, FactAnswer], ...]
     answered_links: tuple[tuple[LinkQuestion, LinkAnswer], ...]
     #: For a waiting job, each question the limits of :data:`EARLY_RULES`
-    #: hold back from every round. No round shows it, and an answer to it is
+    #: hold back from the list. The list leaves it out, and an answer to it is
     #: still admitted, so a submitter can choose to answer it.
     held_back: tuple[EarlyQuestion, ...]
     #: For a waiting job, each early question the submitter skipped for now.
-    #: A skip is not an answer: the fact stays open, no round shows it again,
+    #: A skip is not an answer: the fact stays open, the list leaves it out,
     #: and an answer to it is still admitted.
     skipped: tuple[EarlyQuestion, ...]
     #: For a waiting job, each link question the submitter skipped for now,
@@ -348,17 +388,23 @@ class QuestionSet:
     #: it (:func:`~analysis_service.early_questions.framework_gates`).
     gates: Mapping[FrameworkName, PreconditionResult] = field(default_factory=dict)
     #: For a waiting job, each open question under its kind's floor
-    #: (:func:`passes_floor`). No round shows it, and an answer to it is still
-    #: admitted, so a submitter can choose to answer it.
+    #: (:func:`passes_floor`). The list leaves it out, and an answer to it is
+    #: still admitted, so a submitter can choose to answer it.
     below_floor: tuple[EarlyQuestion, ...] = ()
     #: For a waiting job, what the pause asked and what it leaves open; ``None``
     #: for a report's set.
     summary: PauseSummary | None = None
-
-    @property
-    def withheld(self) -> int:
-        """How many questions the limits hold back from every round."""
-        return len(self.held_back)
+    #: For a waiting job, each question that waits on another: a part whose
+    #: parent the list asks and is not yet answered "yes", or a question of a
+    #: framework whose precondition an answer reopened. It takes no place
+    #: under a limit, and an answer to it is still admitted.
+    blocked: tuple[tuple[EarlyQuestion, Reason], ...] = ()
+    #: For a waiting job, each question of the first list that a saved answer
+    #: proved unnecessary, with the rule that proved it.
+    unnecessary: tuple[tuple[EarlyQuestion, Reason], ...] = ()
+    #: For a waiting job, what each possible answer to a listed capability
+    #: question proves about the others (:mod:`analysis_service.answer_effects`).
+    effects: Mapping[UnknownKey, Effect] = field(default_factory=dict)
 
     @property
     def stop(self) -> Stop | None:
@@ -382,8 +428,9 @@ class QuestionSet:
     def asked(self) -> frozenset[UnknownKey]:
         """Every fact the questions name, which is every fact that takes an answer.
 
-        A question the limits hold back, or one under its floor, is named
-        too: no round shows it, but a submitter may choose to answer it.
+        A question the limits hold back, one under its floor, or one that
+        waits on its parent is named too: the list leaves it out, but a
+        submitter may choose to answer it.
         """
         early = frozenset(
             question.key
@@ -392,6 +439,7 @@ class QuestionSet:
                 *self.skipped,
                 *self.held_back,
                 *self.below_floor,
+                *(question for question, _ in self.blocked),
             )
         )
         return early | frozenset(question.key for question in self.facts)
@@ -431,20 +479,33 @@ class QuestionSet:
         index = ModelIndex.of(self.model)
         early = partial(self._early_row, index)
         link = partial(self._link_row, index)
+
+        def listed(question: EarlyQuestion, reason: Reason | None) -> dict[str, object]:
+            effect = self.effects.get(question.key)
+            return early(question) | {
+                "reason": reason,
+                "rank": None if effect is None else effect.to_json(),
+            }
+
         return {
             "link_questions": [link(question) for question in self.links],
             "fact_questions": [question.to_json() for question in self.facts],
-            "early_questions": [early(question) for question in self.early],
+            "early_questions": [listed(question, None) for question in self.early],
             "final": self.final,
             "resumed_by": self.resumed_by,
-            "early_remaining": dict(self.remaining),
-            "early_withheld": self.withheld,
+            "policy_version": POLICY_VERSION,
             "early_stop": self.stop,
-            "early_held_back": [early(question) for question in self.held_back],
-            "early_below_floor": [early(question) for question in self.below_floor],
+            "early_blocked": [listed(*blocked) for blocked in self.blocked],
+            "early_unnecessary": [listed(*moot) for moot in self.unnecessary],
+            "early_held_back": [
+                listed(question, "answer-limit") for question in self.held_back
+            ],
+            "early_below_floor": [
+                listed(question, "below-floor") for question in self.below_floor
+            ],
             "early_summary": None if self.summary is None else self.summary.to_json(),
             "framework_gates": dict(self.gates),
-            "skipped_early": [early(question) for question in self.skipped],
+            "skipped_early": [listed(question, "skipped") for question in self.skipped],
             "skipped_links": [link(question) for question in self.skipped_links],
             "answered_early": [
                 early(question) | {"answer": answer.model_dump(mode="json")}
@@ -469,16 +530,19 @@ class QuestionSet:
         given: AnswerSet,
         save: bool = False,
         skips: Sequence[SkipKey] = (),
+        presented: Sequence[UnknownKey] = (),
     ) -> AdmittedRound:
-        """The resumed job this round's answers start, or a ``ValueError``.
+        """The resumed job these answers start, or a ``ValueError``.
 
         ``sources`` and ``earlier`` are what the answered job was given, and
-        ``given`` is this round's answers. A refusal names the submitter's own
+        ``given`` is this submission's answers. A refusal names the submitter's own
         choices, so its message is safe to show. A link answer to a job with no
         catalog raises :class:`~analysis_service.links.NoCatalogError`. ``save`` admits
-        a round a waiting job keeps, or a report's draft (ADR 0070), which must
-        answer or skip something and starts nothing. ``skips`` names questions of this round the submitter
-        skips for now; only a saved round skips. A report's one follow-up is
+        answers a waiting job keeps, or a report's draft (ADR 0070), which must
+        answer or skip something and starts nothing. ``skips`` names questions
+        the submitter skips for now; only a save skips. ``presented`` names
+        the early questions the page showed, which is what the record keeps
+        as shown and what a skip must be of (:meth:`presented`). A report's one follow-up is
         refused where its answers add no information
         (:func:`_adds_information`), so it is not spent on a run that reads
         nothing new.
@@ -490,13 +554,13 @@ class QuestionSet:
             )
         links, facts = given.links, given.facts
         if save and not (links or facts or skips):
-            raise ValueError("a saved round answers or skips at least one question")
+            raise ValueError("a save answers or skips at least one question")
         merged = merged_facts(earlier.facts, facts)
         complete: frozenset[SkipKey] = answered_keys(merged) & {
             fact.key for fact in facts
         } | {fold(link.principal) for link in links}
-        presented = self.presented(merged)
-        self._check_skips(skips, complete, save, presented)
+        shown = self._check_presented(presented, merged)
+        self._check_skips(skips, complete, save, shown)
         if self.final:
             raise ValueError(
                 "this report is final: its follow-up has run, so it takes no answers"
@@ -531,7 +595,7 @@ class QuestionSet:
         return AdmittedRound(
             sources=composed,
             answers=AnswerSet(links=tuple(all_links), facts=tuple(all_facts)),
-            shown=tuple(dict.fromkeys([*self.shown, *presented])),
+            shown=tuple(dict.fromkeys([*self.shown, *shown])),
             skipped=tuple(
                 dict.fromkeys(
                     key
@@ -546,16 +610,43 @@ class QuestionSet:
         )
 
     def presented(self, answers: Sequence[FactAnswer]) -> tuple[UnknownKey, ...]:
-        """This round's early questions a page shows once ``answers`` are given.
+        """The listed early questions a page may show once ``answers`` are given.
 
         **The one reader of which part is hidden** (#1542 F4). A part whose
-        parent this round also asks shows only once the parent is answered
-        "yes", and a part of a hidden part stays hidden, as the page hides
-        them. A hidden part was not presented: no history records it as shown,
-        and a skip of it is refused. ``answers`` is every answer the job holds
-        with this submission's in.
+        parent the list also holds shows only once the parent is answered
+        "yes", and a part of a hidden part stays hidden. A page reports what
+        it presented, and a save records only the reported questions this
+        rule allows (:meth:`_check_presented`), so no history records a
+        hidden part as shown, and a skip of it is refused. ``answers`` is every
+        answer the job holds with this submission's in.
         """
         return _presented(self.early, answers)
+
+    def _check_presented(
+        self, presented: Sequence[UnknownKey], answers: Sequence[FactAnswer]
+    ) -> tuple[UnknownKey, ...]:
+        """The reported questions, or a ``ValueError`` where one is not a listed
+        question the page could show (ADR 0078).
+
+        **A page cannot record a question as shown that the service did not
+        list**, nor a part hidden under its parent's answer. So the shown
+        history holds only questions the service offered and the page says it
+        showed.
+        """
+        allowed = self.presented(answers)
+        listed = {question.key for question in self.early}
+        for key in presented:
+            if key not in listed:
+                raise ValueError(
+                    "only a question this list holds is recorded as shown:"
+                    f' "{fact_label(key, self.model)}"'
+                )
+            if key not in allowed:
+                raise ValueError(
+                    f'"{fact_label(key, self.model)}" is hidden until its parent is'
+                    ' answered "yes", so it is not recorded as shown'
+                )
+        return tuple(dict.fromkeys(presented))
 
     def correct(
         self,
@@ -602,36 +693,30 @@ class QuestionSet:
         save: bool,
         presented: Sequence[UnknownKey],
     ) -> None:
-        """Refuse a skip outside a saved round, of a question it does not show,
-        of a part hidden under its parent's answer, or of a question the same
-        submission answers in full.
+        """Refuse a skip outside a save, of a question the page did not present
+        (ADR 0069), or of a question the same submission answers in full.
 
-        A question with facets answered in part may be skipped with it: the
-        facets given are kept, and the rest are set aside for now, so a
-        question the owner can answer only in part does not come back first
-        in every round.
+        ``presented`` is what the page reported and the list allows
+        (:meth:`_check_presented`), so a part hidden under its parent, or a
+        question the service returned and the page never showed, is not
+        skipped. A question with facets answered in part may be skipped with
+        it: the facets given are kept, and the rest are set aside for now, so
+        a question the owner can answer only in part does not stay first in
+        the list.
         """
         if not skips:
             return
         if not save:
-            raise ValueError("only a saved round skips questions")
+            raise ValueError("only a save skips questions")
         shown: dict[SkipKey, str] = {
             question.key: question.principal for question in self.links
         }
-        shown |= {
-            question.key: fact_label(question.key, self.model)
-            for question in self.early
-        }
+        shown |= {key: fact_label(key, self.model) for key in presented}
         for key in skips:
             if key not in shown:
                 named = key if isinstance(key, str) else fact_label(key, self.model)
                 raise ValueError(
-                    f'only a question this round shows is skipped: "{named}"'
-                )
-            if not isinstance(key, str) and key not in presented:
-                raise ValueError(
-                    f'"{shown[key]}" is hidden until its parent is answered "yes",'
-                    " so it is not skipped; it is asked once it shows"
+                    f'only a question the page presented is skipped: "{named}"'
                 )
             if key in complete:
                 raise ValueError(
@@ -652,12 +737,12 @@ def question_set(
     skipped: Sequence[SkipKey] = (),
     resumed_by: str | None = None,
 ) -> QuestionSet:
-    """The questions a job asks: a waiting job's round, or its report's list.
+    """The questions a job asks: a waiting job's list, or its report's list.
 
     ``frameworks`` maps each selected framework to its options, and ranks the
     early list; ``analyses`` ranks the report's list. So a waiting job passes
     no analyses, and a finished one's frameworks go unread. ``answered`` holds
-    the answers of the earlier rounds, which are not asked again. ``final`` marks a report the follow-up wrote, and ``shown``
+    the saved answers, whose questions are not asked again. ``final`` marks a report the follow-up wrote, and ``shown``
     is every early question the pause presented. ``skipped`` is every early
     question and link question the pause's submitter skipped for now; a
     report's list reads both to say what became of each question before the
@@ -678,7 +763,6 @@ def question_set(
             links=(),
             final=final,
             shown=tuple(shown),
-            remaining={},
             answered_early=(),
             answered_links=(),
             held_back=(),
@@ -696,7 +780,6 @@ def question_set(
             links=(),
             final=True,
             shown=tuple(shown),
-            remaining={},
             answered_early=(),
             answered_links=(),
             held_back=(),
@@ -721,7 +804,6 @@ def question_set(
             links=link_questions(catalog, model),
             final=False,
             shown=tuple(shown),
-            remaining={},
             answered_early=(),
             answered_links=(),
             held_back=(),
@@ -750,7 +832,43 @@ def question_set(
     }
     aside: frozenset[SkipKey] = frozenset(skipped)
     gates = framework_gates(view, frameworks, catalog)
-    this_round, remaining, held_back = next_round(listed, aside | done, answered_for)
+    prepared = prepared_model(view, catalog)
+    runnable = {
+        name: frameworks[name] for name, state in gates.items() if state == "satisfied"
+    }
+    open_keys = {question.key for question in listed if question.key not in done}
+    waiting_on = {
+        question.key: question
+        for question in first
+        if question.key not in open_keys and question.key not in done
+    }
+    held: list[tuple[EarlyQuestion, Reason]] = []
+    moot: list[tuple[EarlyQuestion, Reason]] = []
+    facts = resolve(prepared.capability_facts())
+    for question in waiting_on.values():
+        reason = _left_out(question, gates, facts, prepared)
+        (held if reason == "gate-undecided" else moot).append((question, reason))
+    settled = {
+        key_ref(key).capability for key in aside | done if not isinstance(key, str)
+    }
+    parts = _waiting(listed, settled)
+    effects = capability_effects(
+        prepared,
+        runnable,
+        [
+            question
+            for question in listed
+            if question.kind == "capability"
+            and not question.gates
+            and question.key not in aside | done
+            and question.key not in parts
+            and passes_floor(question, listed)
+        ],
+        settled,
+    )
+    active, blocked, held_back = recommended(
+        listed, aside | done, answered_for, effects
+    )
     below_floor = tuple(
         question
         for question in listed
@@ -764,12 +882,11 @@ def question_set(
         model=view,
         catalog=catalog,
         waiting=True,
-        early=this_round,
+        early=active,
         facts=(),
         links=tuple(question for question in open_links if question.key not in aside),
         final=False,
         shown=tuple(shown),
-        remaining=remaining,
         answered_early=tuple(
             (question, given[question.key])
             for question in first
@@ -791,36 +908,98 @@ def question_set(
         ),
         gates=gates,
         below_floor=below_floor,
+        blocked=(*blocked, *held),
+        unnecessary=tuple(moot),
+        effects=effects,
         summary=_summary(
-            prepared_model(view, catalog),
+            prepared,
             frameworks,
             gates,
             listed,
             done,
             answered.facts,
-            [*shown, *_presented(this_round, answered.facts)],
+            shown,
+            recommended=active,
             skipped=len(aside),
             held_back=len(held_back),
             below_floor=len(below_floor),
+            blocked=len(blocked) + len(held),
+            unnecessary=len(moot),
         ),
     )
+
+
+def _left_out(
+    question: EarlyQuestion,
+    gates: Mapping[FrameworkName, PreconditionResult],
+    facts: Mapping[str, CapabilityFact],
+    prepared: SystemModel,
+) -> Reason:
+    """Why a question the pause first listed is open and no longer listed.
+
+    **Each reason names the rule that removed the question.** A gate
+    question leaves once a precondition it decides is read; another question
+    leaves with its frameworks' gates, with the parent that an answer made
+    absent (``facts`` is :func:`~analysis_service.capabilities.resolve`'s
+    answer), with the fact a later answer or the catalog states, or with the
+    units that no longer need it. A question whose framework a reopened
+    answer left undecidable waits, and is not unnecessary.
+    """
+    states = {gates.get(name) for name in question.frameworks}
+    if question.gates:
+        if "satisfied" in states:
+            return "gate-satisfied"
+        if states == {"refuted"}:
+            return "gate-refuted"
+        return "fact-settled"
+    if "satisfied" not in states:
+        return "gate-undecided" if "undecidable" in states else "gate-refuted"
+    ref = key_ref(question.key)
+    if ref.capability:
+        fact = facts.get(ref.capability)
+        if fact is None or fact.state == "unknown":
+            return "no-longer-needed-by-selected-units"
+        return "parent-absent" if fact.derived_from else "fact-settled"
+    if ref.attribute and not open_attribute(prepared, ref.element_id, ref.attribute):
+        return "fact-settled"
+    return "no-longer-needed-by-selected-units"
+
+
+def _waiting(
+    listed: Sequence[EarlyQuestion], settled: Container[str]
+) -> frozenset[UnknownKey]:
+    """The listed questions that wait on a parent, by the one reader of the
+    rule (:func:`~analysis_service.early_questions.waiting_parts`)."""
+    names = {
+        key_ref(question.key).capability: question.key
+        for question in listed
+        if question.kind == "capability"
+    }
+    return frozenset(names[name] for name in waiting_parts(names.keys(), settled))
 
 
 def _presented(
     early: Sequence[EarlyQuestion], answers: Sequence[FactAnswer]
 ) -> tuple[UnknownKey, ...]:
-    """The rule :meth:`QuestionSet.presented` states, for a round's questions."""
+    """The rule :meth:`QuestionSet.presented` states, for the listed questions."""
     said = {answer.key: answer.value for answer in answers}
     asked = {question.key for question in early}
     hidden: set[UnknownKey] = set()
-    # A parent comes before its parts in a round (by_turn keeps each
-    # framework's order, and in_boxes keeps a group's order), so one pass
-    # reaches a part of a part.
+    # A parent comes before its parts in the list (by_turn keeps each
+    # framework's order), so one pass reaches a part of a part.
     for question in early:
         parent = question.parent
         if parent in asked and (parent in hidden or said.get(parent) != "yes"):
             hidden.add(question.key)
     return tuple(question.key for question in early if question.key not in hidden)
+
+
+def _choices_left(question: EarlyQuestion, answer: FactAnswer | None) -> int:
+    """The choices a person still makes to answer it: one a facet without an
+    answer, else one."""
+    if question.facets and answer is not None and answer.facets:
+        return sum(1 for facet in question.facets if facet.id not in answer.facets)
+    return question.decisions
 
 
 def _summary(
@@ -832,16 +1011,19 @@ def _summary(
     answered: Sequence[FactAnswer],
     introduced: Sequence[UnknownKey],
     *,
+    recommended: Sequence[EarlyQuestion],
     skipped: int,
     held_back: int,
     below_floor: int,
+    blocked: int,
+    unnecessary: int,
 ) -> PauseSummary:
     """What a waiting job asked and what it leaves open (:class:`PauseSummary`).
 
     ``prepared`` is the model the lanes read, with the saved answers in.
-    ``done`` is every fact a saved answer names, "I don't know" included, and
-    ``introduced`` every early question the rounds showed, this one's
-    included.
+    ``done`` is every fact a saved answer names, "I don't know" included,
+    ``introduced`` every early question the page presented so far, and
+    ``recommended`` the list as it stands.
     """
     askable = {
         key_ref(question.key).capability
@@ -879,7 +1061,12 @@ def _summary(
     shown = tuple(dict.fromkeys(introduced))
     content = [_known_content(answer) for answer in answered]
     settles = [answer.settles for answer in answered]
+    given = {answer.key: answer for answer in answered}
     return PauseSummary(
+        recommended=len(recommended),
+        recommended_choices=sum(
+            _choices_left(question, given.get(question.key)) for question in recommended
+        ),
         introduced=len(shown),
         choices=sum(len(answer_facets(key)) or 1 for key in shown),
         settled=sum(settles),
@@ -892,46 +1079,78 @@ def _summary(
         skipped=skipped,
         held_back=held_back,
         below_floor=below_floor,
+        blocked=blocked,
+        unnecessary=unnecessary,
         applicability=applicability,
     )
 
 
-def next_round(
+def recommended(
     listed: Sequence[EarlyQuestion],
     done: frozenset[SkipKey],
     answered_for: Mapping[UnknownKey, Sequence[FrameworkName]],
-) -> tuple[tuple[EarlyQuestion, ...], dict[str, int], tuple[EarlyQuestion, ...]]:
-    """This round's questions, how many each kind has left, and the questions the limits hold back.
+    effects: Mapping[UnknownKey, Effect],
+) -> tuple[
+    tuple[EarlyQuestion, ...],
+    tuple[tuple[EarlyQuestion, Reason], ...],
+    tuple[EarlyQuestion, ...],
+]:
+    """The list as the page shows it, the questions that wait on a parent, and the questions the limits hold back.
 
-    A question an earlier round answered in full is not asked again. One it
-    answered in part is taken first, and takes no place under the limit, which
-    it already counts toward: each earlier answer counts toward its kind's
-    limit, and the limit bounds only the questions not yet answered at all.
-    ``answered_for`` maps each answered question to the frameworks it served.
+    **The one reader of the list's order** (ADR 0078). A question a save
+    answered in full is not asked again. One it answered in part is listed
+    first, and takes no place under the limit, which it already counts
+    toward: each saved answer counts toward its kind's limit, and the limit
+    bounds only the questions not yet answered at all. ``answered_for`` maps
+    each answered question to the frameworks it served. ``done`` is every
+    question answered or skipped.
 
     **Each framework has its own limit.** A question counts toward the limit
     of every framework it serves, and a new question is taken while one of
     them has a place left. So the questions one framework asks alone keep
     their places when a second framework is selected (``QA-2026-10-09-01-E1``).
 
-    A round takes the first ``per_round`` questions of each kind, so the
-    number of questions a round opens with never grows from one round to the
-    next (:func:`_take`). Each kind's questions are taken with the selected
-    frameworks in turn, so each framework's best questions reach the round
-    (:func:`by_turn`). The round is shown in boxes, one for each group, with
-    the frameworks in turn by whole boxes (:func:`in_boxes`). So a question
-    answered in part is shown in its group's box, which is not always first.
+    **A part waits on its parent.** A capability question whose parent is
+    still open is not listed and takes no place: it is listed once the parent
+    is answered "yes", and leaves once the parent is "no". So the list shows
+    no hidden row, and a page needs no rule of its own for which part shows.
 
-    **A question that decides a framework's precondition is taken first**, every
-    one still open, outside the limits and the floor (ADR 0067). Its count is
-    the ``gate`` entry of the remaining counts.
+    **Within a kind, the question whose answer settles the most other
+    questions is taken first** (``effects``), then the one whose least answer
+    settles the most, then the list's own order: the band and the units a
+    capability could settle, or the prior per choice for a field question
+    (:mod:`analysis_service.early_questions`). A field question has no
+    proven effect on another question, so it keeps the list's order. The
+    selected frameworks then take turns over both kinds (:func:`by_turn`).
+
+    **A question that decides a framework's precondition is listed first**,
+    every one still open, outside the limits and the floor (ADR 0067).
     """
     gates = [
         question for question in listed if question.gates and question.key not in done
     ]
+    settled = {key_ref(key).capability for key in done if not isinstance(key, str)}
+    waiting = _waiting(listed, settled)
+    undecided: Reason = "parent-undecided"
+    blocked = tuple(
+        (question, undecided)
+        for question in listed
+        if question.key not in done and question.key in waiting
+    )
     shown: list[EarlyQuestion] = []
-    remaining = {"gate": len(gates)}
     held_back: list[EarlyQuestion] = []
+    place = {question.key: index for index, question in enumerate(listed)}
+
+    def rank(question: EarlyQuestion) -> tuple[float, int, int]:
+        effect = effects.get(question.key)
+        if effect is None:
+            return (0.0, 0, place[question.key])
+        return (
+            -effect.potential / question.decisions,
+            -effect.least,
+            place[question.key],
+        )
+
     for kind, rule in EARLY_RULES.items():
         counted = Counter(
             name
@@ -946,20 +1165,22 @@ def next_round(
             and not question.gates
             and passes_floor(question, listed)
             and question.key not in done
+            and question.key not in waiting
         ]
         started = [question for question in eligible if question.key in answered_for]
         taken: list[EarlyQuestion] = []
-        for question in by_turn(
-            [question for question in eligible if question.key not in answered_for]
-        ):
+        fresh = sorted(
+            (question for question in eligible if question.key not in answered_for),
+            key=rank,
+        )
+        for question in by_turn(fresh):
             if any(counted[name] < rule.limit for name in question.frameworks):
                 taken.append(question)
                 counted.update(question.frameworks)
             else:
                 held_back.append(question)
-        remaining[kind] = len(started) + len(taken)
-        shown += _take([*started, *taken], rule.per_round)
-    return in_boxes([*gates, *by_turn(shown)]), remaining, tuple(held_back)
+        shown += [*started, *taken]
+    return (*gates, *by_turn(shown)), blocked, tuple(held_back)
 
 
 def by_turn(questions: Sequence[EarlyQuestion]) -> list[EarlyQuestion]:
@@ -985,50 +1206,6 @@ def by_turn(questions: Sequence[EarlyQuestion]) -> list[EarlyQuestion]:
     )
 
 
-def in_boxes(questions: Sequence[EarlyQuestion]) -> tuple[EarlyQuestion, ...]:
-    """A round's questions in the order it is shown: one box for each group.
-
-    **The one reader of the order a round is shown in.** A page shows each
-    group in one box under its heading, so each heading appears once in a
-    round. A box holds its group's questions in their order here, so a parent
-    still comes before its parts. The boxes that hold a question deciding a
-    precondition come first (ADR 0067). Then the selected frameworks take
-    turns by whole boxes: the next box is the first left that serves the
-    framework charged the fewest choices so far, and every framework a box
-    serves is charged the box's choices. On a tie the framework whose next box
-    asks fewer choices goes first, then the first by name. So a large box,
-    such as every capability question in one, waits for its framework's turn
-    and does not push out another framework's small boxes
-    (``QA-2026-10-09-02-E2``).
-    """
-    boxes: dict[str, list[EarlyQuestion]] = {}
-    for question in questions:
-        boxes.setdefault(question.group, []).append(question)
-    gated = [box for box in boxes.values() if any(q.gates for q in box)]
-    rest = [box for box in boxes.values() if not any(q.gates for q in box)]
-    return tuple(
-        question
-        for box in (*_boxes_in_turn(gated), *_boxes_in_turn(rest))
-        for question in box
-    )
-
-
-def _boxes_in_turn(
-    boxes: Sequence[Sequence[EarlyQuestion]],
-) -> list[Sequence[EarlyQuestion]]:
-    """The boxes with the frameworks in turn, as :func:`in_boxes` states."""
-
-    def choices(box: Sequence[EarlyQuestion]) -> int:
-        return sum(question.decisions for question in box)
-
-    return _in_turn(
-        boxes,
-        serves=lambda box: {name for question in box for name in question.frameworks},
-        choices=choices,
-        tie=choices,
-    )
-
-
 _Item = TypeVar("_Item")
 
 
@@ -1041,13 +1218,12 @@ def _in_turn(
 ) -> list[_Item]:
     """The items with the selected frameworks taking turns.
 
-    **The one reader of whose turn it is**, for a question (:func:`by_turn`)
-    and for a box (:func:`in_boxes`) alike. The next item is the first one
-    left that serves the framework charged the fewest choices so far. On a
-    tie the framework whose next item has the smaller ``tie`` value goes
-    first, then the first by name. Every framework the item serves is charged
-    its choices. An item that serves no framework keeps its place after
-    every item that does.
+    **The one reader of whose turn it is** (:func:`by_turn`). The next item
+    is the first one left that serves the framework charged the fewest
+    choices so far. On a tie the framework whose next item has the smaller
+    ``tie`` value goes first, then the first by name. Every framework the
+    item serves is charged its choices. An item that serves no framework
+    keeps its place after every item that does.
     """
     charged: Counter[str] = Counter()
     left = list(items)
@@ -1066,33 +1242,6 @@ def _in_turn(
         for holder in serves(item):
             charged[holder] += choices(item)
     return order
-
-
-def _take(candidates: Sequence[EarlyQuestion], per_round: int) -> list[EarlyQuestion]:
-    """The first ``per_round`` questions, with each one's parts beside them.
-
-    **A part waits on its parent, so it takes no place in the round.** A
-    question whose parent the round also asks is hidden until the parent is
-    answered "yes" (``parent`` on :class:`EarlyQuestion`). It joins the round
-    beside its parent, outside the count, so a round opens with as many
-    questions as it counts. A part whose parent an earlier round answered is
-    an ordinary question and takes a place.
-    """
-    taken: list[EarlyQuestion] = []
-    keys: set[UnknownKey] = set()
-    counted = 0
-    # A parent comes before its parts in the list (capability_questions), so
-    # one pass in order reaches a part of a part too.
-    for question in candidates:
-        if question.parent in keys:
-            taken.append(question)
-        elif counted < per_round:
-            taken.append(question)
-            counted += 1
-        else:
-            continue
-        keys.add(question.key)
-    return taken
 
 
 def _adds_information(earlier: AnswerSet, given: AnswerSet) -> bool:
@@ -1151,15 +1300,19 @@ class SourcesOverLimit(Exception):
 class Answers:
     """One submission of answers to a job's questions.
 
-    ``given`` is the answers. ``save`` keeps a waiting job's round, or a
-    report's draft, and starts nothing. ``skips`` names questions of this round the submitter skips for
-    now; only a waiting job's saved round skips. ``revision`` is the revision
-    the questions were read with, which a waiting job and every save require.
+    ``given`` is the answers. ``save`` keeps a waiting job's answers, or a
+    report's draft, and starts nothing. ``skips`` names questions the
+    submitter skips for now; only a waiting job's save skips. ``presented``
+    names the early questions the page showed, which the record keeps as
+    shown and a skip must be of; a question the service listed and the page
+    did not show is not recorded. ``revision`` is the revision the questions
+    were read with, which a waiting job and every save require.
     """
 
     given: AnswerSet = NO_ANSWERS
     save: bool = False
     skips: Sequence[SkipKey] = ()
+    presented: Sequence[UnknownKey] = ()
     revision: int | None = None
 
 
@@ -1443,6 +1596,7 @@ class AnswerState:
             given=given,
             save=answers.save,
             skips=answers.skips,
+            presented=answers.presented,
         )
         held = within_held_limits(admitted.answers)
         # Checked for a save too: a saved round or draft that no start could

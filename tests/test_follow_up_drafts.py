@@ -23,7 +23,7 @@ from analysis_service.jobs import JobRecord
 from analysis_service.links import MAX_LINK_ANSWERS, LinkAnswer
 from analysis_service.sources import SourceLimits
 from tests.factories import sample_report, sample_selection, sample_threat
-from tests.test_answer_admission import TestTheRoundRevision
+from tests.test_answer_admission import TestTheRevision
 from tests.test_api import admit, auth, make_client
 from tests.test_questions import DESCRIPTION
 
@@ -70,7 +70,7 @@ def _questions(client, job):
 
 
 def _post(client, job, body):
-    return TestTheRoundRevision().post(client, job, **body)
+    return TestTheRevision().post(client, job, **body)
 
 
 def _facts(numbers, value="known"):

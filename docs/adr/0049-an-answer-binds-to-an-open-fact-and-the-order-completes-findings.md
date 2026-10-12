@@ -7,6 +7,8 @@
   whose order and count this changes, and
   [ADR 0048](0048-a-paused-job-ranks-its-open-facts-before-any-finding.md),
   whose eligibility rule this keeps
+- **Amended by**: [ADR 0078](0078-a-paused-job-asks-one-adaptive-list.md),
+  which ranks a question by what its answer settles before the prior
 - **Evidence**: `QA-2026-09-26-03-E16` and `-E17` in `evals/experiments/`
 
 ## Context

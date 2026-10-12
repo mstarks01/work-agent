@@ -130,14 +130,14 @@ const workspace = (() => {
   const progress = (data, filled, total) => {
     const saved = (data.answered_early || []).length + (data.answered_links || []).length;
     const skipped = (data.skipped_early || []).length + (data.skipped_links || []).length;
-    const remaining = Object.values(data.early_remaining || {}).reduce((sum, n) => sum + n, 0) + data.link_questions.length;
+    const recommended = (data.early_questions || []).length + data.link_questions.length;
     const done = data.early_stop != null;
     el("round-progress-bar").max = total || 1;
     el("round-progress-bar").value = total ? filled : done ? 1 : 0;
-    el("round-progress-label").textContent = done ? "No more questions in a round" : `This round: ${filled} of ${total} answers filled in`;
+    el("round-progress-label").textContent = done ? "No more recommended questions" : `Recommended: ${filled} of ${total} answers filled in`;
     el("round-progress-detail").textContent = `${saved} questions saved · ${skipped} skipped. ` + (done
       ? "Some facts can still be open; the list below says which. You can start the analysis, or change an earlier answer."
-      : `About ${remaining} questions remain, including this round. Answers can add or remove questions. You can start the analysis at any time.`);
+      : `${recommended} questions are recommended now. Answers can add or remove questions. You can start the analysis at any time.`);
   };
   const grouped = () => {
     show("asked");

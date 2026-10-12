@@ -31,7 +31,7 @@ from analysis_service.early_questions import PriorRow, early_questions
 from analysis_service.frameworks import PACKAGES
 from analysis_service.report import Report
 from evals.harness.bundle import reports_dir
-from evals.harness.early_policies import _prefix, _shipped_rounds, needs_of
+from evals.harness.early_policies import _prefix, _shipped_list, needs_of
 from evals.harness.question_prior import count
 
 PRIOR_RUN = Path("evals/runs/20260906T234806Z-asvs-two-question-t1/analysis-asvs.json")
@@ -76,7 +76,7 @@ def order(model, prior, how):
     """The order an owner meets: the shipped rounds, or the ranked list."""
     eq.early_questions.__defaults__ = (prior,)
     if how == "rounds":
-        return _shipped_rounds(model, SELECTION)
+        return _shipped_list(model, SELECTION)
     return list(early_questions(model, SELECTION, None, prior))
 
 

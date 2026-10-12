@@ -6,6 +6,8 @@
 - **Supersedes**: the limit of three rounds in
   [ADR 0052](0052-the-answer-rounds-end.md). Its rule that a fact answered
   once is not asked again stands.
+- **Amended by**: [ADR 0078](0078-a-paused-job-asks-one-adaptive-list.md),
+  which replaces the rounds before the analysis with one list
 - **Relates to**: [ADR 0053](0053-a-paused-job-asks-in-bounded-rounds.md)
 - **Evidence**: `QA-2026-09-26-03-E22` in `evals/experiments/`
 
