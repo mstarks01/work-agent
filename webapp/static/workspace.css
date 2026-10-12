@@ -274,7 +274,7 @@ main {
   font-weight:600;
   margin:24px 0 8px
 }
-.description-help,.entry-actions,.heading-row,.question-intro,.answer-actions,.start-actions {
+.description-help,.entry-actions,.heading-row,.answer-actions,.start-actions {
   display:flex;
   align-items:center;
   justify-content:space-between;
@@ -394,17 +394,6 @@ summary:hover {
   border-bottom-color:var(--accent);
   color:var(--text);
   font-weight:600
-}
-.question-intro {
-  align-items:flex-start;
-  margin-bottom:24px
-}
-.question-intro h2 {
-  margin-bottom:6px
-}
-.question-intro p {
-  font-size:14px;
-  margin:0
 }
 .question-layout {
   display:grid;
@@ -680,9 +669,6 @@ code {
   #question-index small {
     display:none
   }
-  .question-intro {
-    flex-wrap:wrap
-  }
   .section-nav {
     gap:20px
   }
@@ -763,9 +749,6 @@ code {
   }
   .analysis-row {
     flex-wrap:wrap
-  }
-  .question-intro h2 {
-    font-size:19px
   }
   #list>details>summary {
     font-size:18px
@@ -865,10 +848,6 @@ a.analysis-row:hover {
   #questions > details > p { margin:0 16px; }
   #questions .shared-controls { margin:12px 16px 0; }
 }
-
-.list-intro > details.round-estimate { border:0; border-radius:0; margin:0 0 16px; overflow:visible; }
-.list-intro > details.round-estimate > summary { padding:0; background:none; font-size:13px; font-weight:400; color:var(--muted); }
-.list-intro > details.round-estimate > p { border:0; margin:10px 0 0; padding:0; }
 
 .save-line {
   margin:8px 0 0;

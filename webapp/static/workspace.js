@@ -128,18 +128,10 @@ const workspace = (() => {
     el("processing-empty").hidden = any;
   };
   const progress = (data, filled, total) => {
-    const saved = (data.answered_early || []).length + (data.answered_links || []).length;
-    const skipped = (data.skipped_early || []).length + (data.skipped_links || []).length;
-    const summary = data.early_summary || {};
-    const recommended = (data.early_questions || []).length + data.link_questions.length;
-    const unknown = summary.unknown || 0;
     const done = data.early_stop != null;
     el("round-progress-bar").max = total || 1;
     el("round-progress-bar").value = total ? filled : done ? 1 : 0;
-    el("round-progress-label").textContent = done ? "No more recommended questions" : `Recommended: ${filled} of ${total} answers filled in`;
-    el("round-progress-detail").textContent = `${saved} answered · ${unknown} “I don't know” · ${skipped} skipped. ` + (done
-      ? "Some facts can still be open; the list below says which. You can start the analysis, or change an earlier answer."
-      : `${recommended} questions are recommended now. Answers can add or remove questions. You can start the analysis at any time.`);
+    el("round-progress-label").textContent = done ? "No more recommended questions" : `${filled} of ${total} answers filled in`;
   };
   const grouped = () => {
     show("asked");
@@ -159,13 +151,11 @@ const workspace = (() => {
   const indexGroups = () => {
     el("question-index").replaceChildren();
     const groups = [...el("list").children].filter((item) => item.classList.contains("question-group"));
-    let visible = 0;
     groups.forEach((group, index) => {
       // Read the renderer's row visibility; do not repeat its dependency rules.
       group.hidden = ![...group.children].some((row) =>
         (row.tagName === "P" || row.tagName === "TABLE") && !row.hidden);
       if (group.hidden) return;
-      visible += 1;
       group.id = "question-group-" + index;
       const link = node("a", group.querySelector(".group-heading")?.textContent || group.querySelector("summary").textContent);
       link.href = "#" + group.id;
@@ -177,7 +167,6 @@ const workspace = (() => {
       });
       el("question-index").append(link);
     });
-    el("question-progress").textContent = visible ? visible + " question groups" : "Review your answers";
   };
   el("questions").addEventListener("change", indexGroups);
   // Capture the entry route before live progress changes it to ?run=.
