@@ -4,8 +4,8 @@ The pause asks early questions before any finding exists (ADR 0078). Where a
 job selects two frameworks, the shipped list takes the frameworks in turn, and
 within a turn the question whose answer settles the most other questions
 first. The #1289 review of 2026-10-01 asked which order serves each selected
-framework best at the same owner effort. This command answers that offline,
-for an owner who answers from the top and stops after a number of choices.
+framework best at the same submitter effort. This command answers that offline,
+for a submitter who answers from the top and stops after a number of choices.
 
 **What an order is worth is read off archived reports.** No archived report
 holds two frameworks, so each framework is measured on its own reports: the
@@ -19,7 +19,7 @@ sets an order completes, never a count of findings an answer changes.
 
 **Effort is choices**: one for each facet of a question with facets, and one
 for every other question (:attr:`~analysis_service.early_questions.EarlyQuestion.decisions`).
-The owner answers every question shown, the parts of a capability included.
+The submitter answers every question shown, the parts of a capability included.
 
 **Each order is a policy in** :data:`POLICIES`, built from the production
 readers: the early list, the floor and the list's selection.
@@ -45,19 +45,20 @@ from analysis_service.frameworks import PACKAGES
 from analysis_service.questions import fact_questions
 from analysis_service.report import Report
 from analysis_service.system_model import SystemModel
+from evals.harness.audit import holdout_cases
 from evals.harness.early_rounds import MAX_SAVES, dont_know
 
 #: The frameworks a job selects, each with its options.
 Selection = Mapping[FrameworkName, Mapping[str, Any]]
 
-#: The owner effort, in choices, at which each order is read.
+#: The submitter effort, in choices, at which each order is read.
 BUDGETS = (5, 10, 15, 20, 30, 45, 60)
 
 
 def _lists(model: SystemModel, frameworks: Selection) -> list[list[EarlyQuestion]]:
     """The list after each save, in turn.
 
-    The owner answers "I don't know" to every listed question, which writes
+    The submitter answers "I don't know" to every listed question, which writes
     nothing, so the model and the ranking stay as they started and only the
     saved answers move the list on.
     """
@@ -147,7 +148,7 @@ POLICIES: Mapping[str, Callable[[SystemModel, Selection], list[EarlyQuestion]]] 
 
 
 def _prefix(order: Sequence[EarlyQuestion], budget: int | None) -> set[UnknownKey]:
-    """The questions an owner answers before ``budget`` choices run out."""
+    """The questions a submitter answers before ``budget`` choices run out."""
     spent = 0
     answered = set()
     for question in order:
@@ -256,31 +257,53 @@ def readings(
     return found
 
 
-def sweep(root: Path) -> list[Reading]:
-    """Every archived report whose case another framework's report shares.
+@dataclass(frozen=True)
+class Paired:
+    """One archived report whose case another framework's report shares."""
 
-    Each is read twice: with its own framework selected, and with every
-    framework the case's reports hold, each with the options its report chose.
-    """
+    case: str
+    path: Path
+    report: Report
+    #: The report's own framework (``alone``), and every framework the
+    #: case's reports hold (``all``), each with the options its report chose.
+    selections: Mapping[str, Selection]
+
+
+def paired(root: Path) -> list[Paired]:
+    """Every archived report under ``root`` whose case holds a report of
+    another framework, with the two selections it is read under. A holdout
+    case's report is not opened (:func:`~evals.harness.audit.holdout_cases`)."""
+    held_out = holdout_cases()
     by_case: dict[str, list[tuple[Path, Report]]] = defaultdict(list)
     for path in sorted(root.rglob("*.report.json")):
+        case = path.name.removesuffix(".report.json")
+        if case in held_out:
+            continue
         report = Report.model_validate_json(path.read_text(encoding="utf-8"))
         if len(report.job.frameworks) == 1:
-            by_case[path.name.removesuffix(".report.json")].append((path, report))
+            by_case[case].append((path, report))
     found = []
     for case, reports in sorted(by_case.items()):
         every = {
-            selection.name: selection.options
+            selection.name: dict(selection.options)
             for _, report in reports
             for selection in report.job.frameworks
         }
         if len(every) < 2:
             continue
         for path, report in reports:
-            own = {s.name: s.options for s in report.job.frameworks}
-            selections = {"alone": own, "all": every}
-            found.extend(readings(case, str(path), report, selections))
+            own = {s.name: dict(s.options) for s in report.job.frameworks}
+            found.append(Paired(case, path, report, {"alone": own, "all": every}))
     return found
+
+
+def sweep(root: Path) -> list[Reading]:
+    """Every policy's reading on every :func:`paired` report, under both selections."""
+    return [
+        reading
+        for one in paired(root)
+        for reading in readings(one.case, str(one.path), one.report, one.selections)
+    ]
 
 
 #: The counts a summary sums over reports, each read off a reading.

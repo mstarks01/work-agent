@@ -60,7 +60,7 @@ class TestTheMerge:
         )
 
 
-def test_an_owner_stops_before_the_choice_that_passes_the_budget():
+def test_a_submitter_stops_before_the_choice_that_passes_the_budget():
     order = POLICIES["framework-merge"](valid_model(), BOTH)
     for budget in (1, 5, 10):
         answered = _prefix(order, budget)
@@ -85,3 +85,17 @@ def test_a_finding_completes_only_when_every_fact_it_waits_on_is_answered():
         assert whole[policy].completed == expected
     by_budget = [one.completed for one in found if one.policy == "shipped-list"]
     assert by_budget == sorted(by_budget)
+
+
+def test_paired_never_opens_a_holdout_case(tmp_path):
+    """Both instruments pair reports through ``paired``. A holdout case's
+    file is skipped unopened, so one that is not JSON raises nothing, and a
+    case with one framework's reports pairs with nothing."""
+    (tmp_path / BASELINE.name).write_text(
+        BASELINE.read_text(encoding="utf-8"), encoding="utf-8"
+    )
+    (tmp_path / "14-loyalty-oauth-platform.report.json").write_text("not JSON")
+    assert early_policies.paired(tmp_path) == []
+    (tmp_path / "01-payments-checkout.report.json").write_text("not JSON")
+    with pytest.raises(ValueError):
+        early_policies.paired(tmp_path)
