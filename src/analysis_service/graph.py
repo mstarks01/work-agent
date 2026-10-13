@@ -196,7 +196,6 @@ from analysis_service.knowledge import (
 from analysis_service.links import LinkAnswer, apply_answers
 from analysis_service.markdown_loader import MarkdownLoader, estimate_tokens
 from analysis_service.model_tiers import ReviewIndependence, TierName
-from analysis_service.platform_defaults import with_platform_defaults
 from analysis_service.prompt_cache import remember_stable_prefix, stable_prefix
 from analysis_service.prompts import (
     compose_analyze_prompt,
@@ -207,6 +206,7 @@ from analysis_service.prompts import (
     compose_repair_prompt,
     lane_closing,
 )
+from analysis_service.protocol_defaults import with_protocol_defaults
 from analysis_service.report import (
     AnalysisContext,
     ExecutionEnvelope,
@@ -1404,9 +1404,10 @@ def validate_extraction(
     # :mod:`analysis_service.basis` for why token overlap cannot gate.
     for flag in unbased_controls(model, source_texts or {}):
         logger.warning("stated control with no basis in its source: %s", flag)
-    # What a named platform always does is written where the sources are
-    # silent, after the gate and never into what extraction read (ADR 0082).
-    model = with_platform_defaults(model)
+    # What a stated protocol guarantees by definition is written where the
+    # sources are silent, after the gate and never into what extraction read
+    # (ADR 0082).
+    model = with_protocol_defaults(model)
     state.put(STATE_VALID_MODEL, model.model_dump(mode="json"))
     return _routed(ROUTE_VALID, {"issue_count": 0})
 

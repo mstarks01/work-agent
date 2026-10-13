@@ -429,7 +429,7 @@ The app can ask you questions before the analysis, and after the report.
   without an assertion catalog. The list does not ask a fact you
   already answered, "I don't know" included.
 
-Where your description names a service or a protocol whose security property cannot be turned off, such as DynamoDB's encryption at rest, Stripe's HTTPS-only API or SFTP's encryption, the app records that property and does not ask about it. An answer settles its fact, even where your description said otherwise. A run
+Where your description names a protocol that is secure by its own definition, such as SFTP's encryption or WireGuard's peer authentication, the app records that property and does not ask about it. An answer settles its fact, even where your description said otherwise. A run
 that waits for your answers is kept in the app's memory, like every other
 run, and the app never removes it to make room. When every run the app holds
 waits for answers, the app refuses a new run until you answer or continue

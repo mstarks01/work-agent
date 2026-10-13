@@ -1,6 +1,8 @@
 # 82. A platform default that cannot be disabled is recorded, not asked
 
-- **Status**: accepted
+- **Status**: accepted; its vendor rows are removed by
+  [ADR 0083](0083-a-vendor-default-is-asked-and-a-protocol-definition-is-recorded.md),
+  and its protocol rows stand
 - **Date**: 2026-10-13
 - **Relates to**: [ADR 0081](0081-a-question-kind-is-asked-once-for-the-system.md),
   whose questions a recorded default removes; `QA-2026-10-13-05`, which
@@ -21,7 +23,7 @@ assumed rather than asked.
 
 **A closed table in code names each default:** the service, how a description
 names it, the attribute, the value, the vendor's statement in our words, and
-where the vendor documents it (`platform_defaults.PLATFORM_DEFAULTS`). Only a
+where the vendor documents it (`protocol_defaults.PROTOCOL_DEFAULTS`). Only a
 property the vendor documents as always on and impossible to disable is in it.
 On 2026-10-13 that was: encryption at rest for Amazon S3 (new objects since
 2023), DynamoDB, CloudWatch Logs, Secrets Manager, Google Cloud's managed
