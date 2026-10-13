@@ -17,6 +17,7 @@ rather than lets the check pass without running.
 
 from __future__ import annotations
 
+import asyncio
 import json
 import os
 import socket
@@ -257,6 +258,51 @@ def test_a_new_analysis_reuses_the_answers_of_an_earlier_one(page):
     page.click("#earlier summary")
     assert "yes" in page.inner_text("#earlier")
     assert page.locator(f'#list select[aria-label="{label}"]').count() == 0
+
+
+class HeldRunner(web.PausingRunner):
+    """Holds each run in progress until the test releases it."""
+
+    def __init__(self) -> None:
+        super().__init__(catalog=False)
+        self.release = threading.Event()
+
+    async def run(self, job, on_node):
+        while not self.release.is_set():
+            await asyncio.sleep(0.05)
+        return await super().run(job, on_node)
+
+
+def test_a_running_analysis_keeps_a_tab_that_leads_back_to_its_progress(browser, tiers):
+    """A run that will ask shows its progress under Questions, and the tab
+    stays enabled, so a submitter who opens Description can come back."""
+    runner = HeldRunner()
+    for base in serve(web.app_for(tiers, runner, catalog=False)):
+        context = browser.new_context(base_url=base)
+        opened = context.new_page()
+        opened.goto("/")
+        opened.fill("#description", "A web app talks to a database.")
+        opened.check("#ask")
+        for framework in opened.locator('input[name="framework"]').all():
+            framework.check()
+        opened.click("#go")
+        opened.wait_for_function(
+            "() => document.querySelector('#questions-nav')"
+            ".getAttribute('aria-current') === 'page'"
+        )
+        tab = opened.locator("#questions-nav")
+        assert opened.is_visible("#progress-panel")
+        assert tab.is_enabled()
+
+        opened.click("#description-nav")
+        assert not opened.is_visible("#progress-panel")
+        tab.click()
+        assert opened.is_visible("#progress-panel")
+        assert tab.get_attribute("aria-current") == "page"
+
+        runner.release.set()
+        opened.wait_for_selector("#asked", state="visible")
+        context.close()
 
 
 def test_a_double_click_on_start_starts_one_run(page):

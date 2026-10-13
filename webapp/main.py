@@ -404,6 +404,9 @@ class Workspace:
             "run": record.id,
             "name": _name_of(record),
             "status": _page_status(record.status),
+            # Whether the run stops for answers, so the page shows its
+            # progress under the Questions tab rather than Reports.
+            "pauses": record.pauses(),
             "frameworks": [selection.name for selection in record.frameworks],
             "reports": [
                 {

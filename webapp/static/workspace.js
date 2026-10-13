@@ -4,12 +4,20 @@ const workspace = (() => {
   const panels = ["description-panel", "progress-panel", "asked", "reports-panel", "library-panel"];
   let current = null;
   let generation = 0;
-  const show = (id) => {
-    panels.forEach((name) => { el(name).hidden = name !== id; });
-    for (const [button, panel] of [["description-nav", "description-panel"], ["questions-nav", "asked"], ["reports-nav", "reports-panel"]]) {
-      el(button).setAttribute("aria-current", panel === id ? "page" : "false");
+  // A running analysis shows its progress under the tab of what it produces
+  // next: Questions where it will stop to ask, Reports where it runs to a report.
+  const progressTab = () => current?.pauses ? "questions-nav" : "reports-nav";
+  const mark = (id) => {
+    const tabs = {"description-panel": "description-nav", "asked": "questions-nav", "reports-panel": "reports-nav", "progress-panel": progressTab()};
+    for (const button of ["description-nav", "questions-nav", "reports-nav"]) {
+      el(button).setAttribute("aria-current", tabs[id] === button ? "page" : "false");
     }
   };
+  const show = (id) => {
+    panels.forEach((name) => { el(name).hidden = name !== id; });
+    mark(id);
+  };
+  const running = () => current?.status === "running";
   const node = (tag, text, className) => {
     const item = document.createElement(tag);
     item.textContent = text;
@@ -32,7 +40,8 @@ const workspace = (() => {
     el("breadcrumb-title").textContent = data.name;
     el("analysis-state").textContent = labels[data.status] || data.status;
     el("analysis-frameworks").textContent = data.frameworks.join(" · ");
-    el("questions-nav").disabled = data.status !== "awaiting-answers";
+    el("questions-nav").disabled = !(data.status === "awaiting-answers" || (data.status === "running" && data.pauses));
+    if (!el("progress-panel").hidden) mark("progress-panel");
     el("report-list").replaceChildren();
     data.reports.forEach((report) => {
       const link = node("a", "", "analysis-row");
@@ -111,8 +120,13 @@ const workspace = (() => {
   };
   el("library-nav").addEventListener("click", library);
   el("description-nav").addEventListener("click", () => show("description-panel"));
-  el("questions-nav").addEventListener("click", () => show("asked"));
-  el("reports-nav").addEventListener("click", () => show("reports-panel"));
+  el("questions-nav").addEventListener("click", () => show(running() ? "progress-panel" : "asked"));
+  el("reports-nav").addEventListener("click", () => {
+    if (!running() || current.pauses) return show("reports-panel");
+    // A run toward a report shows its progress above the earlier reports.
+    show("progress-panel");
+    el("reports-panel").hidden = false;
+  });
   const track = async (id) => {
     history.replaceState(null, "", "/?run=" + encodeURIComponent(id));
     const ticket = generation;
