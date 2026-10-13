@@ -19,7 +19,9 @@ arrives without a review fails.
 :data:`UNREVIEWED` says what each unread case leaves unchecked. It is not the
 count of unread cases — :func:`~evals.review_submission.unreviewed_cases`
 derives that from the corpus and the submissions, so no list can disagree with
-it. An entry for a case a merged submission clears is spent, and it fails.
+it. An entry for a case a merged submission clears is spent. No test fails
+on it, because a sitting pull request carries its one file and cannot
+delete the entry, so a maintainer deletes it in the next pull request.
 
 **A sitting must cover every framework the case carries.** Step 6 asks the reader
 to sign off on the reference sets *together*, because the property being
@@ -57,7 +59,7 @@ from evals.review_submission import REPO_ROOT, unreviewed_cases
 #: 2026-10-03 read the two holdout cases #744 added. The table is derived, never maintained —
 #: :func:`~evals.review_submission.unreviewed_cases` reads the corpus and the
 #: merged submissions — so an entry here only ever says what an unread case
-#: leaves unchecked, and an entry for a case a submission clears fails.
+#: leaves unchecked, and an entry for a case a submission clears is spent.
 UNREVIEWED: dict[str, str] = {
     "04-ml-inference-service": (
         "model.json gained a trust_zone assumption for the calling service, a"
@@ -112,15 +114,6 @@ def test_a_new_case_carries_a_sitting(reviewed_by_case):
         " contribute it, or name the case as unread by adding its line to"
         " UNREVIEWED. A case merged unread cannot be caught later by any lint"
         " — that is what this module's docstring is about."
-    )
-
-
-def test_no_listed_case_is_read(reviewed_by_case):
-    """An entry for a case a submission clears says nothing true about it."""
-    spent = sorted(case_id for case_id in UNREVIEWED if reviewed_by_case.get(case_id))
-    assert not spent, (
-        f"UNREVIEWED names cases a merged submission clears: {spent}. Delete"
-        " their lines."
     )
 
 
