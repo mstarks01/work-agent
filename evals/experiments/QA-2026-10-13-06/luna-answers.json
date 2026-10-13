@@ -1,0 +1,1661 @@
+{
+ "model": "openai/gpt-5.6-luna",
+ "items": [
+  [
+   "T01",
+   "Amazon S3",
+   "encryption at rest of newly written objects",
+   true
+  ],
+  [
+   "T02",
+   "Amazon DynamoDB",
+   "encryption at rest of table data",
+   true
+  ],
+  [
+   "T03",
+   "Amazon CloudWatch Logs",
+   "encryption at rest of log data",
+   true
+  ],
+  [
+   "T04",
+   "AWS Secrets Manager",
+   "encryption at rest of secret values",
+   true
+  ],
+  [
+   "T05",
+   "Google Cloud Storage",
+   "encryption at rest of objects",
+   true
+  ],
+  [
+   "T06",
+   "Google BigQuery",
+   "encryption at rest of table data",
+   true
+  ],
+  [
+   "T07",
+   "Azure Blob Storage",
+   "encryption at rest of blobs",
+   true
+  ],
+  [
+   "T08",
+   "Azure managed disks",
+   "server-side encryption at rest",
+   true
+  ],
+  [
+   "T09",
+   "Azure Cosmos DB",
+   "encryption at rest",
+   true
+  ],
+  [
+   "T10",
+   "Snowflake",
+   "encryption at rest of customer data",
+   true
+  ],
+  [
+   "T11",
+   "Snowflake",
+   "TLS encryption for client connections to the service",
+   true
+  ],
+  [
+   "T12",
+   "Stripe API",
+   "requests only over HTTPS",
+   true
+  ],
+  [
+   "T13",
+   "Stripe API",
+   "every request must carry an API key",
+   true
+  ],
+  [
+   "T14",
+   "Auth0 (hosted)",
+   "TLS on the authorization and token endpoints",
+   true
+  ],
+  [
+   "T15",
+   "Amazon API Gateway",
+   "endpoints served only over HTTPS",
+   true
+  ],
+  [
+   "T16",
+   "MongoDB Atlas",
+   "encryption at rest of cluster storage volumes",
+   true
+  ],
+  [
+   "T17",
+   "Amazon ElastiCache Serverless",
+   "encryption at rest",
+   true
+  ],
+  [
+   "T18",
+   "WebRTC",
+   "encryption of media and data channels",
+   true
+  ],
+  [
+   "T19",
+   "QUIC (HTTP/3)",
+   "encryption of packets",
+   true
+  ],
+  [
+   "T20",
+   "WireGuard",
+   "authentication of peers",
+   true
+  ],
+  [
+   "F01",
+   "Amazon RDS for PostgreSQL",
+   "encryption at rest",
+   false
+  ],
+  [
+   "F02",
+   "Amazon SQS",
+   "server-side encryption at rest",
+   false
+  ],
+  [
+   "F03",
+   "Amazon EBS",
+   "encryption at rest of new volumes",
+   false
+  ],
+  [
+   "F04",
+   "Azure SQL Database",
+   "transparent data encryption at rest",
+   false
+  ],
+  [
+   "F05",
+   "Azure Storage account",
+   "requiring HTTPS (secure transfer) for requests",
+   false
+  ],
+  [
+   "F06",
+   "Amazon S3",
+   "requiring TLS for API requests",
+   false
+  ],
+  [
+   "F07",
+   "Google Cloud SQL",
+   "requiring TLS for client connections",
+   false
+  ],
+  [
+   "F08",
+   "Amazon CloudFront",
+   "serving viewers only over HTTPS",
+   false
+  ],
+  [
+   "F09",
+   "Amazon ElastiCache for Redis OSS (node-based)",
+   "encryption at rest",
+   false
+  ],
+  [
+   "F10",
+   "AWS Lambda function URLs",
+   "serving only over HTTPS",
+   false
+  ],
+  [
+   "F11",
+   "HTTP/2",
+   "encryption in transit",
+   false
+  ],
+  [
+   "F12",
+   "gRPC",
+   "encryption in transit",
+   false
+  ],
+  [
+   "F13",
+   "MQTT",
+   "encryption in transit",
+   false
+  ],
+  [
+   "F14",
+   "SSH",
+   "authentication of the connecting client",
+   false
+  ],
+  [
+   "O01",
+   "self-managed PostgreSQL on an EC2 instance",
+   "encryption at rest",
+   false
+  ],
+  [
+   "O02",
+   "self-hosted Redis",
+   "TLS for client connections",
+   false
+  ],
+  [
+   "O03",
+   "self-hosted Apache Kafka",
+   "TLS between clients and brokers",
+   false
+  ],
+  [
+   "O04",
+   "self-hosted MinIO",
+   "encryption at rest",
+   false
+  ],
+  [
+   "O05",
+   "a plain HTTP REST API",
+   "encryption in transit",
+   false
+  ]
+ ],
+ "results": [
+  {
+   "run": 1,
+   "answers": [
+    {
+     "id": "T01",
+     "on_by_default": true,
+     "can_disable": false,
+     "source": "https://docs.aws.amazon.com/AmazonS3/latest/userguide/default-bucket-encryption.html"
+    },
+    {
+     "id": "T02",
+     "on_by_default": true,
+     "can_disable": false,
+     "source": "https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/EncryptionAtRest.html"
+    },
+    {
+     "id": "T03",
+     "on_by_default": true,
+     "can_disable": false,
+     "source": "https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/encrypt-log-data-kms.html"
+    },
+    {
+     "id": "T04",
+     "on_by_default": true,
+     "can_disable": false,
+     "source": "https://docs.aws.amazon.com/secretsmanager/latest/userguide/security-encryption.html"
+    },
+    {
+     "id": "T05",
+     "on_by_default": true,
+     "can_disable": false,
+     "source": "https://cloud.google.com/storage/docs/encryption/default-keys"
+    },
+    {
+     "id": "T06",
+     "on_by_default": true,
+     "can_disable": false,
+     "source": "https://cloud.google.com/bigquery/docs/encryption-at-rest"
+    },
+    {
+     "id": "T07",
+     "on_by_default": true,
+     "can_disable": false,
+     "source": "https://learn.microsoft.com/en-us/azure/storage/common/storage-service-encryption"
+    },
+    {
+     "id": "T08",
+     "on_by_default": true,
+     "can_disable": false,
+     "source": "https://learn.microsoft.com/en-us/azure/virtual-machines/disk-encryption"
+    }
+   ],
+   "usage": {
+    "prompt_tokens": 244,
+    "completion_tokens": 1332,
+    "cached": 0
+   }
+  },
+  {
+   "run": 1,
+   "answers": [
+    {
+     "id": "T09",
+     "on_by_default": true,
+     "can_disable": false,
+     "source": "https://learn.microsoft.com/en-us/azure/cosmos-db/database-encryption-at-rest"
+    },
+    {
+     "id": "T10",
+     "on_by_default": true,
+     "can_disable": false,
+     "source": "https://docs.snowflake.com/en/user-guide/security-encryption"
+    },
+    {
+     "id": "T11",
+     "on_by_default": true,
+     "can_disable": false,
+     "source": "https://docs.snowflake.com/en/user-guide/security-encryption"
+    },
+    {
+     "id": "T12",
+     "on_by_default": true,
+     "can_disable": false,
+     "source": "https://docs.stripe.com/security/guide"
+    },
+    {
+     "id": "T13",
+     "on_by_default": true,
+     "can_disable": false,
+     "source": "https://docs.stripe.com/keys"
+    },
+    {
+     "id": "T14",
+     "on_by_default": true,
+     "can_disable": false,
+     "source": "https://auth0.com/docs/get-started/authentication-and-authorization-flow/authorization-protocol"
+    },
+    {
+     "id": "T15",
+     "on_by_default": true,
+     "can_disable": false,
+     "source": "https://docs.aws.amazon.com/apigateway/latest/developerguide/api-gateway-basic-concept.html"
+    },
+    {
+     "id": "T16",
+     "on_by_default": true,
+     "can_disable": false,
+     "source": "https://www.mongodb.com/docs/atlas/security-encryption-at-rest/"
+    }
+   ],
+   "usage": {
+    "prompt_tokens": 242,
+    "completion_tokens": 1832,
+    "cached": 0
+   }
+  },
+  {
+   "run": 1,
+   "answers": [
+    {
+     "id": "T17",
+     "on_by_default": true,
+     "can_disable": false,
+     "source": "https://docs.aws.amazon.com/AmazonElastiCache/latest/APIReference/API_CreateServerlessCache.html"
+    },
+    {
+     "id": "T18",
+     "on_by_default": true,
+     "can_disable": false,
+     "source": "https://www.w3.org/TR/webrtc/#security"
+    },
+    {
+     "id": "T19",
+     "on_by_default": true,
+     "can_disable": false,
+     "source": "https://www.rfc-editor.org/rfc/rfc9001.html"
+    },
+    {
+     "id": "T20",
+     "on_by_default": true,
+     "can_disable": false,
+     "source": "https://www.wireguard.com/protocol/"
+    },
+    {
+     "id": "F01",
+     "on_by_default": false,
+     "can_disable": true,
+     "source": "https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/Overview.Encryption.html"
+    },
+    {
+     "id": "F02",
+     "on_by_default": true,
+     "can_disable": true,
+     "source": "https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/sqs-server-side-encryption.html"
+    },
+    {
+     "id": "F03",
+     "on_by_default": false,
+     "can_disable": true,
+     "source": "https://docs.aws.amazon.com/ebs/latest/userguide/encryption-by-default.html"
+    },
+    {
+     "id": "F04",
+     "on_by_default": true,
+     "can_disable": false,
+     "source": "https://learn.microsoft.com/en-us/azure/azure-sql/database/transparent-data-encryption-tde-overview"
+    }
+   ],
+   "usage": {
+    "prompt_tokens": 238,
+    "completion_tokens": 2890,
+    "cached": 0
+   }
+  },
+  {
+   "run": 1,
+   "answers": [
+    {
+     "id": "F05",
+     "on_by_default": true,
+     "can_disable": true,
+     "source": "https://learn.microsoft.com/en-us/azure/storage/common/storage-require-secure-transfer"
+    },
+    {
+     "id": "F06",
+     "on_by_default": false,
+     "can_disable": true,
+     "source": "https://docs.aws.amazon.com/AmazonS3/latest/userguide/amazon-s3-policy-keys.html#amazon-s3-policy-keys-secure-transport"
+    },
+    {
+     "id": "F07",
+     "on_by_default": false,
+     "can_disable": true,
+     "source": "https://cloud.google.com/sql/docs/mysql/configure-ssl-instance"
+    },
+    {
+     "id": "F08",
+     "on_by_default": false,
+     "can_disable": true,
+     "source": "https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/using-https-viewers-to-cloudfront.html"
+    },
+    {
+     "id": "F09",
+     "on_by_default": false,
+     "can_disable": true,
+     "source": "https://docs.aws.amazon.com/AmazonElastiCache/latest/dg/at-rest-encryption.html"
+    },
+    {
+     "id": "F10",
+     "on_by_default": true,
+     "can_disable": false,
+     "source": "https://docs.aws.amazon.com/lambda/latest/dg/lambda-urls.html"
+    },
+    {
+     "id": "F11",
+     "on_by_default": false,
+     "can_disable": true,
+     "source": "https://www.rfc-editor.org/rfc/rfc9113.html#name-starting-http-2-with-prior"
+    },
+    {
+     "id": "F12",
+     "on_by_default": false,
+     "can_disable": true,
+     "source": "https://grpc.github.io/grpc/python/grpc.html#grpc.insecure_channel"
+    }
+   ],
+   "usage": {
+    "prompt_tokens": 240,
+    "completion_tokens": 1879,
+    "cached": 0
+   }
+  },
+  {
+   "run": 1,
+   "answers": [
+    {
+     "id": "F13",
+     "on_by_default": false,
+     "can_disable": true,
+     "source": "https://docs.oasis-open.org/mqtt/mqtt/v5.0/mqtt-v5.0.html"
+    },
+    {
+     "id": "F14",
+     "on_by_default": true,
+     "can_disable": true,
+     "source": "https://www.rfc-editor.org/rfc/rfc4252"
+    },
+    {
+     "id": "O01",
+     "on_by_default": false,
+     "can_disable": true,
+     "source": "https://docs.aws.amazon.com/ebs/latest/userguide/ebs-encryption.html"
+    },
+    {
+     "id": "O02",
+     "on_by_default": false,
+     "can_disable": true,
+     "source": "https://redis.io/docs/latest/operate/oss_and_stack/management/security/encryption/"
+    },
+    {
+     "id": "O03",
+     "on_by_default": false,
+     "can_disable": true,
+     "source": "https://kafka.apache.org/documentation/#security_ssl"
+    },
+    {
+     "id": "O04",
+     "on_by_default": false,
+     "can_disable": true,
+     "source": "https://min.io/docs/minio/linux/operations/server-side-encryption.html"
+    },
+    {
+     "id": "O05",
+     "on_by_default": false,
+     "can_disable": true,
+     "source": "https://www.rfc-editor.org/rfc/rfc9110"
+    }
+   ],
+   "usage": {
+    "prompt_tokens": 222,
+    "completion_tokens": 1808,
+    "cached": 0
+   }
+  },
+  {
+   "run": 2,
+   "answers": [
+    {
+     "id": "T01",
+     "on_by_default": true,
+     "can_disable": false,
+     "source": "https://docs.aws.amazon.com/AmazonS3/latest/userguide/UsingServerSideEncryption.html"
+    },
+    {
+     "id": "T02",
+     "on_by_default": true,
+     "can_disable": false,
+     "source": "https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/EncryptionAtRest.html"
+    },
+    {
+     "id": "T03",
+     "on_by_default": true,
+     "can_disable": false,
+     "source": "https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/encrypt-log-data-kms.html"
+    },
+    {
+     "id": "T04",
+     "on_by_default": true,
+     "can_disable": false,
+     "source": "https://docs.aws.amazon.com/secretsmanager/latest/userguide/security-encryption.html"
+    },
+    {
+     "id": "T05",
+     "on_by_default": true,
+     "can_disable": false,
+     "source": "https://cloud.google.com/storage/docs/encryption/default-keys"
+    },
+    {
+     "id": "T06",
+     "on_by_default": true,
+     "can_disable": false,
+     "source": "https://cloud.google.com/bigquery/docs/encryption-at-rest"
+    },
+    {
+     "id": "T07",
+     "on_by_default": true,
+     "can_disable": false,
+     "source": "https://learn.microsoft.com/en-us/azure/storage/common/storage-service-encryption"
+    },
+    {
+     "id": "T08",
+     "on_by_default": true,
+     "can_disable": false,
+     "source": "https://learn.microsoft.com/en-us/azure/virtual-machines/disk-encryption"
+    }
+   ],
+   "usage": {
+    "prompt_tokens": 244,
+    "completion_tokens": 1220,
+    "cached": 0
+   }
+  },
+  {
+   "run": 2,
+   "answers": [
+    {
+     "id": "T09",
+     "on_by_default": true,
+     "can_disable": false,
+     "source": "https://learn.microsoft.com/en-us/azure/cosmos-db/database-encryption"
+    },
+    {
+     "id": "T10",
+     "on_by_default": true,
+     "can_disable": false,
+     "source": "https://docs.snowflake.com/en/user-guide/security-encryption-end-to-end"
+    },
+    {
+     "id": "T11",
+     "on_by_default": true,
+     "can_disable": false,
+     "source": "https://docs.snowflake.com/en/user-guide/security-encryption-end-to-end"
+    },
+    {
+     "id": "T12",
+     "on_by_default": true,
+     "can_disable": false,
+     "source": "https://docs.stripe.com/api/authentication"
+    },
+    {
+     "id": "T13",
+     "on_by_default": true,
+     "can_disable": false,
+     "source": "https://docs.stripe.com/api/authentication"
+    },
+    {
+     "id": "T14",
+     "on_by_default": true,
+     "can_disable": false,
+     "source": "https://auth0.com/docs/secure/security-guidance/data-security/transport-layer-security"
+    },
+    {
+     "id": "T15",
+     "on_by_default": true,
+     "can_disable": false,
+     "source": "https://docs.aws.amazon.com/apigateway/latest/developerguide/api-gateway-api-endpoint-types.html"
+    },
+    {
+     "id": "T16",
+     "on_by_default": true,
+     "can_disable": false,
+     "source": "https://www.mongodb.com/docs/atlas/security-encryption-at-rest/"
+    }
+   ],
+   "usage": {
+    "prompt_tokens": 242,
+    "completion_tokens": 2718,
+    "cached": 0
+   }
+  },
+  {
+   "run": 2,
+   "answers": [
+    {
+     "id": "T17",
+     "on_by_default": true,
+     "can_disable": false,
+     "source": "https://docs.aws.amazon.com/AmazonElastiCache/latest/dg/Serverless.html"
+    },
+    {
+     "id": "T18",
+     "on_by_default": true,
+     "can_disable": false,
+     "source": "https://www.rfc-editor.org/rfc/rfc8827.html"
+    },
+    {
+     "id": "T19",
+     "on_by_default": true,
+     "can_disable": false,
+     "source": "https://www.rfc-editor.org/rfc/rfc9001.html"
+    },
+    {
+     "id": "T20",
+     "on_by_default": true,
+     "can_disable": false,
+     "source": "https://www.wireguard.com/protocol/"
+    },
+    {
+     "id": "F01",
+     "on_by_default": false,
+     "can_disable": true,
+     "source": "https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/Overview.Encryption.html"
+    },
+    {
+     "id": "F02",
+     "on_by_default": false,
+     "can_disable": true,
+     "source": "https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/sqs-server-side-encryption.html"
+    },
+    {
+     "id": "F03",
+     "on_by_default": false,
+     "can_disable": true,
+     "source": "https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/ebs-encryption.html"
+    },
+    {
+     "id": "F04",
+     "on_by_default": true,
+     "can_disable": true,
+     "source": "https://learn.microsoft.com/en-us/azure/azure-sql/database/transparent-data-encryption-tde-overview"
+    }
+   ],
+   "usage": {
+    "prompt_tokens": 238,
+    "completion_tokens": 2893,
+    "cached": 0
+   }
+  },
+  {
+   "run": 2,
+   "answers": [
+    {
+     "id": "F05",
+     "on_by_default": true,
+     "can_disable": true,
+     "source": "https://learn.microsoft.com/en-us/azure/storage/common/storage-require-secure-transfer"
+    },
+    {
+     "id": "F06",
+     "on_by_default": false,
+     "can_disable": true,
+     "source": "https://docs.aws.amazon.com/AmazonS3/latest/userguide/UsingHTTPS.html"
+    },
+    {
+     "id": "F07",
+     "on_by_default": false,
+     "can_disable": true,
+     "source": "https://cloud.google.com/sql/docs/mysql/configure-ssl-instance"
+    },
+    {
+     "id": "F08",
+     "on_by_default": false,
+     "can_disable": true,
+     "source": "https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/using-https-viewers-to-cloudfront.html"
+    },
+    {
+     "id": "F09",
+     "on_by_default": false,
+     "can_disable": true,
+     "source": "https://docs.aws.amazon.com/AmazonElastiCache/latest/dg/at-rest-encryption.html"
+    },
+    {
+     "id": "F10",
+     "on_by_default": true,
+     "can_disable": false,
+     "source": "https://docs.aws.amazon.com/lambda/latest/dg/lambda-urls.html"
+    },
+    {
+     "id": "F11",
+     "on_by_default": false,
+     "can_disable": true,
+     "source": "https://www.rfc-editor.org/rfc/rfc9113.html"
+    },
+    {
+     "id": "F12",
+     "on_by_default": false,
+     "can_disable": true,
+     "source": "https://grpc.github.io/grpc/python/grpc.html#grpc.insecure_channel"
+    }
+   ],
+   "usage": {
+    "prompt_tokens": 240,
+    "completion_tokens": 1854,
+    "cached": 0
+   }
+  },
+  {
+   "run": 2,
+   "answers": [
+    {
+     "id": "F13",
+     "on_by_default": false,
+     "can_disable": true,
+     "source": "https://docs.oasis-open.org/mqtt/mqtt/v5.0/os/mqtt-v5.0-os.html"
+    },
+    {
+     "id": "F14",
+     "on_by_default": true,
+     "can_disable": false,
+     "source": "https://www.rfc-editor.org/rfc/rfc4252.html#section-5.3"
+    },
+    {
+     "id": "O01",
+     "on_by_default": false,
+     "can_disable": true,
+     "source": "https://docs.aws.amazon.com/ebs/latest/userguide/ebs-encryption.html"
+    },
+    {
+     "id": "O02",
+     "on_by_default": false,
+     "can_disable": true,
+     "source": "https://redis.io/docs/latest/operate/oss_and_stack/management/security/encryption/"
+    },
+    {
+     "id": "O03",
+     "on_by_default": false,
+     "can_disable": true,
+     "source": "https://kafka.apache.org/documentation/#security"
+    },
+    {
+     "id": "O04",
+     "on_by_default": false,
+     "can_disable": true,
+     "source": "https://min.io/docs/minio/linux/administration/server-side-encryption/server-side-encryption.html"
+    },
+    {
+     "id": "O05",
+     "on_by_default": false,
+     "can_disable": true,
+     "source": "https://www.rfc-editor.org/rfc/rfc9110.html#section-4.2.2"
+    }
+   ],
+   "usage": {
+    "prompt_tokens": 222,
+    "completion_tokens": 2669,
+    "cached": 0
+   }
+  },
+  {
+   "run": 3,
+   "answers": [
+    {
+     "id": "T01",
+     "on_by_default": true,
+     "can_disable": false,
+     "source": "https://docs.aws.amazon.com/AmazonS3/latest/userguide/UsingServerSideEncryption.html"
+    },
+    {
+     "id": "T02",
+     "on_by_default": true,
+     "can_disable": false,
+     "source": "https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/EncryptionAtRest.html"
+    },
+    {
+     "id": "T03",
+     "on_by_default": true,
+     "can_disable": false,
+     "source": "https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/encrypt-log-data-kms.html"
+    },
+    {
+     "id": "T04",
+     "on_by_default": true,
+     "can_disable": false,
+     "source": "https://docs.aws.amazon.com/secretsmanager/latest/userguide/security-encryption.html"
+    },
+    {
+     "id": "T05",
+     "on_by_default": true,
+     "can_disable": false,
+     "source": "https://cloud.google.com/storage/docs/encryption/default-keys"
+    },
+    {
+     "id": "T06",
+     "on_by_default": true,
+     "can_disable": false,
+     "source": "https://cloud.google.com/bigquery/docs/encryption-at-rest"
+    },
+    {
+     "id": "T07",
+     "on_by_default": true,
+     "can_disable": false,
+     "source": "https://learn.microsoft.com/en-us/azure/storage/common/storage-service-encryption"
+    },
+    {
+     "id": "T08",
+     "on_by_default": true,
+     "can_disable": false,
+     "source": "https://learn.microsoft.com/en-us/azure/virtual-machines/managed-disks-overview#encryption"
+    }
+   ],
+   "usage": {
+    "prompt_tokens": 244,
+    "completion_tokens": 1337,
+    "cached": 0
+   }
+  },
+  {
+   "run": 3,
+   "answers": [
+    {
+     "id": "T09",
+     "on_by_default": true,
+     "can_disable": false,
+     "source": "https://learn.microsoft.com/en-us/azure/cosmos-db/database-encryption"
+    },
+    {
+     "id": "T10",
+     "on_by_default": true,
+     "can_disable": false,
+     "source": "https://docs.snowflake.com/en/user-guide/security-encryption"
+    },
+    {
+     "id": "T11",
+     "on_by_default": true,
+     "can_disable": false,
+     "source": "https://docs.snowflake.com/en/user-guide/security-encryption"
+    },
+    {
+     "id": "T12",
+     "on_by_default": true,
+     "can_disable": false,
+     "source": "https://docs.stripe.com/security/guide#transport-layer-security"
+    },
+    {
+     "id": "T13",
+     "on_by_default": true,
+     "can_disable": false,
+     "source": "https://docs.stripe.com/keys"
+    },
+    {
+     "id": "T14",
+     "on_by_default": true,
+     "can_disable": false,
+     "source": "https://auth0.com/docs/secure/security-guidance/data-security/transport-layer-security"
+    },
+    {
+     "id": "T15",
+     "on_by_default": true,
+     "can_disable": false,
+     "source": "https://docs.aws.amazon.com/apigateway/latest/developerguide/api-gateway-basic-concept.html"
+    },
+    {
+     "id": "T16",
+     "on_by_default": true,
+     "can_disable": false,
+     "source": "https://www.mongodb.com/docs/atlas/security-encryption-at-rest/"
+    }
+   ],
+   "usage": {
+    "prompt_tokens": 242,
+    "completion_tokens": 2350,
+    "cached": 0
+   }
+  },
+  {
+   "run": 3,
+   "answers": [
+    {
+     "id": "T17",
+     "on_by_default": true,
+     "can_disable": false,
+     "source": "https://docs.aws.amazon.com/AmazonElastiCache/latest/dg/Serverless.html"
+    },
+    {
+     "id": "T18",
+     "on_by_default": true,
+     "can_disable": false,
+     "source": "https://www.rfc-editor.org/rfc/rfc8827.html"
+    },
+    {
+     "id": "T19",
+     "on_by_default": true,
+     "can_disable": false,
+     "source": "https://www.rfc-editor.org/rfc/rfc9001.html"
+    },
+    {
+     "id": "T20",
+     "on_by_default": true,
+     "can_disable": false,
+     "source": "https://www.wireguard.com/protocol/"
+    },
+    {
+     "id": "F01",
+     "on_by_default": false,
+     "can_disable": true,
+     "source": "https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/Overview.Encryption.html"
+    },
+    {
+     "id": "F02",
+     "on_by_default": true,
+     "can_disable": true,
+     "source": "https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/sqs-server-side-encryption.html"
+    },
+    {
+     "id": "F03",
+     "on_by_default": false,
+     "can_disable": true,
+     "source": "https://docs.aws.amazon.com/ebs/latest/userguide/encryption-by-default.html"
+    },
+    {
+     "id": "F04",
+     "on_by_default": true,
+     "can_disable": false,
+     "source": "https://learn.microsoft.com/en-us/azure/azure-sql/database/transparent-data-encryption-tde-overview"
+    }
+   ],
+   "usage": {
+    "prompt_tokens": 238,
+    "completion_tokens": 2373,
+    "cached": 0
+   }
+  },
+  {
+   "run": 3,
+   "answers": [
+    {
+     "id": "F05",
+     "on_by_default": true,
+     "can_disable": true,
+     "source": "https://learn.microsoft.com/en-us/azure/storage/common/storage-require-secure-transfer"
+    },
+    {
+     "id": "F06",
+     "on_by_default": false,
+     "can_disable": true,
+     "source": "https://docs.aws.amazon.com/AmazonS3/latest/userguide/security-best-practices.html"
+    },
+    {
+     "id": "F07",
+     "on_by_default": false,
+     "can_disable": true,
+     "source": "https://cloud.google.com/sql/docs/mysql/configure-ssl-instance#require-ssl"
+    },
+    {
+     "id": "F08",
+     "on_by_default": false,
+     "can_disable": true,
+     "source": "https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/using-https-viewers-to-cloudfront.html"
+    },
+    {
+     "id": "F09",
+     "on_by_default": false,
+     "can_disable": true,
+     "source": "https://docs.aws.amazon.com/AmazonElastiCache/latest/APIReference/API_CreateReplicationGroup.html"
+    },
+    {
+     "id": "F10",
+     "on_by_default": true,
+     "can_disable": false,
+     "source": "https://docs.aws.amazon.com/lambda/latest/dg/lambda-urls.html"
+    },
+    {
+     "id": "F11",
+     "on_by_default": false,
+     "can_disable": true,
+     "source": "https://www.rfc-editor.org/rfc/rfc9113.html"
+    },
+    {
+     "id": "F12",
+     "on_by_default": false,
+     "can_disable": true,
+     "source": "https://grpc.io/docs/guides/auth/"
+    }
+   ],
+   "usage": {
+    "prompt_tokens": 240,
+    "completion_tokens": 1853,
+    "cached": 0
+   }
+  },
+  {
+   "run": 3,
+   "answers": [
+    {
+     "id": "F13",
+     "on_by_default": false,
+     "can_disable": true,
+     "source": "https://docs.oasis-open.org/mqtt/mqtt/v5.0/os/mqtt-v5.0-os.html"
+    },
+    {
+     "id": "F14",
+     "on_by_default": true,
+     "can_disable": false,
+     "source": "https://www.rfc-editor.org/rfc/rfc4252.html#section-5"
+    },
+    {
+     "id": "O01",
+     "on_by_default": false,
+     "can_disable": true,
+     "source": "https://docs.aws.amazon.com/ebs/latest/userguide/ebs-encryption.html"
+    },
+    {
+     "id": "O02",
+     "on_by_default": false,
+     "can_disable": true,
+     "source": "https://redis.io/docs/latest/operate/oss_and_stack/management/security/encryption/"
+    },
+    {
+     "id": "O03",
+     "on_by_default": false,
+     "can_disable": true,
+     "source": "https://kafka.apache.org/documentation/#security_ssl"
+    },
+    {
+     "id": "O04",
+     "on_by_default": false,
+     "can_disable": true,
+     "source": "https://min.io/docs/minio/linux/administration/server-side-encryption.html"
+    },
+    {
+     "id": "O05",
+     "on_by_default": false,
+     "can_disable": true,
+     "source": "https://www.rfc-editor.org/rfc/rfc2818.html"
+    }
+   ],
+   "usage": {
+    "prompt_tokens": 222,
+    "completion_tokens": 2335,
+    "cached": 0
+   }
+  },
+  {
+   "run": 4,
+   "answers": [
+    {
+     "id": "T01",
+     "on_by_default": true,
+     "can_disable": false,
+     "source": "https://docs.aws.amazon.com/AmazonS3/latest/userguide/serv-side-encryption.html"
+    },
+    {
+     "id": "T02",
+     "on_by_default": true,
+     "can_disable": false,
+     "source": "https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/EncryptionAtRest.html"
+    },
+    {
+     "id": "T03",
+     "on_by_default": true,
+     "can_disable": false,
+     "source": "https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/encrypt-log-data-kms.html"
+    },
+    {
+     "id": "T04",
+     "on_by_default": true,
+     "can_disable": false,
+     "source": "https://docs.aws.amazon.com/secretsmanager/latest/userguide/security-encryption.html"
+    },
+    {
+     "id": "T05",
+     "on_by_default": true,
+     "can_disable": false,
+     "source": "https://cloud.google.com/storage/docs/encryption/default-keys"
+    },
+    {
+     "id": "T06",
+     "on_by_default": true,
+     "can_disable": false,
+     "source": "https://cloud.google.com/bigquery/docs/encryption-at-rest"
+    },
+    {
+     "id": "T07",
+     "on_by_default": true,
+     "can_disable": false,
+     "source": "https://learn.microsoft.com/en-us/azure/storage/common/storage-service-encryption"
+    },
+    {
+     "id": "T08",
+     "on_by_default": true,
+     "can_disable": false,
+     "source": "https://learn.microsoft.com/en-us/azure/virtual-machines/disk-encryption"
+    }
+   ],
+   "usage": {
+    "prompt_tokens": 244,
+    "completion_tokens": 1332,
+    "cached": 0
+   }
+  },
+  {
+   "run": 4,
+   "answers": [
+    {
+     "id": "T09",
+     "on_by_default": true,
+     "can_disable": false,
+     "source": "https://learn.microsoft.com/en-us/azure/cosmos-db/database-encryption-at-rest"
+    },
+    {
+     "id": "T10",
+     "on_by_default": true,
+     "can_disable": false,
+     "source": "https://docs.snowflake.com/en/user-guide/security-encryption"
+    },
+    {
+     "id": "T11",
+     "on_by_default": true,
+     "can_disable": false,
+     "source": "https://docs.snowflake.com/en/user-guide/security-encryption#encryption-in-transit"
+    },
+    {
+     "id": "T12",
+     "on_by_default": true,
+     "can_disable": false,
+     "source": "https://docs.stripe.com/security/guide#transport-layer-security"
+    },
+    {
+     "id": "T13",
+     "on_by_default": true,
+     "can_disable": false,
+     "source": "https://docs.stripe.com/api/authentication"
+    },
+    {
+     "id": "T14",
+     "on_by_default": true,
+     "can_disable": false,
+     "source": "https://auth0.com/docs/secure/security-guidance/data-security/transport-layer-security"
+    },
+    {
+     "id": "T15",
+     "on_by_default": true,
+     "can_disable": false,
+     "source": "https://docs.aws.amazon.com/apigateway/latest/developerguide/how-to-call-api.html"
+    },
+    {
+     "id": "T16",
+     "on_by_default": true,
+     "can_disable": false,
+     "source": "https://www.mongodb.com/docs/atlas/security-encryption-at-rest/"
+    }
+   ],
+   "usage": {
+    "prompt_tokens": 242,
+    "completion_tokens": 1839,
+    "cached": 0
+   }
+  },
+  {
+   "run": 4,
+   "answers": [
+    {
+     "id": "T17",
+     "on_by_default": true,
+     "can_disable": false,
+     "source": "https://docs.aws.amazon.com/AmazonElastiCache/latest/APIReference/API_CreateServerlessCache.html"
+    },
+    {
+     "id": "T18",
+     "on_by_default": true,
+     "can_disable": false,
+     "source": "https://www.rfc-editor.org/rfc/rfc8827"
+    },
+    {
+     "id": "T19",
+     "on_by_default": true,
+     "can_disable": false,
+     "source": "https://www.rfc-editor.org/rfc/rfc9001"
+    },
+    {
+     "id": "T20",
+     "on_by_default": true,
+     "can_disable": false,
+     "source": "https://www.wireguard.com/protocol/"
+    },
+    {
+     "id": "F01",
+     "on_by_default": false,
+     "can_disable": true,
+     "source": "https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/Overview.Encryption.html"
+    },
+    {
+     "id": "F02",
+     "on_by_default": true,
+     "can_disable": true,
+     "source": "https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/sqs-server-side-encryption.html"
+    },
+    {
+     "id": "F03",
+     "on_by_default": false,
+     "can_disable": true,
+     "source": "https://docs.aws.amazon.com/ebs/latest/userguide/ebs-encryption.html"
+    },
+    {
+     "id": "F04",
+     "on_by_default": true,
+     "can_disable": false,
+     "source": "https://learn.microsoft.com/en-us/azure/azure-sql/database/transparent-data-encryption-tde-overview"
+    }
+   ],
+   "usage": {
+    "prompt_tokens": 238,
+    "completion_tokens": 2580,
+    "cached": 0
+   }
+  },
+  {
+   "run": 4,
+   "answers": [
+    {
+     "id": "F05",
+     "on_by_default": true,
+     "can_disable": true,
+     "source": "https://learn.microsoft.com/en-us/azure/storage/common/storage-require-secure-transfer"
+    },
+    {
+     "id": "F06",
+     "on_by_default": false,
+     "can_disable": true,
+     "source": "https://docs.aws.amazon.com/AmazonS3/latest/userguide/amazon-s3-policy-keys.html#amazon-s3-policy-keys-condition-keys"
+    },
+    {
+     "id": "F07",
+     "on_by_default": false,
+     "can_disable": true,
+     "source": "https://cloud.google.com/sql/docs/mysql/configure-ssl-instance"
+    },
+    {
+     "id": "F08",
+     "on_by_default": false,
+     "can_disable": true,
+     "source": "https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/using-https-viewers-to-cloudfront.html"
+    },
+    {
+     "id": "F09",
+     "on_by_default": false,
+     "can_disable": true,
+     "source": "https://docs.aws.amazon.com/AmazonElastiCache/latest/dg/at-rest-encryption.html"
+    },
+    {
+     "id": "F10",
+     "on_by_default": true,
+     "can_disable": false,
+     "source": "https://docs.aws.amazon.com/lambda/latest/dg/urls-configuration.html"
+    },
+    {
+     "id": "F11",
+     "on_by_default": false,
+     "can_disable": true,
+     "source": "https://www.rfc-editor.org/rfc/rfc9113.html#name-starting-http-2-with-prior"
+    },
+    {
+     "id": "F12",
+     "on_by_default": false,
+     "can_disable": true,
+     "source": "https://grpc.io/docs/guides/auth/"
+    }
+   ],
+   "usage": {
+    "prompt_tokens": 240,
+    "completion_tokens": 2346,
+    "cached": 0
+   }
+  },
+  {
+   "run": 4,
+   "answers": [
+    {
+     "id": "F13",
+     "on_by_default": false,
+     "can_disable": true,
+     "source": "https://docs.oasis-open.org/mqtt/mqtt/v5.0/mqtt-v5.0.html"
+    },
+    {
+     "id": "F14",
+     "on_by_default": true,
+     "can_disable": true,
+     "source": "https://www.rfc-editor.org/rfc/rfc4252.html#section-5.2"
+    },
+    {
+     "id": "O01",
+     "on_by_default": false,
+     "can_disable": true,
+     "source": "https://docs.aws.amazon.com/ebs/latest/userguide/encryption-by-default.html"
+    },
+    {
+     "id": "O02",
+     "on_by_default": false,
+     "can_disable": true,
+     "source": "https://redis.io/docs/latest/operate/oss_and_stack/management/security/encryption/"
+    },
+    {
+     "id": "O03",
+     "on_by_default": false,
+     "can_disable": true,
+     "source": "https://kafka.apache.org/documentation/#security_ssl"
+    },
+    {
+     "id": "O04",
+     "on_by_default": false,
+     "can_disable": true,
+     "source": "https://min.io/docs/minio/linux/administration/server-side-encryption.html"
+    },
+    {
+     "id": "O05",
+     "on_by_default": false,
+     "can_disable": true,
+     "source": "https://www.rfc-editor.org/rfc/rfc9112.html#name-security-considerations"
+    }
+   ],
+   "usage": {
+    "prompt_tokens": 222,
+    "completion_tokens": 1822,
+    "cached": 0
+   }
+  },
+  {
+   "run": 5,
+   "answers": [
+    {
+     "id": "T01",
+     "on_by_default": true,
+     "can_disable": false,
+     "source": "https://docs.aws.amazon.com/AmazonS3/latest/userguide/serv-side-encryption.html"
+    },
+    {
+     "id": "T02",
+     "on_by_default": true,
+     "can_disable": false,
+     "source": "https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/HowItWorks.ServerSideEncryption.html"
+    },
+    {
+     "id": "T03",
+     "on_by_default": true,
+     "can_disable": false,
+     "source": "https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/encrypt-log-data-kms.html"
+    },
+    {
+     "id": "T04",
+     "on_by_default": true,
+     "can_disable": false,
+     "source": "https://docs.aws.amazon.com/secretsmanager/latest/userguide/security-encryption.html"
+    },
+    {
+     "id": "T05",
+     "on_by_default": true,
+     "can_disable": false,
+     "source": "https://cloud.google.com/storage/docs/encryption/default-keys"
+    },
+    {
+     "id": "T06",
+     "on_by_default": true,
+     "can_disable": false,
+     "source": "https://cloud.google.com/bigquery/docs/encryption-at-rest"
+    },
+    {
+     "id": "T07",
+     "on_by_default": true,
+     "can_disable": false,
+     "source": "https://learn.microsoft.com/en-us/azure/storage/common/storage-service-encryption"
+    },
+    {
+     "id": "T08",
+     "on_by_default": true,
+     "can_disable": false,
+     "source": "https://learn.microsoft.com/en-us/azure/virtual-machines/disk-encryption"
+    }
+   ],
+   "usage": {
+    "prompt_tokens": 244,
+    "completion_tokens": 1014,
+    "cached": 0
+   }
+  },
+  {
+   "run": 5,
+   "answers": [
+    {
+     "id": "T09",
+     "on_by_default": true,
+     "can_disable": false,
+     "source": "https://learn.microsoft.com/en-us/azure/cosmos-db/database-encryption-at-rest"
+    },
+    {
+     "id": "T10",
+     "on_by_default": true,
+     "can_disable": false,
+     "source": "https://docs.snowflake.com/en/user-guide/security-encryption"
+    },
+    {
+     "id": "T11",
+     "on_by_default": true,
+     "can_disable": false,
+     "source": "https://docs.snowflake.com/en/user-guide/security-encryption"
+    },
+    {
+     "id": "T12",
+     "on_by_default": true,
+     "can_disable": false,
+     "source": "https://docs.stripe.com/security/guide#connection-security"
+    },
+    {
+     "id": "T13",
+     "on_by_default": true,
+     "can_disable": false,
+     "source": "https://docs.stripe.com/keys"
+    },
+    {
+     "id": "T14",
+     "on_by_default": true,
+     "can_disable": false,
+     "source": "https://auth0.com/docs/secure/security-guidance/data-security/encrypt-data-in-transit"
+    },
+    {
+     "id": "T15",
+     "on_by_default": true,
+     "can_disable": false,
+     "source": "https://docs.aws.amazon.com/apigateway/latest/developerguide/api-gateway-basic-concept.html"
+    },
+    {
+     "id": "T16",
+     "on_by_default": true,
+     "can_disable": false,
+     "source": "https://www.mongodb.com/docs/atlas/security-encryption-at-rest/"
+    }
+   ],
+   "usage": {
+    "prompt_tokens": 242,
+    "completion_tokens": 1835,
+    "cached": 0
+   }
+  },
+  {
+   "run": 5,
+   "answers": [
+    {
+     "id": "T17",
+     "on_by_default": true,
+     "can_disable": false,
+     "source": "https://docs.aws.amazon.com/AmazonElastiCache/latest/dg/WhatIs.EncryptionAtRest.html"
+    },
+    {
+     "id": "T18",
+     "on_by_default": true,
+     "can_disable": false,
+     "source": "https://www.rfc-editor.org/rfc/rfc8827.html"
+    },
+    {
+     "id": "T19",
+     "on_by_default": true,
+     "can_disable": false,
+     "source": "https://www.rfc-editor.org/rfc/rfc9001.html"
+    },
+    {
+     "id": "T20",
+     "on_by_default": true,
+     "can_disable": false,
+     "source": "https://www.wireguard.com/protocol/"
+    },
+    {
+     "id": "F01",
+     "on_by_default": false,
+     "can_disable": true,
+     "source": "https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/Overview.Encryption.html"
+    },
+    {
+     "id": "F02",
+     "on_by_default": true,
+     "can_disable": true,
+     "source": "https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/sqs-server-side-encryption.html"
+    },
+    {
+     "id": "F03",
+     "on_by_default": false,
+     "can_disable": true,
+     "source": "https://docs.aws.amazon.com/ebs/latest/userguide/ebs-encryption.html"
+    },
+    {
+     "id": "F04",
+     "on_by_default": true,
+     "can_disable": false,
+     "source": "https://learn.microsoft.com/en-us/azure/azure-sql/database/transparent-data-encryption-tde-overview?view=azuresql"
+    }
+   ],
+   "usage": {
+    "prompt_tokens": 238,
+    "completion_tokens": 3760,
+    "cached": 0
+   }
+  },
+  {
+   "run": 5,
+   "answers": [
+    {
+     "id": "F05",
+     "on_by_default": true,
+     "can_disable": true,
+     "source": "https://learn.microsoft.com/en-us/azure/storage/common/storage-require-secure-transfer"
+    },
+    {
+     "id": "F06",
+     "on_by_default": false,
+     "can_disable": true,
+     "source": "https://docs.aws.amazon.com/AmazonS3/latest/userguide/UsingHTTPS.html"
+    },
+    {
+     "id": "F07",
+     "on_by_default": false,
+     "can_disable": true,
+     "source": "https://cloud.google.com/sql/docs/mysql/configure-ssl-instance#require-ssl"
+    },
+    {
+     "id": "F08",
+     "on_by_default": false,
+     "can_disable": true,
+     "source": "https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/using-https-viewers-to-cloudfront.html"
+    },
+    {
+     "id": "F09",
+     "on_by_default": false,
+     "can_disable": true,
+     "source": "https://docs.aws.amazon.com/AmazonElastiCache/latest/APIReference/API_CreateReplicationGroup.html"
+    },
+    {
+     "id": "F10",
+     "on_by_default": true,
+     "can_disable": false,
+     "source": "https://docs.aws.amazon.com/lambda/latest/dg/lambda-urls.html"
+    },
+    {
+     "id": "F11",
+     "on_by_default": false,
+     "can_disable": true,
+     "source": "https://www.rfc-editor.org/rfc/rfc9113#section-3.4"
+    },
+    {
+     "id": "F12",
+     "on_by_default": false,
+     "can_disable": true,
+     "source": "https://grpc.github.io/grpc/python/grpc.html#grpc.insecure_channel"
+    }
+   ],
+   "usage": {
+    "prompt_tokens": 240,
+    "completion_tokens": 2835,
+    "cached": 0
+   }
+  },
+  {
+   "run": 5,
+   "answers": [
+    {
+     "id": "F13",
+     "on_by_default": false,
+     "can_disable": true,
+     "source": "https://docs.oasis-open.org/mqtt/mqtt/v5.0/mqtt-v5.0.html"
+    },
+    {
+     "id": "F14",
+     "on_by_default": true,
+     "can_disable": true,
+     "source": "https://www.rfc-editor.org/rfc/rfc4252"
+    },
+    {
+     "id": "O01",
+     "on_by_default": false,
+     "can_disable": true,
+     "source": "https://docs.aws.amazon.com/ebs/latest/userguide/encryption-by-default.html"
+    },
+    {
+     "id": "O02",
+     "on_by_default": false,
+     "can_disable": true,
+     "source": "https://redis.io/docs/latest/operate/oss_and_stack/management/security/encryption/"
+    },
+    {
+     "id": "O03",
+     "on_by_default": false,
+     "can_disable": true,
+     "source": "https://kafka.apache.org/documentation/#security"
+    },
+    {
+     "id": "O04",
+     "on_by_default": false,
+     "can_disable": true,
+     "source": "https://min.io/docs/minio/linux/administration/server-side-encryption.html"
+    },
+    {
+     "id": "O05",
+     "on_by_default": false,
+     "can_disable": true,
+     "source": "https://www.rfc-editor.org/rfc/rfc9110"
+    }
+   ],
+   "usage": {
+    "prompt_tokens": 222,
+    "completion_tokens": 1807,
+    "cached": 0
+   }
+  }
+ ]
+}
