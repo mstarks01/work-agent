@@ -2,7 +2,8 @@
 
 Each test gets its store from :func:`new_store`, which takes one parameter for
 each backend pair. A new backend adds its parameter there and proves the same
-behaviour as ``memory``. No test here reads a private attribute of a store.
+behaviour as ``memory``. Read a store here only through the ``JobStore``
+protocol, never through a private attribute or method.
 """
 
 from __future__ import annotations
@@ -16,6 +17,7 @@ from analysis_service.answer_sets import NO_ANSWERS, AnswerSet
 from analysis_service.budgets import BudgetPolicy
 from analysis_service.fact_answers import FactAnswer
 from analysis_service.jobs import (
+    NON_LOCKING_STATUSES,
     Admission,
     Checkpoint,
     InMemoryJobStore,
@@ -624,7 +626,7 @@ class TestTheParentLock:
         second = reserve(store, child(parent))
         assert second == Admission(outcome="resumed_already", active=0)
 
-    @pytest.mark.parametrize("status", ["failed", "rejected"])
+    @pytest.mark.parametrize("status", sorted(NON_LOCKING_STATUSES))
     def test_a_child_that_read_nothing_into_a_report_releases_its_parent(
         self, store, status
     ):
