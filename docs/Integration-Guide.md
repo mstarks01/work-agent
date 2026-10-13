@@ -138,7 +138,10 @@ async def analyze(
 - `system_name` — optional label echoed into the report. Blank falls through to
   a default; over 200 characters (`MAX_SYSTEM_NAME_CHARS`) is a caller error.
 - `caller` — isolates the underlying session; it is not an authorization
-  identity. Pass a per-tenant value if you run multiple callers.
+  identity. The engine maps each caller string to a **Principal** under the
+  reserved issuer `local:`, and the principal's random owner ID owns the job
+  and keys its session. The engine keeps these principals in memory for its
+  own life. Pass a per-tenant value if you run multiple callers.
 - `on_node` — optional async callback invoked with each node name as it
   completes, for progress or tracing.
 

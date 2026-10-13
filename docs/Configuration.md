@@ -110,7 +110,7 @@ version and an optional `:<variant>` tail such as `:thinking`. The bare
 OpenRouter may serve one slug from more than one upstream provider, so two runs
 of one configuration can reach two backends. That does not stop an analysis. A
 **Baseline** reads the upstream the record names for every node on the route
-and carries it as a part of its identity: `evals/harness/baseline.py` refuses a
+and carries it as a part of its identity: `evals/harness/baseline.py` refuses an
 sweep whose record names no upstream or more than one, and names the Baseline
 after route and upstream together otherwise.
 
@@ -868,9 +868,9 @@ further bounds close that over a rolling window:
 | Knob | What it bounds |
 | --- | --- |
 | `budget_window_seconds` | The width of the window all three are measured over. Rolling, not aligned to a clock boundary — a fixed hourly window lets a caller spend a full allowance at 10:59 and another at 11:00. |
-| `max_jobs_per_window` | Jobs one token subject may **start** per window, whether or not they finished. The rate the ceiling is not. |
-| `max_tokens_per_window` | Tokens one token subject may commit per window. One very large submission can cost more than a window's whole count of small ones, and a count admits it. |
-| `global_max_tokens_per_window` | The same across **every** subject. Not the sum of theirs — this is the provider quota's share, which a deployment with ten subjects divides rather than multiplies. |
+| `max_jobs_per_window` | Jobs one owner may **start** per window, whether or not they finished. The rate the ceiling is not. |
+| `max_tokens_per_window` | Tokens one owner may commit per window. One very large submission can cost more than a window's whole count of small ones, and a count admits it. |
+| `global_max_tokens_per_window` | The same across **every** owner. Not the sum of theirs — this is the provider quota's share, which a deployment with ten owners divides rather than multiplies. |
 
 **Tokens, not currency.** A price is vendor data with an expiry date. `evals/`
 carries a price table because a sweep reports what it *spent* and can be
@@ -1105,10 +1105,10 @@ it with a measurement — see [Tuning the models](../evals/TUNING.md).
 | `ANALYSIS_JOB_DEADLINE_MS` | Wall-clock budget for one whole job, milliseconds, where no pinned upstream has a row in `[bounds_by_upstream]`. Turn it down to shed load. |
 | `ANALYSIS_RETRY_BUDGET_RATIO` | Retries as a share of successful requests. Turn it down to give up sooner under sustained failure. |
 | `ANALYSIS_BUDGET_WINDOW_SECONDS` | Width of the rolling budget window. |
-| `ANALYSIS_MAX_JOBS_PER_WINDOW` | Jobs one subject may start per window. Turn it down to shed load. |
-| `ANALYSIS_MAX_TOKENS_PER_WINDOW` | Tokens one subject may commit per window. |
-| `ANALYSIS_GLOBAL_MAX_TOKENS_PER_WINDOW` | Tokens every subject may commit per window, together. Turn it down to protect a provider quota mid-incident. |
-| `ANALYSIS_MAX_ACTIVE_JOBS` | Jobs one token subject may have in flight. Turn it down to shed load; raising it multiplies by the lane count of the frameworks a job names. |
+| `ANALYSIS_MAX_JOBS_PER_WINDOW` | Jobs one owner may start per window. Turn it down to shed load. |
+| `ANALYSIS_MAX_TOKENS_PER_WINDOW` | Tokens one owner may commit per window. |
+| `ANALYSIS_GLOBAL_MAX_TOKENS_PER_WINDOW` | Tokens every owner may commit per window, together. Turn it down to protect a provider quota mid-incident. |
+| `ANALYSIS_MAX_ACTIVE_JOBS` | Jobs one owner may have in flight. Turn it down to shed load; raising it multiplies by the lane count of the frameworks a job names. |
 
 ### How strictly each override family is checked
 
@@ -1223,7 +1223,7 @@ Bounds enforced before or during analysis:
 | `max_source_bytes` | 100 KiB (UTF-8), total across all sources | Rejected at both entry points; deployment config. |
 | `max_sources` | 10 | Rejected at both entry points; deployment config. |
 | `job_deadline_ms` | 900 s per job, wall clock | `failed` at the deadline; deployment config. |
-| `max_active_jobs` | 3 jobs in flight per token subject | `429` at submission; deployment config. |
+| `max_active_jobs` | 3 jobs in flight per owner | `429` at submission; deployment config. |
 | Source `label` | 200 characters, single-line, unique per job | Rejected as a malformed source. |
 | `MAX_SYSTEM_NAME_CHARS` | 200 | Rejected by the engine / API. |
 | `MAX_ELEMENTS` | 150 | A larger model is a `too-many-elements` [rejection](Report-Schema.md). |

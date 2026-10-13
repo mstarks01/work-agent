@@ -59,7 +59,7 @@ def a_report(store) -> tuple[str, str]:
 def a_report_that_asks(store) -> tuple[str, str]:
     """A completed job whose report waits on :data:`OPEN`."""
     record = JobRecord.create(
-        owner_subject="alice",
+        owner_id="alice",
         sources=[Source.description("A web app writes to an audit log.")],
         frameworks=sample_selection(),
     )
@@ -210,6 +210,8 @@ def test_another_owner_reads_a_record_of_an_older_major_as_missing():
     client, store = catalog_client()
     job = waiting(store)
     aged(store, job, OLDER)
+    # bob holds a principal, so the read reaches the ownership check.
+    waiting(store, owner="bob")
 
     response = call(client, "GET", job, "questions", None, token="bob-token")
 

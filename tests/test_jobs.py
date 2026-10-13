@@ -38,7 +38,7 @@ from tests.factories import (
 
 def make_record() -> JobRecord:
     return JobRecord.create(
-        owner_subject="alice",
+        owner_id="alice",
         sources=[Source.description("a web app storing orders")],
         frameworks=sample_selection(),
     )

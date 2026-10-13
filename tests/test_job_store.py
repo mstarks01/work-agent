@@ -28,12 +28,14 @@ from analysis_service.jobs import (
     Resumption,
     same_major,
 )
+from analysis_service.principals import Identity, Principal
 from analysis_service.report import SCHEMA_VERSION, NodeRun, TokenUsage
 from analysis_service.sources import Source
 from tests import test_resume
 from tests.factories import (
     SEEDING_BUDGET,
     admit,
+    new_principal,
     sample_report,
     sample_selection,
     valid_model,
@@ -68,21 +70,42 @@ def store(new_store):
 
 def new_record(subject: str = "alice", reserved: int = 0) -> JobRecord:
     return JobRecord.create(
-        owner_subject=subject,
+        owner_id=subject,
         sources=[Source.description("a web app storing orders")],
         frameworks=sample_selection(),
         reserved_tokens=reserved,
     )
 
 
+async def reserving(
+    store, rec, *, ceiling: int = 100, budget: BudgetPolicy = POLICY
+) -> Admission:
+    """Reserve ``rec``, and create its owner's principal where it has none."""
+    return await store.reserve(
+        rec,
+        ceiling=ceiling,
+        budget=budget,
+        principal=await new_principal(store, rec.owner_id),
+    )
+
+
 def reserve(store, rec, *, ceiling: int = 100, budget: BudgetPolicy = POLICY):
-    return asyncio.run(store.reserve(rec, ceiling=ceiling, budget=budget))
+    return asyncio.run(reserving(store, rec, ceiling=ceiling, budget=budget))
+
+
+def enrol(store, owner: str = "alice") -> None:
+    """Give ``owner`` a principal before a race, through a job that holds no
+    slot, no token and no parent: a rejected job that measured nothing."""
+    record = new_record(owner)
+    record.transition("running")
+    record.transition("rejected")
+    asyncio.run(admit(store, record))
 
 
 def completed(store, subject="alice", **create) -> str:
     """The ID of a completed job with a report, admitted to ``store``."""
     record = JobRecord.create(
-        owner_subject=subject,
+        owner_id=subject,
         sources=[Source.description("a web app storing orders")],
         frameworks=sample_selection(),
         **create,
@@ -97,7 +120,7 @@ def completed(store, subject="alice", **create) -> str:
 def follow_up(parent: str) -> JobRecord:
     """A report's follow-up of ``parent``, still queued."""
     return JobRecord.create(
-        owner_subject="alice",
+        owner_id="alice",
         sources=[Source.description("a web app storing orders")],
         frameworks=sample_selection(),
         resumption=Resumption(
@@ -117,7 +140,7 @@ def final(store, parent: str) -> str:
 def amendment(parent: str, revision: int = 0) -> JobRecord:
     """A job an amendment of ``parent`` started, still queued."""
     return JobRecord.create(
-        owner_subject="alice",
+        owner_id="alice",
         sources=[Source.description("a web app storing orders")],
         frameworks=sample_selection(),
         amends=parent,
@@ -327,7 +350,7 @@ class TestReserve:
                     record.transition(status)
                 await store.save(record)
             probe = JobRecord.create(
-                owner_subject=subject,
+                owner_id=subject,
                 sources=[Source.description("an app")],
                 frameworks=sample_selection(),
             )
@@ -354,7 +377,7 @@ class TestReserve:
             seen = {}
             for owner in ("alice", "alice", "bob", "alice", "bob"):
                 record = JobRecord.create(
-                    owner_subject=owner,
+                    owner_id=owner,
                     sources=[Source.description("an app")],
                     frameworks=sample_selection(),
                 )
@@ -404,11 +427,11 @@ class TestReserve:
             for _ in range(3):
                 await admit(store, new_record())
             bob = JobRecord.create(
-                owner_subject="bob",
+                owner_id="bob",
                 sources=[Source.description("an app")],
                 frameworks=sample_selection(),
             )
-            return await store.reserve(bob, ceiling=1, budget=SEEDING_BUDGET)
+            return await reserving(store, bob, ceiling=1, budget=SEEDING_BUDGET)
 
         assert asyncio.run(scenario()).outcome == "admitted"
 
@@ -438,6 +461,8 @@ class TestReserve:
         # The check-then-act race, run at a barrier: every task is released at
         # the same moment and they contend for one slot. Two calls -- a count
         # then a create -- would let all of them read 0 before any wrote.
+        enrol(store)
+
         async def scenario():
             start = asyncio.Event()
 
@@ -457,6 +482,8 @@ class TestReserve:
     def test_the_store_holds_exactly_what_it_admitted(self, store):
         # The count and the records cannot disagree: an admitted reservation is
         # a written record, and a refused one is nothing at all.
+        enrol(store)
+
         async def scenario():
             async def contend():
                 record = new_record()
@@ -523,8 +550,8 @@ class TestTheTokenBounds:
         assert outcomes == [
             "admitted",
             "admitted",
-            "over_subject_budget",
-            "over_subject_budget",
+            "over_owner_budget",
+            "over_owner_budget",
         ]
 
     def test_one_large_job_can_exhaust_a_budget_a_count_would_admit(self, store):
@@ -534,14 +561,14 @@ class TestTheTokenBounds:
             reserve(
                 store, new_record(reserved=POLICY.max_tokens_per_window + 1)
             ).outcome
-            == "over_subject_budget"
+            == "over_owner_budget"
         )
 
     def test_the_reservation_of_the_job_being_admitted_counts(self, store):
         # Checking only what is already committed would admit a job that takes
         # the window over on its own.
         reserve(store, new_record(reserved=600))
-        assert reserve(store, new_record(reserved=600)).outcome == "over_subject_budget"
+        assert reserve(store, new_record(reserved=600)).outcome == "over_owner_budget"
 
     def test_settling_below_the_estimate_frees_the_difference(self, store):
         # Reconciliation is what stops a coarse estimate from being a hard cap:
@@ -560,19 +587,19 @@ class TestTheTokenBounds:
 
     def test_the_global_budget_holds_when_the_per_subject_ones_do_not(self, store):
         # Three subjects each well inside their own allowance, together past the
-        # deployment's. This is the guardrail a per-subject bound cannot be.
+        # deployment's. This is the guardrail a per-owner bound cannot be.
         for subject in ("alice", "bob", "carol"):
             outcome = reserve(store, new_record(subject, reserved=800))
         assert outcome.outcome == "over_global_budget"
 
     def test_a_global_refusal_reports_the_callers_own_figure(self, store):
-        # `subject_tokens` is the caller's; `global_tokens` is the operator's.
+        # `owner_tokens` is the caller's; `global_tokens` is the operator's.
         # A caller learning the deployment's load learns about other callers.
         reserve(store, new_record("alice", reserved=800))
         reserve(store, new_record("bob", reserved=800))
         outcome = reserve(store, new_record("carol", reserved=800))
         assert outcome.outcome == "over_global_budget"
-        assert outcome.subject_tokens == 0
+        assert outcome.owner_tokens == 0
         assert outcome.global_tokens == 1600
 
 
@@ -593,6 +620,8 @@ class TestOrderingAndAtomicity:
     def test_simultaneous_reservations_never_exceed_the_token_budget(self, store):
         # The same barrier the ceiling is tested at, on the budget: a check
         # separated from the insert would let every task read an empty window.
+        enrol(store)
+
         async def scenario():
             start = asyncio.Event()
 
@@ -658,9 +687,7 @@ class TestTheSaves:
 
         def save(revision):
             return asyncio.run(
-                store.save_round(
-                    job, record.owner_subject, NO_ANSWERS, [], [], revision
-                )
+                store.save_round(job, record.owner_id, NO_ANSWERS, [], [], revision)
             )
 
         assert save(0)
@@ -818,7 +845,7 @@ class TestTheRestartScan:
             reserve(store, record, budget=budget)
         asyncio.run(store.fail_in_flight())
         outcome = reserve(store, new_record(reserved=300), budget=budget).outcome
-        assert outcome == "over_subject_budget"
+        assert outcome == "over_owner_budget"
 
     def test_a_failed_job_frees_its_slot(self, store):
         reserve(store, new_record(), ceiling=1)
@@ -884,3 +911,94 @@ class TestTheSchemaVersion:
         asyncio.run(admit(store, record))
         held = asyncio.run(store.owned(record.id, "alice"))
         assert same_major(held.schema_version) is readable
+
+
+class TestPrincipals:
+    """ADR 0064: a principal is an issuer and a ``sub``, and admission creates it."""
+
+    def identity(self, issuer: str = "https://one.example") -> Identity:
+        return Identity(issuer=issuer, sub="alice")
+
+    def first(
+        self, store, principal: Principal, *, ceiling: int = 100, reserved: int = 0
+    ) -> Admission:
+        """Reserve a first job of ``principal``'s identity, with the principal."""
+        record = new_record(principal.owner_id, reserved=reserved)
+        return asyncio.run(
+            store.reserve(record, ceiling=ceiling, budget=POLICY, principal=principal)
+        )
+
+    def test_an_unknown_identity_holds_no_principal(self, store):
+        assert asyncio.run(store.principal(self.identity())) is None
+
+    def test_the_first_admission_keeps_the_principal_and_nothing_more(self, store):
+        principal = Principal.new(self.identity())
+        assert self.first(store, principal).outcome == "admitted"
+        held = asyncio.run(store.principal(self.identity()))
+        assert held == principal
+        assert {name for name in vars(held)} == {
+            "owner_id",
+            "issuer",
+            "sub",
+            "created_at",
+        }
+
+    @pytest.mark.parametrize(
+        ("bounds", "outcome"),
+        [
+            ({"ceiling": 0}, "at_ceiling"),
+            ({"reserved": POLICY.max_tokens_per_window + 1}, "over_owner_budget"),
+        ],
+    )
+    def test_a_refused_admission_leaves_no_principal(self, store, bounds, outcome):
+        principal = Principal.new(self.identity())
+        assert self.first(store, principal, **bounds).outcome == outcome
+        assert asyncio.run(store.principal(self.identity())) is None
+
+    def test_two_issuers_of_one_sub_are_two_principals(self, store):
+        one = Principal.new(self.identity("https://one.example"))
+        two = Principal.new(self.identity("https://two.example"))
+        self.first(store, one)
+        self.first(store, two)
+        assert asyncio.run(store.principal(one.identity)) == one
+        assert asyncio.run(store.principal(two.identity)) == two
+        assert one.owner_id != two.owner_id
+        mine = asyncio.run(store.owned_jobs(one.owner_id))
+        assert [record.owner_id for record in mine] == [one.owner_id]
+
+    def test_a_second_new_principal_of_one_identity_is_refused(self, store):
+        held = Principal.new(self.identity())
+        self.first(store, held)
+        late = Principal.new(self.identity())
+        record = new_record(late.owner_id)
+        admission = asyncio.run(
+            store.reserve(record, ceiling=100, budget=POLICY, principal=late)
+        )
+        assert admission == Admission(outcome="principal_exists", active=0)
+        assert asyncio.run(store.get(record.id)) is None
+        assert asyncio.run(store.principal(self.identity())) == held
+
+    def test_a_later_job_of_the_owner_needs_no_principal(self, store):
+        principal = Principal.new(self.identity())
+        self.first(store, principal)
+        later = new_record(principal.owner_id)
+        admission = asyncio.run(store.reserve(later, ceiling=100, budget=POLICY))
+        assert admission.outcome == "admitted"
+        assert asyncio.run(store.principal(self.identity())) == principal
+
+    def test_a_job_whose_owner_holds_no_principal_is_a_defect(self, store):
+        with pytest.raises(ValueError, match="holds no principal"):
+            asyncio.run(store.reserve(new_record("nobody"), ceiling=100, budget=POLICY))
+
+    def test_a_job_of_another_owner_than_its_principal_is_a_defect(self, store):
+        principal = Principal.new(self.identity())
+        with pytest.raises(ValueError, match="another owner"):
+            asyncio.run(
+                store.reserve(
+                    new_record("nobody"),
+                    ceiling=100,
+                    budget=POLICY,
+                    principal=principal,
+                )
+            )
+        assert asyncio.run(store.principal(self.identity())) is None

@@ -49,7 +49,7 @@ def _finished(store, count=MAX_FACT_ANSWERS + 1, earlier=()):
         for n in range(count)
     ]
     record = JobRecord.create(
-        owner_subject="alice",
+        owner_id="alice",
         sources=[DESCRIPTION],
         frameworks=sample_selection(),
         answers=AnswerSet(facts=tuple(earlier)),

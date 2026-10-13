@@ -4,7 +4,7 @@ The HTTP ``/v1`` API (:mod:`analysis_service.api`) is one caller of the analysis
 pipeline, and this module is the other. An application that wants to run an
 analysis in process, and to swap this pipeline in behind its own analysis-engine
 interface, reaches for :class:`Engine`. The alternative is to fabricate a
-:class:`~analysis_service.jobs.JobRecord`, an auth subject and a node callback by
+:class:`~analysis_service.jobs.JobRecord`, an owner ID and a node callback by
 hand.
 
 The engine carries none of the HTTP contract's ceremony. There is no bearer
@@ -56,6 +56,12 @@ from analysis_service.links import (
     with_link_answers,
 )
 from analysis_service.pipeline import entry_of
+from analysis_service.principals import (
+    Identity,
+    Principal,
+    PrincipalTable,
+    log_created,
+)
 from analysis_service.report import FrameworkSelection
 from analysis_service.selection import SelectionError, resolve_selection
 from analysis_service.sources import (
@@ -66,9 +72,10 @@ from analysis_service.sources import (
 
 logger = logging.getLogger(__name__)
 
-# owner_subject on an in-process job is only the ADK session's user_id: it
-# isolates session state and carries none of the token-subject meaning it has
-# on the HTTP path. Callers embedding the engine per tenant may pass their own.
+# The caller an in-process job names where its embedder names none. Each
+# caller string maps to a principal under the reserved local issuer, and the
+# principal's owner ID owns the job and keys its ADK session. Callers embedding
+# the engine per tenant may pass their own.
 DEFAULT_CALLER = "in-process"
 
 
@@ -100,8 +107,9 @@ class Engine:
     Build once with :meth:`from_config`, naming the frameworks to analyse under,
     and reuse: the pipeline composes its cacheable shared prefix at
     construction, so a fresh engine per call would pay that cost every time.
-    Each :meth:`analyze` call is independent and holds no cross-call state, so
-    one engine is safe to share across concurrent tasks.
+    Each :meth:`analyze` call is independent, so one engine is safe to share
+    across concurrent tasks. The only state a call leaves is the principal of
+    its caller, which the next call of that caller names again.
     """
 
     def __init__(
@@ -136,6 +144,7 @@ class Engine:
         # engine that cannot know refuses one.
         self._carries_catalog = carries_catalog
         self._limits = limits
+        self._principals = PrincipalTable()
         self._deadline_seconds = deadline_seconds
 
     @property
@@ -344,13 +353,30 @@ class Engine:
         breach = self._limits.breach(sources)
         if breach is not None:
             raise EngineInputError(breach.message)
+        # Every refusal before the owner, so a refused submission creates no
+        # principal.
+        name = _engine_system_name(system_name)
         return JobRecord.create(
-            owner_subject=caller,
+            owner_id=self._owner_id(caller),
             sources=sources,
             frameworks=self._frameworks,
-            system_name=_engine_system_name(system_name),
+            system_name=name,
             ask_questions=ask_questions,
         )
+
+    def _owner_id(self, caller: str) -> str:
+        """The owner ID of ``caller``'s principal under the reserved local issuer.
+
+        The engine has no job store, so it keeps its principals itself, and
+        creates one on the first submission of each caller.
+        """
+        identity = Identity.local(caller)
+        principal = self._principals.find(identity)
+        if principal is None:
+            principal = Principal.new(identity)
+            self._principals.add(principal)
+            log_created(principal)
+        return principal.owner_id
 
 
 def _engine_system_name(system_name: str | None) -> str | None:

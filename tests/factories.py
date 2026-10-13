@@ -88,6 +88,7 @@ from analysis_service.model_tiers import (
     credentials_env_var_for,
     load_model_tiers,
 )
+from analysis_service.principals import Identity, Principal
 from analysis_service.provider import InProcessExecutor
 from analysis_service.report import (
     FrameworkSelection,
@@ -312,6 +313,33 @@ def sample_fingerprint(
     )
 
 
+#: The issuer of every principal a test names.
+TEST_ISSUER = "https://issuer.example"
+
+
+def identity_of(sub: str) -> Identity:
+    """The identity a test names by its ``sub``, under :data:`TEST_ISSUER`."""
+    return Identity(issuer=TEST_ISSUER, sub=sub)
+
+
+async def new_principal(store: Any, owner_id: str) -> Principal | None:
+    """The principal ``store`` creates for a test owner, or ``None`` where it
+    holds one.
+
+    A test names an owner by one string, and it is both the owner ID and the
+    ``sub``: the test identity ``sub`` maps to the owner ID ``sub``. A store
+    keeps a job only for an owner that holds a principal.
+    """
+    if await store.principal(identity_of(owner_id)) is not None:
+        return None
+    return Principal(
+        owner_id=owner_id,
+        issuer=TEST_ISSUER,
+        sub=owner_id,
+        created_at=datetime.now(UTC),
+    )
+
+
 async def admit(store: Any, record: Any) -> Any:
     """Put ``record`` in ``store`` without exercising the ceiling.
 
@@ -319,10 +347,14 @@ async def admit(store: Any, record: Any) -> Any:
     design — the protocol carries no unconditional create, so a backend cannot
     offer one the API might race on. A test that is seeding rather than
     measuring a bound passes bounds it cannot reach. A refused seed fails
-    here, so the test does not fail later on a record that is not there.
+    here, so the test does not fail later on a record that is not there. The
+    record's owner gets its principal on its first seed (:func:`new_principal`).
     """
     admission = await store.reserve(
-        record, ceiling=_SEEDING_CEILING, budget=SEEDING_BUDGET
+        record,
+        ceiling=_SEEDING_CEILING,
+        budget=SEEDING_BUDGET,
+        principal=await new_principal(store, record.owner_id),
     )
     assert admission.outcome == "admitted", admission
     return admission

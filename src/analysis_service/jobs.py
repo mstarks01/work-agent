@@ -54,6 +54,7 @@ from analysis_service.claims import FrameworkAnalysis, FrameworkName, UnknownKey
 from analysis_service.execution import GraphFailed
 from analysis_service.fact_answers import MAX_HELD_FACTS, FactAnswer, SkipKey
 from analysis_service.links import MAX_HELD_LINKS
+from analysis_service.principals import Identity, Principal, PrincipalTable
 from analysis_service.report import (
     SCHEMA_VERSION,
     FrameworkSelection,
@@ -234,15 +235,15 @@ def is_follow_up(resumption: Resumption | None) -> TypeGuard[Resumption]:
 class JobRecord(BaseModel):
     """Everything the service knows about one job.
 
-    ``owner_subject`` is the auth token subject captured at submission; every
-    read is checked against it. The record never leaves the service — API
+    ``owner_id`` is the owner ID of the **Principal** that submitted the job;
+    every read is checked against it. The record never leaves the service — API
     responses are separate views that expose only what each route contracts.
     """
 
     model_config = ConfigDict(extra="forbid", validate_assignment=True)
 
     id: str
-    owner_subject: str
+    owner_id: str
     # The ``SCHEMA_VERSION`` of the service that created this record. It
     # covers the checkpoint, the resumption, the sources and the report, and
     # :func:`same_major` reads it before a route parses any of them (#1532).
@@ -322,7 +323,7 @@ class JobRecord(BaseModel):
     # it depends on a mutable, deployment-local manifest. The report is
     # portable; the manifest is not. Operator-only: no route exposes it.
     certification: CertifyResult | None = None
-    # The two halves of this job's charge against its subject's window budget.
+    # The two halves of this job's charge against its owner's window budget.
     # ``reserved_tokens`` is what admission held before anything was spent, from
     # the submission and the selection alone. ``measured_tokens`` replaces it
     # once the job is terminal, and is ``None`` until then — which is what makes
@@ -341,7 +342,7 @@ class JobRecord(BaseModel):
     def create(
         cls,
         *,
-        owner_subject: str,
+        owner_id: str,
         sources: Sequence[Source],
         frameworks: Sequence[FrameworkSelection],
         system_name: str | None = None,
@@ -359,7 +360,7 @@ class JobRecord(BaseModel):
         now = datetime.now(UTC)
         record = cls(
             id=f"job-{uuid4().hex}",
-            owner_subject=owner_subject,
+            owner_id=owner_id,
             schema_version=SCHEMA_VERSION,
             sources=list(sources),
             frameworks=list(frameworks),
@@ -417,7 +418,7 @@ class JobRecord(BaseModel):
 
         Reaching a terminal state also **settles this job's token charge**: the
         reservation admission held is replaced by what the run measured, so the
-        subject's window shows what happened rather than what was feared. It
+        owner's window shows what happened rather than what was feared. It
         happens here rather than at each of the four terminal call sites because
         this is the single funnel into a terminal state — a reservation a path
         forgot to settle would hold budget until the window rolled past it.
@@ -493,20 +494,23 @@ class JobRecord(BaseModel):
 #
 # Four refusals rather than one, because they clear at different times and a
 # caller needs to know which: ``at_ceiling`` clears when one of their jobs
-# finishes, ``over_rate`` and ``over_subject_budget`` clear as the window rolls
+# finishes, ``over_rate`` and ``over_owner_budget`` clear as the window rolls
 # past their older jobs, and ``over_global_budget`` is a deployment-wide bound
 # that no action of theirs will clear. ``duplicate`` says the store already
 # holds this job id, which the API mints itself, so it reports a defect rather
-# than a caller error.
+# than a caller error. ``principal_exists`` says another admission created the
+# principal of this job's identity after the caller read that it had none, so
+# the caller submits again under the owner ID that admission created.
 AdmissionOutcome = Literal[
     "admitted",
     "at_ceiling",
     "over_rate",
-    "over_subject_budget",
+    "over_owner_budget",
     "over_global_budget",
     "duplicate",
     "resumed_already",
     "parent_moved",
+    "principal_exists",
 ]
 
 
@@ -514,9 +518,9 @@ AdmissionOutcome = Literal[
 class Admission:
     """The result of one :meth:`JobStore.reserve` call.
 
-    ``active`` is how many of the reserving subject's jobs the store observed in
+    ``active`` is how many of the reserving owner's jobs the store observed in
     flight *before* this one, so an ``at_ceiling`` refusal can quote the number
-    it refused against. It counts only the subject named on the record, so no
+    it refused against. It counts only the owner named on the record, so no
     outcome here describes another caller's activity.
 
     A backend failure is not an outcome. It raises, and the API's unhandled-error
@@ -526,11 +530,11 @@ class Admission:
 
     outcome: AdmissionOutcome
     active: int
-    #: Tokens the reserving subject has committed inside the window, before this
+    #: Tokens the reserving owner has committed inside the window, before this
     #: job. Measured where a job of theirs has finished, reserved where it has
     #: not. Zero on every outcome the budget did not decide.
-    subject_tokens: int = 0
-    #: The same total across every subject. It is the *only* field here that
+    owner_tokens: int = 0
+    #: The same total across every owner. It is the *only* field here that
     #: describes activity beyond the caller, and the API never puts it in a
     #: response — a caller learning the deployment's load learns about other
     #: callers. It goes to the operator's log.
@@ -557,28 +561,46 @@ class JobStore(Protocol):
     implementer can miss.
 
     **Every bound admission enforces is enforced by that one call.** The
-    concurrency ceiling, the per-subject rate, the per-subject token budget and
+    concurrency ceiling, the per-owner rate, the per-owner token budget and
     the deployment's global token budget all read state the insert then changes,
     so splitting any of them out would put the race back — one bound at a time.
+
+    **The same call creates the principal of a first submission** (ADR 0064).
+    ``principal`` is a new principal whose owner ID is the record's. The store
+    keeps it only where it admits the job, so a refused submission leaves no
+    principal, and it refuses with ``principal_exists`` where the identity
+    already holds one. Without ``principal``, the record's owner must already
+    hold a principal. A read creates none: :meth:`principal` finds nothing for
+    an unknown identity, and every read by an owner ID that owns nothing
+    answers as for a missing job.
     """
 
     async def reserve(
-        self, record: JobRecord, *, ceiling: int, budget: BudgetPolicy
+        self,
+        record: JobRecord,
+        *,
+        ceiling: int,
+        budget: BudgetPolicy,
+        principal: Principal | None = None,
     ) -> Admission: ...
+
+    async def principal(self, identity: Identity) -> Principal | None: ...
 
     async def get(self, job_id: str) -> JobRecord | None: ...
 
-    async def owned(self, job_id: str, subject: str) -> JobRecord | None: ...
+    async def owned(self, job_id: str, owner_id: str) -> JobRecord | None: ...
 
-    async def report_json(self, job_id: str, subject: str) -> dict[str, Any] | None: ...
+    async def report_json(
+        self, job_id: str, owner_id: str
+    ) -> dict[str, Any] | None: ...
 
-    async def report(self, job_id: str, subject: str) -> Report | None: ...
+    async def report(self, job_id: str, owner_id: str) -> Report | None: ...
 
-    async def checkpoint(self, job_id: str, subject: str) -> Checkpoint | None: ...
+    async def checkpoint(self, job_id: str, owner_id: str) -> Checkpoint | None: ...
 
-    async def resumption(self, job_id: str, subject: str) -> Resumption | None: ...
+    async def resumption(self, job_id: str, owner_id: str) -> Resumption | None: ...
 
-    async def resumed_by(self, job_id: str, subject: str) -> str | None: ...
+    async def resumed_by(self, job_id: str, owner_id: str) -> str | None: ...
 
     async def events_after(
         self, job_id: str, seen: int
@@ -589,7 +611,7 @@ class JobStore(Protocol):
     async def save_round(
         self,
         job_id: str,
-        subject: str,
+        owner_id: str,
         answers: AnswerSet,
         shown: Sequence[UnknownKey],
         skipped: Sequence[SkipKey],
@@ -597,20 +619,20 @@ class JobStore(Protocol):
     ) -> bool: ...
 
     async def save_corrections(
-        self, job_id: str, subject: str, corrections: Sequence[FactAnswer]
+        self, job_id: str, owner_id: str, corrections: Sequence[FactAnswer]
     ) -> bool: ...
 
     async def save_draft(
         self,
         job_id: str,
-        subject: str,
+        owner_id: str,
         draft: AnswerSet,
         revision: int,
     ) -> bool: ...
 
-    async def owned_jobs(self, subject: str) -> list[JobRecord]: ...
+    async def owned_jobs(self, owner_id: str) -> list[JobRecord]: ...
 
-    async def delete(self, job_id: str, subject: str) -> bool: ...
+    async def delete(self, job_id: str, owner_id: str) -> bool: ...
 
     async def fail_in_flight(self) -> list[str]: ...
 
@@ -625,7 +647,7 @@ class UsageRow:
     """
 
     job_id: str
-    owner_subject: str
+    owner_id: str
     created_at: datetime
     reserved_tokens: int
     measured_tokens: int | None
@@ -647,13 +669,19 @@ class InMemoryJobStore:
     def __init__(self) -> None:
         self._records: dict[str, JobRecord] = {}
         self._usage: dict[str, UsageRow] = {}
+        self._principals = PrincipalTable()
 
     def _rows(self) -> Iterator[JobRecord | UsageRow]:
         """Every job admission counts: the records held, and the usage rows left."""
         return chain(self._records.values(), self._usage.values())
 
     async def reserve(
-        self, record: JobRecord, *, ceiling: int, budget: BudgetPolicy
+        self,
+        record: JobRecord,
+        *,
+        ceiling: int,
+        budget: BudgetPolicy,
+        principal: Principal | None = None,
     ) -> Admission:
         """Check every admission bound and insert, as one step.
 
@@ -674,7 +702,11 @@ class InMemoryJobStore:
 
         A duplicate id is settled before every bound, so a record the store
         already holds is never also counted against the budgets it is already
-        inside.
+        inside. The principal is settled next, and the store keeps a new
+        principal with the record it admits, in the same step.
+
+        A record whose owner ID is not ``principal``'s, or whose owner holds no
+        principal where none is given, is the caller's defect, and it raises.
 
         **The bounds run cheapest-first, and the order is the answer a caller
         gets.** A submission over several of them hears about the concurrency
@@ -685,6 +717,13 @@ class InMemoryJobStore:
         """
         if record.id in self._records:
             return Admission(outcome="duplicate", active=0)
+        if principal is None:
+            if not self._principals.holds(record.owner_id):
+                raise ValueError(f"owner {record.owner_id} holds no principal")
+        elif principal.owner_id != record.owner_id:
+            raise ValueError(f"job {record.id} names another owner than its principal")
+        elif self._principals.find(principal.identity) is not None:
+            return Admission(outcome="principal_exists", active=0)
         parent = parent_of(record)
         if parent is not None and self._resumed_by(parent) is not None:
             return Admission(outcome="resumed_already", active=0)
@@ -695,9 +734,9 @@ class InMemoryJobStore:
         ):
             return Admission(outcome="parent_moved", active=0)
 
-        subject = record.owner_subject
+        owner_id = record.owner_id
         since = budget.window_start()
-        mine = [held for held in self._rows() if held.owner_subject == subject]
+        mine = [held for held in self._rows() if held.owner_id == owner_id]
 
         active = sum(1 for held in mine if held.status not in TERMINAL_STATUSES)
         if active >= ceiling:
@@ -707,16 +746,16 @@ class InMemoryJobStore:
         if started >= budget.max_jobs_per_window:
             return Admission(outcome="over_rate", active=active)
 
-        subject_tokens = spent_tokens(
+        owner_tokens = spent_tokens(
             (held.reserved_tokens, held.measured_tokens)
             for held in mine
             if held.created_at >= since
         )
-        if subject_tokens + record.reserved_tokens > budget.max_tokens_per_window:
+        if owner_tokens + record.reserved_tokens > budget.max_tokens_per_window:
             return Admission(
-                outcome="over_subject_budget",
+                outcome="over_owner_budget",
                 active=active,
-                subject_tokens=subject_tokens,
+                owner_tokens=owner_tokens,
             )
 
         global_tokens = spent_tokens(
@@ -728,15 +767,17 @@ class InMemoryJobStore:
             return Admission(
                 outcome="over_global_budget",
                 active=active,
-                subject_tokens=subject_tokens,
+                owner_tokens=owner_tokens,
                 global_tokens=global_tokens,
             )
 
+        if principal is not None:
+            self._principals.add(principal)
         self._records[record.id] = record.model_copy(deep=True)
         return Admission(
             outcome="admitted",
             active=active,
-            subject_tokens=subject_tokens,
+            owner_tokens=owner_tokens,
             global_tokens=global_tokens,
         )
 
@@ -760,23 +801,27 @@ class InMemoryJobStore:
             None,
         )
 
-    async def resumed_by(self, job_id: str, subject: str) -> str | None:
+    async def resumed_by(self, job_id: str, owner_id: str) -> str | None:
         """The ID of the owned job's resumed job that locks it, or ``None``.
 
-        ``None`` too where the job is not the subject's, as every other read
+        ``None`` too where the job is not the owner's, as every other read
         answers a foreign job.
         """
         record = self._records.get(job_id)
-        if record is None or record.owner_subject != subject:
+        if record is None or record.owner_id != owner_id:
             return None
         return self._resumed_by(job_id)
+
+    async def principal(self, identity: Identity) -> Principal | None:
+        """The principal of ``identity``, or ``None``. Creates nothing."""
+        return self._principals.find(identity)
 
     async def get(self, job_id: str) -> JobRecord | None:
         record = self._records.get(job_id)
         return None if record is None else record.model_copy(deep=True)
 
-    async def owned(self, job_id: str, subject: str) -> JobRecord | None:
-        """The record ``subject`` owns, as an envelope, or ``None``.
+    async def owned(self, job_id: str, owner_id: str) -> JobRecord | None:
+        """The record ``owner_id`` owns, as an envelope, or ``None``.
 
         What the status and event routes need: they read the envelope and never
         the analysis. The report, the checkpoint and the resumption are nearly
@@ -793,14 +838,14 @@ class InMemoryJobStore:
         same *speed* is the other half of that.
         """
         record = self._records.get(job_id)
-        if record is None or record.owner_subject != subject:
+        if record is None or record.owner_id != owner_id:
             return None
         envelope = record.model_copy(
             update={"report": None, "checkpoint": None, "resumption": None}
         )
         return envelope.model_copy(deep=True)
 
-    async def report_json(self, job_id: str, subject: str) -> dict[str, Any] | None:
+    async def report_json(self, job_id: str, owner_id: str) -> dict[str, Any] | None:
         """The owned job's report, already JSON, or ``None`` if it has none.
 
         Serialized straight off the stored record. ``model_dump`` builds a fresh
@@ -811,13 +856,13 @@ class InMemoryJobStore:
         the one thing on the record worth reading.
         """
         record = self._records.get(job_id)
-        if record is None or record.owner_subject != subject:
+        if record is None or record.owner_id != owner_id:
             return None
         if record.report is None:
             return None
         return record.report.model_dump(mode="json")
 
-    async def report(self, job_id: str, subject: str) -> Report | None:
+    async def report(self, job_id: str, owner_id: str) -> Report | None:
         """The owned job's report, as a copy the caller may keep, or ``None``.
 
         One pass over the stored report. Serializing it with :meth:`report_json`
@@ -825,13 +870,13 @@ class InMemoryJobStore:
         Ownership is re-checked, as :meth:`report_json` does.
         """
         record = self._records.get(job_id)
-        if record is None or record.owner_subject != subject:
+        if record is None or record.owner_id != owner_id:
             return None
         if record.report is None:
             return None
         return record.report.model_copy(deep=True)
 
-    async def checkpoint(self, job_id: str, subject: str) -> Checkpoint | None:
+    async def checkpoint(self, job_id: str, owner_id: str) -> Checkpoint | None:
         """The owned job's checkpoint, as a copy the caller may keep, or ``None``.
 
         The only route that reads a checkpoint asks for it here, so a status
@@ -839,13 +884,13 @@ class InMemoryJobStore:
         does.
         """
         record = self._records.get(job_id)
-        if record is None or record.owner_subject != subject:
+        if record is None or record.owner_id != owner_id:
             return None
         if record.checkpoint is None:
             return None
         return record.checkpoint.model_copy(deep=True)
 
-    async def resumption(self, job_id: str, subject: str) -> Resumption | None:
+    async def resumption(self, job_id: str, owner_id: str) -> Resumption | None:
         """The owned job's resumption, as a copy, or ``None``.
 
         The envelope leaves it out for its weight, and a finished job's
@@ -853,7 +898,7 @@ class InMemoryJobStore:
         whether its report is final (ADR 0054).
         """
         record = self._records.get(job_id)
-        if record is None or record.owner_subject != subject:
+        if record is None or record.owner_id != owner_id:
             return None
         if record.resumption is None:
             return None
@@ -883,7 +928,7 @@ class InMemoryJobStore:
     async def save_round(
         self,
         job_id: str,
-        subject: str,
+        owner_id: str,
         answers: AnswerSet,
         shown: Sequence[UnknownKey],
         skipped: Sequence[SkipKey],
@@ -896,14 +941,14 @@ class InMemoryJobStore:
         revision the save read: the check and the next revision are one step,
         so of two saves that read one revision only the first lands. Only these
         change, so the checkpoint an envelope read leaves
-        behind is kept. False where the job is not the subject's, no longer
+        behind is kept. False where the job is not the owner's, no longer
         waits, or its answers already started a resumed job that nothing
         reads a later save into, and nothing is written.
         """
         record = self._records.get(job_id)
         if (
             record is None
-            or record.owner_subject != subject
+            or record.owner_id != owner_id
             or record.status != "awaiting-answers"
             or record.round_revision != revision
             or self._resumed_by(job_id) is not None
@@ -919,7 +964,7 @@ class InMemoryJobStore:
     async def save_draft(
         self,
         job_id: str,
-        subject: str,
+        owner_id: str,
         draft: AnswerSet,
         revision: int,
     ) -> bool:
@@ -928,13 +973,13 @@ class InMemoryJobStore:
         ``draft`` is every draft answer so far. ``revision`` is
         the revision the save read: the check and the next revision are one
         step, as for :meth:`save_round`. False where the job is not the
-        subject's, has no report, has a final report, or its answers already
+        owner's, has no report, has a final report, or its answers already
         started a resumed job, and nothing is written.
         """
         record = self._records.get(job_id)
         if (
             record is None
-            or record.owner_subject != subject
+            or record.owner_id != owner_id
             or record.status != "completed"
             or record.final()
             or record.round_revision != revision
@@ -947,14 +992,14 @@ class InMemoryJobStore:
         return True
 
     async def save_corrections(
-        self, job_id: str, subject: str, corrections: Sequence[FactAnswer]
+        self, job_id: str, owner_id: str, corrections: Sequence[FactAnswer]
     ) -> bool:
         """Keep a final report's corrections. False where the job is not the
-        subject's or its report is not final, and nothing is written."""
+        owner's or its report is not final, and nothing is written."""
         record = self._records.get(job_id)
         if (
             record is None
-            or record.owner_subject != subject
+            or record.owner_id != owner_id
             or record.status != "completed"
             or not record.final()
         ):
@@ -963,35 +1008,35 @@ class InMemoryJobStore:
         record.updated_at = datetime.now(UTC)
         return True
 
-    async def owned_jobs(self, subject: str) -> list[JobRecord]:
-        """Every job the subject owns, as envelopes, oldest first.
+    async def owned_jobs(self, owner_id: str) -> list[JobRecord]:
+        """Every job of the owner, as envelopes, oldest first.
 
         A deleted job is not listed: its usage row is admission's to read.
         """
         return [
-            await self.owned(record.id, subject)  # type: ignore[misc]
+            await self.owned(record.id, owner_id)  # type: ignore[misc]
             for record in self._records.values()
-            if record.owner_subject == subject
+            if record.owner_id == owner_id
         ]
 
-    async def delete(self, job_id: str, subject: str) -> bool:
+    async def delete(self, job_id: str, owner_id: str) -> bool:
         """Remove the owned job's content, and keep its usage row (ADR 0066).
 
         Only a job in a terminal status can be deleted: a job in flight holds
-        a slot its run releases. False where the job is not the subject's or
+        a slot its run releases. False where the job is not the owner's or
         not terminal, and nothing changes.
         """
         record = self._records.get(job_id)
         if (
             record is None
-            or record.owner_subject != subject
+            or record.owner_id != owner_id
             or record.status not in TERMINAL_STATUSES
         ):
             return False
         del self._records[job_id]
         self._usage[job_id] = UsageRow(
             job_id=job_id,
-            owner_subject=record.owner_subject,
+            owner_id=record.owner_id,
             created_at=record.created_at,
             reserved_tokens=record.reserved_tokens,
             measured_tokens=record.measured_tokens,

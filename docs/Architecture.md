@@ -540,5 +540,6 @@ and the selection seam are in place for all of them.
 | `analysis_service.binding` | Builds one adapter per tier from `(vendor, model, sampling, resilience)`, and the `NodeBinding` the graph binds onto its LLM nodes. |
 | `analysis_service.model_gate` | The startup check that asks the provider library whether a tier's parameters are actually supported. |
 | `analysis_service.certification` | Compares a run's fingerprints against the deployment's blessed manifest. |
-| `analysis_service.auth` | Bearer-token (OIDC JWT) verification. |
+| `analysis_service.auth` | Bearer-token (OIDC JWT) verification: it returns the token's issuer and `sub`. |
+| `analysis_service.principals` | The **Principal** of an issuer and a `sub`, and the random owner ID that owns each of its jobs (ADR 0064). |
 | `analysis_service.errors` | `ConfigError`, the base every fail-closed config loader raises — so a caller can handle "this deployment cannot run" without enumerating which knob was wrong. |

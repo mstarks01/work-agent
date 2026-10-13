@@ -1,4 +1,4 @@
-"""Per-subject and global consumption budgets over a rolling window (#503)."""
+"""Per-owner and global consumption budgets over a rolling window (#503)."""
 
 from __future__ import annotations
 
@@ -160,7 +160,7 @@ def test_the_admission_result_carries_no_other_subjects_activity():
     withholds from the response and puts in the operator's log instead.
     """
     fields = set(Admission.__dataclass_fields__)
-    assert fields == {"outcome", "active", "subject_tokens", "global_tokens"}
+    assert fields == {"outcome", "active", "owner_tokens", "global_tokens"}
 
 
 def test_a_report_settles_to_what_its_nodes_measured():

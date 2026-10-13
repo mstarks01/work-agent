@@ -1,4 +1,4 @@
-"""Per-subject and global consumption budgets over a rolling window.
+"""Per-owner and global consumption budgets over a rolling window.
 
 The concurrency ceiling bounds how many jobs a caller may run at once. It is
 self-clearing by design, because finishing a job buys the next one, and that is
@@ -8,12 +8,12 @@ an unbounded number of paid jobs. That is the unbounded-consumption half of
 OWASP LLM10, and ADR 0007 named it as the integrator's to close. This module is
 where the service closes it instead.
 
-There are two bounds over one window. A subject gets a job count and a token
+There are two bounds over one window. An owner gets a job count and a token
 budget per rolling window, and the deployment gets a token budget of its own
-across every subject. The count stops a burst of trivial submissions. The token
+across every owner. The count stops a burst of trivial submissions. The token
 budget stops one large submission doing the same damage in a single job. Neither
-substitutes for the other. The global bound is not the sum of the per-subject
-ones: it is the provider quota's share, which a deployment with ten subjects
+substitutes for the other. The global bound is not the sum of the per-owner
+ones: it is the provider quota's share, which a deployment with ten owners
 divides rather than multiplies.
 
 The bounds are in tokens rather than dollars, and the difference is not a
@@ -36,8 +36,8 @@ less than it spends.
 
 Over-counting is the direction a bound that must hold before anything is spent
 should err in, and this does not, so it is a floor rather than a bound today.
-What keeps that from being an exposure is that ``max_jobs_per_window`` refuses a
-subject first at every shipped deployment. :func:`estimate` records what fixing
+What keeps that from being an exposure is that ``max_jobs_per_window`` refuses an
+owner first at every shipped deployment. :func:`estimate` records what fixing
 it takes. The service replaces the
 reservation with the measured usage the moment the job reaches a terminal state,
 so a window's accounting converges on what happened rather than on what was
@@ -124,7 +124,7 @@ def estimate(
     submission the service accepts it is still 1.24 times short.
 
     What limits the damage today is that this is not the bound that binds:
-    ``max_jobs_per_window`` refuses a subject before ``max_tokens_per_window``
+    ``max_jobs_per_window`` refuses an owner before ``max_tokens_per_window``
     does, at every deployment shipped. So the bound the configuration names as
     the spend bound is the inert one, which is worth fixing and is not an
     exposure while that holds.
@@ -156,8 +156,8 @@ class BudgetPolicy(BaseModel):
     window_seconds: int = Field(gt=0)
     max_jobs_per_window: int = Field(ge=1)
     max_tokens_per_window: int = Field(ge=1)
-    #: Across every subject, not the sum of their allowances. This is the
-    #: provider quota's share, which a deployment with ten subjects divides
+    #: Across every owner, not the sum of their allowances. This is the
+    #: provider quota's share, which a deployment with ten owners divides
     #: rather than multiplies.
     global_max_tokens_per_window: int = Field(ge=1)
 

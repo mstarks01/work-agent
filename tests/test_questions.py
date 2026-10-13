@@ -394,7 +394,7 @@ class TestTheResumedRunWithoutACatalog:
             key=(flow_id(), "encryption_in_transit", "", "", "", ""), value="TLS 1.3"
         )
         record = JobRecord.create(
-            owner_subject="idp|user-1",
+            owner_id="idp|user-1",
             sources=with_link_answers([DESCRIPTION], [], [answer]),
             frameworks=sample_selection(),
             answers=AnswerSet(facts=(answer,)),
@@ -427,7 +427,7 @@ class TestTheRoutes:
         from tests.test_api import admit
 
         record = JobRecord.create(
-            owner_subject="alice", sources=[DESCRIPTION], frameworks=sample_selection()
+            owner_id="alice", sources=[DESCRIPTION], frameworks=sample_selection()
         )
         record.transition("running")
         asked = UnknownRef(
@@ -507,7 +507,7 @@ def resume(checkpoint, facts=(), earlier=(), given=(DESCRIPTION,)):
     """One resumed job on the real graph from ``prepare``, and its report."""
     sources, links, answered = resumed_sources(list(given), [], [], earlier, facts)
     job = JobRecord.create(
-        owner_subject="idp|user-1",
+        owner_id="idp|user-1",
         sources=sources,
         frameworks=sample_selection(),
         answers=AnswerSet(links=tuple(links), facts=tuple(answered)),
@@ -621,7 +621,7 @@ def resume_links(checkpoint, links, earlier=()):
     """One resumed job with link answers, on the real graph from ``prepare``."""
     sources, merged, facts = resumed_sources([DESCRIPTION], earlier, links)
     job = JobRecord.create(
-        owner_subject="idp|user-1",
+        owner_id="idp|user-1",
         sources=sources,
         frameworks=sample_selection(),
         answers=AnswerSet(links=tuple(merged), facts=tuple(facts)),

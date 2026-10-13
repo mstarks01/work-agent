@@ -6,6 +6,7 @@ import logging
 from collections.abc import Sequence
 from dataclasses import replace
 from typing import ClassVar, get_args
+from uuid import UUID
 
 import pytest
 from fastapi.testclient import TestClient
@@ -21,6 +22,7 @@ from analysis_service.auth import AuthenticationError
 from analysis_service.budgets import BudgetPolicy
 from analysis_service.claims import FrameworkName
 from analysis_service.deployment import Deployment
+from analysis_service.engine import DEFAULT_CALLER
 from analysis_service.errors import ConfigError
 from analysis_service.jobs import (
     RESTART_FAILURE_MESSAGE,
@@ -35,6 +37,7 @@ from analysis_service.jobs import (
 )
 from analysis_service.parsing import ascii_int
 from analysis_service.pipeline import AdkPipelineRunner
+from analysis_service.principals import Identity
 from analysis_service.report import Report
 from analysis_service.sources import Source, SourceLimits
 from analysis_service.validation import ValidationIssue
@@ -43,18 +46,21 @@ from tests.factories import (
     DEFAULT_FRAMEWORKS,
     SEEDING_BUDGET,
     admit,
+    identity_of,
     sample_selection,
 )
 from tests.test_deployment import VERTEX_ENV
 from tests.test_parsing import ISDIGIT_TRAPS
 
-TOKENS = {"alice-token": "alice", "bob-token": "bob"}
+TOKENS = {"alice-token": "alice", "bob-token": "bob", "carol-token": "carol"}
 
 
 class FakeVerifier:
-    def verify(self, token: str) -> str:
+    """Each token in :data:`TOKENS` names its ``sub`` under the test issuer."""
+
+    def verify(self, token: str) -> Identity:
         try:
-            return TOKENS[token]
+            return identity_of(TOKENS[token])
         except KeyError:
             raise AuthenticationError("invalid or expired credentials") from None
 
@@ -100,12 +106,13 @@ def make_client(
     budget: BudgetPolicy = SEEDING_BUDGET,
     frameworks: Sequence[FrameworkName] = DEFAULT_FRAMEWORKS,
     raise_server_exceptions: bool = True,
+    verifier=None,
 ) -> tuple[TestClient, InMemoryJobStore]:
     store = store if store is not None else InMemoryJobStore()
     app = create_app(
         store=store,
         runner=runner if runner is not None else StubPipelineRunner(),
-        verifier=FakeVerifier(),
+        verifier=verifier if verifier is not None else FakeVerifier(),
         limits=limits,
         job_deadline_seconds=TEST_DEADLINE_SECONDS,
         max_active_jobs=max_active_jobs,
@@ -309,7 +316,7 @@ class TestSystemNameIsBoundedLikeALabel:
     """It reaches the report a consumer renders, so this entry point refuses
     more than a bad length.
 
-    A Source label refuses these categories and the token subject refuses them
+    A Source label refuses these categories and the token sub refuses them
     too. The system name refuses the same categories.
     """
 
@@ -644,6 +651,113 @@ class TestOwnership:
             assert foreign.json() == missing.json()
 
 
+class IssuerVerifier:
+    """Each token names one identity, from the issuer the token names."""
+
+    IDENTITIES: ClassVar[dict[str, Identity]] = {
+        "one-token": Identity(issuer="https://one.example", sub="alice"),
+        "two-token": Identity(issuer="https://two.example", sub="alice"),
+        "local-token": Identity.local(DEFAULT_CALLER),
+    }
+
+    def verify(self, token: str) -> Identity:
+        try:
+            return self.IDENTITIES[token]
+        except KeyError:
+            raise AuthenticationError("invalid or expired credentials") from None
+
+
+class TestPrincipals:
+    """A token's issuer and ``sub`` name a principal, and the principal's owner
+    ID owns each job (ADR 0064)."""
+
+    PATHS = ("", "/report", "/events", "/questions", "/changes")
+
+    def test_a_known_principal_reads_a_foreign_job_as_a_missing_one(self):
+        client, _ = make_client()
+        job_id = submit(client, "alice-token")
+        submit(client, "bob-token")
+        for path in self.PATHS:
+            foreign = client.get(f"/v1/jobs/{job_id}{path}", headers=auth("bob-token"))
+            missing = client.get(
+                f"/v1/jobs/job-missing{path}", headers=auth("bob-token")
+            )
+            assert foreign.status_code == 404
+            assert foreign.json() == missing.json()
+
+    def test_an_unknown_principal_reads_every_job_as_a_missing_one(self):
+        client, _ = make_client()
+        job_id = submit(client, "alice-token")
+        submit(client, "bob-token")
+        for path in self.PATHS:
+            unknown = client.get(
+                f"/v1/jobs/{job_id}{path}", headers=auth("carol-token")
+            )
+            missing = client.get(
+                f"/v1/jobs/job-missing{path}", headers=auth("bob-token")
+            )
+            assert unknown.status_code == 404
+            assert unknown.json() == missing.json()
+
+    def test_a_read_creates_no_principal(self):
+        client, store = make_client()
+        job_id = submit(client, "alice-token")
+        client.get(f"/v1/jobs/{job_id}", headers=auth("carol-token"))
+        client.post(
+            f"/v1/jobs/{job_id}/answers",
+            json={"links": [], "facts": []},
+            headers=auth("carol-token"),
+        )
+        assert asyncio.run(store.principal(identity_of("carol"))) is None
+
+    def test_a_refused_submission_leaves_no_principal(self):
+        client, store = make_client(max_active_jobs=0)
+        refused = client.post("/v1/jobs", json=submission(), headers=auth())
+        assert refused.status_code == 429
+        assert asyncio.run(store.principal(identity_of("alice"))) is None
+
+    def test_the_first_submission_creates_the_principal_and_logs_the_sub_once(
+        self, caplog
+    ):
+        client, store = make_client()
+        with caplog.at_level(logging.INFO):
+            first = submit(client)
+            second = submit(client)
+        principal = asyncio.run(store.principal(identity_of("alice")))
+        assert principal is not None
+        assert UUID(principal.owner_id).version == 4
+        assert principal.identity == identity_of("alice")
+        owners = {asyncio.run(store.get(job)).owner_id for job in (first, second)}
+        assert owners == {principal.owner_id}
+        assert caplog.text.count("alice") == 1
+        assert principal.owner_id in caplog.text
+
+    def test_two_issuers_with_one_sub_are_two_owners(self):
+        client, store = make_client(verifier=IssuerVerifier())
+        job_id = submit(client, "one-token")
+        submit(client, "two-token")
+        one, two = (
+            asyncio.run(store.principal(IssuerVerifier.IDENTITIES[token]))
+            for token in ("one-token", "two-token")
+        )
+        assert one is not None and two is not None
+        assert one.owner_id != two.owner_id
+        foreign = client.get(f"/v1/jobs/{job_id}", headers=auth("two-token"))
+        assert foreign.status_code == 404
+
+    @pytest.mark.parametrize(
+        ("method", "path"), [("post", "/v1/jobs"), ("get", "/v1/jobs/job-x")]
+    )
+    def test_a_token_under_the_local_issuer_is_refused(self, method, path):
+        client, store = make_client(verifier=IssuerVerifier())
+        response = client.request(
+            method, path, headers=auth("local-token"), json=submission()
+        )
+        assert response.status_code == 401
+        local = IssuerVerifier.IDENTITIES["local-token"]
+        assert asyncio.run(store.principal(local)) is None
+
+
 class TestReport:
     def test_completed_job_returns_self_contained_report(self):
         client, _ = make_client()
@@ -658,7 +772,7 @@ class TestReport:
     def test_queued_job_report_is_409(self):
         store = InMemoryJobStore()
         record = JobRecord.create(
-            owner_subject="alice",
+            owner_id="alice",
             sources=[Source.description("an app")],
             frameworks=sample_selection(),
         )
@@ -684,7 +798,7 @@ def seed(store: InMemoryJobStore, subject: str, status: JobStatus) -> JobRecord:
     job is already terminal by the time the next one is sent.
     """
     record = JobRecord.create(
-        owner_subject=subject,
+        owner_id=subject,
         sources=[Source.description("an app")],
         frameworks=sample_selection(),
     )
@@ -731,8 +845,10 @@ class TestAdmissionOutcomes:
         client, store = make_client(raise_server_exceptions=False)
         real = store.reserve
 
-        async def forged(record, *, ceiling, budget):
-            admission = await real(record, ceiling=ceiling, budget=budget)
+        async def forged(record, *, ceiling, budget, principal=None):
+            admission = await real(
+                record, ceiling=ceiling, budget=budget, principal=principal
+            )
             return replace(admission, outcome="unforeseen")
 
         store.reserve = forged
@@ -818,7 +934,7 @@ class TestConcurrencyCeiling:
         client, _ = make_client(store=store, max_active_jobs=1)
         client.post("/v1/jobs", json=submission(), headers=auth())
         probe = JobRecord.create(
-            owner_subject="alice",
+            owner_id="alice",
             sources=[Source.description("an app")],
             frameworks=sample_selection(),
         )
@@ -1108,7 +1224,9 @@ class TestConsumptionBudgets:
         client, _ = make_client(budget=tiny)
         with caplog.at_level(logging.WARNING, logger="analysis_service.api"):
             client.post("/v1/jobs", json=submission(), headers=auth())
-        assert "alice" in caplog.text
+        refusal = next(r for r in caplog.records if "refused" in r.getMessage())
+        assert UUID(refusal.args[0]).version == 4, "a refusal names the owner ID"
+        assert "alice" not in caplog.text, "and never the sub"
         assert "over_global_budget" in caplog.text
         assert "across the deployment" in caplog.text
 
@@ -1117,7 +1235,7 @@ class TestConsumptionBudgets:
         client, store = make_client(budget=tiny)
         client.post("/v1/jobs", json=submission(), headers=auth())
         probe = JobRecord.create(
-            owner_subject="alice",
+            owner_id="alice",
             sources=[Source.description("an app")],
             frameworks=sample_selection(),
         )

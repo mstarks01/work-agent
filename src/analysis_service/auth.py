@@ -1,7 +1,9 @@
 """Bearer-token verification for the `/v1` API.
 
 Every `/v1` route requires a valid bearer token, and verification returns only
-the token subject. That subject is what job ownership binds to.
+the token's issuer and its ``sub`` claim. That pair is the
+:class:`~analysis_service.principals.Identity` of a **Principal**, and job
+ownership binds to the principal's owner ID, never to the ``sub``.
 
 The default ``oidc`` backend verifies OIDC JWTs. It checks the signature through
 JWKS, and the issuer, audience and expiry, which covers any standard OIDC
@@ -25,7 +27,7 @@ It must be ``https``; see :meth:`OidcSettings._https_jwks`. Its fetch may not
 stall a request past :data:`JWKS_TIMEOUT_SECONDS`. A fetch that fails or times
 out raises ``PyJWKClientConnectionError``, which is a ``PyJWTError``, so it
 lands on the same fail-closed path as a bad token: the service refuses the
-request rather than serving it on an unverified subject.
+request rather than serving it on an unverified identity.
 """
 
 from __future__ import annotations
@@ -39,6 +41,7 @@ from typing import Any, Protocol
 import jwt
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator
 
+from analysis_service.principals import Identity
 from analysis_service.sources import plain_name
 
 logger = logging.getLogger(__name__)
@@ -124,7 +127,7 @@ class AuthenticationError(Exception):
 class TokenVerifier(Protocol):
     """What the API layer requires of an auth backend."""
 
-    def verify(self, token: str) -> str: ...
+    def verify(self, token: str) -> Identity: ...
 
 
 class OidcSettings(BaseModel):
@@ -174,7 +177,7 @@ class OidcSettings(BaseModel):
         The signing keys fetched from here are the whole basis on which a token
         is trusted, so plaintext transport makes token verification forgeable by
         anyone on the path: substitute the key set, sign your own token, become
-        any subject. Refused rather than warned about, and with no loopback
+        any principal. Refused rather than warned about, and with no loopback
         exemption — this is deploy-time configuration, and a local identity
         provider that speaks HTTP is a test fixture, which reaches
         :class:`OidcJwtVerifier` by constructing it directly rather than through
@@ -250,23 +253,24 @@ def _parse_algorithms(raw: str) -> tuple[str, ...] | None:
     return tuple(_CANONICAL_ALGORITHMS.get(name.upper(), name) for name in names)
 
 
-def _clean_subject(subject: str) -> str:
-    """Return the subject, or reject one that cannot key an owner safely.
+def _clean_sub(sub: str) -> str:
+    """Return the ``sub`` claim, or reject one that cannot key a principal safely.
 
     ``require: ["sub"]`` only proves the claim is present, so PyJWT accepts an
-    empty or whitespace ``sub``. That is the sole ownership key, with no RBAC
-    above it, so two callers issued a blank ``sub`` would collapse into one
-    owner. A line break or a control character is rejected for a second
-    reason: the subject reaches a log line, and a line break would forge a
-    second record there (CWE-117). :func:`~analysis_service.sources.plain_name`
-    is the rule, as it is for a source label.
+    empty or whitespace ``sub``. With the issuer it is the sole key of a
+    principal, with no RBAC above it, so two callers issued a blank ``sub``
+    would collapse into one owner. A line break or a control character is
+    rejected for a second reason: the ``sub`` reaches the log line that
+    records a new principal, and a line break would forge a second record
+    there (CWE-117). :func:`~analysis_service.sources.plain_name` is the rule,
+    as it is for a source label.
     """
-    if not subject.strip():
-        raise AuthenticationError("token subject is empty")
+    if not sub.strip():
+        raise AuthenticationError("token sub is empty")
     try:
-        return plain_name(subject)
+        return plain_name(sub)
     except ValueError as error:
-        raise AuthenticationError(f"token subject {error}") from None
+        raise AuthenticationError(f"token sub {error}") from None
 
 
 class SigningKeyClient(Protocol):
@@ -340,8 +344,12 @@ class OidcJwtVerifier:
             cooldown_seconds=JWKS_REFRESH_COOLDOWN_SECONDS,
         )
 
-    def verify(self, token: str) -> str:
-        """Return the token subject, or raise :class:`AuthenticationError`."""
+    def verify(self, token: str) -> Identity:
+        """Return the token's issuer and ``sub``, or raise :class:`AuthenticationError`.
+
+        The issuer is the ``iss`` claim, which ``jwt.decode`` already held
+        equal to the configured issuer.
+        """
         try:
             signing_key = self._jwks_client.get_signing_key_from_jwt(token)
             claims = jwt.decode(
@@ -371,7 +379,7 @@ class OidcJwtVerifier:
             # would forge a log record from an unauthenticated request.
             logger.info("rejected bearer token: %r", str(exc))
             raise AuthenticationError("invalid or expired credentials") from exc
-        return _clean_subject(claims["sub"])
+        return Identity(issuer=claims["iss"], sub=_clean_sub(claims["sub"]))
 
 
 VerifierFactory = Callable[[Mapping[str, str]], TokenVerifier]

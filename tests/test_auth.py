@@ -22,6 +22,7 @@ from analysis_service.auth import (
     _CooldownSigningKeyClient,
     build_verifier,
 )
+from analysis_service.principals import Identity
 from analysis_service.sources import plain_name
 
 ISSUER = "https://idp.example.com"
@@ -81,8 +82,8 @@ def make_token(**overrides) -> str:
 
 
 class TestOidcJwtVerifier:
-    def test_valid_token_yields_subject(self):
-        assert verifier().verify(make_token()) == "alice"
+    def test_valid_token_yields_its_issuer_and_its_sub(self):
+        assert verifier().verify(make_token()) == Identity(issuer=ISSUER, sub="alice")
 
     def test_expired_token_rejected(self):
         token = make_token(exp=datetime.now(UTC) - timedelta(minutes=5))
@@ -97,41 +98,41 @@ class TestOidcJwtVerifier:
         with pytest.raises(AuthenticationError):
             verifier().verify(make_token(iss="https://evil.example.com"))
 
-    def test_missing_subject_rejected(self):
+    def test_missing_sub_rejected(self):
         with pytest.raises(AuthenticationError):
             verifier().verify(make_token(sub=None))
 
-    def test_empty_subject_rejected(self):
-        # ``require: ["sub"]`` only proves presence, so an empty subject passes
-        # PyJWT. It is the sole ownership key, so two callers issued a blank sub
-        # would collapse into one owner.
+    def test_empty_sub_rejected(self):
+        # ``require: ["sub"]`` only proves presence, so an empty sub passes
+        # PyJWT. With the issuer it is the sole key of a principal, so two
+        # callers issued a blank sub would collapse into one owner.
         with pytest.raises(AuthenticationError):
             verifier().verify(make_token(sub=""))
 
-    def test_whitespace_subject_rejected(self):
+    def test_whitespace_sub_rejected(self):
         with pytest.raises(AuthenticationError):
             verifier().verify(make_token(sub="   "))
 
-    def test_control_character_subject_rejected(self):
-        # A newline in the subject would forge a second record on the log line
-        # the subject reaches (CWE-117).
+    def test_control_character_sub_rejected(self):
+        # A newline in the sub would forge a second record on the log line
+        # the sub reaches (CWE-117).
         with pytest.raises(AuthenticationError):
             verifier().verify(make_token(sub="alice\nCRITICAL forged"))
 
     @pytest.mark.parametrize(
         "char", ["\n", "\x1c", "\x85", "\u2028", "\u2029", "\u202e", "\u200b", "é"]
     )
-    def test_the_subject_takes_what_a_source_label_takes(self, char):
-        """Two readers of one rule, held against each other. The subject read
+    def test_the_sub_takes_what_a_source_label_takes(self, char):
+        """Two readers of one rule, held against each other. The sub read
         the control categories and admitted U+2028 and U+2029 (run 11)."""
-        subject = f"alice{char}bob"
+        sub = f"alice{char}bob"
         try:
-            plain_name(subject)
+            plain_name(sub)
         except ValueError:
             with pytest.raises(AuthenticationError):
-                verifier().verify(make_token(sub=subject))
+                verifier().verify(make_token(sub=sub))
         else:
-            assert verifier().verify(make_token(sub=subject)) == subject
+            assert verifier().verify(make_token(sub=sub)).sub == sub
 
     def test_hs256_token_rejected(self):
         claims = {
