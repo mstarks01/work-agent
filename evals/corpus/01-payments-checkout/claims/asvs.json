@@ -125,6 +125,18 @@
   },
   {
     "chapter": "authorization",
+    "requirement": "V8.2.1",
+    "affected_element_ids": [
+      "process:order-service",
+      "flow:process:storefront-api>process:order-service>submit-order"
+    ],
+    "claim": "The order service takes an order submission from anything that can reach it, so no stated permission limits who may call the submit-order operation.",
+    "tier": "expected",
+    "disposition": "gap-from-prose",
+    "notes": "The source says the gRPC call carries no auth and the service accepts anything that can reach it. Network reachability is not a permission on the operation. The signed facts hold this as an authorization-grant row, which the system model has no field for."
+  },
+  {
+    "chapter": "authorization",
     "requirement": "V8.2.2",
     "affected_element_ids": [
       "entity:shopper",

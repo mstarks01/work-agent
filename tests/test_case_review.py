@@ -62,7 +62,8 @@ UNREVIEWED: dict[str, str] = {
     "01-payments-checkout": (
         "model.json gained trust_zone assumptions for the shopper and the card"
         " processor, placements the signed facts already call inferred. No"
-        " element, attribute value or claim changed; the digest did."
+        " element or attribute value changed. claims/asvs.json gained a V8.2.1"
+        " record, a gap from prose the reader has not marked."
     ),
     "04-ml-inference-service": (
         "model.json gained a trust_zone assumption for the calling service, a"

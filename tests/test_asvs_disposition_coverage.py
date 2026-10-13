@@ -36,7 +36,7 @@ from evals.harness.reference import (
 #: How many ASVS reference records each case carries, all of which must carry a
 #: disposition. Spelled per case for the reason ``CLAIMS_PER_CASE`` is.
 RECORDS_PER_CASE: dict[str, int] = {
-    "01-payments-checkout": 18,
+    "01-payments-checkout": 19,
     "04-ml-inference-service": 9,
     "05-cookbook-queue-webapp": 7,
     "06-cookbook-online-game": 6,
