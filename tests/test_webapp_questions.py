@@ -1569,30 +1569,34 @@ const group = ids.questions.querySelectorAll("details").find((d) => d.className 
 const child = (r, tag) => r.children.find(c => typeof c === "object" && c.tag === tag);
 const walk = (n, out = []) => { for (const c of n.children || [])
   if (typeof c === "object") { out.push(c); walk(c, out); } return out; };
-const shared = walk(group).filter(n => n.tag === "b" && n.textContent === "Same for all");
+const shared = group.children.filter(c => c.className === "shared-controls");
+const each = group.children.find(c => c.className === "each-one");
+const rowsOf = () => each.children.filter(c => c.tag === "p");
 calls.push({ shared: shared.length });
 """
 
 
-def test_same_for_all_fills_only_the_ticked_rows():
-    """One answer for several parts, with exceptions (#1289, design note C)."""
+def test_one_shared_answer_fills_every_row_but_an_exception():
+    """A box asks its question once for every part it lists, and a row
+    unticked under "Answer each one separately" keeps its own (ADR 0081)."""
     first, second = valid_model().data_flows[:2]
     facts = [_control_row(first), _control_row(second)]
     steps = (
         _SHARED_STEPS.replace("FACTS", json.dumps(facts))
         + """
-const [top, ...rows] = group.children.filter(c => c.tag === "div" || c.tag === "p");
-const line = child(top, "p");
-const state = child(line, "select");
+calls.push({ closed: !each.open, applies: shared[0].children[1].textContent });
+child(rowsOf()[1], "input").checked = false;
+const state = child(shared[0].children[0], "select");
 state.value = "none"; state.listeners.change();
-const ticks = group.children.filter(c => c.tag === "p").map(r => child(r, "input"));
-ticks[1].checked = false;
-await child(line, "button").listeners.click();
 await ids.continue.listeners.click(); await settle();
 """
     )
     seen = _run_form_script(steps)["calls"]
     assert seen[1] == {"shared": 1}
+    assert seen[2] == {
+        "closed": True,
+        "applies": f"Applies to: {first.name}, {second.name}",
+    }
     sent = next(c for c in seen if c.get("url") == "/answer/r1")
     assert sent["body"]["facts"] == [{"key": facts[0]["key"], "value": "none"}]
 
@@ -1649,7 +1653,7 @@ await ids.analyze.listeners.submit({{ preventDefault() {{}} }}); await settle();
 streams[0].listeners.questions({{ data: JSON.stringify({{ run: "r1", link_questions: [],
   early_questions: {json.dumps(facts)} }}) }});
 const groups = ids.questions.querySelectorAll("details").filter(g => g.className === "question-group");
-const rowsOf = g => g.children.filter(r => r.tag === "p");
+const rowsOf = g => g.children.find(c => c.className === "each-one").children.filter(r => r.tag === "p");
 const child = (r, tag) => r.children.find(c => typeof c === "object" && c.tag === tag);
 calls.push({{ groups: groups.map(g => ({{
   title: g.children[0].children.map(n => n.textContent).join(""),
@@ -1703,8 +1707,9 @@ def facet_fact(element, kind="capacity-limits"):
     }
 
 
-def test_the_pause_asks_facets_as_a_table_with_a_same_for_all_row():
-    """A column per facet, a row per element, and a row that sets a column."""
+def test_the_pause_asks_facets_once_with_a_table_for_the_exceptions():
+    """One select per facet above the table sets every row's part, and the
+    table holds a column per facet and a row per element (ADR 0081)."""
     store, flow = valid_model().data_stores[0], valid_model().data_flows[0]
     facts = [facet_fact(store), facet_fact(flow)]
     steps = f"""
@@ -1712,9 +1717,10 @@ await ids.analyze.listeners.submit({{ preventDefault() {{}} }}); await settle();
 streams[0].listeners.questions({{ data: JSON.stringify({{ run: "r1", link_questions: [],
   early_questions: {json.dumps(facts)} }}) }});
 const [table] = ids.questions.querySelectorAll("table");
-const [head, all, ...rows] = table.children;
+const [head, ...rows] = table.children;
 calls.push({{ columns: head.children.map(c => c.textContent), rows: rows.length }});
-const every = all.children[1].children[0];
+const shared = ids.questions.querySelectorAll("div").find(d => d.className === "shared-controls");
+const every = shared.children[0].children[0].children.find(c => c.tag === "select");
 every.value = "yes";
 every.listeners.change();
 const quota = rows[1].children[4].children[0];
@@ -1743,8 +1749,8 @@ await ids.continue.listeners.click(); await settle();
 
 
 @pytest.mark.parametrize(("rows", "shared"), [(1, False), (2, True)])
-def test_a_facet_table_sets_a_column_only_over_two_rows(rows, shared):
-    """A table of one row shows no "Same for all" row."""
+def test_the_shared_question_appears_only_over_two_rows(rows, shared):
+    """A box of one row asks it in the row; two or more share one question."""
     elements = [valid_model().data_stores[0], valid_model().data_flows[0]]
     facts = [facet_fact(element) for element in elements[:rows]]
     steps = f"""
@@ -1752,13 +1758,13 @@ await ids.analyze.listeners.submit({{ preventDefault() {{}} }}); await settle();
 streams[0].listeners.questions({{ data: JSON.stringify({{ run: "r1", link_questions: [],
   early_questions: {json.dumps(facts)} }}) }});
 const [table] = ids.questions.querySelectorAll("table");
-calls.push({{ labels: table.children.map(row => row.children[0].textContent) }});
+const top = ids.questions.querySelectorAll("div").filter(d => d.className === "shared-controls");
+calls.push({{ rows: table.children.length, shared: top.length }});
 """
     seen = _run_form_script(steps)["calls"]
-    (labels,) = [c["labels"] for c in seen if "labels" in c]
+    (layout,) = [c for c in seen if "rows" in c]
 
-    assert ("Same for all" in labels) is shared
-    assert len(labels) == 1 + rows + shared
+    assert layout == {"rows": 1 + rows, "shared": int(shared)}
 
 
 @pytest.mark.parametrize("value", ["yes", "no", "not applicable", "unknown"])

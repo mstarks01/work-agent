@@ -888,3 +888,44 @@ a.analysis-row:hover {
     margin:6px 0 0
   }
 }
+
+/* A box that asks its question once (ADR 0081): the shared answer on top, the
+   elements under "Answer each one separately". */
+#list .each-one>summary {
+  font-size:14px;
+  color:var(--muted);
+  padding:10px 0;
+  cursor:pointer
+}
+#list .each-one>p {
+  padding:16px 0;
+  margin:0;
+  border-top:1px solid var(--line);
+  overflow-wrap:anywhere
+}
+#list .each-one>p>b {
+  display:block;
+  font-size:14px;
+  margin-bottom:8px
+}
+#list .each-one>p:has(.share-answer) {
+  display:grid;
+  grid-template-columns:20px minmax(0,1fr);
+  column-gap:10px;
+  align-items:start
+}
+#list .each-one>p:has(.share-answer)>* { grid-column:2; }
+#list .each-one>p>input.share-answer {
+  grid-column:1;
+  grid-row:1;
+  margin:3px 0 0
+}
+#questions .shared-controls label {
+  display:block;
+  margin:4px 0 8px;
+  font-size:14px
+}
+#questions .shared-controls .hint { margin:8px 0 0; }
+@media (max-width:480px) {
+  #list .each-one>p { padding:12px 0; }
+}

@@ -469,51 +469,59 @@ class TestTheAdaptiveList:
         assert not [q for q in shown if q.kind != "capability"]
         assert len(withheld) == len([q for q in listed if q.kind != "capability"])
 
-    def test_a_second_framework_takes_no_place_from_the_first(self):
+    @staticmethod
+    def _field(element, attribute, framework, decisions=1):
+        return SimpleNamespace(
+            key=(f"process:{element}", attribute, "", "", "", ""),
+            kind="attribute",
+            score=5.0,
+            decisions=decisions,
+            parent=None,
+            frameworks=(framework,),
+            gates=(),
+            framework_bands=(),
+            group=attribute,
+        )
+
+    def test_a_second_framework_takes_no_place_from_the_first(self, monkeypatch):
         """Each framework has its own limit, so a joint pause asks STRIDE what
-        it asks alone (QA-2026-10-09-01-E1)."""
-        from analysis_service.answer_round import EARLY_RULES, recommended
+        it asks alone (QA-2026-10-09-01-E1). A limit counts groups (ADR 0081)."""
+        from analysis_service import answer_round
+        from analysis_service.answer_round import EarlyRule, recommended
 
-        def field(n, framework):
-            key = (f"process:{framework}{n}", "authentication", "", "", "", "")
-            return SimpleNamespace(
-                key=key,
-                kind="attribute",
-                score=5.0,
-                decisions=1,
-                parent=None,
-                frameworks=(framework,),
-                gates=(),
-                framework_bands=(),
-                group="authentication",
-            )
-
-        limit = EARLY_RULES["field"].limit
-        stride = [field(n, "stride") for n in range(limit)]
-        asvs = [field(n, "asvs") for n in range(5)]
+        monkeypatch.setitem(answer_round.EARLY_RULES, "field", EarlyRule(1.0, 2))
+        field = self._field
+        stride = [
+            field(f"s{n}", attribute, "stride")
+            for n in range(3)
+            for attribute in ("authentication", "encryption_in_transit")
+        ]
+        asvs = [field(f"a{n}", "protocol", "asvs") for n in range(2)]
         shown, _, withheld = recommended([*stride, *asvs], frozenset(), {}, {})
-        assert len(shown) == limit + len(asvs)
+        assert len(shown) == len(stride) + len(asvs)
         assert withheld == ()
 
-        answered = {question.key: ("stride",) for question in stride[:limit]}
-        rest = [field(limit + n, "stride") for n in range(3)]
+        answered = {question.key: ("stride",) for question in stride}
+        rest = [field(f"s{n}", "protocol", "stride") for n in range(3)]
         shown, _, withheld = recommended(
             [*rest, *asvs], frozenset(answered), answered, {}
         )
-        assert len(shown) == len(asvs)
+        assert [q.key for q in shown] == [q.key for q in asvs]
         assert [q.key for q in withheld] == [q.key for q in rest]
 
-    def test_a_question_answered_in_part_stays_listed_outside_the_limit(self):
-        """A question with a partial answer stays outside the limit, so thirty
-        partial answers do not hide every question (#1289, B3)."""
-        from analysis_service.answer_round import recommended
+    def test_a_group_answered_in_part_keeps_its_one_place(self, monkeypatch):
+        """A group with a partial answer stays listed and takes one place, so a
+        new row of it is listed too, while a new group waits for a place
+        (#1289, B3; ADR 0081)."""
+        from analysis_service import answer_round
+        from analysis_service.answer_round import EarlyRule, recommended
 
+        monkeypatch.setitem(answer_round.EARLY_RULES, "field", EarlyRule(1.0, 1))
         facets = QUESTION_KINDS["capacity-limits"].facets
 
         def capacity_of(n):
-            key = (f"process:p{n}", "", "", "", "capacity-limits", "")
             return SimpleNamespace(
-                key=key,
+                key=(f"process:p{n}", "", "", "", "capacity-limits", ""),
                 kind="question",
                 score=5.0,
                 facets=facets,
@@ -525,14 +533,17 @@ class TestTheAdaptiveList:
                 group="capacity-limits",
             )
 
-        listed = [capacity_of(n) for n in range(31)]
-        answers = [FactAnswer(key=q.key, facets={"rate": "yes"}) for q in listed[:30]]
-        answered_for = {q.key: q.frameworks for q in listed[:30]}
+        started, joining = capacity_of(0), capacity_of(1)
+        other = self._field("p2", "authentication", "stride")
+        answers = [FactAnswer(key=started.key, facets={"rate": "yes"})]
         shown, _, withheld = recommended(
-            listed, answered_keys(answers), answered_for, {}
+            [started, joining, other],
+            answered_keys(answers),
+            {started.key: started.frameworks},
+            {},
         )
-        assert [q.key for q in shown] == [q.key for q in listed[:30]]
-        assert [q.key for q in withheld] == [listed[-1].key]
+        assert [q.key for q in shown] == [started.key, joining.key]
+        assert [q.key for q in withheld] == [other.key]
 
     def test_a_question_answered_in_part_is_charged_to_its_framework_once(self):
         """The saved answers charge each framework, and so does a question's
@@ -1396,7 +1407,7 @@ class TestTheFrameworksTakeTurns:
 
         def question(key, gates=()):
             return SimpleNamespace(
-                key=(key,),
+                key=(f"process:{key}", "authentication", "", "", "", ""),
                 kind="attribute",
                 score=5.0,
                 decisions=1,
@@ -1409,7 +1420,7 @@ class TestTheFrameworksTakeTurns:
         field = question("f")
         gate = question("g", gates=("asvs",))
         shown, _, _ = recommended([field, gate], frozenset(), {}, {})
-        assert [q.key for q in shown] == [("g",), ("f",)]
+        assert [q.key for q in shown] == [gate.key, field.key]
 
     def test_each_question_kind_is_listed_once_at_its_first_row(self):
         """A kind's rows follow its first row; a capability keeps its place,

@@ -305,6 +305,28 @@ def test_a_running_analysis_keeps_a_tab_that_leads_back_to_its_progress(browser,
         context.close()
 
 
+def test_one_shared_answer_saves_the_part_for_every_element_listed(page):
+    """A box asks its question once (ADR 0081): one choice in the shared
+    control saves that part for each element under it."""
+    pause(page)
+    shared = page.locator("#list .shared-controls select").first
+    shared.wait_for()
+    keys = page.locator("#list .each-one select[data-facet]")
+    facet = shared.get_attribute("data-facet")
+    with page.expect_response(_post_to_answer) as response:
+        shared.select_option("yes")
+    facts = response.value.request.post_data_json["facts"]
+    elements = keys.evaluate_all(
+        "(selects, facet) => [...new Set(selects.filter(s => s.dataset.facet === facet)"
+        ".map(s => s.dataset.key))]",
+        facet,
+    )
+    assert len(elements) >= 2
+    sent = sorted(json.dumps(fact["key"], separators=(",", ":")) for fact in facts)
+    assert sent == sorted(elements)
+    assert all(fact["facets"] == {facet: "yes"} for fact in facts)
+
+
 def test_a_double_click_on_start_starts_one_run(page):
     pause(page)
     starts: list[str] = []

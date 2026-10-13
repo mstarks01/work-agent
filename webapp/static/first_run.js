@@ -528,6 +528,10 @@
     return true;
   };
   const onEdit = (row, event) => {
+    if (!sharing && row.box && row.box.shared) {
+      row.exception = true;
+      if (row.tick) row.tick.checked = false;
+    }
     const typed = Boolean(event && event.type === "input");
     const changed = registerEdit(row);
     if (row.conflict) clearConflict(row);
@@ -701,36 +705,7 @@
     detailHead.textContent = "Exceptions or detail (optional)";
     head.append(detailHead);
     table.append(head);
-    const all = document.createElement("tr");
-    all.className = "same-for-all";
-    const allLabel = document.createElement("td");
-    allLabel.textContent = "Same for all";
-    all.append(allLabel);
-    q.facets.forEach((facet, column) => {
-      const cell = document.createElement("td");
-      const every = facetSelect("(set every row)", "", true);
-      every.addEventListener("change", () => {
-        for (const select of columns[column]) {
-          select.value = every.value;
-          select.dispatchEvent(new Event("change"));
-        }
-      });
-      cell.append(every);
-      all.append(cell);
-    });
-    // The detail column takes no shared answer: each row's are its own.
-    all.append(document.createElement("td"));
-    // The row joins the table once two rows share it (`shareAll`).
-    return { table, columns, all, count: 0 };
-  };
-  // "Same for all" sets a column of two or more rows; one row needs none.
-  const shareAll = (grid) => {
-    const shared = Boolean(grid.all.parentNode);
-    if (grid.count >= 2 && !shared) {
-      grid.table.insertBefore(grid.all, [...grid.table.children][1] || null);
-    } else if (grid.count < 2 && shared) {
-      grid.all.remove();
-    }
+    return { table, columns, count: 0 };
   };
   const drawFacetRow = (row, prefill) => {
     const q = row.q;
@@ -767,6 +742,9 @@
     };
     // Whether a facet is still blank, which a skip sets aside.
     row.open = () => inputs.some((select) => !select.value);
+    row.setFacet = (id, value) => {
+      for (const select of inputs) if (select.dataset.facet === id) select.value = value;
+    };
     row.set = (next) => {
       for (const select of inputs) select.value = (next.facets || {})[select.dataset.facet] || "";
       detail.value = next.detail || "";
@@ -801,8 +779,14 @@
     node.open = true;
     const title = document.createElement("summary");
     const top = document.createElement("div");
-    node.append(title, top);
-    return { node, title, top, group: q.group, heading: q.group_heading, rows: [], grid: null, shared: null };
+    const each = document.createElement("details");
+    each.className = "each-one";
+    each.open = true;
+    const eachTitle = document.createElement("summary");
+    eachTitle.hidden = true;
+    each.append(eachTitle);
+    node.append(title, top, each);
+    return { node, title, top, each, eachTitle, group: q.group, heading: q.group_heading, rows: [], grid: null, shared: null };
   };
   const titleBox = (box) => {
     const heading = document.createElement("span");
@@ -810,37 +794,76 @@
     heading.textContent = box.heading;
     box.title.replaceChildren(heading);
   };
-  // Rows of one box take "Same for all" where two or more ask one attribute
-  // or kind about different elements in one form. A capability asks about
-  // the whole application, so it never shares.
+  // A box whose rows ask one attribute or kind of two or more elements asks
+  // it once (ADR 0081): one answer for every element it lists, sent as each
+  // element's own answer. The rows stay under "Answer each one separately",
+  // and a row edited there is an exception the shared answer leaves alone. A
+  // capability asks about the whole application, so it never shares.
   const shareable = (a, b) =>
     a.key[0] && b.key[0] && a.key[1] === b.key[1] && a.key[4] === b.key[4]
-    && a.form === b.form && a.form !== "facets"
+    && a.form === b.form
     && JSON.stringify(a.choices) === JSON.stringify(b.choices);
-  const ensureShared = (box) => {
-    const plain = box.rows.filter((row) => row.kind === "fact" && row.q.form !== "facets");
-    if (box.shared || plain.length < 2 || !plain.every((row) => shareable(row.q, plain[0].q))) return;
-    const shared = inputFor(plain[0].q, null, () => {});
-    const apply = button("Apply to the ticked rows", () => {
+  // Set while the shared answer writes rows, so those edits are not exceptions.
+  let sharing = false;
+  const applyShared = (box, write) => {
+    sharing = true;
+    try {
       for (const row of box.rows) {
-        if (row.tick && row.tick.checked && !row.compact) {
-          row.set({ value: shared.read() });
-          onEdit(row);
-        }
+        if (row.kind !== "fact" || row.compact || row.exception) continue;
+        if (row.tick && !row.tick.checked) continue;
+        write(row);
+        onEdit(row);
       }
-    });
+    } finally {
+      sharing = false;
+    }
+  };
+  const sharedControl = (box, q) => {
     const line = document.createElement("p");
-    const title = document.createElement("b");
-    title.textContent = "Same for all";
-    line.append(title, " ", ...shared.nodes, " ", apply);
-    const hint = document.createElement("div");
+    if (q.form === "facets") {
+      for (const facet of q.facets) {
+        const label = document.createElement("label");
+        const select = facetSelect("(leave unanswered)", "", true);
+        select.dataset.facet = facet.id;
+        select.addEventListener("change", () =>
+          applyShared(box, (row) => row.setFacet && row.setFacet(facet.id, select.value)));
+        label.append(facet.question, " ", select);
+        line.append(label, " ");
+      }
+      return line;
+    }
+    const shared = inputFor(q, null, () =>
+      applyShared(box, (row) => row.set({ value: shared.read() })));
+    line.append(...shared.nodes);
+    return line;
+  };
+  const ensureShared = (box) => {
+    const members = box.rows.filter((row) => row.kind === "fact");
+    const one = members.length >= 2
+      && members.every((row) => shareable(row.q, members[0].q));
+    box.eachTitle.hidden = !one;
+    box.eachTitle.textContent = `Answer each one separately (${members.length})`;
+    if (!one) {
+      box.top.className = "";
+      box.top.replaceChildren();
+      box.shared = null;
+      box.each.open = true;
+      return;
+    }
+    if (!box.shared) {
+      box.shared = sharedControl(box, members[0].q);
+      box.each.open = false;
+    }
+    const names = document.createElement("p");
+    names.className = "hint";
+    names.textContent = "Applies to: " + members.map((row) => row.q.element).join(", ");
+    const hint = document.createElement("p");
     hint.className = "hint";
-    hint.textContent = "Untick a row the answer does not fit. Each row is sent as its"
-      + " own answer, and you can still change it.";
+    hint.textContent = "One answer covers every part listed. Where one differs,"
+      + " open \"Answer each one separately\" and change it there.";
     box.top.className = "shared-controls";
-    box.top.replaceChildren(line, hint);
-    box.shared = shared;
-    for (const row of plain) addTick(row);
+    box.top.replaceChildren(box.shared, names, hint);
+    for (const row of members) if (row.q.form !== "facets") addTick(row);
   };
   // Ticked rows take the shared answer; an unticked row is an exception.
   const addTick = (row) => {
@@ -877,17 +900,16 @@
     if (row.q.form === "facets" && row.kind === "fact") {
       if (!box.grid) {
         box.grid = facetTable(row.q);
-        box.node.append(box.grid.table);
+        box.each.append(box.grid.table);
       }
       row.grid = box.grid;
       row.node = document.createElement("tr");
       row.node.dataset.key = keyOf(row.q.key);
-      const after = prev && prev.grid === box.grid ? prev.node : [...box.grid.table.children][box.grid.all.parentNode ? 1 : 0];
+      const after = prev && prev.grid === box.grid ? prev.node : [...box.grid.table.children][0];
       insertAfter(box.grid.table, row.node, after);
       box.grid.count += 1;
-      shareAll(box.grid);
     } else {
-      insertAfter(box.node, row.node, prev && prev.box === box ? prev.node : box.top);
+      insertAfter(box.each, row.node, prev && prev.box === box ? prev.node : box.eachTitle);
     }
     titleBox(box);
     ensureShared(box);
@@ -898,12 +920,12 @@
     row.node.remove();
     if (!box) return;
     box.rows = box.rows.filter((other) => other !== row);
-    if (row.grid) {
-      row.grid.count -= 1;
-      shareAll(row.grid);
-    }
+    if (row.grid) row.grid.count -= 1;
     if (!box.rows.length) box.node.remove();
-    else titleBox(box);
+    else {
+      titleBox(box);
+      ensureShared(box);
+    }
   };
 
   // ---- Reconcile ----------------------------------------------------------
@@ -1291,11 +1313,31 @@
   updateQuestionProgress = () => {
     if (!view) return;
     const listed = [...rows.values()].filter((row) => row.listed);
-    const visible = listed.reduce((sum, row) => sum + (row.q.decisions || 1), 0);
-    const filled = listed.reduce((sum, row) => {
+    // A shared box is one question: its parts count once, and a part is
+    // filled where every row it lists has it (ADR 0081).
+    const parts = (row) => {
       const answer = row.read ? row.read() : null;
-      return sum + (!answer ? 0 : answer.facets ? Object.keys(answer.facets).length : 1);
-    }, 0);
+      if (!answer) return new Set();
+      return new Set(answer.facets ? Object.keys(answer.facets) : ["value"]);
+    };
+    let visible = 0;
+    let filled = 0;
+    const counted = new Set();
+    for (const row of listed) {
+      const box = row.box && row.box.shared ? row.box : null;
+      if (!box) {
+        visible += row.q.decisions || 1;
+        filled += parts(row).size;
+        continue;
+      }
+      if (counted.has(box)) continue;
+      counted.add(box);
+      const members = box.rows.filter((member) => member.listed);
+      const ids = row.q.form === "facets" ? row.q.facets.map((facet) => facet.id) : ["value"];
+      visible += ids.length;
+      const each = members.map(parts);
+      filled += ids.filter((id) => each.every((held) => held.has(id))).length;
+    }
     const left = view.early_stop == null;
     skipButton.disabled = answerBusy || !left;
     startButton.className = left ? "" : "primary";

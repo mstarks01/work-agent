@@ -48,7 +48,7 @@ answer the facts a reviewer names differently on each run
 
 from __future__ import annotations
 
-from collections import Counter
+from collections import Counter, defaultdict
 from collections.abc import Callable, Container, Mapping, Sequence
 from dataclasses import dataclass, field, replace
 from functools import cached_property, partial
@@ -96,6 +96,7 @@ from analysis_service.links import (
 )
 from analysis_service.open_facts import (
     CAPABILITY_GROUP,
+    group_of,
     open_attribute,
     prepared_model,
 )
@@ -143,10 +144,12 @@ __all__ = [
 class EarlyRule:
     """Which early questions of one kind the list may hold.
 
-    ``floor`` is the score a question needs, and ``limit`` how many of the
-    kind one pause asks for each selected framework. A question counts toward
-    the limit of every framework it serves, so a second framework takes no
-    place from the first. The two kinds' scores are not on one scale: a field
+    ``floor`` is the score a question needs, and ``limit`` how many places
+    of the kind one pause holds for each selected framework. A group of field
+    questions takes one place and a capability question one
+    (:func:`limit_place`, ADR 0081). A place counts toward the limit of every
+    framework its questions serve, so a second framework takes no place from
+    the first. The two kinds' scores are not on one scale: a field
     question's is a ranking value read off the prior, and a capability
     question's is units it could settle.
     """
@@ -158,10 +161,10 @@ class EarlyRule:
 #: The rule for each kind of early question: ``capability`` and ``field``,
 #: which is every other kind (``QA-2026-09-26-03-E20``). A field question's
 #: floor of 1 is where the ranking cuts: no measurement says how many findings
-#: an answer under it changes. The top 30 of a STRIDE list hold 99% of the
-#: ranking score at that floor, which is not a share of the report's value. A
-#: capability question under 2 settles one unit, and at ASVS level 2 that
-#: leaves 28 of 51.
+#: an answer under it changes. A field place is a group (ADR 0081), and a
+#: STRIDE list holds fewer than 30 groups, so the floor and not the limit
+#: decides which field questions a pause asks. A capability question under 2
+#: settles one unit, and at ASVS level 2 that leaves 28 of 51.
 EARLY_RULES: Mapping[str, EarlyRule] = {
     "capability": EarlyRule(floor=2.0, limit=30),
     "field": EarlyRule(floor=1.0, limit=30),
@@ -1201,12 +1204,13 @@ def recommended(
         )
 
     for kind, rule in EARLY_RULES.items():
-        counted = Counter(
-            name
-            for key, served in answered_for.items()
-            if (kind == "capability") == bool(key_ref(key).capability)
-            for name in served
-        )
+        # The places each framework's limit has counted: a group of field
+        # questions takes one place, and a capability question its own.
+        counted: dict[str, set[UnknownKey | str]] = defaultdict(set)
+        for key, served in answered_for.items():
+            if (kind == "capability") == bool(key_ref(key).capability):
+                for name in served:
+                    counted[name].add(limit_place(key))
         eligible = [
             question
             for question in listed
@@ -1223,15 +1227,31 @@ def recommended(
             key=rank,
         )
         for question in by_turn(fresh, spent):
-            if any(counted[name] < rule.limit for name in question.frameworks):
+            slot = limit_place(question.key)
+            if any(
+                slot in counted[name] or len(counted[name]) < rule.limit
+                for name in question.frameworks
+            ):
                 taken.append(question)
-                counted.update(question.frameworks)
+                for name in question.frameworks:
+                    counted[name].add(slot)
             else:
                 held_back.append(question)
         shown += [*started, *taken]
         for question in started:
             again.update(dict.fromkeys(question.frameworks, question.decisions))
     return grouped((*gates, *by_turn(shown, spent - again))), blocked, tuple(held_back)
+
+
+def limit_place(key: UnknownKey) -> UnknownKey | str:
+    """The place a question takes under its framework's limit (ADR 0081).
+
+    **The one reader of what the limit counts.** A field question's place is
+    its group, so a kind asked of six elements is one question; a page asks it
+    once with one shared answer. A capability question is its own place.
+    """
+    ref = key_ref(key)
+    return key if ref.capability else group_of(ref)[0]
 
 
 def grouped(questions: Sequence[EarlyQuestion]) -> tuple[EarlyQuestion, ...]:
