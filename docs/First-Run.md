@@ -351,9 +351,9 @@ The app can ask you questions before the analysis, and after the report.
 
   The page lists the recommended questions at once, the most useful first,
   and under each yes/no question says what each answer would settle. Where one question asks about several
-  parts of your system, a **Same for all** row takes one answer, and **Apply
-  to the ticked rows** copies it into each row still ticked. Untick a row the
-  answer does not fit. Under each question, a line says why it is
+  parts of your system, the page asks it once and lists the parts it applies
+  to; one answer is saved for each of them. Where a part differs, open
+  **Answer each one separately** and change that part, or untick it. Under each question, a line says why it is
   asked and quotes the words of your description that the part was read
   from. A line at the top says
   what the list holds; your answers can add questions as well as remove

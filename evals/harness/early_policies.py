@@ -23,7 +23,12 @@ for every other question (:attr:`~analysis_service.early_questions.EarlyQuestion
 The submitter answers every question shown, the parts of a capability included.
 
 **Each order is a policy in** :data:`POLICIES`, built from the production
-readers: the early list, the floor and the list's selection.
+readers: the early list, the floor and the list's selection. A policy returns
+charges: each one costs some choices and answers some questions. Every order
+but one charges each question on its own. ``group-question`` asks each group
+of a list once for every element it lists (ADR 0081): one charge for the
+group's parts answers each of its rows. A capability question is charged on
+its own, because every capability shares one group.
 """
 
 from __future__ import annotations
@@ -34,6 +39,7 @@ import sys
 from collections import Counter, defaultdict
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
+from itertools import groupby
 from pathlib import Path
 from typing import Any
 
@@ -43,6 +49,7 @@ from analysis_service.claims import FrameworkName, UnknownKey
 from analysis_service.early_questions import EarlyQuestion, early_questions
 from analysis_service.fact_answers import FactAnswer, key_ref
 from analysis_service.frameworks import PACKAGES
+from analysis_service.open_facts import CAPABILITY_GROUP
 from analysis_service.questions import fact_questions
 from analysis_service.report import Report
 from analysis_service.system_model import SystemModel
@@ -54,6 +61,37 @@ Selection = Mapping[FrameworkName, Mapping[str, Any]]
 
 #: The submitter effort, in choices, at which each order is read.
 BUDGETS = (5, 10, 15, 20, 30, 45, 60)
+
+
+@dataclass(frozen=True)
+class Charge:
+    """One answer a submitter gives: what it costs and what it answers."""
+
+    choices: int
+    keys: frozenset[UnknownKey]
+
+
+def _each(order: Sequence[EarlyQuestion]) -> list[Charge]:
+    """Each question answered on its own."""
+    return [Charge(question.decisions, frozenset({question.key})) for question in order]
+
+
+def _group_question(model: SystemModel, frameworks: Selection) -> list[Charge]:
+    """Each group of each list asked once for every element it lists.
+
+    A run of a list's rows that share a group is one charge: the most parts
+    any of its rows has, for all its rows. A capability is its own charge.
+    """
+    charges: list[Charge] = []
+    for shown in _lists(model, frameworks):
+        for group, rows in groupby(shown, key=lambda question: question.group):
+            run = list(rows)
+            if group == CAPABILITY_GROUP:
+                charges += _each(run)
+            else:
+                keys = frozenset(question.key for question in run)
+                charges.append(Charge(max(q.decisions for q in run), keys))
+    return charges
 
 
 def _lists(model: SystemModel, frameworks: Selection) -> list[list[EarlyQuestion]]:
@@ -141,23 +179,33 @@ def _merge(
 
 
 #: Every order compared, by name.
-POLICIES: Mapping[str, Callable[[SystemModel, Selection], list[EarlyQuestion]]] = {
-    "shipped-list": _shipped_list,
-    "framework-merge": lambda model, chosen: _merge(model, chosen, grouped=False),
-    "grouped-merge": lambda model, chosen: _merge(model, chosen, grouped=True),
+POLICIES: Mapping[str, Callable[[SystemModel, Selection], list[Charge]]] = {
+    "shipped-list": lambda model, chosen: _each(_shipped_list(model, chosen)),
+    "framework-merge": lambda model, chosen: _each(
+        _merge(model, chosen, grouped=False)
+    ),
+    "grouped-merge": lambda model, chosen: _each(_merge(model, chosen, grouped=True)),
+    "group-question": _group_question,
 }
 
 
-def _prefix(order: Sequence[EarlyQuestion], budget: int | None) -> set[UnknownKey]:
-    """The questions a submitter answers before ``budget`` choices run out."""
+def _spend(order: Sequence[Charge], budget: int | None) -> tuple[set[UnknownKey], int]:
+    """The questions a submitter answers before ``budget`` choices run out,
+    and the choices spent."""
     spent = 0
-    answered = set()
-    for question in order:
-        if budget is not None and spent + question.decisions > budget:
+    answered: set[UnknownKey] = set()
+    for charge in order:
+        if budget is not None and spent + charge.choices > budget:
             break
-        spent += question.decisions
-        answered.add(question.key)
-    return answered
+        spent += charge.choices
+        answered |= charge.keys
+    return answered, spent
+
+
+def _prefix(order: Sequence[EarlyQuestion], budget: int | None) -> set[UnknownKey]:
+    """The questions a submitter answers before ``budget`` choices run out,
+    each question charged on its own."""
+    return _spend(_each(order), budget)[0]
 
 
 @dataclass(frozen=True)
@@ -229,7 +277,7 @@ def readings(
         for selected, frameworks in selections.items():
             order = build(report.system_model, frameworks)
             for budget in (*BUDGETS, None):
-                answered = _prefix(order, budget)
+                answered, spent = _spend(order, budget)
                 capabilities = {key_ref(key).capability for key in answered} - {""}
                 done = [
                     band for band, keys in needs.findings.values() if keys <= answered
@@ -242,7 +290,7 @@ def readings(
                         policy=policy,
                         selected=selected,
                         budget=budget,
-                        choices=sum(q.decisions for q in order if q.key in answered),
+                        choices=spent,
                         findings=len(needs.findings),
                         completed=len(done),
                         finding_bands=dict(bands),

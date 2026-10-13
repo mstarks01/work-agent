@@ -70,6 +70,8 @@ const walk = (n, out = []) => { for (const c of n.children || [])
 const text = (n) => typeof n === "string" ? n
   : [n.textContent || "", ...(n.children || []).map(text)].join("");
 const selects = () => walk(ids.list).filter((n) => n.tag === "select");
+const rowsOf = (box) => (box.children.find((c) => c.className === "each-one") || box)
+  .children.filter((c) => c.tag === "p");
 const record = (url, init) => calls.push({ url, body: init && init.body ? JSON.parse(init.body) : null });
 const answer = (q, value) => ({ ...q, answer: { key: q.key, value } });
 """
@@ -93,7 +95,7 @@ calls.push({{ status: ids["save-status"].textContent }});
 await settle(); await settle();
 const box = ids.list.children[0];
 calls.push({{ status: ids["save-status"].textContent, saveHidden: ids.save.hidden,
-  rows: box.children.filter((c) => c.tag === "p").map(text),
+  rows: rowsOf(box).map(text),
   boxes: ids.list.children.length, earlierHidden: ids.earlier.hidden }});
 """
     seen = run(first, steps)["calls"]
@@ -495,7 +497,7 @@ auth.value = "yes"; auth.listeners.change();
 await settle(); await settle();
 const [whoAgain] = walk(ids.list).filter((n) => n.tag === "input" && n.className !== "answer-detail");
 calls.push({{ same: who === whoAgain, value: whoAgain.value, focused: document.activeElement === who,
-  order: ids.list.children.map((box) => box.children.filter((c) => c.tag === "p").map((p) => text(p).slice(0, 12))),
+  order: ids.list.children.map((box) => rowsOf(box).map((p) => text(p).slice(0, 12))),
   note: ids.changes.textContent }});
 """
     seen = run(first, steps)["calls"]
@@ -523,7 +525,7 @@ who.value = "the platform tea"; who.focus();
 const [auth] = selects();
 auth.value = "yes"; auth.listeners.change();
 await settle(); await settle();
-const order = () => ids.list.children.map((box) => box.children.filter((c) => c.tag === "p").map((p) => text(p).slice(0, 12)));
+const order = () => ids.list.children.map((box) => rowsOf(box).map((p) => text(p).slice(0, 12)));
 calls.push({{ typing: order(), note: ids.changes.textContent }});
 document.activeElement = null; ids.list.listeners.focusout(); await settle();
 calls.push({{ left: order(), note: ids.changes.textContent }});
@@ -591,7 +593,7 @@ def test_skip_for_now_sends_one_skip_and_hides_the_row():
 globalThis.fetch = async (url, init) => { record(url, init);
   return { ok: true, json: async () => ({ run: "r1" }) }; };
 const box = ids.list.children[0];
-const row = box.children.find((c) => c.tag === "p");
+const row = rowsOf(box)[0];
 walk(row).find((n) => n.tag === "button" && n.textContent === "Skip for now").listeners.click();
 await settle(); await settle();
 calls.push({ hidden: row.hidden, status: ids["save-status"].textContent });

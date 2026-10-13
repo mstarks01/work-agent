@@ -167,7 +167,9 @@ const workspace = (() => {
     const groups = [...el("list").children].filter((item) => item.classList.contains("question-group"));
     groups.forEach((group, index) => {
       // Read the renderer's row visibility; do not repeat its dependency rules.
-      group.hidden = ![...group.children].some((row) =>
+      // A box's rows sit in it or under its "Answer each one separately".
+      const each = group.querySelector(".each-one");
+      group.hidden = ![...group.children, ...(each ? each.children : [])].some((row) =>
         (row.tagName === "P" || row.tagName === "TABLE") && !row.hidden);
       if (group.hidden) return;
       group.id = "question-group-" + index;

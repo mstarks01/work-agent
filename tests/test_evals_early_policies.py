@@ -10,10 +10,16 @@ from analysis_service.answer_round import question_set
 from analysis_service.answer_sets import AnswerSet
 from analysis_service.report import Report
 from evals.harness import early_policies
-from evals.harness.early_policies import POLICIES, _prefix, needs_of, readings
+from evals.harness.early_policies import POLICIES, _spend, needs_of, readings
 from tests.factories import valid_model
 
 BOTH = {"stride": {}, "asvs": {"level": 2}}
+
+
+def keys_of(charges):
+    """Every question the charges answer, in order."""
+    return [key for charge in charges for key in sorted(charge.keys)]
+
 
 BASELINE = next(
     Path("evals/baselines").glob("6bff717-*/*.reports/01-payments-checkout.report.json")
@@ -31,20 +37,20 @@ def test_the_shipped_order_starts_with_the_pause_s_first_list():
         final=False,
         shown=[],
     ).early
-    order = POLICIES["shipped-list"](valid_model(), BOTH)
-    assert order[: len(first)] == list(first)
+    order = keys_of(POLICIES["shipped-list"](valid_model(), BOTH))
+    assert order[: len(first)] == [q.key for q in first]
 
 
 @pytest.mark.parametrize("policy", ["framework-merge", "grouped-merge"])
 class TestTheMerge:
     def test_a_shared_question_is_asked_once(self, policy):
-        keys = [q.key for q in POLICIES[policy](valid_model(), BOTH)]
+        keys = keys_of(POLICIES[policy](valid_model(), BOTH))
         assert len(keys) == len(set(keys))
 
     def test_each_framework_keeps_its_own_order(self, policy):
         """A question another framework also lists can come earlier, because
         that framework asked it; every other question keeps its place."""
-        order = [q.key for q in POLICIES[policy](valid_model(), BOTH)]
+        order = keys_of(POLICIES[policy](valid_model(), BOTH))
         lists = early_policies._own_lists(valid_model(), BOTH)
         for name, listed in lists.items():
             others = {
@@ -63,10 +69,37 @@ class TestTheMerge:
 def test_a_submitter_stops_before_the_choice_that_passes_the_budget():
     order = POLICIES["framework-merge"](valid_model(), BOTH)
     for budget in (1, 5, 10):
-        answered = _prefix(order, budget)
-        spent = sum(q.decisions for q in order if q.key in answered)
+        answered, spent = _spend(order, budget)
         assert spent <= budget
-        assert answered == {q.key for q in order[: len(answered)]}
+        taken, total = set(), 0
+        for charge in order:
+            if total + charge.choices > budget:
+                break
+            total += charge.choices
+            taken |= charge.keys
+        assert (answered, spent) == (taken, total)
+
+
+def test_a_group_is_one_charge_for_its_rows_and_a_capability_its_own():
+    """``group-question`` asks each group of a list once (ADR 0081): one charge,
+    at its widest row's parts, answers every row of the run."""
+    from itertools import groupby
+
+    from analysis_service.open_facts import CAPABILITY_GROUP
+
+    shown = early_policies._lists(valid_model(), BOTH)[0]
+    charges = POLICIES["group-question"](valid_model(), BOTH)
+    expected = []
+    for group, rows in groupby(shown, key=lambda q: q.group):
+        run = list(rows)
+        if group == CAPABILITY_GROUP:
+            expected += [(q.decisions, frozenset({q.key})) for q in run]
+        else:
+            expected.append(
+                (max(q.decisions for q in run), frozenset(q.key for q in run))
+            )
+    assert [(c.choices, c.keys) for c in charges[: len(expected)]] == expected
+    assert any(len(c.keys) > 1 for c in charges), "the fixture shares a group"
 
 
 def test_a_finding_completes_only_when_every_fact_it_waits_on_is_answered():
@@ -80,7 +113,7 @@ def test_a_finding_completes_only_when_every_fact_it_waits_on_is_answered():
         if one.budget is None and one.selected == "alone"
     }
     for policy, build in POLICIES.items():
-        asked = {q.key for q in build(report.system_model, {"stride": {}})}
+        asked = set(keys_of(build(report.system_model, {"stride": {}})))
         expected = sum(1 for _, keys in needs.findings.values() if keys <= asked)
         assert whole[policy].completed == expected
     by_budget = [one.completed for one in found if one.policy == "shipped-list"]
