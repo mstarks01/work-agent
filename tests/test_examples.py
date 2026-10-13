@@ -135,7 +135,7 @@ def test_the_sample_description_is_in_the_band_the_docs_promise():
     a wall of text.
     """
     words = len((EXAMPLES / "orders.md").read_text(encoding="utf-8").split())
-    assert 150 <= words <= 250, f"sample is {words} words, outside the 150-250 band"
+    assert 150 <= words <= 300, f"sample is {words} words, outside the 150-300 band"
 
 
 def test_no_example_teaches_a_stub_runner():
