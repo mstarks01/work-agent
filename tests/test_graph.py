@@ -58,6 +58,7 @@ from analysis_service.frameworks.stride.record import (
 )
 from analysis_service.markdown_loader import MarkdownLoader
 from analysis_service.model_tiers import LLM_NODES
+from analysis_service.platform_defaults import with_platform_defaults
 from analysis_service.report import (
     InputRef,
     Job,
@@ -1238,7 +1239,9 @@ def test_validate_expands_a_compact_emission_before_the_gate():
 
     assert event.actions.route == graph.ROUTE_VALID
     assert ctx.state[graph.STATE_VALID_MODEL] == (
-        normalize_element_ids(valid_model()).model_dump(mode="json")
+        with_platform_defaults(normalize_element_ids(valid_model())).model_dump(
+            mode="json"
+        )
     )
 
 
