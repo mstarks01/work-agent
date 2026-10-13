@@ -2334,7 +2334,6 @@ def framework_lane_inputs(
     ruled_out: dict[str, str] = {}
     ruled_in: dict[str, str] = {}
     idle_lanes: list[str] = []
-    applicability = package.record.applicability(model, options)
     for position, lane in enumerate(nodes.lanes):
         candidate_set = candidates[lane.lane]
         # The package's own rules may rule a lane's units out of this model
@@ -2362,8 +2361,6 @@ def framework_lane_inputs(
                 options,
                 units=package.record.units_for(options, lane.lane) or (),
                 ruled_out=tuple(lane_ruled_out),
-                ruled_in=tuple(lane_ruled_in),
-                applicability=applicability,
             ),
             "reference_notes": compose_notes(loader, notes),
             "prior_cases": compose_cases(loader, cases),
