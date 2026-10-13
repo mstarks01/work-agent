@@ -169,6 +169,51 @@ def test_an_excerpt_no_source_holds_is_refused(case, tmp_path):  # noqa: F811
         withheld_case(case, signed_copy(tmp_path, unground))
 
 
+class TestTheLanesReadAssetsAndAssumptions:
+    """A fact can sit in an ``assets`` list or an assumption record (#1283)."""
+
+    def test_a_list_value_sets_a_list_field(self, case, tmp_path):  # noqa: F811
+        def clear_assets(raw):
+            raw["withheld"]["model"].append(
+                {"element_id": "store:orders-db", "field": "assets", "value": []}
+            )
+
+        withheld = withheld_case(case, signed_copy(tmp_path, clear_assets))
+        store = withheld.model.get("store:orders-db")
+        assert store is not None and store.assets == []
+
+    def test_a_value_of_another_shape_is_refused(self, tmp_path):
+        def number(raw):
+            raw["withheld"]["model"][0]["value"] = 3
+
+        with pytest.raises(modes.EvalRunError, match="a string or a list"):
+            signed_copy(tmp_path, number)
+
+    def test_a_withheld_assumption_is_dropped(self, case, tmp_path):  # noqa: F811
+        def drop(raw):
+            raw["withheld"]["assumptions"] = [
+                {"element_id": "store:orders-db", "attribute": "data_classification"}
+            ]
+
+        withheld = withheld_case(case, signed_copy(tmp_path, drop))
+        named = {(a.element_id, a.attribute) for a in withheld.model.assumptions}
+        assert ("store:orders-db", "data_classification") not in named
+        assert len(withheld.model.assumptions) == len(case.model.assumptions) - 1
+
+    def test_an_assumption_the_model_does_not_hold_is_refused(
+        self,
+        case,  # noqa: F811
+        tmp_path,
+    ):
+        def miss(raw):
+            raw["withheld"]["assumptions"] = [
+                {"element_id": "store:orders-db", "attribute": "exposure"}
+            ]
+
+        with pytest.raises(modes.EvalRunError, match="holds 0 assumption records"):
+            withheld_case(case, signed_copy(tmp_path, miss))
+
+
 @pytest.mark.parametrize(
     "draft", sorted(DRAFT.parent.glob("*.json")), ids=lambda path: path.stem
 )
