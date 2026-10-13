@@ -237,8 +237,12 @@ def test_a_draft_resting_on_an_unknown_still_reaches_the_critic():
     question, it is the one a reader of the report cares about, and a rule
     cannot answer it — so the draft goes to the critic like any other.
     """
+    # A self-hosted Postgres has no platform default, so the store's
+    # encryption stays open for the draft to rest on (ADR 0082).
+    model = valid_model()
+    model.get("store:orders-db").technology = "self-hosted Postgres"
     replies = {
-        "extract": emitted(valid_model()),
+        "extract": emitted(model),
         graph.analyze_node_name("stride", "spoofing"): proposal_json(
             "S-01",
             "spoofing",
