@@ -102,6 +102,32 @@ def test_a_group_is_one_charge_for_its_rows_and_a_capability_its_own():
     assert any(len(c.keys) > 1 for c in charges), "the fixture shares a group"
 
 
+@pytest.mark.parametrize("name", ["none", "third", "all"])
+def test_no_to_the_rest_answers_every_capability_left_in_one_choice(name):
+    """``no-to-the-rest`` keeps each capability question at its place: the
+    "yes" answers come one at a time, and the first question after them is
+    one choice answering every capability question of the list left."""
+    from analysis_service.fact_answers import key_ref
+    from analysis_service.open_facts import CAPABILITY_GROUP
+
+    shown = early_policies._lists(valid_model(), BOTH)[0]
+    capabilities = [q for q in shown if q.group == CAPABILITY_GROUP]
+    assert len(capabilities) > 1, "the fixture asks several capabilities"
+    yes = round(len(capabilities) * early_policies.YES_SHARES[name])
+    charges = POLICIES[f"no-to-the-rest-{name}"](valid_model(), BOTH)
+    first = {q.key for q in capabilities}
+    asked = [c for c in charges if c.keys & first]
+    rest = [frozenset(q.key for q in capabilities[yes:])] if capabilities[yes:] else []
+    assert [(c.choices, c.keys) for c in asked] == [
+        (q.decisions, frozenset({q.key})) for q in capabilities[:yes]
+    ] + [(1, keys) for keys in rest]
+
+    def fields(found):
+        return [c for c in found if not any(key_ref(k).capability for k in c.keys)]
+
+    assert fields(charges) == fields(POLICIES["group-question"](valid_model(), BOTH))
+
+
 def test_a_finding_completes_only_when_every_fact_it_waits_on_is_answered():
     report = Report.model_validate_json(BASELINE.read_text(encoding="utf-8"))
     needs = needs_of(report)

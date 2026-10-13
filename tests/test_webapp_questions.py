@@ -494,7 +494,7 @@ class Node {
 const ids = {};
 for (const id of ["analyze","description","ticks","problem","go","load","ask",
                   "asked","questions","list","earlier","save","continue","status",
-                  "status-text","answer-problem","skip","skipped","more",
+                  "status-text","answer-problem","skip","no-rest","no-rest-hint","skipped","more",
                   "answer_limits","save-status","changes"])
   ids[id] = new Node(id);
 ids.questions.append(ids.list);
@@ -1972,6 +1972,56 @@ calls.push(walk(ids.questions).map(n => n.textContent).find(t => t.startsWith("W
 """
     said = _run_form_script(steps)["calls"][-1]
     assert "Decides what the asvs analysis covers" in said
+
+
+def test_no_to_the_rest_answers_only_the_blank_capability_questions():
+    """The button answers "no" to each blank capability row, as each row's own
+    answer; a capability answered "yes", one with only a typed detail, and a
+    blank field row stay as they are."""
+
+    def capability(name):
+        return _text_row(["", "", "", "", "", name], f"{name}?") | {
+            "kind": "capability",
+            "form": "choice",
+            "choices": [{"id": "yes", "name": ""}, {"id": "no", "name": ""}],
+            "group": "capabilities",
+            "group_heading": "About the application",
+            "frameworks": ["asvs"],
+        }
+
+    rows = [
+        capability("oauth"),
+        capability("websocket"),
+        capability("cookies"),
+        _text_row(["", "", "", "when?", "", ""], "when?"),
+    ]
+    steps = f"""
+await ids.analyze.listeners.submit({{ preventDefault() {{}} }}); await settle();
+streams[0].listeners.questions({{ data: JSON.stringify({{ run: "r1", link_questions: [],
+  early_questions: {json.dumps(rows)},
+  answered_early: [], answered_links: [], revision: 0 }}) }});
+const yes = ids.questions.querySelectorAll("select")[0];
+yes.value = "yes"; yes.listeners.change({{ type: "change" }});
+const detail = ids.questions.querySelectorAll("input")[2];
+detail.value = "only the admin console"; detail.listeners.input({{ type: "input" }});
+calls.push({{ shown: !ids["no-rest"].hidden && !ids["no-rest-hint"].hidden,
+  label: ids["no-rest"].textContent }});
+globalThis.fetch = async (url, init) => {{
+  calls.push({{ url, body: JSON.parse(init.body) }});
+  return {{ ok: false, json: async () => ({{ message: "stop here" }}) }};
+}};
+ids["no-rest"].listeners.click(); await settle(); await settle();
+"""
+    calls = _run_form_script(steps)["calls"]
+    shown, sent = calls[-2], calls[-1]
+    assert shown == {
+        "shown": True,
+        "label": "Answer “no” to every question about the application left blank (1)",
+    }
+    assert sorted(sent["body"]["facts"], key=lambda f: f["key"][5]) == [
+        {"key": rows[0]["key"], "value": "yes"},
+        {"key": rows[1]["key"], "value": "no"},
+    ]
 
 
 def test_skip_the_rest_skips_only_the_blank_questions():
