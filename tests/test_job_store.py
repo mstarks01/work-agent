@@ -834,9 +834,37 @@ def last_updated(store, status: JobStatus, days_ago: int, reserved: int = 0) -> 
     return record.id
 
 
+class ChangedAfterListing:
+    """A store whose owner saves a draft on each job just after the sweep lists it."""
+
+    def __init__(self, store) -> None:
+        self._store = store
+
+    def __getattr__(self, name: str):
+        return getattr(self._store, name)
+
+    async def expired(self, before: datetime) -> list[tuple[str, str]]:
+        listed = await self._store.expired(before)
+        for job_id, owner_id in listed:
+            assert await self._store.save_draft(job_id, owner_id, NO_ANSWERS, 0)
+        return listed
+
+
 class TestTheRetentionSweep:
     """#1530: the sweep deletes each terminal job older than the period, through
     the delete of the route."""
+
+    def test_a_delete_with_a_cutoff_keeps_a_job_updated_since(self, store):
+        job = last_updated(store, "completed", days_ago=2)
+        cutoff = datetime.now(UTC) - timedelta(days=1)
+        assert asyncio.run(store.save_draft(job, "alice", NO_ANSWERS, 0))
+        assert asyncio.run(store.delete(job, "alice", updated_before=cutoff)) is None
+        assert asyncio.run(store.get(job)) is not None
+
+    def test_it_keeps_a_job_that_changes_after_the_listing(self, store):
+        job = last_updated(store, "completed", days_ago=2)
+        asyncio.run(jobs.expire_jobs(ChangedAfterListing(store), 1))
+        assert asyncio.run(store.get(job)) is not None
 
     @pytest.mark.parametrize(
         "status", ["completed", "failed", "rejected", "awaiting-answers"]

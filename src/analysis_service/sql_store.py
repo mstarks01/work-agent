@@ -852,14 +852,22 @@ class SqlJobStore:
         listed = [await self.owned(job_id, owner_id) for job_id in job_ids]
         return [record for record in listed if record is not None]
 
-    async def delete(self, job_id: str, owner_id: str) -> int | None:
+    async def delete(
+        self, job_id: str, owner_id: str, *, updated_before: datetime | None = None
+    ) -> int | None:
         """Turn the owned job's row into a usage row, then delete its objects
         (ADR 0066). The number of objects removed, or ``None`` where the job
-        is not the owner's or not terminal, and nothing changes."""
+        is not the owner's, not terminal or not last updated before
+        ``updated_before``, and nothing changes."""
+        query = (
+            select(jobs)
+            .where(jobs.c.id == job_id, jobs.c.owner_id == owner_id)
+            .with_for_update()
+        )
+        if updated_before is not None:
+            query = query.where(jobs.c.updated_at < updated_before)
         async with self._transaction(writes=True) as connection:
-            found = await connection.execute(
-                select(jobs).where(jobs.c.id == job_id, jobs.c.owner_id == owner_id)
-            )
+            found = await connection.execute(query)
             row = found.one_or_none()
             if row is None or row.status not in TERMINAL_STATUSES:
                 return None

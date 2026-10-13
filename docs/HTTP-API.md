@@ -897,7 +897,8 @@ When the period is set, a sweep in the service deletes each expired job. The
 sweep runs when the service starts and then once each hour, so a job stays
 for one hour after its period at most. The sweep deletes a job in a terminal
 status: `completed`, `failed`, `rejected` or `awaiting-answers`. It never
-deletes a `queued` or `running` job. A swept job is deleted the same way as a
+deletes a `queued` or `running` job. The store checks the period again when it
+deletes the job, so a job that changes after the sweep finds it stays. A swept job is deleted the same way as a
 job that its owner [deletes](#deleting-a-job): the job keeps its usage row,
 and the service log gets one line with the cause `retention`. The service
 uses no bucket lifecycle rule (ADR 0066).
