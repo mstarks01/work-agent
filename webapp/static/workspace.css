@@ -92,7 +92,7 @@ input::placeholder,textarea::placeholder {
 }
 textarea {
   resize:vertical;
-  min-height:210px;
+  min-height:330px;
   line-height:1.65
 }
 input,textarea {
@@ -733,7 +733,7 @@ code {
     font-size:16px
   }
   textarea {
-    min-height:230px
+    min-height:460px
   }
   .pick {
     flex-wrap:wrap
