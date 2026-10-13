@@ -107,12 +107,18 @@ class TestLifecycle:
         record.transition(terminal)
         assert record.status == terminal
 
+    def test_a_queued_job_can_fail(self):
+        # The restart scan fails a job that never started (#1529).
+        record = make_record()
+        record.transition("failed")
+        assert record.status == "failed"
+
     @pytest.mark.parametrize(
         ("start", "target"),
         [
             ("queued", "completed"),
-            ("queued", "failed"),
             ("queued", "rejected"),
+            ("queued", "awaiting-answers"),
             ("running", "queued"),
             ("completed", "running"),
             ("failed", "queued"),

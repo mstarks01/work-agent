@@ -28,7 +28,8 @@ from __future__ import annotations
 
 import logging
 from collections import Counter
-from collections.abc import Callable, Mapping, Sequence
+from collections.abc import AsyncIterator, Callable, Mapping, Sequence
+from contextlib import asynccontextmanager
 from datetime import datetime
 from functools import partial
 from http import HTTPStatus
@@ -697,6 +698,24 @@ def _setting(
     return read(deployment)
 
 
+@asynccontextmanager
+async def _restart_scan(app: FastAPI) -> AsyncIterator[None]:
+    """Fail each job in flight before the app takes a request (#1529).
+
+    The ASGI server runs this at startup, after :func:`create_app` built the
+    store, the deployment and the verifier, and starts to serve only after it.
+    """
+    # The scan is correct for a single instance only. It fails every queued or
+    # running job in the store, so with a second live instance on one store it
+    # would fail the jobs that instance still runs.
+    failed = await app.state.store.fail_in_flight()
+    if failed:
+        logger.warning(
+            "restart scan failed %d job(s) in flight: %s", len(failed), failed
+        )
+    yield
+
+
 def create_app(
     *,
     deployment: Deployment | None = None,
@@ -740,6 +759,9 @@ def create_app(
     runner instead must state them, because reading a second configuration
     behind their back is how an app comes to enforce bounds its deployment never
     chose.
+
+    At startup, before the app takes a request, the restart scan fails each
+    job that is queued or running in the store.
     """
     # No schema routes: the schema states the bounds and the source kinds a
     # caller may not send, and the three webapps close them too.
@@ -748,6 +770,7 @@ def create_app(
         docs_url=None,
         redoc_url=None,
         openapi_url=None,
+        lifespan=_restart_scan,
     )
     app.state.store = store if store is not None else build_store()
     app.state.event_streams = Counter()

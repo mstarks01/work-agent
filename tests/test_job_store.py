@@ -18,6 +18,7 @@ from analysis_service.budgets import BudgetPolicy
 from analysis_service.fact_answers import FactAnswer
 from analysis_service.jobs import (
     NON_LOCKING_STATUSES,
+    RESTART_FAILURE_MESSAGE,
     Admission,
     Checkpoint,
     InMemoryJobStore,
@@ -25,6 +26,7 @@ from analysis_service.jobs import (
     JobStatus,
     Resumption,
 )
+from analysis_service.report import NodeRun, TokenUsage
 from analysis_service.sources import Source
 from tests import test_resume
 from tests.factories import (
@@ -761,3 +763,62 @@ class TestADeletedJobLeavesAUsageRow:
         listed = asyncio.run(store.owned_jobs("alice"))
         assert [record.id for record in listed] == [first, second]
         assert all(record.report is None for record in listed)
+
+
+class TestTheRestartScan:
+    """#1529: a job in flight at startup fails, and nothing runs it again."""
+
+    def test_it_fails_each_queued_or_running_job_with_the_restart_message(self, store):
+        queued = new_record()
+        running = new_record()
+        running.transition("running")
+        for record in (queued, running):
+            asyncio.run(admit(store, record))
+        failed = asyncio.run(store.fail_in_flight())
+        assert sorted(failed) == sorted([queued.id, running.id])
+        for job in failed:
+            record = asyncio.run(store.get(job))
+            assert record.status == "failed"
+            assert record.error == RESTART_FAILURE_MESSAGE
+            assert (record.events[-1].kind, record.events[-1].status) == (
+                "status",
+                "failed",
+            )
+        assert asyncio.run(store.fail_in_flight()) == []
+
+    def test_a_waiting_or_terminal_job_stays_as_it_is(self, store):
+        jobs = [completed(store)]
+        for status in ("awaiting-answers", "failed", "rejected"):
+            record = new_record()
+            record.transition("running")
+            record.transition(status)
+            asyncio.run(admit(store, record))
+            jobs.append(record.id)
+        before = [asyncio.run(store.get(job)) for job in jobs]
+        assert asyncio.run(store.fail_in_flight()) == []
+        assert [asyncio.run(store.get(job)) for job in jobs] == before
+
+    def test_a_failed_job_keeps_its_full_charge(self, store):
+        # max(measured, reserved): the vendor billed the lost node runs, and a
+        # smaller charge would let a restart reset the budget.
+        budget = POLICY.model_copy(update={"max_jobs_per_window": 100})
+        queued = new_record(reserved=400)
+        running = new_record(reserved=400)
+        running.transition("running")
+        running.unreported_nodes = [
+            NodeRun(
+                node="extract",
+                duration_ms=10,
+                usage=TokenUsage(prompt_tokens=10, total_tokens=10),
+            )
+        ]
+        for record in (queued, running):
+            reserve(store, record, budget=budget)
+        asyncio.run(store.fail_in_flight())
+        outcome = reserve(store, new_record(reserved=300), budget=budget).outcome
+        assert outcome == "over_subject_budget"
+
+    def test_a_failed_job_frees_its_slot(self, store):
+        reserve(store, new_record(), ceiling=1)
+        asyncio.run(store.fail_in_flight())
+        assert reserve(store, new_record(), ceiling=1).outcome == "admitted"

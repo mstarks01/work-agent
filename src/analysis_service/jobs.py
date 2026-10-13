@@ -2,7 +2,8 @@
 
 This is the job side of the front-end API contract. It holds the ``queued ->
 running -> completed | failed | rejected`` state machine, which refuses illegal
-transitions, and an append-only per-job event log that backs both the poll
+transitions. A restart also fails a queued job, along the ``queued -> failed``
+edge. It holds an append-only per-job event log that backs both the poll
 response and the SSE stream. It also holds two open seams:
 
 * :class:`JobStore`. The API only ever talks to this interface. A deployment
@@ -79,7 +80,8 @@ TERMINAL_STATUSES: frozenset[JobStatus] = frozenset(
 )
 
 _LEGAL_TRANSITIONS: dict[JobStatus, frozenset[JobStatus]] = {
-    "queued": frozenset({"running"}),
+    # A restart fails a job that never started (#1529).
+    "queued": frozenset({"running", "failed"}),
     "running": TERMINAL_STATUSES,
     "completed": frozenset(),
     "failed": frozenset(),
@@ -126,6 +128,13 @@ GENERIC_FAILURE_MESSAGE = "internal error while running the analysis pipeline"
 # and no elapsed time — those go to the log, where the operator reads them.
 DEADLINE_FAILURE_MESSAGE = (
     "the analysis exceeded this service's time budget and was stopped"
+)
+
+# Stored on a job that was queued or running when the service stopped. Like the
+# deadline message, it names an operational fact and no internal detail. The
+# service never runs the job again: that is a second paid run nobody approved.
+RESTART_FAILURE_MESSAGE = (
+    "the service restarted during the analysis; submit the job again"
 )
 
 
@@ -581,6 +590,8 @@ class JobStore(Protocol):
 
     async def delete(self, job_id: str, subject: str) -> bool: ...
 
+    async def fail_in_flight(self) -> list[str]: ...
+
 
 @dataclass(frozen=True)
 class UsageRow:
@@ -966,6 +977,24 @@ class InMemoryJobStore:
             parent_id=parent_of(record),
         )
         return True
+
+    async def fail_in_flight(self) -> list[str]:
+        """Fail each queued or running job with :data:`RESTART_FAILURE_MESSAGE`.
+
+        The restart scan (#1529). A job in flight at startup has no run left
+        to finish it. Each failed job keeps its full charge and gets a status
+        event, as :meth:`JobRecord.transition` settles it. A terminal job,
+        which includes one in ``awaiting-answers``, stays as it is. Returns
+        the IDs of the failed jobs.
+        """
+        failed = []
+        for record in self._records.values():
+            if record.status in TERMINAL_STATUSES:
+                continue
+            record.transition("failed")
+            record.error = RESTART_FAILURE_MESSAGE
+            failed.append(record.id)
+        return failed
 
 
 #: How long an event stream waits before it asks the store for new events.
