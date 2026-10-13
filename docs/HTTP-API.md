@@ -154,9 +154,12 @@ accounts", "the calling teams", "ML engineers". The sources state facts about
 these principals, such as "no MFA for shopper accounts", but never say which
 element each one is, so no rule can place those facts.
 `GET /v1/jobs/{id}/questions` lists the questions, and the report page shows
-the same list. Each entry is `{key, principal, rows, options}`: `rows` is how
-many stated facts an answer would place, and `options` lists the elements an
-answer may name, each as `{id, name}`. The most rows come first.
+the same list. Each entry is `{key, principal, rows, options, suggested}`:
+`rows` is how many stated facts an answer would place, and `options` lists the
+elements an answer may name, each as `{id, name}`. `suggested` is the one
+option whose name matches the principal, ignoring case, punctuation and a
+plural, or `null`. It is a suggestion only: nothing is placed until you answer.
+The most rows come first.
 
 **Ask before the analysis runs.** Submit with `"questions": true` beside the
 sources. The job stops after extraction, and after the assertion pass where

@@ -240,6 +240,9 @@ class LinkQuestion:
     rows: int
     #: The components an answer may name, in model order.
     options: tuple[str, ...]
+    #: The one option whose name folds to :attr:`key`, or ``None``. A page
+    #: offers it; it is never an answer until a person gives it.
+    suggested: str | None = None
 
     def to_json(self) -> dict[str, object]:
         return {
@@ -247,6 +250,7 @@ class LinkQuestion:
             "principal": self.principal,
             "rows": self.rows,
             "options": list(self.options),
+            "suggested": self.suggested,
         }
 
 
@@ -286,8 +290,18 @@ def link_questions(
             rows[key] += facts
             first.setdefault(key, subject.label)
     options = components(model)
+    named: dict[str, list[str]] = defaultdict(list)
+    for element in model.elements():
+        if element.id in options:
+            named[fold(element.name)].append(element.id)
     return tuple(
-        LinkQuestion(key=key, principal=first[key], rows=count, options=options)
+        LinkQuestion(
+            key=key,
+            principal=first[key],
+            rows=count,
+            options=options,
+            suggested=named[key][0] if len(named[key]) == 1 else None,
+        )
         for key, count in sorted(rows.items(), key=lambda item: (-item[1], item[0]))
         if key not in linked
     )

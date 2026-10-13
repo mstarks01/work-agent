@@ -401,7 +401,9 @@ The app can ask you questions before the analysis, and after the report.
   corrections**. The report marks each finding that rests on a corrected
   answer. The analysis does not run again. Where your install builds an assertion catalog, the
   follow-up also lists the group questions under **Which element is each of
-  these?**. Under **Earlier answers**, the follow-up lists the answers this
+  these?**. Where a part of your system has the same name as the person or
+  team, the question offers **Use** with that name; nothing is chosen until
+  you click it. Under **Earlier answers**, the follow-up lists the answers this
   report read. Click **Change** beside one to give a new answer, and the
   follow-up reads it. A known answer cannot change back to "I don't know"
   there, and a known part of a question with parts cannot either. Where you

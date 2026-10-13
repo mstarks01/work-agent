@@ -160,6 +160,23 @@ class TestTheQuestions:
         (question,) = link_questions(held, model)
         assert question.rows == 2
 
+    def test_the_one_element_whose_name_folds_to_the_principal_is_suggested(
+        self, model
+    ):
+        """Case and a plural are one spelling, as :func:`fold` reads them."""
+        (question,) = link_questions(catalog(label="customers"), model)
+        assert question.suggested == "entity:customer"
+        assert question.to_json()["suggested"] == "entity:customer"
+
+    def test_no_name_match_suggests_nothing(self, model):
+        (question,) = link_questions(catalog(), model)
+        assert question.suggested is None
+
+    def test_two_elements_with_one_name_suggest_nothing(self, model):
+        model.get("process:web-app").name = "Customers"
+        (question,) = link_questions(catalog(label="customer"), model)
+        assert question.suggested is None
+
     def test_no_catalog_asks_nothing(self, model):
         assert link_questions(None, model) == ()
 
