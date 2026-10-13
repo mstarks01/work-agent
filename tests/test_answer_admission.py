@@ -1403,12 +1403,39 @@ class TestTheFrameworksTakeTurns:
                 parent=None,
                 frameworks=("asvs",),
                 gates=gates,
+                group=key,
             )
 
         field = question("f")
         gate = question("g", gates=("asvs",))
         shown, _, _ = recommended([field, gate], frozenset(), {}, {})
         assert [q.key for q in shown] == [("g",), ("f",)]
+
+    def test_each_question_kind_is_listed_once_at_its_first_row(self):
+        """A kind's rows follow its first row; a capability keeps its place,
+        because every capability shares one group (ADR 0080)."""
+        from analysis_service.answer_round import grouped
+        from analysis_service.open_facts import CAPABILITY_GROUP
+
+        def question(key, group):
+            return SimpleNamespace(key=(key,), group=group)
+
+        listed = [
+            question("cap-1", CAPABILITY_GROUP),
+            question("a-1", "authorization-scope"),
+            question("b-1", "capacity-limits"),
+            question("cap-2", CAPABILITY_GROUP),
+            question("a-2", "authorization-scope"),
+            question("b-2", "capacity-limits"),
+        ]
+        assert [q.key[0] for q in grouped(listed)] == [
+            "cap-1",
+            "a-1",
+            "a-2",
+            "b-1",
+            "b-2",
+            "cap-2",
+        ]
 
     def test_a_shared_question_is_charged_to_each_framework_it_serves(self):
         from analysis_service.answer_round import by_turn

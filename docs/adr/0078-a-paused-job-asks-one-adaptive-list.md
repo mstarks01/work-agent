@@ -1,6 +1,7 @@
 # 78. A paused job asks one adaptive list, and says what an answer settles
 
-- **Status**: accepted
+- **Status**: accepted; its rule that the page shows each group's rows in the
+  list's order is amended by [ADR 0080](0080-each-question-kind-is-listed-once.md)
 - **Date**: 2026-10-12
 - **Effort**: [#1632](https://github.com/mstarks01/work-agent/issues/1632)
 - **Supersedes**: the rounds of
