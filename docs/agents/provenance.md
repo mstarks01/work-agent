@@ -33,7 +33,7 @@ A list of what nobody has done. Five lists use this pattern:
 
 | list | what it counts |
 |---|---|
-| `tests/test_case_review.py` — `UNREVIEWED` | cases no person has read (13) |
+| `tests/test_case_review.py` — `UNREVIEWED` | cases no person has read |
 | `tests/test_knowledge_lints.py` — `EMPTY_CORPUS` | packages shipping no reference material |
 | `tests/test_evals_triggers.py` — `UNTRIGGERED_LANES`, `UNLED_CASES` | lanes and cases drawing no structural lead |
 | `tests/test_claim_identity.py` — `UNSEPARATED` | claims the identity key cannot tell apart |
