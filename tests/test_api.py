@@ -23,6 +23,7 @@ from analysis_service.claims import FrameworkName
 from analysis_service.deployment import Deployment
 from analysis_service.errors import ConfigError
 from analysis_service.jobs import (
+    RESTART_FAILURE_MESSAGE,
     AdmissionOutcome,
     InMemoryJobStore,
     JobRecord,
@@ -693,6 +694,22 @@ def seed(store: InMemoryJobStore, subject: str, status: JobStatus) -> JobRecord:
         record.transition(status)
     asyncio.run(admit(store, record))
     return record
+
+
+class TestTheRestartScan:
+    """#1529: the app fails each job in flight before it takes a request."""
+
+    def test_a_job_in_flight_at_startup_reads_as_failed(self):
+        store = InMemoryJobStore()
+        jobs = [seed(store, "alice", status).id for status in ("queued", "running")]
+        client, _ = make_client(store=store)
+        with client:
+            bodies = [
+                client.get(f"/v1/jobs/{job}", headers=auth()).json() for job in jobs
+            ]
+        assert [(body["status"], body["error"]) for body in bodies] == [
+            ("failed", RESTART_FAILURE_MESSAGE)
+        ] * 2
 
 
 class TestAdmissionOutcomes:

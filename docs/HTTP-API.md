@@ -79,9 +79,10 @@ appears in `GET /v1/jobs/{id}`; it is operator-facing only. See
 ```mermaid
 flowchart LR
     queued([queued]) --> running([running])
+    queued -- service restarted --> failed
     running -- report produced --> completed([completed])
     running -- validity gate refused the input --> rejected([rejected])
-    running -- internal error --> failed([failed])
+    running -- internal error or service restarted --> failed([failed])
     running -- questions asked --> awaiting([awaiting-answers])
 
     classDef live fill:#f1f5f9,stroke:#64748b,stroke-width:1.5px,color:#0f172a
@@ -95,7 +96,12 @@ flowchart LR
 - `completed` — the report is available at `/v1/jobs/{id}/report`.
 - `rejected` — the input failed the validity gate; the poll response carries the
   `validation_issues` (see [Report-Schema](Report-Schema.md)).
-- `failed` — an internal error; only a generic message is exposed.
+- `failed` — an internal error; only a generic message is exposed. A job that
+  is `queued` or `running` when the service stops also fails, at the next
+  startup, with the message "the service restarted during the analysis; submit
+  the job again". The service never runs it again on its own, because that is
+  a second paid run that nobody submitted. The job keeps its full token
+  charge.
 - `awaiting-answers` — only for a job submitted with `"questions": true`. The
   run stopped after its assertion pass and waits for you, for as long as it
   takes. `GET /v1/jobs/{id}/questions` lists what it asks, and
@@ -753,12 +759,21 @@ but jobs are lost on restart and are not shared across instances, so it suits
 single-instance or development deployments only. Durable, multi-instance
 deployments need a shared backend (see below).
 
+At startup, before the app takes a request, a restart scan fails each `queued`
+or `running` job in the store. A job in `awaiting-answers` and a job in a
+terminal status stay as they are. The ASGI server runs the scan as the app's
+lifespan startup, so do not turn the lifespan off (for example with
+`uvicorn --lifespan off`). The scan is correct for a single instance only. With
+two instances on one shared store, the scan at the start of one instance fails
+the jobs that the other instance still runs.
+
 ### Adding a new backend
 
 A durable or shared backend (Redis, Postgres, …) is a new entry in the
 `_FACTORIES` registry in [`src/analysis_service/jobs.py`](../src/analysis_service/jobs.py).
 Implement the `JobStore` protocol and read any connection settings from its own
-prefixed env vars; the API layer is unchanged. The protocol is six methods:
+prefixed env vars; the API layer is unchanged. These are some of the protocol's
+methods:
 
 | Method | What a backend owes it |
 | --- | --- |
@@ -768,6 +783,7 @@ prefixed env vars; the API layer is unchanged. The protocol is six methods:
 | `report_json` | The owned job's report, already serialised. |
 | `events_after` | A job's status and the events past a cursor, and nothing else. |
 | `save` | The record back, for a job that already exists. |
+| `fail_in_flight` | Fails each `queued` or `running` job with the restart message and returns their IDs. It settles each job through `JobRecord.transition`, so the job keeps its full charge and gets a status event. |
 
 The three read methods are separate because a read that copies a whole report to
 answer a question about its status is the expensive path, and no bound applies to
