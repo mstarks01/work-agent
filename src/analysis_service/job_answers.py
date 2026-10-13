@@ -60,11 +60,12 @@ from analysis_service.jobs import (
     JobStore,
     PipelineRunner,
     Resumption,
+    same_major,
 )
 from analysis_service.links import NoCatalogError
 from analysis_service.pipeline import entry_of
 from analysis_service.questions import question_fallback
-from analysis_service.report import Report
+from analysis_service.report import SCHEMA_VERSION, Report
 from analysis_service.report_conditions import corrected_findings
 from analysis_service.sources import SourceLimits
 from analysis_service.system_model import SystemModel
@@ -88,6 +89,7 @@ __all__ = [
     "SaveConflict",
     "Start",
     "Started",
+    "UnreadableSchema",
     "Withheld",
 ]
 
@@ -201,6 +203,21 @@ class NotAdmitted(Exception):
 class SaveConflict(Exception):
     """A save landed on a job that moved: another save, a start, or a status
     change came first. Read the questions again."""
+
+
+class UnreadableSchema(Exception):
+    """The job's record has a schema version of another major (#1532).
+
+    This service cannot parse what such a record holds, and no migration
+    rewrites it, so the owner must submit the job again.
+    """
+
+    def __init__(self, version: str) -> None:
+        super().__init__(
+            f"the job was stored under schema version {version}, which this"
+            f" service (schema version {SCHEMA_VERSION}) cannot read; submit the"
+            " job again"
+        )
 
 
 @dataclass(frozen=True)
@@ -359,6 +376,19 @@ class JobAnswers:
             raise NoSuchJob(job_id)
         return record
 
+    async def parsable(self, job_id: str, subject: str) -> JobRecord:
+        """The owned job, where this service can parse what its record holds.
+
+        **The gate before every read that parses a stored record.** It raises
+        :class:`UnreadableSchema` where :func:`~analysis_service.jobs.same_major`
+        refuses the record's version. Ownership is checked first, so a foreign
+        job reads as missing and never as unreadable.
+        """
+        record = await self.owned(job_id, subject)
+        if not same_major(record.schema_version):
+            raise UnreadableSchema(record.schema_version)
+        return record
+
     async def answerable(self, job_id: str, subject: str) -> Answerable:
         """What this caller may ask or answer about, read once.
 
@@ -366,7 +396,7 @@ class JobAnswers:
         is read by name, once: the envelope carries neither, so a status read
         never pays for them.
         """
-        record = await self.owned(job_id, subject)
+        record = await self.parsable(job_id, subject)
         store = self.store
         if record.status == "awaiting-answers":
             # The questions are read off what the head built, so they answer
@@ -524,7 +554,7 @@ class JobAnswers:
                 "answers from an earlier analysis are offered as questions;"
                 " turn the questions on to carry them"
             )
-        earlier = await self.owned(job_id, subject)
+        earlier = await self.parsable(job_id, subject)
         held = earlier.held_answers()
         if held.empty:
             raise Refused("the earlier analysis holds no answers to carry")

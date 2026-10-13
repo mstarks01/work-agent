@@ -55,6 +55,7 @@ from analysis_service.execution import GraphFailed
 from analysis_service.fact_answers import MAX_HELD_FACTS, FactAnswer, SkipKey
 from analysis_service.links import MAX_HELD_LINKS
 from analysis_service.report import (
+    SCHEMA_VERSION,
     FrameworkSelection,
     InputRef,
     Job,
@@ -115,6 +116,21 @@ def locks_its_parent(status: JobStatus) -> bool:
     job store and the first-run app both ask it.
     """
     return status not in NON_LOCKING_STATUSES
+
+
+def same_major(version: str) -> bool:
+    """Whether ``version`` has the major number of this service's ``SCHEMA_VERSION``.
+
+    **The one comparison of schema versions** (#1532). A record that another
+    major wrote can hold a shape this service cannot parse, so each route that
+    parses a stored record asks this first. A minor bump only adds fields, so a
+    record from an older minor of this major reads as before.
+
+    The major is the text before the first dot. Text that this service never
+    writes, such as an empty string, has no major that matches, so it reads as
+    another major.
+    """
+    return version.partition(".")[0] == SCHEMA_VERSION.partition(".")[0]
 
 
 # Stored on a failed job in place of any internal detail.
@@ -227,6 +243,11 @@ class JobRecord(BaseModel):
 
     id: str
     owner_subject: str
+    # The ``SCHEMA_VERSION`` of the service that created this record. It
+    # covers the checkpoint, the resumption, the sources and the report, and
+    # :func:`same_major` reads it before a route parses any of them (#1532).
+    # No default, so a record that does not state its version fails to load.
+    schema_version: str
     sources: list[Source] = Field(min_length=1)
     # What this job asked to be analysed under, in the order its report's blocks
     # will carry. Required and non-empty here as well as on the wire: the record
@@ -339,6 +360,7 @@ class JobRecord(BaseModel):
         record = cls(
             id=f"job-{uuid4().hex}",
             owner_subject=owner_subject,
+            schema_version=SCHEMA_VERSION,
             sources=list(sources),
             frameworks=list(frameworks),
             system_name=system_name,

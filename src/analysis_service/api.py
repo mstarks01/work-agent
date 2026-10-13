@@ -80,6 +80,7 @@ from analysis_service.job_answers import (
     SaveConflict,
     Start,
     Started,
+    UnreadableSchema,
     Withheld,
 )
 from analysis_service.jobs import (
@@ -663,6 +664,7 @@ _REFUSAL_STATUS: dict[type[Exception], int] = {
     SaveConflict: 409,
     AlreadyResumed: 409,
     NoCatalogError: 409,
+    UnreadableSchema: 409,
     JobDataMissing: 500,
     RunnerUnavailable: 503,
 }
@@ -1004,10 +1006,12 @@ def create_app(
 
         Both reports are served under their own rule first, so a comparison
         never names a finding of a report this caller may not read. ``409``
-        where the job is not a follow-up, or the store no longer holds the
-        report its answers came from.
+        where the job is not a follow-up, the store no longer holds the report
+        its answers came from, or either record has a schema version of
+        another major.
         """
-        await _servable_report(request, job_id, subject)
+        answers = _answers(request)
+        answers.servable(await answers.parsable(job_id, subject))
         store: JobStore = request.app.state.store
         # The envelope leaves the resumption out, so it is read by name.
         resumption = await store.resumption(job_id, subject)
@@ -1016,12 +1020,14 @@ def create_app(
                 status_code=409,
                 detail="the job is not a follow-up: it resumed from no finished report",
             )
-        if await store.owned(resumption.parent_id, subject) is None:
+        try:
+            parent = await answers.parsable(resumption.parent_id, subject)
+        except NoSuchJob:
             raise HTTPException(
                 status_code=409,
                 detail="the report this follow-up's answers came from is no longer held",
-            )
-        await _servable_report(request, resumption.parent_id, subject)
+            ) from None
+        answers.servable(parent)
         before = await store.report(resumption.parent_id, subject)
         after = await store.report(job_id, subject)
         if before is None or after is None:
