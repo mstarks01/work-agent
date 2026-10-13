@@ -148,7 +148,7 @@ class AdkPipelineRunner:
     ) -> PipelineOutcome:
         graph_run = await self._executor.run(
             job.sources,
-            user_id=job.owner_subject,
+            user_id=job.owner_id,
             # The options ride into the run rather than into the graph. A runner
             # holds one built graph per selection and two jobs may select the
             # same frameworks with different options, so what varies per job is

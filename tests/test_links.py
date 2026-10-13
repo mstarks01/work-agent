@@ -372,7 +372,7 @@ class TestTheQuestionsRoute:
         from tests.test_api import admit
 
         record = JobRecord.create(
-            owner_subject=subject,
+            owner_id=subject,
             sources=[DESCRIPTION],
             frameworks=sample_selection(),
         )

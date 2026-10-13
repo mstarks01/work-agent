@@ -64,6 +64,7 @@ from analysis_service.jobs import (
 )
 from analysis_service.links import NoCatalogError
 from analysis_service.pipeline import entry_of
+from analysis_service.principals import Identity, Principal, log_created
 from analysis_service.questions import question_fallback
 from analysis_service.report import SCHEMA_VERSION, Report
 from analysis_service.report_conditions import corrected_findings
@@ -89,6 +90,7 @@ __all__ = [
     "SaveConflict",
     "Start",
     "Started",
+    "Submitter",
     "UnreadableSchema",
     "Withheld",
 ]
@@ -101,7 +103,8 @@ Start = Callable[[JobRecord, PipelineRunner], None]
 
 
 class NoSuchJob(LookupError):
-    """The subject owns no job with this ID. A foreign job reads the same."""
+    """The owner owns no job with this ID. A foreign job reads the same, and so
+    does every job where the caller's identity holds no principal."""
 
     def __init__(self, job_id: str) -> None:
         self.job_id = job_id
@@ -314,6 +317,18 @@ class Started:
 
 
 @dataclass(frozen=True)
+class Submitter:
+    """The owner of a new submission: the owner ID its job names.
+
+    ``new`` is the principal admission creates with the job, where the
+    identity holds none yet, and ``None`` where it holds one.
+    """
+
+    owner_id: str
+    new: Principal | None
+
+
+@dataclass(frozen=True)
 class Corrected:
     """A final report's corrections once a submission landed, and the findings
     they reach."""
@@ -328,7 +343,7 @@ class JobAnswers:
     """One job store's answer operations, under one deployment's bounds.
 
     ``runner_for`` looks a runner up by selection and entry. ``limits`` bounds
-    what a job may carry, ``ceiling`` how many jobs one subject may have in
+    what a job may carry, ``ceiling`` how many jobs one owner may have in
     flight, and ``budget`` the tokens a window admits. ``carries_catalog``
     says whether a job here builds an assertion catalog, the only reader of
     a link answer. ``gate`` is the certification gate that withholds an
@@ -369,14 +384,14 @@ class JobAnswers:
         if result is not None:
             raise Withheld(result)
 
-    async def owned(self, job_id: str, subject: str) -> JobRecord:
-        """The job the subject owns, without its heavy fields, or :class:`NoSuchJob`."""
-        record = await self.store.owned(job_id, subject)
+    async def owned(self, job_id: str, owner_id: str) -> JobRecord:
+        """The job the owner owns, without its heavy fields, or :class:`NoSuchJob`."""
+        record = await self.store.owned(job_id, owner_id)
         if record is None:
             raise NoSuchJob(job_id)
         return record
 
-    async def parsable(self, job_id: str, subject: str) -> JobRecord:
+    async def parsable(self, job_id: str, owner_id: str) -> JobRecord:
         """The owned job, where this service can parse what its record holds.
 
         **The gate before every read that parses a stored record.** It raises
@@ -384,19 +399,19 @@ class JobAnswers:
         refuses the record's version. Ownership is checked first, so a foreign
         job reads as missing and never as unreadable.
         """
-        record = await self.owned(job_id, subject)
+        record = await self.owned(job_id, owner_id)
         if not same_major(record.schema_version):
             raise UnreadableSchema(record.schema_version)
         return record
 
-    async def answerable(self, job_id: str, subject: str) -> Answerable:
+    async def answerable(self, job_id: str, owner_id: str) -> Answerable:
         """What this caller may ask or answer about, read once.
 
         **The one reader of "what does this job ask about".** Each heavy field
         is read by name, once: the envelope carries neither, so a status read
         never pays for them.
         """
-        record = await self.parsable(job_id, subject)
+        record = await self.parsable(job_id, owner_id)
         store = self.store
         if record.status == "awaiting-answers":
             # The questions are read off what the head built, so they answer
@@ -404,23 +419,23 @@ class JobAnswers:
             result = self.withheld(record)
             if result is not None:
                 raise Withheld(result)
-            held = await store.checkpoint(job_id, subject)
+            held = await store.checkpoint(job_id, owner_id)
             if held is None:
                 logger.error("waiting job %s holds no checkpoint", record.id)
                 raise JobDataMissing(record.id)
-            resumed_by = await store.resumed_by(job_id, subject)
+            resumed_by = await store.resumed_by(job_id, owner_id)
             return Answerable(
                 record, held.system_model, held.assertions, [], resumed_by
             )
         self.servable(record)
-        report = await store.report(job_id, subject)
+        report = await store.report(job_id, owner_id)
         if report is None:
             logger.error("completed job %s has no report attached", record.id)
             raise JobDataMissing(record.id)
         # The envelope leaves the resumption out, and it says whether the
         # report is final: a report its follow-up wrote asks nothing (ADR 0054).
-        record.resumption = await store.resumption(job_id, subject)
-        resumed_by = await store.resumed_by(job_id, subject)
+        record.resumption = await store.resumption(job_id, owner_id)
+        resumed_by = await store.resumed_by(job_id, owner_id)
         return Answerable(
             record,
             report.system_model,
@@ -430,17 +445,17 @@ class JobAnswers:
             report,
         )
 
-    async def questions(self, job_id: str, subject: str) -> dict[str, Any]:
+    async def questions(self, job_id: str, owner_id: str) -> dict[str, Any]:
         """Every question the job asks the submitter, derived at read time.
 
         The derivation grows with the report, and a read carries no admission
         bound, so it runs off the event loop.
         """
-        answerable = await self.answerable(job_id, subject)
+        answerable = await self.answerable(job_id, owner_id)
         return await anyio.to_thread.run_sync(answerable.payload)
 
     async def answer(
-        self, job_id: str, subject: str, answers: Answers, *, start: Start
+        self, job_id: str, owner_id: str, answers: Answers, *, start: Start
     ) -> DraftSaved | RoundSaved | Started:
         """Keep a round or a draft, or start the Resumed Job the answers start.
 
@@ -451,7 +466,7 @@ class JobAnswers:
         """
         if answers.given.links and not self.carries_catalog:
             raise NoCatalog()
-        answerable = await self.answerable(job_id, subject)
+        answerable = await self.answerable(job_id, owner_id)
         parent = answerable.record
         state = answerable.state()
         outcome = await anyio.to_thread.run_sync(
@@ -459,7 +474,7 @@ class JobAnswers:
         )
         if isinstance(outcome, SavedDraft):
             if not await self.store.save_draft(
-                parent.id, subject, outcome.draft, outcome.revision
+                parent.id, owner_id, outcome.draft, outcome.revision
             ):
                 raise SaveConflict(
                     "the report's follow-up has started, or another save landed"
@@ -470,7 +485,7 @@ class JobAnswers:
         if isinstance(outcome, SavedRound):
             if not await self.store.save_round(
                 parent.id,
-                subject,
+                owner_id,
                 outcome.answers,
                 outcome.shown,
                 outcome.skipped,
@@ -483,7 +498,7 @@ class JobAnswers:
             # A saved round never starts the analysis: a continue does.
             return RoundSaved(job_id=parent.id)
         record = JobRecord.create(
-            owner_subject=subject,
+            owner_id=owner_id,
             sources=outcome.sources,
             frameworks=parent.frameworks,
             system_name=parent.system_name,
@@ -504,7 +519,7 @@ class JobAnswers:
     async def amend(
         self,
         job_id: str,
-        subject: str,
+        owner_id: str,
         text: str,
         *,
         revision: int | None,
@@ -516,7 +531,7 @@ class JobAnswers:
         pauses again, and carries the paused job's answers, which its own
         questions take where they still ask them.
         """
-        answerable = await self.answerable(job_id, subject)
+        answerable = await self.answerable(job_id, owner_id)
         parent = answerable.record
         state = answerable.state()
         amended = await anyio.to_thread.run_sync(
@@ -525,7 +540,7 @@ class JobAnswers:
             )
         )
         record = JobRecord.create(
-            owner_subject=subject,
+            owner_id=owner_id,
             sources=amended.sources,
             frameworks=parent.frameworks,
             system_name=parent.system_name,
@@ -538,11 +553,11 @@ class JobAnswers:
         return await self.admit(record, start=start)
 
     async def carried_from(
-        self, job_id: str | None, subject: str, *, asks: bool
+        self, job_id: str | None, owner_id: str, *, asks: bool
     ) -> AnswerSet:
-        """The answers a new job carries from an earlier job of this subject (ADR 0079).
+        """The answers a new job carries from an earlier job of this owner (ADR 0079).
 
-        ``None`` names no job and carries nothing. Another subject's job reads
+        ``None`` names no job and carries nothing. Another owner's job reads
         as missing, as every read does. A job that does not pause would never
         read what it carries, so it is refused one; so is a job that holds no
         answer, or more than one job may hold.
@@ -554,27 +569,27 @@ class JobAnswers:
                 "answers from an earlier analysis are offered as questions;"
                 " turn the questions on to carry them"
             )
-        earlier = await self.parsable(job_id, subject)
+        earlier = await self.parsable(job_id, owner_id)
         held = earlier.held_answers()
         if held.empty:
             raise Refused("the earlier analysis holds no answers to carry")
         return self._refusing(within_held_limits, held)
 
     async def correct(
-        self, job_id: str, subject: str, facts: Sequence[FactAnswer]
+        self, job_id: str, owner_id: str, facts: Sequence[FactAnswer]
     ) -> Corrected:
         """Correct a final report's answers, and run nothing (ADR 0054).
 
         The corrections are kept beside the report; the report is not
         rewritten.
         """
-        answerable = await self.answerable(job_id, subject)
+        answerable = await self.answerable(job_id, owner_id)
         parent = answerable.record
         state = answerable.state()
         corrections = await anyio.to_thread.run_sync(
             partial(self._refusing, state.correct, facts)
         )
-        if not await self.store.save_corrections(parent.id, subject, corrections):
+        if not await self.store.save_corrections(parent.id, owner_id, corrections):
             raise SaveConflict("the job's report is no longer final")
         return Corrected(
             job_id=parent.id,
@@ -586,7 +601,25 @@ class JobAnswers:
             ),
         )
 
-    async def admit(self, record: JobRecord, *, start: Start) -> Started:
+    async def submitter(self, identity: Identity) -> Submitter:
+        """The owner a submission by ``identity`` names, read once.
+
+        An identity with no principal gets a new one here, which nothing
+        keeps until :meth:`admit` admits its first job.
+        """
+        held = await self.store.principal(identity)
+        if held is not None:
+            return Submitter(owner_id=held.owner_id, new=None)
+        new = Principal.new(identity)
+        return Submitter(owner_id=new.owner_id, new=new)
+
+    async def admit(
+        self,
+        record: JobRecord,
+        *,
+        start: Start,
+        principal: Principal | None = None,
+    ) -> Started:
         """Admit one new job against the ceiling and the budget, and start it.
 
         **The one admission.** A submission, a Resumed Job and an amended job
@@ -595,6 +628,10 @@ class JobAnswers:
         one. Every refusal is logged, because it is the only place these
         bounds are observable from outside the caller they refused, and the
         log carries the deployment-wide figure a response withholds.
+
+        ``principal`` is the new principal of a first submission
+        (:attr:`Submitter.new`). The store creates it with the job, and this
+        method writes the one log line that records it.
         """
         try:
             runner = self.runner_for(record.selection(), entry_of(record))
@@ -602,22 +639,24 @@ class JobAnswers:
             logger.error("cannot build a runner for job %s: %s", record.id, exc)
             raise RunnerUnavailable() from None
         admission = await self.store.reserve(
-            record, ceiling=self.ceiling, budget=self.budget
+            record, ceiling=self.ceiling, budget=self.budget, principal=principal
         )
         if admission.outcome != "admitted":
             logger.warning(
-                "subject %s refused (%s): %d in flight of %d, %d tokens of %d"
-                " in this subject's window, %d of %d across the deployment",
-                record.owner_subject,
+                "owner %s refused (%s): %d in flight of %d, %d tokens of %d"
+                " in this owner's window, %d of %d across the deployment",
+                record.owner_id,
                 admission.outcome,
                 admission.active,
                 self.ceiling,
-                admission.subject_tokens,
+                admission.owner_tokens,
                 self.budget.max_tokens_per_window,
                 admission.global_tokens,
                 self.budget.global_max_tokens_per_window,
             )
             raise NotAdmitted(admission, self.ceiling)
+        if principal is not None:
+            log_created(principal)
         start(record, runner)
         return Started(job_id=record.id, status=record.status)
 

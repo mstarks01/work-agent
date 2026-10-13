@@ -39,9 +39,9 @@ own.
 A ceiling alone therefore closes nothing cumulative. A caller who submits
 serially, and lets each job finish before the next, stays inside any ceiling for
 ever. The four window knobs are the other half.
-:mod:`analysis_service.budgets` bounds how many jobs one subject may start per
-window, how many tokens one subject may commit, and how many tokens every
-subject may commit together. The service decides all of them inside the same
+:mod:`analysis_service.budgets` bounds how many jobs one owner may start per
+window, how many tokens one owner may commit, and how many tokens every
+owner may commit together. The service decides all of them inside the same
 atomic reservation the ceiling uses, so no two of them can be raced apart.
 
 The input bounds are in bytes rather than tokens. A token budget would make the
@@ -167,7 +167,7 @@ class ResilienceConfig(BaseModel):
     and no single source is at fault.
 
     ``max_active_jobs`` is one of the bounds here that is per *caller* rather
-    than per job: how many jobs one token subject may have in flight at once. It
+    than per job: how many jobs one owner may have in flight at once. It
     bounds concurrency and nothing cumulative — a caller who submits serially
     stays inside it forever — so the four ``*_per_window`` values beside it bound
     the spend over time that it cannot. See

@@ -281,6 +281,10 @@ Treat this as a set of tested controls, not an OWASP certification. Do not
 expose this unauthenticated app to a network; introduce authenticated ownership
 checks for every analysis and report before adding multi-user access.
 
+The app has one local operator. Every job it holds belongs to one **Principal**
+under the reserved issuer `local:`, which no bearer token can name. The first
+analysis creates that principal; before it, the app lists no runs.
+
 
 ### Question progress and reports
 

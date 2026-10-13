@@ -192,6 +192,7 @@ from analysis_service.links import (
 )
 from analysis_service.model_tiers import ModelTierConfig
 from analysis_service.open_facts import open_facts_by_framework, reference_labels
+from analysis_service.principals import Identity
 from analysis_service.questions import question_fallback
 from analysis_service.report_changes import report_changes
 from analysis_service.report_conditions import conditions, corrected_findings
@@ -246,10 +247,10 @@ _FORM_GRANTS = Grants(script=True, style=True, connect=True)
 _DIAGNOSTIC_GRANTS = Grants(style=True)
 
 
-#: The one owner of every job this app holds. The store keys each job by its
-#: owner, and this app has one local operator, so every job names the caller
-#: the engine names for an in-process run.
-OWNER = DEFAULT_CALLER
+#: The identity of this app's one local operator, who owns every job it holds.
+#: It is the caller the engine names for an in-process run, under the reserved
+#: local issuer, so no bearer token can name it.
+OPERATOR = Identity.local(DEFAULT_CALLER)
 
 
 class WorkspaceFull(Exception):
@@ -310,6 +311,33 @@ class Workspace:
         self._tasks.add(task)
         task.add_done_callback(self._tasks.discard)
 
+    async def _owner_id(self) -> str | None:
+        """The owner ID of the operator's principal, or ``None`` before the
+        first submission creates it."""
+        principal = await self.store.principal(OPERATOR)
+        return None if principal is None else principal.owner_id
+
+    async def owner_id(self, job_id: str) -> str:
+        """The operator's owner ID, or :class:`NoSuchJob` for ``job_id``.
+
+        Before the first submission the operator has no principal and owns no
+        job, so every job reads as missing.
+        """
+        owner_id = await self._owner_id()
+        if owner_id is None:
+            raise NoSuchJob(job_id)
+        return owner_id
+
+    async def owned(self, job_id: str) -> JobRecord | None:
+        """The operator's job ``job_id``, as an envelope, or ``None``."""
+        owner_id = await self._owner_id()
+        return None if owner_id is None else await self.store.owned(job_id, owner_id)
+
+    async def jobs(self) -> list[JobRecord]:
+        """Every job of the operator, as envelopes, oldest first."""
+        owner_id = await self._owner_id()
+        return [] if owner_id is None else await self.store.owned_jobs(owner_id)
+
     async def waiting(self, record: JobRecord) -> bool:
         """True while the job waits for answers.
 
@@ -318,7 +346,7 @@ class Workspace:
         """
         if record.status != "awaiting-answers":
             return False
-        locker = await self.store.resumed_by(record.id, OWNER)
+        locker = await self.store.resumed_by(record.id, record.owner_id)
         if locker is None:
             return True
         child = await self.store.get(locker)
@@ -337,9 +365,9 @@ class Workspace:
         :class:`WorkspaceFull` where every held job waits.
         """
         limit = self._max_jobs + (answering is not None)
-        held = await self.store.owned_jobs(OWNER)
+        held = await self.jobs()
         removable = [
-            job.id
+            job
             for job in held
             if job.status in TERMINAL_STATUSES
             and job.id != answering
@@ -352,14 +380,14 @@ class Workspace:
                 " one of them before you start another."
             )
         yield
-        for job_id in removable[: max(excess, 0)]:
-            await self.store.delete(job_id, OWNER)
+        for job in removable[: max(excess, 0)]:
+            await self.store.delete(job.id, job.owner_id)
 
     async def parent_of(self, record: JobRecord) -> str | None:
         """The job this one resumes or amends: :func:`parent_of` over the
         record with its resumption, which an envelope leaves out for its
         weight."""
-        resumption = await self.store.resumption(record.id, OWNER)
+        resumption = await self.store.resumption(record.id, record.owner_id)
         return parent_of(record.model_copy(update={"resumption": resumption}))
 
     async def workspace_id(self, record: JobRecord) -> str:
@@ -369,7 +397,7 @@ class Workspace:
         """
         current = record
         while (parent := await self.parent_of(current)) is not None:
-            above = await self.store.owned(parent, OWNER)
+            above = await self.store.owned(parent, current.owner_id)
             if above is None:
                 return parent
             current = above
@@ -378,7 +406,7 @@ class Workspace:
     async def snapshots(self) -> list[dict[str, object]]:
         """Latest retained job per analysis, with its retained reports, newest first."""
         grouped: dict[str, list[JobRecord]] = {}
-        for record in await self.store.owned_jobs(OWNER):
+        for record in await self.jobs():
             grouped.setdefault(await self.workspace_id(record), []).append(record)
         snapshots = []
         for records in reversed(list(grouped.values())):
@@ -398,7 +426,7 @@ class Workspace:
             group = await self.workspace_id(record)
             related = [
                 item
-                for item in await self.store.owned_jobs(OWNER)
+                for item in await self.jobs()
                 if await self.workspace_id(item) == group
             ]
         return {
@@ -792,13 +820,15 @@ _ADMISSION_MESSAGES: dict[str, str] = {
     "at_ceiling": "An analysis is already running. Wait for it to finish.",
     "over_rate": "This workspace started too many analyses in the current"
     " window. Wait for the window to roll past the earlier ones.",
-    "over_subject_budget": "This workspace has reached its consumption limit"
+    "over_owner_budget": "This workspace has reached its consumption limit"
     " for the current window. Retry later, or submit less text.",
     "over_global_budget": "This workspace has reached its consumption limit"
     " for the current window. Retry later, or submit less text.",
     "resumed_already": "These answers already started an analysis. Open its"
     " report, or answer again only if it fails.",
     "parent_moved": _STALE_MESSAGE,
+    "principal_exists": "Another analysis started at the same moment. Start"
+    " this one again.",
 }
 
 
@@ -902,11 +932,12 @@ def create_app(
         if workspace is None:
             return no_such_run()
         store = workspace.store
-        record = await store.owned(run_id, OWNER)
+        record = await workspace.owned(run_id)
         if record is None:
             return no_such_run()
-        while (locker := await store.resumed_by(record.id, OWNER)) is not None:
-            locked = await store.owned(locker, OWNER)
+        owner_id = record.owner_id
+        while (locker := await store.resumed_by(record.id, owner_id)) is not None:
+            locked = await store.owned(locker, owner_id)
             if locked is None:
                 break
             record = locked
@@ -929,7 +960,7 @@ def create_app(
         if record.status == "awaiting-answers":
             payload["questions"] = {
                 "run": record.id
-            } | await workspace.answers.questions(record.id, OWNER)
+            } | await workspace.answers.questions(record.id, owner_id)
         return JSONResponse(payload)
 
     @app.post("/analyze")
@@ -968,11 +999,12 @@ def create_app(
         breach = state.settings.limits.breach(sources)
         if breach is not None:
             return _message(400, breach.message)
+        submitter = await workspace.answers.submitter(OPERATOR)
         carried = await workspace.answers.carried_from(
-            answers_from, OWNER, asks=ask_questions
+            answers_from, submitter.owner_id, asks=ask_questions
         )
         record = JobRecord.create(
-            owner_subject=OWNER,
+            owner_id=submitter.owner_id,
             sources=sources,
             frameworks=selection,
             system_name=name,
@@ -981,7 +1013,9 @@ def create_app(
             reserved_tokens=budgets.estimate(sources, selection),
         )
         async with workspace.make_room():
-            started = await workspace.answers.admit(record, start=workspace.start)
+            started = await workspace.answers.admit(
+                record, start=workspace.start, principal=submitter.new
+            )
         return JSONResponse({"run": started.job_id})
 
     @app.post("/answer/{run_id}")
@@ -1042,12 +1076,13 @@ def create_app(
                 "Expected a JSON body with a 'links' list and a 'facts' list of"
                 " answers this report asked for.",
             )
+        owner_id = await workspace.owner_id(run_id)
         # A save starts no job, so it needs no room.
         room = nullcontext() if save else workspace.make_room(answering=run_id)
         async with room:
             outcome = await workspace.answers.answer(
                 run_id,
-                OWNER,
+                owner_id,
                 Answers(
                     given=AnswerSet(links=tuple(links), facts=tuple(facts)),
                     save=save,
@@ -1065,7 +1100,7 @@ def create_app(
         # A save runs no model: the answers go onto the paused run, and the
         # list is read again off the model with them in.
         return JSONResponse(
-            {"run": run_id} | await workspace.answers.questions(run_id, OWNER)
+            {"run": run_id} | await workspace.answers.questions(run_id, owner_id)
         )
 
     @app.post("/amend/{run_id}")
@@ -1088,9 +1123,10 @@ def create_app(
                 raise TypeError
         except (ValueError, KeyError, TypeError):
             return _message(400, "Expected a JSON body with a 'text' and a 'revision'.")
+        owner_id = await workspace.owner_id(run_id)
         async with workspace.make_room(answering=run_id):
             started = await workspace.answers.amend(
-                run_id, OWNER, text, revision=revision, start=workspace.start
+                run_id, owner_id, text, revision=revision, start=workspace.start
             )
         return JSONResponse({"run": started.job_id})
 
@@ -1098,7 +1134,7 @@ def create_app(
     async def events(run_id: str) -> Response:
         """The job's status and node events, as the store records them, until
         the job reaches a terminal status."""
-        if workspace is None or await workspace.store.owned(run_id, OWNER) is None:
+        if workspace is None or await workspace.owned(run_id) is None:
             return PlainTextResponse("no such run", status_code=404)
         return StreamingResponse(
             _stream(workspace, run_id),
@@ -1111,7 +1147,8 @@ def create_app(
         if workspace is None:
             return PlainTextResponse("no such report", status_code=404)
         try:
-            answerable = await workspace.answers.answerable(run_id, OWNER)
+            owner_id = await workspace.owner_id(run_id)
+            answerable = await workspace.answers.answerable(run_id, owner_id)
         except (NoSuchJob, NotCompleted, Withheld):
             return PlainTextResponse("no such report", status_code=404)
         report = answerable.report
@@ -1121,7 +1158,7 @@ def create_app(
         previous = (
             None
             if resumption is None
-            else await workspace.store.report(resumption.parent_id, OWNER)
+            else await workspace.store.report(resumption.parent_id, owner_id)
         )
         return response(render_report(report, answerable.state(), previous))
 
@@ -1146,7 +1183,9 @@ def create_app(
             return _message(
                 400, "Expected a JSON body with a 'facts' list of corrections."
             )
-        corrected = await workspace.answers.correct(run_id, OWNER, facts)
+        corrected = await workspace.answers.correct(
+            run_id, await workspace.owner_id(run_id), facts
+        )
         return JSONResponse({"run": corrected.job_id})
 
     return app
@@ -1282,7 +1321,9 @@ def _questions_of(
     """The run's Question Set, read only where a refusal needs a label."""
 
     async def read() -> QuestionSet:
-        answerable = await workspace.answers.answerable(run_id, OWNER)
+        answerable = await workspace.answers.answerable(
+            run_id, await workspace.owner_id(run_id)
+        )
         return answerable.state().questions
 
     return read
@@ -1331,13 +1372,13 @@ async def _stream(workspace: Workspace, run_id: str) -> AsyncIterator[str]:
     """
     async for frame in event_frames(workspace.store, run_id):
         yield frame
-    record = await workspace.store.owned(run_id, OWNER)
+    record = await workspace.owned(run_id)
     if record is None:
         return
     status = record.status
     if status == "awaiting-answers":
         try:
-            payload = await workspace.answers.questions(run_id, OWNER)
+            payload = await workspace.answers.questions(run_id, record.owner_id)
         except tuple(_REFUSAL_STATUS) as refusal:
             # The response has started, so a refusal is a frame, never a status.
             yield _frame("failed", {"message": str(refusal)})

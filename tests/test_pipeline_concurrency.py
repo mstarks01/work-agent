@@ -132,12 +132,12 @@ def _build_shared_pipeline() -> graph.Pipeline:
 def _marker_job(index: int) -> tuple[str, JobRecord]:
     """One job carrying a unique marker. All jobs share one caller on purpose.
 
-    A shared ``owner_subject`` proves isolation is per session, not per caller:
+    A shared ``owner_id`` proves isolation is per session, not per caller:
     two jobs from the same caller still must not see each other.
     """
     marker = f"MARK-{index:04x}"
     record = JobRecord.create(
-        owner_subject="idp|shared-caller",
+        owner_id="idp|shared-caller",
         sources=[Source.description(f"{DESCRIPTION_TEXT} Job token {marker}.")],
         system_name=f"System-{index:04x}",
         frameworks=sample_selection(),

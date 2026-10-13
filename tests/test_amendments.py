@@ -149,7 +149,7 @@ class TestTheRoute:
         """The carried answers wait for its questions; the extraction and the
         catalog pass never read them."""
         record = JobRecord.create(
-            owner_subject="alice",
+            owner_id="alice",
             sources=[Source.description(DESCRIPTION_TEXT)],
             frameworks=sample_selection(),
             ask_questions=True,

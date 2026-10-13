@@ -31,6 +31,13 @@ anyone but the job's owner gets `404`, not `403`, so job IDs cannot be probed
 for existence. Rejection detail is generic on purpose — the real reason is
 logged, never returned.
 
+The token's issuer and `sub` claim name a **Principal**. The service gives each
+principal a random owner ID, and that owner ID owns each job of the principal
+(ADR 0064). Two identity providers that issue the same `sub` give two
+principals. The service creates a principal only when it admits the first job
+of the token, so a read creates none, and a refused submission leaves none. A
+token whose principal does not exist yet gets the same `404` as a missing job.
+
 ## Routes
 
 | Method | Path | Purpose |
@@ -644,8 +651,14 @@ backstop behind them both — see
 ## Bearer auth
 
 These apply to the `/v1` API only; the in-process engine uses none of them.
-Every `/v1` route requires a valid bearer token; the verifier returns the
-token's `sub`, and job ownership binds to that subject.
+Every `/v1` route requires a valid bearer token. The verifier returns the
+token's issuer and its `sub`, and that pair names a **Principal**. Job ownership
+binds to the principal's owner ID, never to the `sub`. The issuer `local:` is
+reserved for the web app and the in-process engine, and the `/v1` path refuses
+a token under it with `401`.
+
+Log lines name an owner by the owner ID. One log line names the `sub`: the
+line that records a new principal.
 
 ### How the provider is chosen
 
@@ -709,7 +722,9 @@ which is OIDC's own vocabulary. For each provider, the settings come from its
 discovery document (`<issuer>/.well-known/openid-configuration` → `issuer`,
 `jwks_uri` and `id_token_signing_alg_values_supported`); the audience is the
 API/resource identifier you register for this service. Switching providers is a
-values change only — the variable names stay `ANALYSIS_OIDC_*`.
+values change only — the variable names stay `ANALYSIS_OIDC_*`. A principal
+of one issuer owns no job of a principal of another issuer, so a new issuer
+starts with no jobs.
 
 Listed alphabetically. None is more supported than any other, and the list is
 illustrative rather than exhaustive — an IdP absent from it is not unsupported.
@@ -792,9 +807,10 @@ methods:
 
 | Method | What a backend owes it |
 | --- | --- |
-| `reserve` | **Counts and inserts in one atomic operation.** Every bound admission enforces — the concurrency ceiling, the per-subject rate, the per-subject token budget and the deployment's global token budget — is enforced here and nowhere else. A backend that checks and then inserts has put the race back: two submissions that each read the count before either inserts both pass a ceiling of one. |
+| `reserve` | **Counts and inserts in one atomic operation.** Every bound admission enforces — the concurrency ceiling, the per-owner rate, the per-owner token budget and the deployment's global token budget — is enforced here and nowhere else. A backend that checks and then inserts has put the race back: two submissions that each read the count before either inserts both pass a ceiling of one. The same operation creates the **Principal** of a first submission, and only where it admits the job. It refuses with `principal_exists` where the identity already holds one. |
+| `principal` | The principal of an issuer and a `sub`, or nothing. It creates nothing. |
 | `get` | The whole record, for the driver that runs the job. |
-| `owned` | The record a subject owns, without its report. Ownership is checked before anything is copied, so a foreign job costs what a missing one costs. |
+| `owned` | The record an owner ID owns, without its report. Ownership is checked before anything is copied, so a foreign job costs what a missing one costs. |
 | `report_json` | The owned job's report, already serialised. |
 | `events_after` | A job's status and the events past a cursor, and nothing else. |
 | `save` | The record back, for a job that already exists. |

@@ -40,11 +40,17 @@ from analysis_service.job_answers import (
 from analysis_service.jobs import InMemoryJobStore, JobRecord, StubPipelineRunner
 from analysis_service.links import LinkAnswer
 from analysis_service.sources import SourceLimits
-from tests.factories import SEEDING_BUDGET, admit, sample_selection, valid_model
+from tests.factories import (
+    SEEDING_BUDGET,
+    admit,
+    identity_of,
+    sample_selection,
+    valid_model,
+)
 from tests.test_pause import waiting
 from tests.test_questions import TestTheRoutes
 
-SUBJECT = "alice"
+OWNER = "alice"
 ROOMY = SourceLimits(max_total_bytes=100_000, max_sources=10)
 #: The fact the completed report of :meth:`TestTheRoutes.completed` asks.
 ASKED = (valid_model().data_flows[1].id, "encryption_in_transit", "", "", "", "")
@@ -79,7 +85,7 @@ def operations(
 
 
 def first_early_key(answers: JobAnswers, job: str) -> tuple[str, ...]:
-    payload = asyncio.run(answers.questions(job, SUBJECT))
+    payload = asyncio.run(answers.questions(job, OWNER))
     return tuple(payload["early_questions"][0]["key"])
 
 
@@ -89,27 +95,27 @@ class TestReadingAJob:
         job = waiting(store)
         answers = operations(store)
         with pytest.raises(NoSuchJob):
-            asyncio.run(answers.questions("job-nobody", SUBJECT))
+            asyncio.run(answers.questions("job-nobody", OWNER))
         with pytest.raises(NoSuchJob):
             asyncio.run(answers.questions(job, "mallory"))
 
     def test_a_running_job_has_no_report_to_ask_about(self):
         store = InMemoryJobStore()
         record = JobRecord.create(
-            owner_subject=SUBJECT,
+            owner_id=OWNER,
             sources=list(valid_model_sources()),
             frameworks=sample_selection(),
         )
         record.transition("running")
         asyncio.run(admit(store, record))
         with pytest.raises(NotCompleted) as refused:
-            asyncio.run(operations(store).questions(record.id, SUBJECT))
+            asyncio.run(operations(store).questions(record.id, OWNER))
         assert refused.value.status == "running"
 
     def test_a_waiting_job_asks_its_early_questions(self):
         store = InMemoryJobStore()
         job = waiting(store)
-        payload = asyncio.run(operations(store).questions(job, SUBJECT))
+        payload = asyncio.run(operations(store).questions(job, OWNER))
         assert payload["early_questions"]
         assert payload["revision"] == 0
         assert payload["fact_questions"] == []
@@ -125,7 +131,7 @@ class TestAnsweringAWaitingJob:
         outcome = asyncio.run(
             answers.answer(
                 job,
-                SUBJECT,
+                OWNER,
                 Answers(
                     given=AnswerSet(facts=(FactAnswer(key=key, value="unknown"),)),
                     save=True,
@@ -150,7 +156,7 @@ class TestAnsweringAWaitingJob:
         outcome = asyncio.run(
             answers.answer(
                 job,
-                SUBJECT,
+                OWNER,
                 Answers(given=AnswerSet(), save=False, skips=(), revision=0),
                 start=starts,
             )
@@ -161,7 +167,7 @@ class TestAnsweringAWaitingJob:
         assert record.resumption is not None
         assert record.resumption.parent_id == job
         assert not record.resumption.follow_up
-        assert asyncio.run(store.resumed_by(job, SUBJECT)) == record.id
+        assert asyncio.run(store.resumed_by(job, OWNER)) == record.id
 
     def test_a_link_answer_needs_a_catalog_before_any_read(self):
         store = InMemoryJobStore()
@@ -173,7 +179,7 @@ class TestAnsweringAWaitingJob:
             asyncio.run(
                 answers.answer(
                     "job-nobody",
-                    SUBJECT,
+                    OWNER,
                     Answers(given=given, save=False, skips=(), revision=0),
                     start=Starts(),
                 )
@@ -186,7 +192,7 @@ class TestAnsweringAWaitingJob:
             asyncio.run(
                 operations(store).answer(
                     job,
-                    SUBJECT,
+                    OWNER,
                     Answers(given=AnswerSet(), save=True, skips=(), revision=0),
                     start=Starts(),
                 )
@@ -203,19 +209,19 @@ class TestAnsweringAWaitingJob:
             skips=(),
             revision=0,
         )
-        asyncio.run(answers.answer(job, SUBJECT, saved, start=Starts()))
+        asyncio.run(answers.answer(job, OWNER, saved, start=Starts()))
         starts = Starts()
         with pytest.raises(StaleRevision):
             asyncio.run(
                 answers.answer(
                     job,
-                    SUBJECT,
+                    OWNER,
                     Answers(given=AnswerSet(), save=False, skips=(), revision=0),
                     start=starts,
                 )
             )
         assert starts.started == []
-        assert asyncio.run(store.resumed_by(job, SUBJECT)) is None
+        assert asyncio.run(store.resumed_by(job, OWNER)) is None
 
     def test_a_round_of_skips_alone_is_kept_and_listed(self):
         store = InMemoryJobStore()
@@ -225,7 +231,7 @@ class TestAnsweringAWaitingJob:
         outcome = asyncio.run(
             answers.answer(
                 job,
-                SUBJECT,
+                OWNER,
                 Answers(
                     given=AnswerSet(),
                     save=True,
@@ -237,7 +243,7 @@ class TestAnsweringAWaitingJob:
             )
         )
         assert outcome == RoundSaved(job_id=job)
-        payload = asyncio.run(answers.questions(job, SUBJECT))
+        payload = asyncio.run(answers.questions(job, OWNER))
         assert [tuple(q["key"]) for q in payload["skipped_early"]] == [key]
         assert key not in {tuple(q["key"]) for q in payload["early_questions"]}
 
@@ -249,7 +255,7 @@ class TestAnsweringAWaitingJob:
         asyncio.run(
             answers.answer(
                 job,
-                SUBJECT,
+                OWNER,
                 Answers(given=AnswerSet(), save=False, skips=(), revision=0),
                 start=Starts(),
             )
@@ -258,7 +264,7 @@ class TestAnsweringAWaitingJob:
             asyncio.run(
                 answers.answer(
                     job,
-                    SUBJECT,
+                    OWNER,
                     Answers(
                         given=AnswerSet(),
                         save=True,
@@ -282,7 +288,7 @@ class TestAnsweringAWaitingJob:
             asyncio.run(
                 tight.answer(
                     job,
-                    SUBJECT,
+                    OWNER,
                     Answers(
                         given=AnswerSet(facts=(FactAnswer(key=key, value="unknown"),)),
                         save=False,
@@ -303,7 +309,7 @@ class TestAnsweringAReport:
         outcome = asyncio.run(
             operations(store).answer(
                 job,
-                SUBJECT,
+                OWNER,
                 Answers(
                     given=AnswerSet(facts=(FactAnswer(key=ASKED, value="TLS 1.3"),)),
                     save=False,
@@ -323,7 +329,7 @@ class TestAnsweringAReport:
         outcome = asyncio.run(
             operations(store).answer(
                 job,
-                SUBJECT,
+                OWNER,
                 Answers(
                     given=AnswerSet(facts=(FactAnswer(key=ASKED, value="TLS 1.3"),)),
                     save=True,
@@ -344,7 +350,7 @@ class TestAnsweringAReport:
         with pytest.raises(Refused, match="final"):
             asyncio.run(
                 operations(store).correct(
-                    job, SUBJECT, [FactAnswer(key=ASKED, value="TLS 1.3")]
+                    job, OWNER, [FactAnswer(key=ASKED, value="TLS 1.3")]
                 )
             )
 
@@ -356,7 +362,7 @@ class TestAnsweringAReport:
             asyncio.run(
                 operations(store).answer(
                     job,
-                    SUBJECT,
+                    OWNER,
                     Answers(
                         given=AnswerSet(
                             facts=(FactAnswer(key=wrong, value="internal"),)
@@ -381,7 +387,7 @@ class TestAmending:
         asyncio.run(
             answers.answer(
                 job,
-                SUBJECT,
+                OWNER,
                 Answers(
                     given=AnswerSet(facts=(FactAnswer(key=key, value="unknown"),)),
                     save=True,
@@ -395,7 +401,7 @@ class TestAmending:
         outcome = asyncio.run(
             answers.amend(
                 job,
-                SUBJECT,
+                OWNER,
                 "The web app also calls a payment gateway.",
                 revision=1,
                 start=starts,
@@ -416,7 +422,7 @@ class TestAmending:
         asyncio.run(
             answers.answer(
                 job,
-                SUBJECT,
+                OWNER,
                 Answers(
                     given=AnswerSet(),
                     save=True,
@@ -430,7 +436,7 @@ class TestAmending:
         starts = Starts()
         with pytest.raises(StaleRevision):
             asyncio.run(
-                answers.amend(job, SUBJECT, "More text.", revision=0, start=starts)
+                answers.amend(job, OWNER, "More text.", revision=0, start=starts)
             )
         assert starts.started == []
 
@@ -443,7 +449,7 @@ class TestTheOneAdmission:
             raise ConfigError("ANALYSIS_TIERS_FILE is unset")
 
         record = JobRecord.create(
-            owner_subject=SUBJECT,
+            owner_id=OWNER,
             sources=list(valid_model_sources()),
             frameworks=sample_selection(),
         )
@@ -455,17 +461,18 @@ class TestTheOneAdmission:
         assert asyncio.run(store.get(record.id)) is None
         assert starts.started == []
 
-    def test_a_subject_at_the_ceiling_is_refused_and_nothing_starts(self):
+    def test_an_owner_at_the_ceiling_is_refused_and_nothing_starts(self):
         store = InMemoryJobStore()
         answers = operations(store, ceiling=1)
+        submitter = asyncio.run(answers.submitter(identity_of(OWNER)))
         first = JobRecord.create(
-            owner_subject=SUBJECT,
+            owner_id=submitter.owner_id,
             sources=list(valid_model_sources()),
             frameworks=sample_selection(),
         )
-        asyncio.run(answers.admit(first, start=Starts()))
+        asyncio.run(answers.admit(first, start=Starts(), principal=submitter.new))
         second = JobRecord.create(
-            owner_subject=SUBJECT,
+            owner_id=submitter.owner_id,
             sources=list(valid_model_sources()),
             frameworks=sample_selection(),
         )

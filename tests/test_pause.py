@@ -45,12 +45,12 @@ from tests.test_resume import LINK, PRINCIPAL, parent_catalog, recorded_entries
 
 
 def asking_job(
-    owner_subject: str = "alice",
+    owner_id: str = "alice",
     ask_questions: bool = True,
     resumption: Resumption | None = None,
 ) -> JobRecord:
     return JobRecord.create(
-        owner_subject=owner_subject,
+        owner_id=owner_id,
         sources=[Source.description(DESCRIPTION_TEXT)],
         frameworks=sample_selection(),
         ask_questions=ask_questions,
@@ -151,8 +151,8 @@ class TestTheWait:
         assert not asking_job(ask_questions=False).pauses()
 
 
-def waiting(store, subject="alice", checkpoint=True) -> str:
-    record = asking_job(owner_subject=subject)
+def waiting(store, owner="alice", checkpoint=True) -> str:
+    record = asking_job(owner_id=owner)
     record.transition("running")
     record.checkpoint = held() if checkpoint else None
     record.transition("awaiting-answers")
@@ -246,7 +246,7 @@ class TestTheRoutes:
 
     def test_another_caller_s_waiting_job_is_not_found(self):
         client, store = catalog_client()
-        job = waiting(store, subject="bob")
+        job = waiting(store, owner="bob")
         assert (
             client.get(f"/v1/jobs/{job}/questions", headers=auth()).status_code == 404
         )
@@ -268,7 +268,7 @@ class TestTheEventStreamCap:
 
     @staticmethod
     def queued(store, subject="alice") -> str:
-        record = asking_job(owner_subject=subject)
+        record = asking_job(owner_id=subject)
         asyncio.run(admit(store, record))
         return record.id
 
@@ -317,7 +317,7 @@ class TestTheEventStreamCap:
 
     @pytest.mark.parametrize("spec", ["2.0", "2.4"])
     def test_a_subject_past_the_cap_is_refused_and_every_slot_comes_back(self, spec):
-        from analysis_service.api import MAX_EVENT_STREAMS_PER_SUBJECT
+        from analysis_service.api import MAX_EVENT_STREAMS_PER_OWNER
 
         client, store = catalog_client()
         app = client.app
@@ -327,7 +327,7 @@ class TestTheEventStreamCap:
         async def scenario():
             held = [
                 await self.open_stream(app, mine, "alice-token", spec)
-                for _ in range(MAX_EVENT_STREAMS_PER_SUBJECT)
+                for _ in range(MAX_EVENT_STREAMS_PER_OWNER)
             ]
             assert [status for status, _, _ in held] == [200] * len(held)
             refused, _, done = await self.open_stream(app, mine, "alice-token", spec)

@@ -1249,7 +1249,7 @@ def unfence(rendered: str) -> str:
 
 #: How many node bodies may hold a worker thread at once, across every job in
 #: the process. Separate from anyio's default limiter on purpose: that one is
-#: also what `require_subject` verifies a bearer token through, and a graph that
+#: also what `require_identity` verifies a bearer token through, and a graph that
 #: could fill it would make every arriving caller wait for a node body.
 #:
 #: Small because a node body is CPU-bound, so more threads than cores buys
@@ -1283,7 +1283,7 @@ def _node(func: Callable[..., Any], name: str) -> FunctionNode:
     @functools.wraps(func)
     async def offloaded(**kwargs: Any) -> Any:
         # On a limiter of its own, because the default one is shared and
-        # `require_subject` verifies every bearer token through it: node bodies
+        # `require_identity` verifies every bearer token through it: node bodies
         # filling all forty slots put an arriving caller behind a whole body
         # before their token was even read.
         #

@@ -61,7 +61,7 @@ def test_the_mode_seeds_the_run_a_resumed_job_seeds(case, monkeypatch):  # noqa:
     with pytest.raises(modes.EvalRunError, match="captured"):
         asyncio.run(modes.run_answered(case, object(), [AT_REST, KIND]))
     job = JobRecord.create(
-        owner_subject="idp|user-1",
+        owner_id="idp|user-1",
         sources=list(case.sources),
         frameworks=sample_selection(),
         answers=AnswerSet(facts=(AT_REST, KIND)),

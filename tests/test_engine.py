@@ -9,6 +9,8 @@ prove the facade reaches a genuine report end to end.
 from __future__ import annotations
 
 import asyncio
+import logging
+from uuid import UUID
 
 import pytest
 from pydantic import ValidationError
@@ -29,6 +31,7 @@ from analysis_service.jobs import (
     StubPipelineRunner,
 )
 from analysis_service.pipeline import AdkPipelineRunner
+from analysis_service.principals import LOCAL_ISSUER
 from analysis_service.resilience import load_resilience
 from analysis_service.sources import MAX_SYSTEM_NAME_CHARS, Source, SourceLimits
 from tests.factories import (
@@ -132,14 +135,32 @@ def test_on_node_receives_every_node():
     assert seen == ["extract", "critic"]
 
 
-def test_caller_becomes_the_job_owner_subject():
+def test_a_caller_maps_to_one_principal_under_the_local_issuer(caplog):
     runner = RecordingRunner(PipelineRejected(issues=[]))
     engine = engine_for(runner)
 
-    analyze(engine, "text", caller="tenant-42")
+    with caplog.at_level(logging.INFO, logger="analysis_service.principals"):
+        for caller in ("tenant-42", "tenant-42", "tenant-7"):
+            analyze(engine, "text", caller=caller)
 
-    assert runner.jobs[0].owner_subject == "tenant-42"
+    first, again, other = (job.owner_id for job in runner.jobs)
+    assert first == again != other
+    assert UUID(first).version == 4
+    assert caplog.text.count("tenant-42") == 1, "only the creation names the sub"
+    assert f"issuer {LOCAL_ISSUER!r}" in caplog.text
     assert DEFAULT_CALLER == "in-process"
+
+
+def test_a_refused_submission_creates_no_principal(caplog):
+    engine = engine_for(RecordingRunner(PipelineRejected(issues=[])))
+
+    with (
+        caplog.at_level(logging.INFO, logger="analysis_service.principals"),
+        pytest.raises(EngineInputError),
+    ):
+        analyze(engine, "text", system_name="s" * (MAX_SYSTEM_NAME_CHARS + 1))
+
+    assert "principal" not in caplog.text
 
 
 @pytest.mark.parametrize("text", ["", "   ", "\n\t "])

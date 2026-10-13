@@ -40,6 +40,7 @@ from analysis_service.jobs import (
     StubPipelineRunner,
 )
 from analysis_service.pipeline import AdkPipelineRunner, PipelineError
+from analysis_service.principals import Identity
 from analysis_service.prompt_cache import stable_prefix
 from analysis_service.report import (
     FrameworkSelection,
@@ -97,7 +98,7 @@ def proposal_json(threat_id: str, category: str, **overrides) -> str:
 
 def job(text: str = DESCRIPTION_TEXT) -> JobRecord:
     record = JobRecord.create(
-        owner_subject="idp|user-1",
+        owner_id="idp|user-1",
         sources=[Source.description(text)],
         system_name="Order Service",
         frameworks=sample_selection(),
@@ -871,7 +872,7 @@ def test_the_api_runs_jobs_through_the_real_graph_by_default(monkeypatch):
         monkeypatch.setenv(var, value)
 
     class NoVerifier:
-        def verify(self, token: str) -> str:
+        def verify(self, token: str) -> Identity:
             raise AssertionError("not reached")
 
     app = create_app(store=InMemoryJobStore(), verifier=NoVerifier())
@@ -973,7 +974,7 @@ class HeldLlm(ScriptedLlm):
 
 def pair_job(pair: Sequence[FrameworkName]) -> JobRecord:
     record = JobRecord.create(
-        owner_subject="idp|user-1",
+        owner_id="idp|user-1",
         sources=[Source.description(DESCRIPTION_TEXT)],
         system_name="Order Service",
         frameworks=[

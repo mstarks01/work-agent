@@ -32,7 +32,7 @@ def finished(store, *, final: bool = True) -> str:
 
     report = sample_report([asking_threat(ASKED)])
     record = JobRecord.create(
-        owner_subject="alice",
+        owner_id="alice",
         sources=[Source.description(DESCRIPTION_TEXT)],
         frameworks=sample_selection(),
         answers=AnswerSet(facts=(ANSWER,)),

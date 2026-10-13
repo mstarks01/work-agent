@@ -37,6 +37,7 @@ from analysis_service import (
 from analysis_service.budgets import BudgetPolicy
 from analysis_service.deployment import Deployment
 from analysis_service.jobs import AdmissionOutcome, JobRecord
+from analysis_service.principals import LOCAL_ISSUER
 from analysis_service.vendors import ProviderAuthError
 from tests.factories import (
     TEST_TIER_ENV,
@@ -611,7 +612,7 @@ def test_the_injection_point_escapes_every_angle_bracket():
     from webapp.main import VIEWER
 
     record = JobRecord.create(
-        owner_subject="local",
+        owner_id="local",
         sources=[Source.description("A web app.")],
         frameworks=sample_selection(),
         system_name=BREAKOUT,
@@ -1694,3 +1695,25 @@ def test_both_drivers_answer_every_refusal_of_the_module(tiers):
     for driver, app in _driver_apps(tiers).items():
         missing = refusals - set(app.exception_handlers)
         assert not missing, f"{driver} has no handler for {missing}"
+
+
+def test_the_operator_is_a_local_principal_that_the_first_run_creates(tiers):
+    """Before its first run the operator owns nothing, and every run reads as
+    missing; the first run creates the principal under the local issuer."""
+    from webapp.main import OPERATOR
+
+    startup = startup_for(tiers)
+    workspace = Workspace(startup.settings)
+    client = TestClient(create_app(startup, workspace), base_url=LOOPBACK)
+
+    assert client.get("/workspace/runs").json() == []
+    assert client.get("/workspace/runs/job-missing").status_code == 404
+    assert asyncio.run(workspace.store.principal(OPERATOR)) is None
+
+    run_id = run_to_completion(client)
+
+    principal = asyncio.run(workspace.store.principal(OPERATOR))
+    assert principal is not None
+    assert principal.issuer == LOCAL_ISSUER
+    assert asyncio.run(workspace.store.get(run_id)).owner_id == principal.owner_id
+    assert [run["run"] for run in client.get("/workspace/runs").json()] == [run_id]

@@ -236,7 +236,7 @@ def test_a_resumed_asvs_run_reports_the_answered_absence():
 
     answer = _answer("oauth", "no")
     record = JobRecord.create(
-        owner_subject="idp|user-1",
+        owner_id="idp|user-1",
         sources=with_link_answers([Source.description(DESCRIPTION_TEXT)], [], [answer]),
         frameworks=[FrameworkSelection(name="asvs", options={"level": 1})],
         answers=AnswerSet(facts=(answer,)),

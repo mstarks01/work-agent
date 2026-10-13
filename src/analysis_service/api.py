@@ -4,7 +4,7 @@
   and in count by this deployment's config, together with the frameworks to
   analyse them under. The framework list is required and non-empty, is drawn
   from what this install carries, and has no default on any path. The route
-  returns a job handle. A subject may hold only ``max_active_jobs`` jobs in
+  returns a job handle. An owner may hold only ``max_active_jobs`` jobs in
   flight at once. The service refuses a submission past that with a 429 rather
   than queueing it, because a queued job still holds the caller's place in the
   provider quota, and a refusal is the only answer that sheds the load (OWASP
@@ -20,8 +20,11 @@
 * ``GET /healthz`` — unauthenticated, for Cloud Run probes.
 
 Every error body is RFC 9457 ``application/problem+json``. Every `/v1` route
-requires a verified bearer token. Job reads are owner-only, and return 404
-rather than 403 for a non-owner, so nobody can enumerate job IDs.
+requires a verified bearer token. The token's issuer and ``sub`` name a
+**Principal**, and its owner ID is what owns a job (ADR 0064). Job reads are
+owner-only, and return 404 rather than 403 for a non-owner, so nobody can
+enumerate job IDs. A token whose principal does not exist yet gets the same 404:
+only a submission creates a principal.
 """
 
 from __future__ import annotations
@@ -101,6 +104,7 @@ from analysis_service.links import (
     with_link_answers,
 )
 from analysis_service.parsing import ascii_int
+from analysis_service.principals import Identity
 from analysis_service.report import FrameworkSelection
 from analysis_service.report_changes import report_changes
 from analysis_service.selection import SelectionError, resolve_selection
@@ -117,11 +121,11 @@ logger = logging.getLogger(__name__)
 # what was declared.
 _BODY_SLACK = 2
 
-#: How many event streams one subject may hold open at once. Each stream polls
+#: How many event streams one owner may hold open at once. Each stream polls
 #: the store until its job is terminal, and a job that waits on answers is not,
 #: so a stream can stay open for as long as its caller keeps it. A page follows
 #: one job at a time; eight leaves room for a few tabs and a reconnect.
-MAX_EVENT_STREAMS_PER_SUBJECT = 8
+MAX_EVENT_STREAMS_PER_OWNER = 8
 
 #: How long a ``Last-Event-ID`` may be. The shape itself is
 #: :func:`~analysis_service.parsing.ascii_int`'s question, and this is the
@@ -486,14 +490,14 @@ def _started(started: Started) -> JSONResponse:
 
 
 async def _servable_report(
-    request: Request, job_id: str, subject: str
+    request: Request, job_id: str, owner_id: str
 ) -> dict[str, Any]:
     """The report payload this caller may read, or the refusal that withholds it."""
     answers = _answers(request)
-    record = await answers.owned(job_id, subject)
+    record = await answers.owned(job_id, owner_id)
     answers.servable(record)
     store: JobStore = request.app.state.store
-    payload = await store.report_json(job_id, subject)
+    payload = await store.report_json(job_id, owner_id)
     if payload is None:
         logger.error("completed job %s has no report attached", record.id)
         raise HTTPException(status_code=500, detail="an internal error occurred")
@@ -519,10 +523,10 @@ class _CountedStream(StreamingResponse):
             self._release()
 
 
-def _release_stream(streams: Counter[str], subject: str) -> None:
-    streams[subject] -= 1
-    if streams[subject] <= 0:
-        del streams[subject]
+def _release_stream(streams: Counter[str], owner_id: str) -> None:
+    streams[owner_id] -= 1
+    if streams[owner_id] <= 0:
+        del streams[owner_id]
 
 
 def _problem_response(
@@ -555,26 +559,51 @@ def _unauthorized() -> HTTPException:
     )
 
 
-async def require_subject(
+async def require_identity(
     request: Request,
     credentials: Annotated[
         HTTPAuthorizationCredentials | None, Depends(_bearer_scheme)
     ],
-) -> str:
-    """FastAPI dependency: verify the bearer token, return its subject.
+) -> Identity:
+    """FastAPI dependency: verify the bearer token, return its issuer and ``sub``.
 
     ``verify`` is synchronous and may reach the network to fetch JWKS. Run it in
     a worker thread rather than inline: a blocking call on the event loop would
     stall every other in-flight request for the fetch, so one unverified token
     could freeze the whole worker (OWASP LLM10).
+
+    A token under the reserved local issuer is refused like any invalid token,
+    whatever verifier accepted it. Only the engine and the web app name a
+    principal under that issuer, so no token can reach their jobs.
     """
     if credentials is None:
         raise _unauthorized()
     verifier: TokenVerifier = request.app.state.verifier
     try:
-        return await anyio.to_thread.run_sync(verifier.verify, credentials.credentials)
+        identity = await anyio.to_thread.run_sync(
+            verifier.verify, credentials.credentials
+        )
     except AuthenticationError:
         raise _unauthorized() from None
+    if identity.is_local:
+        logger.warning("rejected bearer token: its issuer is the reserved local one")
+        raise _unauthorized()
+    return identity
+
+
+async def require_owner(
+    request: Request, identity: Annotated[Identity, Depends(require_identity)]
+) -> str:
+    """FastAPI dependency: the owner ID of the caller's principal.
+
+    A read creates no principal. Where the identity holds none, the caller owns
+    no job, so every job route answers the 404 of a missing job.
+    """
+    store: JobStore = request.app.state.store
+    principal = await store.principal(identity)
+    if principal is None:
+        raise NoSuchJob(request.path_params.get("job_id", ""))
+    return principal.owner_id
 
 
 def _status_view(record: JobRecord) -> JobStatusView:
@@ -599,7 +628,7 @@ def _status_view(record: JobRecord) -> JobStatusView:
 # on. Every message names the bound that stopped them and what clears it, and
 # **none of them names another caller**: a global refusal reports the caller's
 # own window and says the deployment is at its limit, because a figure covering
-# every subject is activity a caller has no business reading. The operator's log
+# every owner is activity a caller has no business reading. The operator's log
 # carries it instead.
 #
 # A table because the machinery has one entry per bound, which is what
@@ -622,7 +651,7 @@ _REFUSALS: dict[str, tuple[int, Callable[[Admission, int], str]]] = {
             " Wait for the window to roll past your earlier jobs."
         ),
     ),
-    "over_subject_budget": (
+    "over_owner_budget": (
         429,
         lambda admission, ceiling: (
             "this token has committed too many tokens in the current window."
@@ -649,6 +678,13 @@ _REFUSALS: dict[str, tuple[int, Callable[[Admission, int], str]]] = {
         lambda admission, ceiling: (
             "the saved answers changed while this request read them; read the"
             " questions again"
+        ),
+    ),
+    "principal_exists": (
+        409,
+        lambda admission, ceiling: (
+            "another request with this token started its first job while this"
+            " one was read; submit again"
         ),
     ),
 }
@@ -886,7 +922,7 @@ def create_app(
         submission: JobSubmission,
         request: Request,
         background_tasks: BackgroundTasks,
-        subject: str = Depends(require_subject),
+        identity: Annotated[Identity, Depends(require_identity)],
     ) -> JSONResponse:
         # Shape before budget: a framework this service does not carry is the
         # wrong request at any size, and answering it with a byte count would
@@ -923,11 +959,12 @@ def create_app(
         # submission which breaches a rung *and* sits on the ceiling hears
         # about the rung; both answers refuse it, and neither runs a model.
         answers = _answers(request)
+        submitter = await answers.submitter(identity)
         carried = await answers.carried_from(
-            submission.answers_from, subject, asks=submission.questions
+            submission.answers_from, submitter.owner_id, asks=submission.questions
         )
         record = JobRecord.create(
-            owner_subject=subject,
+            owner_id=submitter.owner_id,
             sources=sources,
             frameworks=selection,
             system_name=submission.system_name,
@@ -936,7 +973,11 @@ def create_app(
             ask_questions=submission.questions,
             reserved_tokens=budgets.estimate(sources, selection),
         )
-        started = await answers.admit(record, start=_starter(request, background_tasks))
+        started = await answers.admit(
+            record,
+            start=_starter(request, background_tasks),
+            principal=submitter.new,
+        )
         return _started(started)
 
     @app.post("/v1/jobs/{job_id}/answers", status_code=201)
@@ -945,7 +986,7 @@ def create_app(
         answers: AnswersSubmission,
         request: Request,
         background_tasks: BackgroundTasks,
-        subject: str = Depends(require_subject),
+        owner_id: str = Depends(require_owner),
     ) -> JSONResponse:
         """Answer a finished report's questions, and resume its job from ``prepare``.
 
@@ -964,7 +1005,7 @@ def create_app(
         """
         outcome = await _answers(request).answer(
             job_id,
-            subject,
+            owner_id,
             Answers(
                 given=AnswerSet(links=tuple(answers.links), facts=tuple(answers.facts)),
                 save=answers.save,
@@ -987,20 +1028,20 @@ def create_app(
         response_model_exclude_none=True,
     )
     async def get_job(
-        job_id: str, request: Request, subject: str = Depends(require_subject)
+        job_id: str, request: Request, owner_id: str = Depends(require_owner)
     ) -> JobStatusView:
-        record = await _answers(request).owned(job_id, subject)
+        record = await _answers(request).owned(job_id, owner_id)
         return _status_view(record)
 
     @app.get("/v1/jobs/{job_id}/report")
     async def get_report(
-        job_id: str, request: Request, subject: str = Depends(require_subject)
+        job_id: str, request: Request, owner_id: str = Depends(require_owner)
     ) -> JSONResponse:
-        return JSONResponse(await _servable_report(request, job_id, subject))
+        return JSONResponse(await _servable_report(request, job_id, owner_id))
 
     @app.get("/v1/jobs/{job_id}/changes")
     async def get_changes(
-        job_id: str, request: Request, subject: str = Depends(require_subject)
+        job_id: str, request: Request, owner_id: str = Depends(require_owner)
     ) -> JSONResponse:
         """How each finding of a follow-up moved since the report before it (#561).
 
@@ -1011,25 +1052,25 @@ def create_app(
         another major.
         """
         answers = _answers(request)
-        answers.servable(await answers.parsable(job_id, subject))
+        answers.servable(await answers.parsable(job_id, owner_id))
         store: JobStore = request.app.state.store
         # The envelope leaves the resumption out, so it is read by name.
-        resumption = await store.resumption(job_id, subject)
+        resumption = await store.resumption(job_id, owner_id)
         if not is_follow_up(resumption):
             raise HTTPException(
                 status_code=409,
                 detail="the job is not a follow-up: it resumed from no finished report",
             )
         try:
-            parent = await answers.parsable(resumption.parent_id, subject)
+            parent = await answers.parsable(resumption.parent_id, owner_id)
         except NoSuchJob:
             raise HTTPException(
                 status_code=409,
                 detail="the report this follow-up's answers came from is no longer held",
             ) from None
         answers.servable(parent)
-        before = await store.report(resumption.parent_id, subject)
-        after = await store.report(job_id, subject)
+        before = await store.report(resumption.parent_id, owner_id)
+        after = await store.report(job_id, owner_id)
         if before is None or after is None:
             logger.error("follow-up %s or its parent has no report attached", job_id)
             raise HTTPException(status_code=500, detail="an internal error occurred")
@@ -1048,7 +1089,7 @@ def create_app(
         body: AmendmentSubmission,
         request: Request,
         background_tasks: BackgroundTasks,
-        subject: str = Depends(require_subject),
+        owner_id: str = Depends(require_owner),
     ) -> JSONResponse:
         """Extract a paused job's description again with an amendment (ADR 0072).
 
@@ -1060,7 +1101,7 @@ def create_app(
         """
         started = await _answers(request).amend(
             job_id,
-            subject,
+            owner_id,
             body.text,
             revision=body.revision,
             start=_starter(request, background_tasks),
@@ -1072,7 +1113,7 @@ def create_app(
         job_id: str,
         body: CorrectionsSubmission,
         request: Request,
-        subject: str = Depends(require_subject),
+        owner_id: str = Depends(require_owner),
     ) -> JSONResponse:
         """Correct a final report's answers, and run nothing (ADR 0054).
 
@@ -1080,7 +1121,7 @@ def create_app(
         rewritten. ``400`` where the job's report is not final, a correction
         names no answer the report read, or changes none.
         """
-        corrected = await _answers(request).correct(job_id, subject, body.facts)
+        corrected = await _answers(request).correct(job_id, owner_id, body.facts)
         return JSONResponse(
             {
                 "job_id": corrected.job_id,
@@ -1093,7 +1134,7 @@ def create_app(
 
     @app.get("/v1/jobs/{job_id}/questions")
     async def get_questions(
-        job_id: str, request: Request, subject: str = Depends(require_subject)
+        job_id: str, request: Request, owner_id: str = Depends(require_owner)
     ) -> JSONResponse:
         """What a job asks the submitter, derived at read time.
 
@@ -1102,29 +1143,29 @@ def create_app(
         about its report, served under the report's own rule, so a report that
         is withheld withholds its questions too.
         """
-        payload = await _answers(request).questions(job_id, subject)
+        payload = await _answers(request).questions(job_id, owner_id)
         return JSONResponse({"job_id": job_id} | payload)
 
     @app.get("/v1/jobs/{job_id}/events")
     async def stream_events(
-        job_id: str, request: Request, subject: str = Depends(require_subject)
+        job_id: str, request: Request, owner_id: str = Depends(require_owner)
     ) -> StreamingResponse:
-        await _answers(request).owned(job_id, subject)
+        await _answers(request).owned(job_id, owner_id)
         streams: Counter[str] = request.app.state.event_streams
-        if streams[subject] >= MAX_EVENT_STREAMS_PER_SUBJECT:
+        if streams[owner_id] >= MAX_EVENT_STREAMS_PER_OWNER:
             raise HTTPException(
                 status_code=429,
-                detail=f"{MAX_EVENT_STREAMS_PER_SUBJECT} event streams are open"
+                detail=f"{MAX_EVENT_STREAMS_PER_OWNER} event streams are open"
                 " for this token; close one first",
             )
-        streams[subject] += 1
+        streams[owner_id] += 1
         last_event_id = request.headers.get("last-event-id", "")
         seen = ascii_int(last_event_id, max_digits=_LAST_EVENT_ID_DIGITS) or 0
         store: JobStore = request.app.state.store
         frames = event_frames(store, job_id, seen, gone=request.is_disconnected)
 
         return _CountedStream(
-            partial(_release_stream, streams, subject),
+            partial(_release_stream, streams, owner_id),
             frames,
             media_type="text/event-stream",
             headers={"Cache-Control": "no-store"},
