@@ -1,0 +1,167 @@
+{
+  "envelope": 1,
+  "submitted_by": "mstarks01",
+  "submitted_for": "mstarks01",
+  "generated": "2026-10-13T185903Z",
+  "cases": {
+    "04-ml-inference-service": {
+      "own_list": [
+        "An attacker who obtains a still-valid team API key can submit requests as that team and misuse its inference service allocation.",
+        "An attacker reaching the model network can invoke the model server directly, bypassing gateway API-key admission because the internal forwarding interface has no authentication.",
+        "An attacker with a model-network foothold can read customer account-age and spend-band features from passwordless Redis if no compensating identity or command restriction blocks access.",
+        "A model-network attacker can change customer feature values and distort inference results if passwordless Redis also permits that caller's write commands.",
+        "A compromised authorized artifact publisher can substitute a malicious model that the server loads at startup without an independent artifact-integrity check.",
+        "If engineers publish through a shared account, a malicious publisher can dispute which engineer supplied a harmful artifact because the publishing identity cannot distinguish individuals.",
+        "A legitimate or compromised team can monopolize GPU inference resources with costly or numerous requests if per-team concurrency and inference-work budgets are insufficient.",
+        "An inference-log reader whose duties do not justify end-user content can obtain historical sensitive prompts and responses because the gateway retains every request and response for debugging.",
+        "An on-path attacker can capture team API keys and end-user text if the external gateway channel lacks authenticated encryption, then replay a recovered valid key.",
+        "A caller using a valid team key could request another customer's features through inference if the service trusts supplied customer identifiers without checking that team's customer entitlement."
+      ],
+      "marks": {
+        "v5:30f9bdd1dcdbacac": "agree",
+        "v5:215d6bebf58c4b5e": "reject",
+        "v5:920e75566ee9d1de": "agree",
+        "v5:0d847327e053b7eb": "unsure",
+        "v5:3cc137d992a83cba": "agree",
+        "v5:fd411b40c6945a4c": "agree",
+        "v5:9b8f74372ff63f3f": "agree",
+        "v5:d161efd8985fb56f": "agree",
+        "v5:177dd599b0148127": "agree",
+        "v6:93f355a91ddd1656": "reject",
+        "v6:07f7a52926708626": "agree",
+        "v6:d706386373e4a1fc": "unsure",
+        "v6:a5ee43b437e4cda4": "agree",
+        "v6:34146745be326c8d": "agree",
+        "v6:6bbd12275a2ee859": "reject",
+        "v6:87edf5de63c29070": "unsure",
+        "v6:38482dc4ae4fae65": "unsure",
+        "v6:530fe570cad1e4a9": "unsure",
+        "v6:3d1f27558076e376": "agree",
+        "v6:cd961ec3034b4885": "unsure",
+        "v6:1db2d4e2697e03b5": "agree",
+        "v6:6ccd8e08af097e28": "agree",
+        "v6:26be57482ff26e3a": "agree",
+        "v6:b655f84d4986053c": "agree",
+        "v6:af7591c474a974bb": "unsure",
+        "v6:62be9cd414d7cedf": "agree"
+      },
+      "missing": [
+        "Own-list 04.9: An observer on an inadequately protected external caller-to-gateway channel can capture team API keys and end-user text, enabling subsequent valid-key replay."
+      ],
+      "notes": "Confirming sitting on the model changes since the sitting of 2026-09-22, ruled as CSV in conversation. Row numbers refer to the confirming ballot for cases 04, 09 and 13.\nRow 1 (model.json, #1624): yes. The trust_zone assumption added for entity:calling-service changes no element or attribute value, and the reader's 26 marks of 2026-09-22 still stand.\nEvery finding carries the reader's mark of 2026-09-22, and the own list and the missing list are carried from that sitting.\nNotes of the sitting of 2026-09-22, carried:\nReview basis: supplied source texts and model; no repository code consulted. Earlier reviews were visible, so this is not a blind first pass. Agree accepts the stated conditional threat or unanswered ASVS evidence question, not proof of a missing implementation control. ASVS marks assess the supplied claim; they are not an independent compliance certification. Duplicate references use case-local n and concern repeated attack mechanisms, not merely matching elements or different CIA effects. Corrected wording in these notes is proposed only; original claims and fingerprints remain unchanged.\nRecorded 11 covers use of a held key and 22 covers internal request interception. Neither names this external credential-acquisition path. Transport is unknown, not proved plaintext.\nRow review notes and proposed corrections:\nn=1 [asvs V4.1.1; agree]: HTTP response content-type handling is unresolved. Method policy is a separate question and should not be silently treated as the same requirement.\nn=2 [asvs V5.2.1; reject]: The source does not say nothing limits uploads; it says nothing about limits. Rewrite as an unanswered size/type-control question.\nn=3 [asvs V5.2.2; agree]: Artifact validation is unresolved and origin/integrity checking is reported absent. The rationale overclaims: a model artifact is not necessarily executable code.\nn=4 [asvs V9.1.1; unsure]: An API key's opaque format is not stated. Confirm credential representation and assess the chapter per applicable surface before declaring it inapplicable.\nn=5 [asvs V13.2.1; agree]: The source reports never expiring team keys. Do not equate that with proved infinite cryptographic lifetime or absence of all credential lifecycle controls.\nn=6 [asvs V8.2.1; agree]: No inter-service authentication is explicit. Treat permission-check behavior separately; network position alone is the stated admission basis.\nn=7 [asvs V11.3.2; agree]: At-rest algorithms are unstated. Correct the rationale: the supplied inference-log classification is unknown, although it contains PII.\nn=8 [asvs V12.3.3; agree]: Internal transport is unresolved. Correct the case-05 analogy: an unmarked link is not an explicitly unencrypted link.\nn=9 [asvs V16.2.5; reject]: Directly contradicted: every request and response, including raw prompts, is explicitly logged. Review sensitive-data exclusion and reader access instead.\nn=10 [asvs V13.3.2; agree]: The model server's service account is stated; its grants and scope are not.\nn=11 [stride spoofing; reject]: Never having expired a key does not establish that keys are never-expiring or usable indefinitely. Rewrite to misuse of a stolen still-valid team key.\nn=12 [stride spoofing; agree]: Explicit no-auth service admission supports direct gateway impersonation by a reachable workload.\nn=13 [stride spoofing; unsure]: The source only suspects a shared publishing account. Confirm account existence and access before accepting this particular impersonation route.\nn=14 [stride tampering; agree]: Valid artifact-substitution scenario after write compromise; the source expresses lack of independent verification. Preserve that evidence qualification.\nn=15 [stride tampering; agree]: Conditional feature poisoning if Redis permits attacker write commands. No password does not rule out compensating ACLs or prove writable commands from the modeled read path.\nn=16 [stride tampering; reject]: Internal encryption is unknown, not stated absent. Rewrite as conditional on-path modification; lack of authentication does not imply lack of encryption.\nn=17 [stride repudiation; unsure]: Shared publishing identity is uncertain, and individual release provenance may exist elsewhere. Inspect identity and retained publishing records.\nn=18 [stride repudiation; unsure]: Shared team keys limit credential-level attribution, but the source does not state team-key log fields or absence of corroborating caller records.\nn=19 [stride information-disclosure; unsure]: Raw prompt retention is stated; the exposure route is not. Separate inappropriate log-reader grants from a raw-storage-copy encryption claim.\nn=20 [stride information-disclosure; agree]: Passwordless Redis supports conditional internal unauthorized reads if no compensating identity/command restriction applies.\nn=21 [stride information-disclosure; unsure]: Cross-customer feature access is plausible, but caller-controlled customer selection and emitted feature values are not established. Verify request binding and output behavior.\nn=22 [stride information-disclosure; agree]: Conditional disclosure of sensitive forwarded inputs on an observable unprotected internal channel.\nn=23 [stride denial-of-service; agree]: Valid conditional authenticated request flood against shared GPU capacity; per-team budgets and concurrency controls determine exploitability.\nn=24 [stride denial-of-service; agree]: Conditional destructive Redis commands or memory exhaustion. Verify command ACLs and resource limits; readable does not automatically mean flushable.\nn=25 [stride denial-of-service; agree]: Conditional startup denial after artifact deletion/corruption. Requires destructive bucket permissions and absence of a usable cached/fallback artifact.\nn=26 [stride elevation-of-privilege; reject]: The model artifact format and loader do not establish executable deserialization or code loading. Artifact substitution alone does not prove GPU-node code execution.\nn=27 [stride elevation-of-privilege; reject]: The gateway's unauthenticated model-server access does not imply access to everything in the model network. Narrow service invocation is already 12.\nn=28 [stride elevation-of-privilege; unsure]: Team-scoped capability authorization deserves investigation, but multiple models/capability entitlements and a bypass operation are not described.\n\nSecond sitting, 2026-09-22. The marks on the findings this case carried on 2026-09-21 are the reader's own from that sitting, carried forward: each binds to a current finding by fingerprint, so it rules on a claim whose identity has not moved. The own list is that sitting's, which was written blind. The findings added since were all drafted from that own list, so no blind reading remained to protect on them; the reader marked every one of them on 2026-09-22 as a conditional threat scenario, and not as an assertion that the unspecified controls are absent.",
+      "opened_digests": {
+        "source.md": "3da14d8d61e45baa73b0a7ee2b6935b0da3c1d47c62fdf9cb30ef4a09d6c67b6",
+        "model.json": "78c74d4f13767bb8ae4acdb04af4b44975a91fe074927e0c76a70c2f5214bd82",
+        "claims/asvs.json": "0cb9e82391d0647fccc20a8d022b8e3a6287058ee2086b86999f1bab22cf7254",
+        "claims/stride.json": "4a8a17637e863c3dfc81b84a252f1587ab25eb3d0841c2960c64619cf52266e5"
+      }
+    },
+    "09-cookbook-sokify-retail": {
+      "own_list": [
+        "An observer on the mobile-app-to-API path can read customer and order details because that connection explicitly uses HTTP without HTTPS.",
+        "An on-path attacker can modify mobile order requests before the API receives them, changing order or delivery details that are passed to SIMS.",
+        "A caller can place orders as another customer if the API does not verify the customer's identity and bind submitted customer references to that identity.",
+        "A marketing-laptop attacker can use the spreadsheet's SQL submission path to make unauthorized catalogue changes if the API accepts that caller's statements without narrowly scoped server-side authorization.",
+        "A caller without Marketing's role can reach the catalogue-write operation through the shared web API if the API fails to separate customer and marketing privileges.",
+        "An incorrect, stale, or attacker-supplied order fax number can send the customer's name and address to an unintended recipient because delivery to the intended party is not checked.",
+        "An attacker who reads an inadequately protected delivery-address file or its raw copy can disclose customers' home addresses outside the ordering application.",
+        "An attacker obtaining an unprotected raw user-database copy can disclose customer names, addresses, and stored payment-related information.",
+        "An attacker reaching SIMS can inject fake order handoffs if SIMS does not authenticate the sending API and validate authorized orders, triggering incorrect fulfilment and fax processing.",
+        "A user can flood accepted orders to exhaust the shared API and downstream order/dispatch processing if request, fulfilment, and fax work are not rate- and cost-bounded."
+      ],
+      "marks": {
+        "v5:83384a37dc6f4838": "agree",
+        "v5:2b3a813c1fd09620": "agree",
+        "v5:6def30df716b1425": "agree",
+        "v5:ce9767b205f3e13c": "agree",
+        "v5:ffc5ebc28d9deb96": "agree",
+        "v5:acbb2e67274e9a03": "agree",
+        "v5:09463b5f38c37e76": "agree",
+        "v6:a16637d96d20519c": "agree",
+        "v6:5fd615185b1c6e85": "unsure",
+        "v6:b71e8862d23691be": "unsure",
+        "v6:5498f21a0b4cd325": "agree",
+        "v6:4edc229f0bf799a1": "agree",
+        "v6:8f357f92f516e254": "unsure",
+        "v6:725344fd1857bf05": "agree",
+        "v6:77ec82298847eec4": "unsure",
+        "v6:8b2b2c1687a914e0": "unsure",
+        "v6:e9845154d2fc311c": "agree",
+        "v6:41a42948c9a0aa9b": "agree",
+        "v6:ee638bc5b6698382": "agree",
+        "v6:e760ac0b1b2a3c37": "agree",
+        "v6:30d3864d2e58afbc": "agree",
+        "v6:5369dafee0a455e0": "agree",
+        "v6:cc1ef5e66d770fc3": "unsure",
+        "v6:843230027a9c6abb": "agree",
+        "v6:15a2da88ac25a0be": "unsure",
+        "v6:e48c8d797b2ad830": "agree",
+        "v6:1282d129e9bcd0fc": "agree"
+      },
+      "missing": [
+        "Own-list 09.5: An authenticated customer can invoke Marketing-only catalogue writes if the shared web API fails to enforce per-operation role separation.",
+        "Own-list 09.9: A reachable attacker can send fake order handoffs directly to SIMS if SIMS fails to authenticate the API and validate authorized orders, triggering improper downstream processing."
+      ],
+      "notes": "Confirming sitting on the model changes since the sitting of 2026-09-22, ruled as CSV in conversation. Row numbers refer to the confirming ballot for cases 04, 09 and 13.\nRow 2 (model.json, #1624): yes. The trust_zone assumption added for entity:customer changes no element or attribute value.\nRow 3 (model.json, #1624): yes. The trust_zone assumption for process:catalogue-spreadsheet is removed, because the source states the office. The zone value did not change. The reader's 27 marks of 2026-09-22 still stand.\nEvery finding carries the reader's mark of 2026-09-22, and the own list and the missing list are carried from that sitting.\nNotes of the sitting of 2026-09-22, carried:\nReview basis: supplied source texts and model; no repository code consulted. Earlier reviews were visible, so this is not a blind first pass. Agree accepts the stated conditional threat or unanswered ASVS evidence question, not proof of a missing implementation control. ASVS marks assess the supplied claim; they are not an independent compliance certification. Duplicate references use case-local n and concern repeated attack mechanisms, not merely matching elements or different CIA effects. Corrected wording in these notes is proposed only; original claims and fingerprints remain unchanged.\nDistinct from copied/compromised marketing credentials and from catalogue SQL reaching the customer database. Verify routing and server-side roles.\nRow review notes and proposed corrections:\nn=1 [asvs V12.2.1; agree]: Explicit HTTP rather than HTTPS establishes the unprotected client/API transport.\nn=2 [asvs V14.2.1; agree]: Sensitive customer/payment data and unresolved protection are stated. Specify the particular protection requirement rather than equating all safeguards with encryption.\nn=3 [asvs V1.2.4; agree]: The raw SQL client path warrants query/command construction review. It does not by itself prove injectable concatenation, arbitrary statements or excessive SQL grants.\nn=4 [asvs V15.3.1; agree]: Response field minimization is unresolved. The source does not establish that every stored customer/payment field is returned to the mobile app.\nn=5 [asvs V6.1.1; agree]: Customer authentication is undocumented. Distinguish local app access from server-side verification of API callers.\nn=6 [asvs V8.2.2; agree]: Customer-object authorization is unresolved. Frame it around caller entitlement, not merely the backend API's legitimate database read grant.\nn=7 [asvs V3.5.3; agree]: Order-submission HTTP method handling is unspecified; a bad method policy is not established.\nn=8 [stride spoofing; agree]: Conditional customer/client impersonation if API caller verification is ineffective. Being a non-official client alone does not imply unauthorized use.\nn=9 [stride spoofing; unsure]: A spreadsheet copy does not necessarily include a credential or an accepted authenticated session. Identify how possession of the file confers API authority.\nn=10 [stride spoofing; unsure]: Recipient-verification failure does not establish absent sender authentication or how the customer trusts an incoming fax. Need a concrete forged-confirmation path and harm.\nn=11 [stride tampering; agree]: Explicit plaintext transport supports active order modification by an on-path attacker, absent separate message integrity.\nn=12 [stride tampering; agree]: A compromised authorized marketing workstation/session can misuse the intended catalogue-write path. A valid identity or ineffective caller checks remain prerequisites.\nn=13 [stride tampering; unsure]: Sending SQL does not establish concatenation, multi-statement execution, parser acceptance or broader grants. Verify how arbitrary extra statements would be accepted.\nn=14 [stride tampering; reject]: The model states that SIMS writes the address file, not that fulfilment later reads it. Address-file tampering does not establish diversion of goods without a re-entry path.\nn=15 [stride tampering; agree]: An attacker able to change the stored fax destination can redirect a confirmation. Specify that write capability; it is not conferred merely by the existence of the order field.\nn=16 [stride repudiation; unsure]: Unknown authentication and missing described order evidence do not establish inability to attribute orders. Need identity binding and retained records.\nn=17 [stride repudiation; unsure]: A spreadsheet-originated request may still carry individual credentials and audit context. A process endpoint is not proof that the human is unrecorded.\nn=18 [stride repudiation; agree]: Absent intended-recipient checking limits evidence that the customer received the confirmation. Transmission/delivery records could still prove narrower facts.\nn=19 [stride information-disclosure; agree]: Explicit plaintext client/API traffic exposes modeled customer details to an on-path observer.\nn=20 [stride information-disclosure; agree]: Conditional disclosure through an unprotected raw customer-database copy. Do not assume full card numbers or security codes from 'the card they paid with'.\nn=21 [stride information-disclosure; agree]: Conditional unauthorized file/copy read exposes addresses only. Verify permissions/protection; the file is not stated to contain names or payment data.\nn=22 [stride information-disclosure; agree]: An incorrect, stale or attacker-controlled destination can disclose the faxed name/address. Recipient checking is absent in the process, not inherently impossible for fax.\nn=23 [stride denial-of-service; agree]: Conditional API request exhaustion disrupts the stated sole customer-ordering channel if resource controls are insufficient.\nn=24 [stride denial-of-service; unsure]: Need accepted transaction/locking operations, privileges and duration. A catalogue-update SQL path does not by itself establish arbitrary lock-based denial.\nn=25 [stride denial-of-service; agree]: Disruption of the sole described SIMS handoff can delay dispatch. Identify a feasible attack path; age alone does not establish weakness or lack of fallback.\nn=26 [stride elevation-of-privilege; reject]: Compromising a workstation and using its existing catalogue-write authority is not a demonstrated escalation. 'Unmanaged' is also unstated; specify excess scope or a role bypass.\nn=27 [stride elevation-of-privilege; unsure]: The marketing SQL interface is not shown to share unrestricted authority over the customer database. Verify statement routing, database separation and grants.\nThe set names the SIMS availability dependency but not this internal input-authenticity bypass. SIMS is not assumed internet-facing.\n\nSecond sitting, 2026-09-22. The marks on the findings this case carried on 2026-09-21 are the reader's own from that sitting, carried forward: each binds to a current finding by fingerprint, so it rules on a claim whose identity has not moved. The own list is that sitting's, which was written blind. The findings added since were all drafted from that own list, so no blind reading remained to protect on them; the reader marked every one of them on 2026-09-22 as a conditional threat scenario, and not as an assertion that the unspecified controls are absent.",
+      "opened_digests": {
+        "source.md": "603873a0d569ba3f0ac4a91a363086b54bae022cf432862d17be9eec9465e4ea",
+        "model.json": "d31cf0ff67c1b91da63c2973e0b21a57ae52dadbc55168073222882da6410ac2",
+        "claims/asvs.json": "fbc32dc14ac8a90e9bbb2bab6801dc704f2468a03e056d992f41564c9d8de41c",
+        "claims/stride.json": "3c6cc2581eae539e4ac135dd37a0f933a2a8082f6bcf9cdf65112ab58c0ce5d8"
+      }
+    },
+    "13-dispatch-control-plane": {
+      "own_list": [
+        "A corporate user without dispatch rights can invoke crew-move or depot-change operations if the API does not enforce authenticated server-side dispatch authorization on every request.",
+        "A malicious web origin can read privileged dispatch responses using an engineer's browser if the API trusts that origin, permits credentials, and the browser sends an authenticated session.",
+        "A malicious page can open a dispatch WebSocket in an engineer's browser and receive live status if cookies are sent and the handshake fails to check both authorized origin and session.",
+        "A former or revoked engineer session can continue receiving live job status over an existing WebSocket if the server never rechecks or terminates the socket when authorization expires.",
+        "A corporate-network observer can capture live crew/job status if the WebSocket lacks TLS or equivalent confidentiality.",
+        "An attacker can hold enough dispatch WebSockets open to exhaust shared API resources if connection quotas, timeouts, and isolation are insufficient, disrupting status and dispatch writes.",
+        "A holder of the importer's still-valid API token can submit fabricated work orders as the importer.",
+        "A malicious or compromised scheduling partner can return semantically false but well-formed work orders that reach live dispatch if the importer/API does not independently validate authorized scheduling constraints.",
+        "A malicious partner can return XML containing external entity references that make the importer read local files or contact internal services if external entity resolution is enabled.",
+        "A malicious partner can return oversized, deeply nested, or expansion-heavy XML to exhaust importer CPU, memory, or archive capacity if document and parser resource limits are insufficient."
+      ],
+      "marks": {
+        "v5:fddf9a2e4210c6ef": "agree",
+        "v5:4505f47008fdd1c9": "agree",
+        "v5:b8c8b1f595c0f40b": "agree",
+        "v5:dff6ea7cdc2022d6": "agree",
+        "v5:cb30d8ba2fa9d75e": "agree",
+        "v5:a3de9161d5d7e1cf": "agree",
+        "v6:7214cd95407ede95": "agree",
+        "v6:3b9e809c166f5681": "agree",
+        "v6:2cf2ee6494b70de4": "unsure",
+        "v6:5d48efef79c9e6ab": "agree",
+        "v6:031a6ef6d029ea80": "agree",
+        "v6:61f5cbde78263cf0": "agree",
+        "v6:c786078296a8f64e": "agree",
+        "v6:293569e81e8621c5": "agree",
+        "v6:f38c925f816c80df": "unsure",
+        "v6:2332485d7edb4080": "unsure",
+        "v6:b18309b8dca32862": "agree",
+        "v6:628af900bca0c64f": "agree",
+        "v6:10d259f558ba1561": "agree",
+        "v6:c4f2496111674398": "agree",
+        "v6:cabe776e411e1fb9": "agree",
+        "v6:c1feb458b30b2661": "agree",
+        "v6:bba43b9c210dfcb3": "reject",
+        "v6:60ab6a2c9357fa30": "agree",
+        "v6:74b792c5c3413dee": "agree",
+        "v6:c0c35ac27eb1bc8e": "agree"
+      },
+      "missing": [
+        "Own-list 13.2: A malicious allowed web origin can read privileged API responses through an engineer's browser if credentialed CORS permits it and the browser supplies a valid session.",
+        "Own-list 13.3: A malicious page can open a credentialed dispatch WebSocket in an engineer's browser and receive live status if handshake origin/session checks fail."
+      ],
+      "notes": "Confirming sitting on the model changes since the sitting of 2026-09-22, ruled as CSV in conversation. Row numbers refer to the confirming ballot for cases 04, 09 and 13.\nRow 4 (model.json, #1624): yes. The trust_zone assumption added for process:dispatch-console changes no element or attribute value, and the reader's 26 marks of 2026-09-22 still stand.\nEvery finding carries the reader's mark of 2026-09-22, and the own list and the missing list are carried from that sitting.\nNotes of the sitting of 2026-09-22, carried:\nReview basis: supplied source texts and model; no repository code consulted. Earlier reviews were visible, so this is not a blind first pass. Agree accepts the stated conditional threat or unanswered ASVS evidence question, not proof of a missing implementation control. ASVS marks assess the supplied claim; they are not an independent compliance certification. Duplicate references use case-local n and concern repeated attack mechanisms, not merely matching elements or different CIA effects. Corrected wording in these notes is proposed only; original claims and fingerprints remain unchanged.\nRecorded 24 instead alleges unauthorized writes from unknown CORS. Cross-origin response disclosure and CSRF are different mechanisms; verify response contents, origin policy and credential attachment.\nRow review notes and proposed corrections:\nn=1 [asvs V1.5.1; agree]: External XML parsing makes entity-resolution configuration a valid unanswered question; vulnerable parser behavior is not established.\nn=2 [asvs V3.4.2; agree]: Allowed CORS origins are explicitly undocumented; no permissive configuration is proved.\nn=3 [asvs V3.5.1; agree]: Cross-origin request legitimacy/CSRF controls are unresolved. CORS response permissions are not equivalent to authenticating or authorizing the request.\nn=4 [asvs V4.4.1; agree]: WebSocket TLS is explicitly unknown. Remove the incorrect case-05 inference about absent internal encryption.\nn=5 [asvs V7.2.1; agree]: Ongoing session validity on the long-lived socket is explicitly unresolved; this is distinct from handshake authentication.\nn=6 [asvs V6.1.1; agree]: Engineer sign-in and attempt-limiting documentation are not supplied.\nn=7 [stride spoofing; agree]: A stolen still-valid importer token can submit work orders within its grant. Non-rotation does not prove unlimited expiry or full dispatch administration.\nn=8 [stride spoofing; agree]: Conditional false-engineer WebSocket admission if handshake identity/session checks are ineffective. Access and accepted identity are prerequisites.\nn=9 [stride spoofing; unsure]: The feed explicitly uses HTTPS. Show certificate/endpoint validation failure or another concrete impersonation route; unknown application authentication does not negate TLS server identity.\nn=10 [stride spoofing; agree]: Conditional engineer impersonation if sign-in verification is ineffective. Unknown mechanism alone is not proof of an exploitable login.\nn=11 [stride tampering; agree]: Conditional accepted malicious schedule content can become dispatch work. A compromised genuine partner is a supported attack condition; validate semantic controls and do not assume HTTPS is absent.\nn=12 [stride tampering; agree]: Conditional active network modification if dispatch-request integrity protection is ineffective. Requires an on-path position, not merely a corporate foothold.\nn=13 [stride tampering; agree]: Conditional direct database tampering through ineffective caller/write controls. Control-plane presence alone does not confer write permissions.\nn=14 [stride tampering; agree]: An unauthorized archive writer can falsify retained schedule evidence. Requires modify permissions; no downstream replay into dispatch is established or needed.\nn=15 [stride repudiation; unsure]: A recorded token/session may map to a person in retained issuance/session logs. Need that mapping and retention evidence before deciding attribution failure.\nn=16 [stride repudiation; unsure]: Order-to-document linkage is not described, but absence is not proved. Inspect retained provenance, hashes and import identifiers.\nn=17 [stride information-disclosure; agree]: Conditional disclosure of private live status over a transport-unprotected observable WebSocket.\nn=18 [stride information-disclosure; agree]: Conditional raw-copy disclosure of crew names/mobile numbers if storage protection is ineffective. Copy access alone is not proof that ciphertext is readable.\nn=19 [stride information-disclosure; agree]: Valid conditional XXE disclosure if entity resolution, file access and an exfiltration path are enabled. No specific parser behavior is established.\nn=20 [stride information-disclosure; agree]: Conditional unauthorized archive access exposes operational schedules. File-store reachability is not sufficient; verify read grants and schedule confidentiality.\nn=21 [stride denial-of-service; agree]: Conditional exhaustion of persistent socket resources if connection/session caps and timeouts are inadequate.\nn=22 [stride denial-of-service; agree]: Conditional oversized XML resource exhaustion. Indefinite failure, absent detection and loss of all tomorrow's work are possible impacts, not established facts.\nn=23 [stride elevation-of-privilege; duplicate]: Same stolen importer token and authorized work-order API operation as 7. Crossing a privilege boundary does not add a second attack.\nn=24 [stride elevation-of-privilege; reject]: Unknown CORS policy does not establish browser-forced writes. Specify CSRF prerequisites, credential attachment, accepted content/method and ineffective request validation; CORS is not write authorization.\nn=25 [stride elevation-of-privilege; agree]: A compromised console publisher can serve attacker script from the legitimate origin and misuse a visiting engineer's accepted authority. Requires host-write compromise and an authorized session; cite corporate-web-host/load-console too.\nn=26 [stride tampering; agree]: Valid conditional direct unauthorized dispatch writes if API authentication/authorization is ineffective. Does not rely on CORS or a victim session.\nn=27 [stride elevation-of-privilege; duplicate]: Same corporate caller acquiring unauthorized dispatch operations through missing API authorization as 26.\nRecorded 8's generic handshake impersonation does not specify browser credential attachment and hostile Origin; these checks remain necessary even when the session itself is valid. Ordinary CORS response rules do not establish socket protection.\n\nSecond sitting, 2026-09-22. The marks on the findings this case carried on 2026-09-21 are the reader's own from that sitting, carried forward: each binds to a current finding by fingerprint, so it rules on a claim whose identity has not moved. The own list is that sitting's, which was written blind. The findings added since were all drafted from that own list, so no blind reading remained to protect on them; the reader marked every one of them on 2026-09-22 as a conditional threat scenario, and not as an assertion that the unspecified controls are absent.",
+      "opened_digests": {
+        "source.md": "7e370ab58f5a0138f9dd36d41cb6d3ef2b88e15594ab7995a9eb1488b157fec7",
+        "model.json": "7d6b0954ab6043050bb4f3a726aa40e7da3b02494e0430ff942375f10c4b14da",
+        "claims/asvs.json": "e2a9c33f73e15df69bd2a4645afa0bb6070692516af24a275100775832359970",
+        "claims/stride.json": "707f050fcada8b0089b8762bb210da900bde56c19e7652678b0f1de1af351b02"
+      }
+    }
+  }
+}
