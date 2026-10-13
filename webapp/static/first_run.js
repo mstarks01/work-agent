@@ -663,6 +663,15 @@
     row.compact = false;
     label.append(name, ` — places ${q.rows} stated fact(s) `, select);
     row.node.replaceChildren(label, " ", skipControl(row));
+    // The element whose name matches, offered and never chosen for the
+    // person: the page sends only what a person picks.
+    const match = !prefill && q.options.find((option) => option.id === q.suggested);
+    if (match) {
+      row.node.append(" ", button(`Use ${match.name || match.id}`, (event) => {
+        select.value = match.id;
+        onEdit(row, event);
+      }));
+    }
   };
   const drawCompactLink = (row, answer) => {
     const name = document.createElement("b");

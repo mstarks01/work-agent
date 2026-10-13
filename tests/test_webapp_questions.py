@@ -2054,6 +2054,36 @@ _LINK = {
 }
 
 
+def _suggested(click: bool) -> list:
+    link = _LINK | {"suggested": "entity:shopper"}
+    steps = f"""
+await ids.analyze.listeners.submit({{ preventDefault() {{}} }}); await settle();
+streams[0].listeners.questions({{ data: JSON.stringify({{ run: "r1",
+  link_questions: [{json.dumps(link)}], early_questions: [], answered_early: [],
+  answered_links: [], revision: 0 }}) }});
+const walk = (n, out = []) => {{ for (const c of n.children || [])
+  if (typeof c === "object") {{ out.push(c); walk(c, out); }} return out; }};
+const use = walk(ids.questions).find((n) => n.tag === "button" && n.textContent === "Use Shopper");
+calls.push({{ offered: Boolean(use) }});
+if ({json.dumps(click)}) {{ await use.listeners.click({{ type: "click" }}); await settle(); }}
+await ids.continue.listeners.click(); await settle();
+"""
+    return _run_form_script(steps)["calls"]
+
+
+def test_a_suggested_element_is_offered_and_sent_only_when_chosen():
+    """The service names the element whose name matches; the page offers it
+    as one click, and sends nothing a person did not pick."""
+    untouched = _suggested(click=False)
+    assert {"offered": True} in untouched
+    assert all(not call.get("body", {}).get("links") for call in untouched)
+
+    chosen = _suggested(click=True)
+    sent = [call["body"]["links"] for call in chosen if call.get("url") == "/answer/r1"]
+    expected = [{"principal": "shopper accounts", "element": "entity:shopper"}]
+    assert sent[0] == expected
+
+
 def _skip_the_rest(links, facts) -> dict:
     """The body "Skip the rest" sends for a round of these, every row blank."""
     steps = f"""
