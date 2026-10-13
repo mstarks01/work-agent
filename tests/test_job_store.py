@@ -13,6 +13,7 @@ from datetime import UTC, datetime, timedelta
 
 import pytest
 
+from analysis_service import jobs
 from analysis_service.answer_sets import NO_ANSWERS, AnswerSet
 from analysis_service.budgets import BudgetPolicy
 from analysis_service.fact_answers import FactAnswer
@@ -25,8 +26,9 @@ from analysis_service.jobs import (
     JobRecord,
     JobStatus,
     Resumption,
+    same_major,
 )
-from analysis_service.report import NodeRun, TokenUsage
+from analysis_service.report import SCHEMA_VERSION, NodeRun, TokenUsage
 from analysis_service.sources import Source
 from tests import test_resume
 from tests.factories import (
@@ -822,3 +824,63 @@ class TestTheRestartScan:
         reserve(store, new_record(), ceiling=1)
         asyncio.run(store.fail_in_flight())
         assert reserve(store, new_record(), ceiling=1).outcome == "admitted"
+
+
+class TestTheSchemaVersion:
+    """Each record keeps the ``SCHEMA_VERSION`` that created it, and
+    :func:`~analysis_service.jobs.same_major` reads it (#1532)."""
+
+    def test_a_new_record_holds_the_current_version(self, store):
+        record = new_record()
+        asyncio.run(admit(store, record))
+        held = asyncio.run(store.owned(record.id, "alice"))
+        assert held.schema_version == SCHEMA_VERSION
+        assert same_major(held.schema_version)
+
+    @pytest.mark.parametrize("version", ["2.10", "1.0"])
+    def test_every_read_and_save_keeps_the_version_the_record_states(
+        self, store, version
+    ):
+        job = waiting(store)
+        record = asyncio.run(store.get(job))
+        record.schema_version = version
+        asyncio.run(store.save(record))
+        assert asyncio.run(store.save_round(job, "alice", NO_ANSWERS, (), (), 0))
+        reads = [
+            asyncio.run(store.get(job)),
+            asyncio.run(store.owned(job, "alice")),
+            *asyncio.run(store.owned_jobs("alice")),
+        ]
+        assert {read.schema_version for read in reads} == {version}
+
+    def test_the_restart_scan_keeps_the_version_of_a_job_it_fails(self, store):
+        record = new_record()
+        record.schema_version = "2.10"
+        asyncio.run(admit(store, record))
+        assert asyncio.run(store.fail_in_flight()) == [record.id]
+        failed = asyncio.run(store.get(record.id))
+        assert (failed.status, failed.schema_version) == ("failed", "2.10")
+
+    @pytest.mark.parametrize(
+        ("version", "readable"),
+        [
+            ("9.4", True),
+            ("9.1", True),  # an older minor of this major
+            ("9.7", True),
+            ("9", True),
+            ("8.4", False),  # an older major
+            ("10.0", False),  # a newer major
+            ("90.4", False),  # a major that starts with this one
+            ("", False),
+            (" 9.4", False),
+        ],
+    )
+    def test_same_major_compares_the_major_of_what_the_store_returns(
+        self, store, monkeypatch, version, readable
+    ):
+        monkeypatch.setattr(jobs, "SCHEMA_VERSION", "9.4")
+        record = new_record()
+        record.schema_version = version
+        asyncio.run(admit(store, record))
+        held = asyncio.run(store.owned(record.id, "alice"))
+        assert same_major(held.schema_version) is readable

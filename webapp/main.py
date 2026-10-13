@@ -170,6 +170,7 @@ from analysis_service.job_answers import (
     RunnerUnavailable,
     SaveConflict,
     Started,
+    UnreadableSchema,
     Withheld,
 )
 from analysis_service.jobs import (
@@ -773,6 +774,7 @@ _REFUSAL_STATUS: dict[type[Exception], int] = {
     NoCatalogError: 409,
     Refused: 400,
     SaveConflict: 409,
+    UnreadableSchema: 409,
     WorkspaceFull: 409,
     RunnerUnavailable: 503,
     JobDataMissing: 500,

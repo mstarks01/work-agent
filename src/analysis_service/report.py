@@ -174,9 +174,11 @@ from analysis_service.vendors import ServedTrust, vendor_for_route
 #   sources left open, so a ``confirmed`` claim on an open assertion has a
 #   dismissal to name (#1082).
 #
-# **There is no version gate.** ``Report`` keeps ``extra="forbid"``, so a 2.10
+# **``Report`` has no version gate.** It keeps ``extra="forbid"``, so a 2.10
 # payload carrying ``threats`` at the top level is refused by this model, and a
-# 3.0 payload carrying ``analyses`` is refused by a 2.10 model.
+# 3.0 payload carrying ``analyses`` is refused by a 2.10 model. A stored job
+# record is a different case: it states the version that created it, and
+# :func:`analysis_service.jobs.same_major` reads that before a route parses it.
 SCHEMA_VERSION = "3.0"
 
 # The envelope's disclaimer, which is about the *service* rather than about any
