@@ -60,23 +60,7 @@ from evals.review_submission import REPO_ROOT, unreviewed_cases
 #: :func:`~evals.review_submission.unreviewed_cases` reads the corpus and the
 #: merged submissions — so an entry here only ever says what an unread case
 #: leaves unchecked, and an entry for a case a submission clears is spent.
-UNREVIEWED: dict[str, str] = {
-    "04-ml-inference-service": (
-        "model.json gained a trust_zone assumption for the calling service, a"
-        " placement the signed facts already call inferred. No element,"
-        " attribute value or claim changed; the digest did."
-    ),
-    "09-cookbook-sokify-retail": (
-        "model.json gained a trust_zone assumption for the customer, a"
-        " placement the signed facts already call inferred. No element,"
-        " attribute value or claim changed; the digest did."
-    ),
-    "13-dispatch-control-plane": (
-        "model.json gained a trust_zone assumption for the dispatch console, a"
-        " placement the signed facts already call inferred. No element,"
-        " attribute value or claim changed; the digest did."
-    ),
-}
+UNREVIEWED: dict[str, str] = {}
 
 
 @pytest.fixture(scope="module")
