@@ -885,6 +885,18 @@ class SqlJobStore:
             [object_key(row.owner_id, row.id, name) for name in names]
         )
 
+    async def expired(self, before: datetime) -> list[tuple[str, str]]:
+        async with self._transaction() as connection:
+            found = await connection.execute(
+                select(jobs.c.id, jobs.c.owner_id)
+                .where(
+                    jobs.c.status.in_(sorted(TERMINAL_STATUSES)),
+                    jobs.c.updated_at < before,
+                )
+                .order_by(jobs.c.updated_at, jobs.c.id)
+            )
+            return [(row.id, row.owner_id) for row in found]
+
     async def fail_in_flight(self) -> list[str]:
         """Fail each queued or running job with :data:`RESTART_FAILURE_MESSAGE`.
 

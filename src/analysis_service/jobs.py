@@ -41,7 +41,7 @@ from collections.abc import (
     Sequence,
 )
 from dataclasses import dataclass, field
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from itertools import chain
 from typing import TYPE_CHECKING, Any, Literal, Protocol, Self, TypeGuard, TypeVar
 from uuid import uuid4
@@ -57,6 +57,7 @@ from analysis_service.claims import FrameworkAnalysis, FrameworkName, UnknownKey
 from analysis_service.execution import GraphFailed
 from analysis_service.fact_answers import MAX_HELD_FACTS, FactAnswer, SkipKey
 from analysis_service.links import MAX_HELD_LINKS
+from analysis_service.parsing import ascii_int
 from analysis_service.principals import Identity, Principal, PrincipalTable
 from analysis_service.report import (
     SCHEMA_VERSION,
@@ -658,6 +659,11 @@ class JobStore(Protocol):
         """
         ...
 
+    async def expired(self, before: datetime) -> list[tuple[str, str]]:
+        """The ID and the owner ID of each terminal job last updated before
+        ``before``. The retention sweep deletes these (#1530)."""
+        ...
+
     async def fail_in_flight(self) -> list[str]: ...
 
 
@@ -1088,6 +1094,13 @@ class InMemoryJobStore:
         )
         return 0
 
+    async def expired(self, before: datetime) -> list[tuple[str, str]]:
+        return [
+            (record.id, record.owner_id)
+            for record in self._records.values()
+            if record.status in TERMINAL_STATUSES and record.updated_at < before
+        ]
+
     async def fail_in_flight(self) -> list[str]:
         """Fail each queued or running job with :data:`RESTART_FAILURE_MESSAGE`.
 
@@ -1231,6 +1244,69 @@ def build_store(env: Mapping[str, str] = os.environ) -> JobStore:
             "this job store keeps no objects; unset ANALYSIS_OBJECT_STORE"
         )
     return backend.build(env, None)
+
+
+#: Why a job is deleted: its owner asked, or its retention period passed.
+DeleteCause = Literal["owner", "retention"]
+
+
+async def audited_delete(
+    store: JobStore, job_id: str, owner_id: str, cause: DeleteCause
+) -> int | None:
+    """Delete the owned job with :meth:`JobStore.delete`, and log the delete.
+
+    **The one writer of the delete log line** (ADR 0066). The delete route and
+    the retention sweep both delete through it. The line names the job ID, the
+    owner ID, the cause and the number of objects removed, and no content.
+    Returns what :meth:`JobStore.delete` returns.
+    """
+    removed = await store.delete(job_id, owner_id)
+    if removed is not None:
+        logger.info(
+            "deleted job %s of owner %s: cause %s, %d object(s) removed",
+            job_id,
+            owner_id,
+            cause,
+            removed,
+        )
+    return removed
+
+
+#: The longest retention period: a century. The bound keeps the cutoff of a
+#: sweep inside the range of ``datetime``.
+MAX_RETENTION_DAYS = 36_500
+
+
+def retention_days(env: Mapping[str, str] = os.environ) -> int | None:
+    """The retention period from ``ANALYSIS_RETENTION_DAYS``, in days.
+
+    ``None`` where the setting is unset: the service keeps every job (#1530).
+    A value that is not a whole number from 1 to :data:`MAX_RETENTION_DAYS`
+    raises, so the startup stops.
+    """
+    value = env.get("ANALYSIS_RETENTION_DAYS")
+    if value is None:
+        return None
+    days = ascii_int(value, max_digits=len(str(MAX_RETENTION_DAYS)))
+    if days is None or not 1 <= days <= MAX_RETENTION_DAYS:
+        raise JobStoreConfigError(
+            "ANALYSIS_RETENTION_DAYS must be a whole number of days from 1 to"
+            f" {MAX_RETENTION_DAYS}, or unset to keep every job"
+        )
+    return days
+
+
+async def expire_jobs(store: JobStore, days: int) -> None:
+    """Delete each terminal job whose last update is more than ``days`` days old.
+
+    One pass of the retention sweep (#1530). Each delete goes through
+    :func:`audited_delete` with the cause ``retention``, so the job keeps its
+    usage row and the log gets the line of the delete route. A ``queued`` or
+    ``running`` job is never expired.
+    """
+    before = datetime.now(UTC) - timedelta(days=days)
+    for job_id, owner_id in await store.expired(before):
+        await audited_delete(store, job_id, owner_id, "retention")
 
 
 @dataclass(frozen=True)

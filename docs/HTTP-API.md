@@ -115,8 +115,10 @@ the rate and the token [budgets](#how-much-you-may-consume-over-time). A
 deleted follow-up still uses the one follow-up of its report.
 
 Each delete writes one line to the service log. The line names the job ID, the
-owner ID, the cause `owner` and the number of stored objects that the delete
-removed. It holds no content of the job.
+owner ID, the cause and the number of stored objects that the delete removed.
+The cause is `owner` for a delete through this route and `retention` for a
+delete by the [retention sweep](#retention). The line holds no content of the
+job.
 
 ## Lifecycle
 
@@ -809,6 +811,7 @@ an unset or unknown value stops the startup. The service never falls back to
 | `ANALYSIS_OBJECT_STORE` | `filesystem` | Required by `sql`. Refused by `memory`. |
 | `ANALYSIS_DATABASE_URL` | `sqlite+aiosqlite:///<path>` | Required by `sql`. A URL that holds a password stops the startup. |
 | `ANALYSIS_OBJECT_ROOT` | an absolute path to a directory | Required by `filesystem`. |
+| `ANALYSIS_RETENTION_DAYS` | a whole number of days from 1 to 36500 | Optional. Unset keeps every job. See [Retention](#retention). |
 
 ### The `memory` store
 
@@ -869,17 +872,39 @@ The startup stops when the schema is not at the latest revision.
 The service starts in this order, and a failure at a step stops the startup:
 
 1. It reads the backend settings and builds the store.
-2. The `sql` store checks that the schema is at the latest revision.
-3. The `sql` store checks the object store: for `filesystem`, the root.
-4. The restart scan fails each `queued` or `running` job in the store.
-5. The service takes requests.
+2. It reads `ANALYSIS_RETENTION_DAYS`.
+3. The `sql` store checks that the schema is at the latest revision.
+4. The `sql` store checks the object store: for `filesystem`, the root.
+5. The restart scan fails each `queued` or `running` job in the store.
+6. The service takes requests. Where a retention period is set, the
+   retention sweep starts at the same time.
 
 The restart scan leaves a job in `awaiting-answers` and a job in a terminal
-status as they are. The ASGI server runs steps 2 to 4 as the app's lifespan
+status as they are. The ASGI server runs steps 2 to 5 as the app's lifespan
 startup, so do not turn the lifespan off (for example with
 `uvicorn --lifespan off`). The scan is correct for a single instance only.
 With two instances on one shared store, the scan at the start of one instance
 fails the jobs that the other instance still runs.
+
+### Retention
+
+`ANALYSIS_RETENTION_DAYS` sets the retention period of a job, in days. The
+period starts at the last update of the job. When the setting is unset, the
+service keeps every job for ever. The value must be a whole number from 1 to
+36500. Any other value stops the startup, and an empty value also stops it.
+
+When the period is set, a sweep in the service deletes each expired job. The
+sweep runs when the service starts and then once each hour, so a job stays
+for one hour after its period at most. The sweep deletes a job in a terminal
+status: `completed`, `failed`, `rejected` or `awaiting-answers`. It never
+deletes a `queued` or `running` job. A swept job is deleted the same way as a
+job that its owner [deletes](#deleting-a-job): the job keeps its usage row,
+and the service log gets one line with the cause `retention`. The service
+uses no bucket lifecycle rule (ADR 0066).
+
+The sweep works on the `memory` store and on the `sql` store. Each instance
+of the service runs its own sweep. Two sweeps on one shared store do not
+delete a job twice, because the second delete finds no job.
 
 ### Adding a new backend
 
@@ -907,6 +932,7 @@ pair, so a new row runs every contract test. A new job store implements the
 | `report_json` | The owned job's report, already serialised. |
 | `events_after` | A job's status and the events past a cursor, and nothing else. |
 | `save` | The record back, for a job that already exists. |
+| `expired` | The ID and the owner ID of each job in a terminal status whose last update is before a given time. The retention sweep deletes each one through `delete`. |
 | `fail_in_flight` | Fails each `queued` or `running` job with the restart message and returns their IDs. It settles each job through `JobRecord.transition`, so the job keeps its full charge and gets a status event. |
 
 Each read returns a record's `schema_version` as the record stored it, and no
