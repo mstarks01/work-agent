@@ -22,17 +22,23 @@ provenance defect stay invisible to the eval lane.
 import asyncio
 import atexit
 import hashlib
+import inspect
 import json
 import shutil
 import tempfile
 from collections.abc import AsyncGenerator, Callable, Mapping, Sequence
 from dataclasses import dataclass, replace
 from datetime import UTC, datetime
+from functools import partial
 from pathlib import Path
 from types import MappingProxyType
 from typing import Any, ClassVar
+from urllib.parse import quote
 
 import httpx
+from fastapi import FastAPI
+from fastapi.routing import APIRoute
+from fastapi.testclient import TestClient
 from google.adk.agents.llm_agent import LlmAgent
 from google.adk.models.base_llm import BaseLlm
 from google.adk.models.llm_response import LlmResponse
@@ -79,7 +85,7 @@ from analysis_service.graph import (
     build_pipeline,
 )
 from analysis_service.identity import build_identity, execution_fingerprint
-from analysis_service.jobs import Checkpoint
+from analysis_service.jobs import Checkpoint, InMemoryJobStore
 from analysis_service.markdown_loader import MarkdownLoader
 from analysis_service.model_tiers import (
     ModelTierConfig,
@@ -358,6 +364,112 @@ async def admit(store: Any, record: Any) -> Any:
     )
     assert admission.outcome == "admitted", admission
     return admission
+
+
+#: A job ID of the minted shape that no store holds.
+MISSING_JOB = "job-" + "0" * 32
+#: Job IDs of another shape than
+#: :meth:`~analysis_service.jobs.JobRecord.create` mints. A ``$``-anchored
+#: match passes the last one, and only ``fullmatch`` refuses it.
+MALFORMED_JOB_IDS = (
+    "job-missing",
+    "JOB-" + "0" * 32,
+    "job-" + "A" * 32,
+    MISSING_JOB + "0",
+    MISSING_JOB + "\n",
+)
+#: A fact answer that validates, for a route body that must name one.
+A_FACT_ANSWER = FactAnswer(
+    key=UnknownRef(element_id="a-flow", attribute="encryption_in_transit").key,
+    value="TLS 1.3",
+).model_dump(mode="json")
+
+
+class LookupSpy(InMemoryJobStore):
+    """A memory store that records each argument a caller passes to a method."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.arguments: list[object] = []
+
+    def __getattribute__(self, name: str) -> Any:
+        attribute = super().__getattribute__(name)
+        if not inspect.ismethod(attribute) or name.startswith("_"):
+            return attribute
+        arguments = super().__getattribute__("arguments")
+
+        def recorded(*args: Any, **kwargs: Any) -> Any:
+            arguments.extend([*args, *kwargs.values()])
+            return attribute(*args, **kwargs)
+
+        return recorded
+
+
+def assert_job_ids_read_as_missing(
+    send: Callable[[str], httpx.Response],
+    store: LookupSpy,
+    *,
+    foreign: str,
+    label: object,
+) -> None:
+    """Send each malformed job ID, a missing job and the ``foreign`` job of
+    another owner through ``send``.
+
+    Each malformed ID must get the status, type and body that the missing job
+    and the foreign job get, and ``store`` must receive no malformed ID.
+    ``label`` names the request in a failure.
+    """
+    store.arguments.clear()
+    missing, alien, *malformed = (
+        (response.status_code, response.headers.get("content-type"), response.content)
+        for response in map(send, (MISSING_JOB, foreign, *MALFORMED_JOB_IDS))
+    )
+    assert missing[0] == 404, label
+    assert alien == missing, label
+    assert malformed == [missing] * len(MALFORMED_JOB_IDS), label
+    reached = [job for job in store.arguments if job in MALFORMED_JOB_IDS]
+    assert reached == [], label
+
+
+def assert_each_route_checks_the_job_id(
+    client: TestClient,
+    store: LookupSpy,
+    *,
+    parameter: str,
+    foreign: str,
+    bodies: Mapping[tuple[str, str], object],
+    headers: Mapping[str, str],
+) -> None:
+    """Apply :func:`assert_job_ids_read_as_missing` to each route of the app
+    that has a path parameter.
+
+    Every path parameter of the app must be ``parameter``, so a route that
+    takes a job ID under another name fails here. ``bodies`` holds the body
+    that a route validates before its lookup.
+    """
+    app = client.app
+    assert isinstance(app, FastAPI)
+    routes = [
+        (method, route.path, name)
+        for route in app.routes
+        if isinstance(route, APIRoute)
+        for name in route.param_convertors
+        for method in sorted(route.methods or ())
+    ]
+    assert {name for _, _, name in routes} == {parameter}
+
+    def send(method: str, path: str, job: str) -> httpx.Response:
+        return client.request(
+            method,
+            path.replace(f"{{{parameter}}}", quote(job, safe="")),
+            headers=headers,
+            json=bodies.get((method, path)),
+        )
+
+    for method, path, _ in routes:
+        assert_job_ids_read_as_missing(
+            partial(send, method, path), store, foreign=foreign, label=(method, path)
+        )
 
 
 def sample_selection(

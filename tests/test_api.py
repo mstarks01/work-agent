@@ -47,9 +47,14 @@ from analysis_service.sources import Source, SourceLimits
 from analysis_service.validation import ValidationIssue
 from analysis_service.vendors import ProviderAuthError
 from tests.factories import (
+    A_FACT_ANSWER,
     DEFAULT_FRAMEWORKS,
+    MISSING_JOB,
     SEEDING_BUDGET,
+    LookupSpy,
     admit,
+    assert_each_route_checks_the_job_id,
+    assert_job_ids_read_as_missing,
     identity_of,
     sample_selection,
 )
@@ -879,23 +884,63 @@ class TestTheRetentionSweep:
             assert client.get(f"/v1/jobs/{kept}", headers=auth()).status_code == 200
 
 
-class LookupSpy(InMemoryJobStore):
-    """A memory store that records each job ID a route looks up."""
+class TestTheJobIdCheck:
+    """Each route that takes a job ID checks its shape before the lookup (#1686)."""
 
-    def __init__(self) -> None:
-        super().__init__()
-        self.looked_up: list[str] = []
+    #: A body that each POST route validates, so that a request reaches the
+    #: lookup. A route without an entry gets no body, and its 422 fails the test.
+    BODIES: ClassVar[dict[tuple[str, str], dict]] = {
+        ("POST", "/v1/jobs/{job_id}/answers"): {"links": [], "facts": []},
+        ("POST", "/v1/jobs/{job_id}/amendments"): {"text": "a CDN", "revision": 0},
+        ("POST", "/v1/jobs/{job_id}/corrections"): {"facts": [A_FACT_ANSWER]},
+    }
 
-    async def owned(self, job_id: str, owner_id: str) -> JobRecord | None:
-        self.looked_up.append(job_id)
-        return await super().owned(job_id, owner_id)
+    def test_each_route_answers_a_malformed_id_as_a_missing_job_before_the_store(
+        self,
+    ):
+        store = LookupSpy()
+        client, _ = make_client(store=store)
+        foreign = submit(client, "alice-token")
+        submit(client, "bob-token")
+        assert_each_route_checks_the_job_id(
+            client,
+            store,
+            parameter="job_id",
+            foreign=foreign,
+            bodies=self.BODIES,
+            headers=auth("bob-token"),
+        )
+
+    def test_answers_from_reads_a_malformed_id_as_a_missing_job_before_the_store(
+        self,
+    ):
+        store = LookupSpy()
+        client, _ = make_client(store=store)
+        foreign = submit(client, "alice-token")
+        submit(client, "bob-token")
+        assert_job_ids_read_as_missing(
+            lambda job: client.post(
+                "/v1/jobs",
+                json=submission(questions=True, answers_from=job),
+                headers=auth("bob-token"),
+            ),
+            store,
+            foreign=foreign,
+            label="answers_from",
+        )
+
+    def test_every_minted_id_has_the_shape_each_route_checks(self):
+        record = JobRecord.create(
+            owner_id="alice",
+            sources=[Source.description("an app")],
+            frameworks=sample_selection(),
+        )
+        assert JOB_ID_PATTERN.fullmatch(record.id)
 
 
 class TestDelete:
     """``DELETE /v1/jobs/{id}`` removes a terminal job and keeps its usage
     (ADR 0066)."""
-
-    MISSING = "job-" + "0" * 32
 
     def test_a_deleted_job_reads_as_missing_on_each_route(self):
         client, _ = make_client()
@@ -917,7 +962,7 @@ class TestDelete:
                 client.request(
                     method, f"/v1/jobs/{job}{path}", headers=auth(), json=body
                 )
-                for job in (job_id, self.MISSING)
+                for job in (job_id, MISSING_JOB)
             )
             assert deleted.status_code == 404, (method, path)
             assert deleted.json() == missing.json()
@@ -932,36 +977,15 @@ class TestDelete:
         assert response.headers["content-type"] == "application/problem+json"
         assert client.get(f"/v1/jobs/{record.id}", headers=auth()).status_code == 200
 
-    def test_a_foreign_job_a_missing_job_and_a_malformed_id_share_one_404(self):
+    def test_another_owner_cannot_delete_a_job(self):
         client, _ = make_client()
         job_id = submit(client, "alice-token")
         submit(client, "bob-token")
-        foreign, missing, malformed = (
-            client.delete(f"/v1/jobs/{job}", headers=auth("bob-token"))
-            for job in (job_id, self.MISSING, "job-missing")
+        assert (
+            client.delete(f"/v1/jobs/{job_id}", headers=auth("bob-token")).status_code
+            == 404
         )
-        assert foreign.status_code == 404
-        assert foreign.json() == missing.json() == malformed.json()
         assert client.get(f"/v1/jobs/{job_id}", headers=auth()).status_code == 200
-
-    @pytest.mark.parametrize(
-        "job_id", ["job-missing", "JOB-" + "0" * 32, "job-" + "A" * 32, MISSING + "0"]
-    )
-    def test_an_id_of_another_shape_reaches_no_lookup(self, job_id):
-        store = LookupSpy()
-        client, _ = make_client(store=store)
-        submit(client)
-        response = client.delete(f"/v1/jobs/{job_id}", headers=auth())
-        assert response.status_code == 404
-        assert store.looked_up == []
-
-    def test_every_minted_id_has_the_shape_the_route_checks(self):
-        record = JobRecord.create(
-            owner_id="alice",
-            sources=[Source.description("an app")],
-            frameworks=sample_selection(),
-        )
-        assert JOB_ID_PATTERN.fullmatch(record.id)
 
     def test_a_deleted_job_still_counts_toward_the_rate(self):
         one_a_window = BudgetPolicy(

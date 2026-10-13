@@ -330,8 +330,10 @@ class Workspace:
 
     async def owned(self, job_id: str) -> JobRecord | None:
         """The operator's job ``job_id``, as an envelope, or ``None``."""
-        owner_id = await self._owner_id()
-        return None if owner_id is None else await self.store.owned(job_id, owner_id)
+        try:
+            return await self.answers.owned(job_id, await self.owner_id(job_id))
+        except NoSuchJob:
+            return None
 
     async def jobs(self) -> list[JobRecord]:
         """Every job of the operator, as envelopes, oldest first."""

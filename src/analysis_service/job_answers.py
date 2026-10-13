@@ -53,6 +53,7 @@ from analysis_service.fact_answers import FactAnswer
 from analysis_service.fact_writes import LineageConflict
 from analysis_service.graph import Entry
 from analysis_service.jobs import (
+    JOB_ID_PATTERN,
     Admission,
     Checkpoint,
     JobRecord,
@@ -385,7 +386,15 @@ class JobAnswers:
             raise Withheld(result)
 
     async def owned(self, job_id: str, owner_id: str) -> JobRecord:
-        """The job the owner owns, without its heavy fields, or :class:`NoSuchJob`."""
+        """The job the owner owns, without its heavy fields, or :class:`NoSuchJob`.
+
+        **The one check of a requested job ID, and every route reads a job
+        through it.** An ID of another shape than
+        :data:`~analysis_service.jobs.JOB_ID_PATTERN` reads as missing, and the
+        store never sees it (#1528).
+        """
+        if not JOB_ID_PATTERN.fullmatch(job_id):
+            raise NoSuchJob(job_id)
         record = await self.store.owned(job_id, owner_id)
         if record is None:
             raise NoSuchJob(job_id)

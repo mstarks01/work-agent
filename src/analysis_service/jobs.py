@@ -76,8 +76,9 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-#: The shape of every job ID :meth:`JobRecord.create` mints. The delete route
-#: checks a requested ID against it before the lookup (#1528).
+#: The shape of every job ID :meth:`JobRecord.create` mints.
+#: :meth:`~analysis_service.job_answers.JobAnswers.owned` checks a requested ID
+#: against it before the lookup (#1528).
 JOB_ID_PATTERN = re.compile(r"job-[0-9a-f]{32}")
 
 JobStatus = Literal[

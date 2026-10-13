@@ -95,7 +95,6 @@ from analysis_service.job_answers import (
     Withheld,
 )
 from analysis_service.jobs import (
-    JOB_ID_PATTERN,
     TERMINAL_STATUSES,
     Admission,
     JobRecord,
@@ -1088,8 +1087,6 @@ def create_app(
         missing. ``409`` where the job is queued or running. A missing job,
         another owner's job and an ID of another shape share one ``404``.
         """
-        if not JOB_ID_PATTERN.fullmatch(job_id):
-            raise NoSuchJob(job_id)
         record = await _answers(request).owned(job_id, owner_id)
         if record.status not in TERMINAL_STATUSES:
             raise HTTPException(
