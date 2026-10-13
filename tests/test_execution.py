@@ -21,7 +21,6 @@ from analysis_service import graph
 from analysis_service.compact import COMPACT_FORMAT, FULL_FORMAT
 from analysis_service.execution import GraphExecutor, GraphFailed, GraphRun, _NodeFinish
 from analysis_service.frameworks.stride.record import STRIDE_CATEGORIES, DraftThreat
-from analysis_service.protocol_defaults import with_protocol_defaults
 from analysis_service.report import (
     InputRef,
     Job,
@@ -720,7 +719,7 @@ class TestTheRunCompletesItself:
         )
 
         assert report.execution.extraction_format == COMPACT_FORMAT
-        assert report.system_model == with_protocol_defaults(
+        assert report.system_model == graph.after_gate(
             normalize_element_ids(valid_model())
         )
 

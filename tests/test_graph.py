@@ -58,7 +58,6 @@ from analysis_service.frameworks.stride.record import (
 )
 from analysis_service.markdown_loader import MarkdownLoader
 from analysis_service.model_tiers import LLM_NODES
-from analysis_service.protocol_defaults import with_protocol_defaults
 from analysis_service.report import (
     InputRef,
     Job,
@@ -1239,9 +1238,7 @@ def test_validate_expands_a_compact_emission_before_the_gate():
 
     assert event.actions.route == graph.ROUTE_VALID
     assert ctx.state[graph.STATE_VALID_MODEL] == (
-        with_protocol_defaults(normalize_element_ids(valid_model())).model_dump(
-            mode="json"
-        )
+        graph.after_gate(normalize_element_ids(valid_model())).model_dump(mode="json")
     )
 
 

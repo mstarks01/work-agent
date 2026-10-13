@@ -33,7 +33,7 @@ from analysis_service.system_model import Assumption, DataFlow, SystemModel
 
 #: A protocol field that also names a plain sibling, or negates, states no
 #: inherent property: "HTTP and HTTPS" carries some traffic unencrypted.
-_PLAIN_OR_NEGATED = re.compile(
+PLAIN_OR_NEGATED = re.compile(
     r"(?<![\w-])(?:http(?!/3)|ftp|ldap|smtp|imap|pop3|mqtt|amqp|ws)(?![\w-])"
     r"|\b(?:no|not|without|plain|plaintext|unencrypted|disabled|optional)\b",
     re.IGNORECASE,
@@ -53,22 +53,27 @@ class ProtocolDefault:
     source: str
 
 
+#: The protocols that run over TLS, and the two that protect every packet
+#: with a TLS 1.3 handshake. Together they are the TLS family.
+TLS_NAMES = (
+    "https",
+    "tls",
+    "mtls",
+    "wss",
+    "ftps",
+    "ldaps",
+    "smtps",
+    "imaps",
+    "pop3s",
+    "mqtts",
+    "amqps",
+    "dtls",
+)
+QUIC_NAMES = ("quic", "http/3")
+
 PROTOCOL_DEFAULTS: tuple[ProtocolDefault, ...] = (
     ProtocolDefault(
-        names=(
-            "https",
-            "tls",
-            "mtls",
-            "wss",
-            "ftps",
-            "ldaps",
-            "smtps",
-            "imaps",
-            "pop3s",
-            "mqtts",
-            "amqps",
-            "dtls",
-        ),
+        names=TLS_NAMES,
         attribute="encryption_in_transit",
         value="TLS (intrinsic to the protocol)",
         basis="The protocol runs over TLS, which encrypts all application data;"
@@ -76,7 +81,7 @@ PROTOCOL_DEFAULTS: tuple[ProtocolDefault, ...] = (
         source="https://datatracker.ietf.org/doc/html/rfc8446",
     ),
     ProtocolDefault(
-        names=("quic", "http/3"),
+        names=QUIC_NAMES,
         attribute="encryption_in_transit",
         value="QUIC packet protection (TLS 1.3)",
         basis="QUIC protects every packet with keys from a TLS 1.3 handshake and"
@@ -134,7 +139,7 @@ PROTOCOL_DEFAULTS: tuple[ProtocolDefault, ...] = (
 )
 
 
-def _names_protocol(text: str, names: tuple[str, ...]) -> bool:
+def names_protocol(text: str, names: tuple[str, ...]) -> bool:
     """Whether ``text`` names one of ``names`` as whole words."""
     lowered = text.lower()
     return any(
@@ -142,12 +147,25 @@ def _names_protocol(text: str, names: tuple[str, ...]) -> bool:
     )
 
 
+def stated_protocol_flows(model: SystemModel) -> Iterator[DataFlow]:
+    """The flows whose protocol the sources state, not one the model assumed.
+
+    **The one reader of whether a flow's protocol counts.**
+    """
+    inferred = {a.element_id for a in model.assumptions if a.attribute == "protocol"}
+    return (flow for flow in model.data_flows if flow.id not in inferred)
+
+
+def states_inherently(flow: DataFlow, names: tuple[str, ...]) -> bool:
+    """Whether ``flow`` names one of ``names`` and no plain sibling or negation."""
+    plain = PLAIN_OR_NEGATED.search(flow.protocol)
+    return not plain and names_protocol(flow.protocol, names)
+
+
 def _flows(model: SystemModel, default: ProtocolDefault) -> Iterator[DataFlow]:
     """The flows whose own stated protocol is this row's protocol."""
-    inferred = {a.element_id for a in model.assumptions if a.attribute == "protocol"}
-    for flow in model.data_flows:
-        stated = flow.id not in inferred and not _PLAIN_OR_NEGATED.search(flow.protocol)
-        if stated and _names_protocol(flow.protocol, default.names):
+    for flow in stated_protocol_flows(model):
+        if states_inherently(flow, default.names):
             yield flow
 
 
