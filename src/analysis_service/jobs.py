@@ -8,11 +8,12 @@ response and the SSE stream. It also holds two open seams:
 
 * :class:`JobStore`. The API only ever talks to this interface. A deployment
   selects a backend with ``ANALYSIS_JOB_STORE``, and :func:`build_store`
-  constructs it, so a durable or shared backend is one registry entry.
-  :class:`InMemoryJobStore` is the ``memory`` backend, which is the only one
-  registered, and is non-durable and per-instance. There is no default:
-  :func:`build_store` fails closed rather than choosing one for a deployment
-  that did not.
+  constructs it from its row of :data:`JOB_STORES`. :class:`InMemoryJobStore`
+  is the ``memory`` backend, which is non-durable and per-instance. The
+  ``sql`` backend, :class:`analysis_service.sql_store.SqlJobStore`, keeps
+  jobs in a database and their sources and reports in an object store, so
+  they live through a restart. There is no default: :func:`build_store` fails
+  closed rather than choosing one for a deployment that did not.
 * :class:`PipelineRunner`. The API runs jobs through this interface, and never
   against a graph directly.
   :class:`analysis_service.pipeline.AdkPipelineRunner` is the implementation,
@@ -34,6 +35,7 @@ from collections.abc import (
     AsyncIterator,
     Awaitable,
     Callable,
+    Iterable,
     Iterator,
     Mapping,
     Sequence,
@@ -41,7 +43,7 @@ from collections.abc import (
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from itertools import chain
-from typing import Any, Literal, Protocol, Self, TypeGuard
+from typing import TYPE_CHECKING, Any, Literal, Protocol, Self, TypeGuard, TypeVar
 from uuid import uuid4
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_validator
@@ -67,6 +69,9 @@ from analysis_service.report import (
 from analysis_service.sources import Source
 from analysis_service.system_model import Process, SystemModel, TrustBoundary
 from analysis_service.validation import ValidationIssue
+
+if TYPE_CHECKING:
+    from analysis_service.objects import ObjectStore
 
 logger = logging.getLogger(__name__)
 
@@ -578,7 +583,14 @@ class JobStore(Protocol):
     hold a principal. A read creates none: :meth:`principal` finds nothing for
     an unknown identity, and every read by an owner ID that owns nothing
     answers as for a missing job.
+
+    **The app calls :meth:`startup_check` before the restart scan.** A store
+    checks there what it needs to serve, such as its schema revision and its
+    object store, and raises where it cannot serve, so the app stops before
+    it takes a request.
     """
+
+    async def startup_check(self) -> None: ...
 
     async def reserve(
         self,
@@ -671,6 +683,67 @@ def _parent_id(row: JobRecord | UsageRow) -> str | None:
     return parent_of(row) if isinstance(row, JobRecord) else row.parent_id
 
 
+def check_bounds(
+    record: JobRecord,
+    held: Iterable[JobRecord | UsageRow],
+    *,
+    ceiling: int,
+    budget: BudgetPolicy,
+) -> Admission:
+    """Check ``record`` against the four admission bounds, over the jobs ``held``.
+
+    **The one reader of the bounds.** Each store calls it inside its own
+    atomic step, after it settles the duplicate, the principal and the
+    parent, and inserts the record only where this admits it. ``held`` is
+    every job the store counts: its records and its usage rows. A store can
+    leave out a terminal job that started before the window, because no bound
+    counts it.
+
+    **The bounds run cheapest-first, and the order is the answer a caller
+    gets.** A submission over several of them hears about the concurrency
+    ceiling before the rate, and the rate before either budget, because that
+    is the order in which they clear: a job of theirs finishing, then the
+    window rolling, then the window rolling further. Telling a caller about
+    the bound that clears soonest is the one that helps them.
+    """
+    since = budget.window_start()
+    held = list(held)
+    mine = [job for job in held if job.owner_id == record.owner_id]
+
+    active = sum(1 for job in mine if job.status not in TERMINAL_STATUSES)
+    if active >= ceiling:
+        return Admission(outcome="at_ceiling", active=active)
+
+    started = sum(1 for job in mine if job.created_at >= since)
+    if started >= budget.max_jobs_per_window:
+        return Admission(outcome="over_rate", active=active)
+
+    owner_tokens = spent_tokens(
+        (job.reserved_tokens, job.measured_tokens)
+        for job in mine
+        if job.created_at >= since
+    )
+    if owner_tokens + record.reserved_tokens > budget.max_tokens_per_window:
+        return Admission(
+            outcome="over_owner_budget", active=active, owner_tokens=owner_tokens
+        )
+
+    global_tokens = spent_tokens(
+        (job.reserved_tokens, job.measured_tokens)
+        for job in held
+        if job.created_at >= since
+    )
+    outcome: AdmissionOutcome = "admitted"
+    if global_tokens + record.reserved_tokens > budget.global_max_tokens_per_window:
+        outcome = "over_global_budget"
+    return Admission(
+        outcome=outcome,
+        active=active,
+        owner_tokens=owner_tokens,
+        global_tokens=global_tokens,
+    )
+
+
 class InMemoryJobStore:
     """Dict-backed store; hands out copies so callers must ``save`` mutations.
 
@@ -686,6 +759,9 @@ class InMemoryJobStore:
     def _rows(self) -> Iterator[JobRecord | UsageRow]:
         """Every job admission counts: the records held, and the usage rows left."""
         return chain(self._records.values(), self._usage.values())
+
+    async def startup_check(self) -> None:
+        """Nothing to check: this store needs no schema and no object store."""
 
     async def reserve(
         self,
@@ -719,13 +795,7 @@ class InMemoryJobStore:
 
         A record whose owner ID is not ``principal``'s, or whose owner holds no
         principal where none is given, is the caller's defect, and it raises.
-
-        **The bounds run cheapest-first, and the order is the answer a caller
-        gets.** A submission over several of them hears about the concurrency
-        ceiling before the rate, and the rate before either budget, because that
-        is the order in which they clear: a job of theirs finishing, then the
-        window rolling, then the window rolling further. Telling a caller about
-        the bound that clears soonest is the one that helps them.
+        :func:`check_bounds` then checks the bounds.
         """
         if record.id in self._records:
             return Admission(outcome="duplicate", active=0)
@@ -746,52 +816,12 @@ class InMemoryJobStore:
         ):
             return Admission(outcome="parent_moved", active=0)
 
-        owner_id = record.owner_id
-        since = budget.window_start()
-        mine = [held for held in self._rows() if held.owner_id == owner_id]
-
-        active = sum(1 for held in mine if held.status not in TERMINAL_STATUSES)
-        if active >= ceiling:
-            return Admission(outcome="at_ceiling", active=active)
-
-        started = sum(1 for held in mine if held.created_at >= since)
-        if started >= budget.max_jobs_per_window:
-            return Admission(outcome="over_rate", active=active)
-
-        owner_tokens = spent_tokens(
-            (held.reserved_tokens, held.measured_tokens)
-            for held in mine
-            if held.created_at >= since
-        )
-        if owner_tokens + record.reserved_tokens > budget.max_tokens_per_window:
-            return Admission(
-                outcome="over_owner_budget",
-                active=active,
-                owner_tokens=owner_tokens,
-            )
-
-        global_tokens = spent_tokens(
-            (held.reserved_tokens, held.measured_tokens)
-            for held in self._rows()
-            if held.created_at >= since
-        )
-        if global_tokens + record.reserved_tokens > budget.global_max_tokens_per_window:
-            return Admission(
-                outcome="over_global_budget",
-                active=active,
-                owner_tokens=owner_tokens,
-                global_tokens=global_tokens,
-            )
-
-        if principal is not None:
-            self._principals.add(principal)
-        self._records[record.id] = record.model_copy(deep=True)
-        return Admission(
-            outcome="admitted",
-            active=active,
-            owner_tokens=owner_tokens,
-            global_tokens=global_tokens,
-        )
+        admission = check_bounds(record, self._rows(), ceiling=ceiling, budget=budget)
+        if admission.outcome == "admitted":
+            if principal is not None:
+                self._principals.add(principal)
+            self._records[record.id] = record.model_copy(deep=True)
+        return admission
 
     def _resumed_by(self, parent_id: str) -> str | None:
         """The resumed job of ``parent_id`` that locks it, if any.
@@ -1111,13 +1141,71 @@ async def event_frames(
 
 
 class JobStoreConfigError(ValueError):
-    """The job-store configuration is missing or unusable."""
+    """A job store setting or an object store setting is missing or unusable."""
 
 
-JobStoreFactory = Callable[[Mapping[str, str]], JobStore]
+Name = TypeVar("Name", bound=str)
 
-_FACTORIES: dict[str, JobStoreFactory] = {
-    "memory": lambda env: InMemoryJobStore(),
+
+def backend_name(value: str, setting: str, table: Mapping[Name, object]) -> Name:
+    """The row of ``table`` that ``value`` names. An empty or unknown value raises.
+
+    **The one reader of a backend value**: the job store, the object store and
+    the database all read theirs here. ``setting`` names where the value comes
+    from, for the message. The value is never read from a request.
+    """
+    value = value.strip().lower()
+    if not value:
+        raise JobStoreConfigError(f"set {setting}")
+    for name in table:
+        if name == value:
+            return name
+    known = ", ".join(sorted(table))
+    raise JobStoreConfigError(
+        f"unknown value {value!r} for {setting}; known values: {known}"
+    )
+
+
+JobStoreName = Literal["memory", "sql"]
+
+
+@dataclass(frozen=True)
+class JobStoreBackend:
+    """One ``ANALYSIS_JOB_STORE`` value: a row of :data:`JOB_STORES`.
+
+    No field has a default, so a new row states every fact.
+    """
+
+    #: Builds the store from the environment and the object store, which is
+    #: ``None`` where :attr:`objects` is False.
+    build: Callable[[Mapping[str, str], ObjectStore | None], JobStore]
+    #: Whether the store keeps sources and reports in an object store. Where
+    #: True, ``ANALYSIS_OBJECT_STORE`` is required; where False, it is refused,
+    #: so a half-durable configuration cannot start.
+    objects: bool
+
+
+def _sql_store(env: Mapping[str, str], objects: ObjectStore | None) -> JobStore:
+    """The ``sql`` store, from the ``sql`` extra (ADR 0023)."""
+    try:
+        from analysis_service.sql_store import SqlJobStore
+    except ModuleNotFoundError as missing:
+        raise JobStoreConfigError(
+            f"the sql job store needs the sql extra ({missing.name} is not installed):"
+            " install analysis-service[sql]"
+        ) from None
+    if objects is None:
+        raise JobStoreConfigError("the sql job store needs an object store")
+    return SqlJobStore.from_env(env, objects)
+
+
+#: Each job store a deployment can select. The table answers for every name of
+#: :data:`JobStoreName`.
+JOB_STORES: dict[JobStoreName, JobStoreBackend] = {
+    "memory": JobStoreBackend(
+        build=lambda env, objects: InMemoryJobStore(), objects=False
+    ),
+    "sql": JobStoreBackend(build=_sql_store, objects=True),
 }
 
 
@@ -1127,20 +1215,22 @@ def build_store(env: Mapping[str, str] = os.environ) -> JobStore:
     The backend is chosen by ``ANALYSIS_JOB_STORE`` at deploy time — never by the
     request — so an empty or unknown value raises rather than silently falling
     back to non-durable, per-instance ``memory`` storage that loses every job on
-    restart and isolates jobs behind a load balancer. Durable or shared storage
-    is a new registry entry implementing the :class:`JobStore` protocol.
+    restart and isolates jobs behind a load balancer. The object store follows
+    the row: ``ANALYSIS_OBJECT_STORE`` is required where the row keeps objects
+    and refused where it does not. This builds the store and opens no
+    connection; :meth:`JobStore.startup_check` checks what the store reaches.
     """
-    name = env.get("ANALYSIS_JOB_STORE", "").strip().lower()
-    if not name:
-        raise JobStoreConfigError("set ANALYSIS_JOB_STORE")
-    try:
-        factory = _FACTORIES[name]
-    except KeyError:
-        known = ", ".join(sorted(_FACTORIES))
+    value = env.get("ANALYSIS_JOB_STORE", "")
+    backend = JOB_STORES[backend_name(value, "ANALYSIS_JOB_STORE", JOB_STORES)]
+    if backend.objects:
+        from analysis_service.objects import build_object_store
+
+        return backend.build(env, build_object_store(env))
+    if env.get("ANALYSIS_OBJECT_STORE", "").strip():
         raise JobStoreConfigError(
-            f"unknown job store {name!r}; known stores: {known}"
-        ) from None
-    return factory(env)
+            "this job store keeps no objects; unset ANALYSIS_OBJECT_STORE"
+        )
+    return backend.build(env, None)
 
 
 @dataclass(frozen=True)

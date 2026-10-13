@@ -1,0 +1,911 @@
+"""The ``sql`` job store: jobs in a database, sources and reports in an object store.
+
+ADR 0065 sets the split. A job row holds the record's fields, each JSON part as
+text and never as ``jsonb``, so one column type serves every database and the
+round trip gives the same bytes. The events are rows of their own. The
+sources and the report are objects under :func:`~analysis_service.objects.object_key`,
+and the row holds the SHA-256 of each one.
+
+The rules this module keeps:
+
+* **The object first, the row second.** A reader never finds a row that names
+  a missing object. Where admission refuses a job, the objects written for it
+  go at once.
+* **The owner on the row before any object.** Each read selects the row by
+  job ID and owner ID, and builds each key from that row alone.
+* **A digest check on each object read.** A missing object, or one whose
+  digest does not match its row, raises :class:`CorruptObject` after one log
+  line with the job ID and the owner ID, and the API answers ``500`` with no
+  detail.
+* **The service writes a report once.** A save never writes a second report
+  over the one a row names.
+* **One code path for each database.** SQLAlchemy 2.0 async Core, with the
+  facts that differ in a row of :data:`DATABASES` (#1525). On SQLite each
+  write transaction opens with ``BEGIN IMMEDIATE``, which is the global lock
+  admission takes, and serialises every other write with it.
+* **The service never migrates.** An operator runs
+  ``python -m analysis_service.migrations`` as a deploy step, and
+  :meth:`SqlJobStore.startup_check` refuses a schema that is not at the latest
+  revision.
+"""
+
+from __future__ import annotations
+
+import hashlib
+import hmac
+import json
+import logging
+from collections.abc import AsyncIterator, Callable, Mapping, Sequence
+from contextlib import asynccontextmanager
+from dataclasses import dataclass
+from datetime import UTC, datetime
+from typing import Any, Literal
+
+from alembic.migration import MigrationContext
+from pydantic import TypeAdapter
+from sqlalchemy import (
+    BigInteger,
+    Boolean,
+    Column,
+    CompoundSelect,
+    Connection,
+    DateTime,
+    Dialect,
+    ForeignKey,
+    Integer,
+    MetaData,
+    Row,
+    Select,
+    String,
+    Table,
+    Text,
+    UniqueConstraint,
+    delete,
+    event,
+    func,
+    insert,
+    or_,
+    select,
+    union_all,
+    update,
+)
+from sqlalchemy.engine import URL, make_url
+from sqlalchemy.exc import ArgumentError
+from sqlalchemy.ext.asyncio import AsyncConnection, AsyncEngine, create_async_engine
+from sqlalchemy.pool import NullPool, Pool
+from sqlalchemy.types import TypeDecorator
+from typing_extensions import override
+
+from analysis_service import migrations
+from analysis_service.answer_sets import AnswerSet
+from analysis_service.budgets import BudgetPolicy
+from analysis_service.claims import UnknownKey
+from analysis_service.fact_answers import FactAnswer, SkipKey
+from analysis_service.jobs import (
+    RESTART_FAILURE_MESSAGE,
+    TERMINAL_STATUSES,
+    Admission,
+    Checkpoint,
+    JobEvent,
+    JobRecord,
+    JobStatus,
+    JobStoreConfigError,
+    Resumption,
+    UsageRow,
+    backend_name,
+    check_bounds,
+    is_follow_up,
+    locks_its_parent,
+    parent_of,
+)
+from analysis_service.objects import ObjectName, ObjectStore, object_key
+from analysis_service.principals import Identity, Principal
+from analysis_service.report import Report
+from analysis_service.sources import Source
+
+logger = logging.getLogger(__name__)
+
+
+class CorruptObject(RuntimeError):
+    """An object that a row names is missing, or its digest does not match."""
+
+
+class _UtcTime(TypeDecorator[datetime]):
+    """A time, stored and read in UTC. SQLite keeps no zone, so the store keeps one."""
+
+    impl = DateTime(timezone=True)
+    cache_ok = True
+
+    @override
+    def process_bind_param(
+        self, value: datetime | None, dialect: Dialect
+    ) -> datetime | None:
+        return None if value is None else value.astimezone(UTC)
+
+    @override
+    def process_result_value(
+        self, value: datetime | None, dialect: Dialect
+    ) -> datetime | None:
+        if value is None or value.tzinfo is not None:
+            return value
+        return value.replace(tzinfo=UTC)
+
+
+class _Json(TypeDecorator[str]):
+    """A JSON part of a job row, as text and never as ``jsonb`` (ADR 0065)."""
+
+    impl = Text
+    cache_ok = True
+
+
+METADATA = MetaData()
+
+#: The ``principals`` table (ADR 0064): one row for each pair of issuer and
+#: ``sub``, and nothing more.
+principals = Table(
+    "principals",
+    METADATA,
+    Column("owner_id", String(64), primary_key=True),
+    Column("issuer", Text, nullable=False),
+    Column("sub", Text, nullable=False),
+    Column("created_at", _UtcTime, nullable=False),
+    UniqueConstraint("issuer", "sub"),
+)
+
+#: The ``jobs`` table: a column for each field of a :class:`JobRecord` but the
+#: two objects and the events.
+jobs = Table(
+    "jobs",
+    METADATA,
+    Column("id", String(64), primary_key=True),
+    Column(
+        "owner_id",
+        String(64),
+        ForeignKey("principals.owner_id"),
+        nullable=False,
+        index=True,
+    ),
+    # What parent_of reads off the record, so admission finds the children of
+    # a job with no read inside the JSON.
+    Column("parent_id", String(64), index=True),
+    Column("schema_version", Text, nullable=False),
+    Column("status", String(32), nullable=False),
+    Column("created_at", _UtcTime, nullable=False, index=True),
+    Column("updated_at", _UtcTime, nullable=False),
+    Column("reserved_tokens", BigInteger, nullable=False),
+    Column("measured_tokens", BigInteger),
+    Column("round_revision", Integer, nullable=False),
+    Column("parent_revision", Integer),
+    Column("system_name", Text),
+    Column("amends", String(64)),
+    Column("error", Text),
+    Column("ask_questions", Boolean, nullable=False),
+    Column("frameworks", _Json, nullable=False),
+    Column("answers", _Json, nullable=False),
+    Column("shown_early", _Json, nullable=False),
+    Column("corrections", _Json, nullable=False),
+    Column("draft", _Json, nullable=False),
+    Column("skipped_early", _Json, nullable=False),
+    Column("resumption", _Json, nullable=False),
+    Column("carried", _Json, nullable=False),
+    Column("checkpoint", _Json, nullable=False),
+    Column("validation_issues", _Json, nullable=False),
+    Column("certification", _Json, nullable=False),
+    Column("unreported_nodes", _Json, nullable=False),
+    Column("sources_sha256", String(64), nullable=False),
+    Column("report_sha256", String(64)),
+)
+
+#: The ``job_events`` table: one row for each event, keyed by the job and the
+#: event's sequence number.
+job_events = Table(
+    "job_events",
+    METADATA,
+    Column("job_id", String(64), ForeignKey("jobs.id"), primary_key=True),
+    Column("seq", Integer, primary_key=True),
+    Column("event", _Json, nullable=False),
+)
+
+#: The usage rows (ADR 0066): what admission still reads of a deleted job.
+usage_rows = Table(
+    "usage_rows",
+    METADATA,
+    Column("job_id", String(64), primary_key=True),
+    Column(
+        "owner_id",
+        String(64),
+        ForeignKey("principals.owner_id"),
+        nullable=False,
+        index=True,
+    ),
+    Column("created_at", _UtcTime, nullable=False, index=True),
+    Column("reserved_tokens", BigInteger, nullable=False),
+    Column("measured_tokens", BigInteger),
+    Column("status", String(32), nullable=False),
+    Column("parent_id", String(64), index=True),
+)
+
+#: The fields of a record that are objects or event rows, not job columns.
+_OUTSIDE_THE_ROW = frozenset({"sources", "report", "events"})
+#: The fields a job row holds as JSON text.
+_JSON_FIELDS = frozenset(
+    column.name for column in jobs.columns if isinstance(column.type, _Json)
+)
+#: How each JSON field is checked and written: as :class:`JobRecord` holds it.
+_ADAPTERS: dict[str, TypeAdapter[Any]] = {
+    name: TypeAdapter(JobRecord.model_fields[name].rebuild_annotation())
+    for name in _JSON_FIELDS
+}
+_SOURCES: TypeAdapter[list[Source]] = TypeAdapter(list[Source])
+
+
+def _json(name: str, value: object) -> str:
+    """``value`` as the JSON part ``name`` of a job row, checked as the record checks it."""
+    adapter = _ADAPTERS[name]
+    return adapter.dump_json(adapter.validate_python(value)).decode()
+
+
+def _job_row(record: JobRecord) -> dict[str, Any]:
+    """The columns of ``record``'s job row, without the object digests.
+
+    Every field but the objects and the events, so a field with no column
+    fails the write rather than vanishing from it.
+    """
+    row = {
+        name: _json(name, value) if name in _JSON_FIELDS else value
+        for name, value in record
+        if name not in _OUTSIDE_THE_ROW
+    }
+    row["parent_id"] = parent_of(record)
+    return row
+
+
+def _record(
+    row: Row[Any],
+    sources: bytes,
+    report: bytes | None,
+    events: Sequence[str],
+    *,
+    whole: bool,
+) -> JobRecord:
+    """The record a row and its objects hold. An envelope, where not ``whole``,
+    leaves the report, the checkpoint and the resumption behind."""
+    data = {
+        name: json.loads(row._mapping[name])
+        if name in _JSON_FIELDS
+        else row._mapping[name]
+        for name in JobRecord.model_fields
+        if name not in _OUTSIDE_THE_ROW
+    }
+    if not whole:
+        data |= {"checkpoint": None, "resumption": None}
+    data["sources"] = json.loads(sources)
+    data["report"] = None if report is None else json.loads(report)
+    data["events"] = [json.loads(text) for text in events]
+    return JobRecord.model_validate(data)
+
+
+def _digest(data: bytes) -> str:
+    return hashlib.sha256(data).hexdigest()
+
+
+def _event_rows(job_id: str, events: Sequence[JobEvent]) -> list[dict[str, Any]]:
+    return [
+        {"job_id": job_id, "seq": event.seq, "event": event.model_dump_json()}
+        for event in events
+    ]
+
+
+#: The execution option that marks a write transaction.
+_WRITES = "analysis_writes"
+
+
+def _prepare_sqlite(engine: AsyncEngine) -> None:
+    """Open each SQLite write transaction with ``BEGIN IMMEDIATE``.
+
+    The driver's own ``BEGIN`` is off, so the store states each one. A write
+    transaction takes the database's write lock when it begins, which makes
+    it the global lock of admission, and a write never starts as a read
+    that SQLite then refuses to upgrade. Foreign keys are on for each
+    connection, because SQLite leaves them off.
+    """
+
+    @event.listens_for(engine.sync_engine, "connect")
+    def _connect(dbapi_connection: Any, _record: Any) -> None:
+        dbapi_connection.isolation_level = None
+        cursor = dbapi_connection.cursor()
+        cursor.execute("PRAGMA foreign_keys = ON")
+        cursor.close()
+
+    @event.listens_for(engine.sync_engine, "begin")
+    def _begin(connection: Connection) -> None:
+        writes = connection.get_execution_options().get(_WRITES, False)
+        connection.exec_driver_sql("BEGIN IMMEDIATE" if writes else "BEGIN")
+
+
+@dataclass(frozen=True)
+class Database:
+    """One database the ``sql`` store runs on: a row of :data:`DATABASES`.
+
+    No field has a default, so a new row states every fact.
+    """
+
+    #: The connection pool.
+    pool: type[Pool]
+    #: What the store sets on a new engine before its first connection.
+    prepare: Callable[[AsyncEngine], None]
+
+
+DatabaseDriver = Literal["sqlite+aiosqlite"]
+
+#: Each database a deployment can name in ``ANALYSIS_DATABASE_URL``, keyed by
+#: the URL's driver name. The table answers for every name of
+#: :data:`DatabaseDriver`.
+DATABASES: dict[DatabaseDriver, Database] = {
+    # A connection opens a file, so a pool saves little, and a connection
+    # that no pool keeps belongs to no event loop.
+    "sqlite+aiosqlite": Database(pool=NullPool, prepare=_prepare_sqlite),
+}
+
+
+def database_url(env: Mapping[str, str]) -> URL:
+    """``ANALYSIS_DATABASE_URL``, checked; fail closed.
+
+    A URL that holds a password stops the startup, so a password never sits
+    in an environment variable. No message repeats the URL.
+    """
+    value = env.get("ANALYSIS_DATABASE_URL", "").strip()
+    if not value:
+        raise JobStoreConfigError("set ANALYSIS_DATABASE_URL for the sql job store")
+    try:
+        url = make_url(value)
+    except ArgumentError:
+        raise JobStoreConfigError(
+            "ANALYSIS_DATABASE_URL is not a database URL"
+        ) from None
+    if url.password is not None or any("password" in key.lower() for key in url.query):
+        raise JobStoreConfigError(
+            "ANALYSIS_DATABASE_URL holds a password; remove it from the URL"
+        )
+    backend_name(url.drivername, "the driver of ANALYSIS_DATABASE_URL", DATABASES)
+    return url
+
+
+def engine_for(url: URL) -> AsyncEngine:
+    """The engine for ``url``, with its database's facts. It opens no connection."""
+    database = DATABASES[
+        backend_name(url.drivername, "the driver of ANALYSIS_DATABASE_URL", DATABASES)
+    ]
+    engine = create_async_engine(url, poolclass=database.pool)
+    database.prepare(engine)
+    return engine
+
+
+def _revision(connection: Connection) -> str | None:
+    return MigrationContext.configure(connection).get_current_revision()
+
+
+def _children(parent_id: str) -> CompoundSelect:
+    """Every job that names ``parent_id`` as its parent, with its status."""
+    return union_all(
+        select(jobs.c.id, jobs.c.status).where(jobs.c.parent_id == parent_id),
+        select(usage_rows.c.job_id, usage_rows.c.status).where(
+            usage_rows.c.parent_id == parent_id
+        ),
+    )
+
+
+def _counted(since: datetime) -> CompoundSelect:
+    """The admission view of each job a bound can count: those in flight, and
+    those that started inside the window."""
+    columns = ("owner_id", "created_at", "reserved_tokens", "measured_tokens")
+
+    def view(table: Table, job_id: Column[Any]) -> Select[Any]:
+        return select(
+            job_id.label("job_id"),
+            *(table.c[name] for name in columns),
+            table.c.status,
+            table.c.parent_id,
+        ).where(
+            or_(
+                table.c.created_at >= since,
+                table.c.status.not_in(sorted(TERMINAL_STATUSES)),
+            )
+        )
+
+    return union_all(view(jobs, jobs.c.id), view(usage_rows, usage_rows.c.job_id))
+
+
+class SqlJobStore:
+    """:class:`~analysis_service.jobs.JobStore` on a database and an object store."""
+
+    def __init__(self, engine: AsyncEngine, objects: ObjectStore) -> None:
+        self._engine = engine
+        self._objects = objects
+
+    @classmethod
+    def from_env(cls, env: Mapping[str, str], objects: ObjectStore) -> SqlJobStore:
+        return cls(engine_for(database_url(env)), objects)
+
+    @asynccontextmanager
+    async def _transaction(
+        self, *, writes: bool = False
+    ) -> AsyncIterator[AsyncConnection]:
+        async with self._engine.connect() as connection:
+            if writes:
+                await connection.execution_options(**{_WRITES: True})
+            async with connection.begin():
+                yield connection
+
+    async def startup_check(self) -> None:
+        """Refuse a schema that is not at the latest revision, then check the
+        object store. The service never migrates."""
+        async with self._transaction() as connection:
+            current = await connection.run_sync(_revision)
+        head = migrations.head()
+        if current != head:
+            raise JobStoreConfigError(
+                f"the database schema is at revision {current}, and this service"
+                f" needs {head}: run python -m analysis_service.migrations first"
+            )
+        await self._objects.check()
+
+    async def _object(self, row: Row[Any], name: ObjectName, digest: str) -> bytes:
+        """The object ``name`` of the job ``row`` names, checked against ``digest``."""
+        data = await self._objects.get(object_key(row.owner_id, row.id, name))
+        if data is None or not hmac.compare_digest(_digest(data), digest):
+            logger.error(
+                "job %s of owner %s: its %s object is missing or fails its digest"
+                " check",
+                row.id,
+                row.owner_id,
+                name,
+            )
+            raise CorruptObject(row.id)
+        return data
+
+    async def _lock(self, connection: AsyncConnection, job_id: str) -> None:
+        """Lock the row of ``job_id`` for this transaction. On SQLite the
+        transaction's write lock already holds it."""
+        await connection.execute(
+            select(jobs.c.id).where(jobs.c.id == job_id).with_for_update()
+        )
+
+    async def _resumed_by(
+        self, connection: AsyncConnection, parent_id: str
+    ) -> str | None:
+        """The child of ``parent_id`` that locks it, by :func:`locks_its_parent`."""
+        children = await connection.execute(_children(parent_id))
+        return next(
+            (child for child, status in children if locks_its_parent(status)), None
+        )
+
+    async def reserve(
+        self,
+        record: JobRecord,
+        *,
+        ceiling: int,
+        budget: BudgetPolicy,
+        principal: Principal | None = None,
+    ) -> Admission:
+        """Check every admission bound and insert, in one write transaction.
+
+        The objects go first, so the row never names a missing one, and they
+        go again at once where admission refuses the job or raises.
+        """
+        if principal is not None and principal.owner_id != record.owner_id:
+            raise ValueError(f"job {record.id} names another owner than its principal")
+        async with self._transaction() as connection:
+            held = await connection.scalar(
+                select(jobs.c.id).where(jobs.c.id == record.id)
+            )
+        if held is not None:
+            return Admission(outcome="duplicate", active=0)
+        objects: dict[ObjectName, bytes] = {
+            "sources.json": _SOURCES.dump_json(record.sources)
+        }
+        if record.report is not None:
+            objects["report.json"] = record.report.model_dump_json().encode()
+        keys = []
+        try:
+            for name, data in objects.items():
+                key = object_key(record.owner_id, record.id, name)
+                await self._objects.put(key, data)
+                keys.append(key)
+            admission = await self._admit(
+                record,
+                ceiling=ceiling,
+                budget=budget,
+                principal=principal,
+                digests={name: _digest(data) for name, data in objects.items()},
+            )
+        except BaseException:
+            await self._remove(keys)
+            raise
+        if admission.outcome != "admitted":
+            await self._remove(keys)
+        return admission
+
+    async def _remove(self, keys: Sequence[str]) -> int:
+        """Delete the objects under ``keys``. How many there were."""
+        return sum([await self._objects.delete(key) for key in keys])
+
+    async def _admit(
+        self,
+        record: JobRecord,
+        *,
+        ceiling: int,
+        budget: BudgetPolicy,
+        principal: Principal | None,
+        digests: Mapping[ObjectName, str],
+    ) -> Admission:
+        async with self._transaction(writes=True) as connection:
+            if await connection.scalar(select(jobs.c.id).where(jobs.c.id == record.id)):
+                return Admission(outcome="duplicate", active=0)
+            if principal is None:
+                owner = select(principals.c.owner_id).where(
+                    principals.c.owner_id == record.owner_id
+                )
+                if await connection.scalar(owner) is None:
+                    raise ValueError(f"owner {record.owner_id} holds no principal")
+            elif await self._principal(connection, principal.identity) is not None:
+                return Admission(outcome="principal_exists", active=0)
+            parent = parent_of(record)
+            if parent is not None:
+                await self._lock(connection, parent)
+                if await self._resumed_by(connection, parent) is not None:
+                    return Admission(outcome="resumed_already", active=0)
+                revision = await connection.scalar(
+                    select(jobs.c.round_revision).where(jobs.c.id == parent)
+                )
+                if revision is not None and revision != record.parent_revision:
+                    return Admission(outcome="parent_moved", active=0)
+            counted = await connection.execute(_counted(budget.window_start()))
+            held = [UsageRow(**row._mapping) for row in counted]
+            admission = check_bounds(record, held, ceiling=ceiling, budget=budget)
+            if admission.outcome != "admitted":
+                return admission
+            if principal is not None:
+                await connection.execute(
+                    insert(principals).values(
+                        owner_id=principal.owner_id,
+                        issuer=principal.issuer,
+                        sub=principal.sub,
+                        created_at=principal.created_at,
+                    )
+                )
+            await connection.execute(
+                insert(jobs).values(
+                    {
+                        **_job_row(record),
+                        "sources_sha256": digests["sources.json"],
+                        "report_sha256": digests.get("report.json"),
+                    }
+                )
+            )
+            await connection.execute(
+                insert(job_events), _event_rows(record.id, record.events)
+            )
+        return admission
+
+    async def _principal(
+        self, connection: AsyncConnection, identity: Identity
+    ) -> Principal | None:
+        found = await connection.execute(
+            select(principals).where(
+                principals.c.issuer == identity.issuer,
+                principals.c.sub == identity.sub,
+            )
+        )
+        row = found.one_or_none()
+        return None if row is None else Principal(**row._mapping)
+
+    async def principal(self, identity: Identity) -> Principal | None:
+        """The principal of ``identity``, or ``None``. Creates nothing."""
+        async with self._transaction() as connection:
+            return await self._principal(connection, identity)
+
+    async def _load(self, query: Select[Any], *, whole: bool) -> JobRecord | None:
+        async with self._transaction() as connection:
+            row = (await connection.execute(query)).one_or_none()
+            if row is None:
+                return None
+            events = await connection.scalars(
+                select(job_events.c.event)
+                .where(job_events.c.job_id == row.id)
+                .order_by(job_events.c.seq)
+            )
+            texts = events.all()
+        sources = await self._object(row, "sources.json", row.sources_sha256)
+        report = None
+        if whole and row.report_sha256 is not None:
+            report = await self._object(row, "report.json", row.report_sha256)
+        return _record(row, sources, report, texts, whole=whole)
+
+    async def get(self, job_id: str) -> JobRecord | None:
+        return await self._load(select(jobs).where(jobs.c.id == job_id), whole=True)
+
+    async def owned(self, job_id: str, owner_id: str) -> JobRecord | None:
+        """The record ``owner_id`` owns, as an envelope, or ``None``.
+
+        The owner is checked on the row, before any object is read.
+        """
+        query = select(jobs).where(jobs.c.id == job_id, jobs.c.owner_id == owner_id)
+        return await self._load(query, whole=False)
+
+    async def _report(self, job_id: str, owner_id: str) -> bytes | None:
+        async with self._transaction() as connection:
+            found = await connection.execute(
+                select(jobs.c.id, jobs.c.owner_id, jobs.c.report_sha256).where(
+                    jobs.c.id == job_id, jobs.c.owner_id == owner_id
+                )
+            )
+            row = found.one_or_none()
+        if row is None or row.report_sha256 is None:
+            return None
+        return await self._object(row, "report.json", row.report_sha256)
+
+    async def report_json(self, job_id: str, owner_id: str) -> dict[str, Any] | None:
+        """The owned job's report as the object holds it, parsed as JSON only.
+
+        It never parses the report as a :class:`Report`, so a report from an
+        older schema version reads as stored.
+        """
+        data = await self._report(job_id, owner_id)
+        return None if data is None else json.loads(data)
+
+    async def report(self, job_id: str, owner_id: str) -> Report | None:
+        data = await self._report(job_id, owner_id)
+        return None if data is None else Report.model_validate_json(data)
+
+    async def _part(self, name: str, job_id: str, owner_id: str) -> Any:
+        async with self._transaction() as connection:
+            text = await connection.scalar(
+                select(jobs.c[name]).where(
+                    jobs.c.id == job_id, jobs.c.owner_id == owner_id
+                )
+            )
+        return None if text is None else _ADAPTERS[name].validate_json(text)
+
+    async def checkpoint(self, job_id: str, owner_id: str) -> Checkpoint | None:
+        return await self._part("checkpoint", job_id, owner_id)
+
+    async def resumption(self, job_id: str, owner_id: str) -> Resumption | None:
+        return await self._part("resumption", job_id, owner_id)
+
+    async def resumed_by(self, job_id: str, owner_id: str) -> str | None:
+        """The ID of the owned job's resumed job that locks it, or ``None``."""
+        async with self._transaction() as connection:
+            owned = await connection.scalar(
+                select(jobs.c.id).where(
+                    jobs.c.id == job_id, jobs.c.owner_id == owner_id
+                )
+            )
+            if owned is None:
+                return None
+            return await self._resumed_by(connection, job_id)
+
+    async def events_after(
+        self, job_id: str, seen: int
+    ) -> tuple[JobStatus, list[JobEvent]] | None:
+        """The job's status and the events past ``seen``, and nothing else."""
+        async with self._transaction() as connection:
+            status = await connection.scalar(
+                select(jobs.c.status).where(jobs.c.id == job_id)
+            )
+            if status is None:
+                return None
+            texts = await connection.scalars(
+                select(job_events.c.event)
+                .where(job_events.c.job_id == job_id, job_events.c.seq > seen)
+                .order_by(job_events.c.seq)
+            )
+            return status, [JobEvent.model_validate_json(text) for text in texts]
+
+    async def save(self, record: JobRecord) -> None:
+        """Write the record back, and the events it gained.
+
+        The sources are written once, at admission. The report is written
+        once: a save puts it where the row names none, and raises where the
+        row names another.
+        """
+        async with self._transaction() as connection:
+            found = await connection.execute(
+                select(jobs.c.id, jobs.c.owner_id, jobs.c.report_sha256).where(
+                    jobs.c.id == record.id
+                )
+            )
+            row = found.one_or_none()
+        if row is None:
+            raise ValueError(f"job {record.id!r} does not exist")
+        values = _job_row(record)
+        if record.report is not None:
+            data = record.report.model_dump_json().encode()
+            if row.report_sha256 is None:
+                await self._objects.put(
+                    object_key(row.owner_id, row.id, "report.json"), data
+                )
+                values["report_sha256"] = _digest(data)
+            elif row.report_sha256 != _digest(data):
+                raise ValueError(f"job {record.id} holds a report, written once")
+        async with self._transaction(writes=True) as connection:
+            await connection.execute(
+                update(jobs).where(jobs.c.id == record.id).values(values)
+            )
+            stored = await connection.scalar(
+                select(func.count())
+                .select_from(job_events)
+                .where(job_events.c.job_id == record.id)
+            )
+            gained = record.events[stored or 0 :]
+            if gained:
+                await connection.execute(
+                    insert(job_events), _event_rows(record.id, gained)
+                )
+
+    async def save_round(
+        self,
+        job_id: str,
+        owner_id: str,
+        answers: AnswerSet,
+        shown: Sequence[UnknownKey],
+        skipped: Sequence[SkipKey],
+        revision: int,
+    ) -> bool:
+        """Keep a saved round's answers, as one conditional ``UPDATE`` on the
+        round revision, under the lock on the job's row."""
+        values = {
+            "answers": _json("answers", answers),
+            "shown_early": _json("shown_early", list(shown)),
+            "skipped_early": _json("skipped_early", list(skipped)),
+        }
+        async with self._transaction(writes=True) as connection:
+            await self._lock(connection, job_id)
+            if await self._resumed_by(connection, job_id) is not None:
+                return False
+            saved = await connection.execute(
+                update(jobs)
+                .where(
+                    jobs.c.id == job_id,
+                    jobs.c.owner_id == owner_id,
+                    jobs.c.status == "awaiting-answers",
+                    jobs.c.round_revision == revision,
+                )
+                .values(
+                    {
+                        **values,
+                        "round_revision": jobs.c.round_revision + 1,
+                        "updated_at": datetime.now(UTC),
+                    }
+                )
+            )
+            return saved.rowcount == 1
+
+    async def _report_is_final(
+        self, connection: AsyncConnection, job_id: str, owner_id: str
+    ) -> bool | None:
+        """Whether the owned, completed job's report is final, or ``None``
+        where the job is not the owner's or has no report."""
+        text = await connection.scalar(
+            select(jobs.c.resumption)
+            .where(
+                jobs.c.id == job_id,
+                jobs.c.owner_id == owner_id,
+                jobs.c.status == "completed",
+            )
+            .with_for_update()
+        )
+        if text is None:
+            return None
+        return is_follow_up(_ADAPTERS["resumption"].validate_json(text))
+
+    async def save_draft(
+        self,
+        job_id: str,
+        owner_id: str,
+        draft: AnswerSet,
+        revision: int,
+    ) -> bool:
+        """Keep a finished report's draft answers, as one conditional
+        ``UPDATE`` on the round revision (ADR 0070)."""
+        value = _json("draft", draft)
+        async with self._transaction(writes=True) as connection:
+            if await self._report_is_final(connection, job_id, owner_id) is not False:
+                return False
+            if await self._resumed_by(connection, job_id) is not None:
+                return False
+            saved = await connection.execute(
+                update(jobs)
+                .where(jobs.c.id == job_id, jobs.c.round_revision == revision)
+                .values(
+                    draft=value,
+                    round_revision=jobs.c.round_revision + 1,
+                    updated_at=datetime.now(UTC),
+                )
+            )
+            return saved.rowcount == 1
+
+    async def save_corrections(
+        self, job_id: str, owner_id: str, corrections: Sequence[FactAnswer]
+    ) -> bool:
+        """Keep a final report's corrections."""
+        value = _json("corrections", list(corrections))
+        async with self._transaction(writes=True) as connection:
+            if not await self._report_is_final(connection, job_id, owner_id):
+                return False
+            await connection.execute(
+                update(jobs)
+                .where(jobs.c.id == job_id)
+                .values(corrections=value, updated_at=datetime.now(UTC))
+            )
+            return True
+
+    async def owned_jobs(self, owner_id: str) -> list[JobRecord]:
+        """Every job of the owner, as envelopes, oldest first."""
+        async with self._transaction() as connection:
+            found = await connection.scalars(
+                select(jobs.c.id)
+                .where(jobs.c.owner_id == owner_id)
+                .order_by(jobs.c.created_at, jobs.c.id)
+            )
+            job_ids = found.all()
+        listed = [await self.owned(job_id, owner_id) for job_id in job_ids]
+        return [record for record in listed if record is not None]
+
+    async def delete(self, job_id: str, owner_id: str) -> int | None:
+        """Turn the owned job's row into a usage row, then delete its objects
+        (ADR 0066). The number of objects removed, or ``None`` where the job
+        is not the owner's or not terminal, and nothing changes."""
+        async with self._transaction(writes=True) as connection:
+            found = await connection.execute(
+                select(jobs).where(jobs.c.id == job_id, jobs.c.owner_id == owner_id)
+            )
+            row = found.one_or_none()
+            if row is None or row.status not in TERMINAL_STATUSES:
+                return None
+            await connection.execute(
+                insert(usage_rows).values(
+                    job_id=row.id,
+                    owner_id=row.owner_id,
+                    created_at=row.created_at,
+                    reserved_tokens=row.reserved_tokens,
+                    measured_tokens=row.measured_tokens,
+                    status=row.status,
+                    parent_id=row.parent_id,
+                )
+            )
+            await connection.execute(
+                delete(job_events).where(job_events.c.job_id == job_id)
+            )
+            await connection.execute(delete(jobs).where(jobs.c.id == job_id))
+        names: list[ObjectName] = ["sources.json"]
+        if row.report_sha256 is not None:
+            names.append("report.json")
+        return await self._remove(
+            [object_key(row.owner_id, row.id, name) for name in names]
+        )
+
+    async def fail_in_flight(self) -> list[str]:
+        """Fail each queued or running job with :data:`RESTART_FAILURE_MESSAGE`.
+
+        The restart scan (#1529), through :meth:`JobRecord.transition` as on
+        every store, so each failed job keeps its full charge and gets a
+        status event.
+        """
+        async with self._transaction() as connection:
+            found = await connection.scalars(
+                select(jobs.c.id)
+                .where(jobs.c.status.not_in(sorted(TERMINAL_STATUSES)))
+                .order_by(jobs.c.created_at, jobs.c.id)
+            )
+            job_ids = found.all()
+        failed = []
+        for job_id in job_ids:
+            record = await self.get(job_id)
+            if record is None:
+                continue
+            record.transition("failed")
+            record.error = RESTART_FAILURE_MESSAGE
+            await self.save(record)
+            failed.append(job_id)
+        return failed

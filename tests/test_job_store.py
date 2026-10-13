@@ -26,6 +26,7 @@ from analysis_service.jobs import (
     JobRecord,
     JobStatus,
     Resumption,
+    build_store,
     same_major,
 )
 from analysis_service.principals import Identity, Principal
@@ -40,6 +41,7 @@ from tests.factories import (
     sample_selection,
     valid_model,
 )
+from tests.sql_stores import sql_env
 from tests.test_pause import waiting
 
 POLICY = BudgetPolicy(
@@ -53,12 +55,20 @@ POLICY = BudgetPolicy(
 KEY = ("df-1", "encryption_in_transit", "", "", "", "")
 
 
-@pytest.fixture(params=["memory"])
-def new_store(request):
+#: Every backend pair the suite runs on: the job store, then the database and
+#: the object store where the job store keeps objects. ``tests/test_backends.py``
+#: checks these against the backend tables, so a new row needs a pair here.
+BACKEND_PAIRS = ("memory", "sql/sqlite+aiosqlite/filesystem")
+
+
+@pytest.fixture(params=BACKEND_PAIRS)
+def new_store(request, tmp_path_factory):
     """A maker of fresh stores of one backend pair."""
 
     def make():
-        return InMemoryJobStore()
+        if request.param == "memory":
+            return InMemoryJobStore()
+        return build_store(sql_env(tmp_path_factory.mktemp("store")))
 
     return make
 
@@ -174,7 +184,9 @@ class TestReadsAndSaves:
         assert fetched.status == "queued"
 
     def test_store_round_trips_a_resumed_job(self, store):
+        # An owner ID is a part of each object key, so it takes that shape.
         record = test_resume.TestTheResumedRun().resumed_job()
+        record.owner_id = "alice"
         asyncio.run(admit(store, record))
         assert asyncio.run(store.get(record.id)).resumption == record.resumption
 
