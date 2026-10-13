@@ -3,8 +3,10 @@
 import asyncio
 import json
 import logging
+import time
 from collections.abc import Sequence
 from dataclasses import replace
+from datetime import UTC, datetime, timedelta
 from typing import ClassVar, get_args
 from uuid import UUID
 
@@ -31,6 +33,7 @@ from analysis_service.jobs import (
     InMemoryJobStore,
     JobRecord,
     JobStatus,
+    JobStoreConfigError,
     NodeCallback,
     PipelineOutcome,
     PipelineRejected,
@@ -825,6 +828,55 @@ class TestTheRestartScan:
         assert [(body["status"], body["error"]) for body in bodies] == [
             ("failed", RESTART_FAILURE_MESSAGE)
         ] * 2
+
+
+def completed_days_ago(store: InMemoryJobStore, days: int) -> str:
+    """The ID of alice's completed job whose last update was ``days`` days ago."""
+    record = seed(store, "alice", "completed")
+    record.updated_at = datetime.now(UTC) - timedelta(days=days)
+    asyncio.run(store.save(record))
+    return record.id
+
+
+class TestTheRetentionSweep:
+    """#1530: the app reads ``ANALYSIS_RETENTION_DAYS`` at startup, and the
+    sweep deletes each expired job."""
+
+    def test_a_value_that_is_not_a_period_stops_the_startup_first(self, monkeypatch):
+        monkeypatch.setenv("ANALYSIS_RETENTION_DAYS", "0")
+        store = InMemoryJobStore()
+        job = seed(store, "alice", "queued").id
+        client, _ = make_client(store=store)
+        with (
+            pytest.raises(JobStoreConfigError, match="ANALYSIS_RETENTION_DAYS"),
+            client,
+        ):
+            pass
+        assert asyncio.run(store.get(job)).status == "queued"
+
+    def test_unset_keeps_every_job(self, monkeypatch):
+        monkeypatch.delenv("ANALYSIS_RETENTION_DAYS", raising=False)
+        store = InMemoryJobStore()
+        job = completed_days_ago(store, 10_000)
+        client, _ = make_client(store=store)
+        with client:
+            assert client.get(f"/v1/jobs/{job}", headers=auth()).status_code == 200
+
+    def test_the_sweep_starts_with_the_app(self, monkeypatch):
+        monkeypatch.setenv("ANALYSIS_RETENTION_DAYS", "30")
+        store = InMemoryJobStore()
+        expired = completed_days_ago(store, 31)
+        kept = completed_days_ago(store, 29)
+        client, _ = make_client(store=store)
+        deadline = time.monotonic() + 5
+        with client:
+            while (
+                client.get(f"/v1/jobs/{expired}", headers=auth()).status_code != 404
+                and time.monotonic() < deadline
+            ):
+                time.sleep(0.01)
+            assert client.get(f"/v1/jobs/{expired}", headers=auth()).status_code == 404
+            assert client.get(f"/v1/jobs/{kept}", headers=auth()).status_code == 200
 
 
 class LookupSpy(InMemoryJobStore):

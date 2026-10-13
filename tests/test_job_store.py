@@ -9,6 +9,8 @@ protocol, never through a private attribute or method.
 from __future__ import annotations
 
 import asyncio
+import logging
+import re
 from datetime import UTC, datetime, timedelta
 
 import pytest
@@ -25,6 +27,7 @@ from analysis_service.jobs import (
     InMemoryJobStore,
     JobRecord,
     JobStatus,
+    JobStoreConfigError,
     Resumption,
     build_store,
     same_major,
@@ -42,6 +45,7 @@ from tests.factories import (
     valid_model,
 )
 from tests.sql_stores import sql_env
+from tests.test_parsing import ISDIGIT_TRAPS
 from tests.test_pause import waiting
 
 POLICY = BudgetPolicy(
@@ -816,6 +820,117 @@ class TestADeletedJobLeavesAUsageRow:
         listed = asyncio.run(store.owned_jobs("alice"))
         assert [record.id for record in listed] == [first, second]
         assert all(record.report is None for record in listed)
+
+
+def last_updated(store, status: JobStatus, days_ago: int, reserved: int = 0) -> str:
+    """The ID of a job in ``status`` whose last update was ``days_ago`` days ago."""
+    record = new_record(reserved=reserved)
+    if status != "queued":
+        record.transition("running")
+    if status not in ("queued", "running"):
+        record.transition(status)
+    record.updated_at = datetime.now(UTC) - timedelta(days=days_ago, minutes=1)
+    asyncio.run(admit(store, record))
+    return record.id
+
+
+class ChangedAfterListing:
+    """A store whose owner saves a draft on each job just after the sweep lists it."""
+
+    def __init__(self, store) -> None:
+        self._store = store
+
+    def __getattr__(self, name: str):
+        return getattr(self._store, name)
+
+    async def expired(self, before: datetime) -> list[tuple[str, str]]:
+        listed = await self._store.expired(before)
+        for job_id, owner_id in listed:
+            assert await self._store.save_draft(job_id, owner_id, NO_ANSWERS, 0)
+        return listed
+
+
+class TestTheRetentionSweep:
+    """#1530: the sweep deletes each terminal job older than the period, through
+    the delete of the route."""
+
+    def test_a_delete_with_a_cutoff_keeps_a_job_updated_since(self, store):
+        job = last_updated(store, "completed", days_ago=2)
+        cutoff = datetime.now(UTC) - timedelta(days=1)
+        assert asyncio.run(store.save_draft(job, "alice", NO_ANSWERS, 0))
+        assert asyncio.run(store.delete(job, "alice", updated_before=cutoff)) is None
+        assert asyncio.run(store.get(job)) is not None
+
+    def test_it_keeps_a_job_that_changes_after_the_listing(self, store):
+        job = last_updated(store, "completed", days_ago=2)
+        asyncio.run(jobs.expire_jobs(ChangedAfterListing(store), 1))
+        assert asyncio.run(store.get(job)) is not None
+
+    @pytest.mark.parametrize(
+        "status", ["completed", "failed", "rejected", "awaiting-answers"]
+    )
+    def test_it_deletes_a_terminal_job_older_than_the_period(self, store, status):
+        old = last_updated(store, status, days_ago=30)
+        recent = last_updated(store, status, days_ago=29)
+        asyncio.run(jobs.expire_jobs(store, 30))
+        assert asyncio.run(store.get(old)) is None
+        assert asyncio.run(store.get(recent)) is not None
+
+    @pytest.mark.parametrize("status", ["queued", "running"])
+    def test_it_never_deletes_a_job_in_flight(self, store, status):
+        job = last_updated(store, status, days_ago=400)
+        asyncio.run(jobs.expire_jobs(store, 1))
+        assert asyncio.run(store.get(job)).status == status
+
+    def test_a_swept_job_keeps_its_usage_row(self, store):
+        last_updated(store, "failed", days_ago=2, reserved=900)
+        asyncio.run(jobs.expire_jobs(store, 1))
+        assert asyncio.run(store.owned_jobs("alice")) == []
+        assert reserve(store, new_record(reserved=200)).outcome == "over_owner_budget"
+
+    def test_each_delete_writes_the_line_of_the_route_with_cause_retention(
+        self, store, caplog
+    ):
+        job = last_updated(store, "completed", days_ago=2)
+        with caplog.at_level(logging.INFO, logger="analysis_service.jobs"):
+            asyncio.run(jobs.expire_jobs(store, 1))
+        [line] = caplog.messages
+        assert re.fullmatch(
+            f"deleted job {job} of owner alice: cause retention,"
+            r" \d+ object\(s\) removed",
+            line,
+        )
+
+
+class TestTheRetentionSetting:
+    """#1530: unset keeps every job, and a value that is not a period refuses."""
+
+    def test_unset_keeps_every_job(self):
+        assert jobs.retention_days({}) is None
+
+    @pytest.mark.parametrize("value", ["1", "30", str(jobs.MAX_RETENTION_DAYS)])
+    def test_a_whole_number_of_days(self, value):
+        assert jobs.retention_days({"ANALYSIS_RETENTION_DAYS": value}) == int(value)
+
+    @pytest.mark.parametrize(
+        "value",
+        [
+            "",
+            "0",
+            "-1",
+            "+7",
+            " 7",
+            "7 ",
+            "1.5",
+            "1e3",
+            "thirty",
+            str(jobs.MAX_RETENTION_DAYS + 1),
+            *ISDIGIT_TRAPS,
+        ],
+    )
+    def test_any_other_value_stops_the_startup(self, value):
+        with pytest.raises(JobStoreConfigError, match="ANALYSIS_RETENTION_DAYS"):
+            jobs.retention_days({"ANALYSIS_RETENTION_DAYS": value})
 
 
 class TestTheRestartScan:

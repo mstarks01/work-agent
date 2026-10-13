@@ -29,10 +29,11 @@ only a submission creates a principal.
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from collections import Counter
 from collections.abc import AsyncIterator, Callable, Mapping, Sequence
-from contextlib import asynccontextmanager
+from contextlib import asynccontextmanager, suppress
 from datetime import datetime
 from functools import partial
 from http import HTTPStatus
@@ -101,10 +102,13 @@ from analysis_service.jobs import (
     JobStatus,
     JobStore,
     PipelineRunner,
+    audited_delete,
     build_store,
     event_frames,
     execute_job,
+    expire_jobs,
     is_follow_up,
+    retention_days,
 )
 from analysis_service.links import (
     MAX_LINK_ANSWERS,
@@ -745,6 +749,22 @@ def _setting(
     return read(deployment)
 
 
+#: How often the retention sweep runs. A job outlives its retention period by
+#: one interval at most.
+SWEEP_SECONDS = 3600
+
+
+async def _sweep(store: JobStore, days: int) -> None:
+    """Run the retention sweep now and then each :data:`SWEEP_SECONDS`, until
+    the app stops. A failed pass is logged, and the next pass runs."""
+    while True:
+        try:
+            await expire_jobs(store, days)
+        except Exception:
+            logger.exception("the retention sweep failed")
+        await asyncio.sleep(SWEEP_SECONDS)
+
+
 @asynccontextmanager
 async def _startup(app: FastAPI) -> AsyncIterator[None]:
     """Check the store, then fail each job in flight, before the app takes a request.
@@ -752,9 +772,12 @@ async def _startup(app: FastAPI) -> AsyncIterator[None]:
     The ASGI server runs this at startup, after :func:`create_app` built the
     store, the deployment and the verifier, and starts to serve only after it.
     The order is: the backend settings (:func:`create_app` reads them), the
-    store's startup check (the schema revision, then the object store), the
-    restart scan (#1529), then requests. A failed check stops the startup.
+    retention setting, the store's startup check (the schema revision, then
+    the object store), the restart scan (#1529), then requests. A failed check
+    stops the startup. Where a retention period is set, the retention sweep
+    starts after the restart scan and stops with the app.
     """
+    days = retention_days()
     store: JobStore = app.state.store
     await store.startup_check()
     # The scan is correct for a single instance only. It fails every queued or
@@ -765,7 +788,14 @@ async def _startup(app: FastAPI) -> AsyncIterator[None]:
         logger.warning(
             "restart scan failed %d job(s) in flight: %s", len(failed), failed
         )
-    yield
+    sweep = None if days is None else asyncio.create_task(_sweep(store, days))
+    try:
+        yield
+    finally:
+        if sweep is not None:
+            sweep.cancel()
+            with suppress(asyncio.CancelledError):
+                await sweep
 
 
 def create_app(
@@ -812,9 +842,9 @@ def create_app(
     behind their back is how an app comes to enforce bounds its deployment never
     chose.
 
-    At startup, before the app takes a request, the store runs its startup
-    check, and then the restart scan fails each job that is queued or running
-    in the store.
+    At startup, before the app takes a request, the app reads the retention
+    setting, the store runs its startup check, and then the restart scan fails
+    each job that is queued or running in the store.
     """
     # No schema routes: the schema states the bounds and the source kinds a
     # caller may not send, and the three webapps close them too.
@@ -1067,15 +1097,8 @@ def create_app(
                 detail="the job is queued or running; delete it when it ends",
             )
         store: JobStore = request.app.state.store
-        removed = await store.delete(job_id, owner_id)
-        if removed is None:
+        if await audited_delete(store, job_id, owner_id, "owner") is None:
             raise NoSuchJob(job_id)
-        logger.info(
-            "deleted job %s of owner %s: cause owner, %d object(s) removed",
-            job_id,
-            owner_id,
-            removed,
-        )
         return Response(status_code=204)
 
     @app.get("/v1/jobs/{job_id}/report")
