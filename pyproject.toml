@@ -68,6 +68,19 @@ dependencies = [
 # a distribution it cannot find — so naming it there would leave every install
 # without this extra unable to produce an execution identity at all.
 bedrock = ["boto3>=1.43.1,<2.0"]
+# The `sql` job store (ADR 0065): SQLAlchemy async Core with one code path for
+# PostgreSQL and SQLite, and Alembic for the schema. A `memory` deployment
+# installs none of them. The upper bounds keep a new minor release out of the
+# lock until somebody reads it.
+sql = [
+    "sqlalchemy[asyncio]>=2.0.54,<2.1",
+    "alembic>=1.20.0,<1.21",
+    "asyncpg>=0.31.0,<0.32",
+    "aiosqlite>=0.22.1,<0.23",
+    # `typing_extensions.override` marks the hooks SQLAlchemy calls by name;
+    # `typing.override` needs Python 3.12.
+    "typing-extensions>=4.12",
+]
 
 [dependency-groups]
 dev = [
@@ -76,6 +89,9 @@ dev = [
     # vendor whose client library were absent would be the one vendor that
     # suite could not cover. One place states the version range.
     "analysis-service[bedrock]",
+    # The `sql` extra, named for the same reason: the job store contract suite
+    # runs on every backend, so CI installs the `sql` store's libraries.
+    "analysis-service[sql]",
     "httpx>=0.27",
     "mypy>=1.18",
     "pip-audit>=2.9",

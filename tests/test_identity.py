@@ -225,9 +225,21 @@ def test_every_distribution_the_package_imports_is_declared():
     from importlib.metadata import packages_distributions
 
     project = tomllib.loads((REPO_ROOT / "pyproject.toml").read_text(encoding="utf-8"))
+    # An extra declares its packages too: the `sql` store imports SQLAlchemy
+    # only where a deployment installs the `sql` extra (ADR 0023).
+    extras = project["project"]["optional-dependencies"].values()
+
+    def normalized(name: str) -> str:
+        """A distribution name as PEP 503 compares it: `typing-extensions`
+        and `typing_extensions` are one name."""
+        return re.sub(r"[-_.]+", "-", name).lower()
+
     declared = {
-        re.split(r"[<>=\[]", spec)[0].strip().lower()
-        for spec in project["project"]["dependencies"]
+        normalized(re.split(r"[<>=\[]", spec)[0].strip())
+        for spec in [
+            *project["project"]["dependencies"],
+            *(spec for extra in extras for spec in extra),
+        ]
     }
     provides = packages_distributions()
 
@@ -247,7 +259,7 @@ def test_every_distribution_the_package_imports_is_declared():
         name
         for name in imported - sys.stdlib_module_names - {"analysis_service"}
         if name in provides
-        and not any(dist.lower() in declared for dist in provides[name])
+        and not any(normalized(dist) in declared for dist in provides[name])
     )
 
     assert not undeclared, (

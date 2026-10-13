@@ -350,8 +350,9 @@ description gives the element the same name. A job you do not own reads as
 job holds no answer. The earlier job does not change. See
 [ADR 0079](adr/0079-a-new-analysis-can-carry-an-earlier-job-s-answers.md).
 
-**Limit:** a waiting job is held in the service's memory. A restart of the
-service loses it, with its extraction; submit it again.
+A waiting job lives through a restart of the service on the `sql`
+[job store](#job-storage). On the `memory` store, a restart loses it with its
+extraction, and you must submit it again.
 
 ### Answering the report's open facts
 
@@ -795,42 +796,112 @@ protocol (`verify(token) -> str`) for anything else; the API layer is unchanged.
 ## Job storage
 
 Required by the [`/v1` API](HTTP-API.md); the in-process engine keeps no jobs.
-The API only ever talks to the `JobStore` interface, so the backend is a
-deploy-time choice.
+The API uses only the `JobStore` interface, so the backend is a deploy-time
+choice.
 
-`ANALYSIS_JOB_STORE` selects the backend at startup and **fails closed** — an
-unset or unknown value stops startup rather than silently falling back to
-non-durable storage. The value is never read from the request.
+Two settings select the backends at startup, and each one **fails closed**:
+an unset or unknown value stops the startup. The service never falls back to
+`memory`, and it never reads a backend value from a request.
 
-| Variable | Purpose |
-| --- | --- |
-| `ANALYSIS_JOB_STORE` | Job-store backend to use. Today: `memory`. |
+| Variable | Values | Rule |
+| --- | --- | --- |
+| `ANALYSIS_JOB_STORE` | `memory`, `sql` | Required. |
+| `ANALYSIS_OBJECT_STORE` | `filesystem` | Required by `sql`. Refused by `memory`. |
+| `ANALYSIS_DATABASE_URL` | `sqlite+aiosqlite:///<path>` | Required by `sql`. A URL that holds a password stops the startup. |
+| `ANALYSIS_OBJECT_ROOT` | an absolute path to a directory | Required by `filesystem`. |
 
-The `memory` backend is a per-instance, in-process dict: fast and dependency-free,
-but jobs are lost on restart and are not shared across instances, so it suits
-single-instance or development deployments only. Durable, multi-instance
-deployments need a shared backend (see below).
+### The `memory` store
 
-At startup, before the app takes a request, a restart scan fails each `queued`
-or `running` job in the store. A job in `awaiting-answers` and a job in a
-terminal status stay as they are. The ASGI server runs the scan as the app's
-lifespan startup, so do not turn the lifespan off (for example with
-`uvicorn --lifespan off`). The scan is correct for a single instance only. With
-two instances on one shared store, the scan at the start of one instance fails
-the jobs that the other instance still runs.
+The `memory` store keeps each job in the memory of one process. It needs no
+server and no extra package. A restart loses every job, and two instances do
+not share their jobs. Use it for a test, a demo or a development deployment.
+
+### The `sql` store
+
+The `sql` store keeps each job in a database, and the sources and the report
+of each job in an object store (ADR 0065). A job that waits for answers, a
+completed report, the events of a job and the answers that a new analysis
+carries all live through a restart. Install the `sql` extra for it:
+
+```bash
+pip install 'analysis-service[sql]'
+```
+
+The extra holds SQLAlchemy, Alembic, `asyncpg` and `aiosqlite`. A `memory`
+deployment installs none of them.
+
+The database is SQLite on one host. Give `ANALYSIS_DATABASE_URL` an absolute
+path, which takes four slashes:
+`sqlite+aiosqlite:////var/lib/analysis/jobs.db`. Give the database file and its
+directory permissions that only the service user can open.
+
+The `filesystem` object store keeps each object as a file under
+`ANALYSIS_OBJECT_ROOT`. The startup stops when the root does not exist, is not
+a directory, has another owner than the service user, or a group or others
+can open it. Make the root as the service user with `install -d -m 0700
+/var/lib/analysis/objects`.
+
+The key of an object is `<owner-id>/<job-id>/sources.json` or
+`<owner-id>/<job-id>/report.json`. A key holds only IDs that the service
+generates, never a name, an email or a `sub`. The service writes the object
+first and the row second, and the row holds the SHA-256 of each object. Each
+read checks the digest. A changed or missing object returns `500` with no
+detail, and the service log names the job ID and the owner ID. The service
+writes the report of a job once.
+
+#### The migration step
+
+The service never changes the schema. Run the migration as a deploy step,
+before you start the service, under a user that can change the database:
+
+```bash
+ANALYSIS_DATABASE_URL=sqlite+aiosqlite:////var/lib/analysis/jobs.db \
+  python -m analysis_service.migrations
+```
+
+The command migrates the database to the latest revision, and it creates the
+database file where there is none. A migration changes the structure of the
+tables only. It never changes a stored report, checkpoint or sources object.
+The startup stops when the schema is not at the latest revision.
+
+### The startup
+
+The service starts in this order, and a failure at a step stops the startup:
+
+1. It reads the backend settings and builds the store.
+2. The `sql` store checks that the schema is at the latest revision.
+3. The `sql` store checks the object store: for `filesystem`, the root.
+4. The restart scan fails each `queued` or `running` job in the store.
+5. The service takes requests.
+
+The restart scan leaves a job in `awaiting-answers` and a job in a terminal
+status as they are. The ASGI server runs steps 2 to 4 as the app's lifespan
+startup, so do not turn the lifespan off (for example with
+`uvicorn --lifespan off`). The scan is correct for a single instance only.
+With two instances on one shared store, the scan at the start of one instance
+fails the jobs that the other instance still runs.
 
 ### Adding a new backend
 
-A durable or shared backend (Redis, Postgres, …) is a new entry in the
-`_FACTORIES` registry in [`src/analysis_service/jobs.py`](../src/analysis_service/jobs.py).
-Implement the `JobStore` protocol and read any connection settings from its own
-prefixed env vars; the API layer is unchanged. These are some of the protocol's
-methods:
+Each backend value is a row of a table, and no code branches on a backend
+name. `JOB_STORES` in [`src/analysis_service/jobs.py`](../src/analysis_service/jobs.py)
+holds the job stores, `OBJECT_STORES` in
+[`src/analysis_service/objects.py`](../src/analysis_service/objects.py) holds
+the object stores, and `DATABASES` in
+[`src/analysis_service/sql_store.py`](../src/analysis_service/sql_store.py)
+holds the databases of the `sql` store, keyed by the driver of the URL. A row
+field has no default, so a new row states every fact.
+[`tests/test_backends.py`](../tests/test_backends.py) checks each table against
+the `Literal` that names its values. It also checks that the contract suite in
+[`tests/test_job_store.py`](../tests/test_job_store.py) runs on every backend
+pair, so a new row runs every contract test. A new job store implements the
+`JobStore` protocol. These are some of the protocol's methods:
 
 | Method | What a backend owes it |
 | --- | --- |
 | `reserve` | **Counts and inserts in one atomic operation.** Every bound admission enforces — the concurrency ceiling, the per-owner rate, the per-owner token budget and the deployment's global token budget — is enforced here and nowhere else. A backend that checks and then inserts has put the race back: two submissions that each read the count before either inserts both pass a ceiling of one. The same operation creates the **Principal** of a first submission, and only where it admits the job. It refuses with `principal_exists` where the identity already holds one. |
 | `principal` | The principal of an issuer and a `sub`, or nothing. It creates nothing. |
+| `startup_check` | Raises where the store cannot serve. The `sql` store checks its schema revision and then its object store. The app calls it before the restart scan. |
 | `get` | The whole record, for the driver that runs the job. |
 | `owned` | The record an owner ID owns, without its report. Ownership is checked before anything is copied, so a foreign job costs what a missing one costs. |
 | `report_json` | The owned job's report, already serialised. |

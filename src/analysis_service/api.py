@@ -746,16 +746,21 @@ def _setting(
 
 
 @asynccontextmanager
-async def _restart_scan(app: FastAPI) -> AsyncIterator[None]:
-    """Fail each job in flight before the app takes a request (#1529).
+async def _startup(app: FastAPI) -> AsyncIterator[None]:
+    """Check the store, then fail each job in flight, before the app takes a request.
 
     The ASGI server runs this at startup, after :func:`create_app` built the
     store, the deployment and the verifier, and starts to serve only after it.
+    The order is: the backend settings (:func:`create_app` reads them), the
+    store's startup check (the schema revision, then the object store), the
+    restart scan (#1529), then requests. A failed check stops the startup.
     """
+    store: JobStore = app.state.store
+    await store.startup_check()
     # The scan is correct for a single instance only. It fails every queued or
     # running job in the store, so with a second live instance on one store it
     # would fail the jobs that instance still runs.
-    failed = await app.state.store.fail_in_flight()
+    failed = await store.fail_in_flight()
     if failed:
         logger.warning(
             "restart scan failed %d job(s) in flight: %s", len(failed), failed
@@ -807,8 +812,9 @@ def create_app(
     behind their back is how an app comes to enforce bounds its deployment never
     chose.
 
-    At startup, before the app takes a request, the restart scan fails each
-    job that is queued or running in the store.
+    At startup, before the app takes a request, the store runs its startup
+    check, and then the restart scan fails each job that is queued or running
+    in the store.
     """
     # No schema routes: the schema states the bounds and the source kinds a
     # caller may not send, and the three webapps close them too.
@@ -817,7 +823,7 @@ def create_app(
         docs_url=None,
         redoc_url=None,
         openapi_url=None,
-        lifespan=_restart_scan,
+        lifespan=_startup,
     )
     app.state.store = store if store is not None else build_store()
     app.state.event_streams = Counter()

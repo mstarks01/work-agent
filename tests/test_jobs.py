@@ -163,7 +163,9 @@ class TestBuildStore:
             build_store({})
 
     def test_unknown_backend_fails_closed(self):
-        with pytest.raises(JobStoreConfigError, match="unknown job store 'redis'"):
+        with pytest.raises(
+            JobStoreConfigError, match="unknown value 'redis' for ANALYSIS_JOB_STORE"
+        ):
             build_store({"ANALYSIS_JOB_STORE": "redis"})
 
 
