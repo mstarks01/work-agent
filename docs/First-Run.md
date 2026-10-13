@@ -368,7 +368,12 @@ The app can ask you questions before the analysis, and after the report.
   question stays where it was, compact, and **Change** opens it again. A
   question you leave blank stays in the list. **Skip for now** beside a
   question sets it aside, and **Skip the questions left blank** sets aside
-  every blank one. A skip also sets aside a question with parts that you
+  every blank one. **Answer “no” to every question about the application
+  left blank** answers "no" to each question under **About the application**
+  that has no answer, as that question's own answer, and each one stays in
+  its place for you to change. A "no" removes from the analysis the checks
+  that need that part of the application, so leave a question blank, or
+  choose "I don't know", where you are not sure. A skip also sets aside a question with parts that you
   answered only in part, and keeps the parts you gave. The questions set
   aside move to **Skipped for now**, where **Answer it** opens one again. A
   skipped question is not an answer, and the analysis treats its fact as

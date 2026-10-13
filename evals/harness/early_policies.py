@@ -29,6 +29,12 @@ but one charges each question on its own. ``group-question`` asks each group
 of a list once for every element it lists (ADR 0081): one charge for the
 group's parts answers each of its rows. A capability question is charged on
 its own, because every capability shares one group.
+
+The ``no-to-the-rest`` policies keep each capability question at its place
+and answer "yes" to some of them, each on its own; one choice then answers
+"no" to every capability question of the list left. The walk does not know
+which capabilities an application has, so each policy reads one share of
+"yes" answers (:data:`YES_SHARES`).
 """
 
 from __future__ import annotations
@@ -39,6 +45,7 @@ import sys
 from collections import Counter, defaultdict
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
+from functools import partial
 from itertools import groupby
 from pathlib import Path
 from typing import Any
@@ -76,21 +83,53 @@ def _each(order: Sequence[EarlyQuestion]) -> list[Charge]:
     return [Charge(question.decisions, frozenset({question.key})) for question in order]
 
 
-def _group_question(model: SystemModel, frameworks: Selection) -> list[Charge]:
+def _group_question(
+    model: SystemModel, frameworks: Selection, yes_share: float | None = None
+) -> list[Charge]:
     """Each group of each list asked once for every element it lists.
 
     A run of a list's rows that share a group is one charge: the most parts
-    any of its rows has, for all its rows. A capability is its own charge.
+    any of its rows has, for all its rows. A capability is its own charge,
+    unless ``yes_share`` is set (:func:`_no_to_the_rest`).
     """
     charges: list[Charge] = []
     for shown in _lists(model, frameworks):
+        capabilities = [q for q in shown if q.group == CAPABILITY_GROUP]
         for group, rows in groupby(shown, key=lambda question: question.group):
             run = list(rows)
-            if group == CAPABILITY_GROUP:
-                charges += _each(run)
-            else:
+            if group != CAPABILITY_GROUP:
                 keys = frozenset(question.key for question in run)
                 charges.append(Charge(max(q.decisions for q in run), keys))
+            elif yes_share is None:
+                charges += _each(run)
+            else:
+                charges += _no_to_the_rest(run, capabilities, yes_share)
+    return charges
+
+
+#: The shares of a list's capability questions a submitter answers "yes",
+#: one policy each. A third is about what the example description states of
+#: its capabilities, by one reading (``QA-2026-10-13-09``).
+YES_SHARES: Mapping[str, float] = {"none": 0.0, "third": 1 / 3, "all": 1.0}
+
+
+def _no_to_the_rest(
+    run: Sequence[EarlyQuestion],
+    capabilities: Sequence[EarlyQuestion],
+    yes_share: float,
+) -> list[Charge]:
+    """A run of a list's capability questions, each at its place: the first
+    ``yes_share`` of the list's capability questions are "yes", each on its
+    own, and the first one after them is one charge answering "no" to it and
+    every capability question of the list after it."""
+    count = round(len(capabilities) * yes_share)
+    charges = []
+    for question in run:
+        place = capabilities.index(question)
+        if place < count:
+            charges += _each([question])
+        elif place == count:
+            charges.append(Charge(1, frozenset(q.key for q in capabilities[count:])))
     return charges
 
 
@@ -186,6 +225,10 @@ POLICIES: Mapping[str, Callable[[SystemModel, Selection], list[Charge]]] = {
     ),
     "grouped-merge": lambda model, chosen: _each(_merge(model, chosen, grouped=True)),
     "group-question": _group_question,
+    **{
+        f"no-to-the-rest-{name}": partial(_group_question, yes_share=share)
+        for name, share in YES_SHARES.items()
+    },
 }
 
 

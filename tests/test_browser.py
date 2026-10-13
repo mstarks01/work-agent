@@ -327,6 +327,28 @@ def test_one_shared_answer_saves_the_part_for_every_element_listed(page):
     assert all(fact["facets"] == {facet: "yes"} for fact in facts)
 
 
+def test_no_to_the_rest_answers_each_blank_capability_question(page):
+    """The button answers "no" to every capability question left blank, each
+    as its own answer, and leaves a capability answered "yes" as it is."""
+    pause(page)
+    rows = page.locator('#list p[data-key^=\'["","","","","",\']')
+    rows.first.wait_for()
+    choose(page, rows.first.locator("select").first, "yes")
+    blank = rows.evaluate_all(
+        "(rows) => rows.filter((row) => !row.hidden && row.querySelector('select')"
+        " && !row.querySelector('select').value).map((row) => row.dataset.key)"
+    )
+    assert len(blank) >= 2
+    with page.expect_response(_post_to_answer) as response:
+        page.click("#no-rest")
+    facts = response.value.request.post_data_json["facts"]
+    sent = sorted(json.dumps(fact["key"], separators=(",", ":")) for fact in facts)
+    assert sent == sorted(blank)
+    assert {fact["value"] for fact in facts} == {"no"}
+    saved(page)
+    assert page.locator("#no-rest").is_hidden()
+
+
 def test_a_double_click_on_start_starts_one_run(page):
     pause(page)
     starts: list[str] = []

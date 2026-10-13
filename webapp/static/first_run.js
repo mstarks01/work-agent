@@ -79,6 +79,8 @@
   const list = document.getElementById("list");
   const saveButton = document.getElementById("save");
   const skipButton = document.getElementById("skip");
+  const noRestButton = document.getElementById("no-rest");
+  const noRestHint = document.getElementById("no-rest-hint");
   const skippedBox = document.getElementById("skipped");
   const moreBox = document.getElementById("more");
   const earlierBox = document.getElementById("earlier");
@@ -613,11 +615,12 @@
     const label = document.createElement("b");
     label.textContent = q.label;
     label.title = (q.reasons || []).join(" ");
-    const { input, nodes, set, answer } = inputFor(q, prefill, (event) =>
+    const { input, nodes, set, answer, readDetail } = inputFor(q, prefill, (event) =>
       onEdit(row, event),
     );
     row.input = input;
     row.read = answer;
+    row.detail = readDetail;
     row.set = (next) => set(next.value);
     row.compact = false;
     const skip = skipControl(row);
@@ -1308,6 +1311,13 @@
     setStatus(edits.size ? "unsaved" : "saved");
     asked.hidden = false;
   };
+  // The capability rows that "no" to the rest answers: listed, open, blank
+  // and offering "no". A "no" rules out every unit that needs the capability,
+  // so a row with an answer, a typed detail, or a skip is left as it is.
+  const blankCapabilities = () => [...rows.values()].filter((row) =>
+    row.listed && !row.compact && !row.node.hidden && row.kind === "fact"
+    && row.q.kind === "capability" && !row.read() && !row.detail()
+    && (row.q.choices || []).some((choice) => choice.id === "no"));
   // What the page says about progress: filled answers among the listed rows,
   // the listed choices, and the start button's weight.
   updateQuestionProgress = () => {
@@ -1339,6 +1349,12 @@
       filled += ids.filter((id) => each.every((held) => held.has(id))).length;
     }
     const left = view.early_stop == null;
+    const blank = blankCapabilities().length;
+    noRestButton.hidden = !blank;
+    noRestHint.hidden = !blank;
+    noRestButton.disabled = answerBusy;
+    noRestButton.textContent = "Answer “no” to every question about the application"
+      + ` left blank (${blank})`;
     skipButton.disabled = answerBusy || !left;
     startButton.className = left ? "" : "primary";
     if (typeof workspace !== "undefined") workspace.progress(view, filled, visible);
@@ -1419,7 +1435,7 @@
   const answerAction = async (action) => {
     if (answerBusy) return;
     answerBusy = true;
-    const controls = [skipButton, startButton];
+    const controls = [skipButton, startButton, noRestButton];
     controls.forEach((control) => { control.disabled = true; });
     try { await action(); }
     catch { refuse("The connection was interrupted. Reload this analysis to check whether your answers were saved."); }
@@ -1430,6 +1446,15 @@
     }
   };
   startButton.addEventListener("click", () => answerAction(startAnalysis));
+
+  // Answer "no" to each of them, as each row's own answer, saved as any
+  // answer is. Each one stays in its place and can be changed.
+  noRestButton.addEventListener("click", () => {
+    for (const row of blankCapabilities()) {
+      row.set({ value: "no" });
+      onEdit(row);
+    }
+  });
 
   // Skip every listed question left blank, and every one with facets
   // answered only in part: its facets given are kept, and the rest are set
