@@ -29,7 +29,7 @@ from analysis_service.jobs import (
     execute_job,
 )
 from analysis_service.pipeline import AdkPipelineRunner, entry_of
-from analysis_service.platform_defaults import with_platform_defaults
+from analysis_service.protocol_defaults import with_protocol_defaults
 from analysis_service.report import NodeRun
 from analysis_service.sources import Source
 from tests.factories import (
@@ -87,7 +87,7 @@ class TestThePausedRun:
         outcome = asyncio.run(AdkPipelineRunner(pipeline).run(record, on_node))
 
         assert isinstance(outcome, PipelineAwaiting)
-        assert outcome.checkpoint.system_model == with_platform_defaults(valid_model())
+        assert outcome.checkpoint.system_model == with_protocol_defaults(valid_model())
         assert graph.ASSERT_NODE in visited
         assert graph.PREPARE_NODE not in visited
         assert outcome.nodes
@@ -108,7 +108,7 @@ class TestThePausedRun:
         outcome = asyncio.run(AdkPipelineRunner(pipeline).run(record, on_node))
 
         assert isinstance(outcome, PipelineAwaiting)
-        assert outcome.checkpoint.system_model == with_platform_defaults(valid_model())
+        assert outcome.checkpoint.system_model == with_protocol_defaults(valid_model())
         assert outcome.checkpoint.assertions is None
         assert graph.PAUSE_NODE in visited
         assert graph.ASSERT_NODE not in visited
