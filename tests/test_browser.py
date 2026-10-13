@@ -241,6 +241,24 @@ def test_a_reload_shows_the_saved_answers(page):
     assert "yes" in page.inner_text("#earlier")
 
 
+def test_a_new_analysis_reuses_the_answers_of_an_earlier_one(page):
+    """The form lists the earlier analysis, and the new one asks again none of
+    the questions it answered (ADR 0079)."""
+    pause(page)
+    control = page.locator('#list select:has(option[value="yes"])').first
+    label = control.get_attribute("aria-label")
+    assert label, "the row's control names its question"
+    choose(page, control, "yes")
+    page.goto("/")
+    page.wait_for_selector("#answers-from-field", state="visible")
+    earlier = page.locator("#answers-from option").nth(1).get_attribute("value")
+    page.select_option("#answers-from", earlier)
+    pause(page)
+    page.click("#earlier summary")
+    assert "yes" in page.inner_text("#earlier")
+    assert page.locator(f'#list select[aria-label="{label}"]').count() == 0
+
+
 def test_a_double_click_on_start_starts_one_run(page):
     pause(page)
     starts: list[str] = []

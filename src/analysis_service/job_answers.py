@@ -38,6 +38,7 @@ from analysis_service.answer_round import (
     SavedDraft,
     SavedRound,
 )
+from analysis_service.answer_sets import NO_ANSWERS, AnswerSet, within_held_limits
 from analysis_service.assertions import AssertionRecord
 from analysis_service.budgets import BudgetPolicy
 from analysis_service.certification import CertificationGate, CertifyResult
@@ -505,6 +506,29 @@ class JobAnswers:
             reserved_tokens=budgets.estimate(amended.sources, parent.frameworks),
         )
         return await self.admit(record, start=start)
+
+    async def carried_from(
+        self, job_id: str | None, subject: str, *, asks: bool
+    ) -> AnswerSet:
+        """The answers a new job carries from an earlier job of this subject (ADR 0079).
+
+        ``None`` names no job and carries nothing. Another subject's job reads
+        as missing, as every read does. A job that does not pause would never
+        read what it carries, so it is refused one; so is a job that holds no
+        answer, or more than one job may hold.
+        """
+        if job_id is None:
+            return NO_ANSWERS
+        if not asks:
+            raise Refused(
+                "answers from an earlier analysis are offered as questions;"
+                " turn the questions on to carry them"
+            )
+        earlier = await self.owned(job_id, subject)
+        held = earlier.held_answers()
+        if held.empty:
+            raise Refused("the earlier analysis holds no answers to carry")
+        return self._refusing(within_held_limits, held)
 
     async def correct(
         self, job_id: str, subject: str, facts: Sequence[FactAnswer]

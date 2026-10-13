@@ -103,6 +103,7 @@
           name: document.getElementById("analysis-name")?.value.trim() || "Your system",
           frameworks: selection(),
           questions: Boolean(ask && ask.checked),
+          answers_from: document.getElementById("answers-from")?.value || undefined,
         }),
       });
       if (!started.ok) {
@@ -1091,9 +1092,9 @@
   const drawTail = (data) => {
     if (tailDrawn) return;
     tailDrawn = true;
-    // Answers the run an amendment started carried and could not take: each
-    // names a part the amended model no longer has, or a fact it now states
-    // (AnswerState.carried, ADR 0072).
+    // Answers this run carried from an earlier one and could not take: each
+    // names a part this model does not have, or a fact it states
+    // (AnswerState.carried, ADRs 0072 and 0079).
     const dropped = [
       ...(data.carried_dropped || []).map((a) => `${a.label} — ${answerText(a)}`),
       ...(data.carried_dropped_links || []).map((a) => `${a.principal} — ${
@@ -1102,7 +1103,7 @@
     if (dropped.length) {
       const lead = document.createElement("p");
       lead.className = "hint";
-      lead.textContent = `${dropped.length} earlier answer(s) do not fit the amended`
+      lead.textContent = `${dropped.length} earlier answer(s) do not fit this`
         + " system model, so they are not kept:";
       const items = document.createElement("ul");
       for (const line of dropped) {

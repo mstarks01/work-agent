@@ -268,9 +268,10 @@ class JobRecord(BaseModel):
     # Admission refuses the job where a save moved it since, so a batch saved
     # in another tab never misses the run in silence (ADR 0070).
     parent_revision: int | None = None
-    # The paused job's answers, carried to the job its amendment started. Its
-    # question set takes each one whose fact it still asks, and lists the rest.
-    # The extraction never reads them.
+    # The answers this job carries from an earlier job: the paused job its
+    # amendment extracts again (ADR 0072), or the job a new analysis names
+    # (ADR 0079). Its question set takes each one whose fact it still asks,
+    # and lists the rest. The extraction never reads them.
     carried: HeldAnswerSet = NO_ANSWERS
     # Whether this job stops after its assertion pass to ask a person, and
     # waits for the answers. Off unless a submission asks for it, so an
@@ -357,6 +358,18 @@ class JobRecord(BaseModel):
     def final(self) -> bool:
         """Whether this job's report is final: the one follow-up wrote it (ADR 0054)."""
         return is_follow_up(self.resumption)
+
+    def held_answers(self) -> AnswerSet:
+        """Every answer this job holds, each later one over the earlier.
+
+        **The one reader of what a new analysis carries** (ADR 0079). A final
+        report's corrections lie over a report's draft, the draft over the
+        answers the job's run read or its pause saved, and those over what
+        the job carried. Nothing is checked here: the job that carries them
+        checks each one against its own questions.
+        """
+        corrected = AnswerSet(facts=tuple(self.corrections))
+        return corrected.over(self.draft.over(self.answers.over(self.carried)))
 
     def selection(self) -> tuple[FrameworkName, ...]:
         """This job's frameworks by name, in selection order.

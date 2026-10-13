@@ -591,6 +591,25 @@ streams[1].listeners.done({ data: JSON.stringify({ url: "/report/r2" }) });
     assert seen["asked"] is False
 
 
+def test_the_form_sends_the_earlier_run_whose_answers_it_reuses():
+    """The submit names the run chosen under "Reuse answers from" (ADR 0079),
+    and names none where the list is left at its first entry."""
+    steps = """
+ids["answers-from"] = new Node("answers-from");
+ids["answers-from"].value = "job-earlier";
+await ids.analyze.listeners.submit({ preventDefault() {} }); await settle();
+ids["answers-from"].value = "";
+await ids.analyze.listeners.submit({ preventDefault() {} }); await settle();
+"""
+    first, second = [
+        call["body"]
+        for call in _run_form_script(steps)["calls"]
+        if call["url"] == "/analyze"
+    ]
+    assert first["answers_from"] == "job-earlier"
+    assert "answers_from" not in second
+
+
 def test_an_unanswered_question_is_left_out_of_the_answers():
     steps = """
 await ids.analyze.listeners.submit({ preventDefault() {} }); await settle();
@@ -3223,7 +3242,7 @@ const text = (n) => typeof n === "string" ? n
 calls.push({ said: text(ids.questions) });
 """
         said = _run_form_script(steps)["calls"][-1]["said"]
-        assert "2 earlier answer(s) do not fit the amended system model" in said
+        assert "2 earlier answer(s) do not fit this system model" in said
         assert "Old DB: encryption at rest \u2014 AES" in said
         assert "batch loader \u2014 none of these" in said, "a link answer is listed"
 

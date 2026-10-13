@@ -180,6 +180,16 @@ const workspace = (() => {
         link.href = "/?run=" + encodeURIComponent(run.run);
         el("recent-analyses").append(link);
       });
+      // Each earlier analysis whose answers a new one can carry (ADR 0079).
+      const reuse = document.getElementById("answers-from");
+      if (reuse && runs.length) {
+        runs.forEach((run) => {
+          const option = node("option", run.name);
+          option.value = run.run;
+          reuse.append(option);
+        });
+        el("answers-from-field").hidden = false;
+      }
     }).catch(() => message("Recent analyses are unavailable. You can still start a new analysis."));
   });
   return {show, track, grouped, progress, processing};
