@@ -175,6 +175,7 @@ from analysis_service.evidence import (
 )
 from analysis_service.fact_answers import FactAnswer
 from analysis_service.fan_in import fan_in
+from analysis_service.field_capabilities import with_field_capabilities
 from analysis_service.frameworks import (
     DISCLAIMER_DOC,
     FrameworkPackage,
@@ -1301,6 +1302,17 @@ def _node(func: Callable[..., Any], name: str) -> FunctionNode:
     return FunctionNode(func=offloaded, name=name)
 
 
+def after_gate(model: SystemModel) -> SystemModel:
+    """The model the analysis reads: the one the gate passed, with what its
+    own fields prove written where the sources are silent.
+
+    **The one composition of the writers after the gate.** What a stated
+    protocol guarantees by definition (ADR 0082), then each capability a
+    closed field proves (ADR 0085). Neither writes into what extraction read.
+    """
+    return with_field_capabilities(with_protocol_defaults(model))
+
+
 def validate_extraction(
     ctx,
     keys: GraphKeys,
@@ -1404,10 +1416,7 @@ def validate_extraction(
     # :mod:`analysis_service.basis` for why token overlap cannot gate.
     for flag in unbased_controls(model, source_texts or {}):
         logger.warning("stated control with no basis in its source: %s", flag)
-    # What a stated protocol guarantees by definition is written where the
-    # sources are silent, after the gate and never into what extraction read
-    # (ADR 0082).
-    model = with_protocol_defaults(model)
+    model = after_gate(model)
     state.put(STATE_VALID_MODEL, model.model_dump(mode="json"))
     return _routed(ROUTE_VALID, {"issue_count": 0})
 

@@ -664,12 +664,14 @@ class Assumption(BaseModel):
 
 
 class CapabilityStatement(BaseModel):
-    """One **Capability** a source states the application has or lacks.
+    """One statement that the application has or lacks a **Capability**.
 
-    It carries the source's own words, as an element does, so the validity gate
-    checks the quote against the source it names. A capability no source
-    mentions has no statement: silence is ``unknown``, and extraction never
-    writes an absence the source did not state.
+    An answer makes one, and code makes a ``present`` one where a closed field
+    of the model proves it (:mod:`analysis_service.field_capabilities`). It
+    carries the words it rests on, the answer's line or the quote of the
+    element whose fields prove it, so the validity gate checks the quote
+    against the source it names. A capability nothing states has no
+    statement: silence is ``unknown``.
 
     ``capability`` lists the closed set in the provider-facing schema, on the
     rule :class:`Assumption` follows, so a key outside the set stays an
@@ -686,6 +688,10 @@ class CapabilityStatement(BaseModel):
     state: Literal["present", "absent"]
     source_excerpt: str = Field(min_length=1, max_length=1000)
     source_label: str = Field(min_length=1, max_length=200)
+    #: Where code wrote the statement from the model's own closed fields, the
+    #: element and the rule that prove it (:mod:`analysis_service.field_capabilities`).
+    #: Empty for a statement an answer makes.
+    basis: str = Field(default="", max_length=600)
 
 
 class BoundaryCrossing(BaseModel):
@@ -739,8 +745,9 @@ class BoundaryCrossing(BaseModel):
 class EmittedSystemModel(BaseModel):
     """The System Model as the extraction and repair nodes emit it.
 
-    Every field but ``capabilities``, because only an answer states a
-    capability. Asking extraction for them costs element identity, up to
+    Every field but ``capabilities``, because extraction states no
+    capability: an answer states one, and code states one that a closed field
+    proves. Asking extraction for them costs element identity, up to
     3.5 sd in the #1291 measurement, so the schema a model fills leaves the
     list out, and a model that writes it anyway is refused.
     """
@@ -808,7 +815,8 @@ class SystemModel(EmittedSystemModel):
             quotes = stated.setdefault(statement.capability, {}).setdefault(
                 statement.state, []
             )
-            quotes.append(f"{statement.source_label}: {statement.source_excerpt}")
+            quote = f"{statement.source_label}: {statement.source_excerpt}"
+            quotes.append(f"{quote} ({statement.basis})" if statement.basis else quote)
         facts = {}
         for key, states in stated.items():
             if len(states) == 1:

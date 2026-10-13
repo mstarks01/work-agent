@@ -102,7 +102,7 @@ def test_normalization_snaps_a_statements_label_to_the_jobs_spelling():
 
 
 def test_no_extraction_transport_admits_a_capability_statement():
-    """Only an answer states a capability, so a model that writes one is refused."""
+    """Extraction states no capability, so a model that writes one is refused."""
     statement = _stated("oauth", "absent", "Ana").model_dump()
 
     _, issues = expand({"capabilities": [statement]})

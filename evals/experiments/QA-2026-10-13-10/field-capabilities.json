@@ -1,0 +1,101 @@
+{
+ "example": {
+  "L1": {
+   "listed": [
+    10,
+    8
+   ],
+   "off_list": [
+    24,
+    22
+   ],
+   "left_the_list": [
+    "encryption",
+    "external-facing-http-services"
+   ],
+   "applicable": [
+    7,
+    13
+   ],
+   "unknown": [
+    63,
+    57
+   ]
+  },
+  "L2": {
+   "listed": [
+    30,
+    30
+   ],
+   "off_list": [
+    77,
+    67
+   ],
+   "left_the_list": [
+    "encryption",
+    "external-facing-http-services",
+    "sensitive-http-requests",
+    "tls-use"
+   ],
+   "applicable": [
+    39,
+    59
+   ],
+   "unknown": [
+    214,
+    194
+   ]
+  },
+  "L3": {
+   "listed": [
+    30,
+    30
+   ],
+   "off_list": [
+    111,
+    100
+   ],
+   "left_the_list": [
+    "encryption",
+    "external-facing-http-services",
+    "sensitive-http-requests",
+    "tls-use"
+   ],
+   "applicable": [
+    47,
+    79
+   ],
+   "unknown": [
+    298,
+    266
+   ]
+  }
+ },
+ "archive": {
+  "distinct_models": 58,
+  "fires": {
+   "sensitive-data": 57,
+   "external-facing-http-services": 33,
+   "secret-assets": 25,
+   "tls-use": 18,
+   "cryptographic-operations": 18,
+   "cryptographic-keys": 18,
+   "separate-service-connections": 11,
+   "sensitive-http-requests": 10,
+   "http2-messages": 9,
+   "http2-request-reception": 9,
+   "encryption": 9,
+   "tls-client": 6,
+   "internal-http-connections": 6,
+   "internal-tls-connections": 3,
+   "websocket": 3,
+   "xml-parsing": 3,
+   "internal-services": 2
+  },
+  "units_made_applicable": {
+   "L1": 118,
+   "L2": 551,
+   "L3": 927
+  }
+ }
+}
