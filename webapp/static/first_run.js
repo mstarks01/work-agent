@@ -791,8 +791,10 @@
 
   // ---- Boxes --------------------------------------------------------------
   // The list is a sequence of boxes, one for each run of rows that share a
-  // group, in the service's order. A box never moves a row ahead of another:
-  // a group that comes back later in the list opens a new box.
+  // group, in the service's order. The service lists each question kind's
+  // rows together (ADR 0080), so a kind takes one box. A capability keeps
+  // its place in its framework's turn, so the application's box can come
+  // back later in the list, and then it opens a new box.
   const newBox = (q) => {
     const node = document.createElement("details");
     node.className = "question-group";

@@ -94,7 +94,11 @@ from analysis_service.links import (
     link_questions,
     resumed_sources,
 )
-from analysis_service.open_facts import open_attribute, prepared_model
+from analysis_service.open_facts import (
+    CAPABILITY_GROUP,
+    open_attribute,
+    prepared_model,
+)
 from analysis_service.questions import FactQuestion, fact_questions
 from analysis_service.sources import LimitBreach, Source, SourceLimits
 from analysis_service.system_model import ModelIndex, SystemModel
@@ -1151,6 +1155,10 @@ def recommended(
 
     **A question that decides a framework's precondition is listed first**,
     every one still open, outside the limits and the floor (ADR 0067).
+
+    **Each question kind is listed once** (:func:`grouped`, ADR 0080): its
+    rows follow its first row, so a lower row of a kind can move ahead of
+    another kind's row. A capability question keeps its own place.
     """
     gates = [
         question for question in listed if question.gates and question.key not in done
@@ -1223,7 +1231,22 @@ def recommended(
         shown += [*started, *taken]
         for question in started:
             again.update(dict.fromkeys(question.frameworks, question.decisions))
-    return (*gates, *by_turn(shown, spent - again)), blocked, tuple(held_back)
+    return grouped((*gates, *by_turn(shown, spent - again))), blocked, tuple(held_back)
+
+
+def grouped(questions: Sequence[EarlyQuestion]) -> tuple[EarlyQuestion, ...]:
+    """The list with each question kind's rows together (ADR 0080).
+
+    A group takes the place of its first row, and its other rows follow it in
+    the list's order, so a page shows each kind once. A capability question
+    keeps its own place: every capability shares one group, and gathering them
+    took the frameworks' turns away (``QA-2026-10-13-02-E2``).
+    """
+    places: dict[int | str, list[EarlyQuestion]] = {}
+    for index, question in enumerate(questions):
+        place = index if question.group == CAPABILITY_GROUP else question.group
+        places.setdefault(place, []).append(question)
+    return tuple(question for rows in places.values() for question in rows)
 
 
 def by_turn(

@@ -1,0 +1,1805 @@
+{
+ "system_model": {
+  "external_entities": [
+   {
+    "id": "entity:customer",
+    "name": "Customer",
+    "description": "A customer who signs in and places orders.",
+    "assets": [
+     "pii"
+    ],
+    "source_excerpt": "Customers sign in with our Auth0 identity provider and place orders",
+    "source_label": "Pasted description",
+    "source_speaker": "",
+    "notes": "",
+    "kind": "human",
+    "trust_zone": "boundary:public-internet"
+   },
+   {
+    "id": "entity:auth0-identity-provider",
+    "name": "Auth0 identity provider",
+    "description": "The identity provider used for customer sign-in and OAuth2 bearer tokens.",
+    "assets": [
+     "credentials"
+    ],
+    "source_excerpt": "our Auth0 identity provider",
+    "source_label": "Pasted description",
+    "source_speaker": "",
+    "notes": "",
+    "kind": "external-system",
+    "trust_zone": "boundary:auth0"
+   },
+   {
+    "id": "entity:stripe",
+    "name": "Stripe",
+    "description": "External payment authorization service.",
+    "assets": [
+     "financial",
+     "secrets"
+    ],
+    "source_excerpt": "Payment authorisation goes to Stripe over HTTPS with a secret API key",
+    "source_label": "Pasted description",
+    "source_speaker": "",
+    "notes": "",
+    "kind": "external-system",
+    "trust_zone": "boundary:stripe"
+   },
+   {
+    "id": "entity:platform-team",
+    "name": "Platform team",
+    "description": "The team permitted to copy or restore database snapshots and S3 objects.",
+    "assets": [],
+    "source_excerpt": "Only the platform team can copy or restore its snapshots",
+    "source_label": "Pasted description",
+    "source_speaker": "",
+    "notes": "",
+    "kind": "human",
+    "trust_zone": "boundary:corporate-management-network"
+   },
+   {
+    "id": "entity:analytics-team",
+    "name": "Analytics team",
+    "description": "A group of internal analysts querying the analytics bucket.",
+    "assets": [],
+    "source_excerpt": "The analytics team, a group of internal analysts",
+    "source_label": "Pasted description",
+    "source_speaker": "",
+    "notes": "",
+    "kind": "human",
+    "trust_zone": "boundary:corporate-management-network"
+   },
+   {
+    "id": "entity:support-administrator",
+    "name": "Support administrator",
+    "description": "A staff support administrator using the administrative interface.",
+    "assets": [],
+    "source_excerpt": "Support administrators are staff",
+    "source_label": "Pasted description",
+    "source_speaker": "",
+    "notes": "",
+    "kind": "human",
+    "trust_zone": "boundary:corporate-management-network"
+   }
+  ],
+  "processes": [
+   {
+    "id": "process:cloudfront",
+    "name": "CloudFront",
+    "description": "Serves the React single-page web app to the public internet.",
+    "assets": [],
+    "source_excerpt": "served from CloudFront to the public internet over HTTPS",
+    "source_label": "Pasted description",
+    "source_speaker": "",
+    "notes": "",
+    "technology": "CloudFront",
+    "trust_zone": "unknown",
+    "exposure": "internet-facing",
+    "interface_kind": "web"
+   },
+   {
+    "id": "process:react-single-page-web-app",
+    "name": "React single-page web app",
+    "description": "The customer-facing web application used to place orders and call the Orders API.",
+    "assets": [
+     "pii",
+     "business-critical-data"
+    ],
+    "source_excerpt": "a React single-page web app",
+    "source_label": "Pasted description",
+    "source_speaker": "",
+    "notes": "",
+    "technology": "React",
+    "trust_zone": "unknown",
+    "exposure": "internet-facing",
+    "interface_kind": "web"
+   },
+   {
+    "id": "process:aws-waf",
+    "name": "AWS WAF",
+    "description": "Limits each client to 2,000 requests per five minutes on CloudFront.",
+    "assets": [],
+    "source_excerpt": "AWS WAF on CloudFront limits each client to 2,000 requests per five minutes",
+    "source_label": "Pasted description",
+    "source_speaker": "",
+    "notes": "",
+    "technology": "AWS WAF",
+    "trust_zone": "unknown",
+    "exposure": "internet-facing",
+    "interface_kind": "unknown"
+   },
+   {
+    "id": "process:orders-api",
+    "name": "Orders API",
+    "description": "Internal API that processes orders, accesses the database, authorizes payments, supports administration, and writes audit actions.",
+    "assets": [
+     "pii",
+     "financial",
+     "business-critical-data",
+     "secrets"
+    ],
+    "source_excerpt": "The web app calls an internal Orders API in our AWS VPC",
+    "source_label": "Pasted description",
+    "source_speaker": "",
+    "notes": "",
+    "technology": "unknown",
+    "trust_zone": "boundary:aws-vpc",
+    "exposure": "internal",
+    "interface_kind": "web"
+   },
+   {
+    "id": "process:nightly-batch-job",
+    "name": "Nightly batch job",
+    "description": "Reads up to one day of orders and writes summaries to the S3 bucket.",
+    "assets": [
+     "business-critical-data",
+     "pii"
+    ],
+    "source_excerpt": "A nightly batch job in the same VPC reads at most one day of orders",
+    "source_label": "Pasted description",
+    "source_speaker": "",
+    "notes": "",
+    "technology": "unknown",
+    "trust_zone": "boundary:aws-vpc",
+    "exposure": "internal",
+    "interface_kind": "non-web"
+   },
+   {
+    "id": "process:athena",
+    "name": "Athena",
+    "description": "Used by analytics staff to query the S3 bucket.",
+    "assets": [
+     "business-critical-data",
+     "pii"
+    ],
+    "source_excerpt": "query that bucket through Athena over HTTPS",
+    "source_label": "Pasted description",
+    "source_speaker": "",
+    "notes": "",
+    "technology": "Athena",
+    "trust_zone": "unknown",
+    "exposure": "unknown",
+    "interface_kind": "non-web"
+   },
+   {
+    "id": "process:admin-console",
+    "name": "Admin console",
+    "description": "Administrative interface on the Orders API for refunds, address edits, and order-history lookups.",
+    "assets": [
+     "pii",
+     "financial",
+     "business-critical-data"
+    ],
+    "source_excerpt": "use an admin console on the Orders API",
+    "source_label": "Pasted description",
+    "source_speaker": "",
+    "notes": "",
+    "technology": "unknown",
+    "trust_zone": "unknown",
+    "exposure": "internal",
+    "interface_kind": "web"
+   }
+  ],
+  "data_stores": [
+   {
+    "id": "store:postgres-database",
+    "name": "Postgres database",
+    "description": "Database holding customer names, delivery addresses, phone numbers, and order history.",
+    "assets": [
+     "pii",
+     "business-critical-data"
+    ],
+    "source_excerpt": "It holds customer names, delivery addresses, phone numbers, and order history",
+    "source_label": "Pasted description",
+    "source_speaker": "",
+    "notes": "",
+    "technology": "Postgres",
+    "trust_zone": "boundary:private-subnet",
+    "data_classification": "confidential",
+    "encryption_at_rest": "AWS KMS"
+   },
+   {
+    "id": "store:s3-bucket",
+    "name": "S3 bucket",
+    "description": "Bucket holding summaries produced by the nightly batch job.",
+    "assets": [
+     "business-critical-data",
+     "pii"
+    ],
+    "source_excerpt": "a KMS-encrypted S3 bucket",
+    "source_label": "Pasted description",
+    "source_speaker": "",
+    "notes": "",
+    "technology": "S3",
+    "trust_zone": "unknown",
+    "data_classification": "confidential",
+    "encryption_at_rest": "AWS KMS"
+   },
+   {
+    "id": "store:audit-log",
+    "name": "Audit log",
+    "description": "Log to which the Orders API writes each administrative action.",
+    "assets": [
+     "business-critical-data"
+    ],
+    "source_excerpt": "The API writes each action to an audit log that administrators cannot change",
+    "source_label": "Pasted description",
+    "source_speaker": "",
+    "notes": "",
+    "technology": "unknown",
+    "trust_zone": "unknown",
+    "data_classification": "confidential",
+    "encryption_at_rest": "unknown"
+   }
+  ],
+  "data_flows": [
+   {
+    "id": "flow:entity:customer>entity:auth0-identity-provider>sign-in",
+    "name": "sign in",
+    "description": "Customer sign-in through Auth0.",
+    "assets": [
+     "credentials",
+     "pii"
+    ],
+    "source_excerpt": "Customers sign in with our Auth0 identity provider",
+    "source_label": "Pasted description",
+    "source_speaker": "",
+    "notes": "",
+    "source": "entity:customer",
+    "destination": "entity:auth0-identity-provider",
+    "protocol": "unknown",
+    "authentication": "unknown",
+    "data_description": "Customer sign-in information",
+    "encryption_in_transit": "unknown",
+    "operations": "unknown"
+   },
+   {
+    "id": "flow:entity:customer>process:cloudfront>load-web-app",
+    "name": "load web app",
+    "description": "Customer loads the web application from CloudFront.",
+    "assets": [],
+    "source_excerpt": "served from CloudFront to the public internet over HTTPS with TLS 1.3",
+    "source_label": "Pasted description",
+    "source_speaker": "",
+    "notes": "",
+    "source": "entity:customer",
+    "destination": "process:cloudfront",
+    "protocol": "HTTPS",
+    "authentication": "unknown",
+    "data_description": "React single-page web app",
+    "encryption_in_transit": "TLS 1.3",
+    "operations": "read"
+   },
+   {
+    "id": "flow:process:react-single-page-web-app>process:orders-api>place-orders",
+    "name": "place orders",
+    "description": "The web app calls the Orders API to place orders.",
+    "assets": [
+     "business-critical-data",
+     "pii"
+    ],
+    "source_excerpt": "The web app calls an internal Orders API in our AWS VPC over HTTPS",
+    "source_label": "Pasted description",
+    "source_speaker": "",
+    "notes": "",
+    "source": "process:react-single-page-web-app",
+    "destination": "process:orders-api",
+    "protocol": "HTTPS",
+    "authentication": "Auth0 OAuth2 bearer token",
+    "data_description": "Orders",
+    "encryption_in_transit": "TLS",
+    "operations": "read-write"
+   },
+   {
+    "id": "flow:entity:customer>process:orders-api>place-order",
+    "name": "place order",
+    "description": "Customer places an order through the web application.",
+    "assets": [
+     "business-critical-data",
+     "pii"
+    ],
+    "source_excerpt": "Customers sign in with our Auth0 identity provider and place orders through a React single-page web app",
+    "source_label": "Pasted description",
+    "source_speaker": "",
+    "notes": "",
+    "source": "entity:customer",
+    "destination": "process:orders-api",
+    "protocol": "HTTPS",
+    "authentication": "Auth0 OAuth2 bearer token",
+    "data_description": "Order information",
+    "encryption_in_transit": "TLS 1.3",
+    "operations": "write"
+   },
+   {
+    "id": "flow:process:orders-api>store:postgres-database>access-orders",
+    "name": "access orders",
+    "description": "Orders API reads and writes the Postgres database.",
+    "assets": [
+     "pii",
+     "business-critical-data"
+    ],
+    "source_excerpt": "The Orders API reads and writes a Postgres database in a private subnet over TLS",
+    "source_label": "Pasted description",
+    "source_speaker": "",
+    "notes": "",
+    "source": "process:orders-api",
+    "destination": "store:postgres-database",
+    "protocol": "database protocol",
+    "authentication": "IAM database authentication",
+    "data_description": "Customer information and order history",
+    "encryption_in_transit": "TLS",
+    "operations": "read-write"
+   },
+   {
+    "id": "flow:process:orders-api>entity:stripe>authorize-payment",
+    "name": "authorize payment",
+    "description": "Orders API sends payment authorization to Stripe.",
+    "assets": [
+     "financial",
+     "secrets"
+    ],
+    "source_excerpt": "Payment authorisation goes to Stripe over HTTPS with a secret API key",
+    "source_label": "Pasted description",
+    "source_speaker": "",
+    "notes": "",
+    "source": "process:orders-api",
+    "destination": "entity:stripe",
+    "protocol": "HTTPS",
+    "authentication": "secret API key",
+    "data_description": "Payment authorization; card numbers do not reach our systems",
+    "encryption_in_transit": "TLS",
+    "operations": "write"
+   },
+   {
+    "id": "flow:process:nightly-batch-job>store:postgres-database>read-orders",
+    "name": "read orders",
+    "description": "Nightly batch job reads at most one day of orders.",
+    "assets": [
+     "business-critical-data",
+     "pii"
+    ],
+    "source_excerpt": "reads at most one day of orders over TLS with a read-only database role",
+    "source_label": "Pasted description",
+    "source_speaker": "",
+    "notes": "",
+    "source": "process:nightly-batch-job",
+    "destination": "store:postgres-database",
+    "protocol": "database protocol",
+    "authentication": "read-only database role",
+    "data_description": "At most one day of orders",
+    "encryption_in_transit": "TLS",
+    "operations": "read"
+   },
+   {
+    "id": "flow:process:nightly-batch-job>store:s3-bucket>write-summaries",
+    "name": "write summaries",
+    "description": "Nightly batch job writes summaries to the S3 bucket.",
+    "assets": [
+     "business-critical-data",
+     "pii"
+    ],
+    "source_excerpt": "It writes summaries over HTTPS, with its own IAM role, to a KMS-encrypted S3 bucket",
+    "source_label": "Pasted description",
+    "source_speaker": "",
+    "notes": "",
+    "source": "process:nightly-batch-job",
+    "destination": "store:s3-bucket",
+    "protocol": "HTTPS",
+    "authentication": "IAM role",
+    "data_description": "Order summaries",
+    "encryption_in_transit": "TLS",
+    "operations": "write"
+   },
+   {
+    "id": "flow:entity:analytics-team>process:athena>analytics-team",
+    "name": "Analytics team",
+    "description": "Analytics team queries the S3 bucket through Athena.",
+    "assets": [
+     "business-critical-data",
+     "pii"
+    ],
+    "source_excerpt": "The analytics team, a group of internal analysts, query that bucket",
+    "source_label": "Pasted description",
+    "source_speaker": "",
+    "notes": "",
+    "source": "entity:analytics-team",
+    "destination": "process:athena",
+    "protocol": "HTTPS",
+    "authentication": "read-only IAM roles",
+    "data_description": "Analytics queries",
+    "encryption_in_transit": "TLS",
+    "operations": "read"
+   },
+   {
+    "id": "flow:process:athena>store:s3-bucket>query-summaries",
+    "name": "query summaries",
+    "description": "Athena queries the summaries in the S3 bucket.",
+    "assets": [
+     "business-critical-data",
+     "pii"
+    ],
+    "source_excerpt": "query that bucket through Athena over HTTPS",
+    "source_label": "Pasted description",
+    "source_speaker": "",
+    "notes": "",
+    "source": "process:athena",
+    "destination": "store:s3-bucket",
+    "protocol": "HTTPS",
+    "authentication": "read-only IAM roles",
+    "data_description": "Order summaries",
+    "encryption_in_transit": "TLS",
+    "operations": "read"
+   },
+   {
+    "id": "flow:entity:support-administrator>process:admin-console>support-administrator",
+    "name": "Support administrator",
+    "description": "Support administrator uses the admin console on the Orders API.",
+    "assets": [
+     "pii",
+     "financial",
+     "business-critical-data"
+    ],
+    "source_excerpt": "Through it they refund orders, edit customer delivery addresses, and look up order history",
+    "source_label": "Pasted description",
+    "source_speaker": "",
+    "notes": "",
+    "source": "entity:support-administrator",
+    "destination": "process:admin-console",
+    "protocol": "HTTPS",
+    "authentication": "SSO and MFA",
+    "data_description": "Refunds, delivery addresses, and order history",
+    "encryption_in_transit": "TLS",
+    "operations": "read-write"
+   },
+   {
+    "id": "flow:process:admin-console>process:orders-api>administer-orders",
+    "name": "administer orders",
+    "description": "Admin console performs refunds, address edits, and order-history lookups through the Orders API.",
+    "assets": [
+     "pii",
+     "financial",
+     "business-critical-data"
+    ],
+    "source_excerpt": "use an admin console on the Orders API from a separate corporate management network over HTTPS",
+    "source_label": "Pasted description",
+    "source_speaker": "",
+    "notes": "",
+    "source": "process:admin-console",
+    "destination": "process:orders-api",
+    "protocol": "HTTPS",
+    "authentication": "SSO and MFA",
+    "data_description": "Refunds, delivery addresses, and order history",
+    "encryption_in_transit": "TLS",
+    "operations": "read-write"
+   },
+   {
+    "id": "flow:process:orders-api>store:audit-log>write-audit-actions",
+    "name": "write audit actions",
+    "description": "Orders API writes each administrative action to the audit log.",
+    "assets": [
+     "business-critical-data"
+    ],
+    "source_excerpt": "The API writes each action to an audit log that administrators cannot change",
+    "source_label": "Pasted description",
+    "source_speaker": "",
+    "notes": "",
+    "source": "process:orders-api",
+    "destination": "store:audit-log",
+    "protocol": "unknown",
+    "authentication": "unknown",
+    "data_description": "Administrative actions",
+    "encryption_in_transit": "unknown",
+    "operations": "write"
+   }
+  ],
+  "trust_boundaries": [
+   {
+    "id": "boundary:public-internet",
+    "name": "public internet",
+    "description": "Public internet zone from which the web application is accessed.",
+    "assets": [],
+    "source_excerpt": "served from CloudFront to the public internet",
+    "source_label": "Pasted description",
+    "source_speaker": "",
+    "notes": "",
+    "kind": "network"
+   },
+   {
+    "id": "boundary:cloudfront",
+    "name": "CloudFront",
+    "description": "CloudFront hosting and delivery zone.",
+    "assets": [],
+    "source_excerpt": "served from CloudFront",
+    "source_label": "Pasted description",
+    "source_speaker": "",
+    "notes": "",
+    "kind": "tenant"
+   },
+   {
+    "id": "boundary:aws-vpc",
+    "name": "AWS VPC",
+    "description": "AWS VPC containing the internal Orders API and nightly batch job.",
+    "assets": [],
+    "source_excerpt": "our AWS VPC",
+    "source_label": "Pasted description",
+    "source_speaker": "",
+    "notes": "",
+    "kind": "network"
+   },
+   {
+    "id": "boundary:private-subnet",
+    "name": "private subnet",
+    "description": "Private subnet containing the Postgres database.",
+    "assets": [],
+    "source_excerpt": "a Postgres database in a private subnet",
+    "source_label": "Pasted description",
+    "source_speaker": "",
+    "notes": "",
+    "kind": "network"
+   },
+   {
+    "id": "boundary:corporate-management-network",
+    "name": "corporate management network",
+    "description": "Separate corporate management network used by support administrators.",
+    "assets": [],
+    "source_excerpt": "a separate corporate management network",
+    "source_label": "Pasted description",
+    "source_speaker": "",
+    "notes": "",
+    "kind": "network"
+   },
+   {
+    "id": "boundary:auth0",
+    "name": "Auth0",
+    "description": "External identity-provider zone.",
+    "assets": [],
+    "source_excerpt": "our Auth0 identity provider",
+    "source_label": "Pasted description",
+    "source_speaker": "",
+    "notes": "",
+    "kind": "tenant"
+   },
+   {
+    "id": "boundary:stripe",
+    "name": "Stripe",
+    "description": "External payment-service zone.",
+    "assets": [],
+    "source_excerpt": "Payment authorisation goes to Stripe",
+    "source_label": "Pasted description",
+    "source_speaker": "",
+    "notes": "",
+    "kind": "tenant"
+   }
+  ],
+  "assumptions": [
+   {
+    "assumption": "The Postgres database data is confidential because it contains customer personal information and order history.",
+    "element_id": "store:postgres-database",
+    "attribute": "data_classification",
+    "basis": "The store contains customer names, delivery addresses, phone numbers, and order history."
+   },
+   {
+    "assumption": "The S3 bucket data is confidential because it contains order summaries derived from customer orders.",
+    "element_id": "store:s3-bucket",
+    "attribute": "data_classification",
+    "basis": "The bucket stores summaries written from orders."
+   },
+   {
+    "assumption": "The audit log data is confidential because it contains administrative actions concerning customer and order data.",
+    "element_id": "store:audit-log",
+    "attribute": "data_classification",
+    "basis": "The API writes each administrative action to the audit log."
+   },
+   {
+    "assumption": "The React single-page web app is internet-facing because it is served to the public internet.",
+    "element_id": "process:react-single-page-web-app",
+    "attribute": "exposure",
+    "basis": "The web app is served from CloudFront to the public internet."
+   },
+   {
+    "assumption": "The Orders API presents a web interface because the web app calls it over HTTPS.",
+    "element_id": "process:orders-api",
+    "attribute": "interface_kind",
+    "basis": "The web app calls the Orders API over HTTPS."
+   },
+   {
+    "assumption": "The admin console presents a web interface because administrators use it over HTTPS.",
+    "element_id": "process:admin-console",
+    "attribute": "interface_kind",
+    "basis": "Support administrators use an admin console over HTTPS."
+   },
+   {
+    "assumption": "The Auth0 identity provider is in a tenant boundary because it is an external identity provider.",
+    "element_id": "boundary:auth0",
+    "attribute": "kind",
+    "basis": "The text identifies Auth0 as the identity provider external to the described system."
+   },
+   {
+    "assumption": "Stripe is in a tenant boundary because it is an external payment service.",
+    "element_id": "boundary:stripe",
+    "attribute": "kind",
+    "basis": "Payment authorization goes to the separately named Stripe service."
+   },
+   {
+    "assumption": "CloudFront is in a tenant boundary because it is a separately controlled hosting and delivery service.",
+    "element_id": "boundary:cloudfront",
+    "attribute": "kind",
+    "basis": "The application is served from the separately named CloudFront service."
+   }
+  ],
+  "capabilities": []
+ },
+ "assertions": {
+  "proposed": 45,
+  "catalog": {
+   "registry_version": 8,
+   "subjects": [
+    {
+     "id": "boundary:aws-vpc",
+     "type": "zone",
+     "label": "AWS VPC"
+    },
+    {
+     "id": "boundary:private-subnet",
+     "type": "zone",
+     "label": "private subnet"
+    },
+    {
+     "id": "credential:auth0-oauth2-bearer-token",
+     "type": "credential",
+     "label": "Auth0 OAuth2 bearer token"
+    },
+    {
+     "id": "credential:secret-api-key",
+     "type": "credential",
+     "label": "secret API key"
+    },
+    {
+     "id": "flow:entity:analytics-team>process:athena>analytics-team",
+     "type": "interaction",
+     "label": "Analytics team"
+    },
+    {
+     "id": "flow:entity:customer>entity:auth0-identity-provider>sign-in",
+     "type": "interaction",
+     "label": "sign in"
+    },
+    {
+     "id": "flow:entity:customer>process:cloudfront>load-web-app",
+     "type": "interaction",
+     "label": "load web app"
+    },
+    {
+     "id": "flow:entity:customer>process:orders-api>place-order",
+     "type": "interaction",
+     "label": "place order"
+    },
+    {
+     "id": "flow:entity:support-administrator>process:admin-console>support-administrator",
+     "type": "interaction",
+     "label": "Support administrator"
+    },
+    {
+     "id": "flow:process:admin-console>process:orders-api>administer-orders",
+     "type": "interaction",
+     "label": "administer orders"
+    },
+    {
+     "id": "flow:process:athena>store:s3-bucket>query-summaries",
+     "type": "interaction",
+     "label": "query summaries"
+    },
+    {
+     "id": "flow:process:nightly-batch-job>store:postgres-database>read-orders",
+     "type": "interaction",
+     "label": "read orders"
+    },
+    {
+     "id": "flow:process:nightly-batch-job>store:s3-bucket>write-summaries",
+     "type": "interaction",
+     "label": "write summaries"
+    },
+    {
+     "id": "flow:process:orders-api>entity:stripe>authorize-payment",
+     "type": "interaction",
+     "label": "authorize payment"
+    },
+    {
+     "id": "flow:process:orders-api>store:postgres-database>access-orders",
+     "type": "interaction",
+     "label": "access orders"
+    },
+    {
+     "id": "flow:process:react-single-page-web-app>process:orders-api>place-orders",
+     "type": "interaction",
+     "label": "place orders"
+    },
+    {
+     "id": "principal:analytics-team",
+     "type": "principal",
+     "label": "analytics team"
+    },
+    {
+     "id": "principal:platform-team",
+     "type": "principal",
+     "label": "platform team"
+    },
+    {
+     "id": "principal:support-administrators",
+     "type": "principal",
+     "label": "support administrators"
+    },
+    {
+     "id": "process:admin-console",
+     "type": "component",
+     "label": "Admin console"
+    },
+    {
+     "id": "process:cloudfront",
+     "type": "component",
+     "label": "CloudFront"
+    },
+    {
+     "id": "process:nightly-batch-job",
+     "type": "component",
+     "label": "Nightly batch job"
+    },
+    {
+     "id": "process:orders-api",
+     "type": "component",
+     "label": "Orders API"
+    },
+    {
+     "id": "process:react-single-page-web-app",
+     "type": "component",
+     "label": "React single-page web app"
+    },
+    {
+     "id": "store:audit-log",
+     "type": "component",
+     "label": "Audit log"
+    },
+    {
+     "id": "store:postgres-database",
+     "type": "component",
+     "label": "Postgres database"
+    },
+    {
+     "id": "store:s3-bucket",
+     "type": "component",
+     "label": "S3 bucket"
+    }
+   ],
+   "entries": [
+    {
+     "subject": "process:cloudfront",
+     "predicate": "internet-exposure",
+     "value": "internet-facing",
+     "scope": [],
+     "basis": "stated",
+     "reason": null,
+     "support": [
+      {
+       "source_label": "Pasted description",
+       "digest": "58d4219b663c5b90ae19b2281b476e2e38b50aeffc74be1ee49844f9205e91e1",
+       "start": 105,
+       "end": 150,
+       "quote": "served from CloudFront to the public internet"
+      }
+     ],
+     "premises": [],
+     "explanation": "",
+     "exclusive": false,
+     "assessment": "unchecked",
+     "assessor": ""
+    },
+    {
+     "subject": "process:react-single-page-web-app",
+     "predicate": "internet-exposure",
+     "value": "internet-facing",
+     "scope": [],
+     "basis": "stated",
+     "reason": null,
+     "support": [
+      {
+       "source_label": "Pasted description",
+       "digest": "58d4219b663c5b90ae19b2281b476e2e38b50aeffc74be1ee49844f9205e91e1",
+       "start": 105,
+       "end": 150,
+       "quote": "served from CloudFront to the public internet"
+      }
+     ],
+     "premises": [],
+     "explanation": "",
+     "exclusive": false,
+     "assessment": "unchecked",
+     "assessor": ""
+    },
+    {
+     "subject": "process:orders-api",
+     "predicate": "internet-exposure",
+     "value": "internal",
+     "scope": [],
+     "basis": "stated",
+     "reason": null,
+     "support": [
+      {
+       "source_label": "Pasted description",
+       "digest": "58d4219b663c5b90ae19b2281b476e2e38b50aeffc74be1ee49844f9205e91e1",
+       "start": 188,
+       "end": 231,
+       "quote": "calls an internal Orders API in our AWS VPC"
+      }
+     ],
+     "premises": [],
+     "explanation": "",
+     "exclusive": false,
+     "assessment": "unchecked",
+     "assessor": ""
+    },
+    {
+     "subject": "process:orders-api",
+     "predicate": "network-membership",
+     "value": "boundary:aws-vpc",
+     "scope": [],
+     "basis": "stated",
+     "reason": null,
+     "support": [
+      {
+       "source_label": "Pasted description",
+       "digest": "58d4219b663c5b90ae19b2281b476e2e38b50aeffc74be1ee49844f9205e91e1",
+       "start": 194,
+       "end": 231,
+       "quote": "an internal Orders API in our AWS VPC"
+      }
+     ],
+     "premises": [],
+     "explanation": "",
+     "exclusive": false,
+     "assessment": "unchecked",
+     "assessor": ""
+    },
+    {
+     "subject": "process:nightly-batch-job",
+     "predicate": "network-membership",
+     "value": "boundary:aws-vpc",
+     "scope": [],
+     "basis": "stated",
+     "reason": null,
+     "support": [
+      {
+       "source_label": "Pasted description",
+       "digest": "58d4219b663c5b90ae19b2281b476e2e38b50aeffc74be1ee49844f9205e91e1",
+       "start": 958,
+       "end": 993,
+       "quote": "A nightly batch job in the same VPC"
+      }
+     ],
+     "premises": [],
+     "explanation": "",
+     "exclusive": false,
+     "assessment": "unchecked",
+     "assessor": ""
+    },
+    {
+     "subject": "store:postgres-database",
+     "predicate": "network-membership",
+     "value": "boundary:private-subnet",
+     "scope": [],
+     "basis": "stated",
+     "reason": null,
+     "support": [
+      {
+       "source_label": "Pasted description",
+       "digest": "58d4219b663c5b90ae19b2281b476e2e38b50aeffc74be1ee49844f9205e91e1",
+       "start": 497,
+       "end": 536,
+       "quote": "a Postgres database in a private subnet"
+      }
+     ],
+     "premises": [],
+     "explanation": "",
+     "exclusive": false,
+     "assessment": "unchecked",
+     "assessor": ""
+    },
+    {
+     "subject": "store:s3-bucket",
+     "predicate": "storage-encryption",
+     "value": "AWS KMS",
+     "scope": [],
+     "basis": "stated",
+     "reason": null,
+     "support": [
+      {
+       "source_label": "Pasted description",
+       "digest": "58d4219b663c5b90ae19b2281b476e2e38b50aeffc74be1ee49844f9205e91e1",
+       "start": 1125,
+       "end": 1151,
+       "quote": "a KMS-encrypted S3 bucket"
+      }
+     ],
+     "premises": [],
+     "explanation": "",
+     "exclusive": false,
+     "assessment": "unchecked",
+     "assessor": ""
+    },
+    {
+     "subject": "store:postgres-database",
+     "predicate": "data-classification",
+     "value": "confidential",
+     "scope": [],
+     "basis": "inferred",
+     "reason": null,
+     "support": [],
+     "premises": [],
+     "explanation": "The database holds customer names, delivery addresses, phone numbers, and order history, which supports a confidential classification.",
+     "exclusive": false,
+     "assessment": "unchecked",
+     "assessor": ""
+    },
+    {
+     "subject": "store:s3-bucket",
+     "predicate": "data-classification",
+     "value": "confidential",
+     "scope": [],
+     "basis": "inferred",
+     "reason": null,
+     "support": [],
+     "premises": [],
+     "explanation": "The bucket holds summaries derived from orders, which supports a confidential classification.",
+     "exclusive": false,
+     "assessment": "unchecked",
+     "assessor": ""
+    },
+    {
+     "subject": "store:audit-log",
+     "predicate": "data-classification",
+     "value": "confidential",
+     "scope": [],
+     "basis": "inferred",
+     "reason": null,
+     "support": [],
+     "premises": [],
+     "explanation": "The audit log contains each administrative action concerning customer and order data, which supports a confidential classification.",
+     "exclusive": false,
+     "assessment": "unchecked",
+     "assessor": ""
+    },
+    {
+     "subject": "flow:entity:customer>entity:auth0-identity-provider>sign-in",
+     "predicate": "authentication-mechanism",
+     "value": "Auth0 identity provider",
+     "scope": [],
+     "basis": "stated",
+     "reason": null,
+     "support": [
+      {
+       "source_label": "Pasted description",
+       "digest": "58d4219b663c5b90ae19b2281b476e2e38b50aeffc74be1ee49844f9205e91e1",
+       "start": 0,
+       "end": 50,
+       "quote": "Customers sign in with our Auth0 identity provider"
+      }
+     ],
+     "premises": [],
+     "explanation": "",
+     "exclusive": false,
+     "assessment": "unchecked",
+     "assessor": ""
+    },
+    {
+     "subject": "flow:entity:customer>process:cloudfront>load-web-app",
+     "predicate": "transport-encryption",
+     "value": "TLS 1.3",
+     "scope": [],
+     "basis": "stated",
+     "reason": null,
+     "support": [
+      {
+       "source_label": "Pasted description",
+       "digest": "58d4219b663c5b90ae19b2281b476e2e38b50aeffc74be1ee49844f9205e91e1",
+       "start": 105,
+       "end": 175,
+       "quote": "served from CloudFront to the public internet over HTTPS with TLS 1.3"
+      }
+     ],
+     "premises": [],
+     "explanation": "",
+     "exclusive": false,
+     "assessment": "unchecked",
+     "assessor": ""
+    },
+    {
+     "subject": "flow:process:react-single-page-web-app>process:orders-api>place-orders",
+     "predicate": "transport-encryption",
+     "value": "TLS",
+     "scope": [],
+     "basis": "stated",
+     "reason": null,
+     "support": [
+      {
+       "source_label": "Pasted description",
+       "digest": "58d4219b663c5b90ae19b2281b476e2e38b50aeffc74be1ee49844f9205e91e1",
+       "start": 176,
+       "end": 243,
+       "quote": "The web app calls an internal Orders API in our AWS VPC over HTTPS"
+      }
+     ],
+     "premises": [],
+     "explanation": "",
+     "exclusive": false,
+     "assessment": "unchecked",
+     "assessor": ""
+    },
+    {
+     "subject": "flow:process:react-single-page-web-app>process:orders-api>place-orders",
+     "predicate": "authentication-mechanism",
+     "value": "Auth0 OAuth2 bearer token",
+     "scope": [],
+     "basis": "stated",
+     "reason": null,
+     "support": [
+      {
+       "source_label": "Pasted description",
+       "digest": "58d4219b663c5b90ae19b2281b476e2e38b50aeffc74be1ee49844f9205e91e1",
+       "start": 244,
+       "end": 292,
+       "quote": "Every call carries an Auth0 OAuth2 bearer token"
+      }
+     ],
+     "premises": [],
+     "explanation": "",
+     "exclusive": false,
+     "assessment": "unchecked",
+     "assessor": ""
+    },
+    {
+     "subject": "flow:process:react-single-page-web-app>process:orders-api>place-orders",
+     "predicate": "credential-presented",
+     "value": "credential:auth0-oauth2-bearer-token",
+     "scope": [],
+     "basis": "stated",
+     "reason": null,
+     "support": [
+      {
+       "source_label": "Pasted description",
+       "digest": "58d4219b663c5b90ae19b2281b476e2e38b50aeffc74be1ee49844f9205e91e1",
+       "start": 244,
+       "end": 292,
+       "quote": "Every call carries an Auth0 OAuth2 bearer token"
+      }
+     ],
+     "premises": [],
+     "explanation": "",
+     "exclusive": false,
+     "assessment": "unchecked",
+     "assessor": ""
+    },
+    {
+     "subject": "flow:entity:customer>process:orders-api>place-order",
+     "predicate": "transport-encryption",
+     "value": "TLS 1.3",
+     "scope": [],
+     "basis": "stated",
+     "reason": null,
+     "support": [
+      {
+       "source_label": "Pasted description",
+       "digest": "58d4219b663c5b90ae19b2281b476e2e38b50aeffc74be1ee49844f9205e91e1",
+       "start": 151,
+       "end": 175,
+       "quote": "over HTTPS with TLS 1.3"
+      }
+     ],
+     "premises": [],
+     "explanation": "",
+     "exclusive": false,
+     "assessment": "unchecked",
+     "assessor": ""
+    },
+    {
+     "subject": "flow:entity:customer>process:orders-api>place-order",
+     "predicate": "authentication-mechanism",
+     "value": "Auth0 OAuth2 bearer token",
+     "scope": [],
+     "basis": "stated",
+     "reason": null,
+     "support": [
+      {
+       "source_label": "Pasted description",
+       "digest": "58d4219b663c5b90ae19b2281b476e2e38b50aeffc74be1ee49844f9205e91e1",
+       "start": 244,
+       "end": 292,
+       "quote": "Every call carries an Auth0 OAuth2 bearer token"
+      }
+     ],
+     "premises": [],
+     "explanation": "",
+     "exclusive": false,
+     "assessment": "unchecked",
+     "assessor": ""
+    },
+    {
+     "subject": "flow:entity:customer>process:orders-api>place-order",
+     "predicate": "credential-presented",
+     "value": "credential:auth0-oauth2-bearer-token",
+     "scope": [],
+     "basis": "stated",
+     "reason": null,
+     "support": [
+      {
+       "source_label": "Pasted description",
+       "digest": "58d4219b663c5b90ae19b2281b476e2e38b50aeffc74be1ee49844f9205e91e1",
+       "start": 244,
+       "end": 292,
+       "quote": "Every call carries an Auth0 OAuth2 bearer token"
+      }
+     ],
+     "premises": [],
+     "explanation": "",
+     "exclusive": false,
+     "assessment": "unchecked",
+     "assessor": ""
+    },
+    {
+     "subject": "flow:process:orders-api>store:postgres-database>access-orders",
+     "predicate": "transport-encryption",
+     "value": "TLS",
+     "scope": [],
+     "basis": "stated",
+     "reason": null,
+     "support": [
+      {
+       "source_label": "Pasted description",
+       "digest": "58d4219b663c5b90ae19b2281b476e2e38b50aeffc74be1ee49844f9205e91e1",
+       "start": 465,
+       "end": 546,
+       "quote": "The Orders API reads and writes a Postgres database in a private subnet over TLS"
+      }
+     ],
+     "premises": [],
+     "explanation": "",
+     "exclusive": false,
+     "assessment": "unchecked",
+     "assessor": ""
+    },
+    {
+     "subject": "flow:process:orders-api>store:postgres-database>access-orders",
+     "predicate": "authentication-mechanism",
+     "value": "IAM database authentication",
+     "scope": [],
+     "basis": "stated",
+     "reason": null,
+     "support": [
+      {
+       "source_label": "Pasted description",
+       "digest": "58d4219b663c5b90ae19b2281b476e2e38b50aeffc74be1ee49844f9205e91e1",
+       "start": 547,
+       "end": 580,
+       "quote": "with IAM database authentication"
+      }
+     ],
+     "premises": [],
+     "explanation": "",
+     "exclusive": false,
+     "assessment": "unchecked",
+     "assessor": ""
+    },
+    {
+     "subject": "flow:process:orders-api>entity:stripe>authorize-payment",
+     "predicate": "transport-encryption",
+     "value": "TLS",
+     "scope": [],
+     "basis": "stated",
+     "reason": null,
+     "support": [
+      {
+       "source_label": "Pasted description",
+       "digest": "58d4219b663c5b90ae19b2281b476e2e38b50aeffc74be1ee49844f9205e91e1",
+       "start": 796,
+       "end": 843,
+       "quote": "Payment authorisation goes to Stripe over HTTPS"
+      }
+     ],
+     "premises": [],
+     "explanation": "",
+     "exclusive": false,
+     "assessment": "unchecked",
+     "assessor": ""
+    },
+    {
+     "subject": "flow:process:orders-api>entity:stripe>authorize-payment",
+     "predicate": "authentication-mechanism",
+     "value": "secret API key",
+     "scope": [],
+     "basis": "stated",
+     "reason": null,
+     "support": [
+      {
+       "source_label": "Pasted description",
+       "digest": "58d4219b663c5b90ae19b2281b476e2e38b50aeffc74be1ee49844f9205e91e1",
+       "start": 844,
+       "end": 866,
+       "quote": "with a secret API key"
+      }
+     ],
+     "premises": [],
+     "explanation": "",
+     "exclusive": false,
+     "assessment": "unchecked",
+     "assessor": ""
+    },
+    {
+     "subject": "flow:process:orders-api>entity:stripe>authorize-payment",
+     "predicate": "credential-presented",
+     "value": "credential:secret-api-key",
+     "scope": [],
+     "basis": "stated",
+     "reason": null,
+     "support": [
+      {
+       "source_label": "Pasted description",
+       "digest": "58d4219b663c5b90ae19b2281b476e2e38b50aeffc74be1ee49844f9205e91e1",
+       "start": 844,
+       "end": 866,
+       "quote": "with a secret API key"
+      }
+     ],
+     "premises": [],
+     "explanation": "",
+     "exclusive": false,
+     "assessment": "unchecked",
+     "assessor": ""
+    },
+    {
+     "subject": "flow:process:nightly-batch-job>store:postgres-database>read-orders",
+     "predicate": "transport-encryption",
+     "value": "TLS",
+     "scope": [],
+     "basis": "stated",
+     "reason": null,
+     "support": [
+      {
+       "source_label": "Pasted description",
+       "digest": "58d4219b663c5b90ae19b2281b476e2e38b50aeffc74be1ee49844f9205e91e1",
+       "start": 994,
+       "end": 1034,
+       "quote": "reads at most one day of orders over TLS"
+      }
+     ],
+     "premises": [],
+     "explanation": "",
+     "exclusive": false,
+     "assessment": "unchecked",
+     "assessor": ""
+    },
+    {
+     "subject": "flow:process:nightly-batch-job>store:postgres-database>read-orders",
+     "predicate": "authentication-mechanism",
+     "value": "read-only database role",
+     "scope": [],
+     "basis": "stated",
+     "reason": null,
+     "support": [
+      {
+       "source_label": "Pasted description",
+       "digest": "58d4219b663c5b90ae19b2281b476e2e38b50aeffc74be1ee49844f9205e91e1",
+       "start": 1035,
+       "end": 1066,
+       "quote": "with a read-only database role"
+      }
+     ],
+     "premises": [],
+     "explanation": "",
+     "exclusive": false,
+     "assessment": "unchecked",
+     "assessor": ""
+    },
+    {
+     "subject": "flow:process:nightly-batch-job>store:s3-bucket>write-summaries",
+     "predicate": "transport-encryption",
+     "value": "TLS",
+     "scope": [],
+     "basis": "stated",
+     "reason": null,
+     "support": [
+      {
+       "source_label": "Pasted description",
+       "digest": "58d4219b663c5b90ae19b2281b476e2e38b50aeffc74be1ee49844f9205e91e1",
+       "start": 1067,
+       "end": 1098,
+       "quote": "It writes summaries over HTTPS"
+      }
+     ],
+     "premises": [],
+     "explanation": "",
+     "exclusive": false,
+     "assessment": "unchecked",
+     "assessor": ""
+    },
+    {
+     "subject": "flow:process:nightly-batch-job>store:s3-bucket>write-summaries",
+     "predicate": "authentication-mechanism",
+     "value": "IAM role",
+     "scope": [],
+     "basis": "stated",
+     "reason": null,
+     "support": [
+      {
+       "source_label": "Pasted description",
+       "digest": "58d4219b663c5b90ae19b2281b476e2e38b50aeffc74be1ee49844f9205e91e1",
+       "start": 1099,
+       "end": 1121,
+       "quote": "with its own IAM role"
+      }
+     ],
+     "premises": [],
+     "explanation": "",
+     "exclusive": false,
+     "assessment": "unchecked",
+     "assessor": ""
+    },
+    {
+     "subject": "flow:entity:analytics-team>process:athena>analytics-team",
+     "predicate": "transport-encryption",
+     "value": "TLS",
+     "scope": [],
+     "basis": "stated",
+     "reason": null,
+     "support": [
+      {
+       "source_label": "Pasted description",
+       "digest": "58d4219b663c5b90ae19b2281b476e2e38b50aeffc74be1ee49844f9205e91e1",
+       "start": 1258,
+       "end": 1301,
+       "quote": "query that bucket through Athena over HTTPS"
+      }
+     ],
+     "premises": [],
+     "explanation": "",
+     "exclusive": false,
+     "assessment": "unchecked",
+     "assessor": ""
+    },
+    {
+     "subject": "flow:entity:analytics-team>process:athena>analytics-team",
+     "predicate": "authentication-mechanism",
+     "value": "read-only IAM roles",
+     "scope": [],
+     "basis": "stated",
+     "reason": null,
+     "support": [
+      {
+       "source_label": "Pasted description",
+       "digest": "58d4219b663c5b90ae19b2281b476e2e38b50aeffc74be1ee49844f9205e91e1",
+       "start": 1324,
+       "end": 1349,
+       "quote": "with read-only IAM roles"
+      }
+     ],
+     "premises": [],
+     "explanation": "",
+     "exclusive": false,
+     "assessment": "unchecked",
+     "assessor": ""
+    },
+    {
+     "subject": "flow:process:athena>store:s3-bucket>query-summaries",
+     "predicate": "transport-encryption",
+     "value": "TLS",
+     "scope": [],
+     "basis": "stated",
+     "reason": null,
+     "support": [
+      {
+       "source_label": "Pasted description",
+       "digest": "58d4219b663c5b90ae19b2281b476e2e38b50aeffc74be1ee49844f9205e91e1",
+       "start": 1258,
+       "end": 1301,
+       "quote": "query that bucket through Athena over HTTPS"
+      }
+     ],
+     "premises": [],
+     "explanation": "",
+     "exclusive": false,
+     "assessment": "unchecked",
+     "assessor": ""
+    },
+    {
+     "subject": "flow:process:athena>store:s3-bucket>query-summaries",
+     "predicate": "authentication-mechanism",
+     "value": "read-only IAM roles",
+     "scope": [],
+     "basis": "stated",
+     "reason": null,
+     "support": [
+      {
+       "source_label": "Pasted description",
+       "digest": "58d4219b663c5b90ae19b2281b476e2e38b50aeffc74be1ee49844f9205e91e1",
+       "start": 1324,
+       "end": 1349,
+       "quote": "with read-only IAM roles"
+      }
+     ],
+     "premises": [],
+     "explanation": "",
+     "exclusive": false,
+     "assessment": "unchecked",
+     "assessor": ""
+    },
+    {
+     "subject": "flow:entity:support-administrator>process:admin-console>support-administrator",
+     "predicate": "transport-encryption",
+     "value": "TLS",
+     "scope": [],
+     "basis": "stated",
+     "reason": null,
+     "support": [
+      {
+       "source_label": "Pasted description",
+       "digest": "58d4219b663c5b90ae19b2281b476e2e38b50aeffc74be1ee49844f9205e91e1",
+       "start": 1388,
+       "end": 1483,
+       "quote": "use an admin console on the Orders API from a separate corporate management network over HTTPS"
+      }
+     ],
+     "premises": [],
+     "explanation": "",
+     "exclusive": false,
+     "assessment": "unchecked",
+     "assessor": ""
+    },
+    {
+     "subject": "flow:entity:support-administrator>process:admin-console>support-administrator",
+     "predicate": "authentication-mechanism",
+     "value": "SSO",
+     "scope": [],
+     "basis": "stated",
+     "reason": null,
+     "support": [
+      {
+       "source_label": "Pasted description",
+       "digest": "58d4219b663c5b90ae19b2281b476e2e38b50aeffc74be1ee49844f9205e91e1",
+       "start": 1484,
+       "end": 1512,
+       "quote": "signing in with SSO and MFA"
+      }
+     ],
+     "premises": [],
+     "explanation": "",
+     "exclusive": false,
+     "assessment": "unchecked",
+     "assessor": ""
+    },
+    {
+     "subject": "flow:entity:support-administrator>process:admin-console>support-administrator",
+     "predicate": "mfa-requirement",
+     "value": "required",
+     "scope": [],
+     "basis": "stated",
+     "reason": null,
+     "support": [
+      {
+       "source_label": "Pasted description",
+       "digest": "58d4219b663c5b90ae19b2281b476e2e38b50aeffc74be1ee49844f9205e91e1",
+       "start": 1484,
+       "end": 1512,
+       "quote": "signing in with SSO and MFA"
+      }
+     ],
+     "premises": [],
+     "explanation": "",
+     "exclusive": false,
+     "assessment": "unchecked",
+     "assessor": ""
+    },
+    {
+     "subject": "flow:process:admin-console>process:orders-api>administer-orders",
+     "predicate": "transport-encryption",
+     "value": "TLS",
+     "scope": [],
+     "basis": "stated",
+     "reason": null,
+     "support": [
+      {
+       "source_label": "Pasted description",
+       "digest": "58d4219b663c5b90ae19b2281b476e2e38b50aeffc74be1ee49844f9205e91e1",
+       "start": 1388,
+       "end": 1483,
+       "quote": "use an admin console on the Orders API from a separate corporate management network over HTTPS"
+      }
+     ],
+     "premises": [],
+     "explanation": "",
+     "exclusive": false,
+     "assessment": "unchecked",
+     "assessor": ""
+    },
+    {
+     "subject": "flow:process:admin-console>process:orders-api>administer-orders",
+     "predicate": "authentication-mechanism",
+     "value": "SSO",
+     "scope": [],
+     "basis": "stated",
+     "reason": null,
+     "support": [
+      {
+       "source_label": "Pasted description",
+       "digest": "58d4219b663c5b90ae19b2281b476e2e38b50aeffc74be1ee49844f9205e91e1",
+       "start": 1484,
+       "end": 1512,
+       "quote": "signing in with SSO and MFA"
+      }
+     ],
+     "premises": [],
+     "explanation": "",
+     "exclusive": false,
+     "assessment": "unchecked",
+     "assessor": ""
+    },
+    {
+     "subject": "flow:process:admin-console>process:orders-api>administer-orders",
+     "predicate": "mfa-requirement",
+     "value": "required",
+     "scope": [],
+     "basis": "stated",
+     "reason": null,
+     "support": [
+      {
+       "source_label": "Pasted description",
+       "digest": "58d4219b663c5b90ae19b2281b476e2e38b50aeffc74be1ee49844f9205e91e1",
+       "start": 1484,
+       "end": 1512,
+       "quote": "signing in with SSO and MFA"
+      }
+     ],
+     "premises": [],
+     "explanation": "",
+     "exclusive": false,
+     "assessment": "unchecked",
+     "assessor": ""
+    },
+    {
+     "subject": "principal:platform-team",
+     "predicate": "authorization-grant",
+     "value": "copy or restore database snapshots",
+     "scope": [
+      {
+       "kind": "resource",
+       "value": "Postgres database snapshots"
+      },
+      {
+       "kind": "operation",
+       "value": "copy or restore"
+      }
+     ],
+     "basis": "stated",
+     "reason": null,
+     "support": [
+      {
+       "source_label": "Pasted description",
+       "digest": "58d4219b663c5b90ae19b2281b476e2e38b50aeffc74be1ee49844f9205e91e1",
+       "start": 738,
+       "end": 795,
+       "quote": "Only the platform team can copy or restore its snapshots"
+      }
+     ],
+     "premises": [],
+     "explanation": "",
+     "exclusive": false,
+     "assessment": "unchecked",
+     "assessor": ""
+    },
+    {
+     "subject": "principal:platform-team",
+     "predicate": "authorization-grant",
+     "value": "copy or restore S3 objects",
+     "scope": [
+      {
+       "kind": "resource",
+       "value": "S3 bucket objects"
+      },
+      {
+       "kind": "operation",
+       "value": "copy or restore"
+      }
+     ],
+     "basis": "stated",
+     "reason": null,
+     "support": [
+      {
+       "source_label": "Pasted description",
+       "digest": "58d4219b663c5b90ae19b2281b476e2e38b50aeffc74be1ee49844f9205e91e1",
+       "start": 1152,
+       "end": 1207,
+       "quote": "only the platform team can copy or restore its objects"
+      }
+     ],
+     "premises": [],
+     "explanation": "",
+     "exclusive": false,
+     "assessment": "unchecked",
+     "assessor": ""
+    },
+    {
+     "subject": "principal:analytics-team",
+     "predicate": "authorization-grant",
+     "value": "query S3 bucket summaries",
+     "scope": [
+      {
+       "kind": "resource",
+       "value": "S3 bucket summaries"
+      },
+      {
+       "kind": "operation",
+       "value": "read/query"
+      }
+     ],
+     "basis": "stated",
+     "reason": null,
+     "support": [
+      {
+       "source_label": "Pasted description",
+       "digest": "58d4219b663c5b90ae19b2281b476e2e38b50aeffc74be1ee49844f9205e91e1",
+       "start": 1208,
+       "end": 1290,
+       "quote": "The analytics team, a group of internal analysts, query that bucket through Athena"
+      }
+     ],
+     "premises": [],
+     "explanation": "",
+     "exclusive": false,
+     "assessment": "unchecked",
+     "assessor": ""
+    },
+    {
+     "subject": "principal:support-administrators",
+     "predicate": "authorization-grant",
+     "value": "refund orders",
+     "scope": [
+      {
+       "kind": "resource",
+       "value": "orders"
+      },
+      {
+       "kind": "operation",
+       "value": "refund"
+      }
+     ],
+     "basis": "stated",
+     "reason": null,
+     "support": [
+      {
+       "source_label": "Pasted description",
+       "digest": "58d4219b663c5b90ae19b2281b476e2e38b50aeffc74be1ee49844f9205e91e1",
+       "start": 1513,
+       "end": 1543,
+       "quote": "Through it they refund orders"
+      }
+     ],
+     "premises": [],
+     "explanation": "",
+     "exclusive": false,
+     "assessment": "unchecked",
+     "assessor": ""
+    },
+    {
+     "subject": "principal:support-administrators",
+     "predicate": "authorization-grant",
+     "value": "edit customer delivery addresses",
+     "scope": [
+      {
+       "kind": "resource",
+       "value": "customer delivery addresses"
+      },
+      {
+       "kind": "operation",
+       "value": "edit"
+      }
+     ],
+     "basis": "stated",
+     "reason": null,
+     "support": [
+      {
+       "source_label": "Pasted description",
+       "digest": "58d4219b663c5b90ae19b2281b476e2e38b50aeffc74be1ee49844f9205e91e1",
+       "start": 1544,
+       "end": 1577,
+       "quote": "edit customer delivery addresses"
+      }
+     ],
+     "premises": [],
+     "explanation": "",
+     "exclusive": false,
+     "assessment": "unchecked",
+     "assessor": ""
+    },
+    {
+     "subject": "principal:support-administrators",
+     "predicate": "authorization-grant",
+     "value": "look up order history on a customer's behalf",
+     "scope": [
+      {
+       "kind": "resource",
+       "value": "order history"
+      },
+      {
+       "kind": "operation",
+       "value": "look up"
+      }
+     ],
+     "basis": "stated",
+     "reason": null,
+     "support": [
+      {
+       "source_label": "Pasted description",
+       "digest": "58d4219b663c5b90ae19b2281b476e2e38b50aeffc74be1ee49844f9205e91e1",
+       "start": 1582,
+       "end": 1627,
+       "quote": "look up order history on a customer's behalf"
+      }
+     ],
+     "premises": [],
+     "explanation": "",
+     "exclusive": false,
+     "assessment": "unchecked",
+     "assessor": ""
+    },
+    {
+     "subject": "principal:support-administrators",
+     "predicate": "administrative-authority",
+     "value": "process:admin-console",
+     "scope": [],
+     "basis": "stated",
+     "reason": null,
+     "support": [
+      {
+       "source_label": "Pasted description",
+       "digest": "58d4219b663c5b90ae19b2281b476e2e38b50aeffc74be1ee49844f9205e91e1",
+       "start": 1351,
+       "end": 1408,
+       "quote": "Support administrators are staff who use an admin console"
+      }
+     ],
+     "premises": [],
+     "explanation": "",
+     "exclusive": false,
+     "assessment": "unchecked",
+     "assessor": ""
+    }
+   ]
+  },
+  "issues": [
+   {
+    "code": "unsupported-assertion",
+    "message": "a stated value cites the words that state it, and a quote not found in the source it names takes no span",
+    "subject": "store:postgres-database",
+    "assertion": null,
+    "row": 6
+   }
+  ],
+  "quarantined": [],
+  "projection_version": 6
+ }
+}
