@@ -3,8 +3,9 @@
 ``evals/answers/<case>.json`` holds a person's answers to a case's open facts,
 and who signed them. No corpus case has an owner who knows more than its
 source (``QA-2026-09-26-03-E14``), so the file may also withhold facts the
-source does state: it names the phrases to take out of the sources and the
-model fields to set back, and its answers give those same facts back. Three
+source does state: it names the phrases to take out of the sources, the model
+fields to set back and the assumption records to drop, and its answers give
+those same facts back. Three
 arms then compare one case:
 
 * ``analysis``: the full case, the ceiling;
@@ -24,7 +25,10 @@ excerpt reaches the lanes and makes the floor a ceiling.
 phrase and never a restatement of it: case 01's draft passed with "an
 authenticated session" still in a flow's description. So the file lists
 every field it sets back, a person reads the withheld model before signing,
-and ``targets`` names the reference claims each withheld fact supports.
+and ``targets`` names the reference claims each withheld fact supports. The
+lanes read an element's ``assets`` and every assumption record, so a list
+field takes a list value and an assumption record is dropped by its element
+and attribute.
 """
 
 from __future__ import annotations
@@ -54,6 +58,11 @@ __all__ = [
 ]
 
 
+#: A model field's set-back value: a string, or a list of strings for a list
+#: field such as ``assets``.
+FieldValue = str | tuple[str, ...]
+
+
 @dataclass(frozen=True)
 class AnswerFile:
     """One case's signed answers, and what the case withholds for them."""
@@ -66,12 +75,25 @@ class AnswerFile:
     #: Each withheld phrase, and the text that takes its place.
     withheld_text: tuple[tuple[str, str], ...]
     #: Each model field set back: the element, the field, the value it gets.
-    withheld_fields: tuple[tuple[str, str, str], ...]
+    withheld_fields: tuple[tuple[str, str, FieldValue], ...]
+    #: Each assumption record dropped, named by its element and attribute.
+    withheld_assumptions: tuple[tuple[str, str], ...] = ()
 
 
 def _pattern(text: str) -> re.Pattern[str]:
     """``text`` matched with any run of whitespace standing for any other."""
     return re.compile(r"\s+".join(re.escape(word) for word in text.split()))
+
+
+def _field_value(value: object) -> FieldValue:
+    """A set-back value in one of its two shapes, or a refusal."""
+    if isinstance(value, str):
+        return value
+    if isinstance(value, list) and all(isinstance(item, str) for item in value):
+        return tuple(value)
+    raise EvalRunError(
+        f"a set-back value is a string or a list of strings, not {value!r}"
+    )
 
 
 def load_answer_file(path: Path) -> AnswerFile | None:
@@ -91,8 +113,12 @@ def load_answer_file(path: Path) -> AnswerFile | None:
             for entry in withheld.get("source", [])
         ),
         withheld_fields=tuple(
-            (entry["element_id"], entry["field"], entry["value"])
+            (entry["element_id"], entry["field"], _field_value(entry["value"]))
             for entry in withheld.get("model", [])
+        ),
+        withheld_assumptions=tuple(
+            (entry["element_id"], entry["attribute"])
+            for entry in withheld.get("assumptions", [])
         ),
     )
 
@@ -117,7 +143,9 @@ def _withheld_sources(
 
 
 def _withheld_model(
-    model: SystemModel, withheld: tuple[tuple[str, str, str], ...]
+    model: SystemModel,
+    withheld: tuple[tuple[str, str, FieldValue], ...],
+    assumptions: tuple[tuple[str, str], ...],
 ) -> SystemModel:
     raw = model.model_dump(mode="json")
     elements = {
@@ -131,7 +159,19 @@ def _withheld_model(
         element = elements.get(element_id)
         if element is None or field not in element:
             raise EvalRunError(f"the model holds no field {field!r} on {element_id!r}")
-        element[field] = value
+        element[field] = list(value) if isinstance(value, tuple) else value
+    for element_id, attribute in assumptions:
+        matches = [
+            index
+            for index, entry in enumerate(raw["assumptions"])
+            if (entry["element_id"], entry["attribute"]) == (element_id, attribute)
+        ]
+        if len(matches) != 1:
+            raise EvalRunError(
+                f"the model holds {len(matches)} assumption records on"
+                f" {element_id!r} {attribute!r}, and a withheld one must match once"
+            )
+        del raw["assumptions"][matches[0]]
     return SystemModel.model_validate(raw)
 
 
@@ -207,7 +247,9 @@ def answers_within_rounds(
 def withheld_case(case: GoldenCase, answer_file: AnswerFile) -> GoldenCase:
     """The case with the file's facts taken out of its sources and its model."""
     sources = _withheld_sources(case.sources, answer_file.withheld_text)
-    model = _withheld_model(case.model, answer_file.withheld_fields)
+    model = _withheld_model(
+        case.model, answer_file.withheld_fields, answer_file.withheld_assumptions
+    )
     texts = " ".join(source.text for source in sources)
     fields = json.dumps(model.model_dump(mode="json"), ensure_ascii=False)
     for phrase, _ in answer_file.withheld_text:

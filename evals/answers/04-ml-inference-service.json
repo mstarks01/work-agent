@@ -1,0 +1,103 @@
+{
+  "case": "04-ml-inference-service",
+  "drafted_by": "agent",
+  "signed_by": "",
+  "purpose": "withheld-sentence test for a question kind (#1283): the withheld sentences state what the gateway writes into its log, the model fields that quote or paraphrase it are set back, and the answer gives the same fact back as a facet answer to the data-exposure kind",
+  "targets": [
+    {
+      "withheld": 1,
+      "tier": "must-find",
+      "verb": "read",
+      "affected_element_ids": [
+        "store:inference-log"
+      ],
+      "why": "the log keeps raw end-user prompts, so a reader of the log reads them"
+    }
+  ],
+  "withheld": {
+    "source": [
+      {
+        "text": "The gateway writes every request and response into an inference log in BigQuery, for debugging. That means raw prompts, which sometimes carry whatever the calling team's users typed.",
+        "replacement": "The gateway writes an inference log in BigQuery, for debugging."
+      }
+    ],
+    "model": [
+      {
+        "element_id": "process:inference-gateway",
+        "field": "description",
+        "value": "Internet-exposed FastAPI service on GKE; authenticates callers by API key, forwards requests, and writes an inference log."
+      },
+      {
+        "element_id": "store:inference-log",
+        "field": "description",
+        "value": "BigQuery table the gateway writes for debugging."
+      },
+      {
+        "element_id": "store:inference-log",
+        "field": "source_excerpt",
+        "value": "The gateway writes an inference log in BigQuery, for debugging."
+      },
+      {
+        "element_id": "flow:process:inference-gateway>store:inference-log>write-request-log",
+        "field": "description",
+        "value": "Gateway writes the inference log for debugging."
+      },
+      {
+        "element_id": "flow:process:inference-gateway>store:inference-log>write-request-log",
+        "field": "source_excerpt",
+        "value": "The gateway writes an inference log in BigQuery, for debugging."
+      },
+      {
+        "element_id": "flow:process:inference-gateway>store:inference-log>write-request-log",
+        "field": "data_description",
+        "value": "inference log records"
+      },
+      {
+        "element_id": "flow:entity:calling-service>process:inference-gateway>submit-inference-request",
+        "field": "data_description",
+        "value": "inference request"
+      },
+      {
+        "element_id": "store:inference-log",
+        "field": "assets",
+        "value": []
+      },
+      {
+        "element_id": "flow:process:inference-gateway>store:inference-log>write-request-log",
+        "field": "assets",
+        "value": []
+      },
+      {
+        "element_id": "flow:entity:calling-service>process:inference-gateway>submit-inference-request",
+        "field": "assets",
+        "value": []
+      },
+      {
+        "element_id": "flow:process:inference-gateway>process:model-server>forward-request",
+        "field": "assets",
+        "value": []
+      }
+    ],
+    "assumptions": [
+      {
+        "element_id": "store:inference-log",
+        "attribute": "assets"
+      }
+    ]
+  },
+  "answers": [
+    {
+      "key": [
+        "process:inference-gateway",
+        "",
+        "",
+        "",
+        "data-exposure",
+        ""
+      ],
+      "facets": {
+        "clean-logs": "no"
+      }
+    }
+  ]
+}
