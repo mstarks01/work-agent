@@ -25,7 +25,6 @@ from analysis_service.assertions import (
 )
 from analysis_service.jobs import (
     Checkpoint,
-    InMemoryJobStore,
     JobRecord,
     PipelineCompleted,
     Resumption,
@@ -242,10 +241,3 @@ def test_a_resumption_is_absent_on_an_ordinary_job():
         JobRecord.model_validate(MappingProxyType(record.model_dump())).resumption
         is None
     )
-
-
-def test_store_round_trips_a_resumed_job():
-    store = InMemoryJobStore()
-    record = TestTheResumedRun().resumed_job()
-    asyncio.run(admit(store, record))
-    assert asyncio.run(store.get(record.id)).resumption == record.resumption

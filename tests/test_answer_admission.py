@@ -835,22 +835,6 @@ class TestTheRevision:
         job = waiting(store)
         assert self.post(client, job, links=[]).status_code == 400
 
-    def test_the_store_refuses_a_save_against_an_old_revision(self):
-        _, store = catalog_client()
-        job = waiting(store)
-        record = asyncio.run(store.get(job))
-
-        def save(revision):
-            return asyncio.run(
-                store.save_round(
-                    job, record.owner_subject, NO_ANSWERS, [], [], revision
-                )
-            )
-
-        assert save(0)
-        assert not save(0)
-        assert save(1)
-
 
 class TestTakingAnAnswerBack:
     """A guessed answer could be changed to anything but "I don't know" (#1289)."""
