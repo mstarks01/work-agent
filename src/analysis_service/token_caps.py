@@ -117,7 +117,12 @@ TOKEN_CAPS: dict[str, int] = {
     # where a source genuinely calls two things by one name, so the rule states
     # what to write: the text's own distinguishing word in front, and the
     # shared name in `notes`.
-    "prompts/extract": 4100,
+    #
+    # It says that a protocol encrypted by its own definition states the
+    # flow's `encryption_in_transit` (QA-2026-10-13-05). Terra read "over
+    # HTTPS" as a protocol only and left the encryption open on nine flows of
+    # the example, where luna and the blessed references record it.
+    "prompts/extract": 4170,
     # The compact transport's delta, appended after the body above. It is the
     # whole cost of the route on the input side, paid on every extraction call
     # and cacheable, against the output it removes — see
