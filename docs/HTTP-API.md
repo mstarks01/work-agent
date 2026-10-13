@@ -44,6 +44,7 @@ token whose principal does not exist yet gets the same `404` as a missing job.
 | --- | --- | --- |
 | `POST` | `/v1/jobs` | Submit an ordered list of sources; returns a job handle. `429` when this token is already at its [concurrency ceiling](#how-many-jobs-you-may-run-at-once). |
 | `GET` | `/v1/jobs/{id}` | Poll: status, per-node progress, timestamps. Never the report. |
+| `DELETE` | `/v1/jobs/{id}` | Delete a job in a terminal status; `204`. `409` where the job is queued or running. See [Deleting a job](#deleting-a-job). |
 | `GET` | `/v1/jobs/{id}/events` | The same progression as Server-Sent Events; resumable via `Last-Event-ID`. |
 | `GET` | `/v1/jobs/{id}/report` | The full [report](Report-Schema.md) once completed; `409` before, and `409` if the report is withheld (below). |
 | `GET` | `/v1/jobs/{id}/changes` | For a follow-up, how each finding moved since the report its answers came from: `new`, `unchanged`, `changed` (with the verdict before and after) or `gone`. Matched by claim identity, never by prose. `409` where the job is not a follow-up, where the earlier report is no longer held, or where either report is withheld or [from an older schema version](#a-job-from-an-older-schema-version). |
@@ -95,6 +96,27 @@ major works as before.
 `GET /v1/jobs/{id}` and `GET /v1/jobs/{id}/report` serve a job of any version.
 The report route returns the report as the service stored it, so read its own
 `schema_version`. A job that is not yours reads as `404`, never as `409`.
+
+### Deleting a job
+
+`DELETE /v1/jobs/{id}` deletes a job and returns `204` with no body. Only the
+**Owner** can delete a job, and only a job in a terminal status: `completed`,
+`failed`, `rejected` or `awaiting-answers`. A `queued` or `running` job returns
+`409`, and the job stays as it is. A job that is not yours, a job that does not
+exist and an ID that is not `job-` with 32 lowercase hex digits all return the
+same `404`. The service checks the ID before it looks for the job.
+
+The delete removes the content of the job: its sources, its report, its
+checkpoint, its answers, its corrections and its events. Each route then
+returns `404` for the job. The service keeps a usage row for the job, which no
+route reads (ADR 0066). The row holds the owner ID, the creation time, the
+tokens, the status and the parent job ID. So a deleted job still counts toward
+the rate and the token [budgets](#how-much-you-may-consume-over-time). A
+deleted follow-up still uses the one follow-up of its report.
+
+Each delete writes one line to the service log. The line names the job ID, the
+owner ID, the cause `owner` and the number of stored objects that the delete
+removed. It holds no content of the job.
 
 ## Lifecycle
 

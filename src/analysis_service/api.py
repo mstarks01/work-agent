@@ -40,7 +40,14 @@ from typing import Annotated, Any, TypeVar
 from uuid import uuid4
 
 import anyio.to_thread
-from fastapi import BackgroundTasks, Depends, FastAPI, HTTPException, Request
+from fastapi import (
+    BackgroundTasks,
+    Depends,
+    FastAPI,
+    HTTPException,
+    Request,
+    Response,
+)
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse, StreamingResponse
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
@@ -87,6 +94,8 @@ from analysis_service.job_answers import (
     Withheld,
 )
 from analysis_service.jobs import (
+    JOB_ID_PATTERN,
+    TERMINAL_STATUSES,
     Admission,
     JobRecord,
     JobStatus,
@@ -1032,6 +1041,36 @@ def create_app(
     ) -> JobStatusView:
         record = await _answers(request).owned(job_id, owner_id)
         return _status_view(record)
+
+    @app.delete("/v1/jobs/{job_id}", status_code=204)
+    async def delete_job(
+        job_id: str, request: Request, owner_id: str = Depends(require_owner)
+    ) -> Response:
+        """Delete a job in a terminal status, and keep its usage (ADR 0066).
+
+        ``204`` where the job is deleted, and each route then reads it as
+        missing. ``409`` where the job is queued or running. A missing job,
+        another owner's job and an ID of another shape share one ``404``.
+        """
+        if not JOB_ID_PATTERN.fullmatch(job_id):
+            raise NoSuchJob(job_id)
+        record = await _answers(request).owned(job_id, owner_id)
+        if record.status not in TERMINAL_STATUSES:
+            raise HTTPException(
+                status_code=409,
+                detail="the job is queued or running; delete it when it ends",
+            )
+        store: JobStore = request.app.state.store
+        removed = await store.delete(job_id, owner_id)
+        if removed is None:
+            raise NoSuchJob(job_id)
+        logger.info(
+            "deleted job %s of owner %s: cause owner, %d object(s) removed",
+            job_id,
+            owner_id,
+            removed,
+        )
+        return Response(status_code=204)
 
     @app.get("/v1/jobs/{job_id}/report")
     async def get_report(

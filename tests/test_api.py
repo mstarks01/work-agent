@@ -25,6 +25,7 @@ from analysis_service.deployment import Deployment
 from analysis_service.engine import DEFAULT_CALLER
 from analysis_service.errors import ConfigError
 from analysis_service.jobs import (
+    JOB_ID_PATTERN,
     RESTART_FAILURE_MESSAGE,
     AdmissionOutcome,
     InMemoryJobStore,
@@ -824,6 +825,117 @@ class TestTheRestartScan:
         assert [(body["status"], body["error"]) for body in bodies] == [
             ("failed", RESTART_FAILURE_MESSAGE)
         ] * 2
+
+
+class LookupSpy(InMemoryJobStore):
+    """A memory store that records each job ID a route looks up."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.looked_up: list[str] = []
+
+    async def owned(self, job_id: str, owner_id: str) -> JobRecord | None:
+        self.looked_up.append(job_id)
+        return await super().owned(job_id, owner_id)
+
+
+class TestDelete:
+    """``DELETE /v1/jobs/{id}`` removes a terminal job and keeps its usage
+    (ADR 0066)."""
+
+    MISSING = "job-" + "0" * 32
+
+    def test_a_deleted_job_reads_as_missing_on_each_route(self):
+        client, _ = make_client()
+        job_id = submit(client)
+        response = client.delete(f"/v1/jobs/{job_id}", headers=auth())
+        assert response.status_code == 204
+        assert response.content == b""
+        for method, path, body in (
+            ("get", "", None),
+            ("get", "/report", None),
+            ("get", "/events", None),
+            ("get", "/questions", None),
+            ("get", "/changes", None),
+            ("post", "/answers", {"links": [], "facts": []}),
+            ("post", "/amendments", {"text": "a CDN", "revision": 0}),
+            ("delete", "", None),
+        ):
+            deleted, missing = (
+                client.request(
+                    method, f"/v1/jobs/{job}{path}", headers=auth(), json=body
+                )
+                for job in (job_id, self.MISSING)
+            )
+            assert deleted.status_code == 404, (method, path)
+            assert deleted.json() == missing.json()
+
+    @pytest.mark.parametrize("status", ["queued", "running"])
+    def test_a_job_in_flight_is_409_and_stays(self, status):
+        store = InMemoryJobStore()
+        record = seed(store, "alice", status)
+        client, _ = make_client(store=store)
+        response = client.delete(f"/v1/jobs/{record.id}", headers=auth())
+        assert response.status_code == 409
+        assert response.headers["content-type"] == "application/problem+json"
+        assert client.get(f"/v1/jobs/{record.id}", headers=auth()).status_code == 200
+
+    def test_a_foreign_job_a_missing_job_and_a_malformed_id_share_one_404(self):
+        client, _ = make_client()
+        job_id = submit(client, "alice-token")
+        submit(client, "bob-token")
+        foreign, missing, malformed = (
+            client.delete(f"/v1/jobs/{job}", headers=auth("bob-token"))
+            for job in (job_id, self.MISSING, "job-missing")
+        )
+        assert foreign.status_code == 404
+        assert foreign.json() == missing.json() == malformed.json()
+        assert client.get(f"/v1/jobs/{job_id}", headers=auth()).status_code == 200
+
+    @pytest.mark.parametrize(
+        "job_id", ["job-missing", "JOB-" + "0" * 32, "job-" + "A" * 32, MISSING + "0"]
+    )
+    def test_an_id_of_another_shape_reaches_no_lookup(self, job_id):
+        store = LookupSpy()
+        client, _ = make_client(store=store)
+        submit(client)
+        response = client.delete(f"/v1/jobs/{job_id}", headers=auth())
+        assert response.status_code == 404
+        assert store.looked_up == []
+
+    def test_every_minted_id_has_the_shape_the_route_checks(self):
+        record = JobRecord.create(
+            owner_id="alice",
+            sources=[Source.description("an app")],
+            frameworks=sample_selection(),
+        )
+        assert JOB_ID_PATTERN.fullmatch(record.id)
+
+    def test_a_deleted_job_still_counts_toward_the_rate(self):
+        one_a_window = BudgetPolicy(
+            window_seconds=3600,
+            max_jobs_per_window=1,
+            max_tokens_per_window=10**9,
+            global_max_tokens_per_window=10**9,
+        )
+        client, _ = make_client(budget=one_a_window)
+        job_id = submit(client)
+        assert client.delete(f"/v1/jobs/{job_id}", headers=auth()).status_code == 204
+        response = client.post("/v1/jobs", json=submission(), headers=auth())
+        assert response.status_code == 429
+
+    def test_a_delete_writes_one_log_line_with_no_content(self, caplog):
+        client, store = make_client()
+        job_id = submit(client)
+        principal = asyncio.run(store.principal(identity_of("alice")))
+        assert principal is not None
+        with caplog.at_level(logging.INFO):
+            client.delete(f"/v1/jobs/{job_id}", headers=auth())
+        [line] = caplog.messages
+        assert line == (
+            f"deleted job {job_id} of owner {principal.owner_id}:"
+            " cause owner, 0 object(s) removed"
+        )
 
 
 class TestAdmissionOutcomes:

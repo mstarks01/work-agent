@@ -29,6 +29,7 @@ import asyncio
 import json
 import logging
 import os
+import re
 from collections.abc import (
     AsyncIterator,
     Awaitable,
@@ -68,6 +69,10 @@ from analysis_service.system_model import Process, SystemModel, TrustBoundary
 from analysis_service.validation import ValidationIssue
 
 logger = logging.getLogger(__name__)
+
+#: The shape of every job ID :meth:`JobRecord.create` mints. The delete route
+#: checks a requested ID against it before the lookup (#1528).
+JOB_ID_PATTERN = re.compile(r"job-[0-9a-f]{32}")
 
 JobStatus = Literal[
     "queued", "running", "completed", "failed", "rejected", "awaiting-answers"
@@ -632,7 +637,14 @@ class JobStore(Protocol):
 
     async def owned_jobs(self, owner_id: str) -> list[JobRecord]: ...
 
-    async def delete(self, job_id: str, owner_id: str) -> bool: ...
+    async def delete(self, job_id: str, owner_id: str) -> int | None:
+        """Delete the owned job's content and keep its usage row (ADR 0066).
+
+        The number of objects the delete removed, or ``None`` where nothing
+        changed: the job is missing, another owner's, or not in a terminal
+        status.
+        """
+        ...
 
     async def fail_in_flight(self) -> list[str]: ...
 
@@ -1019,12 +1031,13 @@ class InMemoryJobStore:
             if record.owner_id == owner_id
         ]
 
-    async def delete(self, job_id: str, owner_id: str) -> bool:
+    async def delete(self, job_id: str, owner_id: str) -> int | None:
         """Remove the owned job's content, and keep its usage row (ADR 0066).
 
         Only a job in a terminal status can be deleted: a job in flight holds
-        a slot its run releases. False where the job is not the owner's or
-        not terminal, and nothing changes.
+        a slot its run releases. ``None`` where the job is missing, not the
+        owner's or not terminal, and nothing changes. Else ``0``: this store
+        holds no objects.
         """
         record = self._records.get(job_id)
         if (
@@ -1032,7 +1045,7 @@ class InMemoryJobStore:
             or record.owner_id != owner_id
             or record.status not in TERMINAL_STATUSES
         ):
-            return False
+            return None
         del self._records[job_id]
         self._usage[job_id] = UsageRow(
             job_id=job_id,
@@ -1043,7 +1056,7 @@ class InMemoryJobStore:
             status=record.status,
             parent_id=parent_of(record),
         )
-        return True
+        return 0
 
     async def fail_in_flight(self) -> list[str]:
         """Fail each queued or running job with :data:`RESTART_FAILURE_MESSAGE`.
