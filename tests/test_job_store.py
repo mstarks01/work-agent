@@ -746,7 +746,7 @@ class TestADeletedJobLeavesAUsageRow:
 
     def test_no_read_serves_a_deleted_job(self, store):
         job = completed(store)
-        assert asyncio.run(store.delete(job, "alice"))
+        assert asyncio.run(store.delete(job, "alice")) is not None
         assert asyncio.run(store.get(job)) is None
         assert asyncio.run(store.owned(job, "alice")) is None
         assert asyncio.run(store.report(job, "alice")) is None
@@ -757,8 +757,9 @@ class TestADeletedJobLeavesAUsageRow:
         job = completed(store)
         queued = new_record()
         asyncio.run(admit(store, queued))
-        assert not asyncio.run(store.delete(job, "mallory"))
-        assert not asyncio.run(store.delete(queued.id, "alice"))
+        assert asyncio.run(store.delete(job, "mallory")) is None
+        assert asyncio.run(store.delete(queued.id, "alice")) is None
+        assert asyncio.run(store.delete("job-missing", "alice")) is None
         assert asyncio.run(store.get(job)) is not None
 
     def test_a_deleted_job_still_counts_toward_the_rate(self, store):
@@ -775,6 +776,17 @@ class TestADeletedJobLeavesAUsageRow:
         )
         assert admission.outcome == "over_rate"
 
+    def test_a_deleted_job_still_counts_toward_the_token_budgets(self, store):
+        spent = new_record(reserved=900)
+        spent.transition("running")
+        spent.transition("failed")
+        asyncio.run(admit(store, spent))
+        asyncio.run(store.delete(spent.id, "alice"))
+        assert reserve(store, new_record(reserved=200)).outcome == "over_owner_budget"
+        one_owner = POLICY.model_copy(update={"global_max_tokens_per_window": 1000})
+        bob = reserve(store, new_record("bob", reserved=200), budget=one_owner)
+        assert bob.outcome == "over_global_budget"
+
     def test_a_deleted_follow_up_still_locks_its_parent(self, store):
         parent = completed(store)
         child = follow_up(parent)
@@ -782,7 +794,7 @@ class TestADeletedJobLeavesAUsageRow:
         child.report = sample_report()
         child.transition("completed")
         asyncio.run(admit(store, child))
-        assert asyncio.run(store.delete(child.id, "alice"))
+        assert asyncio.run(store.delete(child.id, "alice")) is not None
         assert asyncio.run(store.resumed_by(parent, "alice")) == child.id
 
     def test_the_listing_is_the_owner_s_jobs_oldest_first_as_envelopes(self, store):
