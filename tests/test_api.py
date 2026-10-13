@@ -54,6 +54,7 @@ from tests.factories import (
     LookupSpy,
     admit,
     assert_each_route_checks_the_job_id,
+    assert_job_ids_read_as_missing,
     identity_of,
     sample_selection,
 )
@@ -908,6 +909,24 @@ class TestTheJobIdCheck:
             foreign=foreign,
             bodies=self.BODIES,
             headers=auth("bob-token"),
+        )
+
+    def test_answers_from_reads_a_malformed_id_as_a_missing_job_before_the_store(
+        self,
+    ):
+        store = LookupSpy()
+        client, _ = make_client(store=store)
+        foreign = submit(client, "alice-token")
+        submit(client, "bob-token")
+        assert_job_ids_read_as_missing(
+            lambda job: client.post(
+                "/v1/jobs",
+                json=submission(questions=True, answers_from=job),
+                headers=auth("bob-token"),
+            ),
+            store,
+            foreign=foreign,
+            label="answers_from",
         )
 
     def test_every_minted_id_has_the_shape_each_route_checks(self):

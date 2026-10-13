@@ -29,6 +29,7 @@ import tempfile
 from collections.abc import AsyncGenerator, Callable, Mapping, Sequence
 from dataclasses import dataclass, replace
 from datetime import UTC, datetime
+from functools import partial
 from pathlib import Path
 from types import MappingProxyType
 from typing import Any, ClassVar
@@ -404,6 +405,32 @@ class LookupSpy(InMemoryJobStore):
         return recorded
 
 
+def assert_job_ids_read_as_missing(
+    send: Callable[[str], httpx.Response],
+    store: LookupSpy,
+    *,
+    foreign: str,
+    label: object,
+) -> None:
+    """Send each malformed job ID, a missing job and the ``foreign`` job of
+    another owner through ``send``.
+
+    Each malformed ID must get the status, type and body that the missing job
+    and the foreign job get, and ``store`` must receive no malformed ID.
+    ``label`` names the request in a failure.
+    """
+    store.arguments.clear()
+    missing, alien, *malformed = (
+        (response.status_code, response.headers.get("content-type"), response.content)
+        for response in map(send, (MISSING_JOB, foreign, *MALFORMED_JOB_IDS))
+    )
+    assert missing[0] == 404, label
+    assert alien == missing, label
+    assert malformed == [missing] * len(MALFORMED_JOB_IDS), label
+    reached = [job for job in store.arguments if job in MALFORMED_JOB_IDS]
+    assert reached == [], label
+
+
 def assert_each_route_checks_the_job_id(
     client: TestClient,
     store: LookupSpy,
@@ -413,14 +440,12 @@ def assert_each_route_checks_the_job_id(
     bodies: Mapping[tuple[str, str], object],
     headers: Mapping[str, str],
 ) -> None:
-    """Send each malformed job ID to each route of the app with a path parameter.
+    """Apply :func:`assert_job_ids_read_as_missing` to each route of the app
+    that has a path parameter.
 
     Every path parameter of the app must be ``parameter``, so a route that
-    takes a job ID under another name fails here. Each route must answer a
-    malformed ID with the status, type and body it gives a missing job and
-    the ``foreign`` job of another owner, and ``store`` must receive no
-    malformed ID. ``bodies`` holds the body that a route validates before
-    its lookup.
+    takes a job ID under another name fails here. ``bodies`` holds the body
+    that a route validates before its lookup.
     """
     app = client.app
     assert isinstance(app, FastAPI)
@@ -433,30 +458,18 @@ def assert_each_route_checks_the_job_id(
     ]
     assert {name for _, _, name in routes} == {parameter}
 
-    def answer(method: str, path: str, job: str) -> tuple[int, str | None, bytes]:
-        response = client.request(
+    def send(method: str, path: str, job: str) -> httpx.Response:
+        return client.request(
             method,
             path.replace(f"{{{parameter}}}", quote(job, safe="")),
             headers=headers,
             json=bodies.get((method, path)),
         )
-        return (
-            response.status_code,
-            response.headers.get("content-type"),
-            response.content,
-        )
 
     for method, path, _ in routes:
-        store.arguments.clear()
-        missing, alien, *malformed = (
-            answer(method, path, job)
-            for job in (MISSING_JOB, foreign, *MALFORMED_JOB_IDS)
+        assert_job_ids_read_as_missing(
+            partial(send, method, path), store, foreign=foreign, label=(method, path)
         )
-        assert missing[0] == 404, (method, path)
-        assert alien == missing, (method, path)
-        assert malformed == [missing] * len(MALFORMED_JOB_IDS), (method, path)
-        reached = [job for job in store.arguments if job in MALFORMED_JOB_IDS]
-        assert reached == [], (method, path)
 
 
 def sample_selection(

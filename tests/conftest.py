@@ -10,6 +10,11 @@ import pytest
 
 from analysis_service.offline import OFFLINE_ENV
 from analysis_service.vendors import VENDORS, refused_var
+
+# The shared assertion helpers in ``tests.factories`` show their values in a
+# failure only where pytest rewrites the module before its first import.
+pytest.register_assert_rewrite("tests.factories")
+
 from tests.factories import TEST_CREDENTIAL_ENV, TEST_TIER_ENV
 
 

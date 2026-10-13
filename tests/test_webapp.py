@@ -45,6 +45,7 @@ from tests.factories import (
     LookupSpy,
     admit,
     assert_each_route_checks_the_job_id,
+    assert_job_ids_read_as_missing,
     report_state,
     sample_selection,
     secret_env,
@@ -585,6 +586,33 @@ def test_each_run_route_answers_a_malformed_id_as_a_missing_run_before_the_store
                 ("POST", "/correct/{run_id}"): {"facts": [A_FACT_ANSWER]},
             },
             headers=SAME_ORIGIN,
+        )
+
+
+def test_answers_from_reads_a_malformed_id_as_a_missing_run_before_the_store(tiers):
+    """A submission's ``answers_from`` is a job ID, and the analysis checks
+    its shape before the lookup (#1686)."""
+    store = LookupSpy()
+    workspace = Workspace(stub_settings(), store=store)
+    with TestClient(
+        create_app(startup_for(tiers), workspace), base_url=LOOPBACK
+    ) as client:
+        run_to_completion(client)
+        foreign = JobRecord.create(
+            owner_id="another-owner",
+            sources=[Source.description("an app")],
+            frameworks=sample_selection(),
+        )
+        client.portal.call(admit, store, foreign)
+        assert_job_ids_read_as_missing(
+            lambda job: client.post(
+                "/analyze",
+                json=posted("An app.") | {"questions": True, "answers_from": job},
+                headers=SAME_ORIGIN,
+            ),
+            store,
+            foreign=foreign.id,
+            label="answers_from",
         )
 
 
