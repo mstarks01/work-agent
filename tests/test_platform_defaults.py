@@ -2,13 +2,14 @@
 
 from __future__ import annotations
 
+from pathlib import Path
 from urllib.parse import urlparse
 
 import pytest
 
 from analysis_service import graph
 from analysis_service.platform_defaults import PLATFORM_DEFAULTS, with_platform_defaults
-from analysis_service.system_model import UNKNOWN, ExternalEntity
+from analysis_service.system_model import UNKNOWN, Assumption, ExternalEntity
 from analysis_service.validation import validate
 from tests.factories import valid_model
 from tests.test_graph import KEYS, FakeContext
@@ -83,6 +84,7 @@ def test_every_default_says_what_it_writes_and_where_the_vendor_says_so():
     attributes = {
         "store": {"encryption_at_rest"},
         "flow-to": {"encryption_in_transit", "authentication"},
+        "flow-protocol": {"encryption_in_transit", "authentication"},
     }
     for default in PLATFORM_DEFAULTS:
         assert default.attribute in attributes[default.applies_to], default
@@ -103,3 +105,73 @@ def test_the_gate_publishes_the_model_with_its_platform_defaults():
     (store,) = published["data_stores"]
     assert store["encryption_at_rest"] == "AES-256 (Google Cloud default)"
     assert emitted["data_stores"][0]["encryption_at_rest"] == UNKNOWN
+
+
+FLOW = "flow:entity:customer>process:web-app>login"
+
+
+def _flow_over(protocol, *, inferred=False):
+    model = valid_model()
+    flow = model.get(FLOW)
+    flow.protocol = protocol
+    flow.encryption_in_transit = UNKNOWN
+    flow.authentication = UNKNOWN
+    if inferred:
+        model.assumptions.append(
+            Assumption(
+                assumption="the flow is HTTPS",
+                element_id=FLOW,
+                attribute="protocol",
+                basis="the model inferred it",
+            )
+        )
+    return with_platform_defaults(model)
+
+
+def test_a_stated_protocol_states_what_its_definition_guarantees():
+    """SFTP is always encrypted, and WireGuard always authenticates its peers."""
+    sftp = _flow_over("SFTP").get(FLOW)
+    assert sftp.encryption_in_transit == "SSH transport encryption (intrinsic)"
+    assert sftp.authentication == UNKNOWN, "SSH defines a 'none' client method"
+    tunnel = _flow_over("WireGuard").get(FLOW)
+    assert tunnel.encryption_in_transit == "ChaCha20-Poly1305 (WireGuard)"
+    assert tunnel.authentication == "peer public keys (WireGuard)"
+    assert _flow_over("HTTP/3").get(FLOW).encryption_in_transit.startswith("QUIC")
+
+
+@pytest.mark.parametrize(
+    "protocol", ["HTTP and HTTPS", "HTTP without TLS", "plain HTTP", "HTTP/2", "gRPC"]
+)
+def test_a_plain_sibling_or_a_negation_states_nothing(protocol):
+    flow = _flow_over(protocol).get(FLOW)
+    assert flow.encryption_in_transit == UNKNOWN
+
+
+def test_an_inferred_protocol_states_nothing():
+    """A property derived from a protocol nobody stated is an inference on an
+    inference."""
+    assert _flow_over("HTTPS", inferred=True).get(FLOW).encryption_in_transit == UNKNOWN
+
+
+def test_every_protocol_the_extraction_prompt_names_is_a_row_of_the_table():
+    """Two readers of one rule: the prompt asks the model to write it, and the
+    table writes it where the model did not. They must name the same protocols."""
+    rule = next(
+        line
+        for line in Path("prompts/extract.md").read_text(encoding="utf-8").splitlines()
+        if "An encrypted protocol states" in line
+    )
+    encrypted, authenticating = set(), set()
+    for default in PLATFORM_DEFAULTS:
+        if default.applies_to != "flow-protocol":
+            continue
+        target = (
+            encrypted
+            if default.attribute == "encryption_in_transit"
+            else authenticating
+        )
+        target.update(default.names)
+    for name in ("HTTPS", "TLS", "mTLS", "WSS", "FTPS", "SSH", "SFTP"):
+        assert name in rule and name.lower() in encrypted, name
+    assert "mTLS also states `authentication`" in rule
+    assert "mtls" in authenticating

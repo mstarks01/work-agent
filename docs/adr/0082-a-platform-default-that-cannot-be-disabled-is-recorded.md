@@ -30,6 +30,20 @@ flows to Snowflake; HTTPS and an API key on flows to Stripe; TLS on flows to a
 hosted OAuth or OpenID Connect provider (Auth0, Okta, Entra ID, Cognito),
 which RFC 6749 requires of its authorization and token endpoints.
 
+**A protocol's own definition is a row too.** A flow whose stated `protocol`
+names HTTPS, TLS, mTLS, WSS, FTPS, LDAPS, SMTPS, IMAPS, POP3S, MQTTS, AMQPS,
+DTLS, QUIC, HTTP/3, SSH, SFTP, SCP, WireGuard or WebRTC is encrypted in
+transit, because the standard defines no other way to speak it (RFC 8446 and
+RFC 9325 for TLS, RFC 9001 for QUIC, RFC 4253 and RFC 4251 for SSH, RFC 8827
+for WebRTC, the WireGuard paper). A flow over mTLS, WireGuard or Kerberos
+authenticates its initiator. SSH and SFTP do not count as authentication,
+because SSH defines a "none" client method. A protocol the model inferred
+states nothing, and neither does a field that also names a plain sibling
+("HTTP and HTTPS", HTTP/2, which has a cleartext form) or negates ("HTTP
+without TLS"). The extraction prompt's rule for encrypted protocols
+([#1659](https://github.com/mstarks01/work-agent/pull/1659)) is a second
+reader of these rows, and a test holds the two to the same protocols.
+
 **Defaults that can be turned off are not in it,** however common: RDS and
 Aurora encryption, SQS and SNS encryption, EBS encryption, CloudFront's
 protocol policy, Azure SQL's transparent encryption, and TLS on every AWS API,
@@ -51,8 +65,9 @@ extract-only graph has no gate. An analysis-mode eval seeds the blessed model
 and is unchanged. A head-mode run sees the defaults: four stores of the blessed
 references (case 02's device registry and telemetry lake, case 03's claims
 warehouse, case 04's inference log) keep `encryption_at_rest` as `unknown`
-where the table now records the Google Cloud default, and they await the
-maintainer's ruling.
+where the table now records the Google Cloud default, and case 02's
+`poll firmware` flow states `HTTPS` with no assumption while keeping its
+encryption `unknown`. These five await the maintainer's ruling.
 
 A vendor can change a default. The table names each source so a reader can
 check it, and a row whose vendor no longer documents the property must be
