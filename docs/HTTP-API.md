@@ -810,7 +810,12 @@ an unset or unknown value stops the startup. The service never falls back to
 | --- | --- | --- |
 | `ANALYSIS_JOB_STORE` | `memory`, `sql` | Required. |
 | `ANALYSIS_OBJECT_STORE` | `filesystem`, `s3` | Required by `sql`. Refused by `memory`. |
-| `ANALYSIS_DATABASE_URL` | `sqlite+aiosqlite:///<path>` | Required by `sql`. A URL that holds a password stops the startup. |
+| `ANALYSIS_DATABASE_URL` | `sqlite+aiosqlite:///<path>`, `postgresql+asyncpg://<user>@<host>:<port>/<database>` | Required by `sql`. A URL that holds a password stops the startup. |
+| `ANALYSIS_DATABASE_CREDENTIALS` | `password`, `iam` | Required for PostgreSQL. Refused for SQLite. |
+| `ANALYSIS_DATABASE_PASSWORD_FILE` | the path of a file that holds the password | Required by `password`. The only way to give the password. Refused by `iam`. |
+| `ANALYSIS_DATABASE_IAM` | `rds` | Required by `iam`. |
+| `ANALYSIS_DATABASE_REGION` | an AWS region, for example `eu-west-1` | Required by `rds`. |
+| `ANALYSIS_DATABASE_CA_FILE` | the path of a PEM file of CA certificates | Optional, for PostgreSQL. Unset trusts the system CA bundle. |
 | `ANALYSIS_OBJECT_ROOT` | an absolute path to a directory | Required by `filesystem`. |
 | `ANALYSIS_OBJECT_BUCKET` | the name of a bucket | Required by `s3`. |
 | `ANALYSIS_OBJECT_REGION` | the name of a region | Required by `s3`. |
@@ -840,10 +845,52 @@ pip install 'analysis-service[sql]'
 The extra holds SQLAlchemy, Alembic, `asyncpg` and `aiosqlite`. A `memory`
 deployment installs none of them.
 
-The database is SQLite on one host. Give `ANALYSIS_DATABASE_URL` an absolute
-path, which takes four slashes:
-`sqlite+aiosqlite:////var/lib/analysis/jobs.db`. Give the database file and its
-directory permissions that only the service user can open.
+The database is PostgreSQL, or SQLite on one host.
+
+For SQLite, give `ANALYSIS_DATABASE_URL` an absolute path, which takes four
+slashes: `sqlite+aiosqlite:////var/lib/analysis/jobs.db`. Give the database
+file and its directory permissions that only the service user can open. A
+SQLite database takes no other database setting, and each one stops the
+startup.
+
+#### PostgreSQL
+
+For PostgreSQL, give `ANALYSIS_DATABASE_URL` a user, a network host and a
+database, for example
+`postgresql+asyncpg://analysis@db.internal:5432/analysis`. The URL must not
+hold a password or a query. A URL without a user or a network host stops the
+startup, because a Unix socket has no TLS.
+
+Each connection uses TLS with `verify-full`: the service checks the
+certificate chain of the server and its host name. No setting turns this off,
+and a server without TLS refuses each connection. By default the service
+trusts the system CA bundle. For a server with a private CA, set
+`ANALYSIS_DATABASE_CA_FILE` to the CA certificate. The service then trusts
+that CA only. For Amazon RDS, give it the RDS `global-bundle.pem`.
+
+`ANALYSIS_DATABASE_CREDENTIALS` selects how the service gets the password:
+
+- `password`: the service reads the password from the file that
+  `ANALYSIS_DATABASE_PASSWORD_FILE` names. Give the file mode `0400` and the
+  service user as its owner. The service refuses a password in
+  `ANALYSIS_DATABASE_PASSWORD`, because an environment variable passes to
+  each child process.
+- `iam`: the deployment holds no password. `ANALYSIS_DATABASE_IAM` names the
+  provider of the token. The provider today is `rds`: the service signs an
+  Amazon RDS IAM token with the AWS credentials of its platform identity. It
+  needs `ANALYSIS_DATABASE_REGION` and the `aws` extra
+  (`pip install 'analysis-service[sql,aws]'`). Without the extra, the startup
+  stops with a message that names it. The database user needs the
+  `rds_iam` role.
+
+The service keeps a pool of connections. It gets a new token for each new
+connection. A token lasts 15 minutes, and the server checks it only when a
+connection opens, so an open connection stays usable after its token
+expires.
+
+Admission takes the PostgreSQL advisory lock `pg_advisory_xact_lock(1525)`
+in its transaction, so the service admits one job at a time. Do not use this
+lock key for another purpose in the same database.
 
 The `filesystem` object store keeps each object as a file under
 `ANALYSIS_OBJECT_ROOT`. The startup stops when the root does not exist, is not
@@ -937,8 +984,31 @@ ANALYSIS_DATABASE_URL=sqlite+aiosqlite:////var/lib/analysis/jobs.db \
   python -m analysis_service.migrations
 ```
 
-The command migrates the database to the latest revision, and it creates the
-database file where there is none. A migration changes the structure of the
+The command reads the same database settings as the service, with the same
+TLS and credential rules. On PostgreSQL, run it under a migration role: a
+user that owns the tables and can change the schema. Give the service a
+separate user that can only read and write the rows. Before the first
+migration, let the service user use each table that the migration role
+makes:
+
+```sql
+GRANT USAGE ON SCHEMA public TO analysis;
+ALTER DEFAULT PRIVILEGES FOR ROLE analysis_migrate IN SCHEMA public
+  GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO analysis;
+```
+
+Then run the step with the migration role in the URL, and its own
+credentials:
+
+```bash
+ANALYSIS_DATABASE_URL=postgresql+asyncpg://analysis_migrate@db.internal:5432/analysis \
+ANALYSIS_DATABASE_CREDENTIALS=password \
+ANALYSIS_DATABASE_PASSWORD_FILE=/run/secrets/analysis-migrate-password \
+  python -m analysis_service.migrations
+```
+
+The command migrates the database to the latest revision. On SQLite it
+creates the database file where there is none. A migration changes the structure of the
 tables only. It never changes a stored report, checkpoint or sources object.
 The startup stops when the schema is not at the latest revision.
 
@@ -991,7 +1061,9 @@ holds the job stores, `OBJECT_STORES` in
 [`src/analysis_service/objects.py`](../src/analysis_service/objects.py) holds
 the object stores, and `DATABASES` in
 [`src/analysis_service/sql_store.py`](../src/analysis_service/sql_store.py)
-holds the databases of the `sql` store, keyed by the driver of the URL. A row
+holds the databases of the `sql` store, keyed by the driver of the URL.
+`DATABASE_CREDENTIALS` and `DATABASE_IAM` in the same file hold the values of
+`ANALYSIS_DATABASE_CREDENTIALS` and `ANALYSIS_DATABASE_IAM`. A row
 field has no default, so a new row states every fact.
 [`tests/test_backends.py`](../tests/test_backends.py) checks each table against
 the `Literal` that names its values. It also checks that the contract suite in

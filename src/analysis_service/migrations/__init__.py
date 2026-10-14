@@ -9,22 +9,26 @@ rewrites a stored report, checkpoint or sources object.
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from pathlib import Path
 
 from alembic.config import Config
 from alembic.script import ScriptDirectory
-from sqlalchemy.engine import URL
 
 #: Alembic's script directory. It is not a package, so nothing imports its
 #: ``env.py``, which runs a migration when Alembic loads it.
 _SCRIPTS = str(Path(__file__).parent / "scripts")
 
 
-def alembic_config(url: URL) -> Config:
-    """The Alembic configuration that migrates the database at ``url``."""
+def alembic_config(env: Mapping[str, str]) -> Config:
+    """The Alembic configuration that migrates the database the settings name.
+
+    The migration connects with the database settings of the service, so it
+    uses the same TLS and credential rules.
+    """
     config = Config()
     config.set_main_option("script_location", _SCRIPTS)
-    config.attributes["url"] = url
+    config.attributes["env"] = env
     return config
 
 

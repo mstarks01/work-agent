@@ -190,3 +190,110 @@ jobs:
             echo "See [.github/WORKLOAD_IDENTITY.md](.github/WORKLOAD_IDENTITY.md)"
             echo "and [docs/adr/0003-no-privileged-vendor.md](docs/adr/0003-no-privileged-vendor.md)."
           } >>"$GITHUB_STEP_SUMMARY"
+
+  # The PostgreSQL lane: the tests marked `postgres`, against two throwaway
+  # servers that live for this job only. The `postgres` server has TLS, and
+  # `postgres-plain` has none, so a test can show that the store refuses a
+  # server without TLS. Their password is not a secret: each server holds no
+  # data, and only this runner can reach it.
+  postgres:
+    name: PostgreSQL lane
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+
+    services:
+      postgres:
+        image: postgres:17.6@sha256:00bc86618629af00d2937fdc5a5d63db3ff8450acf52f0636ec813c7f4902929
+        env:
+          POSTGRES_PASSWORD: lane
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready --health-interval 2s --health-timeout 5s
+          --health-retries 30
+      postgres-plain:
+        image: postgres:17.6@sha256:00bc86618629af00d2937fdc5a5d63db3ff8450acf52f0636ec813c7f4902929
+        env:
+          POSTGRES_PASSWORD: lane
+        ports:
+          - 5433:5432
+        options: >-
+          --health-cmd pg_isready --health-interval 2s --health-timeout 5s
+          --health-retries 30
+
+    steps:
+      - name: Check out
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up uv and Python
+        uses: astral-sh/setup-uv@11f9893b081a58869d3b5fccaea48c9e9e46f990 # v8.3.2
+        with:
+          python-version: "3.12"
+          enable-cache: true
+
+      - name: Install dependencies
+        run: uv sync --locked
+
+      # A service container starts before a step can make a certificate. So
+      # this step makes a CA and a certificate for `localhost`, copies them
+      # into the server, and turns TLS on with a reload. The tests then use
+      # `verify-full` against that CA.
+      - name: Turn on TLS
+        env:
+          CONTAINER: ${{ job.services.postgres.id }}
+        run: |
+          set -euo pipefail
+          dir="$RUNNER_TEMP/postgres"
+          mkdir -p "$dir"
+          cd "$dir"
+          umask 077
+          openssl req -x509 -newkey rsa:2048 -nodes -days 1 \
+            -subj "/CN=PostgreSQL lane CA" -keyout ca.key -out ca.crt \
+            -addext "basicConstraints=critical,CA:TRUE" \
+            -addext "keyUsage=critical,keyCertSign,cRLSign"
+          openssl req -newkey rsa:2048 -nodes -subj "/CN=localhost" \
+            -keyout server.key -out server.csr
+          printf '%s\n' \
+            "subjectAltName=DNS:localhost" \
+            "basicConstraints=critical,CA:FALSE" \
+            "keyUsage=critical,digitalSignature,keyEncipherment" \
+            "extendedKeyUsage=serverAuth" \
+            "authorityKeyIdentifier=keyid,issuer" >server.ext
+          openssl x509 -req -in server.csr -CA ca.crt -CAkey ca.key \
+            -CAcreateserial -days 1 -extfile server.ext -out server.crt
+          printf lane >password
+          for file in server.crt server.key; do
+            docker cp "$file" "$CONTAINER:/var/lib/postgresql/$file"
+          done
+          docker exec "$CONTAINER" chown postgres:postgres \
+            /var/lib/postgresql/server.crt /var/lib/postgresql/server.key
+          docker exec -u postgres "$CONTAINER" psql -v ON_ERROR_STOP=1 \
+            -c "ALTER SYSTEM SET ssl_cert_file = '/var/lib/postgresql/server.crt'" \
+            -c "ALTER SYSTEM SET ssl_key_file = '/var/lib/postgresql/server.key'" \
+            -c "ALTER SYSTEM SET ssl = on" \
+            -c "SELECT pg_reload_conf()"
+          # The reload is asynchronous, so wait until the server reports TLS on.
+          for _ in $(seq 30); do
+            if [ "$(docker exec -u postgres "$CONTAINER" psql -tAc 'SHOW ssl')" = on ]; then
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "the server did not turn TLS on" >&2
+          exit 1
+
+      # REQUIRE_POSTGRES makes a lane test fail where it would skip. -v lists
+      # each lane test, and the last line counts them.
+      - name: PostgreSQL lane
+        env:
+          ANALYSIS_OFFLINE: "1"
+          REQUIRE_POSTGRES: "1"
+          TEST_POSTGRES_URL: postgresql+asyncpg://postgres@localhost:5432/postgres
+          TEST_POSTGRES_PASSWORD_FILE: ${{ runner.temp }}/postgres/password
+          TEST_POSTGRES_CA_FILE: ${{ runner.temp }}/postgres/ca.crt
+          TEST_POSTGRES_PLAIN_URL: postgresql+asyncpg://postgres@localhost:5433/postgres
+        run: uv run pytest -m postgres -v

@@ -11,9 +11,11 @@ from __future__ import annotations
 import asyncio
 import logging
 import re
+from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 
 import pytest
+from sqlalchemy.pool import NullPool
 
 from analysis_service import jobs
 from analysis_service.answer_sets import NO_ANSWERS, AnswerSet
@@ -35,6 +37,7 @@ from analysis_service.jobs import (
 from analysis_service.principals import Identity, Principal
 from analysis_service.report import SCHEMA_VERSION, NodeRun, TokenUsage
 from analysis_service.sources import Source
+from analysis_service.sql_store import DATABASES
 from tests import test_resume
 from tests.factories import (
     SEEDING_BUDGET,
@@ -44,7 +47,7 @@ from tests.factories import (
     sample_selection,
     valid_model,
 )
-from tests.sql_stores import object_env, sql_env
+from tests.sql_stores import OBJECT_ENVS, object_env, postgres_env, sql_env
 from tests.test_parsing import ISDIGIT_TRAPS
 from tests.test_pause import waiting
 
@@ -59,28 +62,45 @@ POLICY = BudgetPolicy(
 KEY = ("df-1", "encryption_in_transit", "", "", "", "")
 
 
+#: The settings of a fresh ``sql`` store on each database, under a new
+#: directory, with the named object store.
+SQL_SETTINGS = {
+    "sqlite+aiosqlite": sql_env,
+    "postgresql+asyncpg": postgres_env,
+}
+
 #: Every backend pair the suite runs on: the job store, then the database and
 #: the object store where the job store keeps objects. ``tests/test_backends.py``
 #: checks these against the backend tables, so a new row needs a pair here.
 BACKEND_PAIRS = (
     "memory",
-    "sql/sqlite+aiosqlite/filesystem",
-    "sql/sqlite+aiosqlite/s3",
+    *(f"sql/{driver}/{objects}" for driver in SQL_SETTINGS for objects in OBJECT_ENVS),
 )
 
+#: The mark of each database that needs a server, so that its pairs run in its
+#: CI lane.
+LANES = {"postgresql+asyncpg": pytest.mark.postgres}
 
-@pytest.fixture(params=BACKEND_PAIRS)
-def new_store(request, tmp_path_factory):
+
+def _param(pair: str):
+    driver = pair.split("/")[1] if "/" in pair else pair
+    return pytest.param(pair, marks=LANES.get(driver, ()))
+
+
+@pytest.fixture(params=[_param(pair) for pair in BACKEND_PAIRS])
+def new_store(request, tmp_path_factory, monkeypatch):
     """A maker of fresh stores of one backend pair."""
     if request.param == "memory":
         return InMemoryJobStore
-    objects = request.param.rsplit("/", 1)[1]
+    _, driver, objects = request.param.split("/")
     object_env(request, objects)
-
-    def make():
-        return build_store(sql_env(tmp_path_factory.mktemp("store"), objects))
-
-    return make
+    # Each test runs each call in an event loop of its own, and a pooled
+    # connection belongs to the loop that opened it. So the stores here keep
+    # no pool. tests/test_postgres.py checks the pool of PostgreSQL.
+    for name, database in DATABASES.items():
+        monkeypatch.setitem(DATABASES, name, replace(database, pool=NullPool))
+    settings = SQL_SETTINGS[driver]
+    return lambda: build_store(settings(tmp_path_factory.mktemp("store"), objects))
 
 
 @pytest.fixture
@@ -701,6 +721,19 @@ class TestTheParentLock:
         assert moved == Admission(outcome="parent_moved", active=0)
         asyncio.run(admit(store, amendment(parent, revision=1)))
 
+    def test_a_saved_round_and_an_amendment_never_both_land(self, store):
+        """Each one locks the parent's row, so the second one sees the first."""
+        parent = waiting(store)
+
+        async def race():
+            return await asyncio.gather(
+                store.save_round(parent, "alice", NO_ANSWERS, [], [], 0),
+                reserving(store, amendment(parent, revision=0)),
+            )
+
+        saved, admission = asyncio.run(race())
+        assert saved != (admission.outcome == "admitted")
+
 
 class TestTheSaves:
     def test_the_store_refuses_a_save_against_an_old_revision(self, store):
@@ -866,6 +899,20 @@ class TestTheRetentionSweep:
         assert asyncio.run(store.save_draft(job, "alice", NO_ANSWERS, 0))
         assert asyncio.run(store.delete(job, "alice", updated_before=cutoff)) is None
         assert asyncio.run(store.get(job)) is not None
+
+    def test_a_draft_and_a_delete_with_a_cutoff_never_both_land(self, store):
+        """Each one locks the job's row: the job goes, or it keeps its draft."""
+        job = last_updated(store, "completed", days_ago=2)
+        cutoff = datetime.now(UTC) - timedelta(days=1)
+
+        async def race():
+            return await asyncio.gather(
+                store.delete(job, "alice", updated_before=cutoff),
+                store.save_draft(job, "alice", NO_ANSWERS, 0),
+            )
+
+        removed, saved = asyncio.run(race())
+        assert (removed is not None) != saved
 
     def test_it_keeps_a_job_that_changes_after_the_listing(self, store):
         job = last_updated(store, "completed", days_ago=2)

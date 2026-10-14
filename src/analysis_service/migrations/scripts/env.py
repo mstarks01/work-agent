@@ -16,7 +16,7 @@ def _migrate(connection: Connection) -> None:
 
 
 async def _run() -> None:
-    engine = engine_for(context.config.attributes["url"])
+    engine = engine_for(context.config.attributes["env"])
     async with engine.connect() as connection:
         await connection.run_sync(_migrate)
     await engine.dispose()

@@ -122,6 +122,14 @@ class TestTheStartupRefusals:
                 {"ANALYSIS_DATABASE_URL": "postgresql+psycopg2://db/jobs"},
                 "unknown value 'postgresql\\+psycopg2'",
             ),
+            (
+                {"ANALYSIS_DATABASE_CREDENTIALS": "password"},
+                "SQLite database takes no ANALYSIS_DATABASE_CREDENTIALS",
+            ),
+            (
+                {"ANALYSIS_DATABASE_PASSWORD": "hunter2"},
+                "SQLite database takes no ANALYSIS_DATABASE_PASSWORD;",
+            ),
             ({"ANALYSIS_OBJECT_ROOT": None}, "set ANALYSIS_OBJECT_ROOT"),
             ({"ANALYSIS_OBJECT_ROOT": "objects"}, "absolute path"),
         ],

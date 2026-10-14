@@ -3,6 +3,9 @@
 Run it as a deploy step, before the service starts::
 
     python -m analysis_service.migrations
+
+It reads the same database settings as the service, so give it the user and
+the credentials of the migration role.
 """
 
 import os
@@ -10,7 +13,6 @@ import os
 from alembic import command
 
 from analysis_service.migrations import alembic_config
-from analysis_service.sql_store import database_url
 
 if __name__ == "__main__":
-    command.upgrade(alembic_config(database_url(os.environ)), "head")
+    command.upgrade(alembic_config(os.environ), "head")
