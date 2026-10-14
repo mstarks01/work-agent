@@ -15,6 +15,7 @@ from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 
 import pytest
+from botocore.exceptions import ClientError, EndpointConnectionError
 from sqlalchemy.pool import NullPool
 
 from analysis_service import jobs
@@ -22,6 +23,7 @@ from analysis_service.answer_sets import NO_ANSWERS, AnswerSet
 from analysis_service.budgets import BudgetPolicy
 from analysis_service.fact_answers import FactAnswer
 from analysis_service.jobs import (
+    JOB_STORES,
     NON_LOCKING_STATUSES,
     RESTART_FAILURE_MESSAGE,
     Admission,
@@ -34,6 +36,7 @@ from analysis_service.jobs import (
     build_store,
     same_major,
 )
+from analysis_service.objects import ObjectStore, build_object_store, object_key
 from analysis_service.principals import Identity, Principal
 from analysis_service.report import SCHEMA_VERSION, NodeRun, TokenUsage
 from analysis_service.sources import Source
@@ -87,11 +90,9 @@ def _param(pair: str):
     return pytest.param(pair, marks=LANES.get(driver, ()))
 
 
-@pytest.fixture(params=[_param(pair) for pair in BACKEND_PAIRS])
-def new_store(request, tmp_path_factory, monkeypatch):
-    """A maker of fresh stores of one backend pair."""
-    if request.param == "memory":
-        return InMemoryJobStore
+def _settings(request, tmp_path_factory, monkeypatch):
+    """A maker of the settings of fresh stores of the pair ``request.param``,
+    which keeps objects."""
     _, driver, objects = request.param.split("/")
     object_env(request, objects)
     # Each test runs each call in an event loop of its own, and a pooled
@@ -100,12 +101,52 @@ def new_store(request, tmp_path_factory, monkeypatch):
     for name, database in DATABASES.items():
         monkeypatch.setitem(DATABASES, name, replace(database, pool=NullPool))
     settings = SQL_SETTINGS[driver]
-    return lambda: build_store(settings(tmp_path_factory.mktemp("store"), objects))
+    return lambda: settings(tmp_path_factory.mktemp("store"), objects)
+
+
+@pytest.fixture(params=[_param(pair) for pair in BACKEND_PAIRS])
+def new_store(request, tmp_path_factory, monkeypatch):
+    """A maker of fresh stores of one backend pair."""
+    if request.param == "memory":
+        return InMemoryJobStore
+    settings = _settings(request, tmp_path_factory, monkeypatch)
+    return lambda: build_store(settings())
 
 
 @pytest.fixture
 def store(new_store):
     return new_store()
+
+
+class FailingDeletes:
+    """An object store whose delete raises ``error`` for each key in ``failing``."""
+
+    def __init__(self, objects: ObjectStore) -> None:
+        self._objects = objects
+        self.failing: set[str] = set()
+        self.error: BaseException = PermissionError("the delete is refused")
+
+    def __getattr__(self, name: str):
+        return getattr(self._objects, name)
+
+    async def delete(self, key: str) -> bool:
+        if key in self.failing:
+            raise self.error
+        return await self._objects.delete(key)
+
+
+#: The backend pairs whose job store keeps objects: each pair that names an
+#: object store.
+OBJECT_PAIRS = tuple(pair for pair in BACKEND_PAIRS if "/" in pair)
+
+
+@pytest.fixture(params=[_param(pair) for pair in OBJECT_PAIRS])
+def held(request, tmp_path_factory, monkeypatch):
+    """A fresh store of a pair that keeps objects, and its object store, whose
+    deletes a test can make fail."""
+    env = _settings(request, tmp_path_factory, monkeypatch)()
+    objects = FailingDeletes(build_object_store(env))
+    return JOB_STORES[env["ANALYSIS_JOB_STORE"]].build(env, objects), objects
 
 
 def new_record(subject: str = "alice", reserved: int = 0) -> JobRecord:
@@ -953,6 +994,251 @@ class TestTheRetentionSweep:
             r" \d+ object\(s\) removed",
             line,
         )
+
+
+def later() -> datetime:
+    """A cutoff after now, so that the orphan sweep counts each object as old."""
+    return datetime.now(UTC) + timedelta(minutes=1)
+
+
+def earlier() -> datetime:
+    """A cutoff before now, so that the orphan sweep counts each object as young."""
+    return datetime.now(UTC) - timedelta(minutes=1)
+
+
+#: One job a window, so that a second submission is refused.
+ONE_A_WINDOW = BudgetPolicy(
+    window_seconds=3600,
+    max_jobs_per_window=1,
+    max_tokens_per_window=10**9,
+    global_max_tokens_per_window=10**9,
+)
+
+#: Each class of error an object store raises on a failed delete: the
+#: filesystem row, then the two error classes of ``boto3``.
+DELETE_ERRORS = [
+    PermissionError("the delete is refused"),
+    ClientError({"Error": {"Code": "InternalError"}}, "DeleteObject"),
+    EndpointConnectionError(endpoint_url="https://objects.example"),
+]
+
+
+class TestAFailedObjectDelete:
+    """#1673: an object delete that fails leaves the object for the orphan
+    sweep. It never undoes the row change, and it never hides an outcome."""
+
+    @pytest.mark.parametrize("error", DELETE_ERRORS)
+    def test_the_delete_answers_the_count_it_removed(self, held, error):
+        store, objects = held
+        job = completed(store)
+        sources = object_key("alice", job, "sources.json")
+        objects.failing = {sources}
+        objects.error = error
+        assert asyncio.run(store.delete(job, "alice")) == 1
+        assert asyncio.run(store.get(job)) is None
+        assert asyncio.run(objects.get(sources)) is not None
+        report = object_key("alice", job, "report.json")
+        assert asyncio.run(objects.get(report)) is None
+
+    def test_the_usage_row_still_counts(self, held):
+        store, objects = held
+        job = completed(store)
+        objects.failing = {object_key("alice", job, "sources.json")}
+        asyncio.run(store.delete(job, "alice"))
+        admission = asyncio.run(
+            store.reserve(new_record(), ceiling=100, budget=ONE_A_WINDOW)
+        )
+        assert admission.outcome == "over_rate"
+
+    def test_the_log_names_the_key_and_no_content(self, held, caplog):
+        store, objects = held
+        job = completed(store)
+        sources = object_key("alice", job, "sources.json")
+        objects.failing = {sources}
+        with caplog.at_level(logging.WARNING, logger="analysis_service.sql_store"):
+            asyncio.run(store.delete(job, "alice"))
+        [line] = caplog.messages
+        assert sources in line
+        assert "PermissionError" in line
+        assert "orders" not in line
+
+    def test_the_audit_line_counts_the_objects_removed(self, held, caplog):
+        store, objects = held
+        job = completed(store)
+        objects.failing = {object_key("alice", job, "sources.json")}
+        with caplog.at_level(logging.INFO, logger="analysis_service.jobs"):
+            assert asyncio.run(jobs.audited_delete(store, job, "alice", "owner")) == 1
+        assert [
+            record.getMessage()
+            for record in caplog.records
+            if record.name == "analysis_service.jobs"
+        ] == [f"deleted job {job} of owner alice: cause owner, 1 object(s) removed"]
+
+    def test_a_cancellation_is_never_caught(self, held):
+        store, objects = held
+        job = completed(store)
+        objects.failing = {object_key("alice", job, "sources.json")}
+        objects.error = asyncio.CancelledError()
+        with pytest.raises(asyncio.CancelledError):
+            asyncio.run(store.delete(job, "alice"))
+
+    @pytest.mark.parametrize("error", DELETE_ERRORS)
+    def test_a_refused_job_answers_its_refusal(self, held, error):
+        store, objects = held
+        completed(store)
+        refused = new_record()
+        sources = object_key("alice", refused.id, "sources.json")
+        objects.failing = {sources}
+        objects.error = error
+        admission = asyncio.run(
+            store.reserve(refused, ceiling=100, budget=ONE_A_WINDOW)
+        )
+        assert admission.outcome == "over_rate"
+        assert asyncio.run(objects.get(sources)) is not None
+        objects.failing = set()
+        assert asyncio.run(store.sweep_orphans(later())) == 1
+        assert asyncio.run(objects.get(sources)) is None
+
+    def test_an_admission_that_raises_keeps_its_own_error(self, held):
+        store, objects = held
+        stranger = new_record("mallory")
+        objects.failing = {object_key("mallory", stranger.id, "sources.json")}
+        with pytest.raises(ValueError, match="holds no principal"):
+            asyncio.run(store.reserve(stranger, ceiling=100, budget=POLICY))
+
+
+class TestTheOrphanSweep:
+    """#1673: the sweep deletes each old object that no row names, and only those."""
+
+    def test_it_removes_nothing_that_a_row_names(self, store):
+        job = completed(store)
+        assert asyncio.run(store.sweep_orphans(later())) == 0
+        assert asyncio.run(store.get(job)).report is not None
+
+    def test_it_deletes_an_old_object_that_no_row_names(self, held):
+        store, objects = held
+        key = object_key("alice", new_record().id, "sources.json")
+        asyncio.run(objects.put(key, b"[]"))
+        assert asyncio.run(store.sweep_orphans(later())) == 1
+        assert asyncio.run(objects.get(key)) is None
+
+    def test_it_keeps_a_young_object(self, held):
+        store, objects = held
+        key = object_key("alice", new_record().id, "sources.json")
+        asyncio.run(objects.put(key, b"[]"))
+        assert asyncio.run(store.sweep_orphans(earlier())) == 0
+        assert asyncio.run(objects.get(key)) == b"[]"
+
+    def test_it_keeps_each_object_of_a_job_that_holds_it(self, held):
+        store, _ = held
+        job = completed(store)
+        queued = new_record()
+        asyncio.run(admit(store, queued))
+        assert asyncio.run(store.sweep_orphans(later())) == 0
+        assert asyncio.run(store.get(job)).report is not None
+        assert asyncio.run(store.get(queued.id)) is not None
+
+    def test_it_deletes_an_old_report_that_its_row_does_not_name(self, held):
+        """A report put before a save wrote its digest, as a crash leaves it."""
+        store, objects = held
+        queued = new_record()
+        asyncio.run(admit(store, queued))
+        report = object_key("alice", queued.id, "report.json")
+        asyncio.run(objects.put(report, b"{}"))
+        assert asyncio.run(store.sweep_orphans(later())) == 1
+        assert asyncio.run(objects.get(report)) is None
+        assert asyncio.run(store.get(queued.id)) is not None
+
+    def test_a_row_names_an_object_only_under_its_own_owner(self, held):
+        store, objects = held
+        queued = new_record()
+        asyncio.run(admit(store, queued))
+        key = object_key("bob", queued.id, "sources.json")
+        asyncio.run(objects.put(key, b"[]"))
+        assert asyncio.run(store.sweep_orphans(later())) == 1
+        assert asyncio.run(store.get(queued.id)) is not None
+
+    def test_it_never_deletes_a_key_that_the_service_never_writes(self, held):
+        store, objects = held
+        job_id = new_record().id
+        strays = [
+            "notes.txt",
+            f"alice/{job_id}/notes.json",
+            "alice/job-1/sources.json",
+            f"Alice/{job_id}/sources.json",
+            f"alice/{job_id}/report.json/extra",
+            f"tenant/alice/{job_id}/sources.json",
+        ]
+        for key in strays:
+            asyncio.run(objects.put(key, b"kept"))
+        assert asyncio.run(store.sweep_orphans(later())) == 0
+        assert [asyncio.run(objects.get(key)) for key in strays] == [b"kept"] * 6
+
+    def test_one_pass_writes_one_line_with_its_count(self, held, caplog, monkeypatch):
+        store, objects = held
+        monkeypatch.setattr(jobs, "ORPHAN_GRACE", timedelta(minutes=-1))
+        key = object_key("alice", new_record().id, "sources.json")
+        asyncio.run(objects.put(key, b"[]"))
+        with caplog.at_level(logging.INFO, logger="analysis_service.jobs"):
+            asyncio.run(jobs.remove_orphans(store))
+        assert caplog.messages == ["the orphan sweep removed 1 object(s)"]
+
+
+class SweepSpy(InMemoryJobStore):
+    """A ``memory`` store that counts the passes of the orphan sweep, and
+    whose first ``failures`` passes raise."""
+
+    def __init__(self, failures: int = 0) -> None:
+        super().__init__()
+        self.passes = 0
+        self.failures = failures
+
+    async def sweep_orphans(self, before: datetime) -> int:
+        self.passes += 1
+        if self.passes <= self.failures:
+            raise OSError("the object store cannot list")
+        return 0
+
+
+async def passes_in_lifespan(store: SweepSpy, passes: int) -> None:
+    """Start the store's lifespan, and wait until the orphan sweep ran
+    ``passes`` times, for five seconds at most."""
+    async with jobs.store_lifespan(store):
+        for _ in range(500):
+            if store.passes >= passes:
+                break
+            await asyncio.sleep(0.01)
+
+
+class TestTheSweepLoop:
+    """#1673: the orphan sweep runs on every start-up, with or without a
+    retention period, and a failed pass does not stop the loop."""
+
+    def test_the_orphan_sweep_runs_without_a_retention_period(self, monkeypatch):
+        monkeypatch.delenv("ANALYSIS_RETENTION_DAYS", raising=False)
+        store = SweepSpy()
+        asyncio.run(passes_in_lifespan(store, 1))
+        assert store.passes == 1
+
+    def test_a_failed_pass_is_logged_and_the_next_pass_runs(self, monkeypatch, caplog):
+        monkeypatch.delenv("ANALYSIS_RETENTION_DAYS", raising=False)
+        monkeypatch.setattr(jobs, "SWEEP_SECONDS", 0)
+        store = SweepSpy(failures=1)
+        with caplog.at_level(logging.INFO, logger="analysis_service.jobs"):
+            asyncio.run(passes_in_lifespan(store, 2))
+        assert store.passes >= 2
+        assert "the orphan sweep failed" in caplog.messages
+
+    def test_a_failed_retention_pass_does_not_stop_the_orphan_sweep(self, monkeypatch):
+        monkeypatch.setenv("ANALYSIS_RETENTION_DAYS", "30")
+        store = SweepSpy()
+
+        async def refused(before: datetime) -> list[tuple[str, str]]:
+            raise OSError("the database is down")
+
+        monkeypatch.setattr(store, "expired", refused)
+        asyncio.run(passes_in_lifespan(store, 1))
+        assert store.passes == 1
 
 
 class TestTheRetentionSetting:

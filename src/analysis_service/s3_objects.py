@@ -33,7 +33,8 @@ or the text of a provider's error.
 from __future__ import annotations
 
 import asyncio
-from collections.abc import Callable, Mapping
+from collections.abc import AsyncIterator, Callable, Mapping
+from datetime import datetime
 from typing import Any, Literal, get_args
 from urllib.parse import urlsplit
 
@@ -238,6 +239,19 @@ class S3ObjectStore:
 
     async def delete(self, key: str) -> bool:
         return await asyncio.to_thread(_delete, self._client, self._bucket, key)
+
+    async def list(self) -> AsyncIterator[tuple[str, datetime]]:
+        """Each key in the bucket, one ``ListObjectsV2`` page at a time."""
+        token: dict[str, str] = {}
+        while True:
+            page = await asyncio.to_thread(
+                self._client.list_objects_v2, Bucket=self._bucket, **token
+            )
+            for listed in page.get("Contents", []):
+                yield listed["Key"], listed["LastModified"]
+            if not page.get("IsTruncated"):
+                break
+            token = {"ContinuationToken": page["NextContinuationToken"]}
 
 
 def _put(client: Any, bucket: str, key: str, data: bytes) -> None:

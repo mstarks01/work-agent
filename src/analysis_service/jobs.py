@@ -671,6 +671,17 @@ class JobStore(Protocol):
         ``before``. The retention sweep deletes these (#1530)."""
         ...
 
+    async def sweep_orphans(self, before: datetime) -> int:
+        """Delete each object last written before ``before`` that no job row
+        names, and return how many the store removed (ADR 0065).
+
+        A row names an object of its own job only: the sources always, and
+        the report only where the row holds the report's digest. A usage row
+        names no object. The sweep never deletes an object that a row names,
+        and never a key that the service does not write.
+        """
+        ...
+
     async def fail_in_flight(self) -> list[str]: ...
 
 
@@ -1111,6 +1122,10 @@ class InMemoryJobStore:
             if record.status in TERMINAL_STATUSES and record.updated_at < before
         ]
 
+    async def sweep_orphans(self, before: datetime) -> int:
+        """Remove nothing: this store holds no objects."""
+        return 0
+
     async def fail_in_flight(self) -> list[str]:
         """Fail each queued or running job with :data:`RESTART_FAILURE_MESSAGE`.
 
@@ -1329,19 +1344,46 @@ async def expire_jobs(store: JobStore, days: int) -> None:
         )
 
 
-#: How often the retention sweep runs. A job outlives its retention period by
-#: one interval at most.
+#: How old an object must be before the orphan sweep can delete it.
+#:
+#: A store writes an object before the row that names it: ``reserve`` puts
+#: the sources and then admits the job, and ``save`` puts the report and then
+#: writes its digest. In that window no row names the object yet. The window
+#: lasts seconds, and admission waits for its global lock in it. One day is
+#: far longer than that window, and longer than a clock difference between
+#: the service and the object store. A put never writes over an object, so no
+#: row can come to name an object that is older than this period.
+ORPHAN_GRACE = timedelta(days=1)
+
+
+async def remove_orphans(store: JobStore) -> None:
+    """One pass of the orphan sweep: delete each object older than
+    :data:`ORPHAN_GRACE` that no row names, and log the count."""
+    removed = await store.sweep_orphans(datetime.now(UTC) - ORPHAN_GRACE)
+    logger.info("the orphan sweep removed %d object(s)", removed)
+
+
+#: How often the sweeps run. A job outlives its retention period by one
+#: interval at most.
 SWEEP_SECONDS = 3600
 
 
-async def _sweep(store: JobStore, days: int) -> None:
-    """Run the retention sweep now and then each :data:`SWEEP_SECONDS`, until
-    the app stops. A failed pass is logged, and the next pass runs."""
+async def _sweep(store: JobStore, days: int | None) -> None:
+    """Run the sweeps now and then each :data:`SWEEP_SECONDS`, until the app
+    stops: the retention sweep where ``days`` is set, then the orphan sweep.
+
+    A failed sweep is logged, and the next sweep runs.
+    """
     while True:
+        if days is not None:
+            try:
+                await expire_jobs(store, days)
+            except Exception:
+                logger.exception("the retention sweep failed")
         try:
-            await expire_jobs(store, days)
+            await remove_orphans(store)
         except Exception:
-            logger.exception("the retention sweep failed")
+            logger.exception("the orphan sweep failed")
         await asyncio.sleep(SWEEP_SECONDS)
 
 
@@ -1353,9 +1395,10 @@ async def store_lifespan(store: JobStore) -> AsyncIterator[None]:
     both run it as the lifespan of their app, after they built the store from
     the backend settings. The order is: the retention setting, the store's
     startup check (the schema revision, then the object store), the restart
-    scan (#1529), then requests. A failed check stops the startup. Where a
-    retention period is set, the retention sweep starts after the restart scan
-    and stops with the app.
+    scan (#1529), then requests. A failed check stops the startup. The sweeps
+    start after the restart scan and stop with the app: the orphan sweep
+    always, because an owner delete can also leave an orphan, and the
+    retention sweep where a retention period is set.
     """
     days = retention_days()
     await store.startup_check()
@@ -1367,14 +1410,13 @@ async def store_lifespan(store: JobStore) -> AsyncIterator[None]:
         logger.warning(
             "restart scan failed %d job(s) in flight: %s", len(failed), failed
         )
-    sweep = None if days is None else asyncio.create_task(_sweep(store, days))
+    sweep = asyncio.create_task(_sweep(store, days))
     try:
         yield
     finally:
-        if sweep is not None:
-            sweep.cancel()
-            with suppress(asyncio.CancelledError):
-                await sweep
+        sweep.cancel()
+        with suppress(asyncio.CancelledError):
+            await sweep
 
 
 @dataclass(frozen=True)
