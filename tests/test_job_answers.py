@@ -26,6 +26,7 @@ from analysis_service.errors import ConfigError
 from analysis_service.fact_answers import FactAnswer
 from analysis_service.fact_writes import LineageConflict, check_fact_answers
 from analysis_service.job_answers import (
+    AnswersSaved,
     DraftSaved,
     JobAnswers,
     NoCatalog,
@@ -33,7 +34,6 @@ from analysis_service.job_answers import (
     NotAdmitted,
     NotCompleted,
     Refused,
-    RoundSaved,
     RunnerUnavailable,
     Started,
 )
@@ -153,11 +153,11 @@ class TestAnsweringAWaitingJob:
                 start=starts,
             )
         )
-        assert outcome == RoundSaved(job_id=job)
+        assert outcome == AnswersSaved(job_id=job)
         assert starts.started == []
         record = asyncio.run(store.get(job))
         assert record is not None
-        assert record.round_revision == 1
+        assert record.revision == 1
         assert [fact.key for fact in record.answers.facts] == [key]
 
     def test_a_continue_starts_the_resumed_job(self):
@@ -254,7 +254,7 @@ class TestAnsweringAWaitingJob:
                 start=Starts(),
             )
         )
-        assert outcome == RoundSaved(job_id=job)
+        assert outcome == AnswersSaved(job_id=job)
         payload = asyncio.run(answers.questions(job, OWNER))
         assert [tuple(q["key"]) for q in payload["skipped_early"]] == [key]
         assert key not in {tuple(q["key"]) for q in payload["early_questions"]}

@@ -1,11 +1,11 @@
-"""The questions one round asks, and the answers it admits.
+"""The questions one job asks, and the answers it admits.
 
 **One value answers "what does this job ask", "may this answer land" and
 "what does it start".** The HTTP routes, the first-run app and the eval replay
 each build an :class:`AnswerState` from their own job record. Its
 :attr:`~AnswerState.questions` is the :class:`QuestionSet` they serve, and its
-:meth:`~AnswerState.answer` checks the round revision, admits the answers,
-checks the source limits and returns a :class:`SavedRound` or a
+:meth:`~AnswerState.answer` checks the revision, admits the answers,
+checks the source limits and returns a :class:`SavedAnswers` or a
 :class:`ResumedJob`. The caller only stores the one or starts the other. The
 facts it admits are the keys of the questions it holds, so the list a caller
 serves and the list it accepts cannot differ.
@@ -37,7 +37,7 @@ rested on its lead. A save records only the questions the page says it
 presented, checked against the list (:class:`Answers`), so a question the
 service returned and the page never showed is not recorded as shown.
 
-**A report offers one follow-up** (ADR 0054). A fact an earlier round
+**A report offers one follow-up** (ADR 0054). A fact an earlier save
 answered is not asked again, and an answer of "I don't know" counts. A report
 lists every open fact its conditional findings wait on, so one follow-up can
 answer them all. The analysis then runs once more, and the report it writes
@@ -114,7 +114,7 @@ __all__ = [
     "EARLY_RULES",
     "MAX_SKIPS",
     "POLICY_VERSION",
-    "AdmittedRound",
+    "AdmittedAnswers",
     "AlreadyResumed",
     "AmendedJob",
     "AnswerState",
@@ -128,8 +128,8 @@ __all__ = [
     "QuestionSet",
     "Reason",
     "ResumedJob",
+    "SavedAnswers",
     "SavedDraft",
-    "SavedRound",
     "SourcesOverLimit",
     "StaleRevision",
     "Stop",
@@ -223,7 +223,7 @@ def _early_kind(question: EarlyQuestion) -> str:
 
 
 def passes_floor(question: EarlyQuestion, listed: Sequence[EarlyQuestion]) -> bool:
-    """Whether a round may show this question: at or above its kind's floor.
+    """Whether the list may show this question: at or above its kind's floor.
 
     **The one reader of the floor.** A question in the highest band of one of
     its frameworks also passes, where that framework's questions of the kind
@@ -256,12 +256,12 @@ class AlreadyResumed(ValueError):
 
 
 @dataclass(frozen=True)
-class AdmittedRound:
-    """What a resumed job carries: its sources and every round's answers."""
+class AdmittedAnswers:
+    """What a resumed job carries: its sources and every saved answer."""
 
     sources: list[Source]
     answers: AnswerSet
-    #: Every early question the pause showed, this round's included, which
+    #: Every early question the pause showed, this save's included, which
     #: the report reads to say a follow-up question was skipped before.
     shown: tuple[UnknownKey, ...]
     #: Every early question and link question the submitter skipped for now
@@ -540,7 +540,7 @@ class QuestionSet:
         save: bool = False,
         skips: Sequence[SkipKey] = (),
         presented: Sequence[UnknownKey] = (),
-    ) -> AdmittedRound:
+    ) -> AdmittedAnswers:
         """The resumed job these answers start, or a ``ValueError``.
 
         ``sources`` and ``earlier`` are what the answered job was given, and
@@ -601,7 +601,7 @@ class QuestionSet:
         composed, all_links, all_facts = resumed_sources(
             sources, earlier.links, links, earlier.facts, facts
         )
-        return AdmittedRound(
+        return AdmittedAnswers(
             sources=composed,
             answers=AnswerSet(links=tuple(all_links), facts=tuple(all_facts)),
             shown=tuple(dict.fromkeys([*self.shown, *shown])),
@@ -1371,11 +1371,11 @@ def _known_content(answer: FactAnswer | None) -> frozenset[tuple[str, str]]:
 
 
 class StaleRevision(Exception):
-    """Answers to a waiting job that name an earlier round revision than its own."""
+    """Answers to a waiting job that name an earlier revision than its own."""
 
 
 class MissingRevision(ValueError):
-    """Answers to a waiting job that name no round revision."""
+    """Answers to a waiting job that name no revision."""
 
 
 class SourcesOverLimit(Exception):
@@ -1407,11 +1407,11 @@ class Answers:
 
 
 @dataclass(frozen=True)
-class SavedRound:
-    """What a waiting job keeps after a saved round. No model runs.
+class SavedAnswers:
+    """What a waiting job keeps after a save. No model runs.
 
-    ``revision`` is the round revision the save read. The store writes the
-    round only while the job still holds that revision, so of two saves that
+    ``revision`` is the revision the save read. The store writes the
+    answers only while the job still holds that revision, so of two saves that
     read one revision only the first lands.
     """
 
@@ -1468,7 +1468,7 @@ class SavedDraft:
     ones. The report and its follow-up are unchanged: the run
     that answers them composes the draft with what it is sent (ADR 0070).
     ``revision`` is the revision the save read, which the store checks as it
-    does a saved round's.
+    does a save's.
     """
 
     draft: AnswerSet
@@ -1502,17 +1502,17 @@ class AnswerState:
     record, and asks it for the questions (:attr:`questions`), for the
     outcome of a submission (:meth:`answer`), or for a final report's
     corrections (:meth:`correct`). It writes nothing: the caller stores a
-    :class:`SavedRound` or starts a :class:`ResumedJob`.
+    :class:`SavedAnswers` or starts a :class:`ResumedJob`.
 
     ``checkpoint`` is the model and catalog the questions ask about: a waiting
     job's, or a finished report's. ``analyses`` are the report's findings, and
     empty for a waiting job. ``waiting`` marks a job that waits on answers
     before its analysis, and ``final`` a report its follow-up wrote.
     ``sources`` and ``answers`` are what the job was given, a waiting job's
-    saved rounds included. ``shown`` is every early question
+    saved answers included. ``shown`` is every early question
     the pause showed, ``skipped`` every question its submitter skipped for
     now, and ``corrections`` what a final report's owner corrected since.
-    ``revision`` is how many rounds a waiting job saved. ``resumed_by`` names
+    ``revision`` is how many saves a waiting job made. ``resumed_by`` names
     the job these answers started, where it locks this one.
     """
 
@@ -1529,7 +1529,7 @@ class AnswerState:
     revision: int
     resumed_by: str | None
     #: A report's draft answers: what its follow-up saved in batches and has
-    #: not yet run. Empty for a waiting job, whose saved rounds are ``answers``.
+    #: not yet run. Empty for a waiting job, whose saved answers are ``answers``.
     draft: AnswerSet = NO_ANSWERS
     #: The answers a paused job held when its amendment started this job
     #: (ADR 0072). This job's questions take each one they still ask.
@@ -1557,7 +1557,7 @@ class AnswerState:
         **Each carried answer passes the answer check of this job's own
         questions**, as a submitter's answer does, so an answer about a part
         the amended model no longer has, or about a fact it now states, is not
-        taken. An answer this job's own rounds gave since replaces the carried
+        taken. An answer this job's own saves gave since replaces the carried
         one.
         """
         if self.carried_in.empty:
@@ -1595,7 +1595,7 @@ class AnswerState:
     @property
     def held(self) -> AnswerSet:
         """Every answer this job holds: the carried ones its questions take,
-        under the ones its own rounds gave."""
+        under the ones its own saves gave."""
         return self.answers.over(self.carried.taken)
 
     @cached_property
@@ -1655,8 +1655,8 @@ class AnswerState:
 
     def answer(
         self, answers: Answers, *, limits: SourceLimits | None
-    ) -> SavedRound | SavedDraft | ResumedJob:
-        """The round a waiting job keeps, a report's draft, or the Resumed Job the answers start.
+    ) -> SavedAnswers | SavedDraft | ResumedJob:
+        """The answers a waiting job keeps, a report's draft, or the Resumed Job the answers start.
 
         **A report's follow-up saves in batches** (ADR 0070). A save to a
         report keeps a draft and runs nothing; the run composes every saved
@@ -1672,7 +1672,7 @@ class AnswerState:
         job with no catalog, :class:`SourcesOverLimit` where the composed
         sources break ``limits``, and a ``ValueError`` that names the
         submitter's own choices otherwise. ``limits`` is ``None`` only where
-        the job holds no sources to bound, as an eval replay of rounds.
+        the job holds no sources to bound, as an eval replay of saves.
         """
         self._check_revision(answers.revision, required=self.waiting or answers.save)
         given = answers.given
@@ -1689,7 +1689,7 @@ class AnswerState:
             presented=answers.presented,
         )
         held = within_held_limits(admitted.answers)
-        # Checked for a save too: a saved round or draft that no start could
+        # Checked for a save too: saved answers or a draft that no start could
         # run would hold the job until the submitter shortens an answer.
         breach = None if limits is None else limits.breach(admitted.sources)
         if breach is not None:
@@ -1697,7 +1697,7 @@ class AnswerState:
         if answers.save and not self.waiting:
             return SavedDraft(draft=given, revision=self.revision)
         if answers.save:
-            return SavedRound(
+            return SavedAnswers(
                 answers=held,
                 shown=admitted.shown,
                 skipped=admitted.skipped,

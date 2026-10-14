@@ -262,7 +262,7 @@ class Engine:
 
         A surface that keeps answers before it resumes passes these to
         :meth:`~analysis_service.answer_round.AnswerState.answer` at each save,
-        so a round that no start could run is refused when it is saved.
+        so answers that no start could run are refused when they are saved.
         """
         return self._limits
 

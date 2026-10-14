@@ -1,5 +1,5 @@
 // The input for one answer, as every page that takes answers builds it: the
-// report page's follow-up and corrections, and the pause page's rounds. Each
+// report page's follow-up and corrections, and the pause page's list. Each
 // page keeps its own layout and its own rule for what it sends; the inputs and
 // the answer each one reads are built here, once.
 //

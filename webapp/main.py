@@ -1063,8 +1063,8 @@ def create_app(
         The run answered is a paused one or a finished one. The new run starts
         at ``prepare`` from what that run reached, so nothing is extracted
         again. An empty answer list continues a paused run without answers; a
-        finished run has nothing to continue. A saved round answers with the
-        next round.
+        finished run has nothing to continue. A save answers with the
+        new revision.
         """
         if not is_same_origin(request):
             logger.warning("refused a POST /answer that was not same-origin")

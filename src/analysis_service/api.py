@@ -398,7 +398,7 @@ class AnswersSubmission(BaseModel):
 class AmendmentSubmission(BaseModel):
     """An amendment to a paused job's description (ADR 0072): what is true
     that the model misses or reads wrongly, in the submitter's own words.
-    ``revision`` is the round revision the questions were read with."""
+    ``revision`` is the revision the questions were read with."""
 
     model_config = ConfigDict(extra="forbid")
 

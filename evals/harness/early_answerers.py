@@ -52,7 +52,7 @@ from typing import Any
 from unittest import mock
 
 from analysis_service import answer_round
-from analysis_service.answer_round import Answers, AnswerState, SavedRound
+from analysis_service.answer_round import Answers, AnswerState, SavedAnswers
 from analysis_service.answer_sets import AnswerSet
 from analysis_service.capabilities import lineage
 from analysis_service.claims import FrameworkName, UnknownKey
@@ -148,7 +148,7 @@ def _save(
     *,
     skips: Sequence[SkipKey] = (),
     presented: Sequence[UnknownKey] = (),
-) -> SavedRound:
+) -> SavedAnswers:
     """One save through the service's own admission, which runs no model."""
     saved = state.answer(
         Answers(
@@ -160,7 +160,7 @@ def _save(
         ),
         limits=None,
     )
-    if not isinstance(saved, SavedRound):
+    if not isinstance(saved, SavedAnswers):
         raise TypeError("a save starts no job")
     return saved
 

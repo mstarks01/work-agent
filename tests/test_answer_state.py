@@ -18,7 +18,7 @@ from analysis_service.answer_round import (
     AnswerState,
     MissingRevision,
     ResumedJob,
-    SavedRound,
+    SavedAnswers,
     SourcesOverLimit,
     StaleRevision,
 )
@@ -100,7 +100,7 @@ class TestTheOutcome:
             Answers(save=True, skips=[key], presented=[key], revision=3), limits=ROOMY
         )
 
-        assert isinstance(outcome, SavedRound)
+        assert isinstance(outcome, SavedAnswers)
         assert outcome.revision == 3
         assert outcome.skipped == (key,)
 
