@@ -1308,15 +1308,13 @@ def _in_turn(
     *,
     serves: Callable[[_Item], set[str]],
     choices: Callable[[_Item], int],
-    tie: Callable[[_Item], int] = lambda item: 0,
     charged: Mapping[str, int] | None = None,
 ) -> list[_Item]:
     """The items with the selected frameworks taking turns.
 
     **The one reader of whose turn it is** (:func:`by_turn`). The next item
     is the first one left that serves the framework charged the fewest
-    choices so far. On a tie the framework whose next item has the smaller
-    ``tie`` value goes first, then the first by name. Every framework the
+    choices so far. On a tie the first by name goes first. Every framework the
     item serves is charged its choices. An item that serves no framework
     keeps its place after every item that does.
     """
@@ -1327,11 +1325,8 @@ def _in_turn(
         served = set().union(*map(serves, left))
         if not served:
             return order + left
-        next_item = {
-            name: next(item for item in left if name in serves(item)) for name in served
-        }
-        name = min(served, key=lambda each: (charged[each], tie(next_item[each]), each))
-        item = next_item[name]
+        name = min(served, key=lambda each: (charged[each], each))
+        item = next(item for item in left if name in serves(item))
         left.remove(item)
         order.append(item)
         for holder in serves(item):
