@@ -12,6 +12,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import os
+import stat
 from pathlib import Path
 
 import pytest
@@ -97,6 +98,23 @@ def queued(store: JobStore) -> str:
     return record.id
 
 
+def empty_database(directory: Path) -> Path:
+    """A private SQLite file that holds no schema."""
+    path = directory / "empty.db"
+    path.touch(mode=0o600)
+    return path
+
+
+def test_the_migration_makes_a_file_that_only_the_service_user_can_open(tmp_path):
+    path = tmp_path / "new.db"
+    previous = os.umask(0o022)
+    try:
+        migrate(path)
+    finally:
+        os.umask(previous)
+    assert stat.S_IMODE(path.stat().st_mode) == 0o600
+
+
 class TestTheStartupRefusals:
     """Each unusable setting stops the startup before the app takes a request."""
 
@@ -149,8 +167,35 @@ class TestTheStartupRefusals:
         assert "hunter2" not in str(refused.value)
 
     def test_a_schema_that_is_not_at_the_latest_revision(self, env, tmp_path):
-        env["ANALYSIS_DATABASE_URL"] = sqlite_url(tmp_path / "empty.db")
+        env["ANALYSIS_DATABASE_URL"] = sqlite_url(empty_database(tmp_path))
         with pytest.raises(JobStoreConfigError, match="revision None"):
+            start(env)
+
+    def test_a_missing_database_file(self, env, tmp_path):
+        """The service never makes the file: only the migration step does."""
+        missing = tmp_path / "missing.db"
+        env["ANALYSIS_DATABASE_URL"] = sqlite_url(missing)
+        with pytest.raises(JobStoreConfigError, match="does not exist"):
+            start(env)
+        assert not missing.exists()
+
+    def test_a_database_file_that_others_can_open(self, env):
+        database = env["ANALYSIS_DATABASE_URL"].removeprefix("sqlite+aiosqlite:///")
+        os.chmod(database, 0o640)
+        with pytest.raises(JobStoreConfigError, match="set its mode to 0600"):
+            start(env)
+
+    def test_a_database_file_that_is_a_symbolic_link(self, env, tmp_path):
+        database = env["ANALYSIS_DATABASE_URL"].removeprefix("sqlite+aiosqlite:///")
+        link = tmp_path / "link.db"
+        link.symlink_to(database)
+        env["ANALYSIS_DATABASE_URL"] = sqlite_url(link)
+        with pytest.raises(JobStoreConfigError, match="not a regular file"):
+            start(env)
+
+    def test_a_relative_database_path(self, env):
+        env["ANALYSIS_DATABASE_URL"] = "sqlite+aiosqlite:///jobs.db"
+        with pytest.raises(JobStoreConfigError, match="absolute path"):
             start(env)
 
     def test_a_missing_root(self, env):
@@ -184,7 +229,7 @@ class TestTheStartupOrder:
     """Settings, the schema revision, the object store, the restart scan, requests."""
 
     def test_the_schema_is_checked_before_the_object_store(self, env, tmp_path):
-        env["ANALYSIS_DATABASE_URL"] = sqlite_url(tmp_path / "empty.db")
+        env["ANALYSIS_DATABASE_URL"] = sqlite_url(empty_database(tmp_path))
         os.rmdir(env["ANALYSIS_OBJECT_ROOT"])
         with pytest.raises(JobStoreConfigError, match="revision"):
             start(env)

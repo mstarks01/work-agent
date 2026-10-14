@@ -69,6 +69,34 @@ def key_parts(key: str) -> tuple[str, str, ObjectName] | None:
     return owner_id, job_id, cast(ObjectName, name)
 
 
+def check_private(path: Path, label: str, *, directory: bool) -> None:
+    """Refuse ``path`` where it is missing, not a directory (or not a regular
+    file), owned by another user, or open to a group or to others.
+
+    **The one rule of a private path.** The object root and a SQLite database
+    file both hold content, and both pass it. ``label`` names the path in the
+    error. A symbolic link is neither a directory nor a regular file, so it
+    is refused.
+    """
+    kind, is_kind, mode = (
+        ("a directory", stat.S_ISDIR, "0700")
+        if directory
+        else ("a regular file", stat.S_ISREG, "0600")
+    )
+    try:
+        held = os.lstat(path)
+    except FileNotFoundError:
+        raise JobStoreConfigError(f"{label} {str(path)!r} does not exist") from None
+    if not is_kind(held.st_mode):
+        raise JobStoreConfigError(f"{label} {str(path)!r} is not {kind}")
+    if held.st_uid != os.geteuid():
+        raise JobStoreConfigError(f"another user owns {label} {str(path)!r}")
+    if held.st_mode & 0o077:
+        raise JobStoreConfigError(
+            f"a group or others can open {label} {str(path)!r}; set its mode to {mode}"
+        )
+
+
 class ObjectStore(Protocol):
     """Bytes under keys that :func:`object_key` gives."""
 
@@ -125,25 +153,7 @@ class FilesystemObjectStore:
     async def check(self) -> None:
         """Refuse a root that is missing, not a directory, owned by another user,
         or open to a group or to others."""
-        try:
-            held = os.lstat(self._root)
-        except FileNotFoundError:
-            raise JobStoreConfigError(
-                f"the object root {str(self._root)!r} does not exist"
-            ) from None
-        if not stat.S_ISDIR(held.st_mode):
-            raise JobStoreConfigError(
-                f"the object root {str(self._root)!r} is not a directory"
-            )
-        if held.st_uid != os.geteuid():
-            raise JobStoreConfigError(
-                f"another user owns the object root {str(self._root)!r}"
-            )
-        if held.st_mode & 0o077:
-            raise JobStoreConfigError(
-                f"a group or others can open the object root {str(self._root)!r};"
-                " set its mode to 0700"
-            )
+        check_private(self._root, "the object root", directory=True)
 
     def _path(self, key: str) -> Path:
         return self._root.joinpath(*key.split("/"))

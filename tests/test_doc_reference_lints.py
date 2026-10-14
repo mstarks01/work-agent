@@ -114,6 +114,12 @@ CODE_TREES: tuple[str, ...] = ("src", "evals", "webapp", "tests", "examples")
 #: entry fails.
 DELIBERATE: dict[tuple[str, str], str] = {
     (
+        "docs/HTTP-API.md",
+        "/etc/analysis/logging.json",
+    ): "an example log configuration that an operator writes on the host of the"
+    " service. The section prints its content, and the repository holds no"
+    " deployment files.",
+    (
         "evals/BLESSING.md",
         "sitting.html",
     ): "the default output of `webapp/offline_sitting.py`, written when a"
