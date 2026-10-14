@@ -112,7 +112,8 @@ returns `404` for the job. The service keeps a usage row for the job, which no
 route reads (ADR 0066). The row holds the owner ID, the creation time, the
 tokens, the status and the parent job ID. So a deleted job still counts toward
 the rate and the token [budgets](#how-much-you-may-consume-over-time). A
-deleted follow-up still uses the one follow-up of its report.
+deleted follow-up still uses the one follow-up of its report. The service keeps
+the usage row, and no new job can take the ID of a deleted job.
 
 On the `sql` store, the delete changes the job row into the usage row in one
 transaction, and then deletes the objects. When the object store does not

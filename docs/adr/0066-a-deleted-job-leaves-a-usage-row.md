@@ -26,6 +26,11 @@ the parent job ID. No route reads a usage row, and the job reads as 404. The
 service removes the usage row when the budget window has passed and no parent
 job still exists.
 
+> **Amended by [#1698](https://github.com/mstarks01/work-agent/pull/1698).**
+> The service keeps each usage row. A usage row also reserves its job ID:
+> admission refuses that ID as a duplicate, so one ID never names both a job
+> and a usage row, and the budgets never count one job twice.
+
 The service turns the row into a usage row in one transaction, then deletes the
 objects. A sweep removes an object whose delete failed. Only a job in a
 terminal status can be deleted.
