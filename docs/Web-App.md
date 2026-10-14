@@ -195,21 +195,14 @@ credential case, which is the common one at this point.
 ## Where the runs are kept
 
 The app keeps its runs in a job store. It reads the store settings of the
-[`/v1` service](HTTP-API.md#job-storage), with one difference: where
-`ANALYSIS_JOB_STORE` is unset, the app uses `memory`. So the first run needs
-no setting.
+[`/v1` service](HTTP-API.md#job-storage) and builds the store as the service
+does, with one difference: where `ANALYSIS_JOB_STORE` is unset, the app uses
+`memory`. So the first run needs no setting, and a restart loses every run.
+The service's table states each setting and its values. An unusable setting
+stops the startup, and the app does not fall back to `memory`.
 
-| Variable | Rule for the app |
-| --- | --- |
-| `ANALYSIS_JOB_STORE` | Optional. Unset selects `memory`, and a restart loses every run. `sql` keeps the runs across a restart. Any other value stops the startup. |
-| `ANALYSIS_OBJECT_STORE` | `filesystem`. Required by `sql`. Refused by `memory`. |
-| `ANALYSIS_DATABASE_URL` | `sqlite+aiosqlite:///<absolute path>`. Required by `sql`. |
-| `ANALYSIS_OBJECT_ROOT` | An absolute path to a directory that only you can open. Required by `filesystem`. |
-| `ANALYSIS_RETENTION_DAYS` | Optional. A whole number of days from 1 to 36500. Unset keeps every run. |
-
-An unusable setting stops the startup, and the app does not fall back to
-`memory`. To keep your runs in SQLite and a directory, install the `sql`
-extra, make the directory, run the migration step once, then start the app:
+To keep your runs in SQLite and a directory, install the `sql` extra, make the
+directory, run the migration step once, then start the app:
 
 ```sh
 uv sync --extra sql
@@ -222,15 +215,10 @@ uv run python webapp/main.py
 ```
 
 The app starts in the order of [the service](HTTP-API.md#the-startup), and a
-failed step stops the startup:
-
-1. It reads the store settings and builds the store.
-2. It reads `ANALYSIS_RETENTION_DAYS`.
-3. The `sql` store checks the schema revision, then the object root.
-4. The restart scan fails each run that was queued or running at the last
-   stop. The run shows a message that names the restart. Submit it again.
-5. The app takes requests. Where a retention period is set, the retention
-   sweep starts at the same time.
+failed step stops the startup. The only difference is the `memory` default at
+the first step. The restart scan fails each run that was queued or running at
+the last stop, and the run shows a message that names the restart. Submit that
+run again.
 
 After a restart over a `sql` store, the list of analyses shows the runs from
 before the restart. Each report opens, and your drafts, saved rounds and
