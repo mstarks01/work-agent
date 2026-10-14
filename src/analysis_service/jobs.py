@@ -1437,10 +1437,10 @@ class StubPipelineRunner:
     It answers the job's selection with one empty block per framework, because
     the envelope refuses a report whose blocks are not the job's frameworks in
     order — and that check is exactly the contract this stand-in exists to
-    exercise. The blocks are the neutral :class:`~analysis_service.claims.
-    FrameworkAnalysis` rather than each package's own narrowed shape: nothing
-    here judges anything, so claiming a package's block type would assert a
-    method that never ran.
+    exercise. Each block is the package's own block type, because the envelope
+    reads each block back as that type: a neutral block would be a report that
+    a store which parses its reports again refuses. The block holds no claim,
+    so it still asserts nothing about the system.
 
     The node names are the shared half of the topology only. A stub that spelled
     per-framework node names would be inventing graph structure it never built.
@@ -1494,16 +1494,27 @@ class StubPipelineRunner:
         # literal: this stand-in runs in the build it is stubbing, and a report
         # carrying a version no package here declares is a fixture nothing could
         # be checked against.
-        from analysis_service.frameworks import package_for
+        from analysis_service.frameworks import (
+            option_fields,
+            package_for,
+            schemas_for,
+        )
 
-        return FrameworkAnalysis(
+        package = package_for(selection.name)
+        block = schemas_for(selection.name).block
+        return block(
             framework=selection.name,
-            framework_version=package_for(selection.name).version,
+            framework_version=package.version,
             disclaimer=(
                 f"Stub run: no {selection.name} analysis was performed and this"
                 " block asserts nothing about the system."
             ),
-            summary=FrameworkAnalysis.summarize([], []),
+            # The scope the pipeline states for a run that raised no claim.
+            scope=block.scope_entries(
+                lanes=package.lanes, claims=(), options=selection.options
+            ),
+            summary=block.summarize([], []),
+            **option_fields(block, selection.options),
         )
 
 

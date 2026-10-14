@@ -8,6 +8,7 @@ import pytest
 
 from analysis_service.assertions import AssertionCatalog, AssertionRecord
 from analysis_service.execution import GraphFailed
+from analysis_service.frameworks import PACKAGES
 from analysis_service.jobs import (
     DEADLINE_FAILURE_MESSAGE,
     GENERIC_FAILURE_MESSAGE,
@@ -24,8 +25,10 @@ from analysis_service.jobs import (
     execute_job,
 )
 from analysis_service.report import (
+    FrameworkSelection,
     InputRef,
     NodeRun,
+    Report,
     TokenUsage,
 )
 from analysis_service.sources import Source
@@ -34,6 +37,7 @@ from tests.factories import (
     admit,
     sample_selection,
 )
+from tests.test_webapp import COMPLETE_OPTIONS
 
 
 def make_record() -> JobRecord:
@@ -82,6 +86,26 @@ class MidGraphFailingRunner:
                 )
             ],
         )
+
+
+class TestTheStubRunner:
+    """The stand-in runner's report is a report the envelope reads back."""
+
+    @pytest.mark.parametrize("name", sorted(PACKAGES))
+    def test_its_report_survives_a_round_trip_for_each_framework(self, name):
+        record = JobRecord.create(
+            owner_id="alice",
+            sources=[Source.description("a web app storing orders")],
+            frameworks=[FrameworkSelection(name=name, options=COMPLETE_OPTIONS[name])],
+        )
+
+        async def ignore(node: str) -> None:
+            pass
+
+        outcome = asyncio.run(StubPipelineRunner().run(record, ignore))
+        assert isinstance(outcome, PipelineCompleted)
+        report = outcome.report
+        assert Report.model_validate_json(report.model_dump_json()) == report
 
 
 class TestLifecycle:
