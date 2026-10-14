@@ -44,7 +44,7 @@ from tests.factories import (
     sample_selection,
     valid_model,
 )
-from tests.sql_stores import sql_env
+from tests.sql_stores import object_env, sql_env
 from tests.test_parsing import ISDIGIT_TRAPS
 from tests.test_pause import waiting
 
@@ -75,8 +75,7 @@ def new_store(request, tmp_path_factory):
     if request.param == "memory":
         return InMemoryJobStore
     objects = request.param.rsplit("/", 1)[1]
-    if objects == "s3":
-        request.getfixturevalue("moto_s3")
+    object_env(request, objects)
 
     def make():
         return build_store(sql_env(tmp_path_factory.mktemp("store"), objects))

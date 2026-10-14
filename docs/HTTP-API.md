@@ -851,11 +851,18 @@ a directory, has another owner than the service user, or a group or others
 can open it. Make the root as the service user with `install -d -m 0700
 /var/lib/analysis/objects`.
 
+The key of an object is `<owner-id>/<job-id>/sources.json` or
+`<owner-id>/<job-id>/report.json`. A key holds only IDs that the service
+generates, never a name, an email or a `sub`. The service writes the object
+first and the row second, and the row holds the SHA-256 of each object. Each
+read checks the digest. A changed or missing object returns `500` with no
+detail, and the service log names the job ID and the owner ID. The service
+writes the report of a job once.
+
 #### The `s3` object store
 
 The `s3` object store keeps each object in a bucket of a store that speaks the
-S3 API: AWS S3, Cloudflare R2, Backblaze B2, MinIO or another store. It uses
-`boto3`, which the `aws` extra holds. Install both extras:
+S3 API. It uses `boto3`, which the `aws` extra holds. Install both extras:
 
 ```bash
 pip install 'analysis-service[sql,aws]'
@@ -864,20 +871,29 @@ pip install 'analysis-service[sql,aws]'
 When `s3` is selected and `boto3` is not installed, the startup stops with a
 message that names the `aws` extra.
 
-Set these values for each provider:
+The service writes each object with a conditional write, `PutObject` with
+`If-None-Match: *`, so a put never replaces an object. A store must refuse
+that write with HTTP 412 when the key holds an object. A store that ignores
+the header replaces the object with no error, and the service then cannot
+keep the rule that it writes a report once. So use a store only when its
+documentation confirms the header on `PutObject`.
+
+Set these values for each provider whose documentation confirms the header:
 
 | Provider | `ANALYSIS_OBJECT_ENDPOINT` | `ANALYSIS_OBJECT_REGION` | `ANALYSIS_OBJECT_CREDENTIALS` |
 | --- | --- | --- | --- |
 | AWS S3 | unset | the region of the bucket, for example `eu-west-1` | `iam` for a role that the platform attaches, or `api_key` |
-| Cloudflare R2 | `https://<account-id>.r2.cloudflarestorage.com` | `auto` | `api_key` |
-| Backblaze B2 | `https://s3.<region>.backblazeb2.com` | the region in the endpoint, for example `us-west-004` | `api_key` |
-| MinIO or another store | the `https` URL of the store | the region of the store; MinIO uses `us-east-1` by default | `api_key` |
+| Cloudflare R2 | `https://<account-id>.r2.cloudflarestorage.com` | `auto` | `api_key`, with an R2 access key ID and secret access key |
+
+Do not use Backblaze B2. Its reference for `PutObject` does not list the
+`If-None-Match` header.
 
 `ANALYSIS_OBJECT_ADDRESSING` sets where a request names the bucket. `virtual`
 puts the bucket in the host name, `<bucket>.<host>`, and `path` puts it in the
-path, `<host>/<bucket>`. Keep the default, `virtual`, for AWS S3, Cloudflare R2
-and Backblaze B2. Set `path` for a store that does not resolve `<bucket>.<host>`,
-for example a MinIO server without a domain setting.
+path, `<host>/<bucket>`. AWS S3 and Cloudflare R2 support `virtual`, so keep
+the default for them. With `virtual`, use a bucket name that has no dot: the
+TLS certificate of AWS S3 matches only a bucket name without a dot. Set `path`
+for a store that does not resolve `<bucket>.<host>`.
 
 `ANALYSIS_OBJECT_CREDENTIALS` declares the credential mode:
 
@@ -890,8 +906,7 @@ for example a MinIO server without a domain setting.
   holds the secret access key. Give each file permissions that only the
   service user can read. `ANALYSIS_OBJECT_ACCESS_KEY_ID` and
   `ANALYSIS_OBJECT_SECRET_ACCESS_KEY` stop the startup, so a key never sits in
-  an environment variable. Cloudflare R2 and Backblaze B2 support this mode
-  only.
+  an environment variable.
 
 Each request uses TLS, and the service always verifies the certificate of the
 endpoint. The service ignores the endpoint that `AWS_ENDPOINT_URL` or a `boto3`
@@ -907,20 +922,10 @@ Prepare the bucket before the first start:
   needs the bucket.
 - Turn on the server-side encryption of the bucket where the provider has a
   setting for it.
-- Use a store that supports a conditional write with `If-None-Match: *`. The
-  service writes each object with it, so a put never replaces an object.
 
 At the startup, the service sends `HeadBucket` to the bucket. A missing
 bucket, a refused credential or an endpoint that the service cannot reach
 stops the startup.
-
-The key of an object is `<owner-id>/<job-id>/sources.json` or
-`<owner-id>/<job-id>/report.json`. A key holds only IDs that the service
-generates, never a name, an email or a `sub`. The service writes the object
-first and the row second, and the row holds the SHA-256 of each object. Each
-read checks the digest. A changed or missing object returns `500` with no
-detail, and the service log names the job ID and the owner ID. The service
-writes the report of a job once.
 
 #### The migration step
 

@@ -27,7 +27,7 @@ from analysis_service.objects import (
     object_key,
 )
 from analysis_service.s3_objects import KEY_FILES
-from tests.sql_stores import OBJECT_ENVS, s3_env, sql_env
+from tests.sql_stores import object_env, s3_env, sql_env
 from tests.test_sql_store import start
 
 KEY = object_key(
@@ -38,9 +38,8 @@ KEY = object_key(
 @pytest.fixture(params=get_args(ObjectStoreName))
 def objects(request, tmp_path) -> ObjectStore:
     """A fresh object store of each row."""
-    if request.param == "s3":
-        request.getfixturevalue("moto_s3")
-    return build_object_store(OBJECT_ENVS[request.param](tmp_path))
+    row = object_env(request, request.param)
+    return build_object_store(row.settings(tmp_path))
 
 
 class TestEachRow:

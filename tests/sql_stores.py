@@ -16,10 +16,12 @@ import tempfile
 import uuid
 from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor
+from dataclasses import dataclass
 from functools import cache
 from pathlib import Path
 
 import boto3
+import pytest
 from alembic import command
 
 from analysis_service.migrations import alembic_config
@@ -88,11 +90,35 @@ def s3_env(directory: Path) -> dict[str, str]:
     return env
 
 
-#: The settings of each object store, by its name.
-OBJECT_ENVS: dict[ObjectStoreName, Callable[[Path], dict[str, str]]] = {
-    "filesystem": filesystem_env,
-    "s3": s3_env,
+@dataclass(frozen=True)
+class ObjectStoreEnv:
+    """How a test reaches one object store: a row of :data:`OBJECT_ENVS`.
+
+    No field has a default, so a new row states every fact.
+    """
+
+    #: The settings of a fresh store under a new directory.
+    settings: Callable[[Path], dict[str, str]]
+    #: The fixtures that a test takes before it builds the store.
+    fixtures: tuple[str, ...]
+
+
+#: Each object store, by its name. The table answers for every name of
+#: :data:`ObjectStoreName`.
+OBJECT_ENVS: dict[ObjectStoreName, ObjectStoreEnv] = {
+    "filesystem": ObjectStoreEnv(settings=filesystem_env, fixtures=()),
+    "s3": ObjectStoreEnv(settings=s3_env, fixtures=("moto_s3",)),
 }
+
+
+def object_env(
+    request: pytest.FixtureRequest, objects: ObjectStoreName
+) -> ObjectStoreEnv:
+    """The row of ``objects``, after ``request`` takes each fixture it needs."""
+    row = OBJECT_ENVS[objects]
+    for fixture in row.fixtures:
+        request.getfixturevalue(fixture)
+    return row
 
 
 def sql_env(directory: Path, objects: ObjectStoreName = "filesystem") -> dict[str, str]:
@@ -102,5 +128,5 @@ def sql_env(directory: Path, objects: ObjectStoreName = "filesystem") -> dict[st
     return {
         "ANALYSIS_JOB_STORE": "sql",
         "ANALYSIS_DATABASE_URL": sqlite_url(database),
-        **OBJECT_ENVS[objects](directory),
+        **OBJECT_ENVS[objects].settings(directory),
     }
