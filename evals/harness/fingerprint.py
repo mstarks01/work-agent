@@ -21,8 +21,8 @@ two corpus cases both derive, and without the scope case 03's disclosure claim
 about partner extracts keys identically to case 12's about a supplier extract.
 Each version refuses an empty scope.
 
-Version 4 adds the action verb as written, because place alone has a measured
-cost. ``tests/test_evals_identity.py``'s ``endpoint subset`` row prices element
+Version 4 reads the action verb as written beside the place, because place
+alone has a measured cost. ``tests/test_evals_identity.py``'s ``endpoint subset`` row prices element
 agreement alone at 12 false splits of 169, 69 false merges of 92 candidate
 negatives, and the reference merges the frontier table in
 ``docs/agents/claim-identity.md`` carries. That table is the one reader of the
@@ -128,20 +128,6 @@ EXTRA_COMPONENT: dict[int, str] = {
     6: "action",
 }
 
-#: Which versions read the scope a claim was reached in. **Keyed, never
-#: branched**, for the reason :data:`EXTRA_COMPONENT` is, and checked against
-#: :data:`SUPPORTED_VERSIONS` in both directions by
-#: ``tests/test_evals_fingerprint.py``.
-#:
-#: A separate table rather than another :data:`EXTRA_COMPONENT` entry, because
-#: the scope is not an alternative to the verb or the identifier — it sits
-#: beside whichever of those a version already reads.
-READS_SCOPE: dict[int, bool] = {
-    4: True,
-    5: True,
-    6: True,
-}
-
 
 class FingerprintError(ValueError):
     """The components cannot be fingerprinted under the version asked for."""
@@ -173,8 +159,7 @@ class Components:
     #: is keyed today. The other half of a place: an **Element ID** is unique
     #: inside one **System Model** and two models may derive one slug, so
     #: without this a claim about one system keys identically to a claim about
-    #: another. ``""`` for the versions :data:`READS_SCOPE` says do not read it;
-    #: a version that does refuses an empty one.
+    #: another. Every version refuses an empty one.
     scope: str = ""
     #: The controls the claim's grounds say are unstated or missing, sorted,
     #: from :func:`~analysis_service.critic.grounded_mechanism`. **Not part of
@@ -330,14 +315,13 @@ def fingerprint(components: Components, version: int) -> str:
             f" ({', '.join(str(known) for known in SUPPORTED_VERSIONS)})"
         )
     parts = [components.framework, components.lane, *sorted(components.targets)]
-    if READS_SCOPE[version]:
-        if not components.scope:
-            raise FingerprintError(
-                f"version {version} reads the scope a claim was reached in and"
-                " this claim names none; pass the case ID, whose absence would"
-                " key two systems' claims about one element slug alike"
-            )
-        parts.append(components.scope)
+    if not components.scope:
+        raise FingerprintError(
+            f"version {version} reads the scope a claim was reached in and"
+            " this claim names none; pass the case ID, whose absence would"
+            " key two systems' claims about one element slug alike"
+        )
+    parts.append(components.scope)
     if EXTRA_COMPONENT[version] in ("verb", "action"):
         if components.verb is None:
             raise FingerprintError(
@@ -388,8 +372,7 @@ def key_claim(
     both taken and :data:`EXTRA_COMPONENT` drops whichever the version does not
     read, rather than each caller deciding. A caller that guessed would compose
     a verb into an ASVS key, and the ledger would hold two spellings of one
-    finding with nothing to say which was right. :data:`READS_SCOPE` drops the
-    scope on the same terms.
+    finding with nothing to say which was right.
 
     Returns the fingerprint first because every caller wants it, and the
     components beside it because the queue stores them on the vote — that is
@@ -405,7 +388,7 @@ def key_claim(
         flows,
         verb=verb if reads in ("verb", "action") else None,
         identifier=identifier if reads == "identifier" else None,
-        scope=scope if READS_SCOPE[version] else "",
+        scope=scope,
         mechanism=mechanism,
     )
     return fingerprint(components, version=version), components

@@ -43,15 +43,13 @@ word that a value follows from a quote is the claim under test, not the answer.
 Scope of this module
 ====================
 
-The schema, the registry, the identity rule and the deterministic checks.
-Nothing produces a catalog yet: extraction emits one in #926 Phase 3, and the
-consumers migrate in Phase 4. So the checks here return their own
-:class:`CatalogIssue` rather than a
-:class:`~analysis_service.validation.ValidationIssue` — ``IssueCode`` is the
-closed set of ways an *extraction* is refused, and
+The schema, the registry, the identity rule and the deterministic checks. The
+assertion pass produces the catalog (ADR 0075). The checks here return their
+own :class:`CatalogIssue` rather than a
+:class:`~analysis_service.validation.ValidationIssue`, because ``IssueCode`` is
+the closed set of ways an *extraction* is refused, and
 ``tests/test_prompt_lints.py`` holds every member of it to a rule in
-``prompts/extract.md``. A code for a fact the prompt does not yet ask for would
-have to be answered by a rule nobody wrote.
+``prompts/extract.md``.
 
 Model output is untrusted input (OWASP LLM05). Every field is bounded, the
 counts are bounded, no regular expression is compiled from a value, and a check
@@ -173,29 +171,21 @@ __all__ = [
 #: vocabulary, scope requirement or multiplicity changed — each of those
 #: changes what a row means, and a reader comparing two runs has to know.
 #:
-#: Version 3 adds ``represented-by``.
+#: Predicates whose meaning is easy to misread:
 #:
-#: Version 4 adds ``data-classification``: a store's classification, which the
-#: sources state and ASVS's classified-store rule reads.
-#:
-#: Version 5 adds ``origin-verification``: whether a receiver checks who
-#: supplied what it took. ``destination-verification`` asks the opposite
-#: question, and ``signature-verification`` names a signature (#1053).
-#:
-#: Version 6 adds ``credential-revocation`` and ``credential-lifetime``, so a
-#: row records how long a credential's window is and whether anyone can
-#: shorten it, apart from the closed ``credential-expiry`` value (#1054).
-#:
-#: Version 7 makes ``data-classification`` a closed term: ``public``,
-#: ``internal`` or ``confidential``, the tiers ``prompts/extract.md`` gives the
-#: graph field it projects into. A list of contents reads as no classification
-#: to the signed reference, the extraction contract and ASVS's
-#: classified-store rule (#926). The same version gives ``network-membership``
-#: the placement rule its graph field already has.
-#:
-#: Version 8 adds ``record-attribution`` and ``content-validation`` (#1242):
-#: which writer a record names, and whether anything validates content beyond
-#: its schema. A must-find in cases 01 and 03 rests on each.
+#: * ``data-classification`` is a closed term: ``public``, ``internal`` or
+#:   ``confidential``, the tiers ``prompts/extract.md`` gives the graph field it
+#:   projects into. A list of contents reads as no classification to the signed
+#:   reference, the extraction contract and ASVS's classified-store rule (#926).
+#: * ``network-membership`` has the placement rule of its graph field.
+#: * ``origin-verification`` asks whether a receiver checks who supplied what it
+#:   took. ``destination-verification`` asks the opposite question, and
+#:   ``signature-verification`` names a signature (#1053).
+#: * ``credential-revocation`` and ``credential-lifetime`` record how long a
+#:   credential's window is and whether anyone can shorten it, apart from the
+#:   closed ``credential-expiry`` value (#1054).
+#: * ``record-attribution`` and ``content-validation`` (#1242) say which writer
+#:   a record names, and whether anything validates content beyond its schema.
 REGISTRY_VERSION = 8
 
 #: The projection's version: which graph attribute each predicate is
