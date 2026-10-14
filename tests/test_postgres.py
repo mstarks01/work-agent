@@ -92,6 +92,11 @@ class TestTheSettings:
                 {"ANALYSIS_DATABASE_PASSWORD": "hunter2"},
                 "unset ANALYSIS_DATABASE_PASSWORD$",
             ),
+            ({"ANALYSIS_DATABASE_IAM": "rds"}, "unset ANALYSIS_DATABASE_IAM$"),
+            (
+                {"ANALYSIS_DATABASE_REGION": "eu-west-1"},
+                "unset ANALYSIS_DATABASE_REGION$",
+            ),
             (
                 {"ANALYSIS_DATABASE_URL": "postgresql+asyncpg://analysis:hunter2@db/x"},
                 "holds a password",

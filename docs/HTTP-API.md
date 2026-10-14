@@ -813,8 +813,8 @@ an unset or unknown value stops the startup. The service never falls back to
 | `ANALYSIS_DATABASE_URL` | `sqlite+aiosqlite:///<path>`, `postgresql+asyncpg://<user>@<host>:<port>/<database>` | Required by `sql`. A URL that holds a password stops the startup. |
 | `ANALYSIS_DATABASE_CREDENTIALS` | `password`, `iam` | Required for PostgreSQL. Refused for SQLite. |
 | `ANALYSIS_DATABASE_PASSWORD_FILE` | the path of a file that holds the password | Required by `password`. The only way to give the password. Refused by `iam`. |
-| `ANALYSIS_DATABASE_IAM` | `rds` | Required by `iam`. |
-| `ANALYSIS_DATABASE_REGION` | an AWS region, for example `eu-west-1` | Required by `rds`. |
+| `ANALYSIS_DATABASE_IAM` | `rds` | Required by `iam`. Refused by `password`. |
+| `ANALYSIS_DATABASE_REGION` | an AWS region, for example `eu-west-1` | Required by `rds`. Refused by `password`. |
 | `ANALYSIS_DATABASE_CA_FILE` | the path of a PEM file of CA certificates | Optional, for PostgreSQL. Unset trusts the system CA bundle. |
 | `ANALYSIS_OBJECT_ROOT` | an absolute path to a directory | Required by `filesystem`. |
 | `ANALYSIS_OBJECT_BUCKET` | the name of a bucket | Required by `s3`. |

@@ -406,8 +406,14 @@ DATABASE_IAM: dict[DatabaseIamName, DatabaseIam] = {
 def _password_file(url: URL, env: Mapping[str, str]) -> Password:
     """The password in the file that ``ANALYSIS_DATABASE_PASSWORD_FILE`` names.
 
-    This file is the only way to give the password.
+    This file is the only way to give the password. The settings of the IAM
+    credentials stop the startup.
     """
+    for setting in (_IAM, _REGION):
+        if env.get(setting, "").strip():
+            raise JobStoreConfigError(
+                f"password credentials use no IAM token; unset {setting}"
+            )
     try:
         password = read_secret(env, _PASSWORD_FILE)
     except ProviderAuthError as error:
