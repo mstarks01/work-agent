@@ -858,8 +858,10 @@ startup.
 For PostgreSQL, give `ANALYSIS_DATABASE_URL` a user, a network host and a
 database, for example
 `postgresql+asyncpg://analysis@db.internal:5432/analysis`. The URL must not
-hold a password or a query. A URL without a user or a network host stops the
-startup, because a Unix socket has no TLS.
+hold a password or a query. A URL without a user, a network host or a
+database stops the startup. A Unix socket has no TLS, and the driver fills a
+missing part from the `PG*` variables of the process. Where the URL has no
+port, the service uses port 5432 and does not read `PGPORT`.
 
 Each connection uses TLS with `verify-full`: the service checks the
 certificate chain of the server and its host name. No setting turns this off,

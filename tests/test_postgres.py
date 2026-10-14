@@ -67,7 +67,7 @@ def connect_args(env: dict[str, str]) -> dict:
 class TestTheSettings:
     def test_a_connection_gets_verify_full_tls_and_the_password_in_the_file(self, env):
         args = connect_args(env)
-        assert set(args) == {"ssl", "password"}
+        assert set(args) == {"port", "ssl", "password"}
         assert args["password"] == "hunter2"
         assert args["ssl"].check_hostname
         assert args["ssl"].verify_mode == ssl.CERT_REQUIRED
@@ -110,6 +110,10 @@ class TestTheSettings:
                 "needs a user and a network host",
             ),
             (
+                {"ANALYSIS_DATABASE_URL": "postgresql+asyncpg://analysis@db.internal"},
+                "names no database",
+            ),
+            (
                 {"ANALYSIS_DATABASE_CA_FILE": "/nonexistent/ca.pem"},
                 r"cannot read as a CA \(FileNotFoundError\)",
             ),
@@ -128,6 +132,33 @@ class TestTheSettings:
         with pytest.raises(JobStoreConfigError, match=message) as refused:
             engine_for(env)
         assert "hunter2" not in str(refused.value)
+
+    @pytest.mark.parametrize(
+        ("url", "port"),
+        [
+            ("postgresql+asyncpg://analysis@db.internal:6432/jobs", 6432),
+            ("postgresql+asyncpg://analysis@db.internal/jobs", 5432),
+        ],
+    )
+    def test_the_port_of_the_url_or_the_default_reaches_the_driver(
+        self, env, url, port
+    ):
+        env["ANALYSIS_DATABASE_URL"] = url
+        assert connect_args(env)["port"] == port
+
+    def test_the_libpq_variables_do_not_change_the_connection(self, env, monkeypatch):
+        """asyncpg fills each argument that the store does not pass from the
+        ``PG*`` variables, so the store passes each one that names a server."""
+        env["ANALYSIS_DATABASE_URL"] = "postgresql+asyncpg://analysis@db.internal/jobs"
+        clean = connect_args(env)
+        libpq = {"PGPORT": "6543", "PGDATABASE": "other", "PGHOST": "elsewhere"}
+        for name, value in libpq.items():
+            monkeypatch.setenv(name, value)
+        args = connect_args(env | libpq)
+        assert args["port"] == clean["port"] == 5432
+        assert args["password"] == clean["password"]
+        url = database_url(env | libpq)
+        assert (url.host, url.database) == ("db.internal", "jobs")
 
     def test_an_empty_password_file_stops_the_startup(self, env, tmp_path):
         empty = tmp_path / "empty"
@@ -195,6 +226,20 @@ class TestTheIamCredentials:
             "DBUsername": "analysis",
             "Region": "eu-west-1",
         }
+
+    def test_the_token_is_signed_for_the_port_that_the_driver_gets(
+        self, iam_env, monkeypatch
+    ):
+        rds = StubRds()
+        stub = types.SimpleNamespace(client=lambda service, region_name: rds)
+        monkeypatch.setitem(sys.modules, "boto3", stub)
+        monkeypatch.setenv("PGPORT", "6543")
+        iam_env["ANALYSIS_DATABASE_URL"] = (
+            "postgresql+asyncpg://analysis@db.internal/jobs"
+        )
+        args = connect_args(iam_env)
+        asyncio.run(args["password"]())
+        assert rds.requests[0]["Port"] == args["port"] == 5432
 
 
 def stub_token(monkeypatch, tokens: list[str]) -> list[str]:

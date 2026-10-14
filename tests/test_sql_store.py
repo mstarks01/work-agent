@@ -123,6 +123,10 @@ class TestTheStartupRefusals:
                 "unknown value 'postgresql\\+psycopg2'",
             ),
             (
+                {"ANALYSIS_DATABASE_URL": "postgresql+asyncpg://analysis@db.internal"},
+                "PostgreSQL names no database",
+            ),
+            (
                 {"ANALYSIS_DATABASE_CREDENTIALS": "password"},
                 "SQLite database takes no ANALYSIS_DATABASE_CREDENTIALS",
             ),

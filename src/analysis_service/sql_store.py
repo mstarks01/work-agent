@@ -372,7 +372,8 @@ def _rds_token(url: URL, env: Mapping[str, str]) -> Callable[[], Awaitable[str]]
     ``boto3`` signs the token locally with the credentials that its chain
     finds. A token lasts 15 minutes, and RDS checks it only when a connection
     opens. The signature runs in a worker thread, because the first one can
-    fetch the credentials over the network.
+    fetch the credentials over the network. ``url`` holds the port that the
+    connection uses (:func:`_postgres`).
     """
     region = env.get(_REGION, "").strip()
     if not region:
@@ -385,7 +386,7 @@ def _rds_token(url: URL, env: Mapping[str, str]) -> Callable[[], Awaitable[str]]
         return await asyncio.to_thread(
             client.generate_db_auth_token,
             DBHostname=url.host,
-            Port=url.port or 5432,
+            Port=url.port,
             DBUsername=url.username,
             Region=region,
         )
@@ -470,11 +471,16 @@ def _verify_full(env: Mapping[str, str]) -> ssl.SSLContext:
 
 
 def _postgres(url: URL, env: Mapping[str, str]) -> dict[str, Any]:
-    """The connect arguments of PostgreSQL: ``verify-full`` TLS and a password.
+    """The connect arguments of PostgreSQL: the port, ``verify-full`` TLS and a
+    password.
 
-    The URL must name a user and a network host, because asyncpg uses no TLS
-    on a Unix socket. The service refuses a query in the URL, because asyncpg
-    takes it as connect arguments, and a ``host`` there can name a Unix socket.
+    The URL must name a user, a network host and a database, because asyncpg
+    uses no TLS on a Unix socket, and it fills each argument that the store
+    does not pass from the ``PG*`` variables of the process. For the same
+    reason the store always passes the port, and the token of the IAM
+    credentials is signed for that port. The service refuses a query in the
+    URL, because asyncpg takes it as connect arguments, and a ``host`` there
+    can name a Unix socket.
     """
     if url.query:
         raise JobStoreConfigError(f"{_URL} for PostgreSQL takes no query; remove it")
@@ -482,6 +488,9 @@ def _postgres(url: URL, env: Mapping[str, str]) -> dict[str, Any]:
         raise JobStoreConfigError(
             f"{_URL} for PostgreSQL needs a user and a network host"
         )
+    if not url.database:
+        raise JobStoreConfigError(f"{_URL} for PostgreSQL names no database")
+    url = url.set(port=url.port or 5432)
     bare = refused_var(_PASSWORD_FILE)
     if env.get(bare, "").strip():
         raise JobStoreConfigError(
@@ -492,6 +501,7 @@ def _postgres(url: URL, env: Mapping[str, str]) -> dict[str, Any]:
         env.get(_CREDENTIALS, ""), _CREDENTIALS, DATABASE_CREDENTIALS
     )
     return {
+        "port": url.port,
         "ssl": _verify_full(env),
         "password": DATABASE_CREDENTIALS[credentials](url, env),
     }
