@@ -45,9 +45,11 @@ FLOWS = {
 
 def test_element_order_does_not_change_the_value():
     """``affected_element_ids`` is a list whose order no rule reads."""
-    one = Components("stride", "spoofing", ("process:a", "store:b"), verb="read")
-    other = Components("stride", "spoofing", ("store:b", "process:a"), verb="read")
-    assert fingerprint(one, version=2) == fingerprint(other, version=2)
+    one = Components(
+        "stride", "spoofing", ("process:a", "store:b"), verb="read", scope="01"
+    )
+    other = replace(one, targets=("store:b", "process:a"))
+    assert fingerprint(one, version=4) == fingerprint(other, version=4)
 
 
 def test_a_flow_and_its_endpoints_fingerprint_alike():
@@ -58,6 +60,7 @@ def test_a_flow_and_its_endpoints_fingerprint_alike():
         ["flow:entity:shopper>process:storefront-api>place-order"],
         FLOWS,
         verb="replay",
+        scope="01",
     )
     as_endpoints = components_for(
         "stride",
@@ -65,33 +68,41 @@ def test_a_flow_and_its_endpoints_fingerprint_alike():
         ["entity:shopper", "process:storefront-api"],
         FLOWS,
         verb="replay",
+        scope="01",
     )
-    assert fingerprint(as_flow, version=2) == fingerprint(as_endpoints, version=2)
+    assert fingerprint(as_flow, version=4) == fingerprint(as_endpoints, version=4)
 
 
 def test_a_trust_boundary_citation_is_dropped():
     """A zone is the context a claim sits in, not the thing it is about."""
     with_zone = components_for(
-        "stride", "spoofing", ["process:a", "boundary:dmz"], FLOWS, verb="read"
+        "stride",
+        "spoofing",
+        ["process:a", "boundary:dmz"],
+        FLOWS,
+        verb="read",
+        scope="01",
     )
-    without = components_for("stride", "spoofing", ["process:a"], FLOWS, verb="read")
-    assert fingerprint(with_zone, version=2) == fingerprint(without, version=2)
+    without = components_for(
+        "stride", "spoofing", ["process:a"], FLOWS, verb="read", scope="01"
+    )
+    assert fingerprint(with_zone, version=4) == fingerprint(without, version=4)
 
 
 def test_a_different_lane_target_or_framework_is_a_different_finding():
-    base = Components("stride", "spoofing", ("process:a",), verb="read")
-    assert fingerprint(base, version=2) != fingerprint(
-        Components("stride", "tampering", ("process:a",), verb="read"), version=2
+    base = Components("stride", "spoofing", ("process:a",), verb="read", scope="01")
+    assert fingerprint(base, version=4) != fingerprint(
+        replace(base, lane="tampering"), version=4
     )
-    assert fingerprint(base, version=2) != fingerprint(
-        Components("stride", "spoofing", ("process:b",), verb="read"), version=2
+    assert fingerprint(base, version=4) != fingerprint(
+        replace(base, targets=("process:b",)), version=4
     )
-    assert fingerprint(base, version=2) != fingerprint(
-        Components("asvs", "spoofing", ("process:a",), verb="read"), version=2
+    assert fingerprint(base, version=4) != fingerprint(
+        replace(base, framework="asvs"), version=4
     )
-    assert fingerprint(base, version=2) != fingerprint(
-        Components("stride", "spoofing", ("process:a",), verb="alter"), version=2
-    ), "the verb is what version 2 adds; two actions are two findings"
+    assert fingerprint(base, version=4) != fingerprint(
+        replace(base, verb="alter"), version=4
+    ), "the verb is what version 4 reads; two actions are two findings"
 
 
 def test_the_version_table_covers_every_package():
@@ -136,9 +147,6 @@ def test_the_table_and_the_hash_agree_about_what_a_version_reads(version):
     scope = "01-payments-checkout" if READS_SCOPE[version] else ""
     without = Components("stride", "spoofing", ("process:a",), scope=scope)
     reads = EXTRA_COMPONENT[version]
-    if reads is None:
-        assert fingerprint(without, version=version)
-        return
     with pytest.raises(FingerprintError):
         fingerprint(without, version=version)
     field = "identifier" if reads == "identifier" else "verb"
@@ -170,7 +178,7 @@ def test_a_version_that_reads_the_scope_refuses_an_empty_one(version):
 
     A version keyed ``True`` in :data:`READS_SCOPE` and willing to hash without
     a scope would be the defect this fixed, one table away: the value would
-    look like a version-4 key and carry a version-1 place.
+    look like a version-4 key and carry a place with no system.
     """
     full = Components(
         "stride", "spoofing", ("process:a",), verb="read", identifier="V6.2.1"
@@ -223,9 +231,9 @@ class TestTwoSystemsAreTwoPlaces:
     """Version 4 and 5's reason, over the two corpus claims that collided.
 
     ``store:landing-bucket`` is a slug case 03 and case 12 both derive, and both
-    cases record a ``read`` disclosure claim about it. Under version 2 they
-    fingerprinted alike, so the review queue showed one and hid the other, and a
-    vote on either answered for both — across two systems, two source texts, and
+    cases record a ``read`` disclosure claim about it. Without the scope they
+    fingerprint alike, so the review queue shows one and hides the other, and a
+    vote on either answers for both — across two systems, two source texts, and
     two tiers.
     """
 
@@ -237,18 +245,6 @@ class TestTwoSystemsAreTwoPlaces:
 
         assert fingerprint(pipeline, version=4) != fingerprint(portal, version=4)
 
-    def test_the_version_that_could_not_tell_them_apart_still_cannot(self):
-        """Version 2 is unchanged, which is what a version is for.
-
-        Redefining a shipped version would make one stored value mean two
-        things. The fix is a version that reads more.
-        """
-        place = Components(*self.PLACE, verb="read")
-
-        assert fingerprint(
-            replace(place, scope="03-batch-data-pipeline"), version=2
-        ) == fingerprint(replace(place, scope="12-overclaiming-portal"), version=2)
-
     def test_one_claim_keys_the_same_twice(self):
         first = Components(*self.PLACE, verb="read", scope="03-batch-data-pipeline")
         second = Components(*self.PLACE, verb="read", scope="03-batch-data-pipeline")
@@ -257,32 +253,32 @@ class TestTwoSystemsAreTwoPlaces:
 
 
 class TestACatalogIdentifierIsHalfTheKey:
-    """Version 3: place plus the requirement the claim names.
+    """Version 5: place plus the requirement the claim names.
 
-    Version 1 keyed such a claim by place alone, so two requirements ruled on
-    one element in one chapter shared a fingerprint and one vote answered for
-    both.
+    Keyed by place alone, two requirements ruled on one element in one chapter
+    would share a fingerprint, and one vote would answer for both.
     """
 
     def test_two_requirements_in_one_chapter_are_two_findings(self):
         place = ("asvs", "authentication", ("process:web-app",))
-        first = Components(*place, identifier="V6.2.1")
-        second = Components(*place, identifier="V6.2.2")
+        first = Components(*place, identifier="V6.2.1", scope="01")
+        second = replace(first, identifier="V6.2.2")
 
-        assert fingerprint(first, version=3) != fingerprint(second, version=3)
+        assert fingerprint(first, version=5) != fingerprint(second, version=5)
 
     def test_the_same_requirement_in_one_place_is_one_finding(self):
         place = ("asvs", "authentication", ("process:web-app",))
 
         assert fingerprint(
-            Components(*place, identifier="V6.2.1"), version=3
-        ) == fingerprint(Components(*place, identifier="V6.2.1"), version=3)
+            Components(*place, identifier="V6.2.1", scope="01"), version=5
+        ) == fingerprint(Components(*place, identifier="V6.2.1", scope="01"), version=5)
 
     def test_a_claim_naming_no_requirement_fails_closed(self):
         """Never a key composed over an empty identifier."""
-        with pytest.raises(FingerprintError, match="version 3"):
+        with pytest.raises(FingerprintError, match="version 5"):
             fingerprint(
-                Components("asvs", "authentication", ("process:web-app",)), version=3
+                Components("asvs", "authentication", ("process:web-app",), scope="01"),
+                version=5,
             )
 
     def test_the_identifier_comes_out_of_the_package_that_owns_the_catalog(self):
@@ -333,28 +329,24 @@ class TestACatalogIdentifierIsHalfTheKey:
         assert Components.from_json(components.to_json()) == components
 
 
-def test_version_one_ignores_the_verb_and_version_two_reads_it():
-    """The whole reason a version rides in the value: two rules, two values."""
-    read = Components("stride", "information-disclosure", ("store:a",), verb="read")
-    alter = Components("stride", "information-disclosure", ("store:a",), verb="alter")
-
-    assert fingerprint(read, version=1) == fingerprint(alter, version=1)
-    assert fingerprint(read, version=2) != fingerprint(alter, version=2)
-
-
 def test_the_version_is_readable_off_the_value():
     """A ledger holding two versions cannot silently compare across them."""
-    value = fingerprint(Components("stride", "spoofing", ("process:a",)), version=1)
-    assert value.startswith("v1:")
-    assert version_of(value) == 1
+    value = fingerprint(
+        Components("stride", "spoofing", ("process:a",), verb="read", scope="01"),
+        version=4,
+    )
+    assert value.startswith("v4:")
+    assert version_of(value) == 4
     with pytest.raises(FingerprintError, match="is not a fingerprint"):
         version_of("deadbeef")
 
 
-def test_version_two_without_a_verb_fails_closed():
+def test_version_four_without_a_verb_fails_closed():
     """Never a hash over a silent empty string, which would collide widely."""
     with pytest.raises(FingerprintError, match="carries none"):
-        fingerprint(Components("stride", "spoofing", ("process:a",)), version=2)
+        fingerprint(
+            Components("stride", "spoofing", ("process:a",), scope="01"), version=4
+        )
 
 
 def test_an_unknown_version_raises_rather_than_falling_back():
@@ -369,11 +361,13 @@ def test_an_unknown_verb_fails_where_the_claim_is_built():
 
 def test_components_round_trip_so_a_version_bump_is_a_recompute():
     """The property the ledger rests on: re-keying needs no re-vote."""
-    original = Components("stride", "spoofing", ("process:a", "store:b"), verb="read")
+    original = Components(
+        "stride", "spoofing", ("process:a", "store:b"), verb="read", scope="01"
+    )
     restored = Components.from_json(original.to_json())
 
     assert restored == original
-    assert fingerprint(restored, version=2) == fingerprint(original, version=2)
+    assert fingerprint(restored, version=4) == fingerprint(original, version=4)
 
 
 def test_malformed_components_are_refused_by_name():

@@ -393,16 +393,15 @@ class TestEvidenceCatalog:
     @pytest.mark.parametrize(
         "unsettled",
         [
-            row(basis="legacy", explanation=""),
             row(assessment="unsupported", assessor="reviewer/1"),
             row(assessment="unresolved", assessor="reviewer/1"),
         ],
-        ids=["legacy", "unsupported", "unresolved"],
+        ids=["unsupported", "unresolved"],
     )
     def test_a_row_nobody_may_rest_on_is_never_offered(self, unsettled):
-        """A legacy row is never support, and an
-        assessed-unsupported row is set aside — none is a fact an agent may
-        cite, so none is in the table an agent selects from."""
+        """An assessed-unsupported or unresolved row is set aside — neither is
+        a fact an agent may cite, so neither is in the table an agent selects
+        from."""
         catalog = evidence_catalog(valid_model(), assertions(unsettled))
 
         assert assertion_id(unsettled) not in catalog

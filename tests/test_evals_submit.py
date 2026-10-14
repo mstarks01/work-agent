@@ -197,19 +197,18 @@ class TestTheVoteChecks:
     def test_a_vote_keyed_under_a_version_stride_left_is_refused(self, repo):
         """The row the loader cannot refuse, caught where it arrives.
 
-        Self-consistent at version 1, because version 1 reads no verb, so it
-        loads and scores under a rule STRIDE has moved past -- and then `rekey`
-        refuses the whole ledger over it. The loader has to keep accepting it,
+        Self-consistent at version 4, so it loads and scores under a rule
+        STRIDE has moved past. The loader has to keep accepting it,
         because a ledger written before a rule change is what `rekey` reads.
         An added row is the one row a pull request can insist is current.
         """
         votes = prepare_vote(repo)
         stale = cast(
-            Components("stride", "information-disclosure", ("process:a",)),
+            Components("stride", "information-disclosure", ("process:a",), verb="read"),
             "01-payments-checkout",
             "up",
             "ada",
-            version=1,
+            version=4,
         )
         (votes / "ada.jsonl").write_text(
             json.dumps(stale.to_json(), ensure_ascii=False, sort_keys=True) + "\n",
@@ -220,7 +219,7 @@ class TestTheVoteChecks:
         check = submit._check_your_file_appends(repo, "ada")
 
         assert not check.passed
-        assert "keyed at version 1" in check.problems[0]
+        assert "keyed at version 4" in check.problems[0]
         assert "stride keys at" in check.problems[0]
 
     def test_a_rewrite_of_history_is_refused(self, repo):
@@ -625,11 +624,13 @@ class TestTheChecklistSurvivesAShapeNobodyListed:
         # what meets the unknown name. A mismatched fingerprint would be caught
         # one step earlier and would not exercise this path at all.
         stray = cast(
-            Components("not-a-package", "information-disclosure", ("process:a",)),
+            Components(
+                "not-a-package", "information-disclosure", ("process:a",), verb="read"
+            ),
             "01-payments-checkout",
             "up",
             "ada",
-            version=1,
+            version=4,
         )
         (votes / "ada.jsonl").write_text(
             json.dumps(stray.to_json(), ensure_ascii=False, sort_keys=True) + "\n",

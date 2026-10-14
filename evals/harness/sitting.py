@@ -626,9 +626,8 @@ class MarkTarget:
     #: before a version moved still names this target through one of these;
     #: :func:`current_marks` reads them. Recomputed from the claim, never
     #: stored, so a version can move without a record moving. An older key
-    #: two findings share — version 1 reads no verb and no scope — names
-    #: neither, so a mark under it is refused by name rather than read as an
-    #: answer on whichever finding was listed last.
+    #: two findings share names neither, so a mark under it is refused by name
+    #: rather than read as an answer on whichever finding was listed last.
     aliases: tuple[str, ...] = ()
 
 

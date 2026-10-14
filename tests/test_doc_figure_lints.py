@@ -11,7 +11,7 @@ it, so prose that still states the earlier one is simply wrong. Every figure bel
 is of this kind, and every one is computed offline with no provider call.
 
 **A module docstring is prose too.** `fingerprint.py` and `verbs.py` argue for
-version 2 from these numbers, and they go stale when the fixtures grow unless
+the action verb from these numbers, and they go stale when the fixtures grow unless
 this module reads a `.py` file. A claim names any path in the repository; the
 extension decides nothing.
 
@@ -174,7 +174,7 @@ def _frontier_row(pairs, corpus):
     """One row of the frontier, so a docstring quoting it cannot go stale.
 
     ``fingerprint.py`` and ``verbs.py`` both argue for the action verb from the
-    ``endpoint subset`` row — what version 1 costs without it — so the figure
+    ``endpoint subset`` row — what place alone costs without it — so the figure
     that pins their prose has to recompute that row rather than the shipped
     rule's.
     """

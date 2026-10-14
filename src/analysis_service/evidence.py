@@ -50,9 +50,8 @@ control stated only for administrators — because those facts reach no
 attribute a rule could read. A row whose projection the graph holds stays
 cited through that attribute: one fact, one reader (ADR 0036). Which rows those
 are is :func:`~analysis_service.assertions.offered`'s one rule, and which rows
-settle is :func:`~analysis_service.assertions.settled`'s, so a conflict, an
-unsupported row or a legacy one is never in the table, and a claim can never
-rest on one.
+settle is :func:`~analysis_service.assertions.settled`'s, so a conflict or an
+unsupported row is never in the table, and a claim can never rest on one.
 
 An **unknown** row is in the table and is a different thing. It is offered under
 the same identity and a ``unknown-assertion`` ground, because the sources were

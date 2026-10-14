@@ -1055,8 +1055,8 @@ def create_app(
         Both reports are served under their own rule first, so a comparison
         never names a finding of a report this caller may not read. ``409``
         where the job is not a follow-up, the store no longer holds the report
-        its answers came from, or either record has a schema version of
-        another major.
+        its answers came from, or either record has a schema version other
+        than this service's.
         """
         answers = _answers(request)
         answers.servable(await answers.parsable(job_id, owner_id))

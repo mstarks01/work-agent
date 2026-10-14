@@ -61,7 +61,7 @@ from analysis_service.jobs import (
     JobStore,
     PipelineRunner,
     Resumption,
-    same_major,
+    same_schema,
 )
 from analysis_service.links import NoCatalogError
 from analysis_service.pipeline import entry_of
@@ -210,7 +210,7 @@ class SaveConflict(Exception):
 
 
 class UnreadableSchema(Exception):
-    """The job's record has a schema version of another major (#1532).
+    """The job's record has a schema version other than this service's (#1532).
 
     This service cannot parse what such a record holds, and no migration
     rewrites it, so the owner must submit the job again.
@@ -404,12 +404,12 @@ class JobAnswers:
         """The owned job, where this service can parse what its record holds.
 
         **The gate before every read that parses a stored record.** It raises
-        :class:`UnreadableSchema` where :func:`~analysis_service.jobs.same_major`
+        :class:`UnreadableSchema` where :func:`~analysis_service.jobs.same_schema`
         refuses the record's version. Ownership is checked first, so a foreign
         job reads as missing and never as unreadable.
         """
         record = await self.owned(job_id, owner_id)
-        if not same_major(record.schema_version):
+        if not same_schema(record.schema_version):
             raise UnreadableSchema(record.schema_version)
         return record
 

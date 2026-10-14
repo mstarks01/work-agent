@@ -18,7 +18,7 @@ from tests.eval_factories import cast, produced_threat, write_sweep_document
 from tests.factories import sample_report
 
 
-def seed(path, *, version=1):
+def seed(path, *, version=4):
     for target, verb in (("process:a", "read"), ("store:b", "alter")):
         append(
             cast(
@@ -67,13 +67,15 @@ def test_rekey_moves_every_key_and_keeps_every_vote(tmp_path):
 def test_rekey_refuses_a_move_the_components_cannot_satisfy(tmp_path, capsys):
     """Fail-closed, so a partial re-key is impossible."""
     led = tmp_path / "votes"
+    # Version 4 keys this row by its verb, and ASVS keys at version 5, which
+    # reads a catalog identifier the row does not carry.
     append(
         cast(
-            Components("stride", "information-disclosure", ("process:a",)),
+            Components("asvs", "authentication", ("process:a",), verb="read"),
             "01-payments-checkout",
             "up",
             "ada",
-            version=1,
+            version=4,
         ),
         led,
     )

@@ -128,7 +128,6 @@ SHAPES: dict[str, tuple[str, list[Assertion]]] = {
         "encryption_in_transit",
         [tls(assessment="unsupported", assessor="audit")],
     ),
-    "legacy": ("encryption_in_transit", [tls(basis="legacy", support=[])]),
 }
 
 #: Each answer an attribute can take: a value, the opposite, and a revision.

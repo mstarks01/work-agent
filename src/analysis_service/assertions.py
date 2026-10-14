@@ -33,8 +33,8 @@ where, and this records the offsets it found. A model proposes words. It never
 states an offset.
 
 **A basis names what it requires.** ``stated`` needs a span, ``inferred`` needs
-premises, ``derived`` needs a rule, and ``legacy`` is never support for
-anything. :func:`catalog_issues` is where each is checked.
+premises, and ``derived`` needs a rule. :func:`catalog_issues` is where each is
+checked.
 
 **No model judge.** :attr:`Assertion.assessment` starts at ``unchecked`` and only
 a reader measured against independent labels may move it. An extractor's own
@@ -220,9 +220,8 @@ REGISTRY_VERSION = 8
 #:
 #: Version 3: a declining projection does not leave a definite attribute
 #: authoritative (#926). A conflict, a scoped value and a row a reviewer set
-#: aside write a qualified ``unknown`` into the attribute; a ``legacy`` row
-#: does not project as ``stated``; and two compatible values keep the
-#: attribute and are cited as rows instead. :data:`PROJECTION_EFFECT` is the
+#: aside write a qualified ``unknown`` into the attribute; and two compatible
+#: values keep the attribute and are cited as rows instead. :data:`PROJECTION_EFFECT` is the
 #: table.
 #:
 #: Version 4: a hedge differs from silence. A source that *said* it was unsure
@@ -268,10 +267,8 @@ QualifierKind = Literal[
     "principal", "operation", "resource", "environment", "condition"
 ]
 
-#: Where an assertion's value comes from. ``legacy`` is an attribute imported
-#: from an artifact written before this layer: it is never support, whatever
-#: quote its element carries.
-Basis = Literal["stated", "inferred", "derived", "legacy"]
+#: Where an assertion's value comes from.
+Basis = Literal["stated", "inferred", "derived"]
 
 #: Whether anything checked that the support *supports* the value. It starts at
 #: ``unchecked`` and no extractor may move it.
@@ -753,7 +750,6 @@ CatalogIssueCode = Literal[
     "missing-scope",
     "unsupported-assertion",
     "too-many-spans",
-    "legacy-with-support",
     "missing-premise",
     "dangling-premise",
     "circular-support",
@@ -1548,9 +1544,8 @@ def settled(catalog: AssertionCatalog) -> tuple[Assertion, ...]:
 
     **The one reader of "may a consumer treat this row as a fact".** A row is
     settled when it holds a value rather than :data:`UNKNOWN`, its predicate
-    is registered, its basis is support of some kind — ``legacy`` is never
-    support for anything (ADR 0034 rule 6) — its assessment is one
-    :data:`PROJECTS_UNDER` admits, and no other row disagrees with it at its
+    is registered, its assessment is one :data:`PROJECTS_UNDER` admits, and no
+    other row disagrees with it at its
     subject, predicate and scope. A conflict settles nothing on either side
     until a recorded adjudication does, and an ``unsupported`` or
     ``unresolved`` row is set aside rather than read as a fact.
@@ -1578,15 +1573,10 @@ def admissible(entry: Assertion) -> bool:
     evidence a lane cites and the attribute a rule reads cannot disagree about
     which rows count (#926).
 
-    A row is admissible when its predicate is registered, its basis is support
-    of some kind — ``legacy`` never is (ADR 0034 rule 6) — and its assessment is
+    A row is admissible when its predicate is registered and its assessment is
     one :data:`PROJECTS_UNDER` admits.
     """
-    return (
-        entry.predicate in REGISTRY
-        and entry.basis != "legacy"
-        and PROJECTS_UNDER[entry.assessment]
-    )
+    return entry.predicate in REGISTRY and PROJECTS_UNDER[entry.assessment]
 
 
 def answered(entry: Assertion) -> bool:
@@ -1795,7 +1785,7 @@ def _entry_issues(
     # when the sources do not answer. A `hedged` unknown may still carry the
     # words somebody hedged with, which is why the span is optional rather than
     # refused.
-    if predicate.stated_only and entry.basis not in ("stated", "legacy"):
+    if predicate.stated_only and entry.basis != "stated":
         refuse(
             "inference-refused",
             f"{entry.predicate!r} says which element a subject is, so the"
@@ -1816,8 +1806,6 @@ def _entry_issues(
             f"{len(entry.support)} support spans, and a row carries at most"
             f" {MAX_SPANS}; a statement resting on more is a summary",
         )
-    if entry.basis == "legacy" and entry.support:
-        refuse("legacy-with-support", "a legacy value is never support-backed")
     # An inference says what it rests on, in words a person reads and, where
     # code made it, in rows. **Not in rows alone**: an assertion's identity is
     # computed, so a model writing a premise ID would be writing a key it
@@ -2427,15 +2415,11 @@ def _spans(
 
 #: Which of two rows of one identity stands when their bases differ, lowest
 #: first: a source that states the value outranks a rule that derived it,
-#: which outranks a reader that inferred it, which outranks an attribute
-#: imported from before this layer. A table over :data:`Basis`, held to it by
-#: ``tests/test_assertions.py``, so a fifth basis fails there rather than
-#: raising in a merge.
+#: which outranks a reader that inferred it. A table over :data:`Basis`, held
+#: to it by ``tests/test_assertions.py``, so a fourth basis fails there rather
+#: than raising in a merge.
 BASIS_RANK: Mapping[str, int] = MappingProxyType(
-    {
-        basis: rank
-        for rank, basis in enumerate(("stated", "derived", "inferred", "legacy"))
-    }
+    {basis: rank for rank, basis in enumerate(("stated", "derived", "inferred"))}
 )
 
 
@@ -2490,7 +2474,6 @@ ProjectionReason = Literal[
     "several-predicates",
     "compatible",
     "unsupported",
-    "legacy",
 ]
 
 #: Whether a row under each :data:`Assessment` states its value for the graph.
@@ -2548,8 +2531,7 @@ def project(catalog: AssertionCatalog) -> tuple[Projection, ...]:
 
     A row :func:`admissible` refuses is set aside: it neither supplies the
     value nor counts as a second one. An attribute only such rows reach writes
-    ``unknown`` with the reason ``unsupported``, or ``legacy`` where every one
-    of them was imported from before this layer, and the rows are still named,
+    ``unknown`` with the reason ``unsupported``, and the rows are still named,
     so a reader sees what was set aside. Two values that can both hold — see
     :func:`_compatible` — read ``compatible`` rather than as a disagreement.
 
@@ -2739,9 +2721,9 @@ def contradiction_issues(
 #: ``leave`` keeps what extraction wrote. ``unknown`` is rows that all read
 #: :data:`UNKNOWN` for a reason that is not a hedge — silence, a predicate
 #: nobody asked about, a bound that stopped the work — which says the pass did
-#: not find an answer, not that the sources gave none; ``legacy`` is rows imported from before this layer, which
-#: are that attribute spelled again; ``compatible`` is several values that all
-#: hold, which one string cannot carry and which :func:`offered` cites as rows.
+#: not find an answer, not that the sources gave none; ``compatible`` is
+#: several values that all hold, which one string cannot carry and which
+#: :func:`offered` cites as rows.
 #: Measured over the 103 archived assertion records against their blessed
 #: models, the two ``several-predicates`` projections were both a mechanism and
 #: the credential it presents, and are ``compatible`` here: qualifying them
@@ -2770,7 +2752,6 @@ PROJECTION_EFFECT: Mapping[str, Literal["write", "qualify", "leave"]] = (
             "several-predicates": "qualify",
             "compatible": "leave",
             "unsupported": "qualify",
-            "legacy": "leave",
         }
     )
 )
@@ -3082,10 +3063,7 @@ def _projected(
         return projected(UNKNOWN, "unknown")
     if not stated:
         # Rows somebody set aside are a question the catalog raised about this
-        # attribute; rows imported from before this layer are the attribute
-        # itself, spelled again, and say nothing new about it.
-        if all(entry.basis == "legacy" for entry in valued):
-            return projected(UNKNOWN, "legacy")
+        # attribute.
         return projected(UNKNOWN, "unsupported")
     if any(entry.scope for entry in stated):
         return projected(UNKNOWN, "scoped")

@@ -186,7 +186,7 @@ from analysis_service.jobs import (
     event_frames,
     execute_job,
     parent_of,
-    same_major,
+    same_schema,
 )
 from analysis_service.links import (
     MAX_LINK_ANSWERS,
@@ -402,10 +402,11 @@ class Workspace:
         record with its resumption, which an envelope leaves out for its
         weight.
 
-        The resumption is read only where :func:`same_major` accepts the
-        record. A record of another major names only the job it amends.
+        The resumption is read only where :func:`same_schema` accepts the
+        record. A record of another schema version names only the job it
+        amends.
         """
-        if not same_major(record.schema_version):
+        if not same_schema(record.schema_version):
             return parent_of(record)
         resumption = await self.store.resumption(record.id, record.owner_id)
         return parent_of(record.model_copy(update={"resumption": resumption}))

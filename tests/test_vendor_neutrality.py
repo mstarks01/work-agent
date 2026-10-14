@@ -671,9 +671,8 @@ VENDOR_TALLY = re.compile(
 )
 
 #: What both rules read: everything a new vendor row would have to update, and
-#: nothing frozen. ``docs/research/`` is evidence dated to its own run and
-#: ``.wayfinder/`` is archived history, so both keep whatever was true when they
-#: were written and neither is swept here.
+#: nothing frozen. ``docs/research/`` is evidence dated to its own run, so it
+#: keeps whatever was true when it was written and is not swept here.
 PROSE = tuple(
     path
     for path in [REPO_ROOT / "README.md", REPO_ROOT / "GLOSSARY.md"]

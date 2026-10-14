@@ -31,7 +31,7 @@ from analysis_service.jobs import (
     JobRecord,
     JobStatus,
     Resumption,
-    same_major,
+    same_schema,
 )
 from analysis_service.objects import ObjectStore, build_object_store, object_key
 from analysis_service.principals import Identity, Principal
@@ -1416,14 +1416,14 @@ class TestTheRestartScan:
 
 class TestTheSchemaVersion:
     """Each record keeps the ``SCHEMA_VERSION`` that created it, and
-    :func:`~analysis_service.jobs.same_major` reads it (#1532)."""
+    :func:`~analysis_service.jobs.same_schema` reads it (#1532)."""
 
     def test_a_new_record_holds_the_current_version(self, store):
         record = new_record()
         asyncio.run(admit(store, record))
         held = asyncio.run(store.owned(record.id, "alice"))
         assert held.schema_version == SCHEMA_VERSION
-        assert same_major(held.schema_version)
+        assert same_schema(held.schema_version)
 
     @pytest.mark.parametrize("version", ["2.10", "1.0"])
     def test_every_read_and_save_keeps_the_version_the_record_states(
@@ -1453,9 +1453,9 @@ class TestTheSchemaVersion:
         ("version", "readable"),
         [
             ("9.4", True),
-            ("9.1", True),  # an older minor of this major
-            ("9.7", True),
-            ("9", True),
+            ("9.1", False),  # an older minor
+            ("9.7", False),  # a newer minor
+            ("9", False),
             ("8.4", False),  # an older major
             ("10.0", False),  # a newer major
             ("90.4", False),  # a major that starts with this one
@@ -1463,7 +1463,7 @@ class TestTheSchemaVersion:
             (" 9.4", False),
         ],
     )
-    def test_same_major_compares_the_major_of_what_the_store_returns(
+    def test_same_schema_matches_exactly_what_the_store_returns(
         self, store, monkeypatch, version, readable
     ):
         monkeypatch.setattr(jobs, "SCHEMA_VERSION", "9.4")
@@ -1471,7 +1471,7 @@ class TestTheSchemaVersion:
         record.schema_version = version
         asyncio.run(admit(store, record))
         held = asyncio.run(store.owned(record.id, "alice"))
-        assert same_major(held.schema_version) is readable
+        assert same_schema(held.schema_version) is readable
 
 
 class TestPrincipals:

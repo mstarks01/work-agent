@@ -302,10 +302,8 @@ def test_double_voted_findings_are_the_agreement_sample(tmp_path):
 def test_a_rekey_needs_no_revote(tmp_path):
     """The property that stops this ledger expiring when the rule changes.
 
-    Cast at version 1 and re-keyed to the current default, which is the shape a
-    row written before :class:`~analysis_service.claims.Claim` carried a verb
-    takes today: the components were stored, so the new key is a recomputation
-    rather than a re-vote.
+    Cast at version 4 and re-keyed to STRIDE's current version: the components
+    were stored, so the new key is a recomputation rather than a re-vote.
     """
     path = tmp_path / "votes"
     append(
@@ -314,14 +312,14 @@ def test_a_rekey_needs_no_revote(tmp_path):
             "01",
             "up",
             "sam",
-            version=1,
+            version=4,
             content=SAMPLE_CONTENT,
             prose=SAMPLE_PROSE,
         ),
         path,
     )
     original = load(path)
-    assert original.votes[0].fingerprint.startswith("v1:")
+    assert original.votes[0].fingerprint.startswith("v4:")
 
     moved = rekey(original.votes)
     assert [vote.fingerprint for vote in moved] != [
@@ -840,7 +838,7 @@ def test_a_rekey_preview_finds_the_pool_unmoved_across_a_version(tmp_path, capsy
             "01",
             "up",
             "sam",
-            version=1,
+            version=4,
             content=SAMPLE_CONTENT,
             prose=SAMPLE_PROSE,
         ),
@@ -852,24 +850,24 @@ def test_a_rekey_preview_finds_the_pool_unmoved_across_a_version(tmp_path, capsy
 
 
 def test_a_rekey_preview_names_a_rule_that_splits_a_finding(tmp_path, capsys):
-    """The positive control: version 1 reads no verb, so a later rule splits.
+    """The positive control: version 6 joins two verbs version 4 keeps apart.
 
-    Two votes on one place with two verbs are one finding under version 1 and
-    two under the current rule, so the pool's votes move.
+    Two votes on one place with two equivalent verbs are two findings under
+    version 4 and one under the current rule, so the pool's votes move.
     """
     import argparse
 
     from evals.harness.ledger import command_rekey
 
     path = tmp_path / "votes"
-    for verb in ("read", "alter"):
+    for verb, voter in (("forge", "sam"), ("inject", "ada")):
         append(
             cast(
                 components(verb=verb),
                 "01",
                 "up",
-                "sam",
-                version=1,
+                voter,
+                version=4,
                 content=SAMPLE_CONTENT,
                 prose=SAMPLE_PROSE,
             ),
@@ -877,4 +875,4 @@ def test_a_rekey_preview_names_a_rule_that_splits_a_finding(tmp_path, capsys):
         )
 
     command_rekey(argparse.Namespace(ledger=str(path), yes=False))
-    assert "POOL MOVED: 1 findings before, 2 after" in capsys.readouterr().out
+    assert "POOL MOVED: 2 findings before, 1 after" in capsys.readouterr().out

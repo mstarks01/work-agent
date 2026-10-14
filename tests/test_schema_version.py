@@ -1,9 +1,9 @@
-"""A route that parses a stored record refuses one of another major (#1532).
+"""A route that parses a stored record refuses one of another version (#1532).
 
 Each test seeds a job, then states an older ``schema_version`` on its record
 through :meth:`~analysis_service.jobs.JobStore.save`. The record content stays
 current, so a route that does not ask
-:func:`~analysis_service.jobs.same_major` serves it, and only the gate refuses.
+:func:`~analysis_service.jobs.same_schema` serves it, and only the gate refuses.
 """
 
 from __future__ import annotations
@@ -12,7 +12,6 @@ import asyncio
 
 import pytest
 
-from analysis_service import jobs
 from analysis_service.claims import UnknownRef, Verdict
 from analysis_service.fact_answers import FactAnswer
 from analysis_service.jobs import JobRecord
@@ -25,7 +24,7 @@ from tests.test_job_store import completed, final
 from tests.test_links import catalog_client
 from tests.test_pause import waiting
 
-#: A schema version of an older major than any this service writes.
+#: A schema version older than the one this service writes.
 OLDER = "2.10"
 
 #: The one fact :func:`a_report_that_asks` asks.
@@ -94,9 +93,9 @@ def the_parent_of_a_follow_up(store) -> tuple[str, str]:
 
 
 #: Each route that parses a stored record: the seed, which returns the job to
-#: request and the job whose record states the version, the request, and
-#: the status the route answers where the record has this major. A callable
-#: body is built from the job before its record states the version.
+#: request and the job whose record states the version, the request, and the
+#: status the route answers where the record has this service's version. A
+#: callable body is built from the job before its record states the version.
 PARSING_ROUTES = [
     pytest.param(
         a_waiting_job, "GET", "questions", None, 200, id="questions-of-a-waiting-job"
@@ -163,14 +162,11 @@ def test_a_parsing_route_refuses_a_record_of_an_older_major(
 
 
 @pytest.mark.parametrize(("seed", "method", "route", "body", "ok"), PARSING_ROUTES)
-def test_a_record_of_an_older_minor_works_as_before(
-    monkeypatch, seed, method, route, body, ok
-):
-    monkeypatch.setattr(jobs, "SCHEMA_VERSION", "9.4")
+def test_a_record_of_this_version_is_served(seed, method, route, body, ok):
     client, store = catalog_client()
     job, stored = seed(store)
     body = body(client, job) if callable(body) else body
-    aged(store, stored, "9.1")
+    aged(store, stored, SCHEMA_VERSION)
 
     response = call(client, method, job, route, body)
 
