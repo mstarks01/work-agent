@@ -24,6 +24,7 @@ from analysis_service.compact import (
 from analysis_service.deployment import (
     ASSERTIONS_VAR,
     BLESSED_FINGERPRINTS_VAR,
+    CAPABILITY_READER_VAR,
     COMPACT_EXTRACTION_VAR,
     MODEL_TIERS_VAR,
     RESILIENCE_VAR,
@@ -32,6 +33,7 @@ from analysis_service.deployment import (
     Deployment,
 )
 from analysis_service.errors import ConfigError
+from analysis_service.frameworks import PACKAGES, reads_capabilities
 from analysis_service.graph import FrameworkNodes
 from analysis_service.jobs import InMemoryJobStore
 from analysis_service.ladder import OUTPUT_TOOL_NAME
@@ -384,6 +386,35 @@ def test_the_flag_puts_the_pass_into_every_graph_that_prepares():
         production.node_models[graph.ASSERT_NODE]
         == (production.node_models[graph.EXTRACT_NODE])
     ), "the pass runs on the base tier beside extraction"
+
+
+def test_an_install_that_sets_nothing_runs_no_capability_reader():
+    """Off until its promotion gate passes (ADR 0086)."""
+    reader = next(name for name in PACKAGES if reads_capabilities(name))
+    deployment = Deployment.from_env(env=VERTEX_ENV)
+
+    assert deployment.capability_reader is False
+    assert graph.CAPABILITIES_NODE not in deployment.pipeline((reader,)).node_models
+
+
+def test_the_flag_puts_the_reader_into_every_graph_that_extracts_for_a_reader():
+    reader = next(name for name in PACKAGES if reads_capabilities(name))
+    others = tuple(name for name in PACKAGES if not reads_capabilities(name))
+    deployment = Deployment.from_env(env=VERTEX_ENV | {CAPABILITY_READER_VAR: "true"})
+
+    production = deployment.pipeline((reader,))
+    head = deployment.pipeline((reader,), entry=graph.ENTRY_HEAD_ONLY)
+    seeded = deployment.pipeline((reader,), entry=graph.ENTRY_PREPARE)
+
+    assert graph.CAPABILITIES_NODE in production.node_models
+    assert graph.CAPABILITIES_NODE in head.node_models
+    assert graph.CAPABILITIES_NODE not in seeded.node_models
+    assert (
+        production.node_models[graph.CAPABILITIES_NODE]
+        == production.node_models[graph.EXTRACT_NODE]
+    ), "the reader runs on the base tier beside extraction"
+    if others:
+        assert graph.CAPABILITIES_NODE not in deployment.pipeline(others).node_models
 
 
 def test_the_llm_nodes_share_two_adapters_one_per_tier():

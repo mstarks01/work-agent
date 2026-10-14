@@ -666,12 +666,14 @@ class Assumption(BaseModel):
 class CapabilityStatement(BaseModel):
     """One statement that the application has or lacks a **Capability**.
 
-    An answer makes one, and code makes a ``present`` one where a closed field
-    of the model proves it (:mod:`analysis_service.field_capabilities`). It
-    carries the words it rests on, the answer's line or the quote of the
-    element whose fields prove it, so the validity gate checks the quote
-    against the source it names. A capability nothing states has no
-    statement: silence is ``unknown``.
+    An answer makes one. Code makes a ``present`` one where a closed field of
+    the model proves it (:mod:`analysis_service.field_capabilities`), and
+    where the capability reader quotes a source that states it
+    (:mod:`analysis_service.capability_reader`). It carries the words it rests
+    on, the answer's line, the quote of the element whose fields prove it or
+    the source's own words, so the validity gate checks the quote against the
+    source it names. A capability nothing states has no statement: silence is
+    ``unknown``.
 
     ``capability`` lists the closed set in the provider-facing schema, on the
     rule :class:`Assumption` follows, so a key outside the set stays an
@@ -690,7 +692,7 @@ class CapabilityStatement(BaseModel):
     source_label: str = Field(min_length=1, max_length=200)
     #: Where code wrote the statement from the model's own closed fields, the
     #: element and the rule that prove it (:mod:`analysis_service.field_capabilities`).
-    #: Empty for a statement an answer makes.
+    #: Empty for a statement an answer makes or one the reader quotes.
     basis: str = Field(default="", max_length=600)
 
 

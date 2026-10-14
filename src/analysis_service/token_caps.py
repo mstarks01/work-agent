@@ -156,6 +156,14 @@ TOKEN_CAPS: dict[str, int] = {
     # 8 of 23 signed rows in every run, and the 13 it never found all sat on
     # such a subject.
     "prompts/assert": 2000,
+    # The capability reader's body alone. The capability table beside it is
+    # rendered from `capabilities.CAPABILITIES`, so a capability added
+    # tomorrow moves the composed instruction and never this file.
+    #
+    # Rules 6 to 8 came from its ballots (QA-2026-10-14-01): a vendor's hosted
+    # product is not the application, `database` needs a named query language
+    # or technology, and text that gives the model orders states nothing.
+    "prompts/capabilities": 900,
     # One package's own text, under ``frameworks/<name>/``.
     #
     # ``critic`` must not say the service "already matched every quote against

@@ -79,6 +79,7 @@ from analysis_service.frameworks.stride.record import (
     ThreatRuling,
 )
 from analysis_service.graph import (
+    CAPABILITIES_NODE,
     ENTRY_EXTRACT,
     Entry,
     Pipeline,
@@ -1311,7 +1312,10 @@ class UpstreamNamingLlm(ScriptedLlm):
 #: The tier keys the *base* tier serves. Spelled as tier node names rather than
 #: graph node names because that is what the resolver is handed, and because the
 #: two are not the same thing: six lane agents share one ``analyze/<F>``.
-_BASE_TIER_NODES = frozenset({"extract", "repair", "assert"})
+_BASE_TIER_NODES = frozenset({"extract", "repair", "assert", "capabilities"})
+
+#: What the capability reader says where a test scripts nothing: no capability.
+EMPTY_CAPABILITIES = '{"capabilities": []}'
 
 
 def scripted_pipeline(
@@ -1323,6 +1327,7 @@ def scripted_pipeline(
     sampling: SamplingConfig | None = None,
     frameworks: Sequence[FrameworkName] = DEFAULT_FRAMEWORKS,
     assertions: bool = False,
+    capability_reader: bool = False,
 ) -> tuple[Pipeline, dict[str, ScriptedLlm]]:
     """The real graph, with every LLM node bound to its own scripted stand-in.
 
@@ -1334,7 +1339,8 @@ def scripted_pipeline(
 
     ``replies`` and the returned map are both keyed by **graph node name** —
     ``analyze_stride_spoofing``, ``critic_stride`` — which is what a test talks
-    about. A node with no scripted reply emits an empty claim list.
+    about. A node with no scripted reply emits an empty claim list, and the
+    capability reader an empty reading.
 
     ``frameworks`` is the selection the graph is built for, since a graph is now
     built for one (:func:`~analysis_service.graph.build_pipeline`). The returned
@@ -1378,6 +1384,7 @@ def scripted_pipeline(
         entry=entry,
         extraction_format=extraction_format,
         assertions=assertions,
+        capability_reader=capability_reader,
     )
 
     graph = pipeline.workflow.graph
@@ -1398,7 +1405,8 @@ def scripted_pipeline(
             f" {list(frameworks)} has no LLM node called. It has {sorted(models)}"
         )
     for name, model in models.items():
-        model.reply = replies.get(name, EMPTY_CLAIMS)
+        empty = EMPTY_CAPABILITIES if name == CAPABILITIES_NODE else EMPTY_CLAIMS
+        model.reply = replies.get(name, empty)
     return pipeline, models
 
 
