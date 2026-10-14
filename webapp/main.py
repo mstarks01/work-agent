@@ -4,11 +4,13 @@ Start it from a clone, with model auth already configured::
 
     uv run python webapp/main.py
 
-It embeds the service in process: its jobs live in the service's in-memory
-job store, and :mod:`analysis_service.job_answers` admits, stores and starts
-them for this app as it does for ``/v1``. It does not go through the ``/v1``
-HTTP surface, so it needs no bearer token and no CORS, and it runs real
-models against real prose, because there is no credential-free path here.
+It embeds the service in process: its jobs live in a service job store, and
+:mod:`analysis_service.job_answers` admits, stores and starts them for this
+app as it does for ``/v1``. The store is the one the service's backend
+settings select, and ``memory`` where ``ANALYSIS_JOB_STORE`` is unset. It does
+not go through the ``/v1`` HTTP surface, so it needs no bearer token and no
+CORS, and it runs real models against real prose, because there is no
+credential-free path here.
 The local workspace provides description entry, grouped questions, and a bounded
 session library of analyses and reports. Templates and native JavaScript keep
 the frontend dependency-free; the engine remains the reader of answer rules.
@@ -100,6 +102,7 @@ from collections.abc import (
 )
 from contextlib import asynccontextmanager, nullcontext
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from functools import partial
 from pathlib import Path
 from typing import Annotated, get_args
@@ -180,9 +183,12 @@ from analysis_service.jobs import (
     JobStatus,
     JobStore,
     PipelineRunner,
+    audited_delete,
+    build_store,
     event_frames,
     execute_job,
     parent_of,
+    store_lifespan,
 )
 from analysis_service.links import (
     MAX_LINK_ANSWERS,
@@ -273,12 +279,12 @@ class Settings:
 class Workspace:
     """The jobs this process holds, and what runs them.
 
-    The jobs live in a job store, in memory, capped at ``max_jobs``. The
-    oldest job that waits for no answers is deleted first, and a job that
-    waits for answers is never deleted: where every job waits, a new one is
-    refused instead. One job runs at a time (LLM10): the store's admission
-    refuses a second while one is in flight, with a message rather than a
-    queue. A restart loses everything, which is correct here.
+    The jobs live in a job store, capped at ``max_jobs``. The oldest job
+    that waits for no answers is deleted first, and a job that waits for
+    answers is never deleted: where every job waits, a new one is refused
+    instead. One job runs at a time (LLM10): the store's admission refuses a
+    second while one is in flight, with a message rather than a queue. A
+    restart keeps the jobs of a durable store and loses those of ``memory``.
     """
 
     def __init__(
@@ -360,13 +366,18 @@ class Workspace:
         new job, until that job fits.
 
         The jobs are chosen on entry and deleted on a clean exit, so a
-        submission the body refuses deletes nothing. A job that answers the
-        job ``answering``, paused or finished, may hold one place over the
-        bound: that job stays the place to retry from until its answer has a
-        report, and it is never deleted to make room for its own answer. Raises
-        :class:`WorkspaceFull` where every held job waits.
+        submission the body refuses deletes nothing. Each delete goes through
+        :func:`~analysis_service.jobs.audited_delete` with the cause
+        ``workspace`` and the time of the choice, so a chosen job that changes
+        before the delete stays, and the workspace then holds one job over its
+        bound. A job that answers the job ``answering``, paused or finished,
+        may hold one place over the bound: that job stays the place to retry
+        from until its answer has a report, and it is never deleted to make
+        room for its own answer. Raises :class:`WorkspaceFull` where every
+        held job waits.
         """
         limit = self._max_jobs + (answering is not None)
+        chosen_at = datetime.now(UTC)
         held = await self.jobs()
         removable = [
             job
@@ -383,7 +394,9 @@ class Workspace:
             )
         yield
         for job in removable[: max(excess, 0)]:
-            await self.store.delete(job.id, job.owner_id)
+            await audited_delete(
+                self.store, job.id, job.owner_id, "workspace", updated_before=chosen_at
+            )
 
     async def parent_of(self, record: JobRecord) -> str | None:
         """The job this one resumes or amends: :func:`parent_of` over the
@@ -871,11 +884,28 @@ def create_app(
     Both collaborators are injectable so the offline lane can drive the app
     without credentials: ``startup`` supplies a stub runner, and ``workspace``
     lets a test bound the jobs held or hand the app a store of its own.
+
+    Without a ``workspace``, the app builds its store with
+    :func:`~analysis_service.jobs.build_store` from the service's backend
+    settings, and an unusable setting raises. Where ``ANALYSIS_JOB_STORE`` is
+    unset, the store is ``memory``, so a first run needs no setting. At
+    startup, before the app takes a request, the app runs
+    :func:`~analysis_service.jobs.store_lifespan` over the store, as the
+    service does.
     """
     state = build_startup() if startup is None else startup
     if workspace is None and state.settings is not None:
-        workspace = Workspace(state.settings)
-    app = FastAPI(title="Work Agent", docs_url=None, redoc_url=None, openapi_url=None)
+        store = build_store({"ANALYSIS_JOB_STORE": "memory", **os.environ})
+        workspace = Workspace(state.settings, store=store)
+    app = FastAPI(
+        title="Work Agent",
+        docs_url=None,
+        redoc_url=None,
+        openapi_url=None,
+        lifespan=lambda app: (
+            nullcontext() if workspace is None else store_lifespan(workspace.store)
+        ),
+    )
     app.add_middleware(TrustedHostMiddleware, allowed_hosts=LOOPBACK_HOSTS)
     app.add_middleware(SecurityHeaders)
     for refusal, status in _REFUSAL_STATUS.items():
@@ -890,9 +920,7 @@ def create_app(
         return _message(503, str(state.error))
 
     def no_such_run() -> JSONResponse:
-        return _message(
-            404, "This analysis is no longer available in this server session."
-        )
+        return _message(404, "This analysis is no longer available.")
 
     @app.get("/", response_class=HTMLResponse)
     async def form_page() -> Response:

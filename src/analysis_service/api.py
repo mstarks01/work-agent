@@ -29,11 +29,9 @@ only a submission creates a principal.
 
 from __future__ import annotations
 
-import asyncio
 import logging
 from collections import Counter
-from collections.abc import AsyncIterator, Callable, Mapping, Sequence
-from contextlib import asynccontextmanager, suppress
+from collections.abc import Callable, Mapping, Sequence
 from datetime import datetime
 from functools import partial
 from http import HTTPStatus
@@ -105,9 +103,8 @@ from analysis_service.jobs import (
     build_store,
     event_frames,
     execute_job,
-    expire_jobs,
     is_follow_up,
-    retention_days,
+    store_lifespan,
 )
 from analysis_service.links import (
     MAX_LINK_ANSWERS,
@@ -748,55 +745,6 @@ def _setting(
     return read(deployment)
 
 
-#: How often the retention sweep runs. A job outlives its retention period by
-#: one interval at most.
-SWEEP_SECONDS = 3600
-
-
-async def _sweep(store: JobStore, days: int) -> None:
-    """Run the retention sweep now and then each :data:`SWEEP_SECONDS`, until
-    the app stops. A failed pass is logged, and the next pass runs."""
-    while True:
-        try:
-            await expire_jobs(store, days)
-        except Exception:
-            logger.exception("the retention sweep failed")
-        await asyncio.sleep(SWEEP_SECONDS)
-
-
-@asynccontextmanager
-async def _startup(app: FastAPI) -> AsyncIterator[None]:
-    """Check the store, then fail each job in flight, before the app takes a request.
-
-    The ASGI server runs this at startup, after :func:`create_app` built the
-    store, the deployment and the verifier, and starts to serve only after it.
-    The order is: the backend settings (:func:`create_app` reads them), the
-    retention setting, the store's startup check (the schema revision, then
-    the object store), the restart scan (#1529), then requests. A failed check
-    stops the startup. Where a retention period is set, the retention sweep
-    starts after the restart scan and stops with the app.
-    """
-    days = retention_days()
-    store: JobStore = app.state.store
-    await store.startup_check()
-    # The scan is correct for a single instance only. It fails every queued or
-    # running job in the store, so with a second live instance on one store it
-    # would fail the jobs that instance still runs.
-    failed = await store.fail_in_flight()
-    if failed:
-        logger.warning(
-            "restart scan failed %d job(s) in flight: %s", len(failed), failed
-        )
-    sweep = None if days is None else asyncio.create_task(_sweep(store, days))
-    try:
-        yield
-    finally:
-        if sweep is not None:
-            sweep.cancel()
-            with suppress(asyncio.CancelledError):
-                await sweep
-
-
 def create_app(
     *,
     deployment: Deployment | None = None,
@@ -841,9 +789,10 @@ def create_app(
     behind their back is how an app comes to enforce bounds its deployment never
     chose.
 
-    At startup, before the app takes a request, the app reads the retention
-    setting, the store runs its startup check, and then the restart scan fails
-    each job that is queued or running in the store.
+    At startup, before the app takes a request, the app runs
+    :func:`~analysis_service.jobs.store_lifespan` over its store: it reads the
+    retention setting, the store runs its startup check, and then the restart
+    scan fails each job that is queued or running in the store.
     """
     # No schema routes: the schema states the bounds and the source kinds a
     # caller may not send, and the three webapps close them too.
@@ -852,7 +801,7 @@ def create_app(
         docs_url=None,
         redoc_url=None,
         openapi_url=None,
-        lifespan=_startup,
+        lifespan=lambda app: store_lifespan(app.state.store),
     )
     app.state.store = store if store is not None else build_store()
     app.state.event_streams = Counter()

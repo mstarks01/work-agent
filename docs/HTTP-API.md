@@ -117,8 +117,9 @@ deleted follow-up still uses the one follow-up of its report.
 Each delete writes one line to the service log. The line names the job ID, the
 owner ID, the cause and the number of stored objects that the delete removed.
 The cause is `owner` for a delete through this route and `retention` for a
-delete by the [retention sweep](#retention). The line holds no content of the
-job.
+delete by the [retention sweep](#retention). The cause is `workspace` for a
+delete by the bound of the [web app](Web-App.md#where-the-runs-are-kept). The
+line holds no content of the job.
 
 ## Lifecycle
 
