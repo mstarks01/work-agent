@@ -18,7 +18,7 @@ import pytest
 from botocore.exceptions import ClientError, EndpointConnectionError
 from sqlalchemy.pool import NullPool
 
-from analysis_service import jobs
+from analysis_service import jobs, sql_store
 from analysis_service.answer_sets import NO_ANSWERS, AnswerSet
 from analysis_service.budgets import BudgetPolicy
 from analysis_service.fact_answers import FactAnswer
@@ -1136,6 +1136,21 @@ class TestTheOrphanSweep:
         asyncio.run(admit(store, queued))
         assert asyncio.run(store.sweep_orphans(later())) == 0
         assert asyncio.run(store.get(job)).report is not None
+        assert asyncio.run(store.get(queued.id)) is not None
+
+    def test_each_batch_of_the_row_read_keeps_what_its_rows_name(
+        self, held, monkeypatch
+    ):
+        store, objects = held
+        monkeypatch.setattr(sql_store, "_ID_BATCH", 1)
+        named = [completed(store), completed(store)]
+        queued = new_record()
+        asyncio.run(admit(store, queued))
+        orphan = object_key("alice", new_record().id, "sources.json")
+        asyncio.run(objects.put(orphan, b"[]"))
+        assert asyncio.run(store.sweep_orphans(later())) == 1
+        assert asyncio.run(objects.get(orphan)) is None
+        assert all(asyncio.run(store.get(job)).report for job in named)
         assert asyncio.run(store.get(queued.id)) is not None
 
     def test_it_deletes_an_old_report_that_its_row_does_not_name(self, held):

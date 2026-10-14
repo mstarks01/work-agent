@@ -245,6 +245,11 @@ DIGEST_COLUMNS: dict[ObjectName, str] = {
 }
 
 
+#: How many job IDs one query of the orphan sweep reads. SQLite and asyncpg
+#: both take this many bind values in one statement.
+_ID_BATCH = 500
+
+
 def _names(row: Row[Any], name: ObjectName) -> bool:
     """Whether the job row ``row`` names its job's object ``name``.
 
@@ -1196,32 +1201,42 @@ class SqlJobStore:
             ]
         )
 
-    async def _named(self, owner_id: str, job_id: str, name: ObjectName) -> bool:
-        """Whether a job row names the object ``name`` of ``owner_id``'s job."""
+    async def _named_keys(self, job_ids: Sequence[str]) -> set[str]:
+        """The key of each object that the job rows of ``job_ids`` name.
+
+        One read transaction, with :data:`_ID_BATCH` job IDs in each query.
+        """
+        columns = (jobs.c[column] for column in DIGEST_COLUMNS.values())
+        query = select(jobs.c.id, jobs.c.owner_id, *columns)
+        named = set()
         async with self._transaction() as connection:
-            found = await connection.execute(
-                select(*(jobs.c[column] for column in DIGEST_COLUMNS.values())).where(
-                    jobs.c.id == job_id, jobs.c.owner_id == owner_id
-                )
-            )
-            row = found.one_or_none()
-        return row is not None and _names(row, name)
+            for start in range(0, len(job_ids), _ID_BATCH):
+                batch = job_ids[start : start + _ID_BATCH]
+                for row in await connection.execute(query.where(jobs.c.id.in_(batch))):
+                    named |= {
+                        object_key(row.owner_id, row.id, name)
+                        for name in DIGEST_COLUMNS
+                        if _names(row, name)
+                    }
+        return named
 
     async def sweep_orphans(self, before: datetime) -> int:
         """Delete each object last written before ``before`` that no job row
         names, and return how many the store removed.
 
-        A key that :func:`object_key` cannot give stays, because the service
-        never writes one. The sweep lists every key before it deletes one.
+        The sweep lists every key first. A key that :func:`object_key` cannot
+        give stays, because the service never writes one. Then one read
+        transaction finds the keys that the rows of the listed job IDs name.
+        A row names a key only under its own owner ID. The sweep deletes each
+        other listed key.
         """
-        orphans = []
+        listed = []
         async for key, modified in self._objects.list():
             parts = key_parts(key)
-            if parts is None or modified >= before:
-                continue
-            if not await self._named(*parts):
-                orphans.append(key)
-        return await self._remove(orphans)
+            if parts is not None and modified < before:
+                listed.append((key, parts[1]))
+        named = await self._named_keys(sorted({job_id for _, job_id in listed}))
+        return await self._remove([key for key, _ in listed if key not in named])
 
     async def expired(self, before: datetime) -> list[tuple[str, str]]:
         async with self._transaction() as connection:
