@@ -812,23 +812,24 @@ class InMemoryJobStore:
         run; that is the same growth the dict itself already has, and bounding it
         is a property of the backend rather than of this count.
 
+        A record whose owner ID is not ``principal``'s is the caller's defect,
+        and it raises first, as on every store.
+
         A duplicate id is settled before every bound, so a record the store
         already holds is never also counted against the budgets it is already
         inside. The ID of a deleted job is a duplicate too, because its usage
         row keeps it. The principal is settled next, and the store keeps a new
-        principal with the record it admits, in the same step.
-
-        A record whose owner ID is not ``principal``'s, or whose owner holds no
-        principal where none is given, is the caller's defect, and it raises.
-        :func:`check_bounds` then checks the bounds.
+        principal with the record it admits, in the same step. A record whose
+        owner holds no principal where none is given is the caller's defect
+        too, and it raises. :func:`check_bounds` then checks the bounds.
         """
+        if principal is not None and principal.owner_id != record.owner_id:
+            raise ValueError(f"job {record.id} names another owner than its principal")
         if record.id in self._records or record.id in self._usage:
             return Admission(outcome="duplicate", active=0)
         if principal is None:
             if not self._principals.holds(record.owner_id):
                 raise ValueError(f"owner {record.owner_id} holds no principal")
-        elif principal.owner_id != record.owner_id:
-            raise ValueError(f"job {record.id} names another owner than its principal")
         elif self._principals.find(principal.identity) is not None:
             return Admission(outcome="principal_exists", active=0)
         parent = parent_of(record)

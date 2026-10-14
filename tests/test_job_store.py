@@ -1554,4 +1554,13 @@ class TestPrincipals:
                     principal=principal,
                 )
             )
+
+    def test_another_owner_is_a_defect_before_a_duplicate(self, store):
+        record = new_record()
+        reserve(store, record)
+        principal = Principal.new(self.identity())
+        with pytest.raises(ValueError, match="another owner"):
+            asyncio.run(
+                store.reserve(record, ceiling=100, budget=POLICY, principal=principal)
+            )
         assert asyncio.run(store.principal(self.identity())) is None
