@@ -108,32 +108,20 @@ def _tls_client(parts: _Parts) -> Iterator[DataFlow]:
     return (flow for flow in _tls(parts) if flow.source in parts.process_ids)
 
 
-def _internal(parts: _Parts, names: tuple[str, ...]) -> Iterator[DataFlow]:
-    """Stated flows of a family between two of the application's own parts."""
+def _internal(parts: _Parts, states: Callable[[DataFlow], bool]) -> Iterator[DataFlow]:
+    """Stated flows between two of the application's own parts, where ``states``
+    holds of the flow's protocol."""
     for flow in parts.stated:
-        if parts.ends(flow) <= parts.own and states_protocol(flow, names):
-            yield flow
-
-
-def _internal_tls(parts: _Parts) -> Iterator[DataFlow]:
-    for flow in parts.stated:
-        if parts.ends(flow) <= parts.own and states_inherently(flow, TLS_FAMILY):
+        if parts.ends(flow) <= parts.own and states(flow):
             yield flow
 
 
 def _internal_service(parts: _Parts) -> Iterator[DataFlow]:
     """A process and a data store that talk over a TLS-family or HTTP-family protocol."""
-    for flow in _internal(parts, (*TLS_FAMILY, *HTTP_FAMILY)):
+    network = (*TLS_FAMILY, *HTTP_FAMILY)
+    for flow in _internal(parts, lambda flow: states_protocol(flow, network)):
         ends = parts.ends(flow)
         if ends & parts.process_ids and ends & parts.store_ids:
-            yield flow
-
-
-def _sensitive_http(parts: _Parts) -> Iterator[DataFlow]:
-    for flow in parts.stated:
-        own_end = parts.ends(flow) & parts.own
-        sensitive = set(flow.assets) & SENSITIVE_TAGS
-        if own_end and sensitive and states_protocol(flow, HTTP_FAMILY):
             yield flow
 
 
@@ -158,6 +146,10 @@ def _named(
 
 def _own_end(parts: _Parts, flow: DataFlow) -> bool:
     return bool(parts.ends(flow) & parts.own)
+
+
+def _sensitive_own_end(parts: _Parts, flow: DataFlow) -> bool:
+    return _own_end(parts, flow) and bool(set(flow.assets) & SENSITIVE_TAGS)
 
 
 def _process_end(parts: _Parts, flow: DataFlow) -> bool:
@@ -228,12 +220,14 @@ FIELD_CAPABILITIES: tuple[FieldCapability, ...] = (
     ),
     FieldCapability(
         "internal-tls-connections",
-        _internal_tls,
+        lambda parts: _internal(
+            parts, lambda flow: states_inherently(flow, TLS_FAMILY)
+        ),
         "two parts of the application talk over a TLS-family protocol",
     ),
     FieldCapability(
         "internal-http-connections",
-        lambda parts: _internal(parts, HTTP_FAMILY),
+        lambda parts: _internal(parts, lambda flow: states_protocol(flow, HTTP_FAMILY)),
         "two parts of the application talk over an HTTP-family protocol",
     ),
     FieldCapability(
@@ -243,7 +237,7 @@ FIELD_CAPABILITIES: tuple[FieldCapability, ...] = (
     ),
     FieldCapability(
         "sensitive-http-requests",
-        _sensitive_http,
+        _named(HTTP_FAMILY, _sensitive_own_end),
         "an HTTP-family flow of the application carries data tagged as sensitive",
     ),
     FieldCapability(
