@@ -44,7 +44,7 @@ from analysis_service.analysis import control_state
 from analysis_service.answer_round import (
     Answers,
     AnswerState,
-    SavedRound,
+    SavedAnswers,
     passes_floor,
 )
 from analysis_service.answer_sets import AnswerSet
@@ -221,7 +221,7 @@ def paused_state(
 
 def _saved(
     state: AnswerState, facts: list[FactAnswer], skips: Sequence[SkipKey] = ()
-) -> SavedRound:
+) -> SavedAnswers:
     """One save, which presents every listed question. The replay holds no
     sources, so no source limit applies."""
     saved = state.answer(
@@ -234,7 +234,7 @@ def _saved(
         ),
         limits=None,
     )
-    if not isinstance(saved, SavedRound):
+    if not isinstance(saved, SavedAnswers):
         raise TypeError("a save starts no job")
     return saved
 
@@ -300,10 +300,9 @@ def replay(
         }
         given = [reply for reply in replies.values() if reply is not None]
         # "Skip the rest" sets aside a blank question, and one with facets
-        # the submitter answered only in part, among the questions the page shows:
-        # a part hidden under its parent's answer is not skipped.
+        # the submitter answered only in part, among the questions the page shows.
         complete = answered_keys(merged_facts(answered, given))
-        shows = set(asked.presented(merged_facts(answered, given)))
+        shows = {question.key for question in asked.early}
         skips = [
             key
             for key, reply in replies.items()

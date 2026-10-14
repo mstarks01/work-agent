@@ -12,10 +12,12 @@ from __future__ import annotations
 import asyncio
 import logging
 import os
+import sqlite3
 import stat
 from pathlib import Path
 
 import pytest
+from alembic import command
 from alembic.autogenerate import compare_metadata
 from alembic.migration import MigrationContext
 from fastapi.testclient import TestClient
@@ -32,6 +34,7 @@ from analysis_service.jobs import (
     JobStore,
     Resumption,
 )
+from analysis_service.migrations import alembic_config
 from analysis_service.report import NodeRun
 from analysis_service.sources import Source
 from analysis_service.sql_store import METADATA, CorruptObject
@@ -46,7 +49,7 @@ from tests.factories import (
     sample_selection,
     valid_model,
 )
-from tests.sql_stores import migrate, sql_env, sqlite_url
+from tests.sql_stores import in_a_thread, migrate, sql_env, sqlite_url
 from tests.test_api import (
     TEST_DEADLINE_SECONDS,
     TEST_LIMITS,
@@ -339,7 +342,7 @@ def every_field(owner_id: str = "alice") -> JobRecord:
     record.record_node("extract")
     record.corrections = [FactAnswer(key=KEY, value="TLS 1.2")]
     record.draft = AnswerSet(facts=(FactAnswer(key=KEY, value="none"),))
-    record.round_revision = 2
+    record.revision = 2
     record.checkpoint = held
     record.validation_issues = [
         ValidationIssue(code="no-trust-zones", message="the model declares none")
@@ -476,6 +479,30 @@ class TestTheObjectRoot:
             for part in (path.parent.parent, path.parent, path)
         ]
         assert modes == [0o700, 0o700, 0o600]
+
+
+def test_revision_0002_keeps_each_job_s_revision_in_both_directions(env):
+    """r0002 renames round_revision to revision, and moves each value."""
+    record = JobRecord.create(
+        owner_id="alice",
+        sources=[Source.description("a web app storing orders")],
+        frameworks=sample_selection(),
+    )
+    asyncio.run(admit(build_store(env), record))
+    path = env["ANALYSIS_DATABASE_URL"].partition(":///")[2]
+    config = alembic_config(env)
+
+    def value(column: str) -> int:
+        with sqlite3.connect(path) as connection:
+            query = f"SELECT {column} FROM jobs WHERE id = ?"
+            return connection.execute(query, (record.id,)).fetchone()[0]
+
+    with sqlite3.connect(path) as connection:
+        connection.execute("UPDATE jobs SET revision = 3 WHERE id = ?", (record.id,))
+    in_a_thread(command.downgrade, config, "0001")
+    assert value("round_revision") == 3
+    in_a_thread(command.upgrade, config, "head")
+    assert value("revision") == 3
 
 
 def test_the_migration_creates_the_tables_the_store_reads(tmp_path):

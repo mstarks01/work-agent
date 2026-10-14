@@ -285,12 +285,12 @@ class JobRecord(BaseModel):
     # A finished report's draft answers: what its follow-up saved in batches
     # and has not run. The run composes them with what it is sent (ADR 0070).
     draft: HeldAnswerSet = NO_ANSWERS
-    # How many rounds a waiting job, or drafts a finished report, has saved. A
+    # How many saves a waiting job, or drafts a finished report, has made. A
     # save or a continue names the revision it read, so a page left open on an
-    # earlier round cannot write over a later one.
-    round_revision: int = 0
+    # earlier revision cannot write over a later one.
+    revision: int = 0
     # Every early question and link question a waiting job's submitter
-    # skipped for now and has not answered since. No round shows it again.
+    # skipped for now and has not answered since. The list does not show it again.
     skipped_early: list[SkipKey] = Field(
         default_factory=list, max_length=MAX_HELD_FACTS + MAX_HELD_LINKS
     )
@@ -301,7 +301,7 @@ class JobRecord(BaseModel):
     # description it extracts again with the amendment added. It locks that
     # job as a resumed job does.
     amends: str | None = None
-    # The parent job's round revision this job's answers were composed from.
+    # The parent job's revision this job's answers were composed from.
     # Admission refuses the job where a save moved it since, so a batch saved
     # in another tab never misses the run in silence (ADR 0070).
     parent_revision: int | None = None
@@ -621,7 +621,7 @@ class JobStore(Protocol):
 
     async def save(self, record: JobRecord) -> None: ...
 
-    async def save_round(
+    async def save_answers(
         self,
         job_id: str,
         owner_id: str,
@@ -831,7 +831,7 @@ class InMemoryJobStore:
         parent_record = None if parent is None else self._records.get(parent)
         if (
             parent_record is not None
-            and parent_record.round_revision != record.parent_revision
+            and parent_record.revision != record.parent_revision
         ):
             return Admission(outcome="parent_moved", active=0)
 
@@ -850,7 +850,7 @@ class InMemoryJobStore:
         0054), and a paused job's answers start one analysis. A job an
         amendment started locks its paused job the same way (ADR 0072). A
         child job that failed or was rejected read nothing into a report, so
-        its parent takes answers again. Admission, a saved round and the questions route
+        its parent takes answers again. Admission, a save and the questions route
         all ask this.
         """
         return next(
@@ -986,7 +986,7 @@ class InMemoryJobStore:
             raise ValueError(f"job {record.id!r} does not exist")
         self._records[record.id] = record.model_copy(deep=True)
 
-    async def save_round(
+    async def save_answers(
         self,
         job_id: str,
         owner_id: str,
@@ -995,10 +995,10 @@ class InMemoryJobStore:
         skipped: Sequence[SkipKey],
         revision: int,
     ) -> bool:
-        """Keep a saved round's answers on a job that still waits for them.
+        """Keep the saved answers of a job that still waits for them.
 
         ``shown`` is every early question the pause has shown, and ``skipped``
-        every one its submitter skipped for now. ``revision`` is the round
+        every one its submitter skipped for now. ``revision`` is the
         revision the save read: the check and the next revision are one step,
         so of two saves that read one revision only the first lands. Only these
         change, so the checkpoint an envelope read leaves
@@ -1011,11 +1011,11 @@ class InMemoryJobStore:
             record is None
             or record.owner_id != owner_id
             or record.status != "awaiting-answers"
-            or record.round_revision != revision
+            or record.revision != revision
             or self._resumed_by(job_id) is not None
         ):
             return False
-        record.round_revision += 1
+        record.revision += 1
         record.answers = answers
         record.shown_early = list(shown)
         record.skipped_early = list(skipped)
@@ -1033,7 +1033,7 @@ class InMemoryJobStore:
 
         ``draft`` is every draft answer so far. ``revision`` is
         the revision the save read: the check and the next revision are one
-        step, as for :meth:`save_round`. False where the job is not the
+        step, as for :meth:`save_answers`. False where the job is not the
         owner's, has no report, has a final report, or its answers already
         started a resumed job, and nothing is written.
         """
@@ -1043,11 +1043,11 @@ class InMemoryJobStore:
             or record.owner_id != owner_id
             or record.status != "completed"
             or record.final()
-            or record.round_revision != revision
+            or record.revision != revision
             or self._resumed_by(job_id) is not None
         ):
             return False
-        record.round_revision += 1
+        record.revision += 1
         record.draft = draft
         record.updated_at = datetime.now(UTC)
         return True

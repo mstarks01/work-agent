@@ -2,10 +2,10 @@
 
 Every surface that takes a submission to a job reads the job through here,
 builds its **Answer State** from the record, admits the submission, and
-either stores a round, a draft or a correction, or creates the **Resumed
+either stores the answers, a draft or a correction, or creates the **Resumed
 Job** and starts it. The Answer State itself writes nothing
 (:mod:`analysis_service.answer_round`); this module is what writes, so no
-caller stores a round or starts a job by hand.
+caller stores answers or starts a job by hand.
 
 A refusal here is typed and never a status code. A driver maps each one to
 its own transport: the ``/v1`` routes to a problem response, the first-run
@@ -35,8 +35,8 @@ from analysis_service.answer_round import (
     AlreadyResumed,
     Answers,
     AnswerState,
+    SavedAnswers,
     SavedDraft,
-    SavedRound,
 )
 from analysis_service.answer_sets import NO_ANSWERS, AnswerSet, within_held_limits
 from analysis_service.assertions import AssertionRecord
@@ -76,6 +76,7 @@ logger = logging.getLogger(__name__)
 
 __all__ = [
     "Answerable",
+    "AnswersSaved",
     "Corrected",
     "DraftSaved",
     "JobAnswers",
@@ -85,7 +86,6 @@ __all__ = [
     "NotAdmitted",
     "NotCompleted",
     "Refused",
-    "RoundSaved",
     "RunnerFor",
     "RunnerUnavailable",
     "SaveConflict",
@@ -258,7 +258,7 @@ class Answerable:
             shown=record.shown_early,
             skipped=record.skipped_early,
             corrections=record.corrections,
-            revision=record.round_revision,
+            revision=record.revision,
             resumed_by=self.resumed_by,
             draft=record.draft,
             carried_in=record.carried,
@@ -273,7 +273,7 @@ class Answerable:
             | state.carried.dropped_json(self.model)
             | {
                 "fallback": question_fallback(self.analyses).to_json(),
-                "revision": record.round_revision,
+                "revision": record.revision,
                 "draft_links": [
                     link.model_dump(mode="json") for link in record.draft.links
                 ],
@@ -303,8 +303,8 @@ class DraftSaved:
 
 
 @dataclass(frozen=True)
-class RoundSaved:
-    """A waiting job's round the job keeps. No model ran."""
+class AnswersSaved:
+    """A waiting job's answers the job keeps. No model ran."""
 
     job_id: str
 
@@ -465,10 +465,10 @@ class JobAnswers:
 
     async def answer(
         self, job_id: str, owner_id: str, answers: Answers, *, start: Start
-    ) -> DraftSaved | RoundSaved | Started:
-        """Keep a round or a draft, or start the Resumed Job the answers start.
+    ) -> DraftSaved | AnswersSaved | Started:
+        """Keep the answers or a draft, or start the Resumed Job the answers start.
 
-        A save keeps a waiting job's round or a finished report's draft, and
+        A save keeps a waiting job's answers or a finished report's draft, and
         starts nothing. A send without ``save`` starts the Resumed Job, which
         is admitted as a new job against the ceiling and the budget, because
         its lanes and critics spend model calls.
@@ -491,8 +491,8 @@ class JobAnswers:
                 )
             # A draft runs nothing and spends no follow-up (ADR 0070).
             return DraftSaved(job_id=parent.id, revision=outcome.revision + 1)
-        if isinstance(outcome, SavedRound):
-            if not await self.store.save_round(
+        if isinstance(outcome, SavedAnswers):
+            if not await self.store.save_answers(
                 parent.id,
                 owner_id,
                 outcome.answers,
@@ -504,8 +504,8 @@ class JobAnswers:
                     "the job no longer waits on answers, or another save landed"
                     " first; read the questions again"
                 )
-            # A saved round never starts the analysis: a continue does.
-            return RoundSaved(job_id=parent.id)
+            # A save never starts the analysis: a continue does.
+            return AnswersSaved(job_id=parent.id)
         record = JobRecord.create(
             owner_id=owner_id,
             sources=outcome.sources,
@@ -520,7 +520,7 @@ class JobAnswers:
                 certification=parent.certification,
                 follow_up=outcome.follow_up,
             ),
-            parent_revision=parent.round_revision,
+            parent_revision=parent.revision,
             reserved_tokens=budgets.estimate(outcome.sources, parent.frameworks),
         )
         return await self.admit(record, start=start)
@@ -555,7 +555,7 @@ class JobAnswers:
             system_name=parent.system_name,
             ask_questions=True,
             amends=parent.id,
-            parent_revision=parent.round_revision,
+            parent_revision=parent.revision,
             carried=amended.answers,
             reserved_tokens=budgets.estimate(amended.sources, parent.frameworks),
         )

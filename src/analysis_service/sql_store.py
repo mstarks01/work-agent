@@ -193,7 +193,7 @@ jobs = Table(
     Column("updated_at", _UtcTime, nullable=False),
     Column("reserved_tokens", BigInteger, nullable=False),
     Column("measured_tokens", BigInteger),
-    Column("round_revision", Integer, nullable=False),
+    Column("revision", Integer, nullable=False),
     Column("parent_revision", Integer),
     Column("system_name", Text),
     Column("amends", String(64)),
@@ -923,7 +923,7 @@ class SqlJobStore:
                 if await self._resumed_by(connection, parent) is not None:
                     return Admission(outcome="resumed_already", active=0)
                 revision = await connection.scalar(
-                    select(jobs.c.round_revision).where(jobs.c.id == parent)
+                    select(jobs.c.revision).where(jobs.c.id == parent)
                 )
                 if revision is not None and revision != record.parent_revision:
                     return Admission(outcome="parent_moved", active=0)
@@ -1118,7 +1118,7 @@ class SqlJobStore:
                     insert(job_events), _event_rows(record.id, gained)
                 )
 
-    async def save_round(
+    async def save_answers(
         self,
         job_id: str,
         owner_id: str,
@@ -1127,8 +1127,8 @@ class SqlJobStore:
         skipped: Sequence[SkipKey],
         revision: int,
     ) -> bool:
-        """Keep a saved round's answers, as one conditional ``UPDATE`` on the
-        round revision, under the lock on the job's row."""
+        """Keep a waiting job's saved answers, as one conditional ``UPDATE`` on
+        the revision, under the lock on the job's row."""
         values = {
             "answers": _json("answers", answers),
             "shown_early": _json("shown_early", list(shown)),
@@ -1144,12 +1144,12 @@ class SqlJobStore:
                     jobs.c.id == job_id,
                     jobs.c.owner_id == owner_id,
                     jobs.c.status == "awaiting-answers",
-                    jobs.c.round_revision == revision,
+                    jobs.c.revision == revision,
                 )
                 .values(
                     {
                         **values,
-                        "round_revision": jobs.c.round_revision + 1,
+                        "revision": jobs.c.revision + 1,
                         "updated_at": datetime.now(UTC),
                     }
                 )
@@ -1184,7 +1184,7 @@ class SqlJobStore:
         revision: int,
     ) -> bool:
         """Keep a finished report's draft answers, as one conditional
-        ``UPDATE`` on the round revision (ADR 0070)."""
+        ``UPDATE`` on the revision (ADR 0070)."""
         value = _json("draft", draft)
         async with self._transaction(writes=True) as connection:
             state = await self._report_state(connection, job_id, owner_id)
@@ -1194,10 +1194,10 @@ class SqlJobStore:
                 return False
             saved = await connection.execute(
                 update(jobs)
-                .where(jobs.c.id == job_id, jobs.c.round_revision == revision)
+                .where(jobs.c.id == job_id, jobs.c.revision == revision)
                 .values(
                     draft=value,
-                    round_revision=jobs.c.round_revision + 1,
+                    revision=jobs.c.revision + 1,
                     updated_at=datetime.now(UTC),
                 )
             )

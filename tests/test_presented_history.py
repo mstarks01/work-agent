@@ -1,4 +1,4 @@
-"""A hidden part is not presented, and a skip is the submitter's own act (#1542 F4).
+"""A skip is the submitter's own act, of a question the page presented (#1542 F4).
 
 At 2fae7d3 the page kept a part hidden under its parent in the round's rows,
 so "Skip the rest" sent its key as a skip, and the service admitted it. With
@@ -118,19 +118,6 @@ class TestThePageSkipsOnlyWhatItShows:
 
 
 class TestTheServiceDecidesWhatWasPresented:
-    @pytest.mark.parametrize("parent", [None, "unknown", "no"])
-    def test_a_hidden_part_reported_as_shown_is_refused(self, parent):
-        """A page cannot record a part as shown while its parent hides it."""
-        parent_q, child = _chain("oauth", "oauth-client")
-        facts = [] if parent is None else [FactAnswer(key=parent_q.key, value=parent)]
-        with pytest.raises(ValueError, match="hidden until its parent"):
-            _save(
-                _round("oauth", "oauth-client"),
-                facts=facts,
-                skips=[child.key],
-                presented=[parent_q.key, child.key],
-            )
-
     def test_a_skip_of_a_question_the_page_did_not_show_is_refused(self):
         parent_q, child = _chain("oauth", "oauth-client")
         yes = [FactAnswer(key=parent_q.key, value="yes")]
@@ -141,33 +128,6 @@ class TestTheServiceDecidesWhatWasPresented:
                 skips=[child.key],
                 presented=[parent_q.key],
             )
-
-    def test_a_hidden_part_is_not_recorded_as_shown(self):
-        parent, child = _chain("oauth", "oauth-client")
-        saved = _save(
-            _round("oauth", "oauth-client"),
-            facts=[FactAnswer(key=parent.key, value="unknown")],
-        )
-        assert parent.key in saved.shown and child.key not in saved.shown
-
-    def test_a_part_of_a_hidden_part_stays_hidden(self):
-        """With the parent "yes" and its part left blank, the part of that part
-        was never shown: it is not skipped, and the part is."""
-        top, middle, bottom = _chain(
-            "oauth", "oauth-authorization-server", "server-code-flow"
-        )
-        asked = _round("oauth", "oauth-authorization-server", "server-code-flow")
-        yes = [FactAnswer(key=top.key, value="yes")]
-        assert asked.presented(yes) == (top.key, middle.key)
-        with pytest.raises(ValueError, match="hidden until its parent"):
-            _save(
-                asked,
-                facts=yes,
-                skips=[bottom.key],
-                presented=[top.key, middle.key, bottom.key],
-            )
-        saved = _save(asked, facts=yes, skips=[middle.key])
-        assert saved.skipped == (middle.key,)
 
     def test_a_part_the_owner_never_saw_is_asked_once_its_parent_is_yes(self):
         """The issue's F4b: the parent first "I don't know", then "yes". The
@@ -189,7 +149,7 @@ class TestTheServiceDecidesWhatWasPresented:
                 return
             assert not after.done, "the list ended without asking the part"
             # A later list: skip what it shows, which spends no limit.
-            saved = _save(after, held, skips=after.presented(held))
+            saved = _save(after, held, skips=[q.key for q in after.early])
             held, skipped, shown = saved.answers.facts, saved.skipped, saved.shown
         pytest.fail("the part never came to the list")
 

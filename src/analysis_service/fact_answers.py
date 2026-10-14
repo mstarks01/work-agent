@@ -424,8 +424,7 @@ def fact_status(
     by key, ``shown`` every early question a page presented, and ``skipped``
     every question the submitter skipped and did not answer since. A skip is
     the submitter's act and is told apart from a question left blank, and a
-    part hidden under its parent's answer was never presented, so it reads
-    ``open``. ``facets`` are the parts a finding needs (:func:`needs_of`): an
+    question the page never presented reads ``open``. ``facets`` are the parts a finding needs (:func:`needs_of`): an
     answer that covers them is ``answered`` for that finding, though other
     parts stay open.
     """

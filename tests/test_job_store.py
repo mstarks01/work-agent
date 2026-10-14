@@ -756,7 +756,7 @@ class TestTheParentLock:
 
     def test_a_child_read_off_an_older_revision_is_refused(self, store):
         parent = waiting(store)
-        assert asyncio.run(store.save_round(parent, "alice", NO_ANSWERS, [], [], 0))
+        assert asyncio.run(store.save_answers(parent, "alice", NO_ANSWERS, [], [], 0))
         moved = reserve(store, amendment(parent, revision=0))
         assert moved == Admission(outcome="parent_moved", active=0)
         asyncio.run(admit(store, amendment(parent, revision=1)))
@@ -767,7 +767,7 @@ class TestTheParentLock:
 
         async def race():
             return await asyncio.gather(
-                store.save_round(parent, "alice", NO_ANSWERS, [], [], 0),
+                store.save_answers(parent, "alice", NO_ANSWERS, [], [], 0),
                 reserving(store, amendment(parent, revision=0)),
             )
 
@@ -782,7 +782,7 @@ class TestTheSaves:
 
         def save(revision):
             return asyncio.run(
-                store.save_round(job, record.owner_id, NO_ANSWERS, [], [], revision)
+                store.save_answers(job, record.owner_id, NO_ANSWERS, [], [], revision)
             )
 
         assert save(0)
@@ -792,21 +792,23 @@ class TestTheSaves:
     def test_a_saved_round_keeps_its_answers_and_its_checkpoint(self, store):
         job = waiting(store)
         given = AnswerSet(facts=(FactAnswer(key=KEY, value="unknown"),))
-        assert asyncio.run(store.save_round(job, "alice", given, [KEY], [], 0))
+        assert asyncio.run(store.save_answers(job, "alice", given, [KEY], [], 0))
         saved = asyncio.run(store.get(job))
-        assert saved.round_revision == 1
+        assert saved.revision == 1
         assert saved.answers == given
         assert saved.shown_early == [KEY]
         assert saved.checkpoint is not None
 
     def test_a_round_is_refused_on_a_foreign_finished_or_locked_job(self, store):
         job = waiting(store)
-        assert not asyncio.run(store.save_round(job, "mallory", NO_ANSWERS, [], [], 0))
+        assert not asyncio.run(
+            store.save_answers(job, "mallory", NO_ANSWERS, [], [], 0)
+        )
         done = completed(store)
-        assert not asyncio.run(store.save_round(done, "alice", NO_ANSWERS, [], [], 0))
+        assert not asyncio.run(store.save_answers(done, "alice", NO_ANSWERS, [], [], 0))
         asyncio.run(admit(store, amendment(job)))
-        assert not asyncio.run(store.save_round(job, "alice", NO_ANSWERS, [], [], 0))
-        assert asyncio.run(store.get(job)).round_revision == 0
+        assert not asyncio.run(store.save_answers(job, "alice", NO_ANSWERS, [], [], 0))
+        assert asyncio.run(store.get(job)).revision == 0
 
     def test_a_draft_lands_once_for_each_revision(self, store):
         job = completed(store)
@@ -814,7 +816,7 @@ class TestTheSaves:
         assert asyncio.run(store.save_draft(job, "alice", draft, 0))
         assert not asyncio.run(store.save_draft(job, "alice", NO_ANSWERS, 0))
         saved = asyncio.run(store.get(job))
-        assert saved.round_revision == 1
+        assert saved.revision == 1
         assert saved.draft == draft
 
     def test_a_draft_is_refused_on_a_foreign_final_or_locked_report(self, store):
@@ -1431,7 +1433,7 @@ class TestTheSchemaVersion:
         record = asyncio.run(store.get(job))
         record.schema_version = version
         asyncio.run(store.save(record))
-        assert asyncio.run(store.save_round(job, "alice", NO_ANSWERS, (), (), 0))
+        assert asyncio.run(store.save_answers(job, "alice", NO_ANSWERS, (), (), 0))
         reads = [
             asyncio.run(store.get(job)),
             asyncio.run(store.owned(job, "alice")),

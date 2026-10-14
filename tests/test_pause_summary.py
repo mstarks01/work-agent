@@ -13,7 +13,7 @@ import pytest
 
 from analysis_service.answer_round import EARLY_RULES, question_set
 from analysis_service.answer_sets import AnswerSet
-from analysis_service.fact_answers import FactAnswer, merged_facts
+from analysis_service.fact_answers import FactAnswer
 from analysis_service.system_model import SystemModel
 from tests.factories import PROJECT_ROOT, valid_model
 
@@ -33,10 +33,10 @@ def _paused(model, selection, answers=(), shown=(), skipped=()):
 
 
 def _save(asked, earlier=(), facts=(), skips=(), presented=None):
-    """One save. The page presents every listed row the rule allows, unless
-    the test says what it presented."""
+    """One save. The page presents every listed row, unless the test says
+    what it presented."""
     if presented is None:
-        presented = asked.presented(merged_facts(list(earlier), list(facts)))
+        presented = [question.key for question in asked.early]
     return asked.admit(
         sources=(),
         earlier=AnswerSet(facts=tuple(earlier)),
@@ -186,7 +186,7 @@ def test_a_pause_whose_questions_left_were_all_skipped_says_so():
         asked = _paused(model, selection, (), shown, skipped)
         if asked.done:
             break
-        admitted = _save(asked, [], skips=list(asked.presented([])))
+        admitted = _save(asked, [], skips=[question.key for question in asked.early])
         shown, skipped = admitted.shown, list(admitted.skipped)
     else:
         pytest.fail("the rounds never ended")
