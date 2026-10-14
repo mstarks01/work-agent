@@ -19,7 +19,7 @@ from analysis_service.capabilities import CAPABILITIES
 from analysis_service.grounding import verify_quote
 from analysis_service.model_gate import completion
 from analysis_service.sources import fenced
-from analysis_service.vendors import VENDORS, CredentialMode
+from analysis_service.vendors import CredentialMode, vendor_for_route
 
 PROMPT = """You read a description of a software system. List each capability from the table below that the description says the application has or does.
 
@@ -84,9 +84,8 @@ def read_once(case: str, model: str, key: str) -> dict:
 
 
 def main(out: str, runs: int, model: str, cases: list[str]) -> None:
-    key = VENDORS["openai"].credential_kwargs(os.environ, CredentialMode.API_KEY)[
-        "api_key"
-    ]
+    vendor = vendor_for_route(model)
+    key = vendor.credential_kwargs(os.environ, CredentialMode.API_KEY)["api_key"]
     results = []
     for run in range(1, runs + 1):
         for case in cases:
