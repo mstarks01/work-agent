@@ -9,7 +9,7 @@ import pytest
 from analysis_service.answer_round import question_set
 from analysis_service.answer_sets import AnswerSet
 from analysis_service.report import Report
-from evals.harness import early_policies
+from evals.harness import audit, early_policies
 from evals.harness.early_policies import POLICIES, _spend, needs_of, readings
 from tests.factories import valid_model
 
@@ -146,10 +146,13 @@ def test_a_finding_completes_only_when_every_fact_it_waits_on_is_answered():
     assert by_budget == sorted(by_budget)
 
 
-def test_paired_never_opens_a_holdout_case(tmp_path):
+def test_paired_never_opens_a_holdout_case(tmp_path, monkeypatch):
     """Both instruments pair reports through ``paired``. A holdout case's
     file is skipped unopened, so one that is not JSON raises nothing, and a
     case with one framework's reports pairs with nothing."""
+    # An empty ledger exhausts no case, so every flagged case is held out.
+    (tmp_path / "ledger").mkdir()
+    monkeypatch.setattr(audit, "EXPERIMENTS_DIR", tmp_path / "ledger")
     (tmp_path / BASELINE.name).write_text(
         BASELINE.read_text(encoding="utf-8"), encoding="utf-8"
     )

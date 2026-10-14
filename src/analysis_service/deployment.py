@@ -152,8 +152,9 @@ COMPACT_EXTRACTION_VAR = "ANALYSIS_COMPACT_EXTRACTION"
 ASSERTIONS_VAR = "ANALYSIS_ASSERTIONS"
 #: Run the capability reader on every job whose selection reads capabilities:
 #: the ``capabilities`` node behind the validity gate, whose checked rows state
-#: the capabilities the sources say the application has (ADR 0086). Off by
-#: default until its promotion gate passes; an affirmative value turns it on.
+#: the capabilities the sources say the application has (ADR 0086). On by
+#: default (ADR 0087); a non-empty value other than an affirmative turns it
+#: off, and an unset or empty variable keeps the default.
 CAPABILITY_READER_VAR = "ANALYSIS_CAPABILITY_READER"
 
 
@@ -241,7 +242,7 @@ class Deployment:
     #: Whether a job whose selection reads capabilities runs the capability
     #: reader. A property of the deployment for the reason the assertion pass
     #: is.
-    capability_reader: bool = False
+    capability_reader: bool = True
     # Held only to derive each vendor's credentials when the adapters are built.
     # Out of repr and equality: a deployment in a log must not carry a key. A
     # copy taken by :meth:`from_env`, never the caller's live mapping: a
@@ -299,7 +300,7 @@ class Deployment:
                 COMPACT_FORMAT if env_flag(env, COMPACT_EXTRACTION_VAR) else FULL_FORMAT
             ),
             assertions=env_flag(env, ASSERTIONS_VAR, default=True),
-            capability_reader=env_flag(env, CAPABILITY_READER_VAR),
+            capability_reader=env_flag(env, CAPABILITY_READER_VAR, default=True),
             env=MappingProxyType(dict(env)),
         )
 

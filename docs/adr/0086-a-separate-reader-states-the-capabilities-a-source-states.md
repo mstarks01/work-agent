@@ -6,6 +6,8 @@
   where only an answer states a capability, and
   [ADR 0085](0085-a-closed-field-of-the-model-proves-a-capability-present.md),
   where code also states one from a closed field
+- **Amended by**: [ADR 0087](0087-the-capability-reader-runs-by-default.md),
+  which turns the reader on by default after the gate passed
 - **Relates to**: [ADR 0084](0084-one-choice-answers-no-to-every-capability-question-left.md),
   after which a capability question costs a choice mostly where its answer
   is "yes"
