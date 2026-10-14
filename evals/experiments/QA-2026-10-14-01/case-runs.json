@@ -1,0 +1,1016 @@
+{
+ "model": "openai/gpt-5.6-luna",
+ "results": [
+  {
+   "run": 1,
+   "case": "01-payments-checkout",
+   "kept": [
+    {
+     "capability": "browser-accessible-http",
+     "quote": "Shoppers browse the storefront and place orders through the storefront API, a Node service running on Cloud Run."
+    },
+    {
+     "capability": "javascript-code",
+     "quote": "Shoppers browse the storefront and place orders through the storefront API, a Node service running on Cloud Run."
+    },
+    {
+     "capability": "external-facing-http-services",
+     "quote": "It is the only thing we expose to the internet."
+    },
+    {
+     "capability": "cookies",
+     "quote": "Shoppers sign in with email and password and get a session cookie;"
+    },
+    {
+     "capability": "sessions",
+     "quote": "Shoppers sign in with email and password and get a session cookie;"
+    },
+    {
+     "capability": "authentication",
+     "quote": "Shoppers sign in with email and password and get a session cookie;"
+    },
+    {
+     "capability": "password-authentication",
+     "quote": "Shoppers sign in with email and password and get a session cookie;"
+    },
+    {
+     "capability": "sensitive-http-requests",
+     "quote": "Shoppers sign in with email and password and get a session cookie;"
+    },
+    {
+     "capability": "sensitive-data",
+     "quote": "Orders, shopper addresses and card-last-four live in a PostgreSQL database (orders-db)"
+    },
+    {
+     "capability": "restricted-access",
+     "quote": "Shoppers sign in with email and password and get a session cookie;"
+    },
+    {
+     "capability": "database",
+     "quote": "Orders, shopper addresses and card-last-four live in a PostgreSQL database (orders-db) that the order service reads and writes with a single application account that has full read/write."
+    },
+    {
+     "capability": "internal-services",
+     "quote": "When a shopper submits an order the storefront API calls the order service over gRPC."
+    },
+    {
+     "capability": "backend-service-connections",
+     "quote": "When a shopper submits an order the storefront API calls the order service over gRPC."
+    },
+    {
+     "capability": "separate-service-connections",
+     "quote": "When a shopper submits an order the storefront API calls the order service over gRPC."
+    },
+    {
+     "capability": "multi-system-request",
+     "quote": "When a shopper submits an order the storefront API calls the order service over gRPC."
+    },
+    {
+     "capability": "service-accounts",
+     "quote": "That is on TLS with the order service's own service account"
+    },
+    {
+     "capability": "backend-service-credentials",
+     "quote": "That is on TLS with the order service's own service account"
+    },
+    {
+     "capability": "backend-secrets",
+     "quote": "The password comes from an environment variable on the worker."
+    },
+    {
+     "capability": "secret-assets",
+     "quote": "The password comes from an environment variable on the worker."
+    },
+    {
+     "capability": "external-resource-use",
+     "quote": "Every completed order also gets a receipt written to a Cloud Storage bucket we call the receipt archive."
+    },
+    {
+     "capability": "encryption",
+     "quote": "the bucket is encrypted with a customer-managed key."
+    },
+    {
+     "capability": "cryptographic-keys",
+     "quote": "the bucket is encrypted with a customer-managed key."
+    },
+    {
+     "capability": "cryptographic-operations",
+     "quote": "the bucket is encrypted with a customer-managed key."
+    },
+    {
+     "capability": "tls-use",
+     "quote": "That is on TLS with the order service's own service account"
+    },
+    {
+     "capability": "http-response-bodies",
+     "quote": "After they settle a payment they POST a webhook back to the storefront API to tell us the order is paid."
+    }
+   ],
+   "refused": [],
+   "usage": {
+    "prompt_tokens": 4349,
+    "completion_tokens": 2201
+   }
+  },
+  {
+   "run": 1,
+   "case": "02-iot-fleet-telemetry",
+   "kept": [
+    {
+     "capability": "database",
+     "quote": "The gateway looks up the device in a device registry (Firestore) to check the key and to find out which customer the node belongs to."
+    },
+    {
+     "capability": "multi-system-request",
+     "quote": "Readings the gateway accepts are forwarded onto Pub/Sub and picked up by the telemetry normalizer, a Python consumer in our analytics network, which writes them into the telemetry lake in BigQuery."
+    },
+    {
+     "capability": "internal-services",
+     "quote": "Readings the gateway accepts are forwarded onto Pub/Sub and picked up by the telemetry normalizer, a Python consumer in our analytics network, which writes them into the telemetry lake in BigQuery."
+    },
+    {
+     "capability": "backend-service-connections",
+     "quote": "The gateway looks up the device in a device registry (Firestore) to check the key and to find out which customer the node belongs to."
+    },
+    {
+     "capability": "separate-service-connections",
+     "quote": "Readings the gateway accepts are forwarded onto Pub/Sub and picked up by the telemetry normalizer, a Python consumer in our analytics network, which writes them into the telemetry lake in BigQuery."
+    },
+    {
+     "capability": "file-download",
+     "quote": "Firmware updates work the other way round: nodes poll a Cloud Storage bucket for a new image and install what they find."
+    },
+    {
+     "capability": "authentication",
+     "quote": "Nodes authenticate to the broker with a pre-shared key."
+    },
+    {
+     "capability": "multiple-authentication-pathways",
+     "quote": "Nodes authenticate to the broker with a pre-shared key."
+    },
+    {
+     "capability": "federated-identity",
+     "quote": "Our own fleet operators look at dashboards over BigQuery from the corporate network, signed in with company SSO."
+    },
+    {
+     "capability": "restricted-access",
+     "quote": "Our own fleet operators look at dashboards over BigQuery from the corporate network, signed in with company SSO."
+    },
+    {
+     "capability": "sensitive-data",
+     "quote": "The lake has site addresses and occupancy patterns in it, so it is customer data."
+    },
+    {
+     "capability": "cryptographic-keys",
+     "quote": "Nodes authenticate to the broker with a pre-shared key."
+    },
+    {
+     "capability": "backend-secrets",
+     "quote": "Nodes authenticate to the broker with a pre-shared key."
+    },
+    {
+     "capability": "secret-assets",
+     "quote": "Nodes authenticate to the broker with a pre-shared key."
+    },
+    {
+     "capability": "external-resource-use",
+     "quote": "The gateway looks up the device in a device registry (Firestore) to check the key and to find out which customer the node belongs to."
+    }
+   ],
+   "refused": [],
+   "usage": {
+    "prompt_tokens": 4358,
+    "completion_tokens": 2059
+   }
+  },
+  {
+   "run": 1,
+   "case": "03-batch-data-pipeline",
+   "kept": [
+    {
+     "capability": "file-upload",
+     "quote": "They push files into a landing bucket over SFTP."
+    },
+    {
+     "capability": "server-side-file-processing",
+     "quote": "The transform normalizes the records and loads them into BigQuery."
+    },
+    {
+     "capability": "database",
+     "quote": "Airflow keeps its connection strings and the partner keys in its own metadata database."
+    },
+    {
+     "capability": "sensitive-data",
+     "quote": "The extracts contain claim records with member names and dates of birth."
+    },
+    {
+     "capability": "authentication",
+     "quote": "They are on the warehouse network and authenticate with SSO, but the grant is dataset-wide \u2014 we have not split member-identifying columns out."
+    },
+    {
+     "capability": "federated-identity",
+     "quote": "They are on the warehouse network and authenticate with SSO, but the grant is dataset-wide \u2014 we have not split member-identifying columns out."
+    },
+    {
+     "capability": "restricted-access",
+     "quote": "They are on the warehouse network and authenticate with SSO, but the grant is dataset-wide \u2014 we have not split member-identifying columns out."
+    },
+    {
+     "capability": "internal-services",
+     "quote": "For each file the scheduler triggers a Spark transform job in the warehouse network."
+    },
+    {
+     "capability": "backend-service-connections",
+     "quote": "For each file the scheduler triggers a Spark transform job in the warehouse network."
+    },
+    {
+     "capability": "separate-service-connections",
+     "quote": "The transform normalizes the records and loads them into BigQuery."
+    },
+    {
+     "capability": "external-resource-use",
+     "quote": "They push files into a landing bucket over SFTP."
+    },
+    {
+     "capability": "backend-secrets",
+     "quote": "Airflow keeps its connection strings and the partner keys in its own metadata database."
+    },
+    {
+     "capability": "secret-assets",
+     "quote": "Airflow keeps its connection strings and the partner keys in its own metadata database."
+    },
+    {
+     "capability": "cryptographic-keys",
+     "quote": "Each partner has a static key we issued when they onboarded; the keys have not changed since."
+    },
+    {
+     "capability": "cryptographic-operations",
+     "quote": "They push files into a landing bucket over SFTP."
+    }
+   ],
+   "refused": [],
+   "usage": {
+    "prompt_tokens": 4290,
+    "completion_tokens": 2871
+   }
+  },
+  {
+   "run": 1,
+   "case": "04-ml-inference-service",
+   "kept": [
+    {
+     "capability": "browser-accessible-http",
+     "quote": "Other teams' backends call our inference gateway, a FastAPI service on GKE that we expose on the internet because two of the calling services are in a different cloud."
+    },
+    {
+     "capability": "sensitive-http-requests",
+     "quote": "Callers pass an API key in a header."
+    },
+    {
+     "capability": "multi-system-request",
+     "quote": "The gateway forwards the request to the model server, which runs the actual model on GPU nodes in our model network."
+    },
+    {
+     "capability": "authentication",
+     "quote": "Callers pass an API key in a header."
+    },
+    {
+     "capability": "restricted-access",
+     "quote": "Keys are issued per calling team and we have never expired one."
+    },
+    {
+     "capability": "sensitive-data",
+     "quote": "The features include account age and spend bands per customer."
+    },
+    {
+     "capability": "internal-services",
+     "quote": "The gateway forwards the request to the model server, which runs the actual model on GPU nodes in our model network."
+    },
+    {
+     "capability": "backend-service-connections",
+     "quote": "Requests often need customer features, which the model server reads from a Redis feature store on the same network."
+    },
+    {
+     "capability": "service-accounts",
+     "quote": "It uses its own service account for that."
+    },
+    {
+     "capability": "backend-service-credentials",
+     "quote": "It uses its own service account for that."
+    },
+    {
+     "capability": "separate-service-connections",
+     "quote": "The model server loads model artifacts from a model registry bucket at startup."
+    },
+    {
+     "capability": "external-resource-use",
+     "quote": "The model server loads model artifacts from a model registry bucket at startup."
+    },
+    {
+     "capability": "backend-secrets",
+     "quote": "Callers pass an API key in a header."
+    },
+    {
+     "capability": "secret-assets",
+     "quote": "Keys are issued per calling team and we have never expired one."
+    },
+    {
+     "capability": "resource-demanding-functionality",
+     "quote": "The model server, which runs the actual model on GPU nodes in our model network."
+    },
+    {
+     "capability": "external-facing-http-services",
+     "quote": "Other teams' backends call our inference gateway, a FastAPI service on GKE that we expose on the internet because two of the calling services are in a different cloud."
+    }
+   ],
+   "refused": [],
+   "usage": {
+    "prompt_tokens": 4333,
+    "completion_tokens": 2516
+   }
+  },
+  {
+   "run": 1,
+   "case": "05-cookbook-queue-webapp",
+   "kept": [
+    {
+     "capability": "browser-accessible-http",
+     "quote": "A user's browser talks to the web application over HTTP/S across the public internet."
+    },
+    {
+     "capability": "database",
+     "quote": "The background worker reads and writes the database."
+    },
+    {
+     "capability": "internal-services",
+     "quote": "The queue, the worker and the database are all in the backend tier, behind the web tier."
+    },
+    {
+     "capability": "backend-service-connections",
+     "quote": "It puts jobs onto a message queue, and a background worker process picks them up and does the work."
+    },
+    {
+     "capability": "separate-service-connections",
+     "quote": "Both processes read their settings from a config store: the web application has a web application config, and the worker has a worker config."
+    },
+    {
+     "capability": "sensitive-data",
+     "quote": "Both of those config stores hold the credentials the process needs \u2014 the web application's queue credentials, and the worker's database credentials."
+    },
+    {
+     "capability": "backend-secrets",
+     "quote": "Both of those config stores hold the credentials the process needs \u2014 the web application's queue credentials, and the worker's database credentials."
+    },
+    {
+     "capability": "secret-assets",
+     "quote": "Both of those config stores hold the credentials the process needs \u2014 the web application's queue credentials, and the worker's database credentials."
+    },
+    {
+     "capability": "external-facing-http-services",
+     "quote": "A user's browser talks to the web application over HTTP/S across the public internet."
+    },
+    {
+     "capability": "tls-use",
+     "quote": "The browser-to-application traffic is the one link marked as encrypted."
+    }
+   ],
+   "refused": [],
+   "usage": {
+    "prompt_tokens": 4282,
+    "completion_tokens": 1864
+   }
+  },
+  {
+   "run": 1,
+   "case": "06-cookbook-online-game",
+   "kept": [
+    {
+     "capability": "browser-frontend",
+     "quote": "customer support staff work from the corporate network and use a moderation website to look at and act on player accounts."
+    },
+    {
+     "capability": "browser-accessible-http",
+     "quote": "customer support staff work from the corporate network and use a moderation website to look at and act on player accounts."
+    },
+    {
+     "capability": "native-client",
+     "quote": "Players run our game client on their own machines."
+    },
+    {
+     "capability": "database",
+     "quote": "The game servers read and write the stats database during and after a match, and they also write back to the player database."
+    },
+    {
+     "capability": "multi-system-request",
+     "quote": "The lobby reads the player database to set up a match, and hands the match over to the game servers."
+    },
+    {
+     "capability": "administrative-interface",
+     "quote": "customer support staff work from the corporate network and use a moderation website to look at and act on player accounts."
+    },
+    {
+     "capability": "internal-services",
+     "quote": "The lobby reads the player database to set up a match, and hands the match over to the game servers."
+    },
+    {
+     "capability": "backend-service-connections",
+     "quote": "The game servers read and write the stats database during and after a match, and they also write back to the player database."
+    },
+    {
+     "capability": "separate-service-connections",
+     "quote": "The client connects out to two things in our production network."
+    },
+    {
+     "capability": "external-facing-http-services",
+     "quote": "customer support staff work from the corporate network and use a moderation website to look at and act on player accounts."
+    },
+    {
+     "capability": "external-resource-use",
+     "quote": "The client connects out to two things in our production network."
+    }
+   ],
+   "refused": [],
+   "usage": {
+    "prompt_tokens": 4278,
+    "completion_tokens": 1893
+   }
+  },
+  {
+   "run": 1,
+   "case": "07-cicd-store-deploy",
+   "kept": [
+    {
+     "capability": "multi-step-flow",
+     "quote": "The build runner picks the merge up, fetches the source, resolves the dependency lockfile and produces a container image."
+    },
+    {
+     "capability": "authentication",
+     "quote": "The token the runner uses to call the controller is a shared build token that is the same for every pipeline and has not been rotated since the pipeline was set up."
+    },
+    {
+     "capability": "restricted-access",
+     "quote": "And any developer can log in to the build runner and kick off a rebuild of `main` by hand; that path does not require a merge and is not reviewed."
+    },
+    {
+     "capability": "sensitive-data",
+     "quote": "The token the runner uses to call the controller is a shared build token that is the same for every pipeline and has not been rotated since the pipeline was set up."
+    },
+    {
+     "capability": "internal-services",
+     "quote": "When the image is pushed the runner calls the deploy controller and asks it to make that image the current release."
+    },
+    {
+     "capability": "backend-service-connections",
+     "quote": "Every store server asks the deploy controller once a minute what the current release is, and if it differs from what it is running it pulls that image from the registry and restarts the container."
+    },
+    {
+     "capability": "backend-service-credentials",
+     "quote": "The token the runner uses to call the controller is a shared build token that is the same for every pipeline and has not been rotated since the pipeline was set up."
+    },
+    {
+     "capability": "backend-secrets",
+     "quote": "The token the runner uses to call the controller is a shared build token that is the same for every pipeline and has not been rotated since the pipeline was set up."
+    },
+    {
+     "capability": "secret-assets",
+     "quote": "The token the runner uses to call the controller is a shared build token that is the same for every pipeline and has not been rotated since the pipeline was set up."
+    },
+    {
+     "capability": "dangerous-functionality",
+     "quote": "When the image is pushed the runner calls the deploy controller and asks it to make that image the current release."
+    }
+   ],
+   "refused": [
+    {
+     "capability": "separate-service-connections",
+     "quote": "Dependency resolution reaches out to the public package registry on the internet.",
+     "reason": "quote not in the description"
+    },
+    {
+     "capability": "external-resource-use",
+     "quote": "Dependency resolution reaches out to the public package registry on the internet.",
+     "reason": "quote not in the description"
+    }
+   ],
+   "usage": {
+    "prompt_tokens": 4504,
+    "completion_tokens": 2906
+   }
+  },
+  {
+   "run": 1,
+   "case": "08-sso-identity-broker",
+   "kept": [
+    {
+     "capability": "authentication",
+     "quote": "Everything colleagues use signs them in through one identity broker."
+    },
+    {
+     "capability": "multiple-authentication-pathways",
+     "quote": "Everything colleagues use signs them in through one identity broker."
+    },
+    {
+     "capability": "federated-identity",
+     "quote": "Franchise colleagues do not have staff accounts with us; their own identity provider vouches for them and the broker takes that as a sign-in."
+    },
+    {
+     "capability": "self-contained-tokens",
+     "quote": "The token carries the colleague's staff id and a list of the groups they are in."
+    },
+    {
+     "capability": "self-contained-token-issuer",
+     "quote": "Once the broker has signed a colleague in it issues them a token."
+    },
+    {
+     "capability": "self-contained-token-consumer",
+     "quote": "Every application takes that token and decides what the colleague may do from the groups in it."
+    },
+    {
+     "capability": "token-validity-period",
+     "quote": "Tokens are good for twelve hours and there is no way to pull one back before it expires."
+    },
+    {
+     "capability": "expiring-authentication-mechanisms",
+     "quote": "Tokens are good for twelve hours and there is no way to pull one back before it expires."
+    },
+    {
+     "capability": "sessions",
+     "quote": "Once the broker has signed a colleague in it issues them a token."
+    },
+    {
+     "capability": "shared-signing-key-audiences",
+     "quote": "The same key signs the tokens for every application."
+    },
+    {
+     "capability": "cryptographic-keys",
+     "quote": "The broker signs tokens with a signing key it keeps in a key store."
+    },
+    {
+     "capability": "cryptographic-operations",
+     "quote": "The broker signs tokens with a signing key it keeps in a key store."
+    },
+    {
+     "capability": "non-tls-public-key-operations",
+     "quote": "Applications fetch the public half from the broker to check the signature."
+    },
+    {
+     "capability": "restricted-access",
+     "quote": "If the token has the store-manager group in it, the console lets the holder change prices and void transactions."
+    },
+    {
+     "capability": "administrative-interface",
+     "quote": "The store admin console is one of those applications."
+    },
+    {
+     "capability": "high-value-flow",
+     "quote": "If the token has the store-manager group in it, the console lets the holder change prices and void transactions."
+    },
+    {
+     "capability": "sensitive-data",
+     "quote": "The token carries the colleague's staff id and a list of the groups they are in."
+    },
+    {
+     "capability": "separate-service-connections",
+     "quote": "Group membership is not maintained there by hand \u2014 it comes from the HR system overnight."
+    },
+    {
+     "capability": "external-resource-use",
+     "quote": "Group membership is not maintained there by hand \u2014 it comes from the HR system overnight."
+    },
+    {
+     "capability": "backend-secrets",
+     "quote": "The broker signs tokens with a signing key it keeps in a key store."
+    },
+    {
+     "capability": "secret-assets",
+     "quote": "The broker signs tokens with a signing key it keeps in a key store."
+    }
+   ],
+   "refused": [
+    {
+     "capability": "backend-service-connections",
+     "quote": "The broker pulls the changes once a night.",
+     "reason": "quote not in the description"
+    }
+   ],
+   "usage": {
+    "prompt_tokens": 4469,
+    "completion_tokens": 2468
+   }
+  },
+  {
+   "run": 1,
+   "case": "09-cookbook-sokify-retail",
+   "kept": [
+    {
+     "capability": "native-client",
+     "quote": "Customers browse and order through our mobile app;"
+    },
+    {
+     "capability": "browser-accessible-http",
+     "quote": "The app talks to the web API over HTTP \u2014 not HTTPS, it's on the list."
+    },
+    {
+     "capability": "http-request-construction",
+     "quote": "The app talks to the web API over HTTP \u2014 not HTTPS, it's on the list."
+    },
+    {
+     "capability": "external-facing-http-services",
+     "quote": "The app talks to the web API over HTTP \u2014 not HTTPS, it's on the list."
+    },
+    {
+     "capability": "database",
+     "quote": "The web API keeps customers in the user database: name, address, and the card they paid with."
+    },
+    {
+     "capability": "sensitive-data",
+     "quote": "The web API keeps customers in the user database: name, address, and the card they paid with."
+    },
+    {
+     "capability": "multi-system-request",
+     "quote": "When an order is placed the API hands the order over to SIMS, our stock and inventory system, which has been running since long before the app existed."
+    },
+    {
+     "capability": "backend-service-connections",
+     "quote": "When an order is placed the API hands the order over to SIMS, our stock and inventory system, which has been running since long before the app existed."
+    },
+    {
+     "capability": "separate-service-connections",
+     "quote": "When an order is placed the API hands the order over to SIMS, our stock and inventory system, which has been running since long before the app existed."
+    },
+    {
+     "capability": "mail-sending",
+     "quote": "it sends a dispatch note to the fax gateway, which faxes the customer a confirmation with their name and address on it."
+    }
+   ],
+   "refused": [],
+   "usage": {
+    "prompt_tokens": 4330,
+    "completion_tokens": 1895
+   }
+  },
+  {
+   "run": 1,
+   "case": "10-cookbook-generic-cms",
+   "kept": [
+    {
+     "capability": "browser-frontend",
+     "quote": "Public site: readers hit the web server over HTTPS, some of them signed in."
+    },
+    {
+     "capability": "browser-accessible-http",
+     "quote": "Public site: readers hit the web server over HTTPS, some of them signed in."
+    },
+    {
+     "capability": "authentication",
+     "quote": "Public site: readers hit the web server over HTTPS, some of them signed in."
+    },
+    {
+     "capability": "database",
+     "quote": "The web server runs the CMS and keeps pages, accounts and comments in a MySQL database on the same hosted network."
+    },
+    {
+     "capability": "external-browser-resources",
+     "quote": "Images, stylesheets and downloads do not come off the web server. Readers fetch those from the CDN over HTTP."
+    },
+    {
+     "capability": "external-resource-use",
+     "quote": "When new assets are published the web server pushes them up to the CDN's bucket."
+    },
+    {
+     "capability": "separate-service-connections",
+     "quote": "When new assets are published the web server pushes them up to the CDN's bucket."
+    },
+    {
+     "capability": "internal-services",
+     "quote": "The web server runs the CMS and keeps pages, accounts and comments in a MySQL database on the same hosted network."
+    },
+    {
+     "capability": "backend-service-connections",
+     "quote": "The web server runs the CMS and keeps pages, accounts and comments in a MySQL database on the same hosted network."
+    },
+    {
+     "capability": "external-facing-http-services",
+     "quote": "Public site: readers hit the web server over HTTPS, some of them signed in."
+    },
+    {
+     "capability": "tls-use",
+     "quote": "Public site: readers hit the web server over HTTPS, some of them signed in."
+    },
+    {
+     "capability": "cryptographic-operations",
+     "quote": "Public site: readers hit the web server over HTTPS, some of them signed in."
+    }
+   ],
+   "refused": [],
+   "usage": {
+    "prompt_tokens": 4226,
+    "completion_tokens": 2436
+   }
+  },
+  {
+   "run": 1,
+   "case": "11-sparse-shift-scheduling",
+   "kept": [
+    {
+     "capability": "browser-frontend",
+     "quote": "Store managers use a scheduling web app to build the weekly rota for their store."
+    },
+    {
+     "capability": "browser-accessible-http",
+     "quote": "Store managers use a scheduling web app to build the weekly rota for their store."
+    },
+    {
+     "capability": "authentication",
+     "quote": "Nobody has documented how colleagues or managers sign in"
+    },
+    {
+     "capability": "restricted-access",
+     "quote": "Colleagues use the same app to look at the shifts they have been given."
+    },
+    {
+     "capability": "sensitive-data",
+     "quote": "Colleague names, contact details and stated availability are held in that database."
+    },
+    {
+     "capability": "database",
+     "quote": "The scheduling service is what actually reads and writes the rotas, which live in a rota database."
+    },
+    {
+     "capability": "internal-services",
+     "quote": "The web app talks to a scheduling service."
+    },
+    {
+     "capability": "backend-service-connections",
+     "quote": "The web app talks to a scheduling service."
+    },
+    {
+     "capability": "separate-service-connections",
+     "quote": "Once a week the scheduling service writes a payroll export onto a file share."
+    },
+    {
+     "capability": "external-resource-use",
+     "quote": "The web app talks to a scheduling service."
+    },
+    {
+     "capability": "external-facing-http-services",
+     "quote": "Colleagues reach the app from their own phones."
+    }
+   ],
+   "refused": [],
+   "usage": {
+    "prompt_tokens": 4260,
+    "completion_tokens": 2331
+   }
+  },
+  {
+   "run": 1,
+   "case": "12-overclaiming-supplier-portal",
+   "kept": [
+    {
+     "capability": "file-upload",
+     "quote": "Suppliers upload their compliance paperwork through a portal \u2014 insurance certificates, food safety audits, and contact details for their own staff."
+    },
+    {
+     "capability": "multi-step-flow",
+     "quote": "Our category managers, who work from the corporate network, review what has been uploaded and approve or reject it."
+    },
+    {
+     "capability": "authentication",
+     "quote": "Suppliers sign in with a username and password that the vendor issues to them."
+    },
+    {
+     "capability": "password-authentication",
+     "quote": "Suppliers sign in with a username and password that the vendor issues to them."
+    },
+    {
+     "capability": "restricted-access",
+     "quote": "Our category managers, who work from the corporate network, review what has been uploaded and approve or reject it."
+    },
+    {
+     "capability": "sensitive-data",
+     "quote": "insurance certificates, food safety audits, and contact details for their own staff."
+    },
+    {
+     "capability": "encryption",
+     "quote": "The vendor's datasheet says the platform is secure by design, that it uses enterprise-grade encryption throughout, that all access is fully authenticated and audited, and that the product is fully compliant."
+    },
+    {
+     "capability": "spreadsheet-export",
+     "quote": "Every night the vendor pushes a supplier data extract to a landing bucket in our cloud account."
+    },
+    {
+     "capability": "server-side-file-processing",
+     "quote": "Our supplier master service loads that file and writes the records into the supplier database."
+    },
+    {
+     "capability": "multi-system-request",
+     "quote": "Every night the vendor pushes a supplier data extract to a landing bucket in our cloud account."
+    },
+    {
+     "capability": "internal-services",
+     "quote": "The bucket, the service and the database are all in our cloud account."
+    },
+    {
+     "capability": "backend-service-connections",
+     "quote": "Our supplier master service loads that file and writes the records into the supplier database."
+    },
+    {
+     "capability": "external-resource-use",
+     "quote": "Our supplier master service loads that file and writes the records into the supplier database."
+    }
+   ],
+   "refused": [],
+   "usage": {
+    "prompt_tokens": 4287,
+    "completion_tokens": 2981
+   }
+  },
+  {
+   "run": 1,
+   "case": "13-dispatch-control-plane",
+   "kept": [
+    {
+     "capability": "browser-frontend",
+     "quote": "They open the dispatch console in their browser."
+    },
+    {
+     "capability": "browser-accessible-http",
+     "quote": "The console is a single-page JavaScript app and our corporate web host serves it."
+    },
+    {
+     "capability": "javascript-code",
+     "quote": "The console is a single-page JavaScript app"
+    },
+    {
+     "capability": "cors",
+     "quote": "The console and the API are served from different origins, so the API answers the console cross-origin."
+    },
+    {
+     "capability": "websocket",
+     "quote": "The console also opens a WebSocket to the dispatch API and holds it open for live job status."
+    },
+    {
+     "capability": "database",
+     "quote": "The dispatch API reads and writes the dispatch database."
+    },
+    {
+     "capability": "xml-parsing",
+     "quote": "Every hour it pulls the partner's SOAP feed over HTTPS and parses the XML document it gets back."
+    },
+    {
+     "capability": "file-upload",
+     "quote": "It writes each document it downloads into the schedule archive, a folder on the corporate file store."
+    },
+    {
+     "capability": "server-side-file-processing",
+     "quote": "Every hour it pulls the partner's SOAP feed over HTTPS and parses the XML document it gets back."
+    },
+    {
+     "capability": "outbound-http",
+     "quote": "Every hour it pulls the partner's SOAP feed over HTTPS"
+    },
+    {
+     "capability": "http-request-construction",
+     "quote": "The importer then posts the parsed work orders to the same dispatch API the console calls."
+    },
+    {
+     "capability": "authentication",
+     "quote": "Nobody wrote down how an engineer signs in to it."
+    },
+    {
+     "capability": "sessions",
+     "quote": "whether that socket runs over TLS, whether its handshake is authenticated, or whether it checks the engineer's session again after it is open."
+    },
+    {
+     "capability": "sensitive-http-requests",
+     "quote": "It presents an API token."
+    },
+    {
+     "capability": "restricted-access",
+     "quote": "an account there can move a crew, and it can change the work a depot does that day."
+    },
+    {
+     "capability": "sensitive-data",
+     "quote": "That database holds the job orders, the crew names and the crew mobile numbers."
+    },
+    {
+     "capability": "high-value-flow",
+     "quote": "an account there can move a crew, and it can change the work a depot does that day."
+    },
+    {
+     "capability": "dangerous-functionality",
+     "quote": "an account there can move a crew, and it can change the work a depot does that day."
+    },
+    {
+     "capability": "multi-system-request",
+     "quote": "The importer then posts the parsed work orders to the same dispatch API the console calls."
+    },
+    {
+     "capability": "internal-services",
+     "quote": "Our schedule importer runs on the corporate network."
+    },
+    {
+     "capability": "internal-http-connections",
+     "quote": "The importer then posts the parsed work orders to the same dispatch API the console calls."
+    },
+    {
+     "capability": "backend-service-connections",
+     "quote": "The dispatch API reads and writes the dispatch database."
+    },
+    {
+     "capability": "separate-service-connections",
+     "quote": "A scheduling partner, which is another company, publishes tomorrow's planned work."
+    },
+    {
+     "capability": "external-resource-use",
+     "quote": "Every hour it pulls the partner's SOAP feed over HTTPS"
+    },
+    {
+     "capability": "backend-service-credentials",
+     "quote": "It presents an API token."
+    },
+    {
+     "capability": "backend-secrets",
+     "quote": "That token was issued when the importer was built and nobody has rotated it since."
+    },
+    {
+     "capability": "secret-assets",
+     "quote": "It presents an API token."
+    },
+    {
+     "capability": "tls-use",
+     "quote": "Every hour it pulls the partner's SOAP feed over HTTPS"
+    },
+    {
+     "capability": "tls-client",
+     "quote": "Every hour it pulls the partner's SOAP feed over HTTPS"
+    },
+    {
+     "capability": "http-response-bodies",
+     "quote": "parses the XML document it gets back"
+    }
+   ],
+   "refused": [],
+   "usage": {
+    "prompt_tokens": 4508,
+    "completion_tokens": 2809
+   }
+  },
+  {
+   "run": 1,
+   "case": "16-library-lending-interview",
+   "kept": [
+    {
+     "capability": "native-client",
+     "quote": "Members borrow, renew and reserve books through the library app on their phones."
+    },
+    {
+     "capability": "browser-frontend",
+     "quote": "through a circulation page the lending API serves."
+    },
+    {
+     "capability": "browser-accessible-http",
+     "quote": "The lending API is a plain REST service"
+    },
+    {
+     "capability": "database",
+     "quote": "Members, loans and reservations live in the loans database."
+    },
+    {
+     "capability": "authentication",
+     "quote": "a member scans their library card"
+    },
+    {
+     "capability": "restricted-access",
+     "quote": "Desk staff can extend a loan, clear a block on a member's account or mark a book as returned by hand"
+    },
+    {
+     "capability": "limited-resource",
+     "quote": "Members borrow, renew and reserve books"
+    },
+    {
+     "capability": "multi-system-request",
+     "quote": "The kiosks send each loan and each return to the lending API."
+    },
+    {
+     "capability": "internal-services",
+     "quote": "The lending API and the loans database run in the council data centre."
+    },
+    {
+     "capability": "backend-service-connections",
+     "quote": "The kiosks send each loan and each return to the lending API."
+    },
+    {
+     "capability": "separate-service-connections",
+     "quote": "The lending API and the loans database run in the council data centre."
+    }
+   ],
+   "refused": [],
+   "usage": {
+    "prompt_tokens": 4215,
+    "completion_tokens": 1807
+   }
+  }
+ ]
+}

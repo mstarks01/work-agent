@@ -1,0 +1,832 @@
+{
+ "model": "openai/gpt-5.6-luna",
+ "results": [
+  {
+   "run": 1,
+   "case": "example",
+   "kept": [
+    {
+     "capability": "browser-frontend",
+     "quote": "Anyone can load our React single-page web app without signing in"
+    },
+    {
+     "capability": "browser-accessible-http",
+     "quote": "CloudFront serves it to the public internet over HTTPS with TLS 1.3."
+    },
+    {
+     "capability": "javascript-code",
+     "quote": "our React single-page web app"
+    },
+    {
+     "capability": "sensitive-http-requests",
+     "quote": "Every call carries an Auth0 OAuth2 bearer token"
+    },
+    {
+     "capability": "authentication",
+     "quote": "the API rejects unauthenticated requests"
+    },
+    {
+     "capability": "federated-identity",
+     "quote": "Customers sign in to our Auth0 identity provider over HTTPS with TLS 1.3, using a password and MFA."
+    },
+    {
+     "capability": "oauth",
+     "quote": "Every call carries an Auth0 OAuth2 bearer token"
+    },
+    {
+     "capability": "oauth-resource-server",
+     "quote": "Every call carries an Auth0 OAuth2 bearer token; the API rejects unauthenticated requests"
+    },
+    {
+     "capability": "user-identity-authorization",
+     "quote": "allows 100 requests per minute per customer"
+    },
+    {
+     "capability": "restricted-access",
+     "quote": "the API rejects unauthenticated requests"
+    },
+    {
+     "capability": "administrative-interface",
+     "quote": "Support administrators are staff who use an admin console on the Orders API"
+    },
+    {
+     "capability": "sensitive-data",
+     "quote": "It holds customer names, delivery addresses, phone numbers, and order history"
+    },
+    {
+     "capability": "database",
+     "quote": "The Orders API reads and writes a Postgres database in a private subnet over TLS, with IAM database authentication."
+    },
+    {
+     "capability": "tls-use",
+     "quote": "over HTTPS with TLS 1.3"
+    },
+    {
+     "capability": "tls-client",
+     "quote": "Payment authorisation goes to Stripe over HTTPS with a secret API key"
+    },
+    {
+     "capability": "internal-services",
+     "quote": "The Orders API reads and writes a Postgres database in a private subnet over TLS"
+    },
+    {
+     "capability": "internal-http-connections",
+     "quote": "The web app calls an internal Orders API in our AWS VPC over HTTPS."
+    },
+    {
+     "capability": "internal-tls-connections",
+     "quote": "The Orders API reads and writes a Postgres database in a private subnet over TLS"
+    },
+    {
+     "capability": "backend-service-connections",
+     "quote": "It writes summaries over HTTPS, with its own IAM role, to a KMS-encrypted S3 bucket."
+    },
+    {
+     "capability": "separate-service-connections",
+     "quote": "Payment authorisation goes to Stripe over HTTPS with a secret API key"
+    },
+    {
+     "capability": "service-accounts",
+     "quote": "with its own IAM role"
+    },
+    {
+     "capability": "backend-service-credentials",
+     "quote": "Payment authorisation goes to Stripe over HTTPS with a secret API key"
+    },
+    {
+     "capability": "backend-secrets",
+     "quote": "with a secret API key"
+    },
+    {
+     "capability": "secret-assets",
+     "quote": "Payment authorisation goes to Stripe over HTTPS with a secret API key"
+    },
+    {
+     "capability": "outbound-http",
+     "quote": "Payment authorisation goes to Stripe over HTTPS with a secret API key"
+    },
+    {
+     "capability": "http-request-construction",
+     "quote": "The web app calls an internal Orders API in our AWS VPC over HTTPS."
+    },
+    {
+     "capability": "multi-system-request",
+     "quote": "Payment authorisation goes to Stripe over HTTPS with a secret API key; card numbers never reach our systems."
+    },
+    {
+     "capability": "business-logic-limits-needed",
+     "quote": "allows 100 requests per minute per customer"
+    },
+    {
+     "capability": "high-value-flow",
+     "quote": "Through it they refund orders, edit delivery addresses, and look up order history."
+    },
+    {
+     "capability": "dangerous-functionality",
+     "quote": "Through it they refund orders, edit delivery addresses, and look up order history."
+    },
+    {
+     "capability": "external-facing-http-services",
+     "quote": "CloudFront serves it to the public internet over HTTPS with TLS 1.3."
+    },
+    {
+     "capability": "intermediary-client-ip-handling",
+     "quote": "AWS WAF on CloudFront limits each client to 2,000 requests per five minutes."
+    },
+    {
+     "capability": "http-response-bodies",
+     "quote": "CloudFront serves it to the public internet over HTTPS with TLS 1.3."
+    },
+    {
+     "capability": "external-resource-use",
+     "quote": "Payment authorisation goes to Stripe over HTTPS with a secret API key"
+    },
+    {
+     "capability": "third-party-components",
+     "quote": "our React single-page web app"
+    },
+    {
+     "capability": "resource-demanding-functionality",
+     "quote": "The analytics team, a group of internal analysts, query that bucket through Athena"
+    }
+   ],
+   "refused": [
+    {
+     "capability": "encryption",
+     "quote": "it is encrypted at rest with AWS KMS",
+     "reason": "quote not in the description"
+    },
+    {
+     "capability": "cryptographic-operations",
+     "quote": "it is encrypted at rest with AWS KMS",
+     "reason": "quote not in the description"
+    },
+    {
+     "capability": "cryptographic-keys",
+     "quote": "it is encrypted at rest with AWS KMS",
+     "reason": "quote not in the description"
+    }
+   ],
+   "usage": {
+    "prompt_tokens": 4635,
+    "completion_tokens": 4037
+   }
+  },
+  {
+   "run": 2,
+   "case": "example",
+   "kept": [
+    {
+     "capability": "browser-frontend",
+     "quote": "Anyone can load our React single-page web app without signing in"
+    },
+    {
+     "capability": "browser-accessible-http",
+     "quote": "CloudFront serves it to the public internet over HTTPS with TLS 1.3."
+    },
+    {
+     "capability": "javascript-code",
+     "quote": "our React single-page web app"
+    },
+    {
+     "capability": "external-facing-http-services",
+     "quote": "CloudFront serves it to the public internet over HTTPS with TLS 1.3."
+    },
+    {
+     "capability": "web-tier-file-serving",
+     "quote": "CloudFront serves it to the public internet"
+    },
+    {
+     "capability": "intermediary-client-ip-handling",
+     "quote": "AWS WAF on CloudFront limits each client to 2,000 requests per five minutes."
+    },
+    {
+     "capability": "sensitive-http-requests",
+     "quote": "Every call carries an Auth0 OAuth2 bearer token"
+    },
+    {
+     "capability": "http-request-construction",
+     "quote": "The web app calls an internal Orders API in our AWS VPC over HTTPS."
+    },
+    {
+     "capability": "outbound-http",
+     "quote": "Payment authorisation goes to Stripe over HTTPS with a secret API key"
+    },
+    {
+     "capability": "multi-system-request",
+     "quote": "Payment authorisation goes to Stripe over HTTPS with a secret API key"
+    },
+    {
+     "capability": "authentication",
+     "quote": "the API rejects unauthenticated requests"
+    },
+    {
+     "capability": "multiple-authentication-pathways",
+     "quote": "Customers sign in to our Auth0 identity provider over HTTPS with TLS 1.3, using a password and MFA."
+    },
+    {
+     "capability": "federated-identity",
+     "quote": "Support administrators are staff who use an admin console on the Orders API from a corporate management network over HTTPS, signing in with SSO and MFA."
+    },
+    {
+     "capability": "oauth",
+     "quote": "Every call carries an Auth0 OAuth2 bearer token"
+    },
+    {
+     "capability": "oauth-resource-server",
+     "quote": "Every call carries an Auth0 OAuth2 bearer token; the API rejects unauthenticated requests"
+    },
+    {
+     "capability": "user-identity-authorization",
+     "quote": "allows 100 requests per minute per customer"
+    },
+    {
+     "capability": "restricted-access",
+     "quote": "Only the platform team can copy or restore the database snapshots, the bucket and the audit log"
+    },
+    {
+     "capability": "administrative-interface",
+     "quote": "Support administrators are staff who use an admin console on the Orders API"
+    },
+    {
+     "capability": "high-value-flow",
+     "quote": "Through it they refund orders"
+    },
+    {
+     "capability": "business-logic-limits-needed",
+     "quote": "allows 100 requests per minute per customer"
+    },
+    {
+     "capability": "database",
+     "quote": "The Orders API reads and writes a Postgres database"
+    },
+    {
+     "capability": "sensitive-data",
+     "quote": "It holds customer names, delivery addresses, phone numbers, and order history"
+    },
+    {
+     "capability": "cryptographic-operations",
+     "quote": "Customers sign in to our Auth0 identity provider over HTTPS with TLS 1.3"
+    },
+    {
+     "capability": "tls-use",
+     "quote": "over HTTPS with TLS 1.3"
+    },
+    {
+     "capability": "tls-client",
+     "quote": "Payment authorisation goes to Stripe over HTTPS with a secret API key"
+    },
+    {
+     "capability": "internal-services",
+     "quote": "The web app calls an internal Orders API in our AWS VPC over HTTPS."
+    },
+    {
+     "capability": "internal-http-connections",
+     "quote": "The web app calls an internal Orders API in our AWS VPC over HTTPS."
+    },
+    {
+     "capability": "internal-tls-connections",
+     "quote": "The web app calls an internal Orders API in our AWS VPC over HTTPS."
+    },
+    {
+     "capability": "backend-service-connections",
+     "quote": "The Orders API reads and writes a Postgres database in a private subnet over TLS"
+    },
+    {
+     "capability": "service-accounts",
+     "quote": "with its IAM role"
+    },
+    {
+     "capability": "backend-service-credentials",
+     "quote": "Payment authorisation goes to Stripe over HTTPS with a secret API key"
+    },
+    {
+     "capability": "separate-service-connections",
+     "quote": "Payment authorisation goes to Stripe over HTTPS with a secret API key"
+    },
+    {
+     "capability": "external-resource-use",
+     "quote": "The analytics team, a group of internal analysts, query that bucket through Athena"
+    },
+    {
+     "capability": "backend-secrets",
+     "quote": "with a secret API key"
+    },
+    {
+     "capability": "secret-assets",
+     "quote": "with a secret API key"
+    },
+    {
+     "capability": "third-party-components",
+     "quote": "our React single-page web app"
+    }
+   ],
+   "refused": [
+    {
+     "capability": "encryption",
+     "quote": "it is encrypted at rest with AWS KMS",
+     "reason": "quote not in the description"
+    },
+    {
+     "capability": "cryptographic-keys",
+     "quote": "it is encrypted at rest with AWS KMS",
+     "reason": "quote not in the description"
+    }
+   ],
+   "usage": {
+    "prompt_tokens": 4635,
+    "completion_tokens": 3749
+   }
+  },
+  {
+   "run": 3,
+   "case": "example",
+   "kept": [
+    {
+     "capability": "browser-frontend",
+     "quote": "Anyone can load our React single-page web app without signing in"
+    },
+    {
+     "capability": "browser-accessible-http",
+     "quote": "CloudFront serves it to the public internet over HTTPS with TLS 1.3."
+    },
+    {
+     "capability": "javascript-code",
+     "quote": "our React single-page web app"
+    },
+    {
+     "capability": "sensitive-http-requests",
+     "quote": "Every call carries an Auth0 OAuth2 bearer token"
+    },
+    {
+     "capability": "database",
+     "quote": "The Orders API reads and writes a Postgres database"
+    },
+    {
+     "capability": "outbound-http",
+     "quote": "Payment authorisation goes to Stripe over HTTPS with a secret API key"
+    },
+    {
+     "capability": "http-request-construction",
+     "quote": "The web app calls an internal Orders API in our AWS VPC over HTTPS."
+    },
+    {
+     "capability": "multi-system-request",
+     "quote": "Payment authorisation goes to Stripe over HTTPS with a secret API key"
+    },
+    {
+     "capability": "high-value-flow",
+     "quote": "Through it they refund orders"
+    },
+    {
+     "capability": "business-logic-limits-needed",
+     "quote": "the API rejects unauthenticated requests and allows 100 requests per minute per customer."
+    },
+    {
+     "capability": "authentication",
+     "quote": "the API rejects unauthenticated requests"
+    },
+    {
+     "capability": "federated-identity",
+     "quote": "signing in with SSO and MFA"
+    },
+    {
+     "capability": "oauth",
+     "quote": "Every call carries an Auth0 OAuth2 bearer token"
+    },
+    {
+     "capability": "oauth-resource-server",
+     "quote": "Every call carries an Auth0 OAuth2 bearer token; the API rejects unauthenticated requests"
+    },
+    {
+     "capability": "user-identity-authorization",
+     "quote": "allows 100 requests per minute per customer"
+    },
+    {
+     "capability": "restricted-access",
+     "quote": "the API rejects unauthenticated requests"
+    },
+    {
+     "capability": "administrative-interface",
+     "quote": "Support administrators are staff who use an admin console on the Orders API"
+    },
+    {
+     "capability": "sensitive-data",
+     "quote": "It holds customer names, delivery addresses, phone numbers, and order history"
+    },
+    {
+     "capability": "internal-services",
+     "quote": "The web app calls an internal Orders API in our AWS VPC over HTTPS."
+    },
+    {
+     "capability": "internal-http-connections",
+     "quote": "The web app calls an internal Orders API in our AWS VPC over HTTPS."
+    },
+    {
+     "capability": "internal-tls-connections",
+     "quote": "The Orders API reads and writes a Postgres database in a private subnet over TLS"
+    },
+    {
+     "capability": "backend-service-connections",
+     "quote": "Payment authorisation goes to Stripe over HTTPS with a secret API key"
+    },
+    {
+     "capability": "service-accounts",
+     "quote": "with its own IAM role"
+    },
+    {
+     "capability": "backend-service-credentials",
+     "quote": "Payment authorisation goes to Stripe over HTTPS with a secret API key"
+    },
+    {
+     "capability": "separate-service-connections",
+     "quote": "Payment authorisation goes to Stripe over HTTPS with a secret API key"
+    },
+    {
+     "capability": "tls-use",
+     "quote": "Customers sign in to our Auth0 identity provider over HTTPS with TLS 1.3"
+    },
+    {
+     "capability": "tls-client",
+     "quote": "Payment authorisation goes to Stripe over HTTPS with a secret API key"
+    },
+    {
+     "capability": "cryptographic-keys",
+     "quote": "with a secret API key"
+    },
+    {
+     "capability": "backend-secrets",
+     "quote": "with a secret API key"
+    },
+    {
+     "capability": "secret-assets",
+     "quote": "with a secret API key"
+    },
+    {
+     "capability": "external-resource-use",
+     "quote": "Payment authorisation goes to Stripe over HTTPS with a secret API key"
+    },
+    {
+     "capability": "third-party-components",
+     "quote": "our React single-page web app"
+    },
+    {
+     "capability": "external-facing-http-services",
+     "quote": "CloudFront serves it to the public internet over HTTPS with TLS 1.3."
+    },
+    {
+     "capability": "http-response-bodies",
+     "quote": "CloudFront serves it to the public internet over HTTPS with TLS 1.3."
+    },
+    {
+     "capability": "web-tier-file-serving",
+     "quote": "CloudFront serves it to the public internet over HTTPS with TLS 1.3."
+    },
+    {
+     "capability": "intermediary-client-ip-handling",
+     "quote": "AWS WAF on CloudFront limits each client to 2,000 requests per five minutes."
+    }
+   ],
+   "refused": [
+    {
+     "capability": "encryption",
+     "quote": "it is encrypted at rest with AWS KMS",
+     "reason": "quote not in the description"
+    },
+    {
+     "capability": "cryptographic-operations",
+     "quote": "it is encrypted at rest with AWS KMS",
+     "reason": "quote not in the description"
+    }
+   ],
+   "usage": {
+    "prompt_tokens": 4635,
+    "completion_tokens": 3754
+   }
+  },
+  {
+   "run": 4,
+   "case": "example",
+   "kept": [
+    {
+     "capability": "browser-frontend",
+     "quote": "Anyone can load our React single-page web app without signing in"
+    },
+    {
+     "capability": "browser-accessible-http",
+     "quote": "CloudFront serves it to the public internet over HTTPS with TLS 1.3."
+    },
+    {
+     "capability": "javascript-code",
+     "quote": "our React single-page web app"
+    },
+    {
+     "capability": "sensitive-http-requests",
+     "quote": "Every call carries an Auth0 OAuth2 bearer token"
+    },
+    {
+     "capability": "database",
+     "quote": "The Orders API reads and writes a Postgres database"
+    },
+    {
+     "capability": "outbound-http",
+     "quote": "Payment authorisation goes to Stripe over HTTPS with a secret API key"
+    },
+    {
+     "capability": "http-request-construction",
+     "quote": "The web app calls an internal Orders API in our AWS VPC over HTTPS."
+    },
+    {
+     "capability": "multi-system-request",
+     "quote": "The Orders API reads and writes a Postgres database in a private subnet over TLS"
+    },
+    {
+     "capability": "authentication",
+     "quote": "the API rejects unauthenticated requests"
+    },
+    {
+     "capability": "multiple-authentication-pathways",
+     "quote": "Customers sign in to our Auth0 identity provider over HTTPS with TLS 1.3, using a password and MFA."
+    },
+    {
+     "capability": "federated-identity",
+     "quote": "Customers sign in to our Auth0 identity provider"
+    },
+    {
+     "capability": "oauth",
+     "quote": "Every call carries an Auth0 OAuth2 bearer token"
+    },
+    {
+     "capability": "oauth-resource-server",
+     "quote": "Every call carries an Auth0 OAuth2 bearer token; the API rejects unauthenticated requests"
+    },
+    {
+     "capability": "user-identity-authorization",
+     "quote": "allows 100 requests per minute per customer"
+    },
+    {
+     "capability": "restricted-access",
+     "quote": "the API rejects unauthenticated requests"
+    },
+    {
+     "capability": "administrative-interface",
+     "quote": "Support administrators are staff who use an admin console on the Orders API"
+    },
+    {
+     "capability": "high-value-flow",
+     "quote": "Through it they refund orders"
+    },
+    {
+     "capability": "business-logic-limits-needed",
+     "quote": "allows 100 requests per minute per customer"
+    },
+    {
+     "capability": "sensitive-data",
+     "quote": "It holds customer names, delivery addresses, phone numbers, and order history"
+    },
+    {
+     "capability": "internal-services",
+     "quote": "The Orders API reads and writes a Postgres database in a private subnet over TLS"
+    },
+    {
+     "capability": "internal-http-connections",
+     "quote": "The web app calls an internal Orders API in our AWS VPC over HTTPS."
+    },
+    {
+     "capability": "internal-tls-connections",
+     "quote": "The Orders API reads and writes a Postgres database in a private subnet over TLS"
+    },
+    {
+     "capability": "backend-service-connections",
+     "quote": "Payment authorisation goes to Stripe over HTTPS with a secret API key"
+    },
+    {
+     "capability": "service-accounts",
+     "quote": "with its own IAM role"
+    },
+    {
+     "capability": "backend-service-credentials",
+     "quote": "with a secret API key"
+    },
+    {
+     "capability": "separate-service-connections",
+     "quote": "It writes summaries over HTTPS, with its own IAM role, to a KMS-encrypted S3 bucket."
+    },
+    {
+     "capability": "cryptographic-keys",
+     "quote": "encrypted at rest with AWS KMS"
+    },
+    {
+     "capability": "cryptographic-operations",
+     "quote": "over HTTPS with TLS 1.3"
+    },
+    {
+     "capability": "tls-use",
+     "quote": "over HTTPS with TLS 1.3"
+    },
+    {
+     "capability": "tls-certificates",
+     "quote": "HTTPS with TLS 1.3"
+    },
+    {
+     "capability": "tls-client",
+     "quote": "Payment authorisation goes to Stripe over HTTPS with a secret API key"
+    },
+    {
+     "capability": "external-resource-use",
+     "quote": "It writes summaries over HTTPS, with its own IAM role, to a KMS-encrypted S3 bucket."
+    },
+    {
+     "capability": "backend-secrets",
+     "quote": "with a secret API key"
+    },
+    {
+     "capability": "secret-assets",
+     "quote": "with a secret API key"
+    },
+    {
+     "capability": "third-party-components",
+     "quote": "our React single-page web app"
+    },
+    {
+     "capability": "intermediary-client-ip-handling",
+     "quote": "AWS WAF on CloudFront limits each client to 2,000 requests per five minutes."
+    }
+   ],
+   "refused": [
+    {
+     "capability": "encryption",
+     "quote": "it is encrypted at rest with AWS KMS",
+     "reason": "quote not in the description"
+    }
+   ],
+   "usage": {
+    "prompt_tokens": 4635,
+    "completion_tokens": 3390
+   }
+  },
+  {
+   "run": 5,
+   "case": "example",
+   "kept": [
+    {
+     "capability": "browser-frontend",
+     "quote": "Anyone can load our React single-page web app without signing in"
+    },
+    {
+     "capability": "browser-accessible-http",
+     "quote": "CloudFront serves it to the public internet over HTTPS with TLS 1.3."
+    },
+    {
+     "capability": "javascript-code",
+     "quote": "our React single-page web app"
+    },
+    {
+     "capability": "sensitive-http-requests",
+     "quote": "Every call carries an Auth0 OAuth2 bearer token"
+    },
+    {
+     "capability": "database",
+     "quote": "The Orders API reads and writes a Postgres database"
+    },
+    {
+     "capability": "outbound-http",
+     "quote": "Payment authorisation goes to Stripe over HTTPS with a secret API key"
+    },
+    {
+     "capability": "http-request-construction",
+     "quote": "The web app calls an internal Orders API in our AWS VPC over HTTPS."
+    },
+    {
+     "capability": "authentication",
+     "quote": "the API rejects unauthenticated requests"
+    },
+    {
+     "capability": "multi-factor-authentication",
+     "quote": "using a password and MFA"
+    },
+    {
+     "capability": "federated-identity",
+     "quote": "Customers sign in to our Auth0 identity provider"
+    },
+    {
+     "capability": "oauth",
+     "quote": "Every call carries an Auth0 OAuth2 bearer token"
+    },
+    {
+     "capability": "oauth-resource-server",
+     "quote": "Every call carries an Auth0 OAuth2 bearer token; the API rejects unauthenticated requests"
+    },
+    {
+     "capability": "user-identity-authorization",
+     "quote": "allows 100 requests per minute per customer"
+    },
+    {
+     "capability": "restricted-access",
+     "quote": "the API rejects unauthenticated requests"
+    },
+    {
+     "capability": "high-value-flow",
+     "quote": "Through it they refund orders"
+    },
+    {
+     "capability": "business-logic-limits-needed",
+     "quote": "allows 100 requests per minute per customer"
+    },
+    {
+     "capability": "internal-services",
+     "quote": "The Orders API reads and writes a Postgres database in a private subnet"
+    },
+    {
+     "capability": "internal-http-connections",
+     "quote": "The web app calls an internal Orders API in our AWS VPC over HTTPS."
+    },
+    {
+     "capability": "internal-tls-connections",
+     "quote": "The Orders API reads and writes a Postgres database in a private subnet over TLS"
+    },
+    {
+     "capability": "backend-service-connections",
+     "quote": "Payment authorisation goes to Stripe over HTTPS with a secret API key"
+    },
+    {
+     "capability": "service-accounts",
+     "quote": "with its own IAM role"
+    },
+    {
+     "capability": "backend-service-credentials",
+     "quote": "with a secret API key"
+    },
+    {
+     "capability": "separate-service-connections",
+     "quote": "Payment authorisation goes to Stripe over HTTPS with a secret API key"
+    },
+    {
+     "capability": "multi-system-request",
+     "quote": "Payment authorisation goes to Stripe over HTTPS with a secret API key"
+    },
+    {
+     "capability": "sensitive-data",
+     "quote": "It holds customer names, delivery addresses, phone numbers, and order history"
+    },
+    {
+     "capability": "encryption",
+     "quote": "is encrypted at rest with AWS KMS"
+    },
+    {
+     "capability": "cryptographic-keys",
+     "quote": "a KMS-encrypted S3 bucket"
+    },
+    {
+     "capability": "cryptographic-operations",
+     "quote": "is encrypted at rest with AWS KMS"
+    },
+    {
+     "capability": "tls-use",
+     "quote": "over HTTPS with TLS 1.3"
+    },
+    {
+     "capability": "tls-certificates",
+     "quote": "over HTTPS with TLS 1.3"
+    },
+    {
+     "capability": "tls-client",
+     "quote": "Payment authorisation goes to Stripe over HTTPS with a secret API key"
+    },
+    {
+     "capability": "external-resource-use",
+     "quote": "Payment authorisation goes to Stripe over HTTPS with a secret API key"
+    },
+    {
+     "capability": "backend-secrets",
+     "quote": "with a secret API key"
+    },
+    {
+     "capability": "secret-assets",
+     "quote": "with a secret API key"
+    },
+    {
+     "capability": "third-party-components",
+     "quote": "our React single-page web app"
+    },
+    {
+     "capability": "external-facing-http-services",
+     "quote": "CloudFront serves it to the public internet over HTTPS with TLS 1.3."
+    },
+    {
+     "capability": "intermediary-client-ip-handling",
+     "quote": "AWS WAF on CloudFront limits each client to 2,000 requests per five minutes."
+    },
+    {
+     "capability": "administrative-interface",
+     "quote": "Support administrators are staff who use an admin console on the Orders API"
+    }
+   ],
+   "refused": [],
+   "usage": {
+    "prompt_tokens": 4635,
+    "completion_tokens": 2878
+   }
+  }
+ ]
+}
