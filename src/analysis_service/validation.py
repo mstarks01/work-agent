@@ -295,8 +295,27 @@ def _blank_control_issues(element: Element) -> list[ValidationIssue]:
 #: but the same words also open a sentence that means the control is absent
 #: or was never mentioned. The two readings differ in whether a candidate
 #: rule fires, so the gate refuses the shape and the repair pass picks one.
+#: A word that names the absence itself, such as "disabled" or "plaintext",
+#: opens a value that the leading-token rule also reads as *stated*, so the
+#: gate refuses it too. No archived model holds a control that opens with one.
 AMBIGUOUS_CONTROL_LEADS: frozenset[str] = frozenset(
-    {"no", "not", "without", "never", "neither", "nor", "n/a", "na", "nil"}
+    {
+        "no",
+        "not",
+        "without",
+        "never",
+        "neither",
+        "nor",
+        "n/a",
+        "na",
+        "nil",
+        "disabled",
+        "plaintext",
+        "unencrypted",
+        "unauthenticated",
+        "missing",
+        "absent",
+    }
 )
 
 #: Leading words that say the writer does not know. ``control_state`` reads
