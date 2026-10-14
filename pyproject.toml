@@ -67,7 +67,11 @@ dependencies = [
 # and never changes what a node answers, and `build_identity()` fails closed on
 # a distribution it cannot find — so naming it there would leave every install
 # without this extra unable to produce an execution identity at all.
-bedrock = ["boto3>=1.43.1,<2.0"]
+# The one `boto3` range. Each feature that needs `boto3` names this extra,
+# so the range has one reader: the Bedrock vendor row, the `s3` object
+# store and the RDS IAM token of the `sql` store.
+aws = ["boto3>=1.43.1,<2.0"]
+bedrock = ["analysis-service[aws]"]
 # The `sql` job store (ADR 0065): SQLAlchemy async Core with one code path for
 # PostgreSQL and SQLite, and Alembic for the schema. A `memory` deployment
 # installs none of them. The upper bounds keep a new minor release out of the
