@@ -92,7 +92,7 @@ BLOCKS = {
 
 class TestEachReaderCountsOnlyTheCasesItSelects:
     def test_the_rows_name_the_held_out_case(self):
-        assert held_out_cases(BLOCKS) == {HELD}
+        assert held_out_cases(BLOCKS, ledger=()) == {HELD}
 
     def test_stride_coverage(self):
         assert scorer.published(

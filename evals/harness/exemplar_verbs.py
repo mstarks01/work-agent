@@ -10,16 +10,16 @@ over-report at once.
 ## The measurement
 
 STRIDE ships 19 exemplars, and the corpus holds 285 reference claims. No
-exemplar is read from a holdout case (#744), so this reads the 254 in the
-tuned cases.
-46 of those claims name a verb no exemplar in their lane demonstrates.
-18 of the 46 are ``must-find``, and 13 of the 14 tuned cases carry at least one.
+exemplar is read from a holdout case (#744), and no case is still held out, so
+this reads all 285.
+51 of those claims name a verb no exemplar in their lane demonstrates.
+21 of the 51 are ``must-find``, and 15 of the 16 tuned cases carry at least one.
 
 They split into two populations, and each wants a different answer:
 
-* 32 near misses. The lane demonstrates the verb's family but not the member,
+* 37 near misses. The lane demonstrates the verb's family but not the member,
   so the agent has a wrong neighbour to reach for.
-  ``disable`` accounts for 9 of them, and ``plant`` and ``replay`` for 7
+  ``disable`` accounts for 9 of them, and ``plant`` and ``replay`` for 8
   each.
 * 14 with no neighbour. The lane never demonstrates that family at all.
   ``denial-of-service`` holds the largest share, 5 of 14: its three exemplars

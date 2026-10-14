@@ -37,7 +37,7 @@ from analysis_service.system_model import (
     parse_flow_id,
 )
 from analysis_service.validation import parse_and_validate
-from evals.harness import bundle, replay
+from evals.harness import audit, bundle, replay
 from evals.harness.alignment import align, placeholder_zones
 from evals.harness.archive import kind_of
 from evals.harness.artifact import load_artifact
@@ -1290,8 +1290,11 @@ class TestTheArchivedEmissionsReplay:
         pool = replay.pooled_extraction(sweeps)
 
         # A holdout case's emission is kept beside the artifact and skipped by
-        # the replay (#744), so it is not among the emissions graded.
-        holdouts = {case.id for case in corpus if case.meta.holdout}
+        # the replay (#744), so it is not among the emissions graded. An
+        # exhausted holdout is a development case, and is graded.
+        holdouts = {
+            case.id for case in corpus if audit.held_out(case.id, case.meta.holdout)
+        }
         assert pool["emissions"] == sum(
             1
             for p in ARTIFACTS
@@ -1455,9 +1458,13 @@ class TestTheArchivedEmissionsReplay:
         self,
         corpus,
         tmp_path,
+        monkeypatch,
         sampling,  # noqa: F811
     ):
         """A replay names every element a case lost, and no diagnosis reads a holdout's (#744)."""
+        # An empty ledger exhausts no case, so every flagged case is held out.
+        (tmp_path / "ledger").mkdir()
+        monkeypatch.setattr(audit, "EXPERIMENTS_DIR", tmp_path / "ledger")
         golden = next(c for c in corpus if c.id == CASE)
         holdout = next(c for c in corpus if c.meta.holdout)
         path = write_run(
