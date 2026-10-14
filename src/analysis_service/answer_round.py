@@ -568,7 +568,7 @@ class QuestionSet:
         complete: frozenset[SkipKey] = answered_keys(merged) & {
             fact.key for fact in facts
         } | {fold(link.principal) for link in links}
-        shown = self._check_presented(presented, merged)
+        shown = self._check_presented(presented)
         self._check_skips(skips, complete, save, shown)
         if self.final:
             raise ValueError(
@@ -618,42 +618,24 @@ class QuestionSet:
             ),
         )
 
-    def presented(self, answers: Sequence[FactAnswer]) -> tuple[UnknownKey, ...]:
-        """The listed early questions a page may show once ``answers`` are given.
-
-        **The one reader of which part is hidden** (#1542 F4). A part whose
-        parent the list also holds shows only once the parent is answered
-        "yes", and a part of a hidden part stays hidden. A page reports what
-        it presented, and a save records only the reported questions this
-        rule allows (:meth:`_check_presented`), so no history records a
-        hidden part as shown, and a skip of it is refused. ``answers`` is every
-        answer the job holds with this submission's in.
-        """
-        return _presented(self.early, answers)
-
     def _check_presented(
-        self, presented: Sequence[UnknownKey], answers: Sequence[FactAnswer]
+        self, presented: Sequence[UnknownKey]
     ) -> tuple[UnknownKey, ...]:
         """The reported questions, or a ``ValueError`` where one is not a listed
-        question the page could show (ADR 0078).
+        question (ADR 0078).
 
         **A page cannot record a question as shown that the service did not
-        list**, nor a part hidden under its parent's answer. So the shown
-        history holds only questions the service offered and the page says it
-        showed.
+        list.** So the shown history holds only questions the service offered
+        and the page says it showed. A part never sits in the list beside its
+        open parent (:func:`recommended`), so the list itself is what a page
+        may show.
         """
-        allowed = self.presented(answers)
         listed = {question.key for question in self.early}
         for key in presented:
             if key not in listed:
                 raise ValueError(
                     "only a question this list holds is recorded as shown:"
                     f' "{fact_label(key, self.model)}"'
-                )
-            if key not in allowed:
-                raise ValueError(
-                    f'"{fact_label(key, self.model)}" is hidden until its parent is'
-                    ' answered "yes", so it is not recorded as shown'
                 )
         return tuple(dict.fromkeys(presented))
 
@@ -705,13 +687,12 @@ class QuestionSet:
         """Refuse a skip outside a save, of a question the page did not present
         (ADR 0069), or of a question the same submission answers in full.
 
-        ``presented`` is what the page reported and the list allows
-        (:meth:`_check_presented`), so a part hidden under its parent, or a
-        question the service returned and the page never showed, is not
-        skipped. A question with facets answered in part may be skipped with
-        it: the facets given are kept, and the rest are set aside for now, so
-        a question the submitter can answer only in part does not stay first in
-        the list.
+        ``presented`` is what the page reported and the list holds
+        (:meth:`_check_presented`), so a question the service returned and
+        the page never showed is not skipped. A question with facets answered
+        in part may be skipped with it: the facets given are kept, and the
+        rest are set aside for now, so a question the submitter can answer only
+        in part does not stay first in the list.
         """
         if not skips:
             return
@@ -1007,22 +988,6 @@ def _waiting(
         if question.kind == "capability"
     }
     return frozenset(names[name] for name in waiting_parts(names.keys(), settled))
-
-
-def _presented(
-    early: Sequence[EarlyQuestion], answers: Sequence[FactAnswer]
-) -> tuple[UnknownKey, ...]:
-    """The rule :meth:`QuestionSet.presented` states, for the listed questions."""
-    said = {answer.key: answer.value for answer in answers}
-    asked = {question.key for question in early}
-    hidden: set[UnknownKey] = set()
-    # A parent comes before its parts in the list (by_turn keeps each
-    # framework's order), so one pass reaches a part of a part.
-    for question in early:
-        parent = question.parent
-        if parent in asked and (parent in hidden or said.get(parent) != "yes"):
-            hidden.add(question.key)
-    return tuple(question.key for question in early if question.key not in hidden)
 
 
 def _choices_left(question: EarlyQuestion, answer: FactAnswer | None) -> int:

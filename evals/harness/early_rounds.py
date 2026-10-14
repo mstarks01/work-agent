@@ -300,10 +300,9 @@ def replay(
         }
         given = [reply for reply in replies.values() if reply is not None]
         # "Skip the rest" sets aside a blank question, and one with facets
-        # the submitter answered only in part, among the questions the page shows:
-        # a part hidden under its parent's answer is not skipped.
+        # the submitter answered only in part, among the questions the page shows.
         complete = answered_keys(merged_facts(answered, given))
-        shows = set(asked.presented(merged_facts(answered, given)))
+        shows = {question.key for question in asked.early}
         skips = [
             key
             for key, reply in replies.items()
