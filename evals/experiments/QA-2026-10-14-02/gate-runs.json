@@ -1,0 +1,800 @@
+{
+ "model": "openai/gpt-5.6-luna",
+ "results": [
+  {
+   "case": "14-loyalty-oauth-platform",
+   "rows": [
+    {
+     "capability": "browser-frontend",
+     "source_label": "System description",
+     "quote": "The support console is a web app that closes a member's account."
+    },
+    {
+     "capability": "browser-accessible-http",
+     "source_label": "System description",
+     "quote": "The support console is a web app that closes a member's account."
+    },
+    {
+     "capability": "native-client",
+     "source_label": "System description",
+     "quote": "Members use our mobile app."
+    },
+    {
+     "capability": "cookies",
+     "source_label": "System description",
+     "quote": "The member's sign-in on the authorization server is kept in a cookie for thirty days."
+    },
+    {
+     "capability": "sensitive-http-requests",
+     "source_label": "System description",
+     "quote": "The app signs a member in through our authorization server with the authorization code flow and then calls the rewards API with the access token it gets back."
+    },
+    {
+     "capability": "authentication",
+     "source_label": "System description",
+     "quote": "A member who connects a partner app signs in on the authorization server's sign-in page in their browser"
+    },
+    {
+     "capability": "expiring-authentication-mechanisms",
+     "source_label": "System description",
+     "quote": "An authorization code stays valid for ten minutes."
+    },
+    {
+     "capability": "password-authentication",
+     "source_label": "System description",
+     "quote": "The authorization server keeps member accounts, email addresses and password hashes in the identity database"
+    },
+    {
+     "capability": "stored-password-verifiers",
+     "source_label": "System description",
+     "quote": "The authorization server keeps member accounts, email addresses and password hashes in the identity database"
+    },
+    {
+     "capability": "sessions",
+     "source_label": "System description",
+     "quote": "The member's sign-in on the authorization server is kept in a cookie for thirty days."
+    },
+    {
+     "capability": "self-contained-tokens",
+     "source_label": "System description",
+     "quote": "Access tokens are signed JWTs that live for one hour"
+    },
+    {
+     "capability": "self-contained-token-consumer",
+     "source_label": "System description",
+     "quote": "The rewards API checks the signature with a public key it downloads when it starts."
+    },
+    {
+     "capability": "self-contained-token-issuer",
+     "source_label": "System description",
+     "quote": "Access tokens are signed JWTs that live for one hour"
+    },
+    {
+     "capability": "token-validity-period",
+     "source_label": "System description",
+     "quote": "Access tokens are signed JWTs that live for one hour"
+    },
+    {
+     "capability": "shared-signing-key-audiences",
+     "source_label": "System description",
+     "quote": "The authorization server signs tokens for the support console with the same key."
+    },
+    {
+     "capability": "oauth",
+     "source_label": "System description",
+     "quote": "The app signs a member in through our authorization server with the authorization code flow and then calls the rewards API with the access token it gets back."
+    },
+    {
+     "capability": "oauth-client",
+     "source_label": "System description",
+     "quote": "The app signs a member in through our authorization server with the authorization code flow and then calls the rewards API with the access token it gets back."
+    },
+    {
+     "capability": "user-agent-authorization-flow",
+     "source_label": "System description",
+     "quote": "A member who connects a partner app signs in on the authorization server's sign-in page in their browser and approves a consent screen that lists the scopes."
+    },
+    {
+     "capability": "client-code-flow",
+     "source_label": "System description",
+     "quote": "The app signs a member in through our authorization server with the authorization code flow"
+    },
+    {
+     "capability": "oauth-resource-server",
+     "source_label": "System description",
+     "quote": "The rewards API checks the signature with a public key it downloads when it starts."
+    },
+    {
+     "capability": "oauth-authorization-server",
+     "source_label": "System description",
+     "quote": "The app signs a member in through our authorization server with the authorization code flow"
+    },
+    {
+     "capability": "server-code-flow",
+     "source_label": "System description",
+     "quote": "The app signs a member in through our authorization server with the authorization code flow"
+    },
+    {
+     "capability": "refresh-tokens",
+     "source_label": "System description",
+     "quote": "The app keeps a refresh token on the phone."
+    },
+    {
+     "capability": "confidential-client-backchannel",
+     "source_label": "System description",
+     "quote": "The partner app sends that secret in the body of its token requests."
+    },
+    {
+     "capability": "user-delegated-authorization",
+     "source_label": "System description",
+     "quote": "A member who connects a partner app signs in on the authorization server's sign-in page in their browser and approves a consent screen that lists the scopes."
+    },
+    {
+     "capability": "restricted-access",
+     "source_label": "System description",
+     "quote": "Redeeming points for a gift card needs only a valid access token that carries the redeem scope."
+    },
+    {
+     "capability": "administrative-interface",
+     "source_label": "System description",
+     "quote": "The support console is a web app that closes a member's account."
+    },
+    {
+     "capability": "sensitive-data",
+     "source_label": "System description",
+     "quote": "The authorization server keeps member accounts, email addresses and password hashes in the identity database, together with the authorization codes, refresh tokens and consents it issues."
+    },
+    {
+     "capability": "cryptographic-keys",
+     "source_label": "System description",
+     "quote": "The rewards API checks the signature with a public key it downloads when it starts."
+    },
+    {
+     "capability": "cryptographic-operations",
+     "source_label": "System description",
+     "quote": "Access tokens are signed JWTs that live for one hour"
+    },
+    {
+     "capability": "tls-use",
+     "source_label": "System description",
+     "quote": "Every connection from a phone, a browser or a partner server uses HTTPS."
+    },
+    {
+     "capability": "external-facing-http-services",
+     "source_label": "System description",
+     "quote": "Loyalty rewards platform and partner API."
+    },
+    {
+     "capability": "backend-secrets",
+     "source_label": "System description",
+     "quote": "The partnerships team registers each partner app by hand and gives it a client ID and a client secret."
+    },
+    {
+     "capability": "secret-assets",
+     "source_label": "System description",
+     "quote": "The app keeps a refresh token on the phone."
+    },
+    {
+     "capability": "high-value-flow",
+     "source_label": "System description",
+     "quote": "Redeeming points for a gift card needs only a valid access token that carries the redeem scope."
+    },
+    {
+     "capability": "dangerous-functionality",
+     "source_label": "System description",
+     "quote": "The support console is a web app that closes a member's account."
+    }
+   ],
+   "kept": [
+    {
+     "capability": "browser-frontend",
+     "state": "present",
+     "source_excerpt": "The support console is a web app that closes a member's account.",
+     "source_label": "System description",
+     "basis": ""
+    },
+    {
+     "capability": "browser-accessible-http",
+     "state": "present",
+     "source_excerpt": "The support console is a web app that closes a member's account.",
+     "source_label": "System description",
+     "basis": ""
+    },
+    {
+     "capability": "native-client",
+     "state": "present",
+     "source_excerpt": "Members use our mobile app.",
+     "source_label": "System description",
+     "basis": ""
+    },
+    {
+     "capability": "cookies",
+     "state": "present",
+     "source_excerpt": "The member's sign-in on the authorization server is kept in a cookie for thirty days.",
+     "source_label": "System description",
+     "basis": ""
+    },
+    {
+     "capability": "sensitive-http-requests",
+     "state": "present",
+     "source_excerpt": "The app signs a member in through our authorization server with the authorization code flow and then calls the rewards API with the access token it gets back.",
+     "source_label": "System description",
+     "basis": ""
+    },
+    {
+     "capability": "authentication",
+     "state": "present",
+     "source_excerpt": "A member who connects a partner app signs in on the authorization server's sign-in page in their browser",
+     "source_label": "System description",
+     "basis": ""
+    },
+    {
+     "capability": "expiring-authentication-mechanisms",
+     "state": "present",
+     "source_excerpt": "An authorization code stays valid for ten minutes.",
+     "source_label": "System description",
+     "basis": ""
+    },
+    {
+     "capability": "password-authentication",
+     "state": "present",
+     "source_excerpt": "The authorization server keeps member accounts, email addresses and password hashes in the identity database",
+     "source_label": "System description",
+     "basis": ""
+    },
+    {
+     "capability": "stored-password-verifiers",
+     "state": "present",
+     "source_excerpt": "The authorization server keeps member accounts, email addresses and password hashes in the identity database",
+     "source_label": "System description",
+     "basis": ""
+    },
+    {
+     "capability": "sessions",
+     "state": "present",
+     "source_excerpt": "The member's sign-in on the authorization server is kept in a cookie for thirty days.",
+     "source_label": "System description",
+     "basis": ""
+    },
+    {
+     "capability": "self-contained-tokens",
+     "state": "present",
+     "source_excerpt": "Access tokens are signed JWTs that live for one hour",
+     "source_label": "System description",
+     "basis": ""
+    },
+    {
+     "capability": "self-contained-token-consumer",
+     "state": "present",
+     "source_excerpt": "The rewards API checks the signature with a public key it downloads when it starts.",
+     "source_label": "System description",
+     "basis": ""
+    },
+    {
+     "capability": "self-contained-token-issuer",
+     "state": "present",
+     "source_excerpt": "Access tokens are signed JWTs that live for one hour",
+     "source_label": "System description",
+     "basis": ""
+    },
+    {
+     "capability": "token-validity-period",
+     "state": "present",
+     "source_excerpt": "Access tokens are signed JWTs that live for one hour",
+     "source_label": "System description",
+     "basis": ""
+    },
+    {
+     "capability": "shared-signing-key-audiences",
+     "state": "present",
+     "source_excerpt": "The authorization server signs tokens for the support console with the same key.",
+     "source_label": "System description",
+     "basis": ""
+    },
+    {
+     "capability": "oauth",
+     "state": "present",
+     "source_excerpt": "The app signs a member in through our authorization server with the authorization code flow and then calls the rewards API with the access token it gets back.",
+     "source_label": "System description",
+     "basis": ""
+    },
+    {
+     "capability": "oauth-client",
+     "state": "present",
+     "source_excerpt": "The app signs a member in through our authorization server with the authorization code flow and then calls the rewards API with the access token it gets back.",
+     "source_label": "System description",
+     "basis": ""
+    },
+    {
+     "capability": "user-agent-authorization-flow",
+     "state": "present",
+     "source_excerpt": "A member who connects a partner app signs in on the authorization server's sign-in page in their browser and approves a consent screen that lists the scopes.",
+     "source_label": "System description",
+     "basis": ""
+    },
+    {
+     "capability": "client-code-flow",
+     "state": "present",
+     "source_excerpt": "The app signs a member in through our authorization server with the authorization code flow",
+     "source_label": "System description",
+     "basis": ""
+    },
+    {
+     "capability": "oauth-resource-server",
+     "state": "present",
+     "source_excerpt": "The rewards API checks the signature with a public key it downloads when it starts.",
+     "source_label": "System description",
+     "basis": ""
+    },
+    {
+     "capability": "oauth-authorization-server",
+     "state": "present",
+     "source_excerpt": "The app signs a member in through our authorization server with the authorization code flow",
+     "source_label": "System description",
+     "basis": ""
+    },
+    {
+     "capability": "server-code-flow",
+     "state": "present",
+     "source_excerpt": "The app signs a member in through our authorization server with the authorization code flow",
+     "source_label": "System description",
+     "basis": ""
+    },
+    {
+     "capability": "refresh-tokens",
+     "state": "present",
+     "source_excerpt": "The app keeps a refresh token on the phone.",
+     "source_label": "System description",
+     "basis": ""
+    },
+    {
+     "capability": "confidential-client-backchannel",
+     "state": "present",
+     "source_excerpt": "The partner app sends that secret in the body of its token requests.",
+     "source_label": "System description",
+     "basis": ""
+    },
+    {
+     "capability": "user-delegated-authorization",
+     "state": "present",
+     "source_excerpt": "A member who connects a partner app signs in on the authorization server's sign-in page in their browser and approves a consent screen that lists the scopes.",
+     "source_label": "System description",
+     "basis": ""
+    },
+    {
+     "capability": "restricted-access",
+     "state": "present",
+     "source_excerpt": "Redeeming points for a gift card needs only a valid access token that carries the redeem scope.",
+     "source_label": "System description",
+     "basis": ""
+    },
+    {
+     "capability": "administrative-interface",
+     "state": "present",
+     "source_excerpt": "The support console is a web app that closes a member's account.",
+     "source_label": "System description",
+     "basis": ""
+    },
+    {
+     "capability": "sensitive-data",
+     "state": "present",
+     "source_excerpt": "The authorization server keeps member accounts, email addresses and password hashes in the identity database, together with the authorization codes, refresh tokens and consents it issues.",
+     "source_label": "System description",
+     "basis": ""
+    },
+    {
+     "capability": "cryptographic-keys",
+     "state": "present",
+     "source_excerpt": "The rewards API checks the signature with a public key it downloads when it starts.",
+     "source_label": "System description",
+     "basis": ""
+    },
+    {
+     "capability": "cryptographic-operations",
+     "state": "present",
+     "source_excerpt": "Access tokens are signed JWTs that live for one hour",
+     "source_label": "System description",
+     "basis": ""
+    },
+    {
+     "capability": "tls-use",
+     "state": "present",
+     "source_excerpt": "Every connection from a phone, a browser or a partner server uses HTTPS.",
+     "source_label": "System description",
+     "basis": ""
+    },
+    {
+     "capability": "external-facing-http-services",
+     "state": "present",
+     "source_excerpt": "Loyalty rewards platform and partner API.",
+     "source_label": "System description",
+     "basis": ""
+    },
+    {
+     "capability": "secret-assets",
+     "state": "present",
+     "source_excerpt": "The app keeps a refresh token on the phone.",
+     "source_label": "System description",
+     "basis": ""
+    },
+    {
+     "capability": "high-value-flow",
+     "state": "present",
+     "source_excerpt": "Redeeming points for a gift card needs only a valid access token that carries the redeem scope.",
+     "source_label": "System description",
+     "basis": ""
+    },
+    {
+     "capability": "dangerous-functionality",
+     "state": "present",
+     "source_excerpt": "The support console is a web app that closes a member's account.",
+     "source_label": "System description",
+     "basis": ""
+    }
+   ],
+   "usage": {
+    "prompt_tokens": 5587,
+    "completion_tokens": 3727
+   }
+  },
+  {
+   "case": "15-multitenant-invoicing",
+   "rows": [
+    {
+     "capability": "browser-frontend",
+     "source_label": "System description",
+     "quote": "People at a customer company use the billing app in their browser over HTTPS."
+    },
+    {
+     "capability": "browser-accessible-http",
+     "source_label": "System description",
+     "quote": "People at a customer company use the billing app in their browser over HTTPS."
+    },
+    {
+     "capability": "cookies",
+     "source_label": "System description",
+     "quote": "They sign in with an email address and a password and get a session cookie."
+    },
+    {
+     "capability": "tls-use",
+     "source_label": "System description",
+     "quote": "People at a customer company use the billing app in their browser over HTTPS."
+    },
+    {
+     "capability": "authentication",
+     "source_label": "System description",
+     "quote": "They sign in with an email address and a password and get a session cookie."
+    },
+    {
+     "capability": "password-authentication",
+     "source_label": "System description",
+     "quote": "They sign in with an email address and a password and get a session cookie."
+    },
+    {
+     "capability": "sessions",
+     "source_label": "System description",
+     "quote": "They sign in with an email address and a password and get a session cookie."
+    },
+    {
+     "capability": "multi-factor-authentication",
+     "source_label": "System description",
+     "quote": "From the admin console an agent can open a session in the billing app as any customer user."
+    },
+    {
+     "capability": "one-time-codes",
+     "source_label": "System description",
+     "quote": "each agent signs in to it with their own account and a one-time code."
+    },
+    {
+     "capability": "mail-sending",
+     "source_label": "System description",
+     "quote": "Each invoice email sends the payer a link that ends in the invoice number."
+    },
+    {
+     "capability": "database",
+     "source_label": "System description",
+     "quote": "The billing app keeps every company's invoices, customers and payout bank details in one PostgreSQL database, the tenant database."
+    },
+    {
+     "capability": "restricted-access",
+     "source_label": "System description",
+     "quote": "Each user belongs to one company and is either an admin or a viewer."
+    },
+    {
+     "capability": "multi-tenancy",
+     "source_label": "System description",
+     "quote": "Each customer company is one tenant, and all companies share one billing app, one database and one PDF bucket in our cloud platform."
+    },
+    {
+     "capability": "sensitive-data",
+     "source_label": "System description",
+     "quote": "The billing app keeps every company's invoices, customers and payout bank details in one PostgreSQL database, the tenant database."
+    },
+    {
+     "capability": "request-object-field-writes",
+     "source_label": "System description",
+     "quote": "The invoice edit form posts the whole invoice back, and the billing app saves every field it receives, including the paid flag and the company's payout bank account."
+    },
+    {
+     "capability": "server-side-file-processing",
+     "source_label": "System description",
+     "quote": "To make a PDF, the billing app puts a render job on the render queue."
+    },
+    {
+     "capability": "file-download",
+     "source_label": "System description",
+     "quote": "Any user can ask for a PDF of any invoice, as often as they like."
+    },
+    {
+     "capability": "administrative-interface",
+     "source_label": "System description",
+     "quote": "The admin console is reachable only from there"
+    },
+    {
+     "capability": "internal-services",
+     "source_label": "System description",
+     "quote": "Nobody recorded how the billing app and the renderer reach the database, the queue or the bucket"
+    },
+    {
+     "capability": "backend-service-connections",
+     "source_label": "System description",
+     "quote": "Nobody recorded how the billing app and the renderer reach the database, the queue or the bucket"
+    },
+    {
+     "capability": "separate-service-connections",
+     "source_label": "System description",
+     "quote": "Nobody recorded how the billing app and the renderer reach the database, the queue or the bucket"
+    },
+    {
+     "capability": "service-accounts",
+     "source_label": "System description",
+     "quote": "The app connects with one database account for all companies."
+    },
+    {
+     "capability": "backend-service-credentials",
+     "source_label": "System description",
+     "quote": "The billing app fetches PDFs from the bucket with one service credential for all companies."
+    },
+    {
+     "capability": "external-resource-use",
+     "source_label": "System description",
+     "quote": "Each customer company is one tenant, and all companies share one billing app, one database and one PDF bucket in our cloud platform."
+    },
+    {
+     "capability": "multi-system-request",
+     "source_label": "System description",
+     "quote": "To make a PDF, the billing app puts a render job on the render queue."
+    },
+    {
+     "capability": "data-object-responses",
+     "source_label": "System description",
+     "quote": "The payment page shows the invoice, the company's name and its bank details"
+    },
+    {
+     "capability": "http-response-bodies",
+     "source_label": "System description",
+     "quote": "The payment page shows the invoice, the company's name and its bank details"
+    },
+    {
+     "capability": "resource-demanding-functionality",
+     "source_label": "System description",
+     "quote": "Any user can ask for a PDF of any invoice, as often as they like."
+    },
+    {
+     "capability": "business-logic-limits-needed",
+     "source_label": "System description",
+     "quote": "Any user can ask for a PDF of any invoice, as often as they like."
+    }
+   ],
+   "kept": [
+    {
+     "capability": "browser-frontend",
+     "state": "present",
+     "source_excerpt": "People at a customer company use the billing app in their browser over HTTPS.",
+     "source_label": "System description",
+     "basis": ""
+    },
+    {
+     "capability": "browser-accessible-http",
+     "state": "present",
+     "source_excerpt": "People at a customer company use the billing app in their browser over HTTPS.",
+     "source_label": "System description",
+     "basis": ""
+    },
+    {
+     "capability": "cookies",
+     "state": "present",
+     "source_excerpt": "They sign in with an email address and a password and get a session cookie.",
+     "source_label": "System description",
+     "basis": ""
+    },
+    {
+     "capability": "tls-use",
+     "state": "present",
+     "source_excerpt": "People at a customer company use the billing app in their browser over HTTPS.",
+     "source_label": "System description",
+     "basis": ""
+    },
+    {
+     "capability": "authentication",
+     "state": "present",
+     "source_excerpt": "They sign in with an email address and a password and get a session cookie.",
+     "source_label": "System description",
+     "basis": ""
+    },
+    {
+     "capability": "password-authentication",
+     "state": "present",
+     "source_excerpt": "They sign in with an email address and a password and get a session cookie.",
+     "source_label": "System description",
+     "basis": ""
+    },
+    {
+     "capability": "sessions",
+     "state": "present",
+     "source_excerpt": "They sign in with an email address and a password and get a session cookie.",
+     "source_label": "System description",
+     "basis": ""
+    },
+    {
+     "capability": "multi-factor-authentication",
+     "state": "present",
+     "source_excerpt": "From the admin console an agent can open a session in the billing app as any customer user.",
+     "source_label": "System description",
+     "basis": ""
+    },
+    {
+     "capability": "one-time-codes",
+     "state": "present",
+     "source_excerpt": "each agent signs in to it with their own account and a one-time code.",
+     "source_label": "System description",
+     "basis": ""
+    },
+    {
+     "capability": "mail-sending",
+     "state": "present",
+     "source_excerpt": "Each invoice email sends the payer a link that ends in the invoice number.",
+     "source_label": "System description",
+     "basis": ""
+    },
+    {
+     "capability": "database",
+     "state": "present",
+     "source_excerpt": "The billing app keeps every company's invoices, customers and payout bank details in one PostgreSQL database, the tenant database.",
+     "source_label": "System description",
+     "basis": ""
+    },
+    {
+     "capability": "restricted-access",
+     "state": "present",
+     "source_excerpt": "Each user belongs to one company and is either an admin or a viewer.",
+     "source_label": "System description",
+     "basis": ""
+    },
+    {
+     "capability": "multi-tenancy",
+     "state": "present",
+     "source_excerpt": "Each customer company is one tenant, and all companies share one billing app, one database and one PDF bucket in our cloud platform.",
+     "source_label": "System description",
+     "basis": ""
+    },
+    {
+     "capability": "sensitive-data",
+     "state": "present",
+     "source_excerpt": "The billing app keeps every company's invoices, customers and payout bank details in one PostgreSQL database, the tenant database.",
+     "source_label": "System description",
+     "basis": ""
+    },
+    {
+     "capability": "request-object-field-writes",
+     "state": "present",
+     "source_excerpt": "The invoice edit form posts the whole invoice back, and the billing app saves every field it receives, including the paid flag and the company's payout bank account.",
+     "source_label": "System description",
+     "basis": ""
+    },
+    {
+     "capability": "server-side-file-processing",
+     "state": "present",
+     "source_excerpt": "To make a PDF, the billing app puts a render job on the render queue.",
+     "source_label": "System description",
+     "basis": ""
+    },
+    {
+     "capability": "file-download",
+     "state": "present",
+     "source_excerpt": "Any user can ask for a PDF of any invoice, as often as they like.",
+     "source_label": "System description",
+     "basis": ""
+    },
+    {
+     "capability": "administrative-interface",
+     "state": "present",
+     "source_excerpt": "The admin console is reachable only from there",
+     "source_label": "System description",
+     "basis": ""
+    },
+    {
+     "capability": "internal-services",
+     "state": "present",
+     "source_excerpt": "Nobody recorded how the billing app and the renderer reach the database, the queue or the bucket",
+     "source_label": "System description",
+     "basis": ""
+    },
+    {
+     "capability": "backend-service-connections",
+     "state": "present",
+     "source_excerpt": "Nobody recorded how the billing app and the renderer reach the database, the queue or the bucket",
+     "source_label": "System description",
+     "basis": ""
+    },
+    {
+     "capability": "separate-service-connections",
+     "state": "present",
+     "source_excerpt": "Nobody recorded how the billing app and the renderer reach the database, the queue or the bucket",
+     "source_label": "System description",
+     "basis": ""
+    },
+    {
+     "capability": "service-accounts",
+     "state": "present",
+     "source_excerpt": "The app connects with one database account for all companies.",
+     "source_label": "System description",
+     "basis": ""
+    },
+    {
+     "capability": "backend-service-credentials",
+     "state": "present",
+     "source_excerpt": "The billing app fetches PDFs from the bucket with one service credential for all companies.",
+     "source_label": "System description",
+     "basis": ""
+    },
+    {
+     "capability": "external-resource-use",
+     "state": "present",
+     "source_excerpt": "Each customer company is one tenant, and all companies share one billing app, one database and one PDF bucket in our cloud platform.",
+     "source_label": "System description",
+     "basis": ""
+    },
+    {
+     "capability": "multi-system-request",
+     "state": "present",
+     "source_excerpt": "To make a PDF, the billing app puts a render job on the render queue.",
+     "source_label": "System description",
+     "basis": ""
+    },
+    {
+     "capability": "data-object-responses",
+     "state": "present",
+     "source_excerpt": "The payment page shows the invoice, the company's name and its bank details",
+     "source_label": "System description",
+     "basis": ""
+    },
+    {
+     "capability": "http-response-bodies",
+     "state": "present",
+     "source_excerpt": "The payment page shows the invoice, the company's name and its bank details",
+     "source_label": "System description",
+     "basis": ""
+    },
+    {
+     "capability": "resource-demanding-functionality",
+     "state": "present",
+     "source_excerpt": "Any user can ask for a PDF of any invoice, as often as they like.",
+     "source_label": "System description",
+     "basis": ""
+    },
+    {
+     "capability": "business-logic-limits-needed",
+     "state": "present",
+     "source_excerpt": "Any user can ask for a PDF of any invoice, as often as they like.",
+     "source_label": "System description",
+     "basis": ""
+    }
+   ],
+   "usage": {
+    "prompt_tokens": 5449,
+    "completion_tokens": 2997
+   }
+  }
+ ]
+}
