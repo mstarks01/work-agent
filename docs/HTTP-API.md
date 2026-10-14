@@ -809,9 +809,15 @@ an unset or unknown value stops the startup. The service never falls back to
 | Variable | Values | Rule |
 | --- | --- | --- |
 | `ANALYSIS_JOB_STORE` | `memory`, `sql` | Required. |
-| `ANALYSIS_OBJECT_STORE` | `filesystem` | Required by `sql`. Refused by `memory`. |
+| `ANALYSIS_OBJECT_STORE` | `filesystem`, `s3` | Required by `sql`. Refused by `memory`. |
 | `ANALYSIS_DATABASE_URL` | `sqlite+aiosqlite:///<path>` | Required by `sql`. A URL that holds a password stops the startup. |
 | `ANALYSIS_OBJECT_ROOT` | an absolute path to a directory | Required by `filesystem`. |
+| `ANALYSIS_OBJECT_BUCKET` | the name of a bucket | Required by `s3`. |
+| `ANALYSIS_OBJECT_REGION` | the name of a region | Required by `s3`. |
+| `ANALYSIS_OBJECT_ENDPOINT` | `https://`, a host and an optional port | Optional for `s3`. Unset selects the AWS endpoint of the region. Any other URL stops the startup. |
+| `ANALYSIS_OBJECT_ADDRESSING` | `virtual`, `path` | Optional for `s3`. The default is `virtual`. |
+| `ANALYSIS_OBJECT_CREDENTIALS` | `iam`, `api_key` | Required by `s3`. |
+| `ANALYSIS_OBJECT_ACCESS_KEY_ID_FILE`, `ANALYSIS_OBJECT_SECRET_ACCESS_KEY_FILE` | a path to a file | Required by `api_key`. Refused by `iam`. |
 | `ANALYSIS_RETENTION_DAYS` | a whole number of days from 1 to 36500 | Optional. Unset keeps every job. See [Retention](#retention). |
 
 ### The `memory` store
@@ -853,6 +859,74 @@ read checks the digest. A changed or missing object returns `500` with no
 detail, and the service log names the job ID and the owner ID. The service
 writes the report of a job once.
 
+#### The `s3` object store
+
+The `s3` object store keeps each object in a bucket of a store that speaks the
+S3 API. It uses `boto3`, which the `aws` extra holds. Install both extras:
+
+```bash
+pip install 'analysis-service[sql,aws]'
+```
+
+When `s3` is selected and `boto3` is not installed, the startup stops with a
+message that names the `aws` extra.
+
+The service writes each object with a conditional write, `PutObject` with
+`If-None-Match: *`, so a put never replaces an object. A store must refuse
+that write with HTTP 412 when the key holds an object. A store that ignores
+the header replaces the object with no error, and the service then cannot
+keep the rule that it writes a report once. So use a store only when its
+documentation confirms the header on `PutObject`.
+
+Set these values for each provider whose documentation confirms the header:
+
+| Provider | `ANALYSIS_OBJECT_ENDPOINT` | `ANALYSIS_OBJECT_REGION` | `ANALYSIS_OBJECT_CREDENTIALS` |
+| --- | --- | --- | --- |
+| AWS S3 | unset | the region of the bucket, for example `eu-west-1` | `iam` for a role that the platform attaches, or `api_key` |
+| Cloudflare R2 | `https://<account-id>.r2.cloudflarestorage.com` | `auto` | `api_key`, with an R2 access key ID and secret access key |
+
+Do not use Backblaze B2. Its reference for `PutObject` does not list the
+`If-None-Match` header.
+
+`ANALYSIS_OBJECT_ADDRESSING` sets where a request names the bucket. `virtual`
+puts the bucket in the host name, `<bucket>.<host>`, and `path` puts it in the
+path, `<host>/<bucket>`. AWS S3 and Cloudflare R2 support `virtual`, so keep
+the default for them. With `virtual`, use a bucket name that has no dot: the
+TLS certificate of AWS S3 matches only a bucket name without a dot. Set `path`
+for a store that does not resolve `<bucket>.<host>`.
+
+`ANALYSIS_OBJECT_CREDENTIALS` declares the credential mode:
+
+- `iam`: the service gives no key. `boto3` finds the identity in its own
+  chain, for example a role that the platform attaches to the service. A key
+  file setting stops the startup.
+- `api_key`: the service reads a static key pair from two files.
+  `ANALYSIS_OBJECT_ACCESS_KEY_ID_FILE` names the file that holds the access
+  key ID, and `ANALYSIS_OBJECT_SECRET_ACCESS_KEY_FILE` names the file that
+  holds the secret access key. Give each file permissions that only the
+  service user can read. `ANALYSIS_OBJECT_ACCESS_KEY_ID` and
+  `ANALYSIS_OBJECT_SECRET_ACCESS_KEY` stop the startup, so a key never sits in
+  an environment variable.
+
+Each request uses TLS, and the service always verifies the certificate of the
+endpoint. The service ignores the endpoint that `AWS_ENDPOINT_URL` or a `boto3`
+profile names, so only `ANALYSIS_OBJECT_ENDPOINT` selects the endpoint.
+
+Prepare the bucket before the first start:
+
+- Give the identity of the service `s3:ListBucket` on the bucket, and
+  `s3:GetObject`, `s3:PutObject` and `s3:DeleteObject` on its objects.
+  `HeadBucket` needs `s3:ListBucket`. Without it, a missing object reads as
+  a refused access, and the read fails.
+- Block public access to the bucket. The API serves each report, and no reader
+  needs the bucket.
+- Turn on the server-side encryption of the bucket where the provider has a
+  setting for it.
+
+At the startup, the service sends `HeadBucket` to the bucket. A missing
+bucket, a refused credential or an endpoint that the service cannot reach
+stops the startup.
+
 #### The migration step
 
 The service never changes the schema. Run the migration as a deploy step,
@@ -875,7 +949,8 @@ The service starts in this order, and a failure at a step stops the startup:
 1. It reads the backend settings and builds the store.
 2. It reads `ANALYSIS_RETENTION_DAYS`.
 3. The `sql` store checks that the schema is at the latest revision.
-4. The `sql` store checks the object store: for `filesystem`, the root.
+4. The `sql` store checks the object store: for `filesystem`, the root, and
+   for `s3`, `HeadBucket` on the bucket.
 5. The restart scan fails each `queued` or `running` job in the store.
 6. The service takes requests. Where a retention period is set, the
    retention sweep starts at the same time.

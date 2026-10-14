@@ -6,6 +6,9 @@ selects no vendor: see :data:`tests.factories.TEST_TIER_ENV`.
 
 from __future__ import annotations
 
+import os
+from collections.abc import Iterator
+
 import pytest
 
 from analysis_service.offline import OFFLINE_ENV
@@ -55,6 +58,24 @@ def _offline(monkeypatch: pytest.MonkeyPatch) -> None:
 def supplied_transport(monkeypatch: pytest.MonkeyPatch) -> None:
     """Admit calls through the real translator to a transport the test supplies."""
     monkeypatch.delenv(OFFLINE_ENV)
+
+
+@pytest.fixture
+def moto_s3(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
+    """The S3 API, which moto serves in this process for one test.
+
+    No request leaves the process, and ``boto3`` reads no configuration file
+    and no profile of the machine. moto sets a fake key pair in the
+    environment for the test.
+    """
+    from moto import mock_aws
+
+    monkeypatch.setenv("AWS_CONFIG_FILE", os.devnull)
+    monkeypatch.setenv("AWS_SHARED_CREDENTIALS_FILE", os.devnull)
+    for var in ("AWS_PROFILE", "AWS_DEFAULT_PROFILE"):
+        monkeypatch.delenv(var, raising=False)
+    with mock_aws():
+        yield
 
 
 @pytest.fixture(scope="session")

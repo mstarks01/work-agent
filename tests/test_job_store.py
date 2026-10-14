@@ -44,7 +44,7 @@ from tests.factories import (
     sample_selection,
     valid_model,
 )
-from tests.sql_stores import sql_env
+from tests.sql_stores import object_env, sql_env
 from tests.test_parsing import ISDIGIT_TRAPS
 from tests.test_pause import waiting
 
@@ -62,17 +62,23 @@ KEY = ("df-1", "encryption_in_transit", "", "", "", "")
 #: Every backend pair the suite runs on: the job store, then the database and
 #: the object store where the job store keeps objects. ``tests/test_backends.py``
 #: checks these against the backend tables, so a new row needs a pair here.
-BACKEND_PAIRS = ("memory", "sql/sqlite+aiosqlite/filesystem")
+BACKEND_PAIRS = (
+    "memory",
+    "sql/sqlite+aiosqlite/filesystem",
+    "sql/sqlite+aiosqlite/s3",
+)
 
 
 @pytest.fixture(params=BACKEND_PAIRS)
 def new_store(request, tmp_path_factory):
     """A maker of fresh stores of one backend pair."""
+    if request.param == "memory":
+        return InMemoryJobStore
+    objects = request.param.rsplit("/", 1)[1]
+    object_env(request, objects)
 
     def make():
-        if request.param == "memory":
-            return InMemoryJobStore()
-        return build_store(sql_env(tmp_path_factory.mktemp("store")))
+        return build_store(sql_env(tmp_path_factory.mktemp("store"), objects))
 
     return make
 

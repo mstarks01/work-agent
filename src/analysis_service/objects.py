@@ -158,12 +158,25 @@ def _read(path: Path) -> bytes:
         return file.read()
 
 
-ObjectStoreName = Literal["filesystem"]
+def _s3_store(env: Mapping[str, str]) -> ObjectStore:
+    """The ``s3`` store, from the ``aws`` extra (ADR 0023)."""
+    try:
+        from analysis_service.s3_objects import S3ObjectStore
+    except ModuleNotFoundError as missing:
+        raise JobStoreConfigError(
+            f"the s3 object store needs the aws extra ({missing.name} is not"
+            " installed): install analysis-service[aws]"
+        ) from None
+    return S3ObjectStore.from_env(env)
+
+
+ObjectStoreName = Literal["filesystem", "s3"]
 
 #: Each ``ANALYSIS_OBJECT_STORE`` value, and how to build its store from the
 #: environment. The table answers for every name of :data:`ObjectStoreName`.
 OBJECT_STORES: dict[ObjectStoreName, Callable[[Mapping[str, str]], ObjectStore]] = {
     "filesystem": FilesystemObjectStore.from_env,
+    "s3": _s3_store,
 }
 
 

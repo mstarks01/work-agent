@@ -70,7 +70,11 @@ dependencies = [
 # The one `boto3` range. Each feature that needs `boto3` names this extra,
 # so the range has one reader: the Bedrock vendor row, the `s3` object
 # store and the RDS IAM token of the `sql` store.
-aws = ["boto3>=1.43.1,<2.0"]
+#
+# The `s3` object store imports `botocore` by name, so the extra names it.
+# It has no range of its own: each `boto3` release requires one `botocore`
+# version range.
+aws = ["boto3>=1.43.1,<2.0", "botocore"]
 bedrock = ["analysis-service[aws]"]
 # The `sql` job store (ADR 0065): SQLAlchemy async Core with one code path for
 # PostgreSQL and SQLite, and Alembic for the schema. A `memory` deployment
@@ -91,12 +95,16 @@ dev = [
     # The project's own bedrock extra, named rather than re-specified: the
     # offline conformance suite binds an adapter for **every** vendor, and a
     # vendor whose client library were absent would be the one vendor that
-    # suite could not cover. One place states the version range.
+    # suite could not cover. One place states the version range. The extra
+    # also brings the `aws` extra, which the `s3` object store needs.
     "analysis-service[bedrock]",
     # The `sql` extra, named for the same reason: the job store contract suite
     # runs on every backend, so CI installs the `sql` store's libraries.
     "analysis-service[sql]",
     "httpx>=0.27",
+    # The `s3` object store's contract suite runs on an S3 API that moto
+    # serves in the test process, so no test reaches a network.
+    "moto[s3]>=5.1",
     "mypy>=1.18",
     "pip-audit>=2.9",
     "pytest>=8",
@@ -203,6 +211,12 @@ warn_unused_ignores = true
 # fail on their import; CI installs the group, so there it checks the calls.
 [[tool.mypy.overrides]]
 module = ["playwright", "playwright.*"]
+ignore_missing_imports = true
+
+# `boto3` and `botocore` ship no type information, and the project installs
+# no stub package for them. The `s3` object store keeps its client as `Any`.
+[[tool.mypy.overrides]]
+module = ["boto3", "boto3.*", "botocore", "botocore.*"]
 ignore_missing_imports = true
 
 [tool.ruff.format]
