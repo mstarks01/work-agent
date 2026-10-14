@@ -166,6 +166,7 @@ TEST_TIER_ENV: dict[str, str] = {
     # read this env script the lanes and the critic and no ``assert`` node, so
     # they turn it off; a test of the pass sets it on.
     "ANALYSIS_ASSERTIONS": "false",
+    "ANALYSIS_CAPABILITY_READER": "false",
 }
 
 _KEY_DIR = Path(tempfile.mkdtemp(prefix="analysis-test-keys-"))

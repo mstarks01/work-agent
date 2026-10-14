@@ -57,9 +57,9 @@ flowchart TD
 
 Purple nodes are model calls. Everything else is a deterministic `FunctionNode`:
 blue ones do work, amber ones only choose an edge, and the rounded ends are the
-run's three outcomes. `capabilities` and `stated` are in the graph only where
-the deployment sets `ANALYSIS_CAPABILITY_READER=true` and a selected framework
-reads capabilities. `assert` is in the graph unless the deployment sets
+run's three outcomes. `capabilities` and `stated` are in the graph where a
+selected framework reads capabilities, unless the deployment sets
+`ANALYSIS_CAPABILITY_READER=false`. `assert` is in the graph unless the deployment sets
 `ANALYSIS_ASSERTIONS=false`. A pass that is not in the graph is skipped, and a
 valid model goes on to the next node.
 
@@ -212,8 +212,8 @@ roughly seventeen times as much for findings the endpoint never reads.
 ## The capability reader
 
 The capability reader puts one more `base`-tier call into a job whose selected
-framework applies its units by a rule over capabilities. It is off by default,
-and `ANALYSIS_CAPABILITY_READER=true` turns it on. The `capabilities` node
+framework applies its units by a rule over capabilities. It runs by default
+(ADR 0087), and `ANALYSIS_CAPABILITY_READER=false` turns it off. The `capabilities` node
 reads the sources and the capability table, and proposes each capability the
 text says the application has, with the source's own words. The `stated` node
 then checks each row in code: the key must be in the table, the label must
@@ -230,7 +230,7 @@ node does.
 
 | Variable | Effect |
 | --- | --- |
-| `ANALYSIS_CAPABILITY_READER` | Run the capability reader on every job whose selection reads capabilities. Off by default; `true` turns it on. |
+| `ANALYSIS_CAPABILITY_READER` | Run the capability reader on every job whose selection reads capabilities. On by default; `false` turns it off. |
 
 ## Models
 

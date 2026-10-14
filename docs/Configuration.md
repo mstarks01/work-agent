@@ -1153,8 +1153,8 @@ misspelled *name* that passes unnoticed.
 ### Optional passes
 
 Three variables add a pass to the graph or change how extraction writes. The
-assertion pass is on by default, and the capability reader and the compact
-form are off, so a deployment that sets none of them runs the graph the table
+assertion pass and the capability reader are on by default, and the compact
+form is off, so a deployment that sets none of them runs the graph the table
 states. A variable is on only when
 it is `1`, `true`, `yes` or `on`. Any other non-empty value is off, and an
 unset or empty variable keeps the default. A change takes effect at the next
@@ -1163,7 +1163,7 @@ restart.
 | Variable | Status | What it does |
 | --- | --- | --- |
 | `ANALYSIS_ASSERTIONS` | supported | Runs the assertion pass on every job. On by default; `false` turns it off (see below). |
-| `ANALYSIS_CAPABILITY_READER` | supported | Runs the capability reader on every job whose selection reads capabilities. Off by default; `true` turns it on (see below). |
+| `ANALYSIS_CAPABILITY_READER` | supported | Runs the capability reader on every job whose selection reads capabilities. On by default; `false` turns it off (see below). |
 | `ANALYSIS_COMPACT_EXTRACTION` | experiment (#938) | Extraction writes a compact form that code expands into the same system model. |
 
 Use the experiments only to measure them. Their results are recorded on the
@@ -1202,9 +1202,10 @@ it cannot find. See [Concepts](Concepts.md#assertion) for what the rows do.
 - **Turn it off.** Set `ANALYSIS_ASSERTIONS=false` and restart. Nothing stored
   changes shape.
 
-**The capability reader.** With `ANALYSIS_CAPABILITY_READER=true`, a
-`capabilities` node runs after the model passes its validity check, in a job
-whose selected framework applies its units by a rule over capabilities. It
+**The capability reader.** By default, a `capabilities` node runs after the
+model passes its validity check, in a job whose selected framework applies its
+units by a rule over capabilities. Set `ANALYSIS_CAPABILITY_READER=false` to
+turn it off. It
 reads the same sources as extraction and lists each capability the text says
 the application has, with the quote that says it. Code keeps a row only where
 the quote is in the source it names, and writes it into the system model as
@@ -1221,7 +1222,7 @@ decides before its lanes run, then read it.
 - **What it states.** Only `present`. A capability that an answer or another
   statement names is left as it is, and a later answer replaces the reader's
   statement.
-- **Turn it off.** Unset the variable, or set it to `false`, and restart.
+- **Turn it off.** Set `ANALYSIS_CAPABILITY_READER=false` and restart.
   Nothing stored changes shape.
 
 ### Provider environment
