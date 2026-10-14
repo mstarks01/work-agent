@@ -101,7 +101,8 @@ valid model goes on to the next node.
   [`coverage`](Report-Schema.md#coverage--what-each-lane-was-offered) account
   over the drafts.
   Then that framework's **critic** rules on the drafts code did not settle, in
-  one pass — verdicts, dedupe, severity calibration — spending judgement only
+  one pass — a verdict on each draft, and the judgements its package's text
+  asks for, such as the STRIDE confidence rating — spending judgement only
   on what code cannot check. A draft resting on an `unknown` is ruled
   `needs-info` in code before the critic reads, and when that leaves nothing
   to rule on, or the lanes drafted nothing, the critic is not called. **Each package carries its own critic, blind to every other
@@ -440,10 +441,13 @@ into something is talked into producing a bad report, not into acting.
 This guarantee assumes the intended concurrency model: `async` calls on a single
 event loop. The default `InMemorySessionService` is an in-process store — safe
 for cooperative async concurrency with distinct session ids, but not a
-thread-safe store to share across OS threads. Scaling across processes keeps
-analyses isolated (nothing is shared), but then each worker has its own in-memory
-job and session state, so a job must be routed to the worker that holds it —
-which is what the persistent backends below are for.
+thread-safe store to share across OS threads. Two processes keep analyses
+isolated, because they share nothing. Each process holds its own session state
+and, with the `memory` store, its own jobs, so a job must go to the process
+that holds it. The `sql` store keeps jobs across a restart of one instance, but
+it does not support two instances on one store: the restart scan at the start
+of one instance fails the jobs that the other instance still runs. See
+[The startup](HTTP-API.md#the-startup).
 
 ## The model translator runs in this process
 
@@ -544,7 +548,7 @@ packaging (container, Cloud Run), and observability.
 | --- | --- |
 | `analysis_service.engine` | In-process `Engine` facade. |
 | `analysis_service.api` | The `/v1` FastAPI app. |
-| `analysis_service.job_answers` | The one writer of a job's answers and the one starter of the job they start. It reads the job from the store, builds the Answer State, stores a round, a draft or a correction, or admits and starts the Resumed Job, and raises typed refusals each driver maps to its transport. |
+| `analysis_service.job_answers` | The one writer of a job's answers and the one starter of the job they start. It reads the job from the store, builds the Answer State, stores the answers, a draft or a correction, or admits and starts the Resumed Job, and raises typed refusals each driver maps to its transport. |
 | `analysis_service.jobs` | Job lifecycle, `JobStore`, `PipelineRunner` seams. |
 | `analysis_service.store_backends` | The job store backends (`JOB_STORES`, `build_store`), the one delete (`audited_delete`), the retention and orphan sweeps, and the start-up an app runs over its store. |
 | `analysis_service.store_settings` | The reader of a closed store setting and `StoreConfigError`. It imports nothing from the stores. |
