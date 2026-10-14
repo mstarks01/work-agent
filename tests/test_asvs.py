@@ -32,6 +32,7 @@ from analysis_service.claims import (
     Refusal,
     RejectionStep,
     ScopeEntry,
+    UnknownRef,
     Verdict,
 )
 from analysis_service.engine import Engine, EngineInputError
@@ -692,6 +693,12 @@ def test_a_flow_that_never_said_no_longer_holds_a_decided_model_open():
         (("unknownish binary framing", "AMQP"), "refuted"),
         (("AMQP", "SFTP"), "refuted"),
         (("HTTPS", "SFTP"), "satisfied"),
+        (("RESTful JSON", "SFTP"), "satisfied"),
+        (("TCP, firewall-restricted port", "SFTP"), "refuted"),
+        (("AMQP, not HTTP", "SFTP"), "undecidable"),
+        (("MQTT without HTTP", "SFTP"), "undecidable"),
+        (("HTTPS, not HTTP/2", "SFTP"), "undecidable"),
+        (("HTTPS, not HTTP/2", "HTTPS"), "satisfied"),
     ],
 )
 def test_a_model_with_no_processes_is_answered_by_its_flows(protocols, expected):
@@ -706,7 +713,9 @@ def test_a_model_with_no_processes_is_answered_by_its_flows(protocols, expected)
 
     ``unknownish binary framing`` is a stated protocol on purpose: the leading
     token is read as a *word*, which is the rule every other reader of an
-    attribute in this repo already applies.
+    attribute in this repo already applies. A web term is a word too, so
+    "restricted" is not REST. A web term beside a negation is open: "AMQP, not
+    HTTP" and "HTTPS, not HTTP/2" read the same to a word match.
     """
     model = valid_model()
     flows = [
@@ -719,6 +728,22 @@ def test_a_model_with_no_processes_is_answered_by_its_flows(protocols, expected)
     )
 
     assert answer == expected
+
+
+def test_a_negated_web_protocol_is_asked():
+    """The facts ask the flow that holds the precondition open."""
+    model = valid_model()
+    flows = [
+        flow.model_copy(update={"protocol": protocol})
+        for flow, protocol in zip(
+            model.data_flows, ("AMQP, not HTTP", "SFTP"), strict=True
+        )
+    ]
+    open_model = model.model_copy(update={"processes": [], "data_flows": flows})
+
+    assert rules.asvs_precondition_facts(open_model) == (
+        UnknownRef(element_id=flows[0].id, attribute="protocol"),
+    )
 
 
 def test_a_model_with_nothing_to_read_at_all_is_undecidable():
