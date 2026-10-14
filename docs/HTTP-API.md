@@ -85,13 +85,12 @@ appears in `GET /v1/jobs/{id}`; it is operator-facing only. See
 ### A job from an older schema version
 
 Each job stores the [`schema_version`](Report-Schema.md) of the service that
-created it. A new major version changes a shape that the service cannot parse
-in an older record, and no migration rewrites a stored job. The questions,
+created it. A new version can change a shape that the service cannot parse in
+an older record, and no migration rewrites a stored job. The questions,
 answers, corrections and amendments routes, `/changes`, and a submission with
-`answers_from` return `409` for a job whose major version is not the current
-one. The `detail` names the stored version and the current version, and tells
-you to submit the job again. A job from an older minor version of the current
-major works as before.
+`answers_from` return `409` for a job whose version is not the current one. The
+`detail` names the stored version and the current version, and tells you to
+submit the job again.
 
 `GET /v1/jobs/{id}` and `GET /v1/jobs/{id}/report` serve a job of any version.
 The report route returns the report as the service stored it, so read its own

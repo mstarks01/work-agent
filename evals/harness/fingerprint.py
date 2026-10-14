@@ -14,43 +14,29 @@ that a new scorer silently re-scores everything, with no way to recompute the
 earlier numbers. This module answers it by making the re-score explicit, total and
 free.
 
-Version 1 reads what a claim carries today: framework, lane, and the
-endpoint-resolved **Element** IDs. It has a measured cost.
-``tests/test_evals_identity.py``'s ``endpoint subset`` row prices element
+Every version reads the framework, the lane, the endpoint-resolved **Element**
+IDs and the **scope** a claim was reached in. An element ID is unique inside one
+**System Model** and says nothing across two: ``store:landing-bucket`` is a slug
+two corpus cases both derive, and without the scope case 03's disclosure claim
+about partner extracts keys identically to case 12's about a supplier extract.
+Each version refuses an empty scope.
+
+Version 4 adds the action verb as written, because place alone has a measured
+cost. ``tests/test_evals_identity.py``'s ``endpoint subset`` row prices element
 agreement alone at 12 false splits of 169, 69 false merges of 92 candidate
 negatives, and the reference merges the frontier table in
 ``docs/agents/claim-identity.md`` carries. That table is the one reader of the
 reference column, so this module states it nowhere.
 
-Version 2 adds the action verb, and it takes the candidate merges from 69 to 2.
+The verb takes the candidate merges from 69 to 2.
 It takes the false splits from 12 to 13 over 169 labelled pairs, which is the
-whole price. Read the candidate column rather than the reference one: on
-reference pairs alone version 1 reads as survivable.
-Scored against the recorded labels, the verb rule agrees on 246/261.
+whole price. Scored against the recorded labels, the verb rule agrees on 246/261.
 Element agreement alone agrees on 169/261.
 
-Version 2 is the default. :class:`~analysis_service.claims.Claim` carries the
-verb, and :class:`~analysis_service.frameworks.stride.record.DraftThreat`
-requires it, so a finding out of a live run fingerprints as a reference claim
-does.
-
-Version 3 reads a catalog identifier instead of an action. A package whose
+Version 5 reads a catalog identifier instead of an action. A package whose
 claims name a requirement in a published catalog is already identified, so the
 rule that keys it is place plus that identifier: ASVS's ``V6.2.1``, in the
-chapter it was ruled in, over the elements it names. Version 1 keyed such a
-claim by place alone, which made two requirements ruled on one element in one
-chapter a single fingerprint, and let one vote answer for both.
-
-Versions 4 and 5 add the **scope** a claim was reached in, and they are what
-:data:`VERSION_FOR` now names. Versions 1 to 3 read a place as an **Element ID**
-and nothing more, so two systems that spell one element alike shared a
-fingerprint: ``store:landing-bucket`` is a slug two corpus cases both derive, and
-case 03's disclosure claim about partner extracts keyed identically to case 12's
-about a supplier extract. One vote answered for both, and a queue built over
-both cases showed only the first. An element ID is unique inside one **System
-Model** and says nothing across two, so the scope is the missing half of the
-place. :data:`READS_SCOPE` says which versions read it, and a version that does
-refuses an empty one the way version 2 refuses a missing verb.
+chapter it was ruled in, over the elements it names.
 
 Version 6 reads the action through :data:`~evals.harness.verbs.EQUIVALENT`,
 so two verbs the labels cannot separate key alike. Version 4 hashes the verb
@@ -120,13 +106,13 @@ IDENTIFIER_OF: dict[FrameworkName, Callable[[str], str] | None] = {
 #: Every version this module can compute. A key missing here raises rather than
 #: falling back — a fingerprint quietly computed under the wrong rule is a vote
 #: silently attached to the wrong finding.
-SUPPORTED_VERSIONS = (1, 2, 3, 4, 5, 6)
+SUPPORTED_VERSIONS = (4, 5, 6)
 
-#: Which component each version reads on top of the framework, lane and targets
-#: every version hashes. ``None`` says this version reads those three alone.
+#: Which component each version reads on top of the framework, lane, targets and
+#: scope every version hashes.
 #:
-#: **Keyed, never branched.** An ``if version == 2`` beside an ``if version ==
-#: 3`` at every site that composed a claim would be three copies of one table,
+#: **Keyed, never branched.** An ``if version == 4`` beside an ``if version ==
+#: 5`` at every site that composed a claim would be three copies of one table,
 #: and a fourth version would have to find all of them.
 #: :func:`key_claim` reads this instead, so a caller offers everything its claim
 #: carries and the version decides what is kept.
@@ -136,10 +122,7 @@ SUPPORTED_VERSIONS = (1, 2, 3, 4, 5, 6)
 #: compares to its registry fails as quietly as a branch.
 #: ``action`` is the verb read through the equivalence table; ``verb`` is the
 #: verb as written. Both require a verb on the claim.
-EXTRA_COMPONENT: dict[int, str | None] = {
-    1: None,
-    2: "verb",
-    3: "identifier",
+EXTRA_COMPONENT: dict[int, str] = {
     4: "verb",
     5: "identifier",
     6: "action",
@@ -152,17 +135,8 @@ EXTRA_COMPONENT: dict[int, str | None] = {
 #:
 #: A separate table rather than another :data:`EXTRA_COMPONENT` entry, because
 #: the scope is not an alternative to the verb or the identifier — it sits
-#: beside whichever of those a version already reads, which is why one change
-#: produced two new versions rather than one.
-#:
-#: ``False`` on 1, 2 and 3 is what keeps those values meaning what they meant.
-#: A version's whole purpose is that a stored value cannot be silently
-#: re-interpreted, so the fix is a version that reads more, never a redefinition
-#: of one that already shipped.
+#: beside whichever of those a version already reads.
 READS_SCOPE: dict[int, bool] = {
-    1: False,
-    2: False,
-    3: False,
     4: True,
     5: True,
     6: True,
@@ -178,9 +152,9 @@ class Components:
     """What a fingerprint is computed from, kept beside every vote.
 
     Stored rather than derived so that a version bump re-keys the ledger by
-    recomputation. ``verb`` is optional because version 1 does not read it and
-    no reference claim carries one yet; asking for version 2 without it is an
-    error rather than a fingerprint over a silent empty string.
+    recomputation. ``verb`` is optional because version 5 reads an identifier
+    instead; asking for version 4 or 6 without it is an error rather than a
+    fingerprint over a silent empty string.
 
     ``targets`` arrives already endpoint-resolved — the caller holds the
     **Data Flow** map, and a component that re-resolved on every hash would make
@@ -193,7 +167,7 @@ class Components:
     verb: str | None = None
     #: The catalog identifier this claim names, for a package whose claims carry
     #: one. ``None`` for a package that composes an identity instead, and
-    #: version 3 refuses to hash without it.
+    #: version 5 refuses to hash without it.
     identifier: str | None = None
     #: Which system this claim was reached in — the case ID, everywhere a claim
     #: is keyed today. The other half of a place: an **Element ID** is unique
@@ -368,8 +342,7 @@ def fingerprint(components: Components, version: int) -> str:
         if components.verb is None:
             raise FingerprintError(
                 f"version {version} reads the action verb and this claim"
-                " carries none; assign one from evals.harness.verbs, or"
-                " fingerprint at version 1"
+                " carries none; assign one from evals.harness.verbs"
             )
         verb = check_verb(components.verb)
         parts.append(canonical(verb) if EXTRA_COMPONENT[version] == "action" else verb)

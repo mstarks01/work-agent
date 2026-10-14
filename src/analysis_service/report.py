@@ -178,7 +178,7 @@ from analysis_service.vendors import ServedTrust, vendor_for_route
 # payload carrying ``threats`` at the top level is refused by this model, and a
 # 3.0 payload carrying ``analyses`` is refused by a 2.10 model. A stored job
 # record is a different case: it states the version that created it, and
-# :func:`analysis_service.jobs.same_major` reads that before a route parses it.
+# :func:`analysis_service.jobs.same_schema` reads that before a route parses it.
 SCHEMA_VERSION = "3.0"
 
 # The envelope's disclaimer, which is about the *service* rather than about any

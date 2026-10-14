@@ -303,18 +303,6 @@ sets as calibration: 14 of 86 readable must-finds moved, floor sd 2.65,
 inflation 1.63 on 12 degrees of freedom, **sd 3.37**. Every repeat run that
 lands from now on sharpens it and costs nothing extra.
 
-An artifact older than the current schema is refused by the loader, and the
-repeat sets on disk are usually older than the instrument reading them. Lift a
-copy first:
-
-```sh
-python -m evals.harness.run migrate evals/runs/<set>/*.json --out /tmp/lifted
-```
-
-It writes copies, never in place, and never inside `evals/baselines`. A file it
-cannot help — a sweep from before execution identities were recorded — is named
-and skipped rather than stopping the rest.
-
 ### Two standards for a name
 
 Extraction is graded on element IDs, which are derived from names, so a model

@@ -133,11 +133,6 @@ prototype work lives on a throwaway branch, and its tip is preserved as an annot
 `archive/<branch>` tag, so a SHA citation still resolves. Read one without touching the worktree:
 `git show archive/research/litellm-sole-adapter:docs/research/litellm-sole-adapter.md`.
 
-`.wayfinder/` holds two archived maps, the original service design map and per-tier model tuning.
-They use the local-markdown convention (`assignee:` frontmatter as the claim, a `blocked-by:` list
-for dependencies) rather than the sub-issue and dependency operations above; don't take them as a
-model for how to chart a new one.
-
 Reopening any completed map would be a **fresh map, not a resumption** — including
 #3, whose closed tickets are the *record* of decisions taken, not a backlog. Work
 that merely implements #3's decisions needs no map at all.

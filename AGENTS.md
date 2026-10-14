@@ -14,8 +14,7 @@ and the evidence. Read that doc before you work in its area.
 ### Issue tracker
 
 Issues live as GitHub issues on `mstarks01/work-agent`, driven through the `gh` CLI;
-wayfinder maps use native sub-issues and issue dependencies. Completed local-markdown
-maps under `.wayfinder/` are archived history, not live. See `docs/agents/issue-tracker.md`.
+wayfinder maps use native sub-issues and issue dependencies. See `docs/agents/issue-tracker.md`.
 
 ### Code review checkpoints
 

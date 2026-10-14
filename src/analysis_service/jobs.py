@@ -125,19 +125,14 @@ def locks_its_parent(status: JobStatus) -> bool:
     return status not in NON_LOCKING_STATUSES
 
 
-def same_major(version: str) -> bool:
-    """Whether ``version`` has the major number of this service's ``SCHEMA_VERSION``.
+def same_schema(version: str) -> bool:
+    """Whether ``version`` is this service's ``SCHEMA_VERSION``, exactly.
 
     **The one comparison of schema versions** (#1532). A record that another
-    major wrote can hold a shape this service cannot parse, so each route that
-    parses a stored record asks this first. A minor bump only adds fields, so a
-    record from an older minor of this major reads as before.
-
-    The major is the text before the first dot. Text that this service never
-    writes, such as an empty string, has no major that matches, so it reads as
-    another major.
+    version wrote can hold a shape this service cannot parse, so each route that
+    parses a stored record asks this first.
     """
-    return version.partition(".")[0] == SCHEMA_VERSION.partition(".")[0]
+    return version == SCHEMA_VERSION
 
 
 # Stored on a failed job in place of any internal detail.
@@ -252,7 +247,7 @@ class JobRecord(BaseModel):
     owner_id: str
     # The ``SCHEMA_VERSION`` of the service that created this record. It
     # covers the checkpoint, the resumption, the sources and the report, and
-    # :func:`same_major` reads it before a route parses any of them (#1532).
+    # :func:`same_schema` reads it before a route parses any of them (#1532).
     # No default, so a record that does not state its version fails to load.
     schema_version: str
     sources: list[Source] = Field(min_length=1)

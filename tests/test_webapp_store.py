@@ -230,8 +230,8 @@ class TestARestart:
         assert (body["status"], body["error"]) == ("failed", RESTART_FAILURE_MESSAGE)
 
 
-class TestARecordOfAnotherMajor:
-    """#1665: each read that parses a stored record asks ``same_major`` first."""
+class TestARecordOfAnotherSchemaVersion:
+    """#1665: each read that parses a stored record asks ``same_schema`` first."""
 
     def test_the_list_shows_it_and_its_page_answers_409(self, tiers, durable):
         with app(tiers) as client:

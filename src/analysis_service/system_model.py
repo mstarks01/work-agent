@@ -153,8 +153,8 @@ class FlowParts:
 
     What ``source`` and ``destination`` hold is the version's own business:
     version 2 recovers full **Element ID**s, version 1 recovers bare name slugs
-    because its derivation dropped the type prefix. That is why the migration
-    reads the original graph rather than the recorded ID (ADR 0037 rule 5), and
+    because its derivation dropped the type prefix. That is why a lift of an
+    old ID reads the graph rather than the recorded ID (ADR 0037 rule 5), and
     why :func:`flow_label` is the only part a version-blind caller asks for.
     """
 
@@ -196,7 +196,7 @@ def _parse_v1(flow_id: str) -> FlowParts:
     own slug as readily as between two of them: ``flow:a-to-b-to-c:read`` is
     three legal splits and this raises on it. That is the defect ADR 0037 fixes,
     stated as a property of the rule rather than as a comment — and it is why
-    rule 5 builds the migration mapping from the graph.
+    rule 5 builds the lift table from the graph.
     """
     body, _, label = _flow_body(flow_id, 1).rpartition(":")
     if not body or not label:
@@ -206,7 +206,7 @@ def _parse_v1(flow_id: str) -> FlowParts:
         raise FlowIdError(
             f"{flow_id!r} splits {len(halves)} ways on version 1's '-to-';"
             " a version 1 ID whose endpoint slugs carry the separator names no"
-            " pair of endpoints, which is why a migration reads the graph"
+            " pair of endpoints, which is why a lift reads the graph"
         )
     return FlowParts(source=halves[0], destination=halves[1], label=label)
 
@@ -267,7 +267,8 @@ _FLOW_ID_SHAPES = MappingProxyType(
 #: The version this service writes. Version 1 dropped the endpoints' type
 #: prefixes, so an entity and a process sharing one name derived one flow ID
 #: (#989); version 2 encodes both endpoints' full IDs. Bumping it is a schema
-#: change with a migration — see ``evals/harness/flow_ids.py``.
+#: change: the corpus moves to the new version in the same change, and
+#: ``evals/harness/flow_ids.py`` lifts an archived artifact's old IDs.
 FLOW_ID_VERSION = 2
 
 
@@ -324,10 +325,9 @@ def flow_id_version(flow_id: str) -> int:
     no string is legal under both. Two matches or none raises, which is what
     keeps that property a check rather than an assumption.
 
-    This is how a *single* ID is read. It is not how a *tree* is read: the
-    corpus migration takes its source version as an argument, because a corpus
-    holding both shapes must fail as a whole rather than have its unmigrated
-    half quietly fixed.
+    This is how a *single* ID is read. A *graph* is read by
+    ``flow_id_version_of_graph`` in ``evals/harness/flow_ids.py``, which raises
+    on a graph that holds both shapes rather than read half of it.
     """
     matched = [
         version for version, shape in _FLOW_ID_SHAPES.items() if shape.match(flow_id)

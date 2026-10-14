@@ -16,12 +16,9 @@ from analysis_service.claims import derive_severity_level
 from analysis_service.frameworks.stride.record import STRIDE_CATEGORIES
 from analysis_service.system_model import SystemModel, normalize_element_ids
 from evals import verify_corpus
-from evals.harness import envelope as envelopes
-from evals.harness import sitting as sittings
 from evals.harness.identity import endpoint_form
 from evals.harness.reference import (
     MAX_CORPUS_SOURCE_BYTES,
-    RETIRED_FIELDS,
     CorpusError,
     ReferenceThreat,
     flows_by_case,
@@ -252,31 +249,8 @@ def test_empty_corpus_fails_closed(tmp_path):
         load_corpus(tmp_path)
 
 
-def test_a_retired_field_says_where_the_record_went(tmp_path):
-    """The refusal is a sentence the reader can act on, not a pydantic frame.
-
-    A hard cutover leaves a working tree carrying the field it retired, and
-    the launch that refuses it is where the reader meets it. ``str`` of a
-    ``ValidationError`` names an error tag, a truncated repr and a
-    documentation link — none of which say what to change.
-    """
-    case_dir = _copy_case(CORPUS_DIR / "02-iot-fleet-telemetry", tmp_path)
-    meta = json.loads((case_dir / "case.json").read_text())
-    meta["reviews"] = [{"submitted_by": "ada", "document": "REVIEW-ada.md"}]
-    (case_dir / "case.json").write_text(json.dumps(meta))
-
-    with pytest.raises(CorpusError) as raised:
-        load_case(case_dir)
-
-    said = str(raised.value)
-    assert "02-iot-fleet-telemetry" in said
-    assert "reviews is not a field case.json has" in said
-    assert RETIRED_FIELDS["reviews"] in said
-    assert "pydantic" not in said and "extra_forbidden" not in said
-
-
-def test_an_unknown_field_is_refused_without_advice(tmp_path):
-    """Only a field somebody retired has somewhere to point."""
+def test_an_unknown_field_is_refused_by_name(tmp_path):
+    """The refusal is a sentence the reader can act on, not a pydantic frame."""
     case_dir = _copy_case(CORPUS_DIR / "02-iot-fleet-telemetry", tmp_path)
     meta = json.loads((case_dir / "case.json").read_text())
     meta["reviewer"] = "ada"
@@ -295,14 +269,6 @@ def test_a_field_with_a_wrong_value_still_names_the_field(tmp_path):
 
     with pytest.raises(CorpusError, match="title: Field required"):
         load_case(case_dir)
-
-
-def test_the_retired_field_names_a_path_the_code_writes():
-    """A path in prose drifts; this pins it to the module that writes there."""
-    assert envelopes.SUBMISSIONS_DIR.as_posix() in RETIRED_FIELDS["reviews"]
-    assert str(sittings.draft_root()) in RETIRED_FIELDS["reviews"].replace(
-        "~", str(Path.home())
-    )
 
 
 class TestTheFlowMapServesTheCitationsItIsAskedAbout:

@@ -4,9 +4,11 @@
 - **Date**: 2026-08-22
 - **Effort**: [#276 — the 6-8K prompt envelope is circular, and two packages'
   text is unlinted](https://github.com/mstarks01/work-agent/issues/276)
-- **Amends**: `.wayfinder/tickets/006-skills-sme-design.md`, which set the first
-  caps and named the envelope. The ticket's other decisions stand: full skill
-  text into the instruction, stable-first order, and a CI lint over the tree.
+- **Amends**: ticket 006 of the original service design map, which set the
+  first caps and named the envelope. Git history keeps it:
+  `git show fb62cb14:.wayfinder/tickets/006-skills-sme-design.md`. The ticket's
+  other decisions stand: full skill text into the instruction, stable-first
+  order, and a CI lint over the tree.
 
 ## Context
 

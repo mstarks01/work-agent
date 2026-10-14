@@ -552,8 +552,8 @@ class Ground(BaseModel):
       subject, value, basis, scope and spans are read off the catalog the
       report embeds, never copied here, so the ground cannot say more than the
       row does. Only a settled row is ever catalogued
-      (:func:`~analysis_service.assertions.settled`), so a conflict, an
-      unsupported row or a legacy one grounds nothing.
+      (:func:`~analysis_service.assertions.settled`), so a conflict or an
+      unsupported row grounds nothing.
     * ``unknown-assertion`` — ``assertion`` alone, for a row the sources left
       open: its value is :data:`~analysis_service.system_model.UNKNOWN`, or
       another row disputes it (:func:`~analysis_service.assertions.disputed`). **The assertion layer's

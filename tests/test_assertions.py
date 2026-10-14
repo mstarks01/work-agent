@@ -311,9 +311,7 @@ class TestAssertionIdentity:
         assert assertion_id(other) == assertion_id(self.stated())
 
     def test_a_basis_or_an_assessment_never_moves_the_identity(self):
-        assert assertion_id(self.stated(basis="legacy", support=[])) == assertion_id(
-            self.stated()
-        )
+        assert assertion_id(self.stated(basis="derived")) == assertion_id(self.stated())
 
     def test_the_wording_of_a_text_value_is_folded(self):
         """The citation ladder's own fold, so two spellings are one value."""
@@ -563,11 +561,6 @@ REFUSALS: dict[str, tuple[str, AssertionCatalog, dict]] = {
         catalog([stated(support=[])]),
         {},
     ),
-    "legacy-with-support": (
-        "an imported value is never support-backed, whatever quote it carries",
-        catalog([stated(basis="legacy")]),
-        {"sources": SOURCES},
-    ),
     "missing-premise": (
         "an inferred value that names nothing it rests on",
         catalog([stated(basis="inferred", support=[])]),
@@ -754,7 +747,7 @@ class TestConflictsAreDerived:
 
     def test_an_unknown_never_conflicts(self):
         """A row saying nobody stated it answers nothing the other row claims."""
-        silent = self.row(value=UNKNOWN, basis="legacy", support=[], reason="silent")
+        silent = self.row(value=UNKNOWN, support=[], reason="silent")
         assert conflicts(catalog([self.row(), silent])) == ()
 
     def test_a_different_scope_is_a_different_question(self):
@@ -902,10 +895,6 @@ class TestWhatAConsumerMayRestOn:
         assert found.rows == (judged,)
         assert found.settled == ()
         assert found.standing == "unknown"
-
-    def test_a_legacy_row_is_never_support(self):
-        legacy = self.row(basis="legacy", support=[])
-        assert answer(catalog([legacy]), FLOW, "mfa-requirement").settled == ()
 
     def test_a_conflict_settles_nothing_and_stays_visible(self):
         held = catalog([self.row(), self.row(value="required")])
@@ -1557,7 +1546,6 @@ PROJECTIONS: dict[str, str] = {
     "several-predicates": "two predicates' facts on one field cannot both hold",
     "compatible": "several values that all hold, which one string cannot carry",
     "unsupported": "a row found unsupported, or left unresolved, states nothing",
-    "legacy": "a row imported from before this layer is never support",
 }
 
 
@@ -1817,7 +1805,7 @@ class TestTheProjectionBecomesTheGraphsValue:
     """ADR 0034's migration, applied where the catalog answers and nowhere else.
 
     What it must *not* do carries the weight. A projection with nothing to add —
-    rows all unknown, rows imported as legacy, values that all hold — leaves
+    rows all unknown, values that all hold — leaves
     what extraction wrote. One whose rows say the attribute is *not settled* —
     a conflict, a scope, a row set aside — writes a qualified ``unknown``
     rather than leave a definite value authoritative over them (#926).
@@ -2113,16 +2101,6 @@ class TestTheImplementationAudit:
         held = catalog([stated(), self.hedge()])
         assert [p.reason for p in project(held)] == ["stated"]
 
-    # --- 5: legacy is never support, for the projection either ---
-
-    def test_a_legacy_row_does_not_project(self):
-        held = catalog([stated(basis="legacy", support=[])])
-        updated, applied = apply_projection(self.model(), held)
-
-        assert [p.reason for p in project(held)] == ["legacy"]
-        assert applied == ()
-        assert self._flow(updated).authentication == "session cookie"
-
     @pytest.mark.parametrize("basis", sorted(get_args(Basis)))
     @pytest.mark.parametrize("assessment", sorted(get_args(Assessment)))
     def test_the_projection_and_settled_agree_on_which_rows_count(
@@ -2133,8 +2111,8 @@ class TestTheImplementationAudit:
             basis=basis,
             assessment=assessment,
             assessor="" if assessment == "unchecked" else "human:test",
-            support=[] if basis == "legacy" else stated().support,
-            explanation="" if basis in ("stated", "legacy") else "because",
+            support=stated().support,
+            explanation="" if basis == "stated" else "because",
         )
         (projection,) = project(catalog([row]))
 
