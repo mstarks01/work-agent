@@ -18,12 +18,11 @@ import pytest
 from botocore.exceptions import ClientError, EndpointConnectionError
 from sqlalchemy.pool import NullPool
 
-from analysis_service import jobs, sql_store
+from analysis_service import jobs, sql_store, store_backends
 from analysis_service.answer_sets import NO_ANSWERS, AnswerSet
 from analysis_service.budgets import BudgetPolicy
 from analysis_service.fact_answers import FactAnswer
 from analysis_service.jobs import (
-    JOB_STORES,
     NON_LOCKING_STATUSES,
     RESTART_FAILURE_MESSAGE,
     Admission,
@@ -31,9 +30,7 @@ from analysis_service.jobs import (
     InMemoryJobStore,
     JobRecord,
     JobStatus,
-    JobStoreConfigError,
     Resumption,
-    build_store,
     same_major,
 )
 from analysis_service.objects import ObjectStore, build_object_store, object_key
@@ -41,6 +38,8 @@ from analysis_service.principals import Identity, Principal
 from analysis_service.report import SCHEMA_VERSION, NodeRun, TokenUsage
 from analysis_service.sources import Source
 from analysis_service.sql_store import DATABASES
+from analysis_service.store_backends import JOB_STORES, build_store
+from analysis_service.store_settings import StoreConfigError
 from tests import test_resume
 from tests.factories import (
     SEEDING_BUDGET,
@@ -965,7 +964,7 @@ class TestTheRetentionSweep:
 
     def test_it_keeps_a_job_that_changes_after_the_listing(self, store):
         job = last_updated(store, "completed", days_ago=2)
-        asyncio.run(jobs.expire_jobs(ChangedAfterListing(store), 1))
+        asyncio.run(store_backends.expire_jobs(ChangedAfterListing(store), 1))
         assert asyncio.run(store.get(job)) is not None
 
     @pytest.mark.parametrize(
@@ -974,19 +973,19 @@ class TestTheRetentionSweep:
     def test_it_deletes_a_terminal_job_older_than_the_period(self, store, status):
         old = last_updated(store, status, days_ago=30)
         recent = last_updated(store, status, days_ago=29)
-        asyncio.run(jobs.expire_jobs(store, 30))
+        asyncio.run(store_backends.expire_jobs(store, 30))
         assert asyncio.run(store.get(old)) is None
         assert asyncio.run(store.get(recent)) is not None
 
     @pytest.mark.parametrize("status", ["queued", "running"])
     def test_it_never_deletes_a_job_in_flight(self, store, status):
         job = last_updated(store, status, days_ago=400)
-        asyncio.run(jobs.expire_jobs(store, 1))
+        asyncio.run(store_backends.expire_jobs(store, 1))
         assert asyncio.run(store.get(job)).status == status
 
     def test_a_swept_job_keeps_its_usage_row(self, store):
         last_updated(store, "failed", days_ago=2, reserved=900)
-        asyncio.run(jobs.expire_jobs(store, 1))
+        asyncio.run(store_backends.expire_jobs(store, 1))
         assert asyncio.run(store.owned_jobs("alice")) == []
         assert reserve(store, new_record(reserved=200)).outcome == "over_owner_budget"
 
@@ -994,8 +993,8 @@ class TestTheRetentionSweep:
         self, store, caplog
     ):
         job = last_updated(store, "completed", days_ago=2)
-        with caplog.at_level(logging.INFO, logger="analysis_service.jobs"):
-            asyncio.run(jobs.expire_jobs(store, 1))
+        with caplog.at_level(logging.INFO, logger="analysis_service.store_backends"):
+            asyncio.run(store_backends.expire_jobs(store, 1))
         [line] = caplog.messages
         assert re.fullmatch(
             f"deleted job {job} of owner alice: cause retention,"
@@ -1074,12 +1073,15 @@ class TestAFailedObjectDelete:
         store, objects = held
         job = completed(store)
         objects.failing = {object_key("alice", job, "sources.json")}
-        with caplog.at_level(logging.INFO, logger="analysis_service.jobs"):
-            assert asyncio.run(jobs.audited_delete(store, job, "alice", "owner")) == 1
+        with caplog.at_level(logging.INFO, logger="analysis_service.store_backends"):
+            assert (
+                asyncio.run(store_backends.audited_delete(store, job, "alice", "owner"))
+                == 1
+            )
         assert [
             record.getMessage()
             for record in caplog.records
-            if record.name == "analysis_service.jobs"
+            if record.name == "analysis_service.store_backends"
         ] == [f"deleted job {job} of owner alice: cause owner, 1 object(s) removed"]
 
     def test_a_cancellation_is_never_caught(self, held):
@@ -1251,11 +1253,11 @@ class TestTheOrphanSweep:
 
     def test_one_pass_writes_one_line_with_its_count(self, held, caplog, monkeypatch):
         store, objects = held
-        monkeypatch.setattr(jobs, "ORPHAN_GRACE", timedelta(minutes=-1))
+        monkeypatch.setattr(store_backends, "ORPHAN_GRACE", timedelta(minutes=-1))
         key = object_key("alice", new_record().id, "sources.json")
         asyncio.run(objects.put(key, b"[]"))
-        with caplog.at_level(logging.INFO, logger="analysis_service.jobs"):
-            asyncio.run(jobs.remove_orphans(store))
+        with caplog.at_level(logging.INFO, logger="analysis_service.store_backends"):
+            asyncio.run(store_backends.remove_orphans(store))
         assert caplog.messages == ["the orphan sweep removed 1 object(s)"]
 
 
@@ -1278,7 +1280,7 @@ class SweepSpy(InMemoryJobStore):
 async def passes_in_lifespan(store: SweepSpy, passes: int) -> None:
     """Start the store's lifespan, and wait until the orphan sweep ran
     ``passes`` times, for five seconds at most."""
-    async with jobs.store_lifespan(store):
+    async with store_backends.store_lifespan(store):
         for _ in range(500):
             if store.passes >= passes:
                 break
@@ -1297,9 +1299,9 @@ class TestTheSweepLoop:
 
     def test_a_failed_pass_is_logged_and_the_next_pass_runs(self, monkeypatch, caplog):
         monkeypatch.delenv("ANALYSIS_RETENTION_DAYS", raising=False)
-        monkeypatch.setattr(jobs, "SWEEP_SECONDS", 0)
+        monkeypatch.setattr(store_backends, "SWEEP_SECONDS", 0)
         store = SweepSpy(failures=1)
-        with caplog.at_level(logging.INFO, logger="analysis_service.jobs"):
+        with caplog.at_level(logging.INFO, logger="analysis_service.store_backends"):
             asyncio.run(passes_in_lifespan(store, 2))
         assert store.passes >= 2
         assert "the orphan sweep failed" in caplog.messages
@@ -1320,11 +1322,15 @@ class TestTheRetentionSetting:
     """#1530: unset keeps every job, and a value that is not a period refuses."""
 
     def test_unset_keeps_every_job(self):
-        assert jobs.retention_days({}) is None
+        assert store_backends.retention_days({}) is None
 
-    @pytest.mark.parametrize("value", ["1", "30", str(jobs.MAX_RETENTION_DAYS)])
+    @pytest.mark.parametrize(
+        "value", ["1", "30", str(store_backends.MAX_RETENTION_DAYS)]
+    )
     def test_a_whole_number_of_days(self, value):
-        assert jobs.retention_days({"ANALYSIS_RETENTION_DAYS": value}) == int(value)
+        assert store_backends.retention_days({"ANALYSIS_RETENTION_DAYS": value}) == int(
+            value
+        )
 
     @pytest.mark.parametrize(
         "value",
@@ -1338,13 +1344,13 @@ class TestTheRetentionSetting:
             "1.5",
             "1e3",
             "thirty",
-            str(jobs.MAX_RETENTION_DAYS + 1),
+            str(store_backends.MAX_RETENTION_DAYS + 1),
             *ISDIGIT_TRAPS,
         ],
     )
     def test_any_other_value_stops_the_startup(self, value):
-        with pytest.raises(JobStoreConfigError, match="ANALYSIS_RETENTION_DAYS"):
-            jobs.retention_days({"ANALYSIS_RETENTION_DAYS": value})
+        with pytest.raises(StoreConfigError, match="ANALYSIS_RETENTION_DAYS"):
+            store_backends.retention_days({"ANALYSIS_RETENTION_DAYS": value})
 
 
 class TestTheRestartScan:

@@ -518,6 +518,8 @@ packaging (container, Cloud Run), and observability.
 | `analysis_service.api` | The `/v1` FastAPI app. |
 | `analysis_service.job_answers` | The one writer of a job's answers and the one starter of the job they start. It reads the job from the store, builds the Answer State, stores a round, a draft or a correction, or admits and starts the Resumed Job, and raises typed refusals each driver maps to its transport. |
 | `analysis_service.jobs` | Job lifecycle, `JobStore`, `PipelineRunner` seams. |
+| `analysis_service.store_backends` | The job store backends (`JOB_STORES`, `build_store`), the one delete (`audited_delete`), the retention and orphan sweeps, and the start-up an app runs over its store. |
+| `analysis_service.store_settings` | The reader of a closed store setting and `StoreConfigError`. It imports nothing from the stores. |
 | `analysis_service.sources` | `Source`: the untrusted text a job is built from, the per-deployment bounds both entry points enforce, and the fenced render that is the only way caller bytes reach a model (OWASP LLM01). |
 | `analysis_service.deployment` | One installation's config, resolved once: the files, the graph they configure, its runner and its certification gate. |
 | `analysis_service.pipeline` | `AdkPipelineRunner`: one job's identity, input digest and certification around a Graph Run. |

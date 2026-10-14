@@ -30,13 +30,13 @@ from analysis_service.jobs import (
     Checkpoint,
     JobRecord,
     JobStore,
-    JobStoreConfigError,
     Resumption,
-    build_store,
 )
 from analysis_service.report import NodeRun
 from analysis_service.sources import Source
 from analysis_service.sql_store import METADATA, CorruptObject
+from analysis_service.store_backends import build_store
+from analysis_service.store_settings import StoreConfigError
 from analysis_service.validation import ValidationIssue
 from tests.factories import (
     DEFAULT_FRAMEWORKS,
@@ -162,27 +162,27 @@ class TestTheStartupRefusals:
                 del env[var]
             else:
                 env[var] = value
-        with pytest.raises(JobStoreConfigError, match=message) as refused:
+        with pytest.raises(StoreConfigError, match=message) as refused:
             start(env)
         assert "hunter2" not in str(refused.value)
 
     def test_a_schema_that_is_not_at_the_latest_revision(self, env, tmp_path):
         env["ANALYSIS_DATABASE_URL"] = sqlite_url(empty_database(tmp_path))
-        with pytest.raises(JobStoreConfigError, match="revision None"):
+        with pytest.raises(StoreConfigError, match="revision None"):
             start(env)
 
     def test_a_missing_database_file(self, env, tmp_path):
         """The service never makes the file: only the migration step does."""
         missing = tmp_path / "missing.db"
         env["ANALYSIS_DATABASE_URL"] = sqlite_url(missing)
-        with pytest.raises(JobStoreConfigError, match="does not exist"):
+        with pytest.raises(StoreConfigError, match="does not exist"):
             start(env)
         assert not missing.exists()
 
     def test_a_database_file_that_others_can_open(self, env):
         database = env["ANALYSIS_DATABASE_URL"].removeprefix("sqlite+aiosqlite:///")
         os.chmod(database, 0o640)
-        with pytest.raises(JobStoreConfigError, match="set its mode to 0600"):
+        with pytest.raises(StoreConfigError, match="set its mode to 0600"):
             start(env)
 
     def test_a_database_file_that_is_a_symbolic_link(self, env, tmp_path):
@@ -190,35 +190,35 @@ class TestTheStartupRefusals:
         link = tmp_path / "link.db"
         link.symlink_to(database)
         env["ANALYSIS_DATABASE_URL"] = sqlite_url(link)
-        with pytest.raises(JobStoreConfigError, match="not a regular file"):
+        with pytest.raises(StoreConfigError, match="not a regular file"):
             start(env)
 
     def test_a_relative_database_path(self, env):
         env["ANALYSIS_DATABASE_URL"] = "sqlite+aiosqlite:///jobs.db"
-        with pytest.raises(JobStoreConfigError, match="absolute path"):
+        with pytest.raises(StoreConfigError, match="absolute path"):
             start(env)
 
     def test_a_missing_root(self, env):
         os.rmdir(env["ANALYSIS_OBJECT_ROOT"])
-        with pytest.raises(JobStoreConfigError, match="does not exist"):
+        with pytest.raises(StoreConfigError, match="does not exist"):
             start(env)
 
     def test_a_root_that_is_a_file(self, env, tmp_path):
         env["ANALYSIS_OBJECT_ROOT"] = str(tmp_path / "jobs.db")
-        with pytest.raises(JobStoreConfigError, match="not a directory"):
+        with pytest.raises(StoreConfigError, match="not a directory"):
             start(env)
 
     @pytest.mark.parametrize("mode", [0o750, 0o705, 0o720])
     def test_a_root_a_group_or_others_can_open(self, env, mode):
         os.chmod(env["ANALYSIS_OBJECT_ROOT"], mode)
-        with pytest.raises(JobStoreConfigError, match="a group or others"):
+        with pytest.raises(StoreConfigError, match="a group or others"):
             start(env)
 
     def test_a_root_another_user_owns(self, env, monkeypatch):
         monkeypatch.setattr(
             "analysis_service.objects.os.geteuid", lambda: os.getuid() + 1
         )
-        with pytest.raises(JobStoreConfigError, match="another user owns"):
+        with pytest.raises(StoreConfigError, match="another user owns"):
             start(env)
 
     def test_a_usable_store_starts(self, env):
@@ -231,7 +231,7 @@ class TestTheStartupOrder:
     def test_the_schema_is_checked_before_the_object_store(self, env, tmp_path):
         env["ANALYSIS_DATABASE_URL"] = sqlite_url(empty_database(tmp_path))
         os.rmdir(env["ANALYSIS_OBJECT_ROOT"])
-        with pytest.raises(JobStoreConfigError, match="revision"):
+        with pytest.raises(StoreConfigError, match="revision"):
             start(env)
 
     def test_a_failed_check_stops_the_startup_before_the_restart_scan(self, env):
@@ -239,7 +239,7 @@ class TestTheStartupOrder:
         job = queued(store)
         os.chmod(env["ANALYSIS_OBJECT_ROOT"], 0o750)
         with (
-            pytest.raises(JobStoreConfigError),
+            pytest.raises(StoreConfigError),
             TestClient(app_over(store)),
         ):
             pass

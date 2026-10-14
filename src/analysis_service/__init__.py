@@ -66,14 +66,12 @@ from analysis_service.jobs import (
     JobRecord,
     JobStatus,
     JobStore,
-    JobStoreConfigError,
     PipelineAwaiting,
     PipelineCompleted,
     PipelineOutcome,
     PipelineRejected,
     PipelineRunner,
     StubPipelineRunner,
-    build_store,
     execute_job,
 )
 from analysis_service.markdown_loader import (
@@ -122,6 +120,8 @@ from analysis_service.sources import (
     clean_system_name,
     render_sources,
 )
+from analysis_service.store_backends import build_store
+from analysis_service.store_settings import StoreConfigError
 from analysis_service.system_model import (
     CORE_ASSET_TAGS,
     FLOW_ID_RULES,
@@ -211,7 +211,6 @@ __all__ = [
     "JobStatus",
     "JobStatusView",
     "JobStore",
-    "JobStoreConfigError",
     "JobSubmission",
     "KnowledgeTables",
     "LaneCoverage",
@@ -240,6 +239,7 @@ __all__ = [
     "SourceKind",
     "SourceLimits",
     "SourceRef",
+    "StoreConfigError",
     "StubPipelineRunner",
     "SystemModel",
     "TierName",

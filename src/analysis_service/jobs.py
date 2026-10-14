@@ -7,12 +7,12 @@ edge. It holds an append-only per-job event log that backs both the poll
 response and the SSE stream. It also holds two open seams:
 
 * :class:`JobStore`. The API only ever talks to this interface. A deployment
-  selects a backend with ``ANALYSIS_JOB_STORE``, and :func:`build_store`
-  constructs it from its row of :data:`JOB_STORES`. :class:`InMemoryJobStore`
+  selects a backend with ``ANALYSIS_JOB_STORE``, and :func:`~analysis_service.store_backends.build_store`
+  constructs it from its row of :data:`~analysis_service.store_backends.JOB_STORES`. :class:`InMemoryJobStore`
   is the ``memory`` backend, which is non-durable and per-instance. The
   ``sql`` backend, :class:`analysis_service.sql_store.SqlJobStore`, keeps
   jobs in a database and their sources and reports in an object store, so
-  they live through a restart. There is no default: :func:`build_store` fails
+  they live through a restart. There is no default: :func:`~analysis_service.store_backends.build_store` fails
   closed rather than choosing one for a deployment that did not.
 * :class:`PipelineRunner`. The API runs jobs through this interface, and never
   against a graph directly.
@@ -29,7 +29,6 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
-import os
 import re
 from collections.abc import (
     AsyncIterator,
@@ -37,14 +36,12 @@ from collections.abc import (
     Callable,
     Iterable,
     Iterator,
-    Mapping,
     Sequence,
 )
-from contextlib import asynccontextmanager, suppress
 from dataclasses import dataclass, field
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime
 from itertools import chain
-from typing import TYPE_CHECKING, Any, Literal, Protocol, Self, TypeGuard, TypeVar
+from typing import Any, Literal, Protocol, Self, TypeGuard
 from uuid import uuid4
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_validator
@@ -58,7 +55,6 @@ from analysis_service.claims import FrameworkAnalysis, FrameworkName, UnknownKey
 from analysis_service.execution import GraphFailed
 from analysis_service.fact_answers import MAX_HELD_FACTS, FactAnswer, SkipKey
 from analysis_service.links import MAX_HELD_LINKS
-from analysis_service.parsing import ascii_int
 from analysis_service.principals import Identity, Principal, PrincipalTable
 from analysis_service.report import (
     SCHEMA_VERSION,
@@ -71,9 +67,6 @@ from analysis_service.report import (
 from analysis_service.sources import Source
 from analysis_service.system_model import Process, SystemModel, TrustBoundary
 from analysis_service.validation import ValidationIssue
-
-if TYPE_CHECKING:
-    from analysis_service.objects import ObjectStore
 
 logger = logging.getLogger(__name__)
 
@@ -562,7 +555,7 @@ class JobStore(Protocol):
     beside the API would be per-instance no matter what backend a deployment
     configured, so behind two instances the effective ceiling would silently be
     double the configured number and would reset on every deploy — precisely the
-    defect :func:`build_store` fails closed over. Asked of the store instead, the
+    defect :func:`~analysis_service.store_backends.build_store` fails closed over. Asked of the store instead, the
     ceiling is exactly as shared as the deployment's storage is, and a shared
     backend makes it a shared ceiling with no change at the call site.
 
@@ -1178,248 +1171,6 @@ async def event_frames(
         if status in TERMINAL_STATUSES or (gone is not None and await gone()):
             return
         await asyncio.sleep(POLL_SECONDS)
-
-
-class JobStoreConfigError(ValueError):
-    """A job store setting or an object store setting is missing or unusable."""
-
-
-Name = TypeVar("Name", bound=str)
-
-
-def backend_name(value: str, setting: str, table: Mapping[Name, object]) -> Name:
-    """The row of ``table`` that ``value`` names. An empty or unknown value raises.
-
-    **The one reader of a backend value**: the job store, the object store and
-    the database all read theirs here. ``setting`` names where the value comes
-    from, for the message. The value is never read from a request.
-    """
-    value = value.strip().lower()
-    if not value:
-        raise JobStoreConfigError(f"set {setting}")
-    for name in table:
-        if name == value:
-            return name
-    known = ", ".join(sorted(table))
-    raise JobStoreConfigError(
-        f"unknown value {value!r} for {setting}; known values: {known}"
-    )
-
-
-JobStoreName = Literal["memory", "sql"]
-
-
-@dataclass(frozen=True)
-class JobStoreBackend:
-    """One ``ANALYSIS_JOB_STORE`` value: a row of :data:`JOB_STORES`.
-
-    No field has a default, so a new row states every fact.
-    """
-
-    #: Builds the store from the environment and the object store, which is
-    #: ``None`` where :attr:`objects` is False.
-    build: Callable[[Mapping[str, str], ObjectStore | None], JobStore]
-    #: Whether the store keeps sources and reports in an object store. Where
-    #: True, ``ANALYSIS_OBJECT_STORE`` is required; where False, it is refused,
-    #: so a half-durable configuration cannot start.
-    objects: bool
-
-
-def _sql_store(env: Mapping[str, str], objects: ObjectStore | None) -> JobStore:
-    """The ``sql`` store, from the ``sql`` extra (ADR 0023)."""
-    try:
-        from analysis_service.sql_store import SqlJobStore
-    except ModuleNotFoundError as missing:
-        raise JobStoreConfigError(
-            f"the sql job store needs the sql extra ({missing.name} is not installed):"
-            " install analysis-service[sql]"
-        ) from None
-    if objects is None:
-        raise JobStoreConfigError("the sql job store needs an object store")
-    return SqlJobStore.from_env(env, objects)
-
-
-#: Each job store a deployment can select. The table answers for every name of
-#: :data:`JobStoreName`.
-JOB_STORES: dict[JobStoreName, JobStoreBackend] = {
-    "memory": JobStoreBackend(
-        build=lambda env, objects: InMemoryJobStore(), objects=False
-    ),
-    "sql": JobStoreBackend(build=_sql_store, objects=True),
-}
-
-
-def build_store(env: Mapping[str, str] = os.environ) -> JobStore:
-    """Select and construct the configured job store; fail closed.
-
-    The backend is chosen by ``ANALYSIS_JOB_STORE`` at deploy time — never by the
-    request — so an empty or unknown value raises rather than silently falling
-    back to non-durable, per-instance ``memory`` storage that loses every job on
-    restart and isolates jobs behind a load balancer. The object store follows
-    the row: ``ANALYSIS_OBJECT_STORE`` is required where the row keeps objects
-    and refused where it does not. This builds the store and opens no
-    connection; :meth:`JobStore.startup_check` checks what the store reaches.
-    """
-    value = env.get("ANALYSIS_JOB_STORE", "")
-    backend = JOB_STORES[backend_name(value, "ANALYSIS_JOB_STORE", JOB_STORES)]
-    if backend.objects:
-        from analysis_service.objects import build_object_store
-
-        return backend.build(env, build_object_store(env))
-    if env.get("ANALYSIS_OBJECT_STORE", "").strip():
-        raise JobStoreConfigError(
-            "this job store keeps no objects; unset ANALYSIS_OBJECT_STORE"
-        )
-    return backend.build(env, None)
-
-
-#: Why a job is deleted: its owner asked, its retention period passed, or the
-#: web app's workspace deleted it to make room for a new job.
-DeleteCause = Literal["owner", "retention", "workspace"]
-
-
-async def audited_delete(
-    store: JobStore,
-    job_id: str,
-    owner_id: str,
-    cause: DeleteCause,
-    *,
-    updated_before: datetime | None = None,
-) -> int | None:
-    """Delete the owned job with :meth:`JobStore.delete`, and log the delete.
-
-    **The one writer of the delete log line** (ADR 0066). The delete route and
-    the retention sweep both delete through it. The line names the job ID, the
-    owner ID, the cause and the number of objects removed, and no content.
-    ``updated_before`` goes to :meth:`JobStore.delete`. Returns what
-    :meth:`JobStore.delete` returns.
-    """
-    removed = await store.delete(job_id, owner_id, updated_before=updated_before)
-    if removed is not None:
-        logger.info(
-            "deleted job %s of owner %s: cause %s, %d object(s) removed",
-            job_id,
-            owner_id,
-            cause,
-            removed,
-        )
-    return removed
-
-
-#: The longest retention period: a century. The bound keeps the cutoff of a
-#: sweep inside the range of ``datetime``.
-MAX_RETENTION_DAYS = 36_500
-
-
-def retention_days(env: Mapping[str, str] = os.environ) -> int | None:
-    """The retention period from ``ANALYSIS_RETENTION_DAYS``, in days.
-
-    ``None`` where the setting is unset: the service keeps every job (#1530).
-    A value that is not a whole number from 1 to :data:`MAX_RETENTION_DAYS`
-    raises, so the startup stops.
-    """
-    value = env.get("ANALYSIS_RETENTION_DAYS")
-    if value is None:
-        return None
-    days = ascii_int(value, max_digits=len(str(MAX_RETENTION_DAYS)))
-    if days is None or not 1 <= days <= MAX_RETENTION_DAYS:
-        raise JobStoreConfigError(
-            "ANALYSIS_RETENTION_DAYS must be a whole number of days from 1 to"
-            f" {MAX_RETENTION_DAYS}, or unset to keep every job"
-        )
-    return days
-
-
-async def expire_jobs(store: JobStore, days: int) -> None:
-    """Delete each terminal job whose last update is more than ``days`` days old.
-
-    One pass of the retention sweep (#1530). Each delete goes through
-    :func:`audited_delete` with the cause ``retention``, so the job keeps its
-    usage row and the log gets the line of the delete route. A ``queued`` or
-    ``running`` job is never expired. Each delete carries the cutoff, so a
-    job that its owner changed after the listing stays.
-    """
-    before = datetime.now(UTC) - timedelta(days=days)
-    for job_id, owner_id in await store.expired(before):
-        await audited_delete(
-            store, job_id, owner_id, "retention", updated_before=before
-        )
-
-
-#: How old an object must be before the orphan sweep can delete it.
-#:
-#: A store writes an object before the row that names it: ``reserve`` puts
-#: the sources and then admits the job, and ``save`` puts the report and then
-#: writes its digest. In that window no row names the object yet. The window
-#: lasts seconds, and admission waits for its global lock in it. One day is
-#: far longer than that window, and longer than a clock difference between
-#: the service and the object store. A save can put a report over an older
-#: orphan report, but only while its job is not terminal, and the sweep keeps
-#: each object of a job that is not terminal.
-ORPHAN_GRACE = timedelta(days=1)
-
-
-async def remove_orphans(store: JobStore) -> None:
-    """One pass of the orphan sweep: delete each object older than
-    :data:`ORPHAN_GRACE` that no row names, and log the count."""
-    removed = await store.sweep_orphans(datetime.now(UTC) - ORPHAN_GRACE)
-    logger.info("the orphan sweep removed %d object(s)", removed)
-
-
-#: How often the sweeps run. A job outlives its retention period by one
-#: interval at most.
-SWEEP_SECONDS = 3600
-
-
-async def _sweep(store: JobStore, days: int | None) -> None:
-    """Run the sweeps now and then each :data:`SWEEP_SECONDS`, until the app
-    stops: the retention sweep where ``days`` is set, then the orphan sweep.
-
-    A failed sweep is logged, and the next sweep runs.
-    """
-    while True:
-        if days is not None:
-            try:
-                await expire_jobs(store, days)
-            except Exception:
-                logger.exception("the retention sweep failed")
-        try:
-            await remove_orphans(store)
-        except Exception:
-            logger.exception("the orphan sweep failed")
-        await asyncio.sleep(SWEEP_SECONDS)
-
-
-@asynccontextmanager
-async def store_lifespan(store: JobStore) -> AsyncIterator[None]:
-    """Check the store, then fail each job in flight, before an app takes a request.
-
-    **The one startup of a job store**: the ``/v1`` service and the web app
-    both run it as the lifespan of their app, after they built the store from
-    the backend settings. The order is: the retention setting, the store's
-    startup check (the schema revision, then the object store), the restart
-    scan (#1529), then requests. A failed check stops the startup. The sweeps
-    start after the restart scan and stop with the app: the orphan sweep
-    always, because an owner delete can also leave an orphan, and the
-    retention sweep where a retention period is set.
-    """
-    days = retention_days()
-    await store.startup_check()
-    # The scan is correct for a single instance only. It fails every queued or
-    # running job in the store, so with a second live instance on one store it
-    # would fail the jobs that instance still runs.
-    failed = await store.fail_in_flight()
-    if failed:
-        logger.warning(
-            "restart scan failed %d job(s) in flight: %s", len(failed), failed
-        )
-    sweep = asyncio.create_task(_sweep(store, days))
-    try:
-        yield
-    finally:
-        sweep.cancel()
-        with suppress(asyncio.CancelledError):
-            await sweep
 
 
 @dataclass(frozen=True)

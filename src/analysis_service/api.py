@@ -99,12 +99,9 @@ from analysis_service.jobs import (
     JobStatus,
     JobStore,
     PipelineRunner,
-    audited_delete,
-    build_store,
     event_frames,
     execute_job,
     is_follow_up,
-    store_lifespan,
 )
 from analysis_service.links import (
     MAX_LINK_ANSWERS,
@@ -118,6 +115,7 @@ from analysis_service.report import FrameworkSelection
 from analysis_service.report_changes import report_changes
 from analysis_service.selection import SelectionError, resolve_selection
 from analysis_service.sources import Source, SourceLimits, clean_system_name
+from analysis_service.store_backends import audited_delete, build_store, store_lifespan
 from analysis_service.validation import ValidationIssue
 
 logger = logging.getLogger(__name__)
@@ -785,7 +783,7 @@ def create_app(
     chose.
 
     At startup, before the app takes a request, the app runs
-    :func:`~analysis_service.jobs.store_lifespan` over its store: it reads the
+    :func:`~analysis_service.store_backends.store_lifespan` over its store: it reads the
     retention setting, the store runs its startup check, and then the restart
     scan fails each job that is queued or running in the store.
     """

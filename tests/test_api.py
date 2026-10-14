@@ -33,7 +33,6 @@ from analysis_service.jobs import (
     InMemoryJobStore,
     JobRecord,
     JobStatus,
-    JobStoreConfigError,
     NodeCallback,
     PipelineOutcome,
     PipelineRejected,
@@ -44,6 +43,7 @@ from analysis_service.pipeline import AdkPipelineRunner
 from analysis_service.principals import Identity
 from analysis_service.report import Report
 from analysis_service.sources import Source, SourceLimits
+from analysis_service.store_settings import StoreConfigError
 from analysis_service.validation import ValidationIssue
 from analysis_service.vendors import ProviderAuthError
 from tests.factories import (
@@ -853,7 +853,7 @@ class TestTheRetentionSweep:
         job = seed(store, "alice", "queued").id
         client, _ = make_client(store=store)
         with (
-            pytest.raises(JobStoreConfigError, match="ANALYSIS_RETENTION_DAYS"),
+            pytest.raises(StoreConfigError, match="ANALYSIS_RETENTION_DAYS"),
             client,
         ):
             pass

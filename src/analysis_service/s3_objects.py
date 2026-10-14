@@ -17,12 +17,12 @@ The ``boto3`` errors this module handles, and what each one becomes:
   :meth:`S3ObjectStore.put` raises :class:`FileExistsError`, as the
   ``filesystem`` row does.
 * **A missing bucket** (HTTP 404) **and a refused access** (HTTP 403).
-  :meth:`S3ObjectStore.check` turns each into a :class:`JobStoreConfigError`
+  :meth:`S3ObjectStore.check` turns each into a :class:`StoreConfigError`
   that names the cause, so the startup stops.
 * **An endpoint that the service cannot reach, or a request it cannot sign.**
   ``botocore`` raises a ``BotoCoreError``: for example
   ``EndpointConnectionError``, ``SSLError`` or ``NoCredentialsError``.
-  :meth:`S3ObjectStore.check` turns each into a :class:`JobStoreConfigError`
+  :meth:`S3ObjectStore.check` turns each into a :class:`StoreConfigError`
   that names the error class.
 
 After the startup, each other error of a call goes to the caller unchanged,
@@ -42,7 +42,7 @@ import boto3
 from botocore.config import Config
 from botocore.exceptions import BotoCoreError, ClientError
 
-from analysis_service.jobs import JobStoreConfigError, backend_name
+from analysis_service.store_settings import StoreConfigError, closed_setting
 from analysis_service.vendors import (
     CredentialMode,
     ProviderAuthError,
@@ -69,9 +69,9 @@ def _key_pair(env: Mapping[str, str]) -> dict[str, str]:
         try:
             value = read_secret(env, var)
         except ProviderAuthError as error:
-            raise JobStoreConfigError(str(error)) from None
+            raise StoreConfigError(str(error)) from None
         if not value:
-            raise JobStoreConfigError(
+            raise StoreConfigError(
                 f"the api_key mode of the s3 object store needs {var};"
                 " it is unset, or its file is empty"
             )
@@ -85,7 +85,7 @@ def _platform_identity(env: Mapping[str, str]) -> dict[str, str]:
     static key works only where the deployment declares ``api_key``."""
     for var in KEY_FILES.values():
         if env.get(var, "").strip():
-            raise JobStoreConfigError(
+            raise StoreConfigError(
                 f"the iam mode of the s3 object store reads no static key;"
                 f" unset {var}, or set ANALYSIS_OBJECT_CREDENTIALS=api_key"
             )
@@ -104,12 +104,12 @@ def _credentials(env: Mapping[str, str]) -> dict[str, str]:
     for var in KEY_FILES.values():
         bare = refused_var(var)
         if env.get(bare, "").strip():
-            raise JobStoreConfigError(
+            raise StoreConfigError(
                 f"the s3 object store reads its key from the file that {var}"
                 f" names; unset {bare}, which this service refuses"
             )
     value = env.get("ANALYSIS_OBJECT_CREDENTIALS", "")
-    mode = backend_name(value, "ANALYSIS_OBJECT_CREDENTIALS", CREDENTIALS)
+    mode = closed_setting(value, "ANALYSIS_OBJECT_CREDENTIALS", CREDENTIALS)
     return CREDENTIALS[mode](env)
 
 
@@ -126,9 +126,9 @@ def _endpoint(env: Mapping[str, str]) -> str | None:
         # A port that is not a number raises here.
         host, _ = parts.hostname, parts.port
     except ValueError:
-        raise JobStoreConfigError("ANALYSIS_OBJECT_ENDPOINT is not a URL") from None
+        raise StoreConfigError("ANALYSIS_OBJECT_ENDPOINT is not a URL") from None
     if parts.scheme != "https":
-        raise JobStoreConfigError("ANALYSIS_OBJECT_ENDPOINT must be an https URL")
+        raise StoreConfigError("ANALYSIS_OBJECT_ENDPOINT must be an https URL")
     extra = (
         parts.username is not None
         or parts.password is not None
@@ -137,7 +137,7 @@ def _endpoint(env: Mapping[str, str]) -> str | None:
         or parts.fragment
     )
     if not host or extra:
-        raise JobStoreConfigError(
+        raise StoreConfigError(
             "ANALYSIS_OBJECT_ENDPOINT must hold https://, a host and an optional"
             " port, and nothing more"
         )
@@ -147,7 +147,7 @@ def _endpoint(env: Mapping[str, str]) -> str | None:
 def _required(env: Mapping[str, str], var: str) -> str:
     value = env.get(var, "").strip()
     if not value:
-        raise JobStoreConfigError(f"set {var} for the s3 object store")
+        raise StoreConfigError(f"set {var} for the s3 object store")
     return value
 
 
@@ -191,7 +191,7 @@ class S3ObjectStore:
     def from_env(cls, env: Mapping[str, str]) -> S3ObjectStore:
         bucket = _required(env, "ANALYSIS_OBJECT_BUCKET")
         region = _required(env, "ANALYSIS_OBJECT_REGION")
-        addressing = backend_name(
+        addressing = closed_setting(
             env.get("ANALYSIS_OBJECT_ADDRESSING", "").strip() or "virtual",
             "ANALYSIS_OBJECT_ADDRESSING",
             dict.fromkeys(get_args(Addressing)),
@@ -222,11 +222,11 @@ class S3ObjectStore:
                 "HeadBucket on the bucket {bucket!r} failed with HTTP {status}:"
                 " check ANALYSIS_OBJECT_REGION and ANALYSIS_OBJECT_ENDPOINT",
             )
-            raise JobStoreConfigError(
+            raise StoreConfigError(
                 reason.format(bucket=self._bucket, status=status)
             ) from None
         except BotoCoreError as error:
-            raise JobStoreConfigError(
+            raise StoreConfigError(
                 f"the s3 object store cannot reach or sign a request to the bucket"
                 f" {self._bucket!r} ({type(error).__name__})"
             ) from None

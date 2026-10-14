@@ -24,7 +24,6 @@ from alembic.migration import MigrationContext
 from sqlalchemy import select, text
 from sqlalchemy.engine import make_url
 
-from analysis_service.jobs import JobStoreConfigError
 from analysis_service.sql_store import (
     DATABASE_IAM,
     DATABASES,
@@ -33,6 +32,7 @@ from analysis_service.sql_store import (
     database_url,
     engine_for,
 )
+from analysis_service.store_settings import StoreConfigError
 from tests.sql_stores import admin, lane_env, lane_url, new_database, upgrade
 
 URL = "postgresql+asyncpg://analysis@db.internal:5432/jobs"
@@ -134,7 +134,7 @@ class TestTheSettings:
                 del env[name]
             else:
                 env[name] = value
-        with pytest.raises(JobStoreConfigError, match=message) as refused:
+        with pytest.raises(StoreConfigError, match=message) as refused:
             engine_for(env)
         assert "hunter2" not in str(refused.value)
 
@@ -169,7 +169,7 @@ class TestTheSettings:
         empty = tmp_path / "empty"
         empty.write_text("\n")
         env["ANALYSIS_DATABASE_PASSWORD_FILE"] = str(empty)
-        with pytest.raises(JobStoreConfigError, match="holds the database password"):
+        with pytest.raises(StoreConfigError, match="holds the database password"):
             engine_for(env)
 
 
@@ -203,13 +203,13 @@ class TestTheIamCredentials:
                 del iam_env[name]
             else:
                 iam_env[name] = value
-        with pytest.raises(JobStoreConfigError, match=message):
+        with pytest.raises(StoreConfigError, match=message):
             engine_for(iam_env)
 
     def test_a_missing_boto3_names_the_aws_extra(self, iam_env, monkeypatch):
         monkeypatch.setitem(sys.modules, "boto3", None)
         with pytest.raises(
-            JobStoreConfigError, match=r"needs boto3.*analysis-service\[aws\]"
+            StoreConfigError, match=r"needs boto3.*analysis-service\[aws\]"
         ):
             engine_for(iam_env)
 

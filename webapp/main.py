@@ -183,13 +183,10 @@ from analysis_service.jobs import (
     JobStatus,
     JobStore,
     PipelineRunner,
-    audited_delete,
-    build_store,
     event_frames,
     execute_job,
     parent_of,
     same_major,
-    store_lifespan,
 )
 from analysis_service.links import (
     MAX_LINK_ANSWERS,
@@ -205,6 +202,7 @@ from analysis_service.report_changes import report_changes
 from analysis_service.report_conditions import conditions, corrected_findings
 from analysis_service.selection import SelectionError, resolve_selection
 from analysis_service.sources import ANSWERS_LABEL, SourceLimits
+from analysis_service.store_backends import audited_delete, build_store, store_lifespan
 from analysis_service.vendors import (
     CREDENTIAL_MODE_NOTES,
     VendorName,
@@ -368,7 +366,7 @@ class Workspace:
 
         The jobs are chosen on entry and deleted on a clean exit, so a
         submission the body refuses deletes nothing. Each delete goes through
-        :func:`~analysis_service.jobs.audited_delete` with the cause
+        :func:`~analysis_service.store_backends.audited_delete` with the cause
         ``workspace`` and the time of the choice, so a chosen job that changes
         before the delete stays, and the workspace then holds one job over its
         bound. A job that answers the job ``answering``, paused or finished,
@@ -893,11 +891,11 @@ def create_app(
     lets a test bound the jobs held or hand the app a store of its own.
 
     Without a ``workspace``, the app builds its store with
-    :func:`~analysis_service.jobs.build_store` from the service's backend
+    :func:`~analysis_service.store_backends.build_store` from the service's backend
     settings, and an unusable setting raises. Where ``ANALYSIS_JOB_STORE`` is
     unset, the store is ``memory``, so a first run needs no setting. At
     startup, before the app takes a request, the app runs
-    :func:`~analysis_service.jobs.store_lifespan` over the store, as the
+    :func:`~analysis_service.store_backends.store_lifespan` over the store, as the
     service does.
     """
     state = build_startup() if startup is None else startup

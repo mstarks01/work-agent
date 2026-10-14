@@ -20,14 +20,10 @@ import pytest
 from fastapi.testclient import TestClient
 
 from analysis_service.answer_sets import NO_ANSWERS
-from analysis_service.jobs import (
-    RESTART_FAILURE_MESSAGE,
-    InMemoryJobStore,
-    JobRecord,
-    JobStoreConfigError,
-    build_store,
-)
+from analysis_service.jobs import RESTART_FAILURE_MESSAGE, InMemoryJobStore, JobRecord
 from analysis_service.sources import Source
+from analysis_service.store_backends import build_store
+from analysis_service.store_settings import StoreConfigError
 from tests import test_webapp
 from tests.factories import SEEDING_BUDGET, sample_selection
 from tests.sql_stores import sql_env
@@ -124,7 +120,7 @@ class TestTheSettings:
         self, tiers, monkeypatch, setting, value, message
     ):
         monkeypatch.setenv(setting, value)
-        with pytest.raises(JobStoreConfigError, match=message):
+        with pytest.raises(StoreConfigError, match=message):
             app(tiers)
 
     def test_a_retention_value_that_is_not_a_period_stops_the_startup(
@@ -132,7 +128,7 @@ class TestTheSettings:
     ):
         monkeypatch.setenv("ANALYSIS_RETENTION_DAYS", "0")
         with (
-            pytest.raises(JobStoreConfigError, match="ANALYSIS_RETENTION_DAYS"),
+            pytest.raises(StoreConfigError, match="ANALYSIS_RETENTION_DAYS"),
             app(tiers),
         ):
             pass
@@ -320,7 +316,9 @@ class TestTheBound:
         )
         with client:
             oldest = run_to_completion(client)
-            with caplog.at_level(logging.INFO, logger="analysis_service.jobs"):
+            with caplog.at_level(
+                logging.INFO, logger="analysis_service.store_backends"
+            ):
                 run_to_completion(client)
         [line] = caplog.messages
         assert re.fullmatch(
