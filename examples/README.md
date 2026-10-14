@@ -52,22 +52,19 @@ that here, and they answer different questions:
   model, so neither can tell you the sample still extracts well or that the
   category agents still return threats for it. A live run of `embed.py` over
   `orders.md` does, and it is a step in
-  [`evals-live.yml`](../.github/workflows/evals-live.yml) — which now runs on
-  pull requests to the agentic surface and on manual dispatch, and on nothing
-  else.
+  [`evals-live.yml`](../.github/workflows/evals-live.yml), which runs on pull
+  requests to the agentic surface and on manual dispatch, and on nothing else.
 
-  **Nothing here is guaranteed on a timer any more.** That workflow's
-  pull-request trigger is path-filtered to the agentic surface — prompts,
-  skills, config, and the graph — and `examples/**` is *not* in the list. So a
-  pull request that changes only `orders.md` fires no live run. Until the Monday
-  06:00 UTC sweep was removed, that gap closed within a week; it no longer
-  closes on its own, and a sample that has quietly become hard to extract will
-  sit undetected until someone dispatches a run by hand.
+  **Nothing here runs on a timer.** That workflow's pull-request trigger is
+  path-filtered to the agentic surface — prompts, skills, config, and the
+  graph — and `examples/**` is *not* in the list. So a pull request that
+  changes only `orders.md` fires no live run, and a sample that has quietly
+  become hard to extract sits undetected until someone dispatches a run by
+  hand.
 
-  The narrow gap was accepted deliberately — widening the filter would spend
-  live model budget on every documentation edit, and the offline lane already
-  covers everything decidable without a model. The *open-ended* gap is not a
-  decision about examples at all: the schedule was removed because Workload
-  Identity Federation is unconfigured, so the weekly run failed every week
-  rather than sweeping anything. Restoring federation and the `schedule:` block
-  restores this guarantee.
+  The narrow gap is deliberate: a wider filter would spend live model budget
+  on every documentation edit, and the offline lane covers everything
+  decidable without a model. The workflow has no schedule because Workload
+  Identity Federation is not configured, so a weekly run would fail every week
+  rather than sweep anything. Federation and a `schedule:` block would close
+  the gap.

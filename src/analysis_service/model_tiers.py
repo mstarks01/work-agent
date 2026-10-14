@@ -63,23 +63,21 @@ from analysis_service.vendors import (
 # The only schema version this loader accepts. A file on any other version
 # fails its own check rather than being migrated in place.
 #
-# Version 7 adds the ``[credentials]`` table: a deployment declares which
-# credential mode it uses for a vendor that allows more than one. Bedrock is the
-# vendor that has the choice, so a file selecting it names a mode there or in
-# ``ANALYSIS_MODEL_CREDENTIALS_BEDROCK``. Every shipped file leaves the table
-# out, because no shipped file selects a vendor at all.
+# Three tables are optional:
 #
-# Version 8 adds the ``[charges]`` table, which is the same shape for the same
-# reason. A vendor that states what it charged may state a different thing under
-# a different arrangement, so a deployment declares which one it runs under.
-# OpenRouter is the vendor that has the choice, so a file selecting it names an
-# arrangement there or in ``ANALYSIS_MODEL_CHARGES_OPENROUTER``.
-#
-# Version 9 adds the ``[upstreams]`` table: a deployment on an aggregator names
-# the upstream providers a request may reach, and the request carries the pin.
-# It is optional, because an analysis needs no pin; a **Baseline** does, since
-# it is named after the upstream the record says served it. A key for a vendor
-# that routes to one provider is an error, because there is nothing to pin.
+# * ``[credentials]``: the credential mode of a vendor that allows more than
+#   one. Bedrock has the choice, so a file that selects it names a mode there
+#   or in ``ANALYSIS_MODEL_CREDENTIALS_BEDROCK``. No shipped file selects a
+#   vendor, so every shipped file leaves the table out.
+# * ``[charges]``: the arrangement a vendor charges under, where a vendor that
+#   states its charge can state a different thing under another arrangement.
+#   OpenRouter has the choice, so a file that selects it names an arrangement
+#   there or in ``ANALYSIS_MODEL_CHARGES_OPENROUTER``.
+# * ``[upstreams]``: the upstream providers a request through an aggregator may
+#   reach, and the request carries the pin. An analysis needs no pin; a
+#   **Baseline** does, because it is named after the upstream that the record
+#   says served it. A key for a vendor that routes to one provider is an error,
+#   because there is nothing to pin.
 SUPPORTED_VERSION = 9
 
 TierName = Literal["base", "strong", "review"]

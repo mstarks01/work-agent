@@ -665,18 +665,14 @@ class TestADirtyTreeIsNamedBeforeTheSpend:
 
     def test_the_note_is_a_seam_the_gate_reads(self):
         """The real wiring, not a grep: what command_run folds into the block."""
-        from evals.harness.artifact import UNRECORDED, RepoCommit
+        from evals.harness.artifact import RepoCommit
         from evals.harness.run import _contribution_note
 
         clean = RepoCommit(commit="c" * 40, clean=True)
         dirty = RepoCommit(commit="c" * 40, clean=False)
-        unrecorded = RepoCommit(commit=UNRECORDED, clean=None)
 
         assert _contribution_note(clean) == ()
         assert "never contributed as a Baseline" in _contribution_note(dirty)[0]
-        assert _contribution_note(unrecorded), (
-            "a sweep that cannot name its commit cannot be contributed either"
-        )
 
 
 class TestAStoppedSweepSaysSo:

@@ -7,7 +7,8 @@ The repository's decisions live in ``docs/adr/`` and in the tickets, so prose
 that cites one points there and describes the current rule.
 
 The scan reads every Python docstring and comment under :data:`SEARCHED`, every
-full-line comment in the page scripts, and every paragraph of the guides in
+full-line comment in the page scripts, every full-line ``#`` comment in the
+files of :data:`HASH_COMMENTED`, and every paragraph of the guides in
 :data:`GUIDES`. A string a page serves or a test asserts is data, and an
 identifier is not prose, so neither is read. ``docs/adr/``, ``docs/research/``
 and ``docs/history/`` are records of a past state, so they are not read either.
@@ -35,12 +36,25 @@ SEARCHED = ("src", "evals", "webapp", "tests")
 #: The page scripts whose comments are read.
 SCRIPTS = ("webapp/static",)
 
-#: The guides a reader follows as a statement of the current state.
+#: The guides a reader follows as a statement of the current state, and the
+#: prompts a model reads as its instructions. The lane skills under
+#: ``frameworks/`` are not read: their passive "used" phrases read as history
+#: to this scan, and the ASVS ones carry a governed licence
+#: (``docs/agents/licensing.md``).
 GUIDES: tuple[Path, ...] = (
     REPO_ROOT / "README.md",
     REPO_ROOT / "AGENTS.md",
     *sorted((REPO_ROOT / "docs").glob("*.md")),
     *sorted((REPO_ROOT / "docs" / "agents").glob("*.md")),
+    *sorted((REPO_ROOT / "evals").glob("*.md")),
+    *sorted((REPO_ROOT / "examples").glob("*.md")),
+    *sorted((REPO_ROOT / "prompts").rglob("*.md")),
+)
+
+#: The config files and workflows whose full-line ``#`` comments are read.
+HASH_COMMENTED: tuple[Path, ...] = (
+    *sorted((REPO_ROOT / "config").glob("*.toml")),
+    *sorted((REPO_ROOT / ".github" / "workflows").glob("*.yml")),
 )
 
 #: Each phrase names an earlier state of the code. Case-insensitive.
@@ -50,7 +64,10 @@ HISTORY = re.compile(
     r"|historically|once (had|took|wrote|sat|listed|lacked|missed|floored|ended)"
     r"|before this[,:.]|until #\d+|this replaced|(branch|if`?|list) it replaced"
     r"|went stale|went unnoticed|nothing caught"
-    r"|an earlier version of this (note|module|page))\b",
+    r"|an earlier version of this (note|module|page)"
+    r"|version \d+ (adds|added|makes|made|renames|renamed|removed)"
+    r"|bumped (to|from) (version |v)?\d+|bumped nothing"
+    r"|hard cutover from|no v\d+ shim|(was|were) (migrated|re-?sealed))\b",
     re.IGNORECASE,
 )
 
@@ -97,6 +114,16 @@ def _script_prose(path: Path) -> list[tuple[int, str]]:
     return _runs(comments)
 
 
+def _hash_prose(path: Path) -> list[tuple[int, str]]:
+    """Every run of full-line ``#`` comments in one config file, at its line."""
+    comments = [
+        (lineno, line.strip().removeprefix("#").strip())
+        for lineno, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1)
+        if line.lstrip().startswith("#")
+    ]
+    return _runs(comments)
+
+
 def _guide_prose(path: Path) -> list[tuple[int, str]]:
     """Every paragraph of one guide outside a fenced block, at its first line."""
     text = _FENCE.sub(
@@ -131,6 +158,7 @@ def history() -> list[str]:
             for path in source_files(*SCRIPTS, suffixes=(".js",))
             for hit in _hits(path, _script_prose(path))
         ),
+        *(hit for path in HASH_COMMENTED for hit in _hits(path, _hash_prose(path))),
         *(hit for path in GUIDES for hit in _hits(path, _guide_prose(path))),
     ]
 
@@ -146,8 +174,9 @@ def test_no_docstring_comment_or_guide_narrates_an_earlier_state():
 
 
 def test_the_scan_reads_every_kind_of_prose(tmp_path):
-    """Positive control: a docstring, a wrapped comment, a script comment and a
-    guide paragraph are each seen, and code and a fenced block are not."""
+    """Positive control: a docstring, a wrapped comment, a script comment, a
+    config comment and a guide paragraph are each seen, and code and a fenced
+    block are not."""
     probe = tmp_path / "probe.py"
     probe.write_text(
         '"""It used to do this."""\n'
@@ -160,6 +189,10 @@ def test_the_scan_reads_every_kind_of_prose(tmp_path):
     )
     script = tmp_path / "page.js"
     script.write_text("const a = 1;\n// This went\n// unnoticed.\n", encoding="utf-8")
+    config = tmp_path / "config.toml"
+    config.write_text(
+        "version = 9  # inline\n# Version 9 adds\n# a table.\n", encoding="utf-8"
+    )
     guide = tmp_path / "guide.md"
     guide.write_text(
         "A rule.\n\n```\nused to\n```\n\nIt went\nstale.\n", encoding="utf-8"
@@ -176,3 +209,9 @@ def test_the_scan_reads_every_kind_of_prose(tmp_path):
     guide_texts = [" ".join(t.split()) for _, t in _guide_prose(guide)]
     assert "It went stale." in guide_texts
     assert not any("used to" in text for text in guide_texts)
+    assert [" ".join(t.split()) for _, t in _hash_prose(config)] == [
+        "Version 9 adds a table."
+    ]
+    assert HISTORY.search("Version 9 adds a table.")
+    assert not HISTORY.search("Version 1 drops the type prefix.")
+    assert not HISTORY.search("an earlier reference bumped to a different position")

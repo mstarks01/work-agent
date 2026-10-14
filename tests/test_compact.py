@@ -354,13 +354,10 @@ class TestAReferenceResolvesOrTheGateSaysSo:
     def test_an_assumption_names_its_element_and_the_tag_decides_which(self):
         """The subject is named, and typed, so nothing has to guess.
 
-        Version 1 left this untyped and it was the only reference no scope
-        could decide. Version 2 removed the reference by nesting the entry in
-        its element, and across five corpus sweeps the model wrote nine
-        ``data_classification`` inferences on a flow or a process — an
-        attribute only a Data Store declares — where the full route and version
-        1 wrote none in five sweeps each. Naming the element beside the
-        attribute is the check; the tag is what makes the name unambiguous.
+        An entry nested in its element let the model write
+        ``data_classification`` inferences on a flow or a process, an attribute
+        only a Data Store declares. Naming the element beside the attribute is
+        the check; the tag is what makes the name unambiguous.
         """
         payload = compact_fixture()
         payload["trust_boundaries"][0]["ref"] = "b:app"

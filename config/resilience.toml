@@ -62,17 +62,16 @@ attempts = 3
 timeout_ms = 300000
 
 # THE ONLY BOUND ON A JOB AS A WHOLE (wayfinder #61). Everything else in this
-# file bounds one HTTP request; nothing bounded the run those requests add up
-# to, so `execute_job` awaited the graph with no deadline at all and a wedged
-# run held a job in `running` until the process died.
+# file bounds one HTTP request. `execute_job` awaits the graph under this
+# deadline; without it, a wedged run would hold a job in `running` until the
+# process dies.
 #
 # The per-call knobs cannot substitute for it, and the arithmetic is why:
 # timeout_ms bounds one request at 300 s, attempts allows 3 of them per node,
 # and the graph's longest path runs five LLM stages in series (extract, repair,
 # the category-agent fan-out, critic, recritic). 300 s x 3 x 5 is 75 minutes, with
-# every individual bound respected the whole way — and it was over two hours
-# before the retry amplification was removed. That is the point rather than a
-# detail: the product moves whenever any factor does, and only a deadline
+# every individual bound respected the whole way. That is the point rather
+# than a detail: the product moves whenever any factor does, and only a deadline
 # states the answer directly. A product of numbers nobody chose is not a bound.
 #
 # 900 s IS A BACKSTOP, NOT AN SLO, and it is sized against measured work rather
@@ -159,8 +158,7 @@ max_sources = 10
 # at the barrier, and a package's lane count is its own: STRIDE declares 6, ASVS
 # declares 17, so a job naming both is 23 and three of them are 69 concurrent
 # `strong`-tier requests. Those three numbers are checked against the registry
-# by `tests/test_fan_out_lints.py` rather than trusted, because the same
-# arithmetic sat stale in four modules until #286 — see
+# by `tests/test_fan_out_lints.py` rather than trusted (#286); see
 # `analysis_service.frameworks.widest_fan_out`. That is the burst a per-minute request quota actually
 # sees. Turn it UP only with a quota that has been checked against the new
 # number times the widest framework selection this deployment offers; turn it
@@ -176,8 +174,7 @@ max_active_jobs = 3
 # self-clearing: finishing a job buys the next one. That is exactly why it
 # bounds no spend. A caller who submits serially -- one job, wait, next job --
 # stays inside a ceiling of 3 forever while running an unbounded number of paid
-# jobs. `docs/HTTP-API.md` used to call that the integrator's problem. It is
-# closed here instead.
+# jobs. The budgets below close that.
 #
 # TOKENS, NOT DOLLARS. A price is vendor data with an expiry date. `evals/`
 # carries a price table because a sweep reports what it SPENT and can be

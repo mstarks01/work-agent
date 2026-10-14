@@ -52,7 +52,7 @@ jobs:
           AFTER: ${{ github.event.after }}
         # A new branch, or a forced push whose old tip this clone does not
         # hold, has no range to read, so the whole history of the tip is read.
-        # The old tip's copy of the script reads the range where it exists, so
+        # The previous tip's copy of the script reads the range where it exists, so
         # a push that edited the script is not checked by its own edit.
         run: |
           check="$RUNNER_TEMP/check-attribution"
