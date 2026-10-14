@@ -20,9 +20,11 @@ The rules this module keeps:
 * **The service writes a report once.** A save never writes a second report
   over the one a row names.
 * **One code path for each database.** SQLAlchemy 2.0 async Core, with the
-  facts that differ in a row of :data:`DATABASES` (#1525). On SQLite each
-  write transaction opens with ``BEGIN IMMEDIATE``, which is the global lock
-  admission takes, and serialises every other write with it.
+  facts that differ in a row of :data:`DATABASES` (#1525). Admission takes a
+  global lock. On SQLite each write transaction opens with ``BEGIN
+  IMMEDIATE``, which is that lock, and serialises every other write with it.
+  On PostgreSQL admission takes ``pg_advisory_xact_lock``, and every
+  connection uses ``verify-full`` TLS.
 * **The service never migrates.** An operator runs
   ``python -m analysis_service.migrations`` as a deploy step, and
   :meth:`SqlJobStore.startup_check` refuses a schema that is not at the latest
@@ -31,11 +33,13 @@ The rules this module keeps:
 
 from __future__ import annotations
 
+import asyncio
 import hashlib
 import hmac
 import json
 import logging
-from collections.abc import AsyncIterator, Callable, Mapping, Sequence
+import ssl
+from collections.abc import AsyncIterator, Awaitable, Callable, Mapping, Sequence
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -72,7 +76,7 @@ from sqlalchemy import (
 from sqlalchemy.engine import URL, make_url
 from sqlalchemy.exc import ArgumentError
 from sqlalchemy.ext.asyncio import AsyncConnection, AsyncEngine, create_async_engine
-from sqlalchemy.pool import NullPool, Pool
+from sqlalchemy.pool import AsyncAdaptedQueuePool, NullPool, Pool
 from sqlalchemy.types import TypeDecorator
 from typing_extensions import override
 
@@ -102,6 +106,12 @@ from analysis_service.objects import ObjectName, ObjectStore, object_key
 from analysis_service.principals import Identity, Principal
 from analysis_service.report import Report
 from analysis_service.sources import Source
+from analysis_service.vendors import (
+    SECRET_FILE_SUFFIX,
+    ProviderAuthError,
+    read_secret,
+    refused_var,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -323,6 +333,227 @@ def _prepare_sqlite(engine: AsyncEngine) -> None:
         connection.exec_driver_sql("BEGIN IMMEDIATE" if writes else "BEGIN")
 
 
+#: The setting that names the database.
+_URL = "ANALYSIS_DATABASE_URL"
+#: The setting that selects a row of :data:`DATABASE_CREDENTIALS`.
+_CREDENTIALS = "ANALYSIS_DATABASE_CREDENTIALS"
+#: The setting that names the file of the database password.
+_PASSWORD_FILE = "ANALYSIS_DATABASE_PASSWORD" + SECRET_FILE_SUFFIX
+#: The setting that names a private CA.
+_CA_FILE = "ANALYSIS_DATABASE_CA_FILE"
+#: The setting that selects a row of :data:`DATABASE_IAM`.
+_IAM = "ANALYSIS_DATABASE_IAM"
+#: The setting that names the AWS region of an RDS database.
+_REGION = "ANALYSIS_DATABASE_REGION"
+
+#: What asyncpg takes as a password: the text, or an async callable that it
+#: awaits for each new connection.
+Password = str | Callable[[], Awaitable[str]]
+
+
+@dataclass(frozen=True)
+class DatabaseIam:
+    """One provider of IAM tokens for a database: a row of :data:`DATABASE_IAM`.
+
+    No field has a default, so a new row states every fact.
+    """
+
+    #: The extra that installs the library of the provider (ADR 0023).
+    extra: str
+    #: Builds the token callable for the database at the URL. It imports the
+    #: library of the provider, so a missing library raises
+    #: :class:`ModuleNotFoundError` here, at startup.
+    token: Callable[[URL, Mapping[str, str]], Callable[[], Awaitable[str]]]
+
+
+def _rds_token(url: URL, env: Mapping[str, str]) -> Callable[[], Awaitable[str]]:
+    """An RDS IAM token for each new connection (#1525).
+
+    ``boto3`` signs the token locally with the credentials that its chain
+    finds. A token lasts 15 minutes, and RDS checks it only when a connection
+    opens. The signature runs in a worker thread, because the first one can
+    fetch the credentials over the network. ``url`` holds the port that the
+    connection uses (:func:`_postgres`).
+    """
+    region = env.get(_REGION, "").strip()
+    if not region:
+        raise JobStoreConfigError(f"set {_REGION} for an RDS IAM token")
+    import boto3
+
+    client = boto3.client("rds", region_name=region)
+
+    async def token() -> str:
+        return await asyncio.to_thread(
+            client.generate_db_auth_token,
+            DBHostname=url.host,
+            Port=url.port,
+            DBUsername=url.username,
+            Region=region,
+        )
+
+    return token
+
+
+DatabaseIamName = Literal["rds"]
+
+#: Each provider of IAM tokens that ``ANALYSIS_DATABASE_IAM`` can name. The
+#: table answers for every name of :data:`DatabaseIamName`.
+DATABASE_IAM: dict[DatabaseIamName, DatabaseIam] = {
+    "rds": DatabaseIam(extra="aws", token=_rds_token),
+}
+
+
+def _password_file(url: URL, env: Mapping[str, str]) -> Password:
+    """The password in the file that ``ANALYSIS_DATABASE_PASSWORD_FILE`` names.
+
+    This file is the only way to give the password. The settings of the IAM
+    credentials stop the startup.
+    """
+    for setting in (_IAM, _REGION):
+        if env.get(setting, "").strip():
+            raise JobStoreConfigError(
+                f"password credentials use no IAM token; unset {setting}"
+            )
+    try:
+        password = read_secret(env, _PASSWORD_FILE)
+    except ProviderAuthError as error:
+        raise JobStoreConfigError(str(error)) from None
+    if not password:
+        raise JobStoreConfigError(
+            f"set {_PASSWORD_FILE} to a file that holds the database password"
+        )
+    return password
+
+
+def _iam_token(url: URL, env: Mapping[str, str]) -> Password:
+    """The token callable of the provider that ``ANALYSIS_DATABASE_IAM`` names."""
+    if env.get(_PASSWORD_FILE, "").strip():
+        raise JobStoreConfigError(
+            f"IAM credentials use no password; unset {_PASSWORD_FILE}"
+        )
+    name = backend_name(env.get(_IAM, ""), _IAM, DATABASE_IAM)
+    iam = DATABASE_IAM[name]
+    try:
+        return iam.token(url, env)
+    except ModuleNotFoundError as missing:
+        raise JobStoreConfigError(
+            f"the {name} IAM token needs {missing.name}, which is not installed:"
+            f" install analysis-service[{iam.extra}]"
+        ) from None
+
+
+DatabaseCredentials = Literal["password", "iam"]
+
+#: How a connection gets its password, for each value of
+#: ``ANALYSIS_DATABASE_CREDENTIALS``. The table answers for every name of
+#: :data:`DatabaseCredentials`.
+DATABASE_CREDENTIALS: dict[
+    DatabaseCredentials, Callable[[URL, Mapping[str, str]], Password]
+] = {
+    "password": _password_file,
+    "iam": _iam_token,
+}
+
+
+def _verify_full(env: Mapping[str, str]) -> ssl.SSLContext:
+    """A TLS context that checks the chain and the host name of the server.
+
+    This is libpq's ``verify-full``, and no setting turns it off. Where
+    ``ANALYSIS_DATABASE_CA_FILE`` names a private CA, the context trusts that
+    CA only. Where the setting is unset, the context trusts the system CA
+    bundle.
+    """
+    ca_file = env.get(_CA_FILE, "").strip() or None
+    try:
+        return ssl.create_default_context(cafile=ca_file)
+    except OSError as error:
+        # A missing or unreadable file (FileNotFoundError, PermissionError,
+        # IsADirectoryError) and a file that holds no PEM certificate
+        # (ssl.SSLError) are each an OSError.
+        raise JobStoreConfigError(
+            f"{_CA_FILE} names a file that this service cannot read as a CA"
+            f" ({type(error).__name__})"
+        ) from None
+
+
+def _postgres(url: URL, env: Mapping[str, str]) -> dict[str, Any]:
+    """The connect arguments of PostgreSQL: the port, ``verify-full`` TLS and a
+    password.
+
+    The URL must name a user, a network host and a database, because asyncpg
+    uses no TLS on a Unix socket, and it fills each argument that the store
+    does not pass from the ``PG*`` variables of the process. For the same
+    reason the store always passes the port, and the token of the IAM
+    credentials is signed for that port. The service refuses a query in the
+    URL, because asyncpg takes it as connect arguments, and a ``host`` there
+    can name a Unix socket.
+    """
+    if url.query:
+        raise JobStoreConfigError(f"{_URL} for PostgreSQL takes no query; remove it")
+    if not url.username or not url.host or url.host.startswith("/"):
+        raise JobStoreConfigError(
+            f"{_URL} for PostgreSQL needs a user and a network host"
+        )
+    if not url.database:
+        raise JobStoreConfigError(f"{_URL} for PostgreSQL names no database")
+    url = url.set(port=url.port or 5432)
+    bare = refused_var(_PASSWORD_FILE)
+    if env.get(bare, "").strip():
+        raise JobStoreConfigError(
+            f"the database password comes only from the file that {_PASSWORD_FILE}"
+            f" names; unset {bare}"
+        )
+    credentials = backend_name(
+        env.get(_CREDENTIALS, ""), _CREDENTIALS, DATABASE_CREDENTIALS
+    )
+    return {
+        "port": url.port,
+        "ssl": _verify_full(env),
+        "password": DATABASE_CREDENTIALS[credentials](url, env),
+    }
+
+
+def _sqlite(url: URL, env: Mapping[str, str]) -> dict[str, Any]:
+    """No connect arguments: a SQLite database is a local file.
+
+    It takes no credentials and no TLS, so each database setting but the URL
+    stops the startup.
+    """
+    stray = sorted(
+        name
+        for name, value in env.items()
+        if name.startswith("ANALYSIS_DATABASE_") and name != _URL and value.strip()
+    )
+    if stray:
+        raise JobStoreConfigError(
+            f"a SQLite database takes no {', '.join(stray)}; unset it"
+        )
+    return {}
+
+
+def _no_preparation(engine: AsyncEngine) -> None:
+    """Set nothing on a new engine."""
+
+
+async def _held_by_begin_immediate(connection: AsyncConnection) -> None:
+    """Take no lock: ``BEGIN IMMEDIATE`` took the write lock of the database."""
+
+
+#: The key of the advisory lock that admission takes on PostgreSQL. The value
+#: is arbitrary, and no other lock in the database uses it.
+_ADMISSION_LOCK_KEY = 1525
+
+
+async def _advisory_lock(connection: AsyncConnection) -> None:
+    """Take the advisory lock of admission until the transaction ends (#1525).
+
+    Admission sums the tokens of every owner, so a lock on one row cannot
+    serialise it. At ``READ COMMITTED``, each statement after the lock sees
+    each admission that committed before it.
+    """
+    await connection.execute(select(func.pg_advisory_xact_lock(_ADMISSION_LOCK_KEY)))
+
+
 @dataclass(frozen=True)
 class Database:
     """One database the ``sql`` store runs on: a row of :data:`DATABASES`.
@@ -334,9 +565,16 @@ class Database:
     pool: type[Pool]
     #: What the store sets on a new engine before its first connection.
     prepare: Callable[[AsyncEngine], None]
+    #: The connect arguments of the driver for the URL and the settings. It
+    #: checks each setting that a connection reads, so a wrong one stops the
+    #: startup.
+    connect: Callable[[URL, Mapping[str, str]], dict[str, Any]]
+    #: Takes the global lock of admission, in the write transaction of
+    #: admission.
+    admission_lock: Callable[[AsyncConnection], Awaitable[None]]
 
 
-DatabaseDriver = Literal["sqlite+aiosqlite"]
+DatabaseDriver = Literal["sqlite+aiosqlite", "postgresql+asyncpg"]
 
 #: Each database a deployment can name in ``ANALYSIS_DATABASE_URL``, keyed by
 #: the URL's driver name. The table answers for every name of
@@ -344,7 +582,21 @@ DatabaseDriver = Literal["sqlite+aiosqlite"]
 DATABASES: dict[DatabaseDriver, Database] = {
     # A connection opens a file, so a pool saves little, and a connection
     # that no pool keeps belongs to no event loop.
-    "sqlite+aiosqlite": Database(pool=NullPool, prepare=_prepare_sqlite),
+    "sqlite+aiosqlite": Database(
+        pool=NullPool,
+        prepare=_prepare_sqlite,
+        connect=_sqlite,
+        admission_lock=_held_by_begin_immediate,
+    ),
+    # The server checks a password or an IAM token only when a connection
+    # opens, so a pooled connection stays open after its token expires, and
+    # asyncpg calls the token callable for each new connection (#1525).
+    "postgresql+asyncpg": Database(
+        pool=AsyncAdaptedQueuePool,
+        prepare=_no_preparation,
+        connect=_postgres,
+        admission_lock=_advisory_lock,
+    ),
 }
 
 
@@ -354,29 +606,34 @@ def database_url(env: Mapping[str, str]) -> URL:
     A URL that holds a password stops the startup, so a password never sits
     in an environment variable. No message repeats the URL.
     """
-    value = env.get("ANALYSIS_DATABASE_URL", "").strip()
+    value = env.get(_URL, "").strip()
     if not value:
-        raise JobStoreConfigError("set ANALYSIS_DATABASE_URL for the sql job store")
+        raise JobStoreConfigError(f"set {_URL} for the sql job store")
     try:
         url = make_url(value)
     except ArgumentError:
-        raise JobStoreConfigError(
-            "ANALYSIS_DATABASE_URL is not a database URL"
-        ) from None
+        raise JobStoreConfigError(f"{_URL} is not a database URL") from None
     if url.password is not None or any("password" in key.lower() for key in url.query):
-        raise JobStoreConfigError(
-            "ANALYSIS_DATABASE_URL holds a password; remove it from the URL"
-        )
-    backend_name(url.drivername, "the driver of ANALYSIS_DATABASE_URL", DATABASES)
+        raise JobStoreConfigError(f"{_URL} holds a password; remove it from the URL")
+    _database(url)
     return url
 
 
-def engine_for(url: URL) -> AsyncEngine:
-    """The engine for ``url``, with its database's facts. It opens no connection."""
-    database = DATABASES[
-        backend_name(url.drivername, "the driver of ANALYSIS_DATABASE_URL", DATABASES)
-    ]
-    engine = create_async_engine(url, poolclass=database.pool)
+def _database(url: URL) -> Database:
+    """The row of :data:`DATABASES` for the driver of ``url``."""
+    return DATABASES[backend_name(url.drivername, f"the driver of {_URL}", DATABASES)]
+
+
+def engine_for(env: Mapping[str, str]) -> AsyncEngine:
+    """The engine of the database that the settings name, with the facts of its row.
+
+    It checks every database setting, and it opens no connection.
+    """
+    url = database_url(env)
+    database = _database(url)
+    engine = create_async_engine(
+        url, poolclass=database.pool, connect_args=database.connect(url, env)
+    )
     database.prepare(engine)
     return engine
 
@@ -422,10 +679,11 @@ class SqlJobStore:
     def __init__(self, engine: AsyncEngine, objects: ObjectStore) -> None:
         self._engine = engine
         self._objects = objects
+        self._admission_lock = _database(engine.url).admission_lock
 
     @classmethod
     def from_env(cls, env: Mapping[str, str], objects: ObjectStore) -> SqlJobStore:
-        return cls(engine_for(database_url(env)), objects)
+        return cls(engine_for(env), objects)
 
     @asynccontextmanager
     async def _transaction(
@@ -540,6 +798,7 @@ class SqlJobStore:
         digests: Mapping[ObjectName, str],
     ) -> Admission:
         async with self._transaction(writes=True) as connection:
+            await self._admission_lock(connection)
             if await connection.scalar(select(jobs.c.id).where(jobs.c.id == record.id)):
                 return Admission(outcome="duplicate", active=0)
             if principal is None:

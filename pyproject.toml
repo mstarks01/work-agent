@@ -236,3 +236,6 @@ testpaths = ["tests"]
 # is deliberately not part of the wheel — nothing under evals/ ships in the
 # production image (wayfinder ticket 009 decision 14).
 pythonpath = ["."]
+markers = [
+    "postgres: needs a PostgreSQL server; runs in the PostgreSQL lane of CI (see tests/sql_stores.py)",
+]

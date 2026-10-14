@@ -1,14 +1,28 @@
-"""The settings of a ``sql`` store on SQLite and an object store, for a test.
+"""The settings of a ``sql`` store and an object store, for a test.
 
 The migration runs once in each test process, as the deploy step runs it, and
 each store gets a copy of that database, so a test never shares a store. The
 object store is a filesystem root or an ``s3`` bucket. A test of the ``s3``
 row takes the ``moto_s3`` fixture, so that moto serves the bucket in the test
 process.
+
+A SQLite store needs nothing. A PostgreSQL store needs a server, so the tests
+that use one carry the ``postgres`` mark and run in the PostgreSQL lane of CI.
+The lane reads these variables:
+
+* ``TEST_POSTGRES_URL``: a user that can create databases, on a server with
+  TLS, as a ``postgresql+asyncpg://`` URL with no password. Where it is unset,
+  each lane test skips, except where ``REQUIRE_POSTGRES=1``, as in CI, where
+  it fails.
+* ``TEST_POSTGRES_PASSWORD_FILE``: the file that holds the password of that
+  user.
+* ``TEST_POSTGRES_CA_FILE``: the CA of the certificate of the server.
+* ``TEST_POSTGRES_PLAIN_URL``: the same user on a server without TLS.
 """
 
 from __future__ import annotations
 
+import asyncio
 import atexit
 import os
 import shutil
@@ -23,11 +37,14 @@ from pathlib import Path
 import boto3
 import pytest
 from alembic import command
+from sqlalchemy.engine import URL, make_url
 
 from analysis_service.migrations import alembic_config
 from analysis_service.objects import ObjectStoreName
 from analysis_service.s3_objects import KEY_FILES
-from analysis_service.sql_store import database_url
+from analysis_service.sql_store import engine_for
+
+REQUIRE_POSTGRES = os.environ.get("REQUIRE_POSTGRES") == "1"
 
 
 def sqlite_url(path: Path) -> str:
@@ -35,14 +52,23 @@ def sqlite_url(path: Path) -> str:
 
 
 def migrate(path: Path) -> None:
-    """Run the deploy step on the SQLite database at ``path``.
+    """Run the deploy step on the SQLite database at ``path``."""
+    upgrade({"ANALYSIS_DATABASE_URL": sqlite_url(path)})
 
-    In a thread of its own, because Alembic's script runs an event loop, and a
-    test can ask for a store inside one.
+
+def in_a_thread(work, *args):
+    """Run ``work`` in a thread of its own, and return what it returns.
+
+    Alembic's script and :func:`admin` each run an event loop, and a test can
+    ask for a store inside one.
     """
-    url = database_url({"ANALYSIS_DATABASE_URL": sqlite_url(path)})
     with ThreadPoolExecutor(max_workers=1) as pool:
-        pool.submit(command.upgrade, alembic_config(url), "head").result()
+        return pool.submit(work, *args).result()
+
+
+def upgrade(env: dict[str, str]) -> None:
+    """Run the deploy step on the database that ``env`` names."""
+    in_a_thread(command.upgrade, alembic_config(env), "head")
 
 
 @cache
@@ -122,11 +148,100 @@ def object_env(
 
 
 def sql_env(directory: Path, objects: ObjectStoreName = "filesystem") -> dict[str, str]:
-    """The settings of a fresh ``sql`` store under ``directory``, which is new."""
+    """The settings of a fresh ``sql`` store on SQLite under ``directory``,
+    which is new."""
     database = directory / "jobs.db"
     shutil.copyfile(_migrated(), database)
     return {
         "ANALYSIS_JOB_STORE": "sql",
         "ANALYSIS_DATABASE_URL": sqlite_url(database),
+        **OBJECT_ENVS[objects].settings(directory),
+    }
+
+
+def lane_url() -> URL:
+    """``TEST_POSTGRES_URL``. Where it is unset, the test skips, or fails
+    where ``REQUIRE_POSTGRES=1``."""
+    value = os.environ.get("TEST_POSTGRES_URL", "").strip()
+    if not value:
+        reason = "TEST_POSTGRES_URL is unset, so the PostgreSQL lane cannot run"
+        if REQUIRE_POSTGRES:
+            pytest.fail(f"REQUIRE_POSTGRES=1, and {reason}")
+        pytest.skip(reason)
+    return make_url(value)
+
+
+def lane_env(url: URL | None = None, **settings: str) -> dict[str, str]:
+    """The database settings of the lane server, with the password credentials.
+
+    ``url`` replaces ``TEST_POSTGRES_URL``, and each of ``settings`` replaces
+    or adds a setting. An empty value removes a setting.
+    """
+    url = lane_url() if url is None else url
+    env = {
+        "ANALYSIS_DATABASE_URL": url.render_as_string(hide_password=False),
+        "ANALYSIS_DATABASE_CREDENTIALS": "password",
+        "ANALYSIS_DATABASE_PASSWORD_FILE": os.environ["TEST_POSTGRES_PASSWORD_FILE"],
+        "ANALYSIS_DATABASE_CA_FILE": os.environ["TEST_POSTGRES_CA_FILE"],
+    }
+    env.update(settings)
+    return {name: value for name, value in env.items() if value}
+
+
+def admin(*statements: str) -> None:
+    """Run each statement on the lane server, outside a transaction."""
+
+    async def run() -> None:
+        engine = engine_for(lane_env())
+        try:
+            async with engine.connect() as connection:
+                await connection.execution_options(isolation_level="AUTOCOMMIT")
+                for statement in statements:
+                    await connection.exec_driver_sql(statement)
+        finally:
+            await engine.dispose()
+
+    in_a_thread(asyncio.run, run())
+
+
+_DATABASES: list[str] = []
+
+
+def _drop_databases() -> None:
+    if _DATABASES:
+        admin(
+            *(f'DROP DATABASE IF EXISTS "{name}" WITH (FORCE)' for name in _DATABASES)
+        )
+
+
+def new_database(template: str = "template1") -> str:
+    """The name of a new database on the lane server, a copy of ``template``.
+
+    The process drops it when it exits.
+    """
+    if not _DATABASES:
+        atexit.register(_drop_databases)
+    name = f"lane_{uuid.uuid4().hex}"
+    _DATABASES.append(name)
+    admin(f'CREATE DATABASE "{name}" TEMPLATE "{template}"')
+    return name
+
+
+@cache
+def _migrated_on_postgres() -> str:
+    name = new_database()
+    upgrade(lane_env(lane_url().set(database=name)))
+    return name
+
+
+def postgres_env(
+    directory: Path, objects: ObjectStoreName = "filesystem"
+) -> dict[str, str]:
+    """The settings of a fresh ``sql`` store on PostgreSQL, with its object
+    store under ``directory``, which is new."""
+    url = lane_url().set(database=new_database(_migrated_on_postgres()))
+    return {
+        "ANALYSIS_JOB_STORE": "sql",
+        **lane_env(url),
         **OBJECT_ENVS[objects].settings(directory),
     }
