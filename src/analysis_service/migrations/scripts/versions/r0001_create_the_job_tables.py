@@ -54,7 +54,7 @@ def upgrade() -> None:
         sa.Column("updated_at", sa.DateTime(timezone=True), nullable=False),
         sa.Column("reserved_tokens", sa.BigInteger(), nullable=False),
         sa.Column("measured_tokens", sa.BigInteger()),
-        sa.Column("round_revision", sa.Integer(), nullable=False),
+        sa.Column("revision", sa.Integer(), nullable=False),
         sa.Column("parent_revision", sa.Integer()),
         sa.Column("system_name", sa.Text()),
         sa.Column("amends", sa.String(64)),
