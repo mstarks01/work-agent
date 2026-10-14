@@ -1,0 +1,366 @@
+{
+ "01-payments-checkout": {
+  "L1": {
+   "lever A": [
+    8,
+    24,
+    11
+   ],
+   "lever A + reader": [
+    6,
+    20,
+    31
+   ]
+  },
+  "L2": {
+   "lever A": [
+    30,
+    74,
+    49
+   ],
+   "lever A + reader": [
+    28,
+    61,
+    98
+   ]
+  }
+ },
+ "02-iot-fleet-telemetry": {
+  "L1": {
+   "lever A": [
+    0,
+    0,
+    8
+   ],
+   "lever A + reader": [
+    0,
+    0,
+    12
+   ]
+  },
+  "L2": {
+   "lever A": [
+    0,
+    0,
+    51
+   ],
+   "lever A + reader": [
+    0,
+    0,
+    64
+   ]
+  }
+ },
+ "03-batch-data-pipeline": {
+  "L1": {
+   "lever A": [
+    0,
+    0,
+    7
+   ],
+   "lever A + reader": [
+    0,
+    0,
+    19
+   ]
+  },
+  "L2": {
+   "lever A": [
+    0,
+    0,
+    45
+   ],
+   "lever A + reader": [
+    0,
+    0,
+    74
+   ]
+  }
+ },
+ "04-ml-inference-service": {
+  "L1": {
+   "lever A": [
+    9,
+    24,
+    9
+   ],
+   "lever A + reader": [
+    7,
+    21,
+    21
+   ]
+  },
+  "L2": {
+   "lever A": [
+    30,
+    75,
+    46
+   ],
+   "lever A + reader": [
+    30,
+    64,
+    71
+   ]
+  }
+ },
+ "05-cookbook-queue-webapp": {
+  "L1": {
+   "lever A": [
+    9,
+    24,
+    9
+   ],
+   "lever A + reader": [
+    8,
+    21,
+    16
+   ]
+  },
+  "L2": {
+   "lever A": [
+    30,
+    74,
+    47
+   ],
+   "lever A + reader": [
+    30,
+    65,
+    69
+   ]
+  }
+ },
+ "06-cookbook-online-game": {
+  "L1": {
+   "lever A": [
+    10,
+    24,
+    7
+   ],
+   "lever A + reader": [
+    9,
+    21,
+    14
+   ]
+  },
+  "L2": {
+   "lever A": [
+    30,
+    76,
+    44
+   ],
+   "lever A + reader": [
+    30,
+    70,
+    62
+   ]
+  }
+ },
+ "07-cicd-store-deploy": {
+  "L1": {
+   "lever A": [
+    0,
+    0,
+    7
+   ],
+   "lever A + reader": [
+    0,
+    0,
+    11
+   ]
+  },
+  "L2": {
+   "lever A": [
+    0,
+    0,
+    45
+   ],
+   "lever A + reader": [
+    0,
+    0,
+    58
+   ]
+  }
+ },
+ "08-sso-identity-broker": {
+  "L1": {
+   "lever A": [
+    10,
+    24,
+    7
+   ],
+   "lever A + reader": [
+    8,
+    23,
+    18
+   ]
+  },
+  "L2": {
+   "lever A": [
+    30,
+    75,
+    45
+   ],
+   "lever A + reader": [
+    30,
+    65,
+    75
+   ]
+  }
+ },
+ "09-cookbook-sokify-retail": {
+  "L1": {
+   "lever A": [
+    9,
+    23,
+    10
+   ],
+   "lever A + reader": [
+    9,
+    21,
+    11
+   ]
+  },
+  "L2": {
+   "lever A": [
+    30,
+    73,
+    48
+   ],
+   "lever A + reader": [
+    30,
+    69,
+    51
+   ]
+  }
+ },
+ "10-cookbook-generic-cms": {
+  "L1": {
+   "lever A": [
+    9,
+    23,
+    10
+   ],
+   "lever A + reader": [
+    8,
+    20,
+    21
+   ]
+  },
+  "L2": {
+   "lever A": [
+    30,
+    72,
+    52
+   ],
+   "lever A + reader": [
+    29,
+    68,
+    77
+   ]
+  }
+ },
+ "11-sparse-shift-scheduling": {
+  "L1": {
+   "lever A": [
+    10,
+    24,
+    7
+   ],
+   "lever A + reader": [
+    7,
+    22,
+    19
+   ]
+  },
+  "L2": {
+   "lever A": [
+    30,
+    76,
+    44
+   ],
+   "lever A + reader": [
+    30,
+    69,
+    70
+   ]
+  }
+ },
+ "12-overclaiming-supplier-portal": {
+  "L1": {
+   "lever A": [
+    10,
+    24,
+    7
+   ],
+   "lever A + reader": [
+    9,
+    24,
+    9
+   ]
+  },
+  "L2": {
+   "lever A": [
+    30,
+    76,
+    44
+   ],
+   "lever A + reader": [
+    30,
+    74,
+    49
+   ]
+  }
+ },
+ "13-dispatch-control-plane": {
+  "L1": {
+   "lever A": [
+    10,
+    21,
+    10
+   ],
+   "lever A + reader": [
+    5,
+    17,
+    36
+   ]
+  },
+  "L2": {
+   "lever A": [
+    30,
+    69,
+    57
+   ],
+   "lever A + reader": [
+    23,
+    62,
+    114
+   ]
+  }
+ },
+ "16-library-lending-interview": {
+  "L1": {
+   "lever A": [
+    9,
+    24,
+    9
+   ],
+   "lever A + reader": [
+    7,
+    21,
+    20
+   ]
+  },
+  "L2": {
+   "lever A": [
+    30,
+    75,
+    46
+   ],
+   "lever A + reader": [
+    30,
+    70,
+    69
+   ]
+  }
+ }
+}

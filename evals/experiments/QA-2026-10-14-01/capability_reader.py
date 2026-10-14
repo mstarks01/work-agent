@@ -7,7 +7,8 @@ in the description under the validity gate's own matcher. It never states an
 absence. Nothing here touches the application.
 
 Usage: capability_reader.py <out.json> <runs> <model> <case> [<case> ...]
-A case is ``example`` or a corpus case directory name.
+A case is ``example``, a corpus case directory name, or ``adversarial/<name>``
+for a case under ``evals/adversarial/cases``.
 """
 
 import json
@@ -49,6 +50,11 @@ def table() -> str:
 def description(case: str) -> str:
     if case == "example":
         return Path("examples/orders.md").read_text(encoding="utf-8")
+    if case.startswith("adversarial/"):
+        name = case.removeprefix("adversarial/")
+        return Path("evals/adversarial/cases", name, "source.md").read_text(
+            encoding="utf-8"
+        )
     return Path("evals/corpus", case, "source.md").read_text(encoding="utf-8")
 
 
