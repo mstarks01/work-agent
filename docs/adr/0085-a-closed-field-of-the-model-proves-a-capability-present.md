@@ -51,8 +51,9 @@ what extraction emitted.
 | `encryption` | a data store whose encryption at rest is stated and not assumed |
 
 The application's parts are the model's processes and data stores. A
-protocol counts only where the flow states it and the model did not assume
-it, the rule the protocol table reads.
+protocol counts only where the flow states it, the model did not assume
+it, and the field does not negate it ("HTTPS, not HTTP/2" states no HTTP/2).
+The protocol table reads the same rule.
 
 **A row only marks a capability present.** No field proves an absence, and
 a wrong "present" makes a requirement apply that should not; it never rules

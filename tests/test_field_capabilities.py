@@ -180,6 +180,22 @@ def test_a_plain_sibling_or_a_negation_proves_no_tls(protocol):
     assert "tls-use" not in _written(_model(**{LOGIN: protocol}))
 
 
+@pytest.mark.parametrize(
+    "protocols",
+    [
+        {LOGIN: "HTTPS, not HTTP/2"},
+        {LOGIN: "HTTP without WebSocket"},
+        {LOGIN: "SFTP, no SOAP"},
+        {STORE: "SFTP, not HTTP"},
+    ],
+)
+def test_a_negated_protocol_proves_no_row_of_its_family(protocols):
+    model = _model(**{LOGIN: "SFTP", STORE: "SFTP"} | protocols)
+    model.get(LOGIN).assets = ["credentials"]
+    tls = {"tls-use", "cryptographic-operations", "cryptographic-keys"}
+    assert set(_written(model)) - tls - {"sensitive-data", "secret-assets"} == set()
+
+
 def test_an_assumed_protocol_proves_nothing():
     model = _model(**{LOGIN: "HTTPS"})
     model.assumptions.append(
