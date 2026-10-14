@@ -73,6 +73,7 @@ from pydantic import BaseModel
 # Imported first so the model-cost map is pinned before anything reaches
 # litellm; `vendor_keyed_tables` imports every shipped module.
 from analysis_service import model_gate  # noqa: F401
+from analysis_service.sql_store import DatabaseCredentials
 from analysis_service.vendors import (
     VENDOR_NAMES,
     VENDORS,
@@ -92,6 +93,18 @@ VOCABULARIES: tuple[tuple[str, frozenset], ...] = (
     ("VENDOR_NAMES", frozenset(VENDOR_NAMES)),
     ("CredentialMode", frozenset(CredentialMode)),
 )
+
+#: Each table whose keys share a word with a vendor vocabulary but come from a
+#: closed set of its own, with that set. The completeness check reads each one
+#: against its own set instead.
+OWN_VOCABULARIES: dict[str, frozenset] = {
+    # ANALYSIS_DATABASE_CREDENTIALS takes `password` or `iam` (#1531). Its
+    # `iam` is the word that CredentialMode uses, and a database has no
+    # `api_key`.
+    "analysis_service.sql_store.DATABASE_CREDENTIALS": frozenset(
+        get_args(DatabaseCredentials)
+    ),
+}
 
 #: Every vendor name, as one alternation, built from the registry. Written down
 #: once and read by both scans below: a hand-kept list is the shape this module
@@ -346,6 +359,10 @@ def test_every_vendor_keyed_table_answers_for_every_vendor(tables):
     incomplete = {}
     for name, (vocabulary_name, answered) in tables.items():
         whole = dict(VOCABULARIES)[vocabulary_name]
+        if name in OWN_VOCABULARIES:
+            module, attribute = name.rsplit(".", 1)
+            answered = set(getattr(importlib.import_module(module), attribute))
+            whole = OWN_VOCABULARIES[name]
         missing = whole - answered
         if missing:
             incomplete[name] = sorted(str(member) for member in missing)
