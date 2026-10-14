@@ -1,7 +1,9 @@
 # 78. A paused job asks one adaptive list, and says what an answer settles
 
 - **Status**: accepted; its rule that the page shows each group's rows in the
-  list's order is amended by [ADR 0080](0080-each-question-kind-is-listed-once.md)
+  list's order is amended by [ADR 0080](0080-each-question-kind-is-listed-once.md),
+  and its limit and its questions by
+  [ADR 0081](0081-a-question-kind-is-asked-once-for-the-system.md)
 - **Date**: 2026-10-12
 - **Effort**: [#1632](https://github.com/mstarks01/work-agent/issues/1632)
 - **Supersedes**: the rounds of
@@ -141,6 +143,10 @@ not claim that the work only shrinks.
 of each kind (ADR 0074), and a limit counts saved answers, not requests,
 edits, facets or rendered rows. A skip spends no place. A read or a save with
 unchanged inputs changes nothing.
+
+> **Amended by [ADR 0081](0081-a-question-kind-is-asked-once-for-the-system.md).**
+> A limit counts places (`answer_round.limit_place`): a group of field
+> questions takes one place, and a capability question takes one.
 
 ## Consequences
 

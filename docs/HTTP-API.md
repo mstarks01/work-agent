@@ -1078,8 +1078,9 @@ the write of its row.
 
 The orphan sweep deletes each orphan that is older than one day. The day is
 much longer than the time between the write of an object and the write of its
-row. The sweep never deletes an object that a row names. It also never
-deletes a key that the service does not write, for example a file that an
+row. The sweep never deletes an object that a row names, or an object of a
+job that is queued or running: a later save of that job can still name it. It
+also never deletes a key that the service does not write, for example a file that an
 operator puts under the object root. The `filesystem` store enters no
 symbolic link when it lists the root.
 
@@ -1118,7 +1119,7 @@ pair, so a new row runs every contract test. A new job store implements the
 | `events_after` | A job's status and the events past a cursor, and nothing else. |
 | `save` | The record back, for a job that already exists. |
 | `expired` | The ID and the owner ID of each job in a terminal status whose last update is before a given time. The retention sweep deletes each one through `delete`. |
-| `sweep_orphans` | Deletes each object written before a given time that no job row names, and returns the number of objects it removed. The orphan sweep calls it. |
+| `sweep_orphans` | Deletes each object written before a given time that no job row names, except an object of a queued or running job, and returns the number of objects it removed. The orphan sweep calls it. |
 | `fail_in_flight` | Fails each `queued` or `running` job with the restart message and returns their IDs. It settles each job through `JobRecord.transition`, so the job keeps its full charge and gets a status event. |
 
 Each read returns a record's `schema_version` as the record stored it, and no

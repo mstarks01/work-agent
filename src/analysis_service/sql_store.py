@@ -269,6 +269,15 @@ def _names(row: Row[Any], name: ObjectName) -> bool:
     return row._mapping[DIGEST_COLUMNS[name]] is not None
 
 
+def _object_keys(row: Row[Any]) -> list[str]:
+    """The key of each object that the job row ``row`` names."""
+    return [
+        object_key(row.owner_id, row.id, name)
+        for name in DIGEST_COLUMNS
+        if _names(row, name)
+    ]
+
+
 #: The fields of a record that are objects or event rows, not job columns.
 _OUTSIDE_THE_ROW = frozenset({"sources", "report", "events"})
 #: The fields a job row holds as JSON text.
@@ -1089,8 +1098,9 @@ class SqlJobStore:
                 try:
                     await self._objects.put(key, data)
                 except FileExistsError:
-                    # No row names the object, so it is an orphan. The new put
-                    # gives it a new write time, so the orphan sweep keeps it.
+                    # No row names the object, so it is an orphan. The job is
+                    # not terminal until the row write below, so the orphan
+                    # sweep keeps the new object.
                     await self._objects.delete(key)
                     await self._objects.put(key, data)
                 values["report_sha256"] = _digest(data)
@@ -1254,50 +1264,52 @@ class SqlJobStore:
                 delete(job_events).where(job_events.c.job_id == job_id)
             )
             await connection.execute(delete(jobs).where(jobs.c.id == job_id))
-        return await self._remove(
-            [
-                object_key(row.owner_id, row.id, name)
-                for name in DIGEST_COLUMNS
-                if _names(row, name)
-            ]
-        )
+        return await self._remove(_object_keys(row))
 
-    async def _named_keys(self, job_ids: Sequence[str]) -> set[str]:
-        """The key of each object that the job rows of ``job_ids`` name.
+    async def _kept_keys(self, job_ids: Sequence[str]) -> set[str]:
+        """The key of each object that the orphan sweep keeps for the job rows
+        of ``job_ids``: each object a terminal job's row names, and each
+        object of a job that is not terminal.
 
-        One read transaction, with :data:`_ID_BATCH` job IDs in each query.
+        A save of a job that is not terminal can put its report before the
+        row write that names it, and over an orphan report of the job. The
+        row write makes the job terminal, so no object that a later save can
+        name is ever deleted. One read transaction, with :data:`_ID_BATCH` job
+        IDs in each query.
         """
         columns = (jobs.c[column] for column in DIGEST_COLUMNS.values())
-        query = select(jobs.c.id, jobs.c.owner_id, *columns)
-        named = set()
+        query = select(jobs.c.id, jobs.c.owner_id, jobs.c.status, *columns)
+        kept = set()
         async with self._transaction() as connection:
             for start in range(0, len(job_ids), _ID_BATCH):
                 batch = job_ids[start : start + _ID_BATCH]
                 for row in await connection.execute(query.where(jobs.c.id.in_(batch))):
-                    named |= {
-                        object_key(row.owner_id, row.id, name)
-                        for name in DIGEST_COLUMNS
-                        if _names(row, name)
-                    }
-        return named
+                    if row.status in TERMINAL_STATUSES:
+                        kept.update(_object_keys(row))
+                    else:
+                        kept.update(
+                            object_key(row.owner_id, row.id, name)
+                            for name in DIGEST_COLUMNS
+                        )
+        return kept
 
     async def sweep_orphans(self, before: datetime) -> int:
         """Delete each object last written before ``before`` that no job row
-        names, and return how many the store removed.
+        keeps, and return how many the store removed.
 
         The sweep lists every key first. A key that :func:`object_key` cannot
         give stays, because the service never writes one. Then one read
-        transaction finds the keys that the rows of the listed job IDs name.
-        A row names a key only under its own owner ID. The sweep deletes each
-        other listed key.
+        transaction finds the keys that the rows of the listed job IDs keep
+        (:meth:`_kept_keys`). A row keeps a key only under its own owner ID.
+        The sweep deletes each other listed key.
         """
         listed = []
         async for key, modified in self._objects.list():
             parts = key_parts(key)
             if parts is not None and modified < before:
                 listed.append((key, parts[1]))
-        named = await self._named_keys(sorted({job_id for _, job_id in listed}))
-        return await self._remove([key for key, _ in listed if key not in named])
+        kept = await self._kept_keys(sorted({job_id for _, job_id in listed}))
+        return await self._remove([key for key, _ in listed if key not in kept])
 
     async def expired(self, before: datetime) -> list[tuple[str, str]]:
         async with self._transaction() as connection:

@@ -177,7 +177,9 @@ def test_the_command_prints_the_table(tmp_path, capsys):
     parser = __import__("argparse").ArgumentParser()
     COMMANDS["gain"].arguments(parser)
 
-    args = parser.parse_args([str(SEALED), str(path), "--spread", str(spread)])
+    args = parser.parse_args(
+        [str(SEALED), str(path), "--framework", "stride", "--spread", str(spread)]
+    )
     assert COMMANDS["gain"].run(args) == 0
     printed = capsys.readouterr().out
     assert "| `volume` | fail |" in printed
@@ -232,5 +234,13 @@ class TestAnIncomparablePairIsRefused:
         parser = __import__("argparse").ArgumentParser()
         COMMANDS["gain"].arguments(parser)
 
-        assert COMMANDS["gain"].run(parser.parse_args([str(SEALED), str(path)])) == 1
+        args = parser.parse_args([str(SEALED), str(path), "--framework", "stride"])
+        assert COMMANDS["gain"].run(args) == 1
         assert "refused: the two artifacts do not compare" in capsys.readouterr().err
+
+
+def test_the_command_names_no_default_framework():
+    parser = __import__("argparse").ArgumentParser()
+    COMMANDS["gain"].arguments(parser)
+    with pytest.raises(SystemExit):
+        parser.parse_args([str(SEALED), str(SEALED)])

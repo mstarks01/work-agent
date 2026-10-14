@@ -649,7 +649,7 @@ def parse(row: Mapping[str, Any], *, source: str) -> Experiment:
         resolves=_text(row.get("resolves"), "resolves", where) or None,
         rerun_reason=_text(row.get("rerun_reason"), "rerun_reason", where),
         holdout_reads=_strings(row, "holdout_reads", "row", where),
-        replicates=row.get("replicates"),
+        replicates=_text(row.get("replicates"), "replicates", where) or None,
     )
 
 
@@ -1185,7 +1185,7 @@ def admit(
     * a ``blocked`` row carries its extension ticket;
     * a rule rests on experiments that are on record;
     * a repeat of another audit's current conclusion says why it reran;
-    * a candidate answers for every package in ``PACKAGES``;
+    * a candidate answers for every package in ``PACKAGES``, and for no other;
     * a kept candidate names the regressions it ran;
     * a row reads only holdout cases, and none already read
       :data:`HOLDOUT_READS` times;
@@ -1217,6 +1217,12 @@ def admit(
             raise ExperimentError(
                 f"{where}: {new.audit_id} has used {held.attempts_used} of"
                 f" {held.attempts} granted attempts"
+            )
+        unknown = sorted(set(new.candidate.parity) - set(PACKAGES))
+        if unknown:
+            raise ExperimentError(
+                f"{where}: the candidate gives a parity answer for"
+                f" {', '.join(unknown)}, which is not in PACKAGES"
             )
         unanswered = sorted(set(PACKAGES) - set(new.candidate.parity))
         if unanswered:

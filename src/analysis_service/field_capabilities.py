@@ -30,9 +30,9 @@ from analysis_service.analysis import SENSITIVE_ASSET_TAGS, control_state
 from analysis_service.protocol_defaults import (
     QUIC_NAMES,
     TLS_NAMES,
-    names_protocol,
     stated_protocol_flows,
     states_inherently,
+    states_protocol,
 )
 from analysis_service.system_model import (
     CapabilityStatement,
@@ -111,7 +111,7 @@ def _tls_client(parts: _Parts) -> Iterator[DataFlow]:
 def _internal(parts: _Parts, names: tuple[str, ...]) -> Iterator[DataFlow]:
     """Stated flows of a family between two of the application's own parts."""
     for flow in parts.stated:
-        if parts.ends(flow) <= parts.own and names_protocol(flow.protocol, names):
+        if parts.ends(flow) <= parts.own and states_protocol(flow, names):
             yield flow
 
 
@@ -133,7 +133,7 @@ def _sensitive_http(parts: _Parts) -> Iterator[DataFlow]:
     for flow in parts.stated:
         own_end = parts.ends(flow) & parts.own
         sensitive = set(flow.assets) & SENSITIVE_TAGS
-        if own_end and sensitive and names_protocol(flow.protocol, HTTP_FAMILY):
+        if own_end and sensitive and states_protocol(flow, HTTP_FAMILY):
             yield flow
 
 
@@ -150,7 +150,7 @@ def _named(
 
     def proof(parts: _Parts) -> Iterator[DataFlow]:
         for flow in parts.stated:
-            if names_protocol(flow.protocol, names) and ends(parts, flow):
+            if states_protocol(flow, names) and ends(parts, flow):
                 yield flow
 
     return proof

@@ -1139,6 +1139,21 @@ class TestARepeatedSave:
         assert asyncio.run(store.get(record.id)).report == record.report
         assert asyncio.run(objects.get(key)) == data
 
+    def test_a_sweep_between_the_put_and_the_row_write_keeps_the_report(self, held):
+        """The sweep reads the row of a running job, which names no report yet."""
+        store, objects = held
+        record = self.running(store)
+        asyncio.run(objects.put(object_key("alice", record.id, "report.json"), b"{}"))
+        put = objects.put
+
+        async def put_then_sweep(key: str, data: bytes) -> None:
+            await put(key, data)
+            await store.sweep_orphans(later())
+
+        objects.put = put_then_sweep
+        asyncio.run(store.save(record))
+        assert asyncio.run(store.get(record.id)).report == record.report
+
 
 class TestTheOrphanSweep:
     """#1673: the sweep deletes each old object that no row names, and only those."""
@@ -1186,16 +1201,28 @@ class TestTheOrphanSweep:
         assert all(asyncio.run(store.get(job)).report for job in named)
         assert asyncio.run(store.get(queued.id)) is not None
 
-    def test_it_deletes_an_old_report_that_its_row_does_not_name(self, held):
-        """A report put before a save wrote its digest, as a crash leaves it."""
+    def test_it_keeps_each_object_of_a_job_that_is_not_terminal(self, held):
+        """A later save of the job can still name the report."""
         store, objects = held
         queued = new_record()
         asyncio.run(admit(store, queued))
         report = object_key("alice", queued.id, "report.json")
         asyncio.run(objects.put(report, b"{}"))
+        assert asyncio.run(store.sweep_orphans(later())) == 0
+        assert asyncio.run(objects.get(report)) == b"{}"
+
+    def test_it_deletes_an_old_report_that_a_terminal_row_does_not_name(self, held):
+        """A report put before a save wrote its digest, as a crash leaves it,
+        once the restart scan failed the job."""
+        store, objects = held
+        queued = new_record()
+        asyncio.run(admit(store, queued))
+        report = object_key("alice", queued.id, "report.json")
+        asyncio.run(objects.put(report, b"{}"))
+        asyncio.run(store.fail_in_flight())
         assert asyncio.run(store.sweep_orphans(later())) == 1
         assert asyncio.run(objects.get(report)) is None
-        assert asyncio.run(store.get(queued.id)) is not None
+        assert asyncio.run(store.get(queued.id)).status == "failed"
 
     def test_a_row_names_an_object_only_under_its_own_owner(self, held):
         store, objects = held
@@ -1526,5 +1553,14 @@ class TestPrincipals:
                     budget=POLICY,
                     principal=principal,
                 )
+            )
+
+    def test_another_owner_is_a_defect_before_a_duplicate(self, store):
+        record = new_record()
+        reserve(store, record)
+        principal = Principal.new(self.identity())
+        with pytest.raises(ValueError, match="another owner"):
+            asyncio.run(
+                store.reserve(record, ceiling=100, budget=POLICY, principal=principal)
             )
         assert asyncio.run(store.principal(self.identity())) is None

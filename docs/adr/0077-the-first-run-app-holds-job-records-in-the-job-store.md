@@ -25,6 +25,10 @@ only to keep the two implementations agreeing.
 **The first-run app holds `JobRecord`s in an `InMemoryJobStore`, and one
 module writes and starts a job for both surfaces.**
 
+> **Amended by [#1676](https://github.com/mstarks01/work-agent/issues/1676).**
+> The first-run app builds its job store from the store settings of the
+> service, and uses the `memory` store where none is set.
+
 - `analysis_service.job_answers` reads a job from the store, builds its
   Answer State, stores a round, a draft or a correction, or creates the
   Resumed Job, admits it and starts it. It raises a typed refusal; the `/v1`
@@ -67,5 +71,8 @@ module writes and starts a job for both surfaces.**
   certification with its parent's, as a `/v1` job does.
 - A restart still loses every job. The durable store of ADR 0065 would give
   the app persistence with no change to its routes.
+
+  > **Amended by [#1676](https://github.com/mstarks01/work-agent/issues/1676).**
+  > With a durable store set, the app keeps its jobs across a restart.
 - ADR 0070's statement that the app keeps a draft on its run in memory now
   reads: the app keeps it on the job record, in the in-memory store.

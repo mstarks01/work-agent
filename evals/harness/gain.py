@@ -301,7 +301,7 @@ def arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("candidate", type=Path, help="the candidate sweep's artifact")
     parser.add_argument(
         "--framework",
-        default="stride",
+        required=True,
         choices=sorted(READERS),
         help="which package's findings to read",
     )

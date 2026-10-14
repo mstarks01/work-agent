@@ -126,8 +126,9 @@ class TestAFailedCandidateIsRevertedAndKept:
         {"candidate": _candidate(reason=5)},
         {"candidate": _candidate(), "resolves": ["A-E0"]},
         {"rerun_reason": 5},
+        {"replicates": ["A-E0"]},
     ],
-    ids=["reason", "resolves", "rerun_reason"],
+    ids=["reason", "resolves", "rerun_reason", "replicates"],
 )
 def test_a_text_field_of_another_type_is_refused(overrides):
     with pytest.raises(audit.ExperimentError, match="is not a string"):
@@ -549,6 +550,12 @@ class TestASharedChangeAnswersForEveryPackage:
         with pytest.raises(
             audit.ExperimentError, match=f"no parity answer for {missing}"
         ):
+            audit.admit(_one(outcome="refuted", candidate=held), [], [_grant()])
+
+    def test_a_package_not_in_packages_is_refused(self):
+        held = _candidate()
+        held["parity"]["strdie"] = "nothing"
+        with pytest.raises(audit.ExperimentError, match="strdie"):
             audit.admit(_one(outcome="refuted", candidate=held), [], [_grant()])
 
     def test_a_blank_answer_is_not_an_answer(self):

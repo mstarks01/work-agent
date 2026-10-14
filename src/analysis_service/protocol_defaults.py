@@ -31,13 +31,17 @@ from typing import Literal
 from analysis_service.analysis import control_state
 from analysis_service.system_model import Assumption, DataFlow, SystemModel
 
-#: A protocol field that also names a plain sibling, or negates, states no
-#: inherent property: "HTTP and HTTPS" carries some traffic unencrypted.
-PLAIN_OR_NEGATED = re.compile(
+#: A protocol field that also names a plain sibling states no inherent
+#: property: "HTTP and HTTPS" carries some traffic unencrypted.
+PLAIN = re.compile(
     r"(?<![\w-])(?:http(?!/3)|ftp|ldap|smtp|imap|pop3|mqtt|amqp|ws)(?![\w-])"
-    r"|\b(?:no|not|without|plain|plaintext|unencrypted|disabled|optional)\b",
+    r"|\b(?:plain|plaintext|unencrypted)\b",
     re.IGNORECASE,
 )
+
+#: A protocol field that negates states no protocol it names: "HTTPS, not
+#: HTTP/2" does not state HTTP/2.
+NEGATED = re.compile(r"\b(?:no|not|without|disabled|optional)\b", re.IGNORECASE)
 
 
 @dataclass(frozen=True)
@@ -156,10 +160,16 @@ def stated_protocol_flows(model: SystemModel) -> Iterator[DataFlow]:
     return (flow for flow in model.data_flows if flow.id not in inferred)
 
 
+def states_protocol(flow: DataFlow, names: tuple[str, ...]) -> bool:
+    """Whether ``flow`` names one of ``names`` and no negation."""
+    negated = NEGATED.search(flow.protocol)
+    return not negated and names_protocol(flow.protocol, names)
+
+
 def states_inherently(flow: DataFlow, names: tuple[str, ...]) -> bool:
-    """Whether ``flow`` names one of ``names`` and no plain sibling or negation."""
-    plain = PLAIN_OR_NEGATED.search(flow.protocol)
-    return not plain and names_protocol(flow.protocol, names)
+    """Whether ``flow`` states one of ``names`` and names no plain sibling."""
+    plain = PLAIN.search(flow.protocol)
+    return not plain and states_protocol(flow, names)
 
 
 def _flows(model: SystemModel, default: ProtocolDefault) -> Iterator[DataFlow]:

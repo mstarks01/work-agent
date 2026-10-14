@@ -37,6 +37,12 @@ changed. A hint under the button says that a "no" removes checks from the
 analysis, and that a question the owner is not sure of stays blank or takes
 "I don't know".
 
+**This sets aside one rule of
+[#1632](https://github.com/mstarks01/work-agent/issues/1632)**: that the page
+does not favour an answer because the answer makes the interview shorter. The
+button favours "no" for that reason. The list's ranking stays neutral between
+the answers (ADR 0078).
+
 **Each capability question keeps its place in its framework's turn.** The
 questions are not moved into one box. The maintainer chose this on
 2026-10-13 from three layouts the walk measured.
