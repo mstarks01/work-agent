@@ -47,7 +47,7 @@ a report that states a higher claim than its rung has reached is wrong.
 | 3 | the changed stage plus its affected deterministic consumers, on scripted or archived input | the affected consumers are verified | no |
 | 3a | the free instruments over archived outputs under the fixed code | the behaviour on archived inputs is measured | no |
 | 4 | a designed run on the shipped route, read with `run.py gain` beside the score | a downstream gain was measured | yes |
-| 5 | held-out confirmation | the gain holds on material the fix never saw | yes |
+| 5 | held-out confirmation, read with `run.py gain --held-out` beside the score | the gain holds on material the fix never saw | yes |
 
 A coverage gain at rung 4 counts only when `run.py gain` passes every gate
 against the baseline. The command refuses a pair whose figures do not compare:
@@ -58,7 +58,11 @@ and the `reviewed` and `rejected-rate` gates wait for votes on what the
 candidate added. A gate that reads `inconclusive` leaves the gain unconfirmed.
 
 Each rung-5 reading spends one of the holdout's `HOLDOUT_READS`, so confirm
-only a gain that rung 4 already measured. Record the read in `holdout_reads`.
+only a gain that rung 4 already measured. Record each case the reading names in
+the row's `holdout_reads`. `run.py gain --held-out` reads the rung-4 gates on
+the held-out cases alone. It refuses a case that is exhausted: a case read
+`HOLDOUT_READS` times counts as a development case in every split, so it
+confirms nothing.
 
 A reproduction is not a verification. Rung 1 shows that the defect exists;
 rung 2 shows that the fix removes it. Report both, and never collapse "fix

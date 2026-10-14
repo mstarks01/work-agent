@@ -60,7 +60,7 @@ from analysis_service.open_facts import CAPABILITY_GROUP
 from analysis_service.questions import fact_questions
 from analysis_service.report import Report
 from analysis_service.system_model import SystemModel
-from evals.harness.audit import holdout_cases
+from evals.harness import audit
 from evals.harness.early_rounds import MAX_SAVES, dont_know
 
 #: The frameworks a job selects, each with its options.
@@ -364,12 +364,16 @@ class Paired:
 def paired(root: Path) -> list[Paired]:
     """Every archived report under ``root`` whose case holds a report of
     another framework, with the two selections it is read under. A holdout
-    case's report is not opened (:func:`~evals.harness.audit.holdout_cases`)."""
-    held_out = holdout_cases()
+    case's report is not opened (:func:`~evals.harness.audit.held_out`); an
+    exhausted one is a development case and is read."""
+    ledger = audit.load()
+    held = {
+        case for case in audit.holdout_cases() if audit.held_out(case, True, ledger)
+    }
     by_case: dict[str, list[tuple[Path, Report]]] = defaultdict(list)
     for path in sorted(root.rglob("*.report.json")):
         case = path.name.removesuffix(".report.json")
-        if case in held_out:
+        if case in held:
             continue
         report = Report.model_validate_json(path.read_text(encoding="utf-8"))
         if len(report.job.frameworks) == 1:

@@ -152,8 +152,11 @@ class TestThePagePrintsTheTwoApart:
             text.split("`stride`, development cases")[1],
             text.split("`stride`, held-out cases")[1],
         )
-        assert "| 0.400 |" in development.split("`stride`, held-out")[0]
-        assert "| 0.900 |" in held_out
+        assert (
+            "| 0.400 (spread unmeasured) |"
+            in development.split("`stride`, held-out")[0]
+        )
+        assert "| 0.900 (spread unmeasured) |" in held_out
 
     def test_a_baseline_with_no_held_out_case_says_so(self, tmp_path):
         merged(tmp_path, "one", scores=[_score("01", 0.4, holdout=False)])

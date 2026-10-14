@@ -19,7 +19,7 @@ from typing import ClassVar
 
 import pytest
 
-from evals.harness import comparison
+from evals.harness import audit, comparison
 from evals.harness.comparison import NO_VOTES, build, is_stale, read_baseline
 from evals.harness.instruments import INSTRUMENTS
 from tests.eval_factories import sweep_document
@@ -149,11 +149,48 @@ class TestARow:
         (directory / "ada-0001.json").write_text(json.dumps(raw), encoding="utf-8")
         assert "0.700 (0.600–0.800)" in build(tmp_path)
 
-    def test_one_sweep_prints_no_spread(self, tmp_path):
+    def test_one_sweep_says_its_spread_is_unmeasured(self, tmp_path):
+        """#1093 item 5: a one-sweep figure names the spread it lacks."""
         merged(tmp_path, "one", scores=[score_row(recall=0.8)])
         text = build(tmp_path)
-        assert "0.800" in text
-        assert "0.800 (" not in text
+        assert "0.800 (spread unmeasured)" in text
+        assert "0.800 (0." not in text
+
+    def test_an_exhausted_holdout_prints_as_development(self, tmp_path):
+        """#1093: the page reclassifies a case the ledger read too often."""
+        row = {**score_row(recall=0.4), "case": "h", "holdout": True}
+        merged(tmp_path, "one", scores=[score_row(recall=0.8), row])
+        assert "Held-out cases, printed apart: `h`" in build(tmp_path)
+        for number in range(audit.HOLDOUT_READS):
+            audit.append(
+                audit.parse(
+                    {
+                        "experiment_id": f"T-E{number}",
+                        "audit_id": "T",
+                        "recorded": "2026-10-14T00:00:00Z",
+                        "revision": "0" * 40,
+                        "signature": "a synthetic holdout read",
+                        "hypothesis": "none",
+                        "falsifier": "none",
+                        "intervention": "none",
+                        "outcome": "null",
+                        "scope": "a test",
+                        "holdout_reads": ["h"],
+                    },
+                    source="test",
+                ),
+                tmp_path / audit.EXPERIMENTS_REL,
+            )
+
+        text = build(tmp_path)
+
+        assert "Held-out cases, printed apart" not in text
+        assert "held-out cases\n" not in text
+        assert (
+            f"counted as development cases: `h` (read {audit.HOLDOUT_READS} times)"
+            in text
+        )
+        assert "0.600 (spread unmeasured)" in text
 
     def test_vote_coverage_prints_so_a_reader_can_weigh_the_row(self, tmp_path):
         merged(tmp_path, "one", scores=[score_row(unvoted=4)])

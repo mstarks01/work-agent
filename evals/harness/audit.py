@@ -76,12 +76,14 @@ from analysis_service.claims import FrameworkName
 from analysis_service.frameworks import PACKAGES
 from evals.harness.history import current_commit
 from evals.harness.provenance import REPO_ROOT
-from evals.harness.reference import DEFAULT_CORPUS, diagnosable, load_corpus
+from evals.harness.reference import DEFAULT_CORPUS, load_corpus
 
 #: Where the ledger lives: one JSONL file per audit, named by its audit ID.
 #: Per audit rather than one shared file for the reason the vote ledger is per
 #: voter -- two audits running from two checkouts then merge without conflict.
-EXPERIMENTS_DIR = REPO_ROOT / "evals" / "experiments"
+#: Relative, for a reader that takes its own tree root.
+EXPERIMENTS_REL = Path("evals") / "experiments"
+EXPERIMENTS_DIR = REPO_ROOT / EXPERIMENTS_REL
 
 Phase = Literal[
     "extraction",
@@ -211,8 +213,8 @@ def protected(paths: Iterable[str]) -> tuple[str, ...]:
 
 #: How many experiments may read a holdout case before it stops being held
 #: out. Every read leaks something about the case into the audit that read
-#: it, so a case read this often is reclassified as a tuned case, and a fresh
-#: holdout is authored in its place (#744).
+#: it, so a case read this often is exhausted: it counts as a development
+#: case from then on, and a fresh holdout is authored in its place (#744).
 HOLDOUT_READS = 3
 
 
@@ -225,10 +227,37 @@ def exposure(ledger: Iterable[Experiment]) -> dict[str, tuple[str, ...]]:
     return {case: tuple(ids) for case, ids in reads.items()}
 
 
+def exhausted(ledger: Sequence[Experiment] | None = None) -> dict[str, int]:
+    """Each case read :data:`HOLDOUT_READS` times or more, with how often.
+
+    ``None`` reads the ledger on record. The corpus keeps its ``holdout`` flag:
+    the reclassification is computed here and never written back.
+    """
+    reads = exposure(load() if ledger is None else ledger)
+    return {case: len(ids) for case, ids in reads.items() if len(ids) >= HOLDOUT_READS}
+
+
+def held_out(
+    case: str, flagged: bool, ledger: Sequence[Experiment] | None = None
+) -> bool:
+    """Whether ``case`` is still held out: the one reader of the development split.
+
+    ``flagged`` is the case's ``holdout`` flag, from the corpus or from the
+    row a sweep scored. A flagged case that the ledger read
+    :data:`HOLDOUT_READS` times is exhausted, so it is no longer unseen and
+    counts as a development case (#1093).
+    """
+    return flagged and case not in exhausted(ledger)
+
+
 def holdout_cases() -> frozenset[str]:
-    """The cases the corpus holds out, read through the one reader of ``holdout``."""
+    """The cases the corpus flags as holdouts, exhausted ones included.
+
+    The flag is what ``holdout_reads`` may name. Whether a flagged case is
+    still held out is :func:`held_out`'s question.
+    """
     return frozenset(
-        case.meta.id for case in load_corpus(DEFAULT_CORPUS) if not diagnosable(case)
+        case.meta.id for case in load_corpus(DEFAULT_CORPUS) if case.meta.holdout
     )
 
 
@@ -975,6 +1004,21 @@ def paths_between(
     return tuple(line for line in done.stdout.splitlines() if line)
 
 
+def files_at(commit: str, root: Path | None = None) -> frozenset[str] | None:
+    """Every path git tracks at ``commit``, or ``None`` where git cannot say."""
+    try:
+        done = subprocess.run(
+            ["git", "ls-tree", "-r", "--name-only", commit],
+            cwd=str(root if root is not None else REPO_ROOT),
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+    except (OSError, subprocess.CalledProcessError):
+        return None
+    return frozenset(line for line in done.stdout.splitlines() if line)
+
+
 @dataclass
 class Lookup:
     """One prior experiment beside what the tree now says about it."""
@@ -1170,6 +1214,7 @@ def admit(
     grants: Sequence[Grant],
     prior: Sequence[Lookup] = (),
     holdouts: frozenset[str] = frozenset(),
+    tracked: frozenset[str] = frozenset(),
 ) -> None:
     """Refuse a new row that widens what the audit was granted, or hides a rerun.
 
@@ -1186,15 +1231,18 @@ def admit(
     * a rule rests on experiments that are on record;
     * a repeat of another audit's current conclusion says why it reran;
     * a candidate answers for every package in ``PACKAGES``, and for no other;
-    * a kept candidate names the regressions it ran;
+    * a kept candidate names the regressions it ran, and each regression's
+      test path (the part before any ``::``) is a file the candidate's commit
+      holds;
     * a row reads only holdout cases, and none already read
       :data:`HOLDOUT_READS` times;
     * a repeat names an experiment on record and shows fresh paid output, so
       a replay is never counted as a repeat.
 
-    ``prior`` is :func:`lookup` for the new row's signature and ``holdouts``
-    is :func:`holdout_cases`; both readings stay at the edge so a test can
-    name them.
+    ``prior`` is :func:`lookup` for the new row's signature, ``holdouts``
+    is :func:`holdout_cases` and ``tracked`` is :func:`files_at` the
+    candidate's commit; the readings stay at the edge so a test can name
+    them.
     """
     where = new.experiment_id
     by_id = {one.experiment_id: one for one in ledger}
@@ -1238,6 +1286,17 @@ def admit(
             raise ExperimentError(
                 f"{where}: the kept candidate names no regressions; run the tests"
                 " the change can reach and list them in regressions"
+            )
+        absent = [
+            one
+            for one in new.candidate.regressions
+            if one.strip() and one.split("::")[0].strip() not in tracked
+        ]
+        if absent:
+            raise ExperimentError(
+                f"{where}: the regressions name {', '.join(absent)}, which"
+                f" {new.candidate.commit} does not hold; name the test files the"
+                " change can reach, as pytest selects them"
             )
         touched = protected(new.candidate.paths)
         if touched:
@@ -1296,12 +1355,12 @@ def admit(
             raise ExperimentError(
                 f"{where}: holdout_reads names {case!r}, which is not a holdout case"
             )
-        earlier = exposure(ledger).get(case, ())
-        if len(earlier) >= HOLDOUT_READS:
+        if case in exhausted(ledger):
+            earlier = exposure(ledger)[case]
             raise ExperimentError(
                 f"{where}: {case} was read by {', '.join(earlier)}, which is"
-                f" {HOLDOUT_READS} reads, so it is no longer unseen. Reclassify it"
-                " as a tuned case and author a fresh holdout (#744)"
+                f" {len(earlier)} reads, so it is no longer unseen. It is exhausted"
+                " and counts as a development case; author a fresh holdout (#744)"
             )
     repeated = [
         one.experiment.experiment_id
@@ -1423,14 +1482,39 @@ def render(found: Sequence[Lookup]) -> Report:
 def render_exposure(
     holdouts: Iterable[str], ledger: Iterable[Experiment]
 ) -> Iterator[str]:
-    """Each holdout case beside the experiments that read it."""
+    """Each holdout case beside the experiments that read it.
+
+    An exhausted case says so, because every split counts it as development.
+    """
+    ledger = tuple(ledger)
     reads = exposure(ledger)
+    spent = exhausted(ledger)
     for case in sorted(holdouts):
         held = reads.get(case, ())
+        note = (
+            "; exhausted, so it counts as a development case" if case in spent else ""
+        )
         yield (
             f"{case}: read {len(held)} of {HOLDOUT_READS} times"
-            f"{': ' + ', '.join(held) if held else ''}"
+            f"{': ' + ', '.join(held) if held else ''}{note}"
         )
+
+
+def exhausted_line(
+    cases: Iterable[str], ledger: Sequence[Experiment] | None = None
+) -> str:
+    """The exhausted cases among ``cases`` with their exposure, or ``""``.
+
+    The line a printer of the split adds, so a reader sees which flagged
+    cases the development figures hold.
+    """
+    spent = exhausted(ledger)
+    named = [
+        f"{case} (read {spent[case]} times)" for case in sorted(set(cases) & set(spent))
+    ]
+    if not named:
+        return ""
+    return "exhausted holdouts, counted as development: " + ", ".join(named)
 
 
 def render_standing(held: Standing) -> Iterator[str]:
@@ -1526,13 +1610,17 @@ def record(source: Path) -> str:
         raise ExperimentError(
             f"{source}: experiment_id {experiment.experiment_id!r} is already on record"
         )
+    tracked: frozenset[str] = frozenset()
     if experiment.candidate is not None:
-        paths = paths_between(experiment.revision, experiment.candidate.commit)
-        if paths is None:
+        commit = experiment.candidate.commit
+        paths = paths_between(experiment.revision, commit)
+        files = files_at(commit)
+        if paths is None or files is None:
             raise ExperimentError(
-                f"{source}: git cannot diff {experiment.candidate.commit} against"
+                f"{source}: git cannot read {commit} against"
                 f" {experiment.revision}; record a candidate while its commit exists"
             )
+        tracked = files
         experiment = replace(
             experiment, candidate=replace(experiment.candidate, paths=paths)
         )
@@ -1542,6 +1630,7 @@ def record(source: Path) -> str:
         load_grants(experiment.audit_id),
         lookup(signature=experiment.signature),
         holdout_cases(),
+        tracked,
     )
     return f"recorded {experiment.experiment_id} in {append(experiment)}"
 

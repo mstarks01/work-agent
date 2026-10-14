@@ -30,7 +30,12 @@ cases' credit, and the page could not show it (#1093).
 A spread prints beside every mean. ``TUNING.md`` records three findings
 retracted because they rested on single-run numbers, and a published table must
 not repeat that in public. Where a Baseline holds more than one sweep, the range
-prints beside the mean.
+prints beside the mean. Where it holds one, the figure says ``spread
+unmeasured``: no spread is stored for a Baseline's figures, and none is
+borrowed from another instrument.
+
+A held-out case the experiment ledger has exhausted prints as a development
+case, with how often it was read (:func:`~evals.harness.audit.held_out`).
 """
 
 from __future__ import annotations
@@ -38,12 +43,12 @@ from __future__ import annotations
 import argparse
 import json
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
 from analysis_service.claims import FrameworkName
-from evals.harness import baseline, standings
+from evals.harness import audit, baseline, standings
 from evals.harness.artifact import REPO_ROOT
 from evals.harness.baseline import BaselineError, artifact_filename
 from evals.harness.instruments import INSTRUMENTS, Cases, Column
@@ -64,6 +69,11 @@ TABLE_REL = Path("evals") / "baselines" / "README.md"
 #: after the seal is not in it. The words say "when sealed" for that reason:
 #: ``run.py score`` re-reads an artifact against today's ledger.
 NO_VOTES = "no votes when sealed"
+
+#: What a figure from one sweep carries in place of a spread. One sweep cannot
+#: tell a real movement from run-to-run noise, and no spread is stored for a
+#: Baseline's figures, so none is borrowed from elsewhere.
+UNSPREAD = "spread unmeasured"
 
 #: The two tables each framework block prints, keyed by the heading each
 #: carries, with whether it reads the held-out cases.
@@ -90,8 +100,12 @@ class Row:
     #: (findings a person answered, findings offered) across every sweep, so
     #: a reader can weigh how much of the row rests on judgement.
     coverage: tuple[int, int]
-    #: Every case a sweep of this Baseline scored as held out.
+    #: Every case a sweep of this Baseline scored as held out, and still held
+    #: out today.
     held_out: frozenset[str] = frozenset()
+    #: Each case a sweep scored as held out that the ledger has since
+    #: exhausted, with how often it was read. Its figures are development ones.
+    exhausted: Mapping[str, int] = field(default_factory=dict)
 
     @property
     def voted(self) -> bool:
@@ -120,11 +134,11 @@ def _series_blocks(raw: dict[str, Any]) -> dict[str, dict[str, Any]]:
     return blocks
 
 
-def held_out_cases(blocks: Mapping[str, Any]) -> frozenset[str]:
-    """Every case a sweep scored as held out, by the flag on its own rows.
+def flagged_cases(blocks: Mapping[str, Any]) -> frozenset[str]:
+    """Every case a sweep scored as a holdout, by the flag on its own rows.
 
-    Read from the rows rather than from today's corpus, because a case can be
-    reclassified after the sweep ran, and the sweep's figure was taken under
+    Read from the rows rather than from today's corpus, because a tuned case
+    can be flagged after the sweep ran, and the sweep's figure was taken under
     the flag it carried then. Framework-neutral: any per-case block whose rows
     carry ``holdout`` answers. A row written before the field existed carries
     none, and no such sweep scored a holdout case.
@@ -138,13 +152,32 @@ def held_out_cases(blocks: Mapping[str, Any]) -> frozenset[str]:
     )
 
 
+def held_out_cases(
+    blocks: Mapping[str, Any], ledger: Sequence[audit.Experiment] | None = None
+) -> frozenset[str]:
+    """The flagged cases of a sweep that are still held out today.
+
+    A flagged case the ledger exhausted counts as a development case
+    (:func:`~evals.harness.audit.held_out`). ``None`` reads the ledger on
+    record.
+    """
+    ledger = audit.load() if ledger is None else ledger
+    return frozenset(
+        case for case in flagged_cases(blocks) if audit.held_out(case, True, ledger)
+    )
+
+
 def _format(values: list[float]) -> str:
-    """A mean, with the range beside it when more than one sweep measured it."""
+    """A mean, with the range beside it when more than one sweep measured it.
+
+    One sweep measures no spread, so its figure says so rather than printing
+    a bare number a reader would take as settled.
+    """
     if not values:
         return "—"
     mean = sum(values) / len(values)
     if len(values) == 1:
-        return f"{mean:.3f}"
+        return f"{mean:.3f} ({UNSPREAD})"
     return f"{mean:.3f} ({min(values):.3f}–{max(values):.3f})"
 
 
@@ -189,12 +222,15 @@ def read_baseline(directory: Path, root: Path = REPO_ROOT) -> Row | None:
     coverage = (sum(one for one, _ in counted), sum(all_ for _, all_ in counted))
     voted = coverage[0] > 0
 
-    held_out = frozenset(
+    ledger = audit.load(root / audit.EXPERIMENTS_REL)
+    flagged = frozenset(
         case
         for sweeps in per_series.values()
         for blocks in sweeps
-        for case in held_out_cases(blocks)
+        for case in flagged_cases(blocks)
     )
+    held_out = frozenset(case for case in flagged if audit.held_out(case, True, ledger))
+    spent = audit.exhausted(ledger)
     cells: dict[str, dict[str, dict[str, dict[str, str]]]] = {}
     for series, sweeps in per_series.items():
         for framework in identity.get("frameworks", []):
@@ -207,7 +243,7 @@ def read_baseline(directory: Path, root: Path = REPO_ROOT) -> Row | None:
                             value := column.read(
                                 blocks,
                                 framework,
-                                Cases(held_out_cases(blocks), holdout),
+                                Cases(held_out_cases(blocks, ledger), holdout),
                             )
                         )
                         is not None
@@ -235,6 +271,7 @@ def read_baseline(directory: Path, root: Path = REPO_ROOT) -> Row | None:
         cells=cells,
         coverage=coverage,
         held_out=held_out,
+        exhausted={case: spent[case] for case in sorted(flagged - held_out)},
     )
 
 
@@ -458,8 +495,17 @@ def _render_row(row: Row) -> str:
         lines.append(f"\nHeld-out cases, printed apart: {named}.\n")
     else:
         lines.append(
-            "\nNo sweep of this Baseline scored a held-out case, so every"
-            " figure below is over development cases.\n"
+            "\nNo sweep of this Baseline scored a case that is still held out,"
+            " so every figure below is over development cases.\n"
+        )
+    if row.exhausted:
+        named = ", ".join(
+            f"`{_inline(case)}` (read {reads} times)"
+            for case, reads in row.exhausted.items()
+        )
+        lines.append(
+            f"\nExhausted holdouts, counted as development cases: {named}. A"
+            " case read this often is no longer unseen.\n"
         )
     for series in standings.SERIES:
         blocks = row.cells.get(series)

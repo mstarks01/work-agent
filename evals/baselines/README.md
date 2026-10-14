@@ -35,7 +35,7 @@ Vote coverage when sealed: 0 of 110 unmatched finding(s) judged by a person.
 
 No vote on this Baseline's findings was recorded when it was sealed, so every vote-dependent number below reads `no votes when sealed`. A vote cast after the seal is not in these figures: `run.py score <artifact>` reads today's vote ledger.
 
-No sweep of this Baseline scored a held-out case, so every figure below is over development cases.
+No sweep of this Baseline scored a case that is still held out, so every figure below is over development cases.
 
 **Series `maintainer`** — reads maintainer votes.
 
@@ -43,7 +43,7 @@ No sweep of this Baseline scored a held-out case, so every figure below is over 
 
 | reference coverage | must-find coverage | rejected rate | writing objections |
 | --- | --- | --- | --- |
-| 0.527 | 0.634 | no votes when sealed | no votes when sealed |
+| 0.527 (spread unmeasured) | 0.634 (spread unmeasured) | no votes when sealed | no votes when sealed |
 
 **Series `all`** — reads maintainer, contributor votes.
 
@@ -51,7 +51,7 @@ No sweep of this Baseline scored a held-out case, so every figure below is over 
 
 | reference coverage | must-find coverage | rejected rate | writing objections |
 | --- | --- | --- | --- |
-| 0.527 | 0.634 | no votes when sealed | no votes when sealed |
+| 0.527 (spread unmeasured) | 0.634 (spread unmeasured) | no votes when sealed | no votes when sealed |
 
 ## Commit `6bff71720140`, corpus `d5f345c2eedb`
 
@@ -65,7 +65,7 @@ Vote coverage when sealed: 0 of 72 unmatched finding(s) judged by a person.
 
 No vote on this Baseline's findings was recorded when it was sealed, so every vote-dependent number below reads `no votes when sealed`. A vote cast after the seal is not in these figures: `run.py score <artifact>` reads today's vote ledger.
 
-No sweep of this Baseline scored a held-out case, so every figure below is over development cases.
+No sweep of this Baseline scored a case that is still held out, so every figure below is over development cases.
 
 **Series `maintainer`** — reads maintainer votes.
 
@@ -73,7 +73,7 @@ No sweep of this Baseline scored a held-out case, so every figure below is over 
 
 | reference coverage | must-find coverage | rejected rate | writing objections |
 | --- | --- | --- | --- |
-| 0.434 | 0.563 | no votes when sealed | no votes when sealed |
+| 0.434 (spread unmeasured) | 0.563 (spread unmeasured) | no votes when sealed | no votes when sealed |
 
 **Series `all`** — reads maintainer, contributor votes.
 
@@ -81,7 +81,7 @@ No sweep of this Baseline scored a held-out case, so every figure below is over 
 
 | reference coverage | must-find coverage | rejected rate | writing objections |
 | --- | --- | --- | --- |
-| 0.434 | 0.563 | no votes when sealed | no votes when sealed |
+| 0.434 (spread unmeasured) | 0.563 (spread unmeasured) | no votes when sealed | no votes when sealed |
 
 ## Commit `d3f1898c8959`, corpus `b09805c6726d`
 
@@ -95,7 +95,7 @@ Vote coverage when sealed: 0 of 103 unmatched finding(s) judged by a person.
 
 No vote on this Baseline's findings was recorded when it was sealed, so every vote-dependent number below reads `no votes when sealed`. A vote cast after the seal is not in these figures: `run.py score <artifact>` reads today's vote ledger.
 
-No sweep of this Baseline scored a held-out case, so every figure below is over development cases.
+No sweep of this Baseline scored a case that is still held out, so every figure below is over development cases.
 
 **Series `maintainer`** — reads maintainer votes.
 
@@ -103,7 +103,7 @@ No sweep of this Baseline scored a held-out case, so every figure below is over 
 
 | reference coverage | must-find coverage | rejected rate | writing objections |
 | --- | --- | --- | --- |
-| 0.473 | 0.518 | no votes when sealed | no votes when sealed |
+| 0.473 (spread unmeasured) | 0.518 (spread unmeasured) | no votes when sealed | no votes when sealed |
 
 **Series `all`** — reads maintainer, contributor votes.
 
@@ -111,7 +111,7 @@ No sweep of this Baseline scored a held-out case, so every figure below is over 
 
 | reference coverage | must-find coverage | rejected rate | writing objections |
 | --- | --- | --- | --- |
-| 0.473 | 0.518 | no votes when sealed | no votes when sealed |
+| 0.473 (spread unmeasured) | 0.518 (spread unmeasured) | no votes when sealed | no votes when sealed |
 
 ## Commit `d4edd642b781`, corpus `09772afde754`
 
@@ -125,7 +125,7 @@ Vote coverage when sealed: 0 of 16 unmatched finding(s) judged by a person.
 
 No vote on this Baseline's findings was recorded when it was sealed, so every vote-dependent number below reads `no votes when sealed`. A vote cast after the seal is not in these figures: `run.py score <artifact>` reads today's vote ledger.
 
-No sweep of this Baseline scored a held-out case, so every figure below is over development cases.
+No sweep of this Baseline scored a case that is still held out, so every figure below is over development cases.
 
 **Series `maintainer`** — reads maintainer votes.
 
@@ -133,7 +133,7 @@ No sweep of this Baseline scored a held-out case, so every figure below is over 
 
 | reference coverage | must-find coverage | rejected rate | writing objections |
 | --- | --- | --- | --- |
-| 0.467 | 0.479 | no votes when sealed | no votes when sealed |
+| 0.467 (spread unmeasured) | 0.479 (spread unmeasured) | no votes when sealed | no votes when sealed |
 
 **Series `all`** — reads maintainer, contributor votes.
 
@@ -141,4 +141,4 @@ No sweep of this Baseline scored a held-out case, so every figure below is over 
 
 | reference coverage | must-find coverage | rejected rate | writing objections |
 | --- | --- | --- | --- |
-| 0.467 | 0.479 | no votes when sealed | no votes when sealed |
+| 0.467 (spread unmeasured) | 0.479 (spread unmeasured) | no votes when sealed | no votes when sealed |
