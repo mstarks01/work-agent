@@ -87,18 +87,13 @@ from analysis_service.errors import ConfigError
 from analysis_service.model_tiers import TIER_NAMES, TierName
 
 # The only schema version this loader accepts. Every config file pins its own
-# version and every loader exact-matches it, so the numbers are independent — a
-# shared one would buy nothing, since a stale file fails its own check. Stated
-# without a count: this read "the four config files" while five carried a
-# version, and ``deployment.py`` two modules away said five.
+# version and every loader exact-matches it, so the numbers are independent: a
+# shared one would buy nothing, since a stale file fails its own check.
 #
-# Version 5 adds the ``review`` tier's block. Every tier is required, so a
-# version-4 file is short one and fails its own check — which is the point: a
-# file that could omit a tier is one where moving criticism onto ``review``
-# silently runs it on values nobody chose.
-#
-# Version 4 added ``constrain_output``, which enters the execution identity and
-# therefore re-baselines every blessed number.
+# Every tier's block is required, the ``review`` tier's included: a file that
+# could omit a tier would run criticism moved onto ``review`` on values nobody
+# chose. ``constrain_output`` enters the execution identity, so a change to it
+# re-baselines every blessed number.
 SUPPORTED_VERSION = 5
 
 # The uniform reasoning surface. Deliberately not per-vendor data: the enum is

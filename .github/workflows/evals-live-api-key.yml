@@ -39,16 +39,12 @@
 name: Evals (live API-key vendors)
 
 on:
-  # NO `schedule`, and dispatch-only is the whole trigger surface. A weekly
-  # backstop was drafted here and removed before it ever ran, for the reason the
-  # Vertex sweep's own cron was removed: the preflight below fails closed when a
-  # key is absent, both secrets are unset, so a scheduled run would have failed
-  # every week until someone configured a vendor. A check that always fails is a
-  # check nobody reads.
+  # NO `schedule`, and dispatch-only is the whole trigger surface. The
+  # preflight below fails closed when a key is absent, and both secrets are
+  # unset, so a scheduled run would fail every week until someone configured a
+  # vendor. A check that always fails is a check nobody reads.
   #
-  # This one has less claim to a schedule than the Vertex sweep did in any case:
-  # that cron was the backstop behind a path filter that can be fooled, whereas
-  # this workflow has no PR trigger to back up. It answers "does the graph still
+  # This workflow also has no PR trigger for a schedule to back up. It answers "does the graph still
   # run on a vendor nobody has tried", which is a question someone asks
   # deliberately, before trusting a non-Vertex deployment.
   #

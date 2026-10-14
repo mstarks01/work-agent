@@ -111,17 +111,15 @@ from analysis_service.vendors import UPSTREAM_SLUG
 # The only schema version this loader accepts. The version check fires before
 # shape validation, so a file on another schema is named as such rather than
 # reported as a set of stray keys under ``extra="forbid"``.
-# Version 6 adds the four per-window budget knobs. Every one is required and
-# none carries a default, for the reason ``max_active_jobs`` carries none: a
-# budget nobody has chosen is version 5's behaviour, and it is the defect this
-# version exists to end.
-# Version 8 adds ``[bounds_by_upstream]``: a per-request timeout and a job
-# deadline keyed by the upstream slug a gateway request is pinned to, read
-# where a tier's pin names one. OpenAI's flex tier serves the same weights
-# slower and its guide asks for a timeout above ten minutes, so the shipped row
-# states thirty minutes for both bounds. Hard cutover like the versions before
-# it: the table is required, and a deployment that wants no per-upstream bound
-# writes an empty one and means it.
+# The four per-window budget knobs are required and none carries a default,
+# for the reason ``max_active_jobs`` carries none: a budget that nobody chose
+# is not a budget.
+# ``[bounds_by_upstream]`` holds a per-request timeout and a job deadline keyed
+# by the upstream slug that a gateway request is pinned to, read where a tier's
+# pin names one. OpenAI's flex tier serves the same weights slower and its
+# guide asks for a timeout above ten minutes, so the shipped row states thirty
+# minutes for both bounds. The table is required, and a deployment that wants
+# no per-upstream bound writes an empty one and means it.
 SUPPORTED_VERSION = 8
 
 _ENV_PREFIX = "ANALYSIS_"

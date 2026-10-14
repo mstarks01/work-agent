@@ -1,32 +1,20 @@
 # Model-tier configuration — source of truth for tier -> (vendor, model) and
 # LLM node -> tier.
 #
-# Version 5 is a hard cutover from version 4, for the framework packages: the
-# six `analyze/<category>` keys collapse to one `analyze/<framework>`, and
-# `critic` and `recritic` become `critic/<framework>` and
-# `recritic/<framework>`. There is no v4 shim, for the reason v4 had no v3 one.
+# The loader reads the `version` below only, and refuses every other version.
+#
+# NODE KEYS ARE PER FRAMEWORK: `analyze/<framework>`, `critic/<framework>` and
+# `recritic/<framework>`.
 #
 # WHY THE FRAMEWORK AND NOT THE LANE: a lane is a framework's internal fact, and
-# every lane of one framework runs the same judgement on the same tier. Six keys
-# that always held one value had no reader. What an operator genuinely chooses
-# between is running one framework's analysis on a cheaper tier than another's,
-# and that is a knob per framework.
+# every lane of one framework runs the same judgement on the same tier. What an
+# operator chooses between is running one framework's analysis on a cheaper tier
+# than another's, and that is a knob per framework.
 #
-# Version 4 (#77 / #85) is a hard cutover from version 3, not a migration: the
-# six `analyst/<category>` node keys became `analyze/<category>`. There is no v3
-# shim — a version-3 file fails the loader's version check, which is the point:
-# a stale key would otherwise be reported as "unknown node" and "missing node"
-# in the same breath, and the fix is a rename, not a merge.
-#
-# WHY THE KEYS MOVED: `Analyst` now names a human — the person reading the
-# report — so the nodes are named for what they do. Each one analyses a single
-# lane, hence `analyze/`. The graph's own node names are a separate namespace
-# and move in the same cutover as the report schema; see
-# `TIER_NODE_BY_GRAPH_NODE` in graph.py for the mapping between the two.
-#
-# Version 3 (wayfinder #5 / #9 / #15) was itself a hard cutover from version 2:
-# the `flash`/`pro` tier keys became the vendor-neutral `base` and `strong`, and
-# each tier's bare model string became a (vendor, model) pair.
+# WHY `analyze/`: `Analyst` names a human, the person who reads the report, so
+# each node is named for what it does: it analyses one lane. The graph's own node
+# names are a separate namespace; `TIER_NODE_BY_GRAPH_NODE` in graph.py maps
+# between the two.
 #
 # WHY A PAIR, NOT A ROUTER STRING: `vertex_ai/gemini-2.5-pro` would have to be
 # parsed back apart by all three consumers that need the vendor as a key — the
@@ -37,9 +25,9 @@
 #
 # TIER NAMES: `base` and `strong` are a capability axis, not a vendor's product
 # line. `base` is the workhorse (extraction, repair); `strong` is judgement
-# (every framework's lane agents, its critic and its re-ask). The old
-# `flash`/`pro` were Gemini product names and would be an active lie under a
-# Claude or GPT model string. `review` is the third tier and the exception: it
+# (every framework's lane agents, its critic and its re-ask). A vendor's product
+# names, such as Gemini's `flash` and `pro`, would be false under a Claude or GPT
+# model string. `review` is the third tier and the exception: it
 # names a place rather than a capability, and exists so criticism can be moved
 # off the model it checks. All three select independently, so mixed-vendor sets
 # are ordinary, not a special case.
@@ -176,8 +164,8 @@ review_independence = "shared"
 # `review` is NOT required while `review_independence = "shared"` leaves the
 # node map pointing criticism at `strong`, because nothing runs on it and the
 # loader binds no adapter for a tier nothing is bound to. Selecting a pair for
-# an empty place is a choice with no consequence, and the answer this block used
-# to suggest -- repeat the `strong` pair -- is a choice that says nothing.
+# an empty place is a choice with no consequence, and a repeat of the `strong`
+# pair is a choice that says nothing.
 #
 # The day somebody moves critic/* onto `review` is still the wrong day to find
 # out no model was chosen for it, and that day is an edit to the [nodes] map
@@ -185,9 +173,8 @@ review_independence = "shared"
 # same message it would have given at a first run.
 #
 # A TEMPLATE RATHER THAN A WORKED PAIR, and that is the same decision as the
-# empty tier tables above. This block used to show a Vertex/Gemini pair, which
-# made "no privileged default" true of the mechanism while the one example a
-# reader could copy said otherwise. The vendors below are alphabetical, equally
+# empty tier tables above. One worked pair would be the one example a reader
+# copies, which makes it a privileged default. The vendors below are alphabetical, equally
 # detailed, and every one of them is a real pair the offline conformance suite
 # profiles (src/analysis_service/conformance.py):
 #

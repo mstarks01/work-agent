@@ -639,7 +639,7 @@ class TestAnElementIdCannotCarryStructure:
 def test_a_flow_between_same_named_endpoints_of_two_types_derives_two_flows():
     """ADR 0037's acceptance probe, and #961 finding 5 before it.
 
-    Version 1 dropped the endpoint's type prefix, so an entity named ``x`` and a
+    Version 1 drops the endpoint's type prefix, so an entity named ``x`` and a
     process named ``x`` writing one label to one store derived a single flow ID.
     The gate refused the collision as ``duplicate-id``, which kept it out of a
     report and stopped a correct model at the gate. Under version 2 the two

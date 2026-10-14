@@ -29,7 +29,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_validator
+from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 from analysis_service.certification import CertifyResult
 from analysis_service.identity import IDENTITY_VERSION
@@ -44,87 +44,42 @@ from evals.harness.provenance import (
 
 CORPUS_DIR = REPO_ROOT / "evals" / "corpus"
 
-# The eval artifact's schema version. Bump it for any change to the declared
-# keys, and promotion will reject the older files by name rather than
-# half-understanding them.
+# The eval artifact's schema version. The loader reads this version only, and
+# it refuses every other version by name rather than half-understanding it.
 #
+# **What the version guards:** the declared top-level keys below, and the
+# names of the figures inside ``scores``. ``stability`` compares ``scores``
+# across two artifacts, so a float under another name reads as a different
+# figure, and a change of a name is a version event. A field that an
+# instrument adds inside a block it already owns is not: the ``stale``
+# standing and ``carried`` in the writing rows, and the extraction figures in
+# ``mode_output``. No reader asks another artifact for those.
 #
-# #925 renames the extraction scorer's ``attribute_agreement`` to
-# ``scored_field_agreement`` and adds five figures beside it inside
-# ``mode_output``, and bumps nothing. The rename is the shape version 7 treats
-# as a version event, and the difference is the reader: ``stability`` compares
-# ``scores`` across two artifacts, so a float under a renamed key there is a
-# silent misreading. Nothing reads an older artifact's ``mode_output`` at all —
-# no command pairs two extraction sweeps, and no committed Baseline carries an
-# extraction payload, because all three ran in ``analysis`` mode. The declared
-# key itself is unchanged.
+# ``flow_identity_version`` is optional at the top level. ``carries`` says
+# whether an artifact holds it, and each flow ID states its version by its
+# shape (:func:`~analysis_service.system_model.flow_id_version`), so an
+# artifact without the key still reads.
 #
-# #743 added the ``stale`` standing to every unlisted threat's counts and
-# ``carried`` inside every writing row, and bumped nothing: both sit inside a
-# block this version already declares, no reader asks an older artifact for
-# them, and a bump would have made the one merged Baseline unreadable by the
-# commands that exist to read it. The version guards the declared keys below,
-# not every field an instrument adds inside its own block.
+# The version declares:
 #
-# #989 adds the top-level ``flow_identity_version``, and bumps nothing. A
-# top-level key is normally a version event, for the reason version 7 was one:
-# the reader cannot tell the two shapes apart from their contents. It can here.
-# ``carries`` says whether an artifact holds the key, and an artifact that does
-# not predates ADR 0037 — and every flow ID in such a bundle states its own
-# version by shape anyway, because the delimiter version 2 separates its parts
-# with cannot occur inside any part of an earlier one
-# (:func:`~analysis_service.system_model.flow_id_version`). A bump would have
-# made the three merged Baselines unreadable by the commands that exist to read
-# them, to record a fact their own bytes already carry.
-#
-# * Version 7 renames the claim scorer's coverage metrics inside ``scores``:
-#   ``recall`` to ``reference_coverage``, ``must_find_recall`` to
-#   ``must_find_coverage``, ``expected_recall`` to ``expected_coverage`` and
-#   ``element_accuracy`` to ``element_agreement`` (#890). No value moves. An
-#   ``_accuracy`` name reads as detection quality and the numbers are not that: the
-#   matcher compares lane, action and endpoint-resolved targets and reads no
-#   prose, so a report whose every finding says "no security problem exists"
-#   scores what it scored before.
-#
-#   A rename inside a block is normally not a version event — see the ``stale``
-#   note above. This one is, because the reader cannot tell the two shapes
-#   apart from their contents: a float under a different key is still a float,
-#   and ``stability`` comparing an old sweep with a new one would raise on a
-#   missing key or, worse, read a number it could still find. The three
-#   archived Baselines were migrated and re-sealed rather than re-run.
-#
-# * Version 6 adds ``node_charges``: what each node's providers said they
-#   charged, summed across the sweep's executions (#822). Empty on every vendor
-#   that reports token counts alone, which is every direct vendor — the key is
-#   what a gateway route has instead of a unit price, because no published rate
-#   describes a slug that reaches many endpoints. This is a declared key rather
-#   than a field inside one, so it is a version event and the one merged
-#   Baseline was migrated rather than re-run.
-# * Version 5 adds ``series``: which standings each published series reads,
-#   and the scored blocks for every series but the primary one (#326). The
-#   top-level scored keys are the primary series — maintainer votes only —
-#   where before they read every vote regardless of standing.
-# * Version 4 adds ``stopped``: the cases the estimate gate's hold prevented,
-#   empty on a sweep that ran to the end (#334). A partial sweep that could
-#   not say so would read as a whole one.
-# * Version 3 adds ``frameworks``: the selection the sweep actually ran, one
-#   of a Baseline's identity parts (#321), recoverable before only by
-#   inference over blocks that write their keys whether or not a framework ran.
-# * Version 2 adds the two keys that say which *repository state* produced a
-#   sweep, beside the ``provenance`` block that already said which models did.
+# * ``commit`` and ``clean``: which repository state produced the sweep, beside
+#   the ``provenance`` block that says which models did.
+# * ``frameworks``: the selection the sweep ran, one of a Baseline's identity
+#   parts (#321).
+# * ``stopped``: the cases the hold of the estimate gate prevented, empty on a
+#   sweep that ran to the end (#334).
+# * ``series``: which standings each published series reads, and the scored
+#   blocks of every series but the primary one (#326). The top-level scored
+#   keys are the primary series: maintainer votes only.
+# * ``node_charges``: what each node's providers said they charged, summed
+#   across the sweep's executions (#822). It is empty on a vendor that reports
+#   token counts alone. A gateway route has it in place of a unit price.
+# * The coverage figures in ``scores``: ``reference_coverage``,
+#   ``must_find_coverage``, ``expected_coverage`` and ``element_agreement``
+#   (#890). The matcher compares lane, action and endpoint-resolved targets and
+#   reads no prose, so the figures measure coverage of the reference, not
+#   detection quality.
 ARTIFACT_VERSION = 7
-
-#: What a recorded artifact carries where the fact was never captured. Only
-#: the sweeps taken before version 2 hold it: :func:`build` computes both keys
-#: or raises, so a new artifact can never claim it.
-#:
-#: A required field that honestly records a deficient provenance, which is the
-#: ``bootstrap`` field's design on ``case.json`` — that one stayed true for a
-#: year because nothing could omit it. Backfilling a commit inferred from a
-#: run's date would be the opposite: a guess at what produced a number,
-#: indistinguishable afterwards from an observation.
-UNRECORDED = "unrecorded"
-
 
 #: Files in a case directory that no number is computed from. Everything else
 #: is graded against, so the digest is taken by **subtraction**: a file added
@@ -150,33 +105,21 @@ class RepoCommit(BaseModel):
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
-    #: A full or abbreviated hex sha, or :data:`UNRECORDED`. Bounded because a
+    #: A full or abbreviated hex sha. Bounded because a
     #: recorded commit reaches ``git`` argv in
     #: option position -- ``git ls-tree -r -z <commit> --`` -- so a value opening
     #: with ``-`` is read as an option rather than a commit. Every path fails
     #: closed today, and the result is a silently skipped check rather than an
     #: injected argument; a shape the field can state is better than a failure
     #: mode the reader has to work out.
-    commit: str = Field(pattern=rf"^([0-9a-f]{{7,40}}|{UNRECORDED})$")
-    #: ``None`` exactly when the commit was never recorded. A recorded sweep
-    #: always knows, so a missing answer and "the tree was clean" stay distinct.
-    clean: bool | None = None
-
-    @model_validator(mode="after")
-    def _clean_is_known_iff_the_commit_is(self) -> RepoCommit:
-        if (self.commit == UNRECORDED) != (self.clean is None):
-            raise ValueError(
-                f"commit={self.commit!r} and clean={self.clean!r} disagree about"
-                f" whether this sweep's repository state was recorded; {UNRECORDED!r}"
-                " takes clean=None and nothing else does"
-            )
-        return self
+    commit: str = Field(pattern=r"^[0-9a-f]{7,40}$")
+    clean: bool
 
 
 def repo_commit() -> RepoCommit:
     """The commit this tree is on, and whether it has uncommitted changes.
 
-    Raises rather than falling back to :data:`UNRECORDED`. A sweep costs money
+    Raises rather than falling back to a guess. A sweep costs money
     and the answer is free, so a repository that cannot say what it is running
     should stop before it spends rather than write an artifact that cannot say
     what produced it.
@@ -355,9 +298,17 @@ def load_artifact(path: Path | str) -> EvalArtifact:
         ),
         provenance=provenance,
         commit=_commit_of(path, raw),
-        corpus_digest=str(raw.get("corpus_digest", UNRECORDED)),
+        corpus_digest=_corpus_digest_of(path, raw),
         raw=raw,
     )
+
+
+def _corpus_digest_of(path: Path, raw: Mapping[str, Any]) -> str:
+    """The artifact's corpus digest, or a refusal naming the file."""
+    digest = raw.get("corpus_digest")
+    if not isinstance(digest, str) or not digest:
+        raise ProvenanceError(f"{path}: the artifact records no corpus_digest")
+    return digest
 
 
 def _commit_of(path: Path, raw: Mapping[str, Any]) -> RepoCommit:

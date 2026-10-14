@@ -24,34 +24,24 @@
 # library, which the fingerprint already hashes, so `"auto"` leaves every
 # blessed number where it is. `"native"` and `"tool"` enter the fingerprint.
 #
-# Version 4 adds `constrain_output` (see below). The field carries a default, so
-# a version-3 file would have loaded unchanged — the bump is deliberate anyway,
-# because the field enters the sampling fingerprint and so re-baselines every
-# blessed number. A silent default would have moved that line under deployments
-# that never read this file.
+# `constrain_output` (see below) enters the sampling fingerprint, so a change
+# to it re-baselines every blessed number.
 #
-# Version 3 (wayfinder #13 / #15) is a hard cutover from version 2, forced by
-# going multi-vendor. Three changes, each because a version-2 construct turned
-# out to be either unportable or silently wrong:
+# THREE PARAMS ARE SHAPED BY PORTABILITY:
 #
-#   top_k is GONE from the surface. It is absent from the signature of
-#   litellm's get_optional_params, so it is the one param the build-time gate
-#   provably cannot cover — LiteLLM re-injects it raw into the request body
-#   after the check runs. A wrong top_k would be silent while the fingerprint
-#   attested to it. It was unset on both tiers, so nothing could depend on it.
+#   top_k is NOT on the surface. It is absent from the signature of litellm's
+#   get_optional_params, so it is the one param the build-time gate cannot
+#   cover: LiteLLM injects it raw into the request body after the check runs.
+#   A wrong top_k would be silent while the fingerprint attested to it.
 #
-#   thinking is now a uniform low/medium/high enum, not an integer budget with
-#   per-tier legal ranges. `reasoning_effort` reaches all three vendors, so the
-#   per-class ranges version 2 mirrored dissolve rather than needing to be
-#   mirrored three times over. `auto` and `off` are both dropped: `auto` raises
-#   on two vendors, and `off` is worse than unportable — gemini-2.5-pro + none
-#   PASSES the build-time gate as thinkingBudget: 0 and then 400s at request
-#   time, and there is no per-(vendor, model) data left to catch it.
+#   thinking is a uniform low/medium/high enum, not an integer budget with
+#   per-tier legal ranges, because `reasoning_effort` reaches every vendor.
+#   There is no `auto` and no `off`: `auto` raises on two vendors, and `off` is
+#   worse than unportable: gemini-2.5-pro + none PASSES the build-time gate as
+#   thinkingBudget: 0 and then fails with a 400 at request time.
 #
-#   max_output_tokens is now PINNED. Anthropic derives a 5,120-8,192 cap only
-#   when the caller is silent — which is exactly what version 2's file did on
-#   both tiers, while its comment claimed "uncapped to 65,536". Pinning it makes
-#   the request say what the file says.
+#   max_output_tokens is PINNED. Anthropic derives a 5,120-8,192 cap only when
+#   the caller is silent, so pinning it makes the request say what the file says.
 #
 #   A PINNED CAP IS A FAILURE MODE, not just a bound: a completion truncated at
 #   the cap comes back with no text at all, so the node writes no output key and
@@ -143,8 +133,7 @@ version = 5
 #          roughly 60-90 tokens per ruled threat, so a 36-draft ruling is
 #          ~3,000 tokens of visible output. But the six analyze/<category>
 #          agents are on this tier too, and they emit the DRAFTS: ~400 tokens
-#          per threat with its grounds, which is the ~14,400-token whole-draft
-#          shape the paragraph above used to cite as the critic's *old* size.
+#          per threat with its grounds, a ~14,400-token whole draft.
 #          Those are the tier's real high-water mark, and nothing here was
 #          sized against them.
 #

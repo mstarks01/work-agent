@@ -174,8 +174,7 @@ Both answers behind `open` move no number, and they part company in your queue.
 `unsure` is a spent answer: you judged the finding and it stays judged. Needing
 more evidence is not a judgement, so it holds for that sitting only, and a later
 sitting asks again over whatever evidence exists by then. Pressing it is how you
-say *not yet*, and it used to be the one answer that removed a finding from your
-queue for good.
+say *not yet*.
 
 Two reviewers can disagree, and then `rejected` wins over `pooled`. A tool must
 not score itself on the answer that flatters it most.
@@ -370,10 +369,10 @@ from. A rule change is then arithmetic over the ledger's files.
 
    It reports how many votes move, how many stay, and how many findings sit in
    the pool, which a re-key never changes. `--yes` rewrites the file through an
-   atomic rename, so an interrupted re-key leaves the old file whole.
+   atomic rename, so an interrupted re-key leaves the file as it was.
 
 4. **Re-score the sweeps you still compare against.** Their standings were
-   computed under the old keys:
+   computed under the keys before the re-key:
 
    ```sh
    python -m evals.harness.run score baseline-1.json

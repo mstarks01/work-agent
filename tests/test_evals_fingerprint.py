@@ -19,7 +19,6 @@ from evals.harness import fingerprint as fingerprint_module
 from evals.harness.fingerprint import (
     EXTRA_COMPONENT,
     IDENTIFIER_OF,
-    READS_SCOPE,
     SUPPORTED_VERSIONS,
     VERSION_FOR,
     Components,
@@ -123,17 +122,6 @@ def test_every_supported_version_declares_what_it_reads():
     assert set(EXTRA_COMPONENT) == set(SUPPORTED_VERSIONS)
 
 
-def test_every_supported_version_declares_whether_it_reads_the_scope():
-    """:data:`READS_SCOPE` against its registry, on ``EXTRA_COMPONENT``'s terms.
-
-    A second table keyed by version is a second place to forget an entry, so it
-    is checked the same way and in the same test file. A version missing here
-    raises a ``KeyError`` inside ``fingerprint`` rather than quietly keying a
-    claim without its scope.
-    """
-    assert set(READS_SCOPE) == set(SUPPORTED_VERSIONS)
-
-
 @pytest.mark.parametrize("version", SUPPORTED_VERSIONS)
 def test_the_table_and_the_hash_agree_about_what_a_version_reads(version):
     """``EXTRA_COMPONENT`` says what ``fingerprint`` refuses to hash without.
@@ -141,11 +129,11 @@ def test_the_table_and_the_hash_agree_about_what_a_version_reads(version):
     The table decides what ``key_claim`` composes and ``fingerprint`` decides
     what it will not hash. Those are two spellings of one fact, so a version
     whose entry names a component the hash does not require — or omits one it
-    does — is the drift this pins. :data:`READS_SCOPE` is held to the same bar
-    below, over the same versions.
+    does — is the drift this pins.
     """
-    scope = "01-payments-checkout" if READS_SCOPE[version] else ""
-    without = Components("stride", "spoofing", ("process:a",), scope=scope)
+    without = Components(
+        "stride", "spoofing", ("process:a",), scope="01-payments-checkout"
+    )
     reads = EXTRA_COMPONENT[version]
     with pytest.raises(FingerprintError):
         fingerprint(without, version=version)
@@ -173,19 +161,11 @@ def test_version_6_keys_two_equivalent_verbs_alike_and_version_4_does_not():
 
 
 @pytest.mark.parametrize("version", SUPPORTED_VERSIONS)
-def test_a_version_that_reads_the_scope_refuses_an_empty_one(version):
-    """The scope half of the rule above: declared means required.
-
-    A version keyed ``True`` in :data:`READS_SCOPE` and willing to hash without
-    a scope would be the defect this fixed, one table away: the value would
-    look like a version-4 key and carry a place with no system.
-    """
+def test_every_version_refuses_an_empty_scope(version):
+    """A key without its scope carries a place with no system."""
     full = Components(
         "stride", "spoofing", ("process:a",), verb="read", identifier="V6.2.1"
     )
-    if not READS_SCOPE[version]:
-        assert fingerprint(replace(full, scope=""), version=version)
-        return
     with pytest.raises(FingerprintError, match="scope"):
         fingerprint(replace(full, scope=""), version=version)
     assert fingerprint(replace(full, scope="01-payments-checkout"), version=version)
@@ -215,16 +195,9 @@ def test_each_package_names_its_lane_in_its_own_terms():
 
 
 def test_the_declared_versions_follow_from_what_a_claim_carries():
-    """STRIDE composes an identity; ASVS's claims name one in a catalog.
-
-    Both live versions read the scope, which is why neither is the version its
-    package started on: an element slug is unique inside one **System Model**
-    and two models may derive the same one.
-    """
+    """STRIDE composes an identity; ASVS's claims name one in a catalog."""
     assert version_for("stride") == 6
     assert version_for("asvs") == 5
-    assert READS_SCOPE[version_for("stride")]
-    assert READS_SCOPE[version_for("asvs")]
 
 
 class TestTwoSystemsAreTwoPlaces:

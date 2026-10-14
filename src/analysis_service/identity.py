@@ -53,9 +53,9 @@ from analysis_service.vendors import ServedTrust, vendor_for_route
 #: field, because every fingerprint moves when it does. Certification refuses a
 #: manifest written for a different one rather than comparing across them.
 #:
-#: Version 2 makes ``served_trust`` vary by vendor. Where litellm fills the
-#: served identifier from the request, a constant ``"provider_reported"`` would
-#: state that a provider named the build when no provider did.
+#: ``served_trust`` varies by vendor. Where litellm fills the served
+#: identifier from the request, a constant ``"provider_reported"`` would state
+#: that a provider named the build when no provider did.
 IDENTITY_VERSION: Final = 2
 
 #: Every distribution whose code sits between a node's request and the

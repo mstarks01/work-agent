@@ -261,7 +261,7 @@ somewhere else.
 | `harness/roster.py` | Voter → standing, read from `review/voters.toml` — the only place a standing lives. Refuses an unrostered voter rather than defaulting one. |
 | `harness/rule_applicability.py` | The applicability rule (ADR 0051) against the labelled fixtures in `evals/applicability/`: accuracy, false exclusions, false inclusions and unknown accuracy, with signed and unsigned fixtures pooled apart. It also answers a fixture's early capability questions from its `truth`, in the order a paused job lists them, and counts what each answer settled, the questions that settled nothing, the parts a "no" kept from being asked, and how many questions reach 50%, 75%, 90% and 100%. It reads no claim, so it stands apart from the conformance scores in `applicability.py`. `run.py rule-applicability`, no credentials. |
 | `harness/baseline.py` | A **Baseline**: one directory under `baselines/`, one configuration, up to ten sweeps. Computes the five-part identity and the derived name, assembles the directory, and verifies that everything recomputes — never that a model ran. |
-| `harness/preflight.py` | What a corpus addition inherits from a ruling nobody made about it. A dropped claim's fingerprint is free again, so a later addition can land on it and take the mark a reader made about the claim that used to be there — #1134 did exactly that, at `must-find`. No check over the tree alone can see it: the discriminator is which claims are new, and at the commit that shipped the defect 304 claims legitimately carried a mark, so a tree-only rule names 305 findings where there is one. So it reads a base revision, and it is a preflight rather than a gate. Run it before the addition lands: after the next sitting every claim carries a mark and an inherited one cannot be told from an earned one. `run.py corpus-preflight`. |
+| `harness/preflight.py` | What a corpus addition inherits from a ruling nobody made about it. A dropped claim's fingerprint is free again, so a later addition can land on it and take the mark a reader made about the dropped claim — #1134 did exactly that, at `must-find`. No check over the tree alone can see it: the discriminator is which claims are new, and at the commit that shipped the defect 304 claims legitimately carried a mark, so a tree-only rule names 305 findings where there is one. So it reads a base revision, and it is a preflight rather than a gate. Run it before the addition lands: after the next sitting every claim carries a mark and an inherited one cannot be told from an earned one. `run.py corpus-preflight`. |
 | `harness/prices.py` | Unit prices from litellm's offline map, and the one cost rule submit and CI both run. A model the map misses prices at `None`, never at zero. A route in front of many providers is refused a price outright — no one rate describes a slug that reaches twelve endpoints. |
 | `harness/sitting.py` | Holding a **Case Sitting**: which files it must read, the digest of each, what a reader may say about one recorded finding and the key that mark files under, the append-only entry that records it, the line it clears in the unreviewed list, and the rail of every case with the status the clearing rule gives it. `webapp/sitting.py` is one surface over it; the shell path writes the same files. |
 | `harness/comparison.py` | The published comparison over the merged Baselines, generated into `baselines/README.md`. Walks the instruments table for its columns, so it names no framework and no column. A figure from one sweep says `spread unmeasured`, and an exhausted holdout prints as a development case with its read count. A test fails a stale copy. |
@@ -631,8 +631,8 @@ the next sitting, and only the rate over it is a score.
   quoted as if the whole corpus stood behind it.
 - **lane accuracy** — was each threat filed under the right STRIDE category? A
   misfiled threat counts as a category error, not a near-miss.
-- **element accuracy** — did the threat cite the right element? Scored, but never
-  used to reject a match — citing the process where the reference cited the flow
+- **element accuracy** — did the threat cite the right element? Scored, but a
+  wrong element never rejects a match — citing the process where the reference cited the flow
   at its endpoint still counts as the same threat.
 - **rejected rate** — of the threats the tool produced that aren't in the
   reference set, how many did a person vote down for substance? The one "extra
@@ -753,7 +753,7 @@ A vote stores the fields its fingerprint was computed from, so re-keying is
 arithmetic over one file — no provider, no credentials, and every verdict, voter
 and date survives. That property is what made the vote affordable: a
 model-scored history re-scores whole every time its scorer changes, with no
-way to recompute the old numbers.
+way to recompute the earlier numbers.
 
 The reviewer answers one question per finding — **could this attack happen in
 this system?** — as up, down, unsure, or needs-more-evidence. A down-vote picks

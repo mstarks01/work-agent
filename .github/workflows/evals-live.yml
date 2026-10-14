@@ -84,7 +84,7 @@ on:
     # remembered.
     #
     # WITHOUT THE BACKSTOP: nothing catches what subtraction still cannot see.
-    # The scheduled sweep is gone, so a responsibility that moves out of
+    # With no scheduled sweep, a responsibility that moves out of
     # `src/analysis_service/` altogether -- into `evals/`, or into a new
     # top-level package -- is invisible until someone dispatches a run by hand.
     paths:
@@ -110,15 +110,14 @@ on:
       - "!src/analysis_service/token_caps.py"
       - "!src/analysis_service/verify_report.py"
       - ".github/workflows/evals-live.yml"
-  # NO `schedule`. There was a Monday 06:00 UTC backstop sweep here until
-  # federation went unconfigured indefinitely. A scheduled run fails closed when
-  # credentials are absent -- deliberately, see the preflight below -- so with no
-  # federation it failed every week, and a check that always fails is a check
-  # nobody reads. Removing it is the honest state: this repository has no
-  # unattended live coverage, rather than an alarm it has learned to ignore.
+  # NO `schedule`. A scheduled run fails closed when credentials are absent --
+  # deliberately, see the preflight below -- and the federation is not
+  # configured, so a scheduled run would fail every week, and a check that
+  # always fails is a check nobody reads. This repository has no unattended live
+  # coverage, rather than an alarm it has learned to ignore.
   #
-  # Restoring it is one `schedule:` block, and the three comments below marked
-  # WITHOUT THE BACKSTOP say what comes back with it.
+  # A schedule is one `schedule:` block, and the comments below marked
+  # WITHOUT THE BACKSTOP say what it would add.
   workflow_dispatch:
     inputs:
       mode:
@@ -329,11 +328,10 @@ jobs:
       # Note: `examples/**` is deliberately NOT on this workflow's path filter,
       # so an examples-only merge does not fire this.
       #
-      # WITHOUT THE BACKSTOP: that gap no longer closes on its own. The Monday
-      # sweep used to be the guarantee behind the omitted path filter, so a
-      # sample that quietly became hard to extract was caught within a week.
-      # Nothing catches it now. examples/README.md carried that promise in those
-      # words and has been corrected in the same commit -- keep the two in step.
+      # WITHOUT THE BACKSTOP: nothing closes that gap on its own. A scheduled
+      # sweep behind the omitted path filter would catch a sample that quietly
+      # became hard to extract within a week; with no schedule, nothing does.
+      # examples/README.md states the same limit -- keep the two in step.
       #
       # Credentials come from the job-level ANALYSIS_VERTEX_* block, like every
       # other live step here.
