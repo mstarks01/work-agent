@@ -62,17 +62,24 @@ KEY = ("df-1", "encryption_in_transit", "", "", "", "")
 #: Every backend pair the suite runs on: the job store, then the database and
 #: the object store where the job store keeps objects. ``tests/test_backends.py``
 #: checks these against the backend tables, so a new row needs a pair here.
-BACKEND_PAIRS = ("memory", "sql/sqlite+aiosqlite/filesystem")
+BACKEND_PAIRS = (
+    "memory",
+    "sql/sqlite+aiosqlite/filesystem",
+    "sql/sqlite+aiosqlite/s3",
+)
 
 
 @pytest.fixture(params=BACKEND_PAIRS)
 def new_store(request, tmp_path_factory):
     """A maker of fresh stores of one backend pair."""
+    if request.param == "memory":
+        return InMemoryJobStore
+    objects = request.param.rsplit("/", 1)[1]
+    if objects == "s3":
+        request.getfixturevalue("moto_s3")
 
     def make():
-        if request.param == "memory":
-            return InMemoryJobStore()
-        return build_store(sql_env(tmp_path_factory.mktemp("store")))
+        return build_store(sql_env(tmp_path_factory.mktemp("store"), objects))
 
     return make
 

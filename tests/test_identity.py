@@ -491,9 +491,9 @@ class TestAPlatformIdentityModePassesNoAmbientCredential:
     AMBIENT = "ambient-token-nobody-declared"
 
     def _authorization(self, api_key: str | None) -> str:
-        # botocore ships no stubs, and this is the one call that needs its
-        # credential object rather than litellm's wrapper around it.
-        from botocore.credentials import Credentials  # type: ignore[import-untyped]
+        # This is the one call that needs the credential object of botocore
+        # rather than litellm's wrapper around it.
+        from botocore.credentials import Credentials
         from litellm.llms.bedrock.base_aws_llm import BaseAWSLLM
 
         prepared = BaseAWSLLM().get_request_headers(
