@@ -118,6 +118,12 @@ DECLARED: dict[str, str] = {
         " place. A package whose claims carry a catalog identifier rules each"
         " requirement, and its E1 ceiling was zero, so it has no target to list."
     ),
+    "evals/experiments/QA-2026-10-14-01/count_on_reference_models.py": (
+        "This code is that framework's. It counts the units that an applicability"
+        " rule over capabilities settles, which exists only for a package whose"
+        " units carry an applicability expression. A package whose units carry"
+        " none reads no capability, so a stated capability settles nothing in it."
+    ),
     "evals/harness/reference.py": (
         "REFERENCE_TYPES is a table keyed by framework. `stride_claims()` is a"
         " named accessor for the scorer that grades STRIDE's open claim set;"
