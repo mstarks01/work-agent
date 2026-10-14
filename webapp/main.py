@@ -318,22 +318,11 @@ class Workspace:
         self._tasks.add(task)
         task.add_done_callback(self._tasks.discard)
 
-    async def _owner_id(self) -> str | None:
-        """The owner ID of the operator's principal, or ``None`` before the
-        first submission creates it."""
-        principal = await self.store.principal(OPERATOR)
-        return None if principal is None else principal.owner_id
-
     async def owner_id(self, job_id: str) -> str:
-        """The operator's owner ID, or :class:`NoSuchJob` for ``job_id``.
-
-        Before the first submission the operator has no principal and owns no
-        job, so every job reads as missing.
-        """
-        owner_id = await self._owner_id()
-        if owner_id is None:
-            raise NoSuchJob(job_id)
-        return owner_id
+        """The operator's owner ID, by :meth:`JobAnswers.owner_id`. Before the
+        first submission the operator owns no job, so ``job_id`` reads as
+        missing."""
+        return await self.answers.owner_id(OPERATOR, job_id)
 
     async def owned(self, job_id: str) -> JobRecord | None:
         """The operator's job ``job_id``, as an envelope, or ``None``."""
@@ -352,8 +341,11 @@ class Workspace:
 
     async def jobs(self) -> list[JobRecord]:
         """Every job of the operator, as envelopes, oldest first."""
-        owner_id = await self._owner_id()
-        return [] if owner_id is None else await self.store.owned_jobs(owner_id)
+        try:
+            owner_id = await self.owner_id("")
+        except NoSuchJob:
+            return []
+        return await self.store.owned_jobs(owner_id)
 
     async def waiting(self, record: JobRecord) -> bool:
         """True while the job waits for answers.

@@ -603,16 +603,11 @@ async def require_identity(
 async def require_owner(
     request: Request, identity: Annotated[Identity, Depends(require_identity)]
 ) -> str:
-    """FastAPI dependency: the owner ID of the caller's principal.
-
-    A read creates no principal. Where the identity holds none, the caller owns
-    no job, so every job route answers the 404 of a missing job.
-    """
-    store: JobStore = request.app.state.store
-    principal = await store.principal(identity)
-    if principal is None:
-        raise NoSuchJob(request.path_params.get("job_id", ""))
-    return principal.owner_id
+    """FastAPI dependency: the owner ID of the caller's principal, by
+    :meth:`JobAnswers.owner_id`. A caller with no principal owns no job, so
+    every job route answers the 404 of a missing job."""
+    job_id = request.path_params.get("job_id", "")
+    return await _answers(request).owner_id(identity, job_id)
 
 
 def _status_view(record: JobRecord) -> JobStatusView:

@@ -99,6 +99,18 @@ class TestReadingAJob:
         with pytest.raises(NoSuchJob):
             asyncio.run(answers.questions(job, "mallory"))
 
+    def test_an_identity_with_no_principal_owns_no_job_and_gets_none(self):
+        store = InMemoryJobStore()
+        with pytest.raises(NoSuchJob):
+            asyncio.run(operations(store).owner_id(identity_of("nobody"), "job-x"))
+        assert asyncio.run(store.principal(identity_of("nobody"))) is None
+
+    def test_a_principal_names_its_owner_id(self):
+        store = InMemoryJobStore()
+        job = waiting(store)
+        owner_id = asyncio.run(operations(store).owner_id(identity_of(OWNER), job))
+        assert owner_id == OWNER
+
     def test_a_running_job_has_no_report_to_ask_about(self):
         store = InMemoryJobStore()
         record = JobRecord.create(
