@@ -40,11 +40,13 @@ import hashlib
 import hmac
 import json
 import logging
+import os
 import ssl
 from collections.abc import AsyncIterator, Awaitable, Callable, Mapping, Sequence
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from datetime import UTC, datetime
+from pathlib import Path
 from typing import Any, Literal
 
 from alembic.migration import MigrationContext
@@ -104,7 +106,13 @@ from analysis_service.jobs import (
     locks_its_parent,
     parent_of,
 )
-from analysis_service.objects import ObjectName, ObjectStore, key_parts, object_key
+from analysis_service.objects import (
+    ObjectName,
+    ObjectStore,
+    check_private,
+    key_parts,
+    object_key,
+)
 from analysis_service.principals import Identity, Principal
 from analysis_service.report import Report
 from analysis_service.sources import Source
@@ -539,11 +547,20 @@ def _postgres(url: URL, env: Mapping[str, str]) -> dict[str, Any]:
     }
 
 
+def _sqlite_file(url: URL) -> Path:
+    """The file of a SQLite database: an absolute path, or the startup stops."""
+    path = Path(url.database or "")
+    if not path.is_absolute():
+        raise JobStoreConfigError(f"{_URL} must name a SQLite file by an absolute path")
+    return path
+
+
 def _sqlite(url: URL, env: Mapping[str, str]) -> dict[str, Any]:
     """No connect arguments: a SQLite database is a local file.
 
     It takes no credentials and no TLS, so each database setting but the URL
-    stops the startup.
+    stops the startup. The file holds content, so it must pass
+    :func:`~analysis_service.objects.check_private`, as the object root does.
     """
     stray = sorted(
         name
@@ -554,7 +571,25 @@ def _sqlite(url: URL, env: Mapping[str, str]) -> dict[str, Any]:
         raise JobStoreConfigError(
             f"a SQLite database takes no {', '.join(stray)}; unset it"
         )
+    check_private(_sqlite_file(url), "the database file", directory=False)
     return {}
+
+
+def _create_sqlite(url: URL) -> None:
+    """Make the database file with mode ``0600`` where there is none.
+
+    SQLite makes a missing file with the mode that the umask gives, which
+    can let every local user read it.
+    """
+    flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW
+    try:
+        os.close(os.open(_sqlite_file(url), flags, 0o600))
+    except FileExistsError:
+        pass
+
+
+def _no_creation(url: URL) -> None:
+    """Make nothing: the operator makes the database on its server."""
 
 
 def _no_preparation(engine: AsyncEngine) -> None:
@@ -598,6 +633,9 @@ class Database:
     #: Takes the global lock of admission, in the write transaction of
     #: admission.
     admission_lock: Callable[[AsyncConnection], Awaitable[None]]
+    #: Makes the database where there is none. Only the migration step calls
+    #: it, through :func:`create_database`; the service never makes one.
+    create: Callable[[URL], None]
 
 
 DatabaseDriver = Literal["sqlite+aiosqlite", "postgresql+asyncpg"]
@@ -613,6 +651,7 @@ DATABASES: dict[DatabaseDriver, Database] = {
         prepare=_prepare_sqlite,
         connect=_sqlite,
         admission_lock=_held_by_begin_immediate,
+        create=_create_sqlite,
     ),
     # The server checks a password or an IAM token only when a connection
     # opens, so a pooled connection stays open after its token expires, and
@@ -622,6 +661,7 @@ DATABASES: dict[DatabaseDriver, Database] = {
         prepare=_no_preparation,
         connect=_postgres,
         admission_lock=_advisory_lock,
+        create=_no_creation,
     ),
 }
 
@@ -648,6 +688,13 @@ def database_url(env: Mapping[str, str]) -> URL:
 def _database(url: URL) -> Database:
     """The row of :data:`DATABASES` for the driver of ``url``."""
     return DATABASES[backend_name(url.drivername, f"the driver of {_URL}", DATABASES)]
+
+
+def create_database(env: Mapping[str, str]) -> None:
+    """Make the database that the settings name where there is none, by the
+    ``create`` field of its row. The migration step calls it first."""
+    url = database_url(env)
+    _database(url).create(url)
 
 
 def engine_for(env: Mapping[str, str]) -> AsyncEngine:

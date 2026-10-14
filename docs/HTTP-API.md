@@ -854,10 +854,14 @@ deployment installs none of them.
 The database is PostgreSQL, or SQLite on one host.
 
 For SQLite, give `ANALYSIS_DATABASE_URL` an absolute path, which takes four
-slashes: `sqlite+aiosqlite:////var/lib/analysis/jobs.db`. Give the database
-file and its directory permissions that only the service user can open. A
-SQLite database takes no other database setting, and each one stops the
-startup.
+slashes: `sqlite+aiosqlite:////var/lib/analysis/jobs.db`. A relative path
+stops the startup. The database file holds the answers, the drafts and the
+checkpoint of each job, so it has the rule of the object root. The
+[migration step](#the-migration-step) makes a new file with mode `0600`. The
+startup stops when the file is missing, is not a regular file, is owned by
+another user, or is open to a group or to others. Give the directory of the
+file permissions that only the service user can open. A SQLite database takes
+no other database setting, and each one stops the startup.
 
 #### PostgreSQL
 
@@ -1016,7 +1020,7 @@ ANALYSIS_DATABASE_PASSWORD_FILE=/run/secrets/analysis-migrate-password \
 ```
 
 The command migrates the database to the latest revision. On SQLite it
-creates the database file where there is none. A migration changes the structure of the
+creates the database file with mode `0600` where there is none. A migration changes the structure of the
 tables only. It never changes a stored report, checkpoint or sources object.
 The startup stops when the schema is not at the latest revision.
 
@@ -1024,7 +1028,8 @@ The startup stops when the schema is not at the latest revision.
 
 The service starts in this order, and a failure at a step stops the startup:
 
-1. It reads the backend settings and builds the store.
+1. It reads the backend settings and builds the store. For SQLite, it checks
+   the database file.
 2. It reads `ANALYSIS_RETENTION_DAYS`.
 3. The `sql` store checks that the schema is at the latest revision.
 4. The `sql` store checks the object store: for `filesystem`, the root, and
@@ -1123,3 +1128,33 @@ version](#a-job-from-an-older-schema-version).
 The three read methods are separate because a read that copies a whole report to
 answer a question about its status is the expensive path, and no bound applies to
 reads at all.
+
+## Logs
+
+The service writes its log lines through the Python `logging` module, under
+the logger `analysis_service`. The app does not configure logging, so the
+server must do it. Without a log configuration, Python drops each `INFO` line
+of the service. These lines include the line of each
+[delete](#deleting-a-job) and the line of each pass of the
+[orphan sweep](#orphan-objects).
+
+Give `uvicorn` a log configuration that keeps the `INFO` lines of
+`analysis_service`, for example this `/etc/analysis/logging.json`:
+
+```json
+{
+  "version": 1,
+  "disable_existing_loggers": false,
+  "formatters": {"plain": {"format": "%(asctime)s %(levelname)s %(name)s: %(message)s"}},
+  "handlers": {"stderr": {"class": "logging.StreamHandler", "formatter": "plain"}},
+  "root": {"level": "WARNING", "handlers": ["stderr"]},
+  "loggers": {
+    "analysis_service": {"level": "INFO"},
+    "uvicorn": {"level": "INFO"}
+  }
+}
+```
+
+```bash
+uvicorn --factory analysis_service:create_app --log-config /etc/analysis/logging.json
+```

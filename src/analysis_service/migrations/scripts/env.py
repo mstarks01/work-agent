@@ -5,7 +5,7 @@ import asyncio
 from alembic import context
 from sqlalchemy import Connection
 
-from analysis_service.sql_store import engine_for
+from analysis_service.sql_store import create_database, engine_for
 
 
 def _migrate(connection: Connection) -> None:
@@ -16,7 +16,9 @@ def _migrate(connection: Connection) -> None:
 
 
 async def _run() -> None:
-    engine = engine_for(context.config.attributes["env"])
+    env = context.config.attributes["env"]
+    create_database(env)
+    engine = engine_for(env)
     async with engine.connect() as connection:
         await connection.run_sync(_migrate)
     await engine.dispose()

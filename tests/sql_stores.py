@@ -151,7 +151,7 @@ def sql_env(directory: Path, objects: ObjectStoreName = "filesystem") -> dict[st
     """The settings of a fresh ``sql`` store on SQLite under ``directory``,
     which is new."""
     database = directory / "jobs.db"
-    shutil.copyfile(_migrated(), database)
+    shutil.copy(_migrated(), database)
     return {
         "ANALYSIS_JOB_STORE": "sql",
         "ANALYSIS_DATABASE_URL": sqlite_url(database),
