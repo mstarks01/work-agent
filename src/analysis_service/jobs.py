@@ -814,14 +814,15 @@ class InMemoryJobStore:
 
         A duplicate id is settled before every bound, so a record the store
         already holds is never also counted against the budgets it is already
-        inside. The principal is settled next, and the store keeps a new
+        inside. The ID of a deleted job is a duplicate too, because its usage
+        row keeps it. The principal is settled next, and the store keeps a new
         principal with the record it admits, in the same step.
 
         A record whose owner ID is not ``principal``'s, or whose owner holds no
         principal where none is given, is the caller's defect, and it raises.
         :func:`check_bounds` then checks the bounds.
         """
-        if record.id in self._records:
+        if record.id in self._records or record.id in self._usage:
             return Admission(outcome="duplicate", active=0)
         if principal is None:
             if not self._principals.holds(record.owner_id):

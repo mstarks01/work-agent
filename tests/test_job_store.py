@@ -849,6 +849,14 @@ class TestADeletedJobLeavesAUsageRow:
         assert asyncio.run(store.events_after(job, 0)) is None
         assert asyncio.run(store.owned_jobs("alice")) == []
 
+    def test_a_new_job_never_takes_the_id_of_a_deleted_job(self, store):
+        job = completed(store)
+        asyncio.run(store.delete(job, "alice"))
+        reused = new_record().model_copy(update={"id": job})
+        admission = asyncio.run(store.reserve(reused, ceiling=100, budget=POLICY))
+        assert admission.outcome == "duplicate"
+        assert asyncio.run(store.get(job)) is None
+
     def test_only_the_owner_deletes_and_only_a_terminal_job(self, store):
         job = completed(store)
         queued = new_record()
@@ -1105,6 +1113,31 @@ class TestAFailedObjectDelete:
         objects.failing = {object_key("mallory", stranger.id, "sources.json")}
         with pytest.raises(ValueError, match="holds no principal"):
             asyncio.run(store.reserve(stranger, ceiling=100, budget=POLICY))
+
+
+class TestARepeatedSave:
+    """A save that stopped after its report put and before its row write left
+    a report object that no row names. A later save puts its report there."""
+
+    def running(self, store) -> JobRecord:
+        record = new_record()
+        asyncio.run(admit(store, record))
+        record.transition("running")
+        asyncio.run(store.save(record))
+        record.report = sample_report()
+        record.transition("completed")
+        return record
+
+    @pytest.mark.parametrize("left", [b"{}", None], ids=["other", "same"])
+    def test_the_save_puts_its_report_over_the_orphan(self, held, left):
+        store, objects = held
+        record = self.running(store)
+        data = record.report.model_dump_json().encode()
+        key = object_key("alice", record.id, "report.json")
+        asyncio.run(objects.put(key, data if left is None else left))
+        asyncio.run(store.save(record))
+        assert asyncio.run(store.get(record.id)).report == record.report
+        assert asyncio.run(objects.get(key)) == data
 
 
 class TestTheOrphanSweep:
