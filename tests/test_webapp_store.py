@@ -12,6 +12,7 @@ import asyncio
 import json
 import logging
 import re
+import sqlite3
 import time
 from pathlib import Path
 
@@ -231,6 +232,33 @@ class TestARestart:
         with app(tiers) as client:
             body = client.get(f"/workspace/runs/{queued}").json()
         assert (body["status"], body["error"]) == ("failed", RESTART_FAILURE_MESSAGE)
+
+
+class TestARecordOfAnotherMajor:
+    """#1665: each read that parses a stored record asks ``same_major`` first."""
+
+    def test_the_list_shows_it_and_its_page_answers_409(self, tiers, durable):
+        with app(tiers) as client:
+            answered = completed(client)
+            child = client.post(
+                f"/answer/{answered}",
+                json={"links": [], "facts": [dict(FACT)]},
+                headers=SAME_ORIGIN,
+            ).json()["run"]
+            assert ran(client, child) == "completed"
+        database = durable["ANALYSIS_DATABASE_URL"].partition(":///")[2]
+        with sqlite3.connect(database) as connection:
+            connection.execute(
+                "UPDATE jobs SET schema_version = '0.1', resumption = '{\"x\": 1}'"
+                " WHERE id = ?",
+                (child,),
+            )
+        with app(tiers) as client:
+            listed = client.get("/workspace/runs")
+            page = client.get(f"/workspace/runs/{child}")
+        assert listed.status_code == 200, listed.text
+        assert child in {run["run"] for run in listed.json()}
+        assert page.status_code == 409
 
 
 def queued_run(store) -> str:

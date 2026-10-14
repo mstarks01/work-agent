@@ -188,6 +188,7 @@ from analysis_service.jobs import (
     event_frames,
     execute_job,
     parent_of,
+    same_major,
     store_lifespan,
 )
 from analysis_service.links import (
@@ -341,6 +342,14 @@ class Workspace:
         except NoSuchJob:
             return None
 
+    async def parsable(self, job_id: str) -> JobRecord | None:
+        """The operator's job ``job_id``, as an envelope, or ``None``. Raises
+        :class:`UnreadableSchema` where this app cannot parse the record."""
+        try:
+            return await self.answers.parsable(job_id, await self.owner_id(job_id))
+        except NoSuchJob:
+            return None
+
     async def jobs(self) -> list[JobRecord]:
         """Every job of the operator, as envelopes, oldest first."""
         owner_id = await self._owner_id()
@@ -357,7 +366,7 @@ class Workspace:
         locker = await self.store.resumed_by(record.id, record.owner_id)
         if locker is None:
             return True
-        child = await self.store.get(locker)
+        child = await self.store.owned(locker, record.owner_id)
         return child is None or child.status != "completed"
 
     @asynccontextmanager
@@ -401,7 +410,13 @@ class Workspace:
     async def parent_of(self, record: JobRecord) -> str | None:
         """The job this one resumes or amends: :func:`parent_of` over the
         record with its resumption, which an envelope leaves out for its
-        weight."""
+        weight.
+
+        The resumption is read only where :func:`same_major` accepts the
+        record. A record of another major names only the job it amends.
+        """
+        if not same_major(record.schema_version):
+            return parent_of(record)
         resumption = await self.store.resumption(record.id, record.owner_id)
         return parent_of(record.model_copy(update={"resumption": resumption}))
 
@@ -971,6 +986,9 @@ def create_app(
             if locked is None:
                 break
             record = locked
+        record = await workspace.parsable(record.id)
+        if record is None:
+            return no_such_run()
         payload = await workspace.snapshot(record)
         payload["completed_steps"] = [
             event.node for event in record.events if event.kind == "node"
