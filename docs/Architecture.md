@@ -500,14 +500,14 @@ whole graph runs offline against scripted models:
 | Seam | Interface | Default | Status |
 | --- | --- | --- | --- |
 | Pipeline execution | `PipelineRunner` | `AdkPipelineRunner` (real graph) / `StubPipelineRunner` (tests) | Complete |
-| Job persistence | `JobStore` | none: `ANALYSIS_JOB_STORE` is required | Two backends, each a row of `JOB_STORES`: the non-durable `memory` store, and the `sql` store on SQLite with a filesystem object store, which keeps jobs across a restart. See [Job storage](HTTP-API.md#job-storage) |
+| Job persistence | `JobStore` | none: `ANALYSIS_JOB_STORE` is required | Two backends, each a row of `JOB_STORES`: the non-durable `memory` store, and the `sql` store, which keeps jobs across a restart. The `sql` store runs on SQLite or PostgreSQL, with a filesystem or `s3` object store. See [Job storage](HTTP-API.md#job-storage) |
 | ADK sessions | `BaseSessionService` | `InMemorySessionService` | In-memory only; a `session_service_uri` backend is unwired |
 
 The in-memory defaults are enough to get a report in process. The `JobStore`
 backend is a deploy-time choice (`ANALYSIS_JOB_STORE`, which stops startup on an
 unset or unknown value rather than quietly falling back), and the `sql` store
-keeps jobs across a restart on one host. Out of scope for the current work: a
-store shared by more than one instance, a session backend, deployment
+keeps jobs across a restart. Out of scope for the current work: a store shared
+by more than one instance, a session backend, deployment
 packaging (container, Cloud Run), and observability.
 
 ## Where the code lives

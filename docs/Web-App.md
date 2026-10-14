@@ -221,7 +221,7 @@ the last stop, and the run shows a message that names the restart. Submit that
 run again.
 
 After a restart over a `sql` store, the list of analyses shows the runs from
-before the restart. Each report opens, and your drafts, saved rounds and
+before the restart. Each report opens, and your drafts, saved answers and
 corrections stay. A run that waits for your answers can be answered.
 
 The bound of 20 runs applies to each store. The app chooses the runs to delete
