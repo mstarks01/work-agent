@@ -668,6 +668,15 @@ def _revision(connection: Connection) -> str | None:
     return MigrationContext.configure(connection).get_current_revision()
 
 
+def _held(job_id: str) -> CompoundSelect:
+    """The ID ``job_id`` where a job row or a usage row holds it. A deleted
+    job keeps its ID, so a new job never takes it."""
+    return union_all(
+        select(jobs.c.id).where(jobs.c.id == job_id),
+        select(usage_rows.c.job_id).where(usage_rows.c.job_id == job_id),
+    )
+
+
 def _children(parent_id: str) -> CompoundSelect:
     """Every job that names ``parent_id`` as its parent, with its status."""
     return union_all(
@@ -781,9 +790,7 @@ class SqlJobStore:
         if principal is not None and principal.owner_id != record.owner_id:
             raise ValueError(f"job {record.id} names another owner than its principal")
         async with self._transaction() as connection:
-            held = await connection.scalar(
-                select(jobs.c.id).where(jobs.c.id == record.id)
-            )
+            held = await connection.scalar(_held(record.id))
         if held is not None:
             return Admission(outcome="duplicate", active=0)
         objects: dict[ObjectName, bytes] = {
@@ -847,7 +854,7 @@ class SqlJobStore:
     ) -> Admission:
         async with self._transaction(writes=True) as connection:
             await self._admission_lock(connection)
-            if await connection.scalar(select(jobs.c.id).where(jobs.c.id == record.id)):
+            if await connection.scalar(_held(record.id)) is not None:
                 return Admission(outcome="duplicate", active=0)
             if principal is None:
                 owner = select(principals.c.owner_id).where(
@@ -1014,7 +1021,9 @@ class SqlJobStore:
 
         The sources are written once, at admission. The report is written
         once: a save puts it where the row names none, and raises where the
-        row names another.
+        row names another. A save that stopped after its put and before its
+        row write left a report object that no row names. A later save puts
+        its report there again.
         """
         async with self._transaction() as connection:
             found = await connection.execute(
@@ -1029,9 +1038,14 @@ class SqlJobStore:
         if record.report is not None:
             data = record.report.model_dump_json().encode()
             if not _names(row, "report.json"):
-                await self._objects.put(
-                    object_key(row.owner_id, row.id, "report.json"), data
-                )
+                key = object_key(row.owner_id, row.id, "report.json")
+                try:
+                    await self._objects.put(key, data)
+                except FileExistsError:
+                    # No row names the object, so it is an orphan. The new put
+                    # gives it a new write time, so the orphan sweep keeps it.
+                    await self._objects.delete(key)
+                    await self._objects.put(key, data)
                 values["report_sha256"] = _digest(data)
             elif row.report_sha256 != _digest(data):
                 raise ValueError(f"job {record.id} holds a report, written once")
