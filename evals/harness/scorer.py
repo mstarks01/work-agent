@@ -63,6 +63,7 @@ from analysis_service.claims import (
 from analysis_service.critic import NO_ROWS, mechanism_of
 from analysis_service.frameworks.stride.record import DraftThreat, StrideCategory
 from analysis_service.system_model import ModelIndex
+from evals.harness import audit
 from evals.harness.content import structural
 from evals.harness.fingerprint import key_claim
 from evals.harness.identity import ClaimPair, ClaimRuling, Matcher
@@ -842,12 +843,18 @@ def holdout_split(scores: Sequence[CaseScore]) -> dict[str, float] | None:
 
     ``None`` where no holdout case was scored. A fix whose gain shows on the
     tuned cases and not on the holdout ones was shaped by the cases it was
-    read on.
+    read on. A holdout the ledger exhausted counts as tuned
+    (:func:`~evals.harness.audit.held_out`).
     """
-    held = [score for score in scores if score.holdout]
+    ledger = audit.load()
+    held = [
+        score
+        for score in scores
+        if audit.held_out(score.case_id, score.holdout, ledger)
+    ]
     if not held:
         return None
-    tuned = [score for score in scores if not score.holdout]
+    tuned = [score for score in scores if score not in held]
     return {
         "tuned_coverage": round(
             ratio(sum(score.reference_coverage for score in tuned), len(tuned)), 3
@@ -925,6 +932,9 @@ def render(scores: Sequence[CaseScore]) -> None:
                 f" {split['holdout_must_find_coverage']:.2f}"
                 f" vs tuned {split['tuned_must_find_coverage']:.2f}"
             )
+        spent = audit.exhausted_line(score.case_id for score in scores if score.holdout)
+        if spent:
+            print(spent)
 
 
 def published(blocks: Mapping[str, Any], metric: str, cases: Cases) -> float | None:

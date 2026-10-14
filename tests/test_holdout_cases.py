@@ -18,7 +18,7 @@ from pathlib import Path
 
 import pytest
 
-from evals.harness import applicability, scorer
+from evals.harness import applicability, audit, comparison, early_policies, scorer
 from evals.harness.provenance import REPO_ROOT
 from evals.harness.reference import (
     CorpusError,
@@ -48,7 +48,7 @@ HOLDOUT_READERS = {
     "evals/harness/envelope.py": "the offline sitting reads every case",
     "evals/review_submission.py": "a sitting on a holdout case is checked too",
     "evals/harness/audit.py:holdout_cases": (
-        "it reads which cases are held out, to count the reads of each"
+        "it reads which cases the corpus flags, to count the reads of each"
     ),
 }
 
@@ -150,9 +150,10 @@ def holdout_corpus(tmp_path):
 
 
 def test_the_holdout_cases_are_the_ones_744_authored():
-    held = {case.id for case in load_corpus(CORPUS) if not diagnosable(case)}
-
-    assert held == {"14-loyalty-oauth-platform", "15-multitenant-invoicing"}
+    assert audit.holdout_cases() == {
+        "14-loyalty-oauth-platform",
+        "15-multitenant-invoicing",
+    }
 
 
 def test_a_holdout_case_is_loaded_and_left_out_of_tuning(holdout_corpus):
@@ -231,10 +232,10 @@ def test_the_stride_split_reports_holdout_coverage_apart():
 
 def test_the_asvs_split_reports_holdout_recall_apart():
     class Score:
-        def __init__(self, holdout, recall):
-            self.holdout, self.recall = holdout, recall
+        def __init__(self, case, holdout, recall):
+            self.case, self.holdout, self.recall = case, holdout, recall
 
-    scores = [Score(False, 0.5), Score(False, 1.0), Score(True, 0.25)]
+    scores = [Score("a", False, 0.5), Score("b", False, 1.0), Score("c", True, 0.25)]
 
     assert applicability.holdout_split(scores) == {
         "tuned_recall": 0.75,
@@ -252,3 +253,148 @@ def test_the_readers_path_is_repo_relative():
     assert all(
         Path(REPO_ROOT / site.split(":")[0]).is_file() for site in HOLDOUT_READERS
     )
+
+
+#: The case the reclassification tests spend. The corpus holds it out, and
+#: the tests read only its flag and a synthetic ledger, never its outputs.
+SPENT = "14-loyalty-oauth-platform"
+
+
+def _reads(case: str, count: int) -> list[audit.Experiment]:
+    """``count`` synthetic ledger rows, each reading ``case`` once."""
+    return [
+        audit.parse(
+            {
+                "experiment_id": f"T-E{number}",
+                "audit_id": "T",
+                "recorded": f"2026-10-14T00:00:{number:02d}Z",
+                "revision": "0" * 40,
+                "signature": "a synthetic holdout read",
+                "hypothesis": "none",
+                "falsifier": "none",
+                "intervention": "none",
+                "outcome": "null",
+                "scope": "a test",
+                "holdout_reads": [case],
+            },
+            source="test",
+        )
+        for number in range(count)
+    ]
+
+
+@pytest.fixture
+def exhausted(tmp_path, monkeypatch):
+    """A ledger that read :data:`SPENT` the full ``HOLDOUT_READS`` times."""
+    ledger = tmp_path / "experiments"
+    for row in _reads(SPENT, audit.HOLDOUT_READS):
+        audit.append(row, ledger)
+    monkeypatch.setattr(audit, "EXPERIMENTS_DIR", ledger)
+    return ledger
+
+
+class TestTheOneReader:
+    """#1093: a case read ``HOLDOUT_READS`` times is development from then on."""
+
+    @pytest.mark.parametrize(
+        ("flagged", "reads", "expected"),
+        [
+            (True, 0, True),
+            (True, audit.HOLDOUT_READS - 1, True),
+            (True, audit.HOLDOUT_READS, False),
+            (True, audit.HOLDOUT_READS + 1, False),
+            (False, 0, False),
+        ],
+    )
+    def test_a_case_is_held_out_while_flagged_and_unexhausted(
+        self, flagged, reads, expected
+    ):
+        assert audit.held_out(SPENT, flagged, _reads(SPENT, reads)) is expected
+
+    def test_exhaustion_counts_each_case_apart(self):
+        ledger = _reads(SPENT, audit.HOLDOUT_READS)
+
+        assert audit.exhausted(ledger) == {SPENT: audit.HOLDOUT_READS}
+        assert audit.held_out("15-multitenant-invoicing", True, ledger)
+
+
+class TestEverySiteAsksTheOneReader:
+    """Each site that splits development from held-out agrees with ``held_out``.
+
+    Each test drives one site over a ledger that exhausted :data:`SPENT`, so a
+    site that reads the corpus flag alone keeps the case held out and fails.
+    """
+
+    def test_the_reader_itself(self, exhausted):
+        assert not audit.held_out(SPENT, True)
+
+    def test_a_diagnosis_reads_an_exhausted_case(self, exhausted):
+        case = load_case(CORPUS / SPENT)
+
+        assert diagnosable(case)
+        assert SPENT in {one.id for one in tuning_cases(load_corpus(CORPUS))}
+        refuse_holdout(SPENT)
+
+    def test_the_corpus_still_names_its_flagged_holdouts(self, exhausted):
+        """The flag is the corpus's fact, and the ledger never rewrites it."""
+        assert SPENT in audit.holdout_cases()
+
+    def test_the_stride_split_counts_it_as_development(self, exhausted):
+        scores = [
+            _stride("a", False, 0.8),
+            _stride(SPENT, True, 0.2),
+            _stride("c", True, 0.3),
+        ]
+
+        split = scorer.holdout_split(scores)
+
+        assert split is not None
+        assert split["tuned_coverage"] == 0.5
+        assert split["holdout_coverage"] == 0.3
+
+    def test_the_asvs_split_counts_it_as_development(self, exhausted):
+        class Score:
+            def __init__(self, case, holdout, recall):
+                self.case, self.holdout, self.recall = case, holdout, recall
+
+        scores = [
+            Score("a", False, 0.5),
+            Score(SPENT, True, 1.0),
+            Score("c", True, 0.25),
+        ]
+
+        assert applicability.holdout_split(scores) == {
+            "tuned_recall": 0.75,
+            "holdout_recall": 0.25,
+        }
+
+    def test_an_artifact_split_counts_it_as_development(self, exhausted):
+        blocks = {
+            "scores": [
+                {"case": SPENT, "holdout": True},
+                {"case": "c", "holdout": True},
+            ]
+        }
+
+        assert comparison.held_out_cases(blocks) == frozenset({"c"})
+
+    def test_a_paired_reading_opens_an_exhausted_case(self, exhausted, tmp_path):
+        """``paired`` skips a held-out report unopened; an exhausted one is read."""
+        (tmp_path / f"{SPENT}.report.json").write_text("not JSON")
+
+        with pytest.raises(ValueError):
+            early_policies.paired(tmp_path)
+
+    def test_the_exposure_listing_says_exhausted(self, exhausted):
+        printed = "\n".join(audit.render_exposure({SPENT}, audit.load()))
+
+        assert f"read {audit.HOLDOUT_READS} of {audit.HOLDOUT_READS} times" in printed
+        assert "exhausted" in printed
+        assert "development" in printed
+
+    def test_the_scorer_prints_it_as_exhausted(self, exhausted, capsys):
+        scorer.render([_stride("a", False, 0.8), _stride(SPENT, True, 0.2)])
+
+        printed = capsys.readouterr().out
+        assert SPENT in printed
+        assert f"read {audit.HOLDOUT_READS} times" in printed

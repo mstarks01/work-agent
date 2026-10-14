@@ -118,8 +118,10 @@ reads them against the audit's grants before it appends the row, and
 
 `verdict` is `kept` only where `outcome` is `supported`. Any other outcome
 means the change did not work, so it is `reverted`, and `reason` says why.
-`regressions` lists the tests the change can reach, run on `commit`. `--record`
-refuses a `kept` candidate whose list is empty.
+`regressions` lists the tests the change can reach, run on `commit`, as pytest
+selects them: a file, or a node ID such as `tests/test_x.py::test_y`.
+`--record` refuses a `kept` candidate whose list is empty, and an entry whose
+file `commit` does not hold.
 `--record` fills `paths` from `git diff` between `revision` and `commit`, and
 refuses a candidate that touches a reference answer, a ruling, a vote, a
 Baseline, the scorer or a gate (`PROTECTED`). Record the candidate while its
@@ -148,7 +150,8 @@ each package, or the answer says why one needs no measurement. See
 
 **`holdout_reads`** lists the holdout cases whose figures or outputs the
 experiment read. Every read counts. `--record` refuses a case that is not a
-holdout, and a case already read `HOLDOUT_READS` times.
+holdout, and a case already read `HOLDOUT_READS` times, which is exhausted and
+counts as a development case.
 
 **`replicates`** names the earlier experiment this one repeats with fresh
 model output. `--record` refuses it unless `actual_usd` shows a paid call,

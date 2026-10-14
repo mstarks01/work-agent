@@ -16,7 +16,7 @@ import json
 import pytest
 
 from analysis_service.frameworks import PACKAGES
-from evals.harness import gain
+from evals.harness import audit, gain
 from evals.harness.provenance import REPO_ROOT
 from evals.harness.run import COMMANDS
 
@@ -244,3 +244,140 @@ def test_the_command_names_no_default_framework():
     COMMANDS["gain"].arguments(parser)
     with pytest.raises(SystemExit):
         parser.parse_args([str(SEALED), str(SEALED)])
+
+
+def _flagged(raw: dict, *cases: str) -> dict:
+    """A copy of ``raw`` whose rows for ``cases`` carry the holdout flag."""
+    flagged = copy.deepcopy(raw)
+    for row in flagged["scores"]:
+        if row["case"] in cases:
+            row["holdout"] = True
+    return flagged
+
+
+def _spend(directory, case: str, reads: int) -> None:
+    """``reads`` synthetic ledger rows, each reading ``case`` once."""
+    for number in range(reads):
+        audit.append(
+            audit.parse(
+                {
+                    "experiment_id": f"T-E{case[:2]}{number}",
+                    "audit_id": "T",
+                    "recorded": "2026-10-14T00:00:00Z",
+                    "revision": "0" * 40,
+                    "signature": "a synthetic holdout read",
+                    "hypothesis": "none",
+                    "falsifier": "none",
+                    "intervention": "none",
+                    "outcome": "null",
+                    "scope": "a test",
+                    "holdout_reads": [case],
+                },
+                source="test",
+            ),
+            directory,
+        )
+
+
+#: Two cases of the sealed artifact, flagged as holdouts in the fixtures
+#: below. The sealed rows carry no flag; the flag is synthetic.
+HELD = ("12-overclaiming-supplier-portal", "13-dispatch-control-plane")
+
+
+@pytest.fixture
+def ledger(tmp_path, monkeypatch):
+    directory = tmp_path / "experiments"
+    directory.mkdir()
+    monkeypatch.setattr(audit, "EXPERIMENTS_DIR", directory)
+    return directory
+
+
+class TestHeldOutConfirmation:
+    """Rung 5: the gates read on the held-out cases alone (#1093)."""
+
+    def _flood(self, raw: dict, case: str) -> dict:
+        flooded = copy.deepcopy(raw)
+        for row in flooded["scores"]:
+            if row["case"] == case:
+                row["counts"]["eligible"] += 50
+                row["counts"]["unvoted"] += 50
+        return flooded
+
+    def test_it_reads_only_the_held_out_cases(self, ledger):
+        baseline = _flagged(_baseline(), *HELD)
+        candidate = self._flood(baseline, HELD[0])
+
+        development = _verdicts(gain.read(baseline, candidate, "stride", spread=SPREAD))
+        held = _verdicts(
+            gain.read(baseline, candidate, "stride", spread=SPREAD, held_out=True)
+        )
+
+        assert development["volume"] == "pass"
+        assert held["volume"] == "fail"
+        assert held["reviewed"] == "fail"
+
+    def test_a_flood_on_a_development_case_is_not_read(self, ledger):
+        baseline = _flagged(_baseline(), *HELD)
+        candidate = self._flood(baseline, "01-payments-checkout")
+
+        held = _verdicts(
+            gain.read(baseline, candidate, "stride", spread=SPREAD, held_out=True)
+        )
+
+        assert held["volume"] == "pass"
+
+    def test_an_exhausted_case_is_refused(self, ledger):
+        _spend(ledger, HELD[0], audit.HOLDOUT_READS)
+        baseline = _flagged(_baseline(), *HELD)
+        candidate = self._flood(baseline, HELD[0])
+
+        selection = gain.select(baseline, candidate, held_out=True)
+        held = _verdicts(
+            gain.read(baseline, candidate, "stride", spread=SPREAD, held_out=True)
+        )
+
+        assert HELD[0] not in selection.candidate.held_out
+        assert any(f"refused: {HELD[0]} is exhausted" in one for one in selection.notes)
+        assert held["volume"] == "pass"
+
+    def test_no_case_left_to_confirm_on_is_refused(self, ledger):
+        _spend(ledger, HELD[0], audit.HOLDOUT_READS)
+        baseline = _flagged(_baseline(), HELD[0])
+
+        with pytest.raises(gain.RefusedError, match="no held-out case"):
+            gain.read(baseline, baseline, "stride", spread=SPREAD, held_out=True)
+
+    def test_the_command_tells_the_user_to_record_each_read(
+        self, ledger, tmp_path, capsys
+    ):
+        _spend(ledger, HELD[0], audit.HOLDOUT_READS)
+        _spend(ledger, HELD[1], 1)
+        path = tmp_path / "flagged.json"
+        path.write_text(json.dumps(_flagged(_baseline(), *HELD)), "utf-8")
+        parser = __import__("argparse").ArgumentParser()
+        COMMANDS["gain"].arguments(parser)
+
+        args = parser.parse_args(
+            [str(path), str(path), "--framework", "stride", "--held-out"]
+        )
+        assert COMMANDS["gain"].run(args) == 0
+        printed = capsys.readouterr().out
+        assert "held-out cases" in printed
+        assert "holdout_reads" in printed
+        assert f"{HELD[1]} (read 1 of {audit.HOLDOUT_READS} times" in printed
+        assert f"refused: {HELD[0]} is exhausted" in printed
+
+    def test_the_development_reading_names_an_exhausted_case(
+        self, ledger, tmp_path, capsys
+    ):
+        _spend(ledger, HELD[0], audit.HOLDOUT_READS)
+        path = tmp_path / "flagged.json"
+        path.write_text(json.dumps(_flagged(_baseline(), *HELD)), "utf-8")
+        parser = __import__("argparse").ArgumentParser()
+        COMMANDS["gain"].arguments(parser)
+
+        args = parser.parse_args([str(path), str(path), "--framework", "stride"])
+        assert COMMANDS["gain"].run(args) == 0
+        printed = capsys.readouterr().out
+        assert "development cases" in printed
+        assert f"{HELD[0]} (read {audit.HOLDOUT_READS} times)" in printed

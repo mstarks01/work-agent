@@ -1030,13 +1030,17 @@ def load_corpus(corpus_dir: Path | str) -> tuple[GoldenCase, ...]:
 
 
 def diagnosable(case: GoldenCase) -> bool:
-    """Whether a diagnosis may read this case: the one reader of ``holdout``.
+    """Whether a diagnosis may read this case: every case not still held out.
 
     A holdout case confirms a fix measured elsewhere. Once an audit reads its
     losses, a fix can be shaped by them, and the case measures that fix no
-    more independently than any other.
+    more independently than any other. A holdout the ledger exhausted is a
+    development case, so :func:`~evals.harness.audit.held_out` decides.
     """
-    return not case.meta.holdout
+    # Imported here because the audit module loads the corpus through this one.
+    from evals.harness.audit import held_out
+
+    return not held_out(case.id, case.meta.holdout)
 
 
 def tuning_cases(cases: Sequence[GoldenCase]) -> tuple[GoldenCase, ...]:

@@ -6,8 +6,8 @@ unlisted finding is not counted wrong (``evals/README.md``). So a coverage gain
 needs a second reading beside it: did the candidate say more than the baseline
 did, and did a person accept what it added?
 
-Three gates answer that, each read on the development cases only (the
-held-out ones confirm a gain and never shape one):
+Three gates answer that. By default each reads the development cases only
+(the held-out ones confirm a gain and never shape one):
 
 * ``volume`` — the unmatched findings per case may not rise by more than one
   standard deviation of the repeat spread. This half works offline, and it is
@@ -22,6 +22,12 @@ The design is the owner's decision of 2026-10-11 on #1093: volume and votes,
 both. Like the ``sd`` gates of :mod:`evals.harness.promotion`, a gate whose
 spread nobody has measured reads ``inconclusive``, and a gain with an unread
 gate is not a promotion.
+
+``--held-out`` is rung 5 of the experiment protocol, held-out confirmation:
+the same gates over the held-out cases alone. Each case it reads spends one of
+that case's ``HOLDOUT_READS``, so the reading names each case for the row's
+``holdout_reads``, and it refuses a case the ledger has exhausted, which is a
+development case now (:func:`~evals.harness.audit.held_out`).
 
 The readers are a table keyed by framework, because what counts as an
 unmatched finding is the package's own question. A package with no vote
@@ -41,8 +47,9 @@ from types import MappingProxyType
 from typing import Any, Literal
 
 from analysis_service.claims import FrameworkName
+from evals.harness import audit
 from evals.harness.artifact import figures_corpus
-from evals.harness.comparison import held_out_cases
+from evals.harness.comparison import flagged_cases, held_out_cases
 from evals.harness.instruments import Cases
 from evals.harness.promotion import Reading, in_spreads
 
@@ -51,7 +58,11 @@ from evals.harness.promotion import Reading, in_spreads
 Reader = Callable[[Mapping[str, Any], Cases], float | None]
 
 
-class IncomparableError(ValueError):
+class RefusedError(ValueError):
+    """A reading the command will not make, naming why."""
+
+
+class IncomparableError(RefusedError):
     """Two artifacts whose figures do not compare, naming what differs."""
 
 
@@ -161,6 +172,82 @@ READERS: Mapping[FrameworkName, Readers] = MappingProxyType(
 
 
 @dataclass(frozen=True)
+class Selection:
+    """Which cases one reading counts in each artifact, and what it says of them."""
+
+    held_out: bool
+    baseline: Cases
+    candidate: Cases
+    #: The lines the table prints under itself about the cases it read.
+    notes: tuple[str, ...]
+
+    @property
+    def part(self) -> str:
+        return "held-out cases" if self.held_out else "development cases"
+
+
+def select(
+    baseline: Mapping[str, Any],
+    candidate: Mapping[str, Any],
+    *,
+    held_out: bool,
+    ledger: Sequence[audit.Experiment] | None = None,
+) -> Selection:
+    """The cases a reading counts, through the one reader of the split.
+
+    A development reading counts an exhausted holdout and names it. A held-out
+    reading refuses one, and raises :class:`RefusedError` where an artifact
+    has no held-out case left.
+    """
+    ledger = audit.load() if ledger is None else ledger
+    flagged = flagged_cases(baseline) | flagged_cases(candidate)
+    held = {
+        name: held_out_cases(raw, ledger)
+        for name, raw in (("baseline", baseline), ("candidate", candidate))
+    }
+    if not held_out:
+        line = audit.exhausted_line(flagged, ledger)
+        return Selection(
+            held_out=False,
+            baseline=Cases(held["baseline"], holdout=False),
+            candidate=Cases(held["candidate"], holdout=False),
+            notes=(line,) if line else (),
+        )
+    empty = [name for name, cases in held.items() if not cases]
+    if empty:
+        verb = "hold" if len(empty) > 1 else "holds"
+        raise RefusedError(
+            f"the {' and the '.join(empty)} {verb} no case that is still held"
+            " out, so no held-out case is left to confirm a gain on"
+        )
+    spent = audit.exhausted(ledger)
+    refused = {case: spent[case] for case in sorted(flagged & set(spent))}
+    reads = audit.exposure(ledger)
+    read = sorted(held["baseline"] | held["candidate"])
+    notes = [
+        f"- refused: {case} is exhausted (read {count} of"
+        f" {audit.HOLDOUT_READS} times), so it is a development case and"
+        " confirms nothing"
+        for case, count in refused.items()
+    ]
+    notes.append(
+        "Each case read here spends one of its reads. Record every one in the"
+        " experiment row's `holdout_reads`: "
+        + ", ".join(
+            f"{case} (read {len(reads.get(case, ()))} of {audit.HOLDOUT_READS}"
+            " times before this reading)"
+            for case in read
+        )
+    )
+    return Selection(
+        held_out=True,
+        baseline=Cases(held["baseline"], holdout=True),
+        candidate=Cases(held["candidate"], holdout=True),
+        notes=tuple(notes),
+    )
+
+
+@dataclass(frozen=True)
 class GainGate:
     """One gate: its question, its limit, and how the limit is read."""
 
@@ -206,12 +293,15 @@ def read(
     framework: FrameworkName,
     *,
     spread: Mapping[str, float] = MappingProxyType({}),
+    held_out: bool = False,
 ) -> tuple[Reading, ...]:
-    """Every gate, read on each artifact's development cases.
+    """Every gate, read on each artifact's development or held-out cases.
 
-    Raises :class:`IncomparableError` first where the two do not compare.
+    Raises :class:`IncomparableError` first where the two do not compare, and
+    :class:`RefusedError` where a held-out reading has no case to read.
     """
     refuse_incomparable(baseline, candidate)
+    cases = select(baseline, candidate, held_out=held_out)
     readings = []
     for name, gate in GATES.items():
         reader = _reader(framework, name)
@@ -222,8 +312,8 @@ def read(
                 )
             )
             continue
-        before = reader(baseline, Cases(held_out_cases(baseline), holdout=False))
-        after = reader(candidate, Cases(held_out_cases(candidate), holdout=False))
+        before = reader(baseline, cases.baseline)
+        after = reader(candidate, cases.candidate)
         readings.append(_decide(name, gate, before, after, spread.get(name)))
     return tuple(readings)
 
@@ -262,10 +352,12 @@ def _decide(
     return Reading(name, verdict, after, before, value)
 
 
-def render(readings: Sequence[Reading], framework: FrameworkName) -> str:
+def render(
+    readings: Sequence[Reading], framework: FrameworkName, cases: Selection
+) -> str:
     """The gate table, as text. It reports no promotion of its own."""
     lines = [
-        f"## Does the gain rest on supported output? ({framework}, development cases)",
+        f"## Does the gain rest on supported output? ({framework}, {cases.part})",
         "",
         "| gate | verdict | candidate | baseline | against limit | limit |",
         "| --- | --- | ---: | ---: | ---: | ---: |",
@@ -293,6 +385,7 @@ def render(readings: Sequence[Reading], framework: FrameworkName) -> str:
             "A gain with a failed or unread gate is not a promotion. Report"
             " the gain as unconfirmed."
         )
+    lines.extend(cases.notes)
     return "\n".join(lines) + "\n"
 
 
@@ -311,6 +404,13 @@ def arguments(parser: argparse.ArgumentParser) -> None:
         help="JSON mapping a gate name to the standard deviation of its figure"
         " over repeats of the baseline",
     )
+    parser.add_argument(
+        "--held-out",
+        action="store_true",
+        help="rung 5, held-out confirmation: read the gates on the held-out"
+        " cases alone. Each case read spends one of its HOLDOUT_READS; record"
+        " it in the experiment row's holdout_reads",
+    )
 
 
 def command_gain(args: argparse.Namespace) -> int:
@@ -325,9 +425,12 @@ def command_gain(args: argparse.Namespace) -> int:
         print(f"cannot read: {error}", file=sys.stderr)
         return 1
     try:
-        readings = read(baseline, candidate, args.framework, spread=spread)
-    except IncomparableError as error:
+        readings = read(
+            baseline, candidate, args.framework, spread=spread, held_out=args.held_out
+        )
+        cases = select(baseline, candidate, held_out=args.held_out)
+    except RefusedError as error:
         print(f"refused: {error}", file=sys.stderr)
         return 1
-    print(render(readings, args.framework), end="")
+    print(render(readings, args.framework, cases), end="")
     return 0

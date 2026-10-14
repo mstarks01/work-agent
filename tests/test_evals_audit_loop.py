@@ -216,6 +216,10 @@ def _blocked() -> audit.Experiment:
     return _one(experiment_id="A-E1", outcome="blocked", ticket=_ticket())
 
 
+#: The files a fixture candidate's commit holds, for the regressions check.
+REGRESSED = frozenset({"tests/test_evals_audit_loop.py"})
+
+
 def _extension(**overrides) -> audit.Experiment:
     held = {
         "experiment_id": "A-E2",
@@ -242,6 +246,7 @@ class TestAnAuthorisedExtensionResumesTheAudit:
         monkeypatch.setattr(audit, "EXPERIMENTS_DIR", tmp_path)
         monkeypatch.setattr(audit, "lookup", lambda **_: [])
         monkeypatch.setattr(audit, "paths_between", lambda *_: ("evals/harness/x.py",))
+        monkeypatch.setattr(audit, "files_at", lambda *_: REGRESSED)
         steps = [
             _blocked(),
             _extension(),
@@ -303,6 +308,7 @@ class TestNothingExpandsSilently:
                 _extension(experiment_id="A-E4", resolves="A-E3"),
                 ledger,
                 [_grant(mode="extend")],
+                tracked=REGRESSED,
             )
 
     def test_a_blocker_is_resolved_once(self):
@@ -311,6 +317,7 @@ class TestNothingExpandsSilently:
                 _extension(experiment_id="A-E3"),
                 [_blocked(), _extension()],
                 [_grant(mode="extend")],
+                tracked=REGRESSED,
             )
 
     @pytest.mark.parametrize(
@@ -320,12 +327,16 @@ class TestNothingExpandsSilently:
     )
     def test_an_extension_resolves_a_blocked_row(self, ledger):
         with pytest.raises(audit.ExperimentError, match="not a blocked row"):
-            audit.admit(_extension(), ledger, [_grant(mode="extend")])
+            audit.admit(
+                _extension(), ledger, [_grant(mode="extend")], tracked=REGRESSED
+            )
 
     def test_an_extension_resolves_its_own_audits_blocker(self):
         other = _one(audit_id="B", outcome="blocked", ticket=_ticket())
         with pytest.raises(audit.ExperimentError, match="not a blocked row of A"):
-            audit.admit(_extension(), [other], [_grant(mode="extend")])
+            audit.admit(
+                _extension(), [other], [_grant(mode="extend")], tracked=REGRESSED
+            )
 
     # Budgets.
 
@@ -413,7 +424,12 @@ class TestNothingExpandsSilently:
             )
 
     def test_an_extension_is_not_an_improvement_attempt(self):
-        audit.admit(_extension(), [_blocked()], [_grant(mode="extend", attempts=0)])
+        audit.admit(
+            _extension(),
+            [_blocked()],
+            [_grant(mode="extend", attempts=0)],
+            tracked=REGRESSED,
+        )
 
     # References and quality criteria.
 
@@ -476,6 +492,7 @@ class TestNothingExpandsSilently:
         monkeypatch.setattr(
             audit, "paths_between", lambda *_: ("evals/harness/scorer.py",)
         )
+        monkeypatch.setattr(audit, "files_at", lambda *_: REGRESSED)
         audit.append_grant(_grant(), tmp_path)
         written = tmp_path / "row.json"
         written.write_text(
@@ -529,7 +546,7 @@ class TestAKeptChangeNamesItsRegressions:
             outcome="supported",
             candidate=_candidate(verdict="kept", reason="", regressions=ran),
         )
-        audit.admit(kept, [], [_grant()])
+        audit.admit(kept, [], [_grant()], tracked=frozenset(ran))
         audit.append(kept, tmp_path)
 
         (loaded,) = audit.load(tmp_path)
@@ -538,6 +555,48 @@ class TestAKeptChangeNamesItsRegressions:
 
     def test_a_reverted_change_owes_none(self):
         audit.admit(_one(outcome="refuted", candidate=_candidate()), [], [_grant()])
+
+    @pytest.mark.parametrize(
+        "named",
+        ["tests/test_nowhere.py", "tests/test_nowhere.py::TestA::test_b"],
+        ids=["path", "node"],
+    )
+    def test_a_regression_the_commit_does_not_hold_is_refused(self, named):
+        """#1092 item 1: the regressions the change can reach, selected and run."""
+        kept = _candidate(verdict="kept", reason="", regressions=[named])
+        with pytest.raises(audit.ExperimentError, match="tests/test_nowhere.py"):
+            audit.admit(
+                _one(outcome="supported", candidate=kept),
+                [],
+                [_grant()],
+                tracked=frozenset({"tests/test_evals_audit_loop.py"}),
+            )
+
+    def test_a_node_id_is_read_by_its_path(self):
+        named = "tests/test_evals_audit_loop.py::TestA::test_b"
+        kept = _candidate(verdict="kept", reason="", regressions=[named])
+        audit.admit(
+            _one(outcome="supported", candidate=kept),
+            [],
+            [_grant()],
+            tracked=frozenset({"tests/test_evals_audit_loop.py"}),
+        )
+
+    def test_the_files_are_read_at_the_candidate_commit(self):
+        """``record`` reads the tree of the commit the regressions ran on."""
+        head = subprocess.run(
+            ["git", "rev-parse", "HEAD"],
+            capture_output=True,
+            text=True,
+            check=True,
+            cwd=Path(__file__).resolve().parents[1],
+        ).stdout.strip()
+
+        tracked = audit.files_at(head)
+
+        assert tracked is not None
+        assert "tests/test_evals_audit_loop.py" in tracked
+        assert audit.files_at("1" * 40) is None
 
 
 class TestASharedChangeAnswersForEveryPackage:
