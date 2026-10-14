@@ -17,6 +17,9 @@
   versioned identity this copies; and
   [ADR 0032](0032-a-derived-crossing-names-an-inferred-zone.md), whose
   derived-never-declared rule this copies.
+- **Amended by**: [ADR 0041](0041-an-unchecked-assertion-informs-and-a-rejected-one-supports-nothing.md),
+  under which an unchecked assertion informs and a rejected one supports
+  nothing (projection version 5)
 
 ## Context
 

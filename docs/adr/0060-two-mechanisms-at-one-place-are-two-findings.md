@@ -7,6 +7,10 @@
   whose key this keeps, and
   [ADR 0059](0059-the-critic-rules-each-draft-and-rejects-no-duplicate.md),
   which removed the step that deleted one of each pair.
+- **Amended by**: [ADR 0061](0061-two-sibling-flows-are-two-places.md),
+  under which the mechanism also holds the sibling flows a claim cites, and
+  [ADR 0062](0062-a-cited-row-is-part-of-a-claims-mechanism.md), under which a
+  cited assertion row adds its control to the mechanism
 
 ## Context
 

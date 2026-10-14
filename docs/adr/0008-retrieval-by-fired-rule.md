@@ -6,6 +6,9 @@
   stays the closed set a finding may cite and which nothing here joins, and
   [ADR 0006](0006-two-exemplar-systems.md), whose exemplars carry the method
   while a **Worked Case** carries a judgement.
+- **Amended by**: [ADR 0011](0011-package-text-follows-its-retrieval-key.md),
+  under which the retrieval key of a document decides whether it lives in a
+  package or in the service
 
 ## Context
 

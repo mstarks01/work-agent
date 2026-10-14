@@ -6,6 +6,12 @@
   evidence references](https://github.com/mstarks01/work-agent/issues/126)
 - **Relates to**: [ADR 0002](0002-finding-level-attribution.md), whose flat
   `Ground` this keeps and whose stated cost it removes.
+- **Amended by**: [ADR 0009](0009-a-bad-reference-costs-its-entry.md),
+  under which a bad reference costs its entry, not the job;
+  [ADR 0010](0010-package-cannot-extend-the-evidence-catalog.md), which names
+  the service as the owner of the catalog; and
+  [ADR 0012](0012-the-catalog-carries-a-stated-absence.md), which adds a stated
+  absence as a fourth ground kind
 
 ## Context
 

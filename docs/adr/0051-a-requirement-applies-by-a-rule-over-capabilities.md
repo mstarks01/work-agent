@@ -7,7 +7,9 @@
   on conjunctions, [ADR 0078](0078-a-paused-job-asks-one-adaptive-list.md),
   on the order of the early capability questions, and
   [ADR 0085](0085-a-closed-field-of-the-model-proves-a-capability-present.md),
-  under which a closed field of the model also states a capability present
+  under which a closed field of the model also states a capability present;
+  and by [ADR 0086](0086-a-separate-reader-states-the-capabilities-a-source-states.md),
+  under which a separate reader also states the capabilities a source states
 - **Relates to**: [ADR 0027](0027-vocabulary-raises-a-lead-and-rules-nothing-out.md), whose
   rule that silence is not absence this keeps, and
   [ADR 0048](0048-a-paused-job-ranks-its-open-facts-before-any-finding.md),

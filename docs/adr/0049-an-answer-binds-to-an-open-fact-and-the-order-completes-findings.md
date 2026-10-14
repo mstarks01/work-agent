@@ -9,7 +9,9 @@
   whose eligibility rule this keeps
 - **Amended by**: [ADR 0078](0078-a-paused-job-asks-one-adaptive-list.md),
   which keeps this order and breaks a tie between two capability questions
-  by what an answer settles
+  by what an answer settles; and by
+  [ADR 0055](0055-a-follow-up-asks-first-what-the-most-important-findings-wait-on.md),
+  under which a follow-up asks first what the most important findings wait on
 - **Evidence**: `QA-2026-09-26-03-E16` and `-E17` in `evals/experiments/`
 
 ## Context

@@ -12,6 +12,8 @@
 - **Evidence**: the nine archived assertion runs under
   `evals/emissions/20260914T201030Z-assert-model-benchmark/`, and
   [`docs/research/assertion-readers.md`](../research/assertion-readers.md).
+- **Amended by**: [ADR 0041](0041-an-unchecked-assertion-informs-and-a-rejected-one-supports-nothing.md),
+  which changes the gloss of a cited row
 
 ## Context
 

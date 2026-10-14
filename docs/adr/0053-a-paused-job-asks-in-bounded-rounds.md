@@ -12,6 +12,10 @@
   [ADR 0052](0052-the-answer-rounds-end.md), whose limit of three rounds a
   saved round does not count toward
 - **Evidence**: `QA-2026-09-26-03-E20` and `-E21` in `evals/experiments/`
+- **Amended by**: [ADR 0068](0068-a-pause-says-what-it-leaves-open.md),
+  which narrows the `nothing-left` stop, and
+  [ADR 0071](0071-the-floor-exception-reads-each-framework-s-own-bands.md),
+  under which the floor exception reads the bands of each framework apart
 
 ## Context
 

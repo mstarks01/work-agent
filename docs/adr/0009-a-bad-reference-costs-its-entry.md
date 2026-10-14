@@ -7,7 +7,9 @@
 - **Relates to**: [ADR 0002](0002-finding-level-attribution.md), which established
   marking beside a threat rather than failing on it.
 - **Amended by**: [ADR 0017](0017-a-groundless-claim-costs-its-entry.md), which
-  drops and marks the groundless threat this ADR still failed the job on.
+  drops and marks the groundless threat this ADR still failed the job on, and
+  [ADR 0019](0019-one-entry-never-costs-the-job.md), under which a fault in
+  one entry of one claim never costs the job.
 
 ## Context
 
