@@ -19,10 +19,12 @@ model calls:
 flowchart TD
     start([text in]) --> extract["extract<br/>(base)"]
     extract --> validate{{validate}}
-    validate -- valid --> assert["assert<br/>(base, ANALYSIS_ASSERTIONS)"]
+    validate -- valid --> capabilities["capabilities<br/>(base, ANALYSIS_CAPABILITY_READER)"]
     validate -- invalid --> repair["repair<br/>(base)"]
     repair --> revalidate{{revalidate}}
-    revalidate -- valid --> assert
+    revalidate -- valid --> capabilities
+    capabilities --> stated[stated]
+    stated --> assert["assert<br/>(base, ANALYSIS_ASSERTIONS)"]
     revalidate -- invalid --> reject([rejected])
     assert --> prepare[prepare]
 
@@ -45,8 +47,8 @@ flowchart TD
     classDef bad fill:#fee2e2,stroke:#dc2626,stroke-width:1.5px,color:#450a0a
     classDef io fill:#f1f5f9,stroke:#64748b,stroke-width:1.5px,color:#0f172a
 
-    class extract,repair,assert,analyze,critic,recritic llm
-    class prepare,merge,assemble code
+    class extract,repair,capabilities,assert,analyze,critic,recritic llm
+    class stated,prepare,merge,assemble code
     class validate,revalidate,router,rereview gate
     class report good
     class reject,failed bad
@@ -55,8 +57,11 @@ flowchart TD
 
 Purple nodes are model calls. Everything else is a deterministic `FunctionNode`:
 blue ones do work, amber ones only choose an edge, and the rounded ends are the
-run's three outcomes. `assert` is in the graph unless the deployment sets
-`ANALYSIS_ASSERTIONS=false`; then a valid model goes straight to `prepare`.
+run's three outcomes. `capabilities` and `stated` are in the graph only where
+the deployment sets `ANALYSIS_CAPABILITY_READER=true` and a selected framework
+reads capabilities. `assert` is in the graph unless the deployment sets
+`ANALYSIS_ASSERTIONS=false`. A pass that is not in the graph is skipped, and a
+valid model goes on to the next node.
 
 - **extract** turns the untrusted text into a canonical system model (five DFD
   element types: external entity, process, data store, data flow, trust
@@ -204,12 +209,35 @@ resolves the catalog through the seam `prepare` resolves through, and stops.
 Measured against a recorded STRIDE sweep, running the lanes as well would cost
 roughly seventeen times as much for findings the endpoint never reads.
 
+## The capability reader
+
+The capability reader puts one more `base`-tier call into a job whose selected
+framework applies its units by a rule over capabilities. It is off by default,
+and `ANALYSIS_CAPABILITY_READER=true` turns it on. The `capabilities` node
+reads the sources and the capability table, and proposes each capability the
+text says the application has, with the source's own words. The `stated` node
+then checks each row in code: the key must be in the table, the label must
+name one of the job's sources, and the quote must be in that source. It
+writes each row that passes into the valid model as `present`. A capability
+that an answer, a closed field or another statement already names stays as it
+is, and a later answer replaces what the reader wrote. The reader states no
+absence. See [ADR 0086](adr/0086-a-separate-reader-states-the-capabilities-a-source-states.md).
+
+The reader runs right behind the validity gate, so a paused job's early
+questions, the assertion pass and `prepare` all read its statements. A
+`capabilities` node that writes nothing fails the job, as a silent `assert`
+node does.
+
+| Variable | Effect |
+| --- | --- |
+| `ANALYSIS_CAPABILITY_READER` | Run the capability reader on every job whose selection reads capabilities. Off by default; `true` turns it on. |
+
 ## Models
 
 Every LLM node runs on one of two **model tiers** — named for the job they do,
 not for any vendor's product line:
 
-- **`base`** — the workhorse: `extract`, `repair` and `assert`, which are
+- **`base`** — the workhorse: `extract`, `repair`, `assert` and `capabilities`, which are
   transcription rather than judgement.
 - **`strong`** — judgement: every framework's lane agents, its `critic`, and the
   `recritic`.

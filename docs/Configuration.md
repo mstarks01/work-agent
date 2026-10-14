@@ -395,13 +395,14 @@ under
 ### Node keys, and the frameworks this deployment carries
 
 `model_tiers.toml`'s `[nodes]` table carries **three keys per framework** beside
-the three neutral ones:
+the four neutral ones:
 
 ```toml
 [nodes]
 extract = "base"
 repair = "base"
 assert = "base"
+capabilities = "base"
 "analyze/asvs" = "strong"
 "critic/asvs" = "strong"
 "recritic/asvs" = "strong"
@@ -1151,9 +1152,10 @@ misspelled *name* that passes unnoticed.
 
 ### Optional passes
 
-Two variables add a pass to the graph or change how extraction writes. The
-assertion pass is on by default and the compact form is off, so a deployment
-that sets neither runs the graph the table states. A variable is on only when
+Three variables add a pass to the graph or change how extraction writes. The
+assertion pass is on by default, and the capability reader and the compact
+form are off, so a deployment that sets none of them runs the graph the table
+states. A variable is on only when
 it is `1`, `true`, `yes` or `on`. Any other non-empty value is off, and an
 unset or empty variable keeps the default. A change takes effect at the next
 restart.
@@ -1161,6 +1163,7 @@ restart.
 | Variable | Status | What it does |
 | --- | --- | --- |
 | `ANALYSIS_ASSERTIONS` | supported | Runs the assertion pass on every job. On by default; `false` turns it off (see below). |
+| `ANALYSIS_CAPABILITY_READER` | supported | Runs the capability reader on every job whose selection reads capabilities. Off by default; `true` turns it on (see below). |
 | `ANALYSIS_COMPACT_EXTRACTION` | experiment (#938) | Extraction writes a compact form that code expands into the same system model. |
 
 Use the experiments only to measure them. Their results are recorded on the
@@ -1198,6 +1201,28 @@ it cannot find. See [Concepts](Concepts.md#assertion) for what the rows do.
   figures from archived reports.
 - **Turn it off.** Set `ANALYSIS_ASSERTIONS=false` and restart. Nothing stored
   changes shape.
+
+**The capability reader.** With `ANALYSIS_CAPABILITY_READER=true`, a
+`capabilities` node runs after the model passes its validity check, in a job
+whose selected framework applies its units by a rule over capabilities. It
+reads the same sources as extraction and lists each capability the text says
+the application has, with the quote that says it. Code keeps a row only where
+the quote is in the source it names, and writes it into the system model as
+`present`. The early capability questions, and the units the framework
+decides before its lanes run, then read it.
+
+- **Cost and time.** The reader adds one call on the `base` tier to such a
+  job, about 4,000 prompt and 3,000 completion tokens on the shipped
+  descriptions, and the passes after it wait for it.
+- **Node map.** The node runs on the tier that `capabilities` names in the
+  `[nodes]` table of `model_tiers.toml`. The shipped file maps it to `base`. A
+  tiers file with no `capabilities` entry fails at startup, whether the reader
+  is on or off.
+- **What it states.** Only `present`. A capability that an answer or another
+  statement names is left as it is, and a later answer replaces the reader's
+  statement.
+- **Turn it off.** Unset the variable, or set it to `false`, and restart.
+  Nothing stored changes shape.
 
 ### Provider environment
 

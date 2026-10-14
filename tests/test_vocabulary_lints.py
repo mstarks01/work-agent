@@ -71,6 +71,10 @@ PARTIAL: dict[tuple[str, str], str] = {
         "the entries that extract a model, which an entry starting after"
         " extraction does not"
     ),
+    ("analysis_service.graph", "READING_ENTRIES"): (
+        "the entries that extract a model and pass it on, which an entry that"
+        " stops at extraction or starts after it does not"
+    ),
     ("analysis_service.graph", "PREPARING_ENTRIES"): (
         "the entries that reach the routing half, which an entry stopping"
         " before it does not"

@@ -71,11 +71,12 @@ from analysis_service.compact import COMPACT_FORMAT, FULL_FORMAT, ExtractionForm
 from analysis_service.config_files import env_flag
 from analysis_service.errors import ConfigError
 from analysis_service.framework_config import load_frameworks
-from analysis_service.frameworks import validate_packages
+from analysis_service.frameworks import reads_capabilities, validate_packages
 from analysis_service.graph import (
     CATALOGUING_ENTRIES,
     ENTRY_EXTRACT,
     EXTRACTING_ENTRIES,
+    READING_ENTRIES,
     Entry,
     ModelResolver,
     Pipeline,
@@ -149,6 +150,11 @@ COMPACT_EXTRACTION_VAR = "ANALYSIS_COMPACT_EXTRACTION"
 #: empty variable keeps the default. A report built without the pass
 #: carries ``assertions: null`` and every other field it carries with it.
 ASSERTIONS_VAR = "ANALYSIS_ASSERTIONS"
+#: Run the capability reader on every job whose selection reads capabilities:
+#: the ``capabilities`` node behind the validity gate, whose checked rows state
+#: the capabilities the sources say the application has (ADR 0086). Off by
+#: default until its promotion gate passes; an affirmative value turns it on.
+CAPABILITY_READER_VAR = "ANALYSIS_CAPABILITY_READER"
 
 
 def _path(env: Mapping[str, str], var: str, default: Path) -> Path:
@@ -232,6 +238,10 @@ class Deployment:
     #: for the reason the transport is: a report with the pass and one without
     #: are compared with everything else held fixed.
     assertions: bool = True
+    #: Whether a job whose selection reads capabilities runs the capability
+    #: reader. A property of the deployment for the reason the assertion pass
+    #: is.
+    capability_reader: bool = False
     # Held only to derive each vendor's credentials when the adapters are built.
     # Out of repr and equality: a deployment in a log must not carry a key. A
     # copy taken by :meth:`from_env`, never the caller's live mapping: a
@@ -289,6 +299,7 @@ class Deployment:
                 COMPACT_FORMAT if env_flag(env, COMPACT_EXTRACTION_VAR) else FULL_FORMAT
             ),
             assertions=env_flag(env, ASSERTIONS_VAR, default=True),
+            capability_reader=env_flag(env, CAPABILITY_READER_VAR),
             env=MappingProxyType(dict(env)),
         )
 
@@ -395,6 +406,14 @@ class Deployment:
             # one carries it; the extraction and assertion eval entries run
             # their one node and stop.
             assertions=self.assertions and entry in CATALOGUING_ENTRIES,
+            # The reader sits behind the validity gate, so only an entry that
+            # extracts a model and passes it on carries it, and only for a
+            # selection a capability serves.
+            capability_reader=(
+                self.capability_reader
+                and entry in READING_ENTRIES
+                and any(reads_capabilities(name) for name in selection)
+            ),
         )
 
     @property

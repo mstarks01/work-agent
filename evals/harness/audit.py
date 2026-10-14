@@ -381,6 +381,8 @@ PHASES: Mapping[Phase, PhaseEntry] = MappingProxyType(
                 {
                     "extract",
                     "assert",
+                    "capabilities",
+                    "stated",
                     "catalog",
                     "pause",
                     "read",

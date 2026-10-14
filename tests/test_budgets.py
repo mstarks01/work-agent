@@ -52,7 +52,9 @@ class TestTheEstimate:
         rather than calls (run 11)."""
         from tests.factories import scripted_pipeline
 
-        _, models = scripted_pipeline({}, frameworks=tuple(PACKAGES), assertions=True)
+        _, models = scripted_pipeline(
+            {}, frameworks=tuple(PACKAGES), assertions=True, capability_reader=True
+        )
         assert widest_llm_calls() == len(models)
 
     def test_naming_two_frameworks_costs_both(self):

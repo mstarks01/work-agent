@@ -39,6 +39,7 @@ from types import MappingProxyType
 from typing import Literal
 
 from analysis_service.assertions import REGISTRY, Predicate, referent_type
+from analysis_service.capabilities import CAPABILITIES
 from analysis_service.claims import FrameworkName
 from analysis_service.compact import COMPACT_FORMAT, FULL_FORMAT
 from analysis_service.frameworks import LANE_CLOSING_DOC, OUTPUT_DOC
@@ -62,10 +63,12 @@ EXTRACT_PROMPT_NAME = "extract"
 EXTRACT_COMPACT_PROMPT_NAME = "extract-compact"
 REPAIR_PROMPT_NAME = "repair"
 ASSERT_PROMPT_NAME = "assert"
+CAPABILITIES_PROMPT_NAME = "capabilities"
 PROMPT_BODY_NAMES: tuple[str, ...] = (
     EXTRACT_PROMPT_NAME,
     REPAIR_PROMPT_NAME,
     ASSERT_PROMPT_NAME,
+    CAPABILITIES_PROMPT_NAME,
     ANALYZE_PROMPT_NAME,
     CRITIC_PROMPT_NAME,
     RECRITIC_PROMPT_NAME,
@@ -218,6 +221,27 @@ def compose_assert_prompt(loader: MarkdownLoader) -> str:
     """
     parts = [loader.load(ASSERT_PROMPT_NAME), render_predicates("catalog")]
     return "\n\n".join(part.strip() for part in parts) + "\n"
+
+
+def compose_capabilities_prompt(loader: MarkdownLoader) -> str:
+    """The capability reader's prompt: the body, then the capability table.
+
+    **The table is rendered from** :data:`~analysis_service.capabilities.CAPABILITIES`,
+    never written in the prompt, for the reason the predicate table is: the
+    gate keeps a row only where its key is in that table, and a copy in prose
+    would be a second reader nothing checks.
+    """
+    parts = [loader.load(CAPABILITIES_PROMPT_NAME), render_capabilities()]
+    return "\n\n".join(part.strip() for part in parts) + "\n"
+
+
+def render_capabilities() -> str:
+    """Each capability as one line: its key, its meaning, and its parent."""
+    lines = ["## Capabilities", "", "Key: meaning. A part names its parent."]
+    for key, capability in CAPABILITIES.items():
+        parent = f" (a part of `{capability.parent}`)" if capability.parent else ""
+        lines.append(f"- `{key}`: {capability.meaning}{parent}")
+    return "\n".join(lines)
 
 
 #: Which composer is rendering the predicate table. A closed set, so a stage

@@ -239,6 +239,11 @@ repair = "base"
 # The assertion pass reads the same sources extraction read and writes rows
 # rather than judgements, so it is transcription on the workhorse tier.
 assert = "base"
+# The capability reader also reads the sources and writes rows the gate checks,
+# so it is transcription on the workhorse tier too. A job runs it only where a
+# selected framework reads capabilities and ANALYSIS_CAPABILITY_READER is on,
+# but every install names its tier, as it does for the assertion pass.
+capabilities = "base"
 # Three keys per framework. Every lane of one framework runs the same judgement
 # on the same tier, so this is one knob per framework rather than one per lane —
 # an operator choosing to run one framework cheaper than another is the choice

@@ -139,6 +139,10 @@ from analysis_service.candidates import (
     catalog_leads,
     generate_candidates,
 )
+from analysis_service.capability_reader import (
+    CapabilityReading,
+    with_stated_capabilities,
+)
 from analysis_service.claims import (
     AnalysisMarks,
     Claim,
@@ -184,6 +188,7 @@ from analysis_service.frameworks import (
     block_type_for,
     option_fields,
     package_for,
+    reads_capabilities,
     run_precondition,
     schemas_for,
 )
@@ -202,6 +207,7 @@ from analysis_service.prompt_cache import remember_stable_prefix, stable_prefix
 from analysis_service.prompts import (
     compose_analyze_prompt,
     compose_assert_prompt,
+    compose_capabilities_prompt,
     compose_critic_prompt,
     compose_extract_prompt,
     compose_recritic_prompt,
@@ -261,6 +267,11 @@ logger = logging.getLogger(__name__)
 # every framework a job selects, so nothing here is per-framework.
 EXTRACT_NODE = "extract"
 ASSERT_NODE = "assert"
+#: The capability reader: the sources and the capability table in, the
+#: capabilities the text states out (ADR 0086).
+CAPABILITIES_NODE = "capabilities"
+#: Writes the reader's checked rows into the **Valid System Model**.
+STATED_NODE = "stated"
 #: The head-only entry's terminal node: resolve the catalog this head produced
 #: and stop, so the catalog is scored without paying for the lanes.
 CATALOG_NODE = "catalog"
@@ -513,6 +524,7 @@ def tier_node_by_graph_node(
         EXTRACT_NODE: "extract",
         REPAIR_NODE: "repair",
         ASSERT_NODE: "assert",
+        CAPABILITIES_NODE: "capabilities",
         **{
             node: tier
             for name in frameworks
@@ -588,6 +600,12 @@ CATALOGUING_ENTRIES: frozenset[Entry] = PREPARING_ENTRIES | {ENTRY_HEAD_ONLY}
 EXTRACTING_ENTRIES: frozenset[Entry] = frozenset(
     {ENTRY_EXTRACT, ENTRY_EXTRACT_ONLY, ENTRY_HEAD_ONLY}
 )
+
+#: The entries that extract a model and pass it on, and so the ones the
+#: capability reader can sit behind the validity gate in. The extraction eval
+#: entry stops at its one node, and an entry that seeds a model reads the
+#: capabilities that model already carries.
+READING_ENTRIES: frozenset[Entry] = EXTRACTING_ENTRIES - {ENTRY_EXTRACT_ONLY}
 """The assertion eval mode: render a **Valid System Model** seeded in state,
 run ``assert`` over it and the sources, and stop.
 
@@ -712,6 +730,9 @@ STATE_FIRST_PASS = "first_pass"
 # into a catalog. Structured, because a driver reads it back and resolves it —
 # see :func:`~analysis_service.assertions.resolve_catalog`.
 STATE_ASSERTION_PROPOSAL = "assertion_proposal"
+# What ``capabilities`` emits: a ``CapabilityReading``, before code checks its
+# rows and writes them into the valid model (ADR 0086).
+STATE_CAPABILITY_READING = "capability_reading"
 # What ``prepare`` made of that proposal: an ``AssertionRecord``, the catalog
 # every lane selected from and the rows the resolver refused. Written once by
 # ``prepare`` and read by every ``merge`` and by ``assemble``, so the catalog an
@@ -835,6 +856,7 @@ SHARED_STRUCTURED_KEYS: frozenset[str] = frozenset(
         STATE_EXTRACTED_MODEL,
         STATE_FIRST_PASS,
         STATE_ASSERTION_PROPOSAL,
+        STATE_CAPABILITY_READING,
         STATE_ASSERTION_CATALOG,
         STATE_VALID_MODEL,
         STATE_DOMAIN_PACKS,
@@ -2814,6 +2836,51 @@ def _assert_node(
     )
 
 
+def _capabilities_node(
+    prompt_loader: MarkdownLoader,
+    resolve_model: ModelResolver,
+    resolve_sampling: SamplingResolver,
+) -> LlmAgent:
+    """The capability reader: the sources in, the capabilities they state out."""
+    return _llm_node(
+        name=CAPABILITIES_NODE,
+        tier_node="capabilities",
+        instruction=compose_capabilities_prompt(prompt_loader),
+        output_schema=CapabilityReading,
+        output_key=STATE_CAPABILITY_READING,
+        resolve_model=resolve_model,
+        resolve_sampling=resolve_sampling,
+    )
+
+
+def _stated_node_func(keys: GraphKeys) -> Callable[..., Any]:
+    """Write the reader's checked rows into the **Valid System Model**.
+
+    It runs right behind the reader, ahead of every node that reads the valid
+    model, so a pause, its early questions and ``prepare`` all read the
+    capabilities the sources state. The rows are checked here and nowhere
+    else (:func:`~analysis_service.capability_reader.with_stated_capabilities`).
+    """
+
+    def stated(valid_model: dict, ctx, source_texts: dict | None = None) -> dict:
+        state = keys.state(ctx)
+        reading = state.get(STATE_CAPABILITY_READING)
+        if reading is None:
+            raise SilentNodeError(
+                f"nothing was written to {STATE_CAPABILITY_READING!r}, so the"
+                " capability reader this deployment selected never ran."
+                f" {_TRUNCATION_HINT}"
+            )
+        model = SystemModel.model_validate(valid_model)
+        updated = with_stated_capabilities(
+            model, CapabilityReading.model_validate(reading), source_texts or {}
+        )
+        state.put(STATE_VALID_MODEL, updated.model_dump(mode="json"))
+        return {"stated": len(updated.capabilities) - len(model.capabilities)}
+
+    return stated
+
+
 def _read_model_node_func(keys: GraphKeys) -> Callable[..., Any]:
     """Render the model for the assertion node, and nothing else.
 
@@ -3052,6 +3119,7 @@ def build_pipeline(
     entry: Entry = ENTRY_EXTRACT,
     extraction_format: ExtractionFormat = FULL_FORMAT,
     assertions: bool = False,
+    capability_reader: bool = False,
     name: str = "analysis_pipeline",
 ) -> Pipeline:
     """Wire the whole graph: prompts, skills, and models onto the topology.
@@ -3091,6 +3159,12 @@ def build_pipeline(
     property of the deployment (``ANALYSIS_ASSERTIONS``) for the reason the
     transport is, and it is refused on an entry that never prepares, because
     a pass nothing reads would spend a submitter's money.
+
+    ``capability_reader`` puts the ``capabilities`` node and the node that
+    writes its checked rows right behind the validity gate, ahead of the
+    assertion pass (ADR 0086). It is refused on an entry that does not extract
+    a model, and on a selection whose frameworks read no capability, for the
+    same reason.
     """
     if entry not in (
         ENTRY_EXTRACT,
@@ -3125,6 +3199,16 @@ def build_pipeline(
         )
     if not frameworks:
         raise ValueError("a graph must be built for at least one framework")
+    if capability_reader and entry not in READING_ENTRIES:
+        raise ValueError(
+            f"entry {entry!r} extracts no model to pass on, so nothing would read"
+            " a capability reader"
+        )
+    if capability_reader and not any(reads_capabilities(f) for f in frameworks):
+        raise ValueError(
+            "no selected framework applies its units by a rule over capabilities,"
+            " so nothing would read a capability reader"
+        )
 
     resolve_model = binding.resolve_model
     resolve_sampling = binding.resolve_sampling
@@ -3207,10 +3291,15 @@ def build_pipeline(
     # whichever graph this is.
     assertion_nodes: list[LlmAgent] = []
     passes: list[tuple[Any, list[Any]]] = []
+    if capability_reader:
+        reader = _capabilities_node(prompt_loader, resolve_model, resolve_sampling)
+        stated = _node(_stated_node_func(keys), STATED_NODE)
+        assertion_nodes.append(reader)
+        passes.append((reader, [reader, stated]))
     if assertions:
         read = _node(_read_model_node_func(keys), READ_MODEL_NODE)
         assert_node = _assert_node(prompt_loader, resolve_model, resolve_sampling)
-        assertion_nodes = [assert_node]
+        assertion_nodes.append(assert_node)
         passes.append((read, [read, assert_node]))
     chain = [node for _, nodes in passes for node in nodes]
     pass_edges: list[tuple[Any, ...]] = [(*chain, tail)] if chain else []

@@ -597,6 +597,19 @@ def package_for(name: FrameworkName) -> FrameworkPackage:
     return PACKAGES[name]
 
 
+def reads_capabilities(name: FrameworkName) -> bool:
+    """Whether the package's units apply by a rule over **Capabilities**.
+
+    **The one reader of that question**, read off the record's own
+    ``applicability`` hook: a package applies by capabilities exactly when its
+    record answers for its units, and a flag beside the hook could say
+    otherwise. A package that inherits the neutral hook reads no capability,
+    so a pass that states capabilities serves it nothing.
+    """
+    hook = PACKAGES[name].record.applicability.__func__  # type: ignore[attr-defined]
+    return hook is not Claim.applicability.__func__  # type: ignore[attr-defined]
+
+
 def widest_fan_out() -> int:
     """Lane agents one job fires at once when it names every carried framework.
 

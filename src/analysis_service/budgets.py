@@ -69,7 +69,7 @@ from datetime import UTC, datetime, timedelta
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from analysis_service.frameworks import PACKAGES
+from analysis_service.frameworks import PACKAGES, reads_capabilities
 from analysis_service.report import (
     FrameworkSelection,
     NodeRun,
@@ -84,6 +84,10 @@ _SHARED_LLM_CALLS = 3
 # Calls one framework adds beyond its lanes: its critic and the bounded re-ask.
 _PER_FRAMEWORK_REVIEW_CALLS = 2
 
+# The capability reader, which a job makes once where any selected framework
+# reads capabilities (ADR 0086), counted whether or not it runs.
+_READER_CALLS = 1
+
 
 def llm_calls_for(frameworks: Sequence[FrameworkSelection]) -> int:
     """How many LLM calls a selection implies, at most.
@@ -93,9 +97,14 @@ def llm_calls_for(frameworks: Sequence[FrameworkSelection]) -> int:
     prose goes stale when a package changes the fan-out. A package registered
     tomorrow moves this number with no edit here.
     """
-    return _SHARED_LLM_CALLS + sum(
-        len(PACKAGES[selection.name].lanes) + _PER_FRAMEWORK_REVIEW_CALLS
-        for selection in frameworks
+    reader = any(reads_capabilities(selection.name) for selection in frameworks)
+    return (
+        _SHARED_LLM_CALLS
+        + (_READER_CALLS if reader else 0)
+        + sum(
+            len(PACKAGES[selection.name].lanes) + _PER_FRAMEWORK_REVIEW_CALLS
+            for selection in frameworks
+        )
     )
 
 
