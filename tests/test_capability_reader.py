@@ -21,7 +21,7 @@ from analysis_service.markdown_loader import MarkdownLoader
 from analysis_service.pipeline import AdkPipelineRunner
 from analysis_service.prompts import compose_capabilities_prompt
 from analysis_service.report import FrameworkSelection
-from analysis_service.sources import DEFAULT_DESCRIPTION_LABEL, Source
+from analysis_service.sources import ANSWERS_LABEL, DEFAULT_DESCRIPTION_LABEL, Source
 from analysis_service.system_model import CapabilityStatement
 from tests.factories import (
     DESCRIPTION_TEXT,
@@ -71,6 +71,17 @@ class TestTheChecks:
 
     def test_a_key_outside_the_table_is_dropped(self):
         assert "teleport" not in _stated(_row("teleport", "Customers log in"))
+
+    def test_a_row_that_quotes_the_answers_is_dropped(self):
+        """An answer writes its own capability; a row quoting it would look
+        like one."""
+        sources = SOURCES | {ANSWERS_LABEL: "Does it use OAuth? yes"}
+        updated = with_stated_capabilities(
+            valid_model(),
+            CapabilityReading(capabilities=[_row("oauth", "yes", ANSWERS_LABEL)]),
+            sources,
+        )
+        assert "oauth" not in {s.capability for s in updated.capabilities}
 
     def test_a_label_in_another_spelling_is_the_job_s_own(self):
         label = DEFAULT_DESCRIPTION_LABEL.upper()

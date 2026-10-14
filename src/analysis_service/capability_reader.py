@@ -13,8 +13,11 @@ already costs the owner little (ADR 0084). A wrong "present" makes a
 requirement apply that does not; it cannot rule one out.
 
 **A row carries its words, or it is dropped.** Code keeps a row only where its
-key is in the table, its label names one of the job's sources, and its quote
-is in that source under the validity gate's own matcher. **A statement always
+key is in the table, its label names one of the job's submitted sources, and
+its quote is in that source under the validity gate's own matcher. The
+answers source is not one of them: an answer writes its own capability
+(:func:`~analysis_service.fact_writes.capability_statements`), and a row that
+quoted it would carry the answers' label with nothing to say a model wrote it. **A statement always
 wins**: a capability an answer, a closed field or another statement already
 names is left as it is, and a later answer replaces what this module wrote.
 
@@ -31,6 +34,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from analysis_service.capabilities import CAPABILITIES
 from analysis_service.grounding import verify_quote
 from analysis_service.references import canonical
+from analysis_service.sources import ANSWERS_LABEL
 from analysis_service.system_model import CapabilityStatement, SystemModel
 
 
@@ -69,14 +73,15 @@ def with_stated_capabilities(
     """The model with each checked row of ``reading`` written as present.
 
     **The one writer of a capability the sources state.** A row is dropped
-    where its key is not in the table, its label names no source, its quote is
-    not in that source, or a statement already names its capability.
+    where its key is not in the table, its label names no submitted source, its
+    quote is not in that source, or a statement already names its capability.
     """
     named = {statement.capability for statement in model.capabilities}
     updated = model.model_copy(deep=True)
     for row in reading.capabilities:
         label = canonical(row.source_label, list(sources))
-        known = row.capability in CAPABILITIES and label in sources
+        submitted = label in sources and label != ANSWERS_LABEL
+        known = row.capability in CAPABILITIES and submitted
         if not known or row.capability in named:
             continue
         if not verify_quote(row.quote, sources[label]):
