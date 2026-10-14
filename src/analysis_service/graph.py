@@ -182,6 +182,7 @@ from analysis_service.frameworks import (
     FrameworkSchemas,
     PreconditionResult,
     block_type_for,
+    option_fields,
     package_for,
     run_precondition,
     schemas_for,
@@ -2454,8 +2455,9 @@ def _framework_block(
     **An option a block declares as a field is stamped from the job's own
     selection.** ASVS records the level it ruled at, so a reader holding the
     block alone can tell which requirement set produced the answer. The rule is
-    one line and neutral: a field named after an option gets that option's value.
-    A package whose block declares no such field is handed nothing.
+    :func:`~analysis_service.frameworks.option_fields`: a field named after an
+    option gets that option's value. A package whose block declares no such
+    field is handed nothing.
     """
     schemas = nodes.schemas
     package = nodes.package
@@ -2508,11 +2510,7 @@ def _framework_block(
             for field, value in marks.model_dump(mode="json").items()
             if field in schemas.block.model_fields
         },
-        **{
-            field: value
-            for field, value in options.items()
-            if field in schemas.block.model_fields
-        },
+        **option_fields(schemas.block, options),
     )
 
 

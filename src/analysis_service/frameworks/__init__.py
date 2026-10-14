@@ -32,7 +32,7 @@ from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from types import MappingProxyType
-from typing import Literal, get_args
+from typing import Any, Literal, get_args
 
 from pydantic import BaseModel
 
@@ -559,6 +559,21 @@ def block_type_for(name: object) -> type[FrameworkAnalysis] | None:
         if registered == name:
             return schemas.block
     return None
+
+
+def option_fields(
+    block: type[FrameworkAnalysis], options: Mapping[str, Any]
+) -> dict[str, Any]:
+    """The job's options that ``block`` declares as fields, by name.
+
+    **The one rule that stamps an option on a block.** A field named after an
+    option gets that option's value, so ASVS records the level it ruled at. A
+    block that declares no such field gets nothing. The pipeline and the stub
+    runner both build a block through it.
+    """
+    return {
+        field: value for field, value in options.items() if field in block.model_fields
+    }
 
 
 def schemas_for(name: FrameworkName) -> FrameworkSchemas:
