@@ -49,7 +49,7 @@ answer the facts a reviewer names differently on each run
 from __future__ import annotations
 
 from collections import Counter, defaultdict
-from collections.abc import Callable, Container, Mapping, Sequence
+from collections.abc import Callable, Container, Iterable, Mapping, Sequence
 from dataclasses import dataclass, field, replace
 from functools import cached_property, partial
 from types import MappingProxyType
@@ -860,23 +860,15 @@ def question_set(
             and question.key not in done
             and passes_floor(question, would_ask)
         ]
-    settled = {
-        key_ref(key).capability for key in aside | done if not isinstance(key, str)
-    }
-    parts = _waiting(listed, settled)
     effects = capability_effects(
         prepared,
         runnable,
         [
             question
-            for question in listed
+            for question in _open(listed, aside | done)
             if question.kind == "capability"
-            and not question.gates
-            and question.key not in aside | done
-            and question.key not in parts
-            and passes_floor(question, listed)
         ],
-        settled,
+        _settled(aside | done),
     )
     active, blocked, held_back = recommended(
         listed, aside | done, answered_for, effects
@@ -975,6 +967,32 @@ def _left_out(
     if ref.attribute and not open_attribute(prepared, ref.element_id, ref.attribute):
         return "fact-settled"
     return "no-longer-needed-by-selected-units"
+
+
+def _settled(done: Iterable[SkipKey]) -> set[str]:
+    """The capabilities whose questions ``done`` holds."""
+    return {key_ref(key).capability for key in done if not isinstance(key, str)}
+
+
+def _open(
+    listed: Sequence[EarlyQuestion], done: frozenset[SkipKey]
+) -> list[EarlyQuestion]:
+    """The listed questions a list may rank: not a gate, at or above its
+    kind's floor, not done, and not waiting on a parent.
+
+    **The one reader of which question is open to rank.** :func:`recommended`
+    takes from it, and the effects that break its ties are computed over its
+    capability questions, so no open question goes without its effect.
+    """
+    waiting = _waiting(listed, _settled(done))
+    return [
+        question
+        for question in listed
+        if not question.gates
+        and passes_floor(question, listed)
+        and question.key not in done
+        and question.key not in waiting
+    ]
 
 
 def _waiting(
@@ -1131,8 +1149,7 @@ def recommended(
     gates = [
         question for question in listed if question.gates and question.key not in done
     ]
-    settled = {key_ref(key).capability for key in done if not isinstance(key, str)}
-    waiting = _waiting(listed, settled)
+    waiting = _waiting(listed, _settled(done))
     undecided: Reason = "parent-undecided"
     blocked = tuple(
         (question, undecided)
@@ -1168,6 +1185,7 @@ def recommended(
             place[question.key],
         )
 
+    open_ = _open(listed, done)
     for kind, rule in EARLY_RULES.items():
         # The places each framework's limit has counted: a group of field
         # questions takes one place, and a capability question its own.
@@ -1176,15 +1194,7 @@ def recommended(
             if (kind == "capability") == bool(key_ref(key).capability):
                 for name in served:
                     counted[name].add(limit_place(key))
-        eligible = [
-            question
-            for question in listed
-            if _early_kind(question) == kind
-            and not question.gates
-            and passes_floor(question, listed)
-            and question.key not in done
-            and question.key not in waiting
-        ]
+        eligible = [question for question in open_ if _early_kind(question) == kind]
         started = [question for question in eligible if question.key in answered_for]
         taken: list[EarlyQuestion] = []
         fresh = sorted(
