@@ -109,9 +109,10 @@ uv run python webapp/main.py
 ```
 
 Open <http://127.0.0.1:8000>, load the included example, choose the frameworks,
-and run the analysis. The app uses real models and stores its recent runs only
-in memory. It is deliberately bound to loopback and has no authentication; do
-not expose it to a network.
+and run the analysis. The app uses real models. It keeps its recent runs in
+memory, or in a durable store that you set
+([Web App](docs/Web-App.md#where-the-runs-are-kept)). It is deliberately bound
+to loopback and has no authentication; do not expose it to a network.
 
 You can also embed [`Engine`](docs/Integration-Guide.md) directly or use the
 authenticated asynchronous [`/v1` HTTP API](docs/HTTP-API.md). Both run the same

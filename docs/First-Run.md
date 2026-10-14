@@ -279,7 +279,9 @@ Open <http://127.0.0.1:8000>.
 
 The app is a local demonstration, not a production service. The implementation
 hard-codes `127.0.0.1:8000`, performs no user authentication, allows one active
-run, and keeps at most 20 recent runs in process memory. A restart loses them.
+run, and keeps at most 20 recent runs. With no store setting, it keeps them in
+process memory, and a restart loses them. To keep them across a restart, set a
+`sql` store as [the web app guide](Web-App.md#where-the-runs-are-kept) states.
 When the app must remove a run, it removes the oldest run that does not wait
 for your answers.
 

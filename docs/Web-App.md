@@ -10,9 +10,10 @@ uv run python webapp/main.py
 
 Then <http://127.0.0.1:8000>.
 
-It **embeds the service in process**: its jobs live in the service's in-memory job
-store, and the module that admits, stores and starts a job for the [`/v1` API](HTTP-API.md)
-does the same for this app. It does not call `/v1` over HTTP,
+It **embeds the service in process**: its jobs live in a service job store, and
+the module that admits, stores and starts a job for the [`/v1` API](HTTP-API.md)
+does the same for this app. With no store setting, the store is `memory`; see
+[Where the runs are kept](#where-the-runs-are-kept). It does not call `/v1` over HTTP,
 so it needs no bearer token and no OIDC provider. It runs real models against
 whatever you type, and every analysis costs whatever your vendor charges.
 
@@ -180,16 +181,53 @@ credential case, which is the common one at this point.
   [`/v1`](HTTP-API.md) is for.
 - **One run at a time.** A second submission while one is running is refused with
   a message rather than queued.
-- **Nothing is persisted.** Jobs are held in the service's in-memory job store,
-  capped at 20, the oldest finished job deleted first, and lost on restart. A
+- **At most 20 runs.** The app holds at most 20 jobs, and it deletes the
+  oldest finished job first. A
   job that waits for your answers is never deleted. When every held job waits
   for answers, a new submission is refused until you answer or continue one.
   A refused submission deletes nothing.
   A deleted job leaves the usage row the store's admission reads
   ([ADR 0066](adr/0066-a-deleted-job-leaves-a-usage-row.md)).
-- **Session history only; no permanent storage or accounts.** If you want the JSON, take it from the
+- **No accounts.** If you want the JSON, take it from the
   engine directly; [`examples/embed.py`](../examples/embed.py) is four lines from
   `report.model_dump_json()`.
+
+## Where the runs are kept
+
+The app keeps its runs in a job store. It reads the store settings of the
+[`/v1` service](HTTP-API.md#job-storage) and builds the store as the service
+does, with one difference: where `ANALYSIS_JOB_STORE` is unset, the app uses
+`memory`. So the first run needs no setting, and a restart loses every run.
+The service's table states each setting and its values. An unusable setting
+stops the startup, and the app does not fall back to `memory`.
+
+To keep your runs in SQLite and a directory, install the `sql` extra, make the
+directory, run the migration step once, then start the app:
+
+```sh
+uv sync --extra sql
+install -d -m 0700 ~/.local/share/work-agent/objects
+export ANALYSIS_JOB_STORE=sql ANALYSIS_OBJECT_STORE=filesystem \
+  ANALYSIS_DATABASE_URL=sqlite+aiosqlite:///$HOME/.local/share/work-agent/jobs.db \
+  ANALYSIS_OBJECT_ROOT=$HOME/.local/share/work-agent/objects
+uv run python -m analysis_service.migrations
+uv run python webapp/main.py
+```
+
+The app starts in the order of [the service](HTTP-API.md#the-startup), and a
+failed step stops the startup. The only difference is the `memory` default at
+the first step. The restart scan fails each run that was queued or running at
+the last stop, and the run shows a message that names the restart. Submit that
+run again.
+
+After a restart over a `sql` store, the list of analyses shows the runs from
+before the restart. Each report opens, and your drafts, saved rounds and
+corrections stay. A run that waits for your answers can be answered.
+
+The bound of 20 runs applies to each store. The app chooses the runs to delete
+before it admits a new run, and it deletes them after the admission. A chosen
+run that changes in that time stays, and the app then holds one run over the
+bound. Each delete writes one log line with the cause `workspace`.
 
 ## How the report page is rendered
 
@@ -257,12 +295,14 @@ existing answer service.
 Use **Analyses** to reopen a paused analysis or review its retained reports.
 Reopening a running analysis polls a read-only snapshot, leaving its original
 progress stream alone. Names are limited to 120 characters. Search filters
-the current server session by name.
+the held analyses by name.
 
-The job store's retention cap still applies. Restarting the server
-clears everything. The UI does not write descriptions or answers to browser
-storage. Persistent reports, accounts and authorization between users require
-separate backend work; the workspace is still bound to loopback.
+The bound of 20 runs still applies. With the `memory` store, a restart clears
+everything; with a `sql` store, the analyses stay
+([Where the runs are kept](#where-the-runs-are-kept)). The UI does not write
+descriptions or answers to browser storage. Accounts and authorization between
+users require separate backend work; the workspace is still bound to
+loopback.
 
 ## Frontend security controls
 

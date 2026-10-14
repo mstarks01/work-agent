@@ -13,7 +13,7 @@
     <a class="brand" href="/" aria-label="Work Agent home"><svg aria-hidden="true" viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="m12 3 9 5-9 5-9-5 9-5Zm-9 9 9 5 9-5M3 16l9 5 9-5"/></svg>Work Agent</a>
     <nav aria-label="Workspace"><a class="new-analysis" href="/">New analysis</a><button id="library-nav" type="button">Analyses</button></nav>
     <div class="recent"><p class="muted">Recent analyses</p><div id="recent-analyses"></div></div>
-    <div class="workspace-identity"><span class="avatar" aria-hidden="true">ME</span><span>Personal workspace<small>Only you · this server session</small></span></div>
+    <div class="workspace-identity"><span class="avatar" aria-hidden="true">ME</span><span>Personal workspace<small>Only you · this computer</small></span></div>
   </aside>
   <div class="workspace-body">
     <header class="breadcrumb">Personal workspace <span aria-hidden="true">/</span> <span id="breadcrumb-title">New analysis</span></header>
@@ -37,11 +37,11 @@
       <section id="asked" hidden aria-label="Questions">
         <div class="round-progress"><label id="round-progress-label" for="round-progress-bar">Answers filled in</label><progress id="round-progress-bar" value="0" max="1"></progress><p class="save-line"><span id="save-status" class="hint" role="status"></span> <button type="button" id="save" class="quiet" hidden>Save now</button></p><p id="changes" class="hint" aria-live="polite"></p></div>
         <div class="question-layout"><nav id="question-index" aria-label="Question groups"></nav><div class="question-body"><div id="questions"><div id="list"></div></div><details id="earlier" hidden></details><details id="skipped" hidden></details><details id="more" hidden></details><div class="answer-actions"><button type="button" id="no-rest" class="quiet" hidden>Answer “no” to every question about the application left blank</button><p id="no-rest-hint" class="hint" hidden>A “no” removes from the analysis the checks that need that part of the application. Where you are not sure, leave the question blank or choose “I don't know”.</p> <button type="button" id="skip" class="quiet" hidden>Skip the questions left blank</button></div><div id="answer-problem" class="problem" role="alert" hidden></div></div></div>
-        <div class="start-actions"><p class="hint">Skipped and unanswered questions stay open. More questions may appear as you answer. Answers are kept for this server session only.</p><button type="button" id="continue">Start the analysis</button></div>
+        <div class="start-actions"><p class="hint">Skipped and unanswered questions stay open. More questions may appear as you answer. With the default memory store, a restart clears your answers.</p><button type="button" id="continue">Start the analysis</button></div>
 
       </section>
-      <section id="reports-panel" hidden aria-label="Reports"><h2>Reports</h2><div id="report-list"></div><p class="hint">Reports are held in memory for this server session. They are not saved permanently.</p></section>
-      <section id="library-panel" hidden aria-label="Analyses"><div class="heading-row"><div><h1>Your analyses</h1><p class="muted">A home for each system and its reports.</p></div><a class="button primary" href="/">New analysis</a></div><label class="field-label" for="analysis-search">Find an analysis</label><input type="search" id="analysis-search" placeholder="Search by name"><div id="analysis-list" aria-live="polite"></div><p class="hint session-note">This server session only. Restarting clears analyses; older completed runs may be removed as space is needed.</p></section>
+      <section id="reports-panel" hidden aria-label="Reports"><h2>Reports</h2><div id="report-list"></div><p class="hint">With the default memory store, a restart clears your reports.</p></section>
+      <section id="library-panel" hidden aria-label="Analyses"><div class="heading-row"><div><h1>Your analyses</h1><p class="muted">A home for each system and its reports.</p></div><a class="button primary" href="/">New analysis</a></div><label class="field-label" for="analysis-search">Find an analysis</label><input type="search" id="analysis-search" placeholder="Search by name"><div id="analysis-list" aria-live="polite"></div><p class="hint session-note">With the default memory store, a restart clears your analyses. Older completed runs may be removed as space is needed.</p></section>
       <p id="workspace-message" class="hint" role="status"></p>
     </main>
   </div>

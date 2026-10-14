@@ -40,6 +40,7 @@ from collections.abc import (
     Mapping,
     Sequence,
 )
+from contextlib import asynccontextmanager, suppress
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 from itertools import chain
@@ -1255,8 +1256,9 @@ def build_store(env: Mapping[str, str] = os.environ) -> JobStore:
     return backend.build(env, None)
 
 
-#: Why a job is deleted: its owner asked, or its retention period passed.
-DeleteCause = Literal["owner", "retention"]
+#: Why a job is deleted: its owner asked, its retention period passed, or the
+#: web app's workspace deleted it to make room for a new job.
+DeleteCause = Literal["owner", "retention", "workspace"]
 
 
 async def audited_delete(
@@ -1325,6 +1327,54 @@ async def expire_jobs(store: JobStore, days: int) -> None:
         await audited_delete(
             store, job_id, owner_id, "retention", updated_before=before
         )
+
+
+#: How often the retention sweep runs. A job outlives its retention period by
+#: one interval at most.
+SWEEP_SECONDS = 3600
+
+
+async def _sweep(store: JobStore, days: int) -> None:
+    """Run the retention sweep now and then each :data:`SWEEP_SECONDS`, until
+    the app stops. A failed pass is logged, and the next pass runs."""
+    while True:
+        try:
+            await expire_jobs(store, days)
+        except Exception:
+            logger.exception("the retention sweep failed")
+        await asyncio.sleep(SWEEP_SECONDS)
+
+
+@asynccontextmanager
+async def store_lifespan(store: JobStore) -> AsyncIterator[None]:
+    """Check the store, then fail each job in flight, before an app takes a request.
+
+    **The one startup of a job store**: the ``/v1`` service and the web app
+    both run it as the lifespan of their app, after they built the store from
+    the backend settings. The order is: the retention setting, the store's
+    startup check (the schema revision, then the object store), the restart
+    scan (#1529), then requests. A failed check stops the startup. Where a
+    retention period is set, the retention sweep starts after the restart scan
+    and stops with the app.
+    """
+    days = retention_days()
+    await store.startup_check()
+    # The scan is correct for a single instance only. It fails every queued or
+    # running job in the store, so with a second live instance on one store it
+    # would fail the jobs that instance still runs.
+    failed = await store.fail_in_flight()
+    if failed:
+        logger.warning(
+            "restart scan failed %d job(s) in flight: %s", len(failed), failed
+        )
+    sweep = None if days is None else asyncio.create_task(_sweep(store, days))
+    try:
+        yield
+    finally:
+        if sweep is not None:
+            sweep.cancel()
+            with suppress(asyncio.CancelledError):
+                await sweep
 
 
 @dataclass(frozen=True)
