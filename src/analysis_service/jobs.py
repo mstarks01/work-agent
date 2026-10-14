@@ -1352,8 +1352,9 @@ async def expire_jobs(store: JobStore, days: int) -> None:
 #: writes its digest. In that window no row names the object yet. The window
 #: lasts seconds, and admission waits for its global lock in it. One day is
 #: far longer than that window, and longer than a clock difference between
-#: the service and the object store. A put never writes over an object, so no
-#: row can come to name an object that is older than this period.
+#: the service and the object store. A save can put a report over an older
+#: orphan report, but only while its job is not terminal, and the sweep keeps
+#: each object of a job that is not terminal.
 ORPHAN_GRACE = timedelta(days=1)
 
 
