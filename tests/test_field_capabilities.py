@@ -187,6 +187,11 @@ def test_a_plain_sibling_or_a_negation_proves_no_tls(protocol):
         {LOGIN: "HTTP without WebSocket"},
         {LOGIN: "SFTP, no SOAP"},
         {STORE: "SFTP, not HTTP"},
+        {LOGIN: "HTTPS; doesn't use WebSocket"},
+        {LOGIN: "HTTPS; doesn\u2019t use WebSocket"},
+        {LOGIN: "HTTP/1.1, never HTTP/2"},
+        {LOGIN: "HTTP/1.1 rather than HTTP/2"},
+        {LOGIN: "REST instead of gRPC"},
     ],
 )
 def test_a_negated_protocol_proves_no_row_of_its_family(protocols):
