@@ -10,7 +10,9 @@ The rules this module keeps:
 
 * **The object first, the row second.** A reader never finds a row that names
   a missing object. Where admission refuses a job, the objects written for it
-  go at once.
+  go at once. A delete changes the row first and deletes the objects second.
+  An object whose delete fails stays, and the orphan sweep
+  (:meth:`SqlJobStore.sweep_orphans`) removes it later.
 * **The owner on the row before any object.** Each read selects the row by
   job ID and owner ID, and builds each key from that row alone.
 * **A digest check on each object read.** A missing object, or one whose
@@ -102,7 +104,7 @@ from analysis_service.jobs import (
     locks_its_parent,
     parent_of,
 )
-from analysis_service.objects import ObjectName, ObjectStore, object_key
+from analysis_service.objects import ObjectName, ObjectStore, key_parts, object_key
 from analysis_service.principals import Identity, Principal
 from analysis_service.report import Report
 from analysis_service.sources import Source
@@ -234,6 +236,30 @@ usage_rows = Table(
     Column("status", String(32), nullable=False),
     Column("parent_id", String(64), index=True),
 )
+
+#: The column of a job row that holds the digest of each object. The table
+#: answers for every name of :data:`~analysis_service.objects.ObjectName`.
+DIGEST_COLUMNS: dict[ObjectName, str] = {
+    "sources.json": "sources_sha256",
+    "report.json": "report_sha256",
+}
+
+
+#: How many job IDs one query of the orphan sweep reads. SQLite and asyncpg
+#: both take this many bind values in one statement.
+_ID_BATCH = 500
+
+
+def _names(row: Row[Any], name: ObjectName) -> bool:
+    """Whether the job row ``row`` names its job's object ``name``.
+
+    **The one rule of a named object.** A row names an object where it holds
+    the object's digest. The sources digest is never null, so a row always
+    names its sources. A row names its report only after a save wrote the
+    report's digest. A usage row names no object.
+    """
+    return row._mapping[DIGEST_COLUMNS[name]] is not None
+
 
 #: The fields of a record that are objects or event rows, not job columns.
 _OUTSIDE_THE_ROW = frozenset({"sources", "report", "events"})
@@ -749,7 +775,8 @@ class SqlJobStore:
         """Check every admission bound and insert, in one write transaction.
 
         The objects go first, so the row never names a missing one, and they
-        go again at once where admission refuses the job or raises.
+        go again at once where admission refuses the job or raises. A failed
+        object delete there changes neither the refusal nor the error.
         """
         if principal is not None and principal.owner_id != record.owner_id:
             raise ValueError(f"job {record.id} names another owner than its principal")
@@ -785,8 +812,29 @@ class SqlJobStore:
         return admission
 
     async def _remove(self, keys: Sequence[str]) -> int:
-        """Delete the objects under ``keys``. How many there were."""
-        return sum([await self._objects.delete(key) for key in keys])
+        """Delete the object under each key, and return how many the store removed.
+
+        A failed delete is logged with its key, and the next key follows. The
+        object then stays for the orphan sweep. Each caller calls this after
+        its row change committed, or in place of a row change, so no error of
+        an object delete can change the outcome of the caller. The catch is
+        :class:`Exception`, because the rows raise errors with no common base
+        below it: :class:`OSError` on a filesystem, and ``ClientError`` or
+        ``BotoCoreError`` from ``boto3``. A cancellation is not an
+        :class:`Exception`, so it goes to the caller.
+        """
+        removed = 0
+        for key in keys:
+            try:
+                removed += await self._objects.delete(key)
+            except Exception as error:  # noqa: BLE001 -- the docstring states why
+                logger.warning(
+                    "the object store did not delete the object %s (%s);"
+                    " the orphan sweep removes it",
+                    key,
+                    type(error).__name__,
+                )
+        return removed
 
     async def _admit(
         self,
@@ -877,7 +925,7 @@ class SqlJobStore:
             texts = events.all()
         sources = await self._object(row, "sources.json", row.sources_sha256)
         report = None
-        if whole and row.report_sha256 is not None:
+        if whole and _names(row, "report.json"):
             report = await self._object(row, "report.json", row.report_sha256)
         return _record(row, sources, report, texts, whole=whole)
 
@@ -900,7 +948,7 @@ class SqlJobStore:
                 )
             )
             row = found.one_or_none()
-        if row is None or row.report_sha256 is None:
+        if row is None or not _names(row, "report.json"):
             return None
         return await self._object(row, "report.json", row.report_sha256)
 
@@ -980,7 +1028,7 @@ class SqlJobStore:
         values = _job_row(record)
         if record.report is not None:
             data = record.report.model_dump_json().encode()
-            if row.report_sha256 is None:
+            if not _names(row, "report.json"):
                 await self._objects.put(
                     object_key(row.owner_id, row.id, "report.json"), data
                 )
@@ -1145,12 +1193,50 @@ class SqlJobStore:
                 delete(job_events).where(job_events.c.job_id == job_id)
             )
             await connection.execute(delete(jobs).where(jobs.c.id == job_id))
-        names: list[ObjectName] = ["sources.json"]
-        if row.report_sha256 is not None:
-            names.append("report.json")
         return await self._remove(
-            [object_key(row.owner_id, row.id, name) for name in names]
+            [
+                object_key(row.owner_id, row.id, name)
+                for name in DIGEST_COLUMNS
+                if _names(row, name)
+            ]
         )
+
+    async def _named_keys(self, job_ids: Sequence[str]) -> set[str]:
+        """The key of each object that the job rows of ``job_ids`` name.
+
+        One read transaction, with :data:`_ID_BATCH` job IDs in each query.
+        """
+        columns = (jobs.c[column] for column in DIGEST_COLUMNS.values())
+        query = select(jobs.c.id, jobs.c.owner_id, *columns)
+        named = set()
+        async with self._transaction() as connection:
+            for start in range(0, len(job_ids), _ID_BATCH):
+                batch = job_ids[start : start + _ID_BATCH]
+                for row in await connection.execute(query.where(jobs.c.id.in_(batch))):
+                    named |= {
+                        object_key(row.owner_id, row.id, name)
+                        for name in DIGEST_COLUMNS
+                        if _names(row, name)
+                    }
+        return named
+
+    async def sweep_orphans(self, before: datetime) -> int:
+        """Delete each object last written before ``before`` that no job row
+        names, and return how many the store removed.
+
+        The sweep lists every key first. A key that :func:`object_key` cannot
+        give stays, because the service never writes one. Then one read
+        transaction finds the keys that the rows of the listed job IDs name.
+        A row names a key only under its own owner ID. The sweep deletes each
+        other listed key.
+        """
+        listed = []
+        async for key, modified in self._objects.list():
+            parts = key_parts(key)
+            if parts is not None and modified < before:
+                listed.append((key, parts[1]))
+        named = await self._named_keys(sorted({job_id for _, job_id in listed}))
+        return await self._remove([key for key, _ in listed if key not in named])
 
     async def expired(self, before: datetime) -> list[tuple[str, str]]:
         async with self._transaction() as connection:

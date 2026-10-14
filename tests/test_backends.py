@@ -13,11 +13,12 @@ from typing import get_args
 import pytest
 
 from analysis_service.jobs import JOB_STORES, JobStoreBackend, JobStoreName
-from analysis_service.objects import OBJECT_STORES, ObjectStoreName
+from analysis_service.objects import OBJECT_STORES, ObjectName, ObjectStoreName
 from analysis_service.sql_store import (
     DATABASE_CREDENTIALS,
     DATABASE_IAM,
     DATABASES,
+    DIGEST_COLUMNS,
     Database,
     DatabaseCredentials,
     DatabaseDriver,
@@ -34,6 +35,7 @@ TABLES = [
     (DATABASE_CREDENTIALS, DatabaseCredentials),
     (DATABASE_IAM, DatabaseIamName),
     (OBJECT_ENVS, ObjectStoreName),
+    (DIGEST_COLUMNS, ObjectName),
 ]
 
 

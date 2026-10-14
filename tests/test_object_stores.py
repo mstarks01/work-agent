@@ -12,6 +12,7 @@ from __future__ import annotations
 import asyncio
 import sys
 import threading
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import get_args
 
@@ -27,11 +28,21 @@ from analysis_service.objects import (
     object_key,
 )
 from analysis_service.s3_objects import KEY_FILES
-from tests.sql_stores import object_env, s3_env, sql_env
+from tests.sql_stores import (
+    TEST_KEYS,
+    TEST_REGION,
+    filesystem_env,
+    object_env,
+    s3_env,
+    sql_env,
+)
 from tests.test_sql_store import start
 
 KEY = object_key(
     "0b3c4f6e-1d2a-4b5c-8d7e-9f0a1b2c3d4e", f"job-{'a' * 32}", "report.json"
+)
+SOURCES = object_key(
+    "0b3c4f6e-1d2a-4b5c-8d7e-9f0a1b2c3d4e", f"job-{'b' * 32}", "sources.json"
 )
 
 
@@ -63,6 +74,48 @@ class TestEachRow:
         asyncio.run(objects.put(KEY, b"data"))
         assert asyncio.run(objects.delete(KEY)) is True
         assert asyncio.run(objects.get(KEY)) is None
+
+    def test_the_listing_holds_each_key_and_the_time_of_its_put(self, objects):
+        start = datetime.now(UTC) - timedelta(minutes=1)
+        for key in (KEY, SOURCES):
+            asyncio.run(objects.put(key, b"data"))
+        listed = asyncio.run(listing(objects))
+        end = datetime.now(UTC) + timedelta(minutes=1)
+        assert set(listed) == {KEY, SOURCES}
+        assert all(start < modified < end for modified in listed.values())
+
+    def test_the_listing_holds_no_deleted_key(self, objects):
+        assert asyncio.run(listing(objects)) == {}
+        asyncio.run(objects.put(KEY, b"data"))
+        asyncio.run(objects.delete(KEY))
+        assert asyncio.run(listing(objects)) == {}
+
+
+async def listing(objects: ObjectStore) -> dict[str, datetime]:
+    """Each key that ``objects`` lists, with the time it gives for the key."""
+    return {key: modified async for key, modified in objects.list()}
+
+
+def test_the_filesystem_listing_enters_and_holds_no_symbolic_link(tmp_path):
+    outside = tmp_path / "outside"
+    (outside / SOURCES).parent.mkdir(parents=True)
+    (outside / SOURCES).write_bytes(b"secret")
+    objects = build_object_store(filesystem_env(tmp_path))
+    root = tmp_path / "objects"
+    asyncio.run(objects.put(KEY, b"data"))
+    (root / "linked-owner").symlink_to(outside / SOURCES.split("/")[0])
+    (root / KEY).parent.joinpath("sources.json").symlink_to(outside / SOURCES)
+    assert set(asyncio.run(listing(objects))) == {KEY}
+
+
+def test_the_s3_listing_reads_every_page(env):
+    """``ListObjectsV2`` returns 1000 keys at most in one page."""
+    objects = build_object_store(env)
+    client = boto3.Session(**TEST_KEYS).client("s3", region_name=TEST_REGION)
+    keys = {f"{i:04}" for i in range(1001)}
+    for key in keys:
+        client.put_object(Bucket=env["ANALYSIS_OBJECT_BUCKET"], Key=key, Body=b"")
+    assert set(asyncio.run(listing(objects))) == keys
 
 
 @pytest.fixture
@@ -209,6 +262,7 @@ def test_each_boto3_call_runs_in_a_worker_thread(env, monkeypatch):
         await objects.put(KEY, b"data")
         await objects.get(KEY)
         await objects.delete(KEY)
+        await listing(objects)
         return threading.get_ident()
 
     loop = asyncio.run(every_call())
@@ -218,6 +272,7 @@ def test_each_boto3_call_runs_in_a_worker_thread(env, monkeypatch):
         "GetObject",
         "HeadObject",
         "DeleteObject",
+        "ListObjectsV2",
     }
     assert loop not in {thread for _, thread in calls}
 

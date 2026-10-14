@@ -114,6 +114,12 @@ tokens, the status and the parent job ID. So a deleted job still counts toward
 the rate and the token [budgets](#how-much-you-may-consume-over-time). A
 deleted follow-up still uses the one follow-up of its report.
 
+On the `sql` store, the delete changes the job row into the usage row in one
+transaction, and then deletes the objects. When the object store does not
+delete an object, the route still returns `204`. The service log gets a
+warning with the key of the object, and the
+[orphan sweep](#orphan-objects) removes the object later.
+
 Each delete writes one line to the service log. The line names the job ID, the
 owner ID, the cause and the number of stored objects that the delete removed.
 The cause is `owner` for a delete through this route and `retention` for a
@@ -1024,8 +1030,9 @@ The service starts in this order, and a failure at a step stops the startup:
 4. The `sql` store checks the object store: for `filesystem`, the root, and
    for `s3`, `HeadBucket` on the bucket.
 5. The restart scan fails each `queued` or `running` job in the store.
-6. The service takes requests. Where a retention period is set, the
-   retention sweep starts at the same time.
+6. The service takes requests. The [orphan sweep](#orphan-objects) starts at
+   the same time. Where a retention period is set, the
+   [retention sweep](#retention) also starts.
 
 The restart scan leaves a job in `awaiting-answers` and a job in a terminal
 status as they are. The ASGI server runs steps 2 to 5 as the app's lifespan
@@ -1054,6 +1061,28 @@ uses no bucket lifecycle rule (ADR 0066).
 The sweep works on the `memory` store and on the `sql` store. Each instance
 of the service runs its own sweep. Two sweeps on one shared store do not
 delete a job twice, because the second delete finds no job.
+
+### Orphan objects
+
+An orphan is an object that no job row names. A row names the sources of its
+job, and it names the report only after the service wrote the digest of the
+report. A usage row names no object. An orphan stays when the object store
+does not delete an object after a delete or after a refused submission. An
+orphan also stays when the service stops between the write of an object and
+the write of its row.
+
+The orphan sweep deletes each orphan that is older than one day. The day is
+much longer than the time between the write of an object and the write of its
+row. The sweep never deletes an object that a row names. It also never
+deletes a key that the service does not write, for example a file that an
+operator puts under the object root. The `filesystem` store enters no
+symbolic link when it lists the root.
+
+The orphan sweep runs on every start-up, also when `ANALYSIS_RETENTION_DAYS`
+is unset. It runs after the retention sweep, at the same times. Each pass
+writes one line to the service log with the number of objects that it
+removed. A failed pass writes the error to the log, and the next pass runs.
+The `memory` store holds no objects, so its sweep removes nothing.
 
 ### Adding a new backend
 
@@ -1084,6 +1113,7 @@ pair, so a new row runs every contract test. A new job store implements the
 | `events_after` | A job's status and the events past a cursor, and nothing else. |
 | `save` | The record back, for a job that already exists. |
 | `expired` | The ID and the owner ID of each job in a terminal status whose last update is before a given time. The retention sweep deletes each one through `delete`. |
+| `sweep_orphans` | Deletes each object written before a given time that no job row names, and returns the number of objects it removed. The orphan sweep calls it. |
 | `fail_in_flight` | Fails each `queued` or `running` job with the restart message and returns their IDs. It settles each job through `JobRecord.transition`, so the job keeps its full charge and gets a status event. |
 
 Each read returns a record's `schema_version` as the record stored it, and no

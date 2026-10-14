@@ -18,9 +18,10 @@ import contextlib
 import os
 import re
 import stat
-from collections.abc import Callable, Mapping
+from collections.abc import AsyncIterator, Callable, Mapping
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Literal, Protocol, get_args
+from typing import Literal, Protocol, cast, get_args
 
 from analysis_service.jobs import JOB_ID_PATTERN, JobStoreConfigError, backend_name
 
@@ -50,6 +51,24 @@ def object_key(owner_id: str, job_id: str, name: ObjectName) -> str:
     return f"{owner_id}/{job_id}/{name}"
 
 
+def key_parts(key: str) -> tuple[str, str, ObjectName] | None:
+    """The owner ID, the job ID and the object name of ``key``, or ``None``
+    where :func:`object_key` cannot give ``key``.
+
+    :func:`object_key` checks each part, so this function holds no rule of
+    its own.
+    """
+    parts = key.split("/")
+    if len(parts) != 3:
+        return None
+    owner_id, job_id, name = parts
+    try:
+        object_key(owner_id, job_id, cast(ObjectName, name))
+    except ValueError:
+        return None
+    return owner_id, job_id, cast(ObjectName, name)
+
+
 class ObjectStore(Protocol):
     """Bytes under keys that :func:`object_key` gives."""
 
@@ -68,6 +87,14 @@ class ObjectStore(Protocol):
     async def delete(self, key: str) -> bool:
         """Remove the object under ``key``. False where it holds none."""
 
+    def list(self) -> AsyncIterator[tuple[str, datetime]]:
+        """Each key in the store, with the time of its last write in UTC.
+
+        The orphan sweep is the only reader. A key can have any shape, so the
+        sweep checks each one with :func:`key_parts`.
+        """
+        ...
+
 
 class FilesystemObjectStore:
     """Objects as files under one directory that only the service user can open.
@@ -75,6 +102,7 @@ class FilesystemObjectStore:
     ``ANALYSIS_OBJECT_ROOT`` names the directory. Each directory this store
     makes is ``0700`` and each file ``0600``. A put creates its file
     exclusively, and no read or write opens a file through a symbolic link.
+    The listing enters no symbolic link.
     Only the service user can make an entry under the root, which
     :meth:`check` holds.
     """
@@ -139,6 +167,32 @@ class FilesystemObjectStore:
         with contextlib.suppress(OSError):
             await asyncio.to_thread(path.parent.rmdir)
         return True
+
+    async def list(self) -> AsyncIterator[tuple[str, datetime]]:
+        for listed in await asyncio.to_thread(_walk, self._root):
+            yield listed
+
+
+def _walk(root: Path) -> list[tuple[str, datetime]]:
+    """Each regular file under ``root``, as its key and the time of its last
+    write in UTC.
+
+    The walk enters no symbolic link and returns none, so each key names a
+    file under ``root``. A file that a delete removes during the walk is not
+    returned.
+    """
+    found = []
+    for folder, _, names in os.walk(root):
+        for name in names:
+            path = Path(folder, name)
+            try:
+                held = os.lstat(path)
+            except FileNotFoundError:
+                continue
+            if stat.S_ISREG(held.st_mode):
+                modified = datetime.fromtimestamp(held.st_mtime, UTC)
+                found.append((path.relative_to(root).as_posix(), modified))
+    return found
 
 
 def _write(root: Path, parts: list[str], data: bytes) -> None:
