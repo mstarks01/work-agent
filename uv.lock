@@ -187,6 +187,9 @@ dependencies = [
 ]
 
 [package.optional-dependencies]
+aws = [
+    { name = "boto3" },
+]
 bedrock = [
     { name = "boto3" },
 ]
@@ -220,9 +223,10 @@ web = [
 requires-dist = [
     { name = "aiosqlite", marker = "extra == 'sql'", specifier = ">=0.22.1,<0.23" },
     { name = "alembic", marker = "extra == 'sql'", specifier = ">=1.20.0,<1.21" },
+    { name = "analysis-service", extras = ["aws"], marker = "extra == 'bedrock'" },
     { name = "anyio", specifier = ">=4" },
     { name = "asyncpg", marker = "extra == 'sql'", specifier = ">=0.31.0,<0.32" },
-    { name = "boto3", marker = "extra == 'bedrock'", specifier = ">=1.43.1,<2.0" },
+    { name = "boto3", marker = "extra == 'aws'", specifier = ">=1.43.1,<2.0" },
     { name = "cryptography", specifier = ">=45" },
     { name = "fastapi", specifier = ">=0.115" },
     { name = "google-adk", specifier = "==2.5.0" },
@@ -234,7 +238,7 @@ requires-dist = [
     { name = "starlette", specifier = ">=0.40" },
     { name = "typing-extensions", marker = "extra == 'sql'", specifier = ">=4.12" },
 ]
-provides-extras = ["bedrock", "sql"]
+provides-extras = ["aws", "bedrock", "sql"]
 
 [package.metadata.requires-dev]
 browser = [
