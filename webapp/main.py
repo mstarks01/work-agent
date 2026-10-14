@@ -183,12 +183,10 @@ from analysis_service.jobs import (
     JobStatus,
     JobStore,
     PipelineRunner,
-    audited_delete,
-    build_store,
     event_frames,
     execute_job,
     parent_of,
-    store_lifespan,
+    same_major,
 )
 from analysis_service.links import (
     MAX_LINK_ANSWERS,
@@ -204,6 +202,7 @@ from analysis_service.report_changes import report_changes
 from analysis_service.report_conditions import conditions, corrected_findings
 from analysis_service.selection import SelectionError, resolve_selection
 from analysis_service.sources import ANSWERS_LABEL, SourceLimits
+from analysis_service.store_backends import audited_delete, build_store, store_lifespan
 from analysis_service.vendors import (
     CREDENTIAL_MODE_NOTES,
     VendorName,
@@ -317,22 +316,11 @@ class Workspace:
         self._tasks.add(task)
         task.add_done_callback(self._tasks.discard)
 
-    async def _owner_id(self) -> str | None:
-        """The owner ID of the operator's principal, or ``None`` before the
-        first submission creates it."""
-        principal = await self.store.principal(OPERATOR)
-        return None if principal is None else principal.owner_id
-
     async def owner_id(self, job_id: str) -> str:
-        """The operator's owner ID, or :class:`NoSuchJob` for ``job_id``.
-
-        Before the first submission the operator has no principal and owns no
-        job, so every job reads as missing.
-        """
-        owner_id = await self._owner_id()
-        if owner_id is None:
-            raise NoSuchJob(job_id)
-        return owner_id
+        """The operator's owner ID, by :meth:`JobAnswers.owner_id`. Before the
+        first submission the operator owns no job, so ``job_id`` reads as
+        missing."""
+        return await self.answers.owner_id(OPERATOR, job_id)
 
     async def owned(self, job_id: str) -> JobRecord | None:
         """The operator's job ``job_id``, as an envelope, or ``None``."""
@@ -341,10 +329,21 @@ class Workspace:
         except NoSuchJob:
             return None
 
+    async def parsable(self, job_id: str) -> JobRecord | None:
+        """The operator's job ``job_id``, as an envelope, or ``None``. Raises
+        :class:`UnreadableSchema` where this app cannot parse the record."""
+        try:
+            return await self.answers.parsable(job_id, await self.owner_id(job_id))
+        except NoSuchJob:
+            return None
+
     async def jobs(self) -> list[JobRecord]:
         """Every job of the operator, as envelopes, oldest first."""
-        owner_id = await self._owner_id()
-        return [] if owner_id is None else await self.store.owned_jobs(owner_id)
+        try:
+            owner_id = await self.owner_id("")
+        except NoSuchJob:
+            return []
+        return await self.store.owned_jobs(owner_id)
 
     async def waiting(self, record: JobRecord) -> bool:
         """True while the job waits for answers.
@@ -357,7 +356,7 @@ class Workspace:
         locker = await self.store.resumed_by(record.id, record.owner_id)
         if locker is None:
             return True
-        child = await self.store.get(locker)
+        child = await self.store.owned(locker, record.owner_id)
         return child is None or child.status != "completed"
 
     @asynccontextmanager
@@ -367,7 +366,7 @@ class Workspace:
 
         The jobs are chosen on entry and deleted on a clean exit, so a
         submission the body refuses deletes nothing. Each delete goes through
-        :func:`~analysis_service.jobs.audited_delete` with the cause
+        :func:`~analysis_service.store_backends.audited_delete` with the cause
         ``workspace`` and the time of the choice, so a chosen job that changes
         before the delete stays, and the workspace then holds one job over its
         bound. A job that answers the job ``answering``, paused or finished,
@@ -401,7 +400,13 @@ class Workspace:
     async def parent_of(self, record: JobRecord) -> str | None:
         """The job this one resumes or amends: :func:`parent_of` over the
         record with its resumption, which an envelope leaves out for its
-        weight."""
+        weight.
+
+        The resumption is read only where :func:`same_major` accepts the
+        record. A record of another major names only the job it amends.
+        """
+        if not same_major(record.schema_version):
+            return parent_of(record)
         resumption = await self.store.resumption(record.id, record.owner_id)
         return parent_of(record.model_copy(update={"resumption": resumption}))
 
@@ -886,11 +891,11 @@ def create_app(
     lets a test bound the jobs held or hand the app a store of its own.
 
     Without a ``workspace``, the app builds its store with
-    :func:`~analysis_service.jobs.build_store` from the service's backend
+    :func:`~analysis_service.store_backends.build_store` from the service's backend
     settings, and an unusable setting raises. Where ``ANALYSIS_JOB_STORE`` is
     unset, the store is ``memory``, so a first run needs no setting. At
     startup, before the app takes a request, the app runs
-    :func:`~analysis_service.jobs.store_lifespan` over the store, as the
+    :func:`~analysis_service.store_backends.store_lifespan` over the store, as the
     service does.
     """
     state = build_startup() if startup is None else startup
@@ -971,6 +976,9 @@ def create_app(
             if locked is None:
                 break
             record = locked
+        record = await workspace.parsable(record.id)
+        if record is None:
+            return no_such_run()
         payload = await workspace.snapshot(record)
         payload["completed_steps"] = [
             event.node for event in record.events if event.kind == "node"

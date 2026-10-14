@@ -23,7 +23,8 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Literal, Protocol, cast, get_args
 
-from analysis_service.jobs import JOB_ID_PATTERN, JobStoreConfigError, backend_name
+from analysis_service.jobs import JOB_ID_PATTERN
+from analysis_service.store_settings import StoreConfigError, closed_setting
 
 #: The two objects of a job. A job has one report, which the service writes
 #: once, so no name carries a revision.
@@ -86,13 +87,13 @@ def check_private(path: Path, label: str, *, directory: bool) -> None:
     try:
         held = os.lstat(path)
     except FileNotFoundError:
-        raise JobStoreConfigError(f"{label} {str(path)!r} does not exist") from None
+        raise StoreConfigError(f"{label} {str(path)!r} does not exist") from None
     if not is_kind(held.st_mode):
-        raise JobStoreConfigError(f"{label} {str(path)!r} is not {kind}")
+        raise StoreConfigError(f"{label} {str(path)!r} is not {kind}")
     if held.st_uid != os.geteuid():
-        raise JobStoreConfigError(f"another user owns {label} {str(path)!r}")
+        raise StoreConfigError(f"another user owns {label} {str(path)!r}")
     if held.st_mode & 0o077:
-        raise JobStoreConfigError(
+        raise StoreConfigError(
             f"a group or others can open {label} {str(path)!r}; set its mode to {mode}"
         )
 
@@ -101,7 +102,7 @@ class ObjectStore(Protocol):
     """Bytes under keys that :func:`object_key` gives."""
 
     async def check(self) -> None:
-        """Raise :class:`JobStoreConfigError` where the store cannot serve.
+        """Raise :class:`StoreConfigError` where the store cannot serve.
 
         The startup runs it after the schema check and before the restart scan.
         """
@@ -142,12 +143,10 @@ class FilesystemObjectStore:
     def from_env(cls, env: Mapping[str, str]) -> FilesystemObjectStore:
         value = env.get("ANALYSIS_OBJECT_ROOT", "")
         if not value:
-            raise JobStoreConfigError(
-                "set ANALYSIS_OBJECT_ROOT for the filesystem store"
-            )
+            raise StoreConfigError("set ANALYSIS_OBJECT_ROOT for the filesystem store")
         root = Path(value)
         if not root.is_absolute():
-            raise JobStoreConfigError("ANALYSIS_OBJECT_ROOT must be an absolute path")
+            raise StoreConfigError("ANALYSIS_OBJECT_ROOT must be an absolute path")
         return cls(root)
 
     async def check(self) -> None:
@@ -227,7 +226,7 @@ def _s3_store(env: Mapping[str, str]) -> ObjectStore:
     try:
         from analysis_service.s3_objects import S3ObjectStore
     except ModuleNotFoundError as missing:
-        raise JobStoreConfigError(
+        raise StoreConfigError(
             f"the s3 object store needs the aws extra ({missing.name} is not"
             " installed): install analysis-service[aws]"
         ) from None
@@ -247,6 +246,6 @@ OBJECT_STORES: dict[ObjectStoreName, Callable[[Mapping[str, str]], ObjectStore]]
 def build_object_store(env: Mapping[str, str]) -> ObjectStore:
     """Build the object store that ``ANALYSIS_OBJECT_STORE`` names; fail closed."""
     value = env.get("ANALYSIS_OBJECT_STORE", "")
-    return OBJECT_STORES[backend_name(value, "ANALYSIS_OBJECT_STORE", OBJECT_STORES)](
+    return OBJECT_STORES[closed_setting(value, "ANALYSIS_OBJECT_STORE", OBJECT_STORES)](
         env
     )

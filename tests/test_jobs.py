@@ -15,13 +15,11 @@ from analysis_service.jobs import (
     InMemoryJobStore,
     InvalidTransitionError,
     JobRecord,
-    JobStoreConfigError,
     NodeCallback,
     PipelineCompleted,
     PipelineOutcome,
     PipelineRejected,
     StubPipelineRunner,
-    build_store,
     execute_job,
 )
 from analysis_service.report import (
@@ -32,6 +30,8 @@ from analysis_service.report import (
     TokenUsage,
 )
 from analysis_service.sources import Source
+from analysis_service.store_backends import build_store
+from analysis_service.store_settings import StoreConfigError
 from analysis_service.validation import ValidationIssue
 from tests.factories import (
     admit,
@@ -183,12 +183,12 @@ class TestBuildStore:
         assert isinstance(store, InMemoryJobStore)
 
     def test_unset_backend_fails_closed(self):
-        with pytest.raises(JobStoreConfigError, match="ANALYSIS_JOB_STORE"):
+        with pytest.raises(StoreConfigError, match="ANALYSIS_JOB_STORE"):
             build_store({})
 
     def test_unknown_backend_fails_closed(self):
         with pytest.raises(
-            JobStoreConfigError, match="unknown value 'redis' for ANALYSIS_JOB_STORE"
+            StoreConfigError, match="unknown value 'redis' for ANALYSIS_JOB_STORE"
         ):
             build_store({"ANALYSIS_JOB_STORE": "redis"})
 

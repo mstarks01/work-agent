@@ -20,7 +20,6 @@ import boto3
 import pytest
 from moto.core import set_initial_no_auth_action_count
 
-from analysis_service.jobs import JobStoreConfigError, build_store
 from analysis_service.objects import (
     ObjectStore,
     ObjectStoreName,
@@ -28,6 +27,8 @@ from analysis_service.objects import (
     object_key,
 )
 from analysis_service.s3_objects import KEY_FILES
+from analysis_service.store_backends import build_store
+from analysis_service.store_settings import StoreConfigError
 from tests.sql_stores import (
     TEST_KEYS,
     TEST_REGION,
@@ -188,13 +189,13 @@ class TestTheSettings:
         ],
     )
     def test_an_unusable_setting(self, env, change, message):
-        with pytest.raises(JobStoreConfigError, match=message) as refused:
+        with pytest.raises(StoreConfigError, match=message) as refused:
             build_store(changed(env, change))
         assert "hunter2" not in str(refused.value)
 
     def test_an_empty_key_file(self, env):
         Path(env["ANALYSIS_OBJECT_ACCESS_KEY_ID_FILE"]).write_text("\n")
-        with pytest.raises(JobStoreConfigError, match="its file is empty"):
+        with pytest.raises(StoreConfigError, match="its file is empty"):
             build_store(env)
 
     @pytest.mark.parametrize("addressing", ["virtual", "path", "PATH", ""])
@@ -225,19 +226,19 @@ class TestTheStartupCheck:
 
     def test_a_missing_bucket(self, env):
         env["ANALYSIS_OBJECT_BUCKET"] = "jobs-missing"
-        with pytest.raises(JobStoreConfigError, match="'jobs-missing' does not exist"):
+        with pytest.raises(StoreConfigError, match="'jobs-missing' does not exist"):
             start(env)
 
     def test_a_wrong_credential(self, env):
         """moto checks each key against its own IAM, which holds no key."""
-        with pytest.raises(JobStoreConfigError, match="refuses access"):
+        with pytest.raises(StoreConfigError, match="refuses access"):
             set_initial_no_auth_action_count(0)(start)(env)
 
     def test_an_endpoint_the_service_cannot_reach(self, env, monkeypatch):
         # One attempt and no retries, so the test does not wait for a back-off.
         monkeypatch.setenv("AWS_MAX_ATTEMPTS", "1")
         env["ANALYSIS_OBJECT_ENDPOINT"] = "https://127.0.0.1:9"
-        with pytest.raises(JobStoreConfigError, match="EndpointConnectionError"):
+        with pytest.raises(StoreConfigError, match="EndpointConnectionError"):
             start(env)
 
 
@@ -282,7 +283,7 @@ def test_without_boto3_the_startup_names_the_aws_extra(tmp_path, monkeypatch):
     monkeypatch.setitem(sys.modules, "boto3", None)
     monkeypatch.delitem(sys.modules, "analysis_service.s3_objects", raising=False)
     env = {"ANALYSIS_OBJECT_STORE": "s3"}
-    with pytest.raises(JobStoreConfigError, match=r"install analysis-service\[aws\]"):
+    with pytest.raises(StoreConfigError, match=r"install analysis-service\[aws\]"):
         build_object_store(env)
 
 

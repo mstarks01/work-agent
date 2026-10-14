@@ -610,6 +610,18 @@ class JobAnswers:
             ),
         )
 
+    async def owner_id(self, identity: Identity, job_id: str) -> str:
+        """The owner ID of ``identity``'s principal, for a read of ``job_id``.
+
+        **The one read of a caller's owner ID.** A read creates no principal:
+        where ``identity`` holds none, it owns no job, so ``job_id`` raises
+        :class:`NoSuchJob`.
+        """
+        held = await self.store.principal(identity)
+        if held is None:
+            raise NoSuchJob(job_id)
+        return held.owner_id
+
     async def submitter(self, identity: Identity) -> Submitter:
         """The owner a submission by ``identity`` names, read once.
 

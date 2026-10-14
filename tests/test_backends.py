@@ -12,7 +12,6 @@ from typing import get_args
 
 import pytest
 
-from analysis_service.jobs import JOB_STORES, JobStoreBackend, JobStoreName
 from analysis_service.objects import OBJECT_STORES, ObjectName, ObjectStoreName
 from analysis_service.sql_store import (
     DATABASE_CREDENTIALS,
@@ -20,11 +19,12 @@ from analysis_service.sql_store import (
     DATABASES,
     DIGEST_COLUMNS,
     Database,
-    DatabaseCredentials,
+    DatabaseCredentialMode,
     DatabaseDriver,
     DatabaseIam,
     DatabaseIamName,
 )
+from analysis_service.store_backends import JOB_STORES, JobStoreBackend, JobStoreName
 from tests.sql_stores import OBJECT_ENVS, ObjectStoreEnv
 from tests.test_job_store import BACKEND_PAIRS
 
@@ -32,7 +32,7 @@ TABLES = [
     (JOB_STORES, JobStoreName),
     (OBJECT_STORES, ObjectStoreName),
     (DATABASES, DatabaseDriver),
-    (DATABASE_CREDENTIALS, DatabaseCredentials),
+    (DATABASE_CREDENTIALS, DatabaseCredentialMode),
     (DATABASE_IAM, DatabaseIamName),
     (OBJECT_ENVS, ObjectStoreName),
     (DIGEST_COLUMNS, ObjectName),

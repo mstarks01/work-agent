@@ -97,10 +97,8 @@ from analysis_service.jobs import (
     JobEvent,
     JobRecord,
     JobStatus,
-    JobStoreConfigError,
     Resumption,
     UsageRow,
-    backend_name,
     check_bounds,
     is_follow_up,
     locks_its_parent,
@@ -116,6 +114,7 @@ from analysis_service.objects import (
 from analysis_service.principals import Identity, Principal
 from analysis_service.report import Report
 from analysis_service.sources import Source
+from analysis_service.store_settings import StoreConfigError, closed_setting
 from analysis_service.vendors import (
     SECRET_FILE_SUFFIX,
     ProviderAuthError,
@@ -420,7 +419,7 @@ def _rds_token(url: URL, env: Mapping[str, str]) -> Callable[[], Awaitable[str]]
     """
     region = env.get(_REGION, "").strip()
     if not region:
-        raise JobStoreConfigError(f"set {_REGION} for an RDS IAM token")
+        raise StoreConfigError(f"set {_REGION} for an RDS IAM token")
     import boto3
 
     client = boto3.client("rds", region_name=region)
@@ -454,15 +453,15 @@ def _password_file(url: URL, env: Mapping[str, str]) -> Password:
     """
     for setting in (_IAM, _REGION):
         if env.get(setting, "").strip():
-            raise JobStoreConfigError(
+            raise StoreConfigError(
                 f"password credentials use no IAM token; unset {setting}"
             )
     try:
         password = read_secret(env, _PASSWORD_FILE)
     except ProviderAuthError as error:
-        raise JobStoreConfigError(str(error)) from None
+        raise StoreConfigError(str(error)) from None
     if not password:
-        raise JobStoreConfigError(
+        raise StoreConfigError(
             f"set {_PASSWORD_FILE} to a file that holds the database password"
         )
     return password
@@ -471,27 +470,27 @@ def _password_file(url: URL, env: Mapping[str, str]) -> Password:
 def _iam_token(url: URL, env: Mapping[str, str]) -> Password:
     """The token callable of the provider that ``ANALYSIS_DATABASE_IAM`` names."""
     if env.get(_PASSWORD_FILE, "").strip():
-        raise JobStoreConfigError(
+        raise StoreConfigError(
             f"IAM credentials use no password; unset {_PASSWORD_FILE}"
         )
-    name = backend_name(env.get(_IAM, ""), _IAM, DATABASE_IAM)
+    name = closed_setting(env.get(_IAM, ""), _IAM, DATABASE_IAM)
     iam = DATABASE_IAM[name]
     try:
         return iam.token(url, env)
     except ModuleNotFoundError as missing:
-        raise JobStoreConfigError(
+        raise StoreConfigError(
             f"the {name} IAM token needs {missing.name}, which is not installed:"
             f" install analysis-service[{iam.extra}]"
         ) from None
 
 
-DatabaseCredentials = Literal["password", "iam"]
+DatabaseCredentialMode = Literal["password", "iam"]
 
 #: How a connection gets its password, for each value of
 #: ``ANALYSIS_DATABASE_CREDENTIALS``. The table answers for every name of
-#: :data:`DatabaseCredentials`.
+#: :data:`DatabaseCredentialMode`.
 DATABASE_CREDENTIALS: dict[
-    DatabaseCredentials, Callable[[URL, Mapping[str, str]], Password]
+    DatabaseCredentialMode, Callable[[URL, Mapping[str, str]], Password]
 ] = {
     "password": _password_file,
     "iam": _iam_token,
@@ -513,7 +512,7 @@ def _verify_full(env: Mapping[str, str]) -> ssl.SSLContext:
         # A missing or unreadable file (FileNotFoundError, PermissionError,
         # IsADirectoryError) and a file that holds no PEM certificate
         # (ssl.SSLError) are each an OSError.
-        raise JobStoreConfigError(
+        raise StoreConfigError(
             f"{_CA_FILE} names a file that this service cannot read as a CA"
             f" ({type(error).__name__})"
         ) from None
@@ -532,21 +531,19 @@ def _postgres(url: URL, env: Mapping[str, str]) -> dict[str, Any]:
     can name a Unix socket.
     """
     if url.query:
-        raise JobStoreConfigError(f"{_URL} for PostgreSQL takes no query; remove it")
+        raise StoreConfigError(f"{_URL} for PostgreSQL takes no query; remove it")
     if not url.username or not url.host or url.host.startswith("/"):
-        raise JobStoreConfigError(
-            f"{_URL} for PostgreSQL needs a user and a network host"
-        )
+        raise StoreConfigError(f"{_URL} for PostgreSQL needs a user and a network host")
     if not url.database:
-        raise JobStoreConfigError(f"{_URL} for PostgreSQL names no database")
+        raise StoreConfigError(f"{_URL} for PostgreSQL names no database")
     url = url.set(port=url.port or 5432)
     bare = refused_var(_PASSWORD_FILE)
     if env.get(bare, "").strip():
-        raise JobStoreConfigError(
+        raise StoreConfigError(
             f"the database password comes only from the file that {_PASSWORD_FILE}"
             f" names; unset {bare}"
         )
-    credentials = backend_name(
+    credentials = closed_setting(
         env.get(_CREDENTIALS, ""), _CREDENTIALS, DATABASE_CREDENTIALS
     )
     return {
@@ -560,7 +557,7 @@ def _sqlite_file(url: URL) -> Path:
     """The file of a SQLite database: an absolute path, or the startup stops."""
     path = Path(url.database or "")
     if not path.is_absolute():
-        raise JobStoreConfigError(f"{_URL} must name a SQLite file by an absolute path")
+        raise StoreConfigError(f"{_URL} must name a SQLite file by an absolute path")
     return path
 
 
@@ -577,7 +574,7 @@ def _sqlite(url: URL, env: Mapping[str, str]) -> dict[str, Any]:
         if name.startswith("ANALYSIS_DATABASE_") and name != _URL and value.strip()
     )
     if stray:
-        raise JobStoreConfigError(
+        raise StoreConfigError(
             f"a SQLite database takes no {', '.join(stray)}; unset it"
         )
     check_private(_sqlite_file(url), "the database file", directory=False)
@@ -683,20 +680,20 @@ def database_url(env: Mapping[str, str]) -> URL:
     """
     value = env.get(_URL, "").strip()
     if not value:
-        raise JobStoreConfigError(f"set {_URL} for the sql job store")
+        raise StoreConfigError(f"set {_URL} for the sql job store")
     try:
         url = make_url(value)
     except ArgumentError:
-        raise JobStoreConfigError(f"{_URL} is not a database URL") from None
+        raise StoreConfigError(f"{_URL} is not a database URL") from None
     if url.password is not None or any("password" in key.lower() for key in url.query):
-        raise JobStoreConfigError(f"{_URL} holds a password; remove it from the URL")
+        raise StoreConfigError(f"{_URL} holds a password; remove it from the URL")
     _database(url)
     return url
 
 
 def _database(url: URL) -> Database:
     """The row of :data:`DATABASES` for the driver of ``url``."""
-    return DATABASES[backend_name(url.drivername, f"the driver of {_URL}", DATABASES)]
+    return DATABASES[closed_setting(url.drivername, f"the driver of {_URL}", DATABASES)]
 
 
 def create_database(env: Mapping[str, str]) -> None:
@@ -793,7 +790,7 @@ class SqlJobStore:
             current = await connection.run_sync(_revision)
         head = migrations.head()
         if current != head:
-            raise JobStoreConfigError(
+            raise StoreConfigError(
                 f"the database schema is at revision {current}, and this service"
                 f" needs {head}: run python -m analysis_service.migrations first"
             )
@@ -1159,11 +1156,12 @@ class SqlJobStore:
             )
             return saved.rowcount == 1
 
-    async def _report_is_final(
+    async def _report_state(
         self, connection: AsyncConnection, job_id: str, owner_id: str
-    ) -> bool | None:
-        """Whether the owned, completed job's report is final, or ``None``
-        where the job is not the owner's or has no report."""
+    ) -> Literal["offers-follow-up", "final"] | None:
+        """Whether the owned, completed job's report still offers its follow-up
+        or is final (ADR 0054), or ``None`` where the job is not the owner's or
+        has no report."""
         text = await connection.scalar(
             select(jobs.c.resumption)
             .where(
@@ -1175,7 +1173,8 @@ class SqlJobStore:
         )
         if text is None:
             return None
-        return is_follow_up(_ADAPTERS["resumption"].validate_json(text))
+        resumption = _ADAPTERS["resumption"].validate_json(text)
+        return "final" if is_follow_up(resumption) else "offers-follow-up"
 
     async def save_draft(
         self,
@@ -1188,7 +1187,8 @@ class SqlJobStore:
         ``UPDATE`` on the round revision (ADR 0070)."""
         value = _json("draft", draft)
         async with self._transaction(writes=True) as connection:
-            if await self._report_is_final(connection, job_id, owner_id) is not False:
+            state = await self._report_state(connection, job_id, owner_id)
+            if state != "offers-follow-up":
                 return False
             if await self._resumed_by(connection, job_id) is not None:
                 return False
@@ -1209,7 +1209,7 @@ class SqlJobStore:
         """Keep a final report's corrections."""
         value = _json("corrections", list(corrections))
         async with self._transaction(writes=True) as connection:
-            if not await self._report_is_final(connection, job_id, owner_id):
+            if await self._report_state(connection, job_id, owner_id) != "final":
                 return False
             await connection.execute(
                 update(jobs)

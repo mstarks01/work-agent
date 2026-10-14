@@ -99,12 +99,9 @@ from analysis_service.jobs import (
     JobStatus,
     JobStore,
     PipelineRunner,
-    audited_delete,
-    build_store,
     event_frames,
     execute_job,
     is_follow_up,
-    store_lifespan,
 )
 from analysis_service.links import (
     MAX_LINK_ANSWERS,
@@ -118,6 +115,7 @@ from analysis_service.report import FrameworkSelection
 from analysis_service.report_changes import report_changes
 from analysis_service.selection import SelectionError, resolve_selection
 from analysis_service.sources import Source, SourceLimits, clean_system_name
+from analysis_service.store_backends import audited_delete, build_store, store_lifespan
 from analysis_service.validation import ValidationIssue
 
 logger = logging.getLogger(__name__)
@@ -603,16 +601,11 @@ async def require_identity(
 async def require_owner(
     request: Request, identity: Annotated[Identity, Depends(require_identity)]
 ) -> str:
-    """FastAPI dependency: the owner ID of the caller's principal.
-
-    A read creates no principal. Where the identity holds none, the caller owns
-    no job, so every job route answers the 404 of a missing job.
-    """
-    store: JobStore = request.app.state.store
-    principal = await store.principal(identity)
-    if principal is None:
-        raise NoSuchJob(request.path_params.get("job_id", ""))
-    return principal.owner_id
+    """FastAPI dependency: the owner ID of the caller's principal, by
+    :meth:`JobAnswers.owner_id`. A caller with no principal owns no job, so
+    every job route answers the 404 of a missing job."""
+    job_id = request.path_params.get("job_id", "")
+    return await _answers(request).owner_id(identity, job_id)
 
 
 def _status_view(record: JobRecord) -> JobStatusView:
@@ -790,7 +783,7 @@ def create_app(
     chose.
 
     At startup, before the app takes a request, the app runs
-    :func:`~analysis_service.jobs.store_lifespan` over its store: it reads the
+    :func:`~analysis_service.store_backends.store_lifespan` over its store: it reads the
     retention setting, the store runs its startup check, and then the restart
     scan fails each job that is queued or running in the store.
     """
