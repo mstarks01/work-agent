@@ -59,6 +59,7 @@ def test_the_example_rows_write_present_with_their_basis_and_a_quote_the_gate_ac
     login = model.get(LOGIN)
     assert statements["tls-use"].source_excerpt == login.source_excerpt
     assert statements["tls-use"].basis.startswith(f"{login.name}: ")
+    assert statements["tls-use"].origin == "field"
     assert validate(written) == []
     (evidence,) = written.capability_facts()["tls-use"].evidence
     assert evidence.endswith(f"({statements['tls-use'].basis})")
@@ -221,6 +222,7 @@ def test_a_capability_a_statement_names_is_left_as_it_is():
         state="absent",
         source_excerpt="no",
         source_label="Answers",
+        origin="answer",
     )
     model.capabilities.append(answer)
     assert _written(model)["tls-use"] == answer

@@ -313,6 +313,7 @@ def with_field_capabilities(model: SystemModel) -> SystemModel:
                 state="present",
                 source_excerpt=cited.source_excerpt,
                 source_label=cited.source_label,
+                origin="field",
                 basis=f"{cited.name}: {row.basis}",
             )
         )

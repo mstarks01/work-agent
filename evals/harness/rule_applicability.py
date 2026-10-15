@@ -144,6 +144,7 @@ def load_fixtures(directory: Path = FIXTURES_DIR) -> tuple[Fixture, ...]:
                         state=row["state"],
                         source_excerpt=row["quote"],
                         source_label=_LABEL,
+                        origin="reader",
                     )
                     for row in raw.get("statements", [])
                 ),

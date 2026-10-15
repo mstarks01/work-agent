@@ -17,9 +17,10 @@ key is in the table, its label names one of the job's submitted sources, and
 its quote is in that source under the validity gate's own matcher. The
 answers source is not one of them: an answer writes its own capability
 (:func:`~analysis_service.fact_writes.capability_statements`), and a row that
-quoted it would carry the answers' label with nothing to say a model wrote it. **A statement always
-wins**: a capability an answer, a closed field or another statement already
-names is left as it is, and a later answer replaces what this module wrote.
+quoted it would state that answer a second time. Each statement this module
+writes has the origin ``reader``. **A statement always wins**: a capability
+an answer, a closed field or another statement already names is left as it
+is, and a later answer replaces what this module wrote.
 
 The node runs as a separate pass, never inside extraction: asking extraction
 for capabilities cost element identity (ADR 0051).
@@ -92,6 +93,7 @@ def with_stated_capabilities(
                 state="present",
                 source_excerpt=row.quote,
                 source_label=label,
+                origin="reader",
             )
         )
         named.add(row.capability)

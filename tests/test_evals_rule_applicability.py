@@ -72,6 +72,7 @@ def test_a_false_exclusion_is_counted():
                 state="absent",
                 source_excerpt="x",
                 source_label="Fixture source",
+                origin="reader",
             ),
         ),
         expected={"V10.4.1": "applicable", "V10.4.2": "unknown"},
