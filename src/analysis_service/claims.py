@@ -39,13 +39,18 @@ from pydantic import (
     ModelWrapValidatorHandler,
     SerializeAsAny,
     ValidationError,
+    ValidationInfo,
     model_validator,
 )
 from pydantic.json_schema import SkipJsonSchema
 
 from analysis_service.actions import ActionVerb
 from analysis_service.bands import Band
-from analysis_service.capabilities import CapabilityNeed
+from analysis_service.capabilities import (
+    Applicability,
+    CapabilityNeed,
+    StatedPresence,
+)
 from analysis_service.grounding import MovedKind, meaning_moved
 from analysis_service.question_kinds import ALL_FACET_IDS, MAX_FACETS, QUESTION_KINDS
 from analysis_service.system_model import (
@@ -1441,8 +1446,14 @@ class ProposalBatch(BaseModel):
     ``claims``, and the ones that fail fill ``invalid``, keyed enough to name
     the claim the agent meant. ``invalid`` is kept out of the JSON schema, so
     the provider is asked for exactly the strict shape and never told there is
-    a slot for a bad one. A payload that already carries ``invalid`` is a
-    batch read back from state and is validated as it stands.
+    a slot for a bad one.
+
+    **Code owns ``invalid``.** A lane's emission arrives as JSON text, and the
+    text may not carry the key: a model that wrote it would put a dropped
+    claim with its own reason on the report, and ``"invalid": []`` would
+    switch off the salvage for its batch. A payload validated from Python
+    objects is a batch read back from state, and one that carries ``invalid``
+    is validated as it stands.
 
     **``claims`` carries no length bound**, and that is deliberate rather than
     an omission. :data:`MAX_CLAIMS_PER_BATCH` still holds, enforced by
@@ -1462,7 +1473,18 @@ class ProposalBatch(BaseModel):
 
     @model_validator(mode="wrap")
     @classmethod
-    def _salvage(cls, data: Any, handler: ModelWrapValidatorHandler[Any]) -> Any:
+    def _salvage(
+        cls,
+        data: Any,
+        handler: ModelWrapValidatorHandler[Any],
+        info: ValidationInfo,
+    ) -> Any:
+        emitted = info.mode == "json"
+        if emitted and isinstance(data, dict) and "invalid" in data:
+            raise ValueError(
+                "invalid is a list the service fills; a lane's emission"
+                " carries claims and nothing else"
+            )
         if (
             not isinstance(data, dict)
             or not isinstance(data.get("claims"), list)
@@ -2219,6 +2241,13 @@ def deferral_reason(kind: str) -> str:
     return f"a lane raised it, and settling it needs {kind}"
 
 
+#: What the analysis did with one unit it filed no claim on. See
+#: :class:`ScopeEntry`.
+ScopeState = Literal[
+    "not-raised", "not-applicable", "undecidable", "needs-other-evidence"
+]
+
+
 class ScopeEntry(BaseModel):
     """One unit a framework raised no claim about.
 
@@ -2263,9 +2292,7 @@ class ScopeEntry(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     unit: str = Field(min_length=1, max_length=300)
-    state: Literal[
-        "not-raised", "not-applicable", "undecidable", "needs-other-evidence"
-    ]
+    state: ScopeState
     reason: str = Field(default="", max_length=1000)
     #: The kind of evidence that would settle this unit, when the state says
     #: none available could. A field rather than a phrase inside ``reason``
@@ -2294,7 +2321,7 @@ class DecidingFact(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     capability: str = Field(min_length=1, max_length=60)
-    state: Literal["present", "absent"]
+    state: StatedPresence
     #: The capability this state was implied by, a parent or a part, or ``""``
     #: where a statement names this capability itself.
     derived_from: str = Field(default="", max_length=60)
@@ -2321,7 +2348,7 @@ class ApplicabilityEntry(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     unit: str = Field(min_length=1, max_length=300)
-    state: Literal["applicable", "not-applicable", "unknown"]
+    state: Applicability
     unconditional: bool = False
     deciding: list[DecidingFact] = Field(default_factory=list, max_length=20)
     missing: list[str] = Field(default_factory=list, max_length=20)

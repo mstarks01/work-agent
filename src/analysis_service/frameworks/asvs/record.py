@@ -60,6 +60,7 @@ from analysis_service.claims import (
     Ruling,
     RulingBatch,
     ScopeEntry,
+    ScopeState,
     build_block_summary,
     deferral_reason,
 )
@@ -552,7 +553,7 @@ def _scope_state(
     refusal: Refusal | None,
     deferred: Mapping[str, str],
     ruled_out: Mapping[str, str] = MappingProxyType({}),
-) -> Literal["not-raised", "not-applicable", "undecidable", "needs-other-evidence"]:
+) -> ScopeState:
     """Which of the four states one unlisted requirement is in.
 
     Order matters. A refused **Precondition** answers for every requirement in

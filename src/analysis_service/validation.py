@@ -31,6 +31,7 @@ from analysis_service.analysis import CONTROL_ATTRIBUTES, control_state, leading
 from analysis_service.capabilities import CAPABILITIES
 from analysis_service.grounding import normalize, verify_normalized
 from analysis_service.references import canonical
+from analysis_service.sources import ANSWERS_LABEL
 from analysis_service.system_model import (
     CORE_ASSET_TAGS,
     ELEMENT_GROUPS,
@@ -544,7 +545,11 @@ def _citation_issues(
             )
     for statement in capabilities:
         found = _quote_issue(
-            statement.source_excerpt, statement.source_label, sources, folded
+            statement.source_excerpt,
+            statement.source_label,
+            sources,
+            folded,
+            answers=statement.origin == "answer",
         )
         if found is not None:
             code, field, message = found
@@ -563,8 +568,14 @@ def _quote_issue(
     label: str,
     sources: Mapping[str, str],
     folded: Mapping[str, str],
+    answers: bool = False,
 ) -> tuple[IssueCode, str, str] | None:
-    """What is wrong with one quote and the label it cites, or ``None``."""
+    """What is wrong with one quote and the label it cites, or ``None``.
+
+    ``answers`` says whether code wrote the quote from an answer. Only such a
+    quote may cite the answers Source: code reads that source, so an element
+    or a statement extracted from it repeats an answer as a fact of its own.
+    """
     if not label:
         return (
             "invalid-reference",
@@ -585,6 +596,16 @@ def _quote_issue(
             (
                 f"source_label {label!r} does not name one of this job's sources"
                 f" {sorted(sources)}"
+            ),
+        )
+    if snapped == ANSWERS_LABEL and not answers:
+        return (
+            "invalid-reference",
+            "source_label",
+            (
+                f"source_label {label!r} names the answers Source, which code"
+                " reads; quote one of the sources the submitter wrote"
+                f" {sorted(set(sources) - {ANSWERS_LABEL})}"
             ),
         )
     if sources[snapped] and not verify_normalized(excerpt, folded[snapped]):

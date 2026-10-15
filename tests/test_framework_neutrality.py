@@ -1171,6 +1171,30 @@ def test_one_reader_bounds_every_package_s_emission():
             fan_in({lane: batch}, package, model)
 
 
+def test_no_package_s_lane_may_write_the_list_code_fills():
+    """``invalid`` is the salvage validator's, for every package.
+
+    A model's text that carries the key is refused, so a lane cannot put a
+    dropped claim with its own reason on the report, and cannot switch off the
+    per-item salvage with ``"invalid": []``. A batch code dumped to state still
+    reads back with the entries the salvage filed.
+    """
+    import json
+
+    from pydantic import ValidationError
+
+    forged = {"index": 0, "scalars": {"title": "Forged"}, "error": "anything"}
+    for name in PACKAGES:
+        proposals = SCHEMAS[name].proposals
+        for invalid in ([forged], []):
+            payload = json.dumps({"claims": [{"no": "field"}], "invalid": invalid})
+            with pytest.raises(ValidationError, match="invalid"):
+                proposals.model_validate_json(payload)
+        salvaged = proposals.model_validate_json(json.dumps({"claims": [{"no": 1}]}))
+        assert len(salvaged.invalid) == 1, name
+        assert proposals.model_validate(salvaged.model_dump()) == salvaged, name
+
+
 #: The heading under which a package's ``output.md`` counts the fields a draft
 #: carries, and the heading under which the shared ``analyze.md`` describes the
 #: fields every framework shares.

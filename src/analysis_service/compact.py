@@ -99,10 +99,15 @@ from pydantic import BaseModel, ConfigDict, Field, ValidationError
 from analysis_service.system_model import (
     ELEMENT_GROUPS,
     UNKNOWN,
+    BoundaryKind,
     DataFlow,
     DataStore,
     Element,
+    EntityKind,
+    Exposure,
     ExternalEntity,
+    InterfaceKind,
+    Operations,
     Process,
     SystemModel,
     TrustBoundary,
@@ -259,7 +264,7 @@ class _CompactElement(BaseModel):
 class CompactExternalEntity(_CompactElement):
     """An :class:`~analysis_service.system_model.ExternalEntity` on the wire."""
 
-    kind: Literal["human", "external-system"]
+    kind: EntityKind
     trust_zone: str = _ref_field(ZONE_REF)
 
 
@@ -268,8 +273,8 @@ class CompactProcess(_CompactElement):
 
     technology: str = Field(max_length=200)
     trust_zone: str = _ref_field(ZONE_REF)
-    exposure: Literal["internet-facing", "internal", "unknown"]
-    interface_kind: Literal["web", "non-web", "unknown"]
+    exposure: Exposure
+    interface_kind: InterfaceKind
 
 
 class CompactDataStore(_CompactElement):
@@ -293,13 +298,13 @@ class CompactDataFlow(_CompactElement):
     authentication: str = Field(max_length=200)
     data_description: str = Field(max_length=1000)
     encryption_in_transit: str = Field(max_length=200)
-    operations: Literal["read", "write", "read-write", "unknown"]
+    operations: Operations
 
 
 class CompactTrustBoundary(_CompactElement):
     """A :class:`~analysis_service.system_model.TrustBoundary` on the wire."""
 
-    kind: Literal["network", "privilege", "tenant", "other"]
+    kind: BoundaryKind
 
 
 class CompactAssumption(BaseModel):

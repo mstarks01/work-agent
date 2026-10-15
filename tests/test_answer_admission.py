@@ -12,6 +12,7 @@ import asyncio
 from dataclasses import replace
 from itertools import pairwise
 from types import SimpleNamespace
+from typing import get_args
 
 import pytest
 from pydantic import ValidationError
@@ -22,7 +23,15 @@ from analysis_service.answer_state import question_set
 from analysis_service.assertions import MAX_QUOTE_CHARS, AssertionCatalog
 from analysis_service.capabilities import lineage
 from analysis_service.early_questions import early_questions
-from analysis_service.fact_answers import FactAnswer, answered_keys, fact_line, key_ref
+from analysis_service.fact_answers import (
+    _KIND_ORDER,
+    FactAnswer,
+    FactKind,
+    answered_keys,
+    fact_kind,
+    fact_line,
+    key_ref,
+)
 from analysis_service.fact_writes import check_fact_answers
 from analysis_service.links import (
     LinkAnswer,
@@ -172,6 +181,24 @@ class TestOneFactHasOneSpelling:
         )
         with pytest.raises(ValueError, match="names one fact"):
             check_fact_answers([answer], valid_model(), None)
+
+    @pytest.mark.parametrize(
+        "key",
+        [
+            ("process:api", "exposure", "", "", "", ""),
+            ("process:api", "exposure", "  ", "", "", ""),
+            ("", "", "assertion:a~b~any~c", "", "", ""),
+            ("", "", "", "who signs in?", "", ""),
+            ("process:api", "", "", "", "authentication", ""),
+            ("", "", "", "", "", "oauth"),
+        ],
+    )
+    def test_the_kind_of_a_fact_is_the_one_spelling_its_key_uses(self, key):
+        """``fact_kind`` and ``spellings`` read one rule, blank padding included."""
+        assert key_ref(key).spellings == (fact_kind(key),)
+
+    def test_every_kind_of_fact_has_a_place_in_the_order(self):
+        assert set(_KIND_ORDER) == set(get_args(FactKind))
 
 
 class TestOnlyAnAskedFactTakesAnAnswer:

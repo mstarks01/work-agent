@@ -1169,6 +1169,32 @@ class TestResolvingAProposal:
         assert held.entries == []
         assert [issue.code for issue in issues] == ["unsupported-assertion"]
 
+    def test_a_quote_label_resolves_by_the_one_label_rule(self):
+        """A re-cased label locates its quote, as an element's label does."""
+        quoting = self.row(
+            quotes=[
+                QuoteProposal(
+                    source_label=SOURCE_LABEL.lower(),
+                    quote="sign in with email and password",
+                )
+            ]
+        )
+        held, issues = self.resolve(quoting)
+        assert issues == []
+        (entry,) = held.entries
+        assert [span.source_label for span in entry.support] == [SOURCE_LABEL]
+
+    def test_a_proposal_states_or_infers_and_never_derives(self):
+        """``derived`` is a basis that code writes, so no proposal carries it.
+
+        A derived absence projected onto the graph with no Assumption beside
+        it, and outranked an inferred row of the same identity on merge.
+        """
+        with pytest.raises(ValidationError, match="basis"):
+            self.row(value=ABSENT, basis="derived", explanation="no sign-in")
+        schema = CatalogProposal.model_json_schema()["$defs"]["AssertionProposal"]
+        assert schema["properties"]["basis"]["enum"] == ["stated", "inferred"]
+
     def test_the_subject_table_is_derived_from_the_rows(self):
         """A model that listed subjects too would have two places to spell one."""
         held, _ = self.resolve(self.row())

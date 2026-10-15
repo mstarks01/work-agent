@@ -58,7 +58,7 @@ from analysis_service.assertions import (
     assertion_id,
 )
 from analysis_service.capabilities import CAPABILITIES
-from analysis_service.claims import UnknownKey, UnknownRef
+from analysis_service.claims import Spelling, UnknownKey, UnknownRef
 from analysis_service.open_facts import element_names, label_of
 from analysis_service.question_kinds import QUESTION_KINDS, Facet
 from analysis_service.sources import plain_name
@@ -114,7 +114,17 @@ MAX_DETAIL_CHARS = 300
 SkipKey = UnknownKey | Annotated[str, StringConstraints(min_length=1, max_length=200)]
 
 
-FactKind = Literal["attribute", "assertion", "question", "subject", "capability"]
+#: The five kinds of fact are the five spellings of a reference to one.
+FactKind = Spelling
+
+#: Which kind a key names where it spells more than one: the first here wins.
+_KIND_ORDER: tuple[FactKind, ...] = (
+    "capability",
+    "question",
+    "assertion",
+    "attribute",
+    "subject",
+)
 
 
 #: The fields of :class:`~analysis_service.claims.UnknownRef`, in key order.
@@ -266,15 +276,14 @@ def key_ref(key: UnknownKey) -> UnknownRef:
 
 
 def fact_kind(key: UnknownKey) -> FactKind:
-    """Which of the five kinds of fact this key names."""
-    element_id, attribute, assertion, _, question, capability = key
-    if capability:
-        return "capability"
-    if question:
-        return "question"
-    if assertion:
-        return "assertion"
-    return "attribute" if element_id or attribute else "subject"
+    """Which of the five kinds of fact this key names.
+
+    Read off :attr:`~analysis_service.claims.UnknownRef.spellings`, so a field
+    of blank padding names no kind here either. A key that spells none is a
+    subject.
+    """
+    used = key_ref(key).spellings
+    return next((kind for kind in _KIND_ORDER if kind in used), "subject")
 
 
 def fact_label(key: UnknownKey, model: SystemModel) -> str:

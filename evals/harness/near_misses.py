@@ -30,7 +30,7 @@ import csv
 import json
 from collections.abc import Mapping, Sequence
 from pathlib import Path
-from typing import Any
+from typing import Any, get_args
 
 from analysis_service.frameworks.stride.record import DraftThreat
 from evals.harness.losses import CaseLosses, Loss
@@ -38,6 +38,7 @@ from evals.harness.reference import (
     RULINGS_FILE,
     CorpusError,
     GoldenCase,
+    RulingVerdict,
     load_case,
 )
 from evals.harness.scorer import CaseScore
@@ -48,7 +49,7 @@ VERDICTS = ("same", "different", "unsure")
 
 #: The verdicts that become a signed ruling. ``unsure`` records nothing, so the
 #: row is asked again on the next ballot.
-RULED = ("same", "different")
+RULED: tuple[RulingVerdict, ...] = get_args(RulingVerdict)
 
 #: The standings a displaced draft may carry and still be asked about. A
 #: ``rejected`` draft is one a person refused; ``None`` means it matched a

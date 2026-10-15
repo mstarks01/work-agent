@@ -77,7 +77,7 @@ from collections.abc import Iterable, Iterator, Mapping, Sequence
 from dataclasses import dataclass, field, replace
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, Literal
+from typing import Any, Literal, get_args
 
 from analysis_service.critic import distinct_mechanisms
 from evals.harness.content import (
@@ -228,7 +228,7 @@ class Vote:
                 raise LedgerError(
                     f"vote {name} {getattr(self, name)!r} is not a string"
                 )
-        if self.verdict not in ("up", "down", "unsure", "needs-evidence"):
+        if self.verdict not in get_args(Verdict):
             raise LedgerError(f"{self.verdict!r} is not a verdict")
         if not self.voter.strip():
             raise LedgerError("a vote carries no voter; this ledger is never anonymous")
