@@ -5,7 +5,7 @@ Applying these in reverse to `model.json` reconstructs the bootstrap artifact.
 
 | # | Path | Bootstrap value | Blessed value | Why (source text) |
 |---|---|---|---|---|
-| 1 | `flow:entity:member>process:lending-api>borrow-renew-and-reserve.authentication` | `a token the app gets at sign-in` | `unknown`, hedge kept in `notes` | The bootstrap recorded the hedge as the value. Priya says "I think it checks a token the app gets at sign-in, but I'd have to look" and then "Honestly I could not tell you today what it accepts". That is a speaker who talks about a fact and does not state it. The confident value suppresses the spoofing must-find, which rests on the unknown. |
+| 1 | `flow:process:library-app>process:lending-api>loan-and-reservation-requests.authentication` | `a token the app gets at sign-in` | `unknown`, hedge kept in `notes` | The bootstrap recorded the hedge as the value. Priya says "I think it checks a token the app gets at sign-in, but I'd have to look" and then "Honestly I could not tell you today what it accepts". That is a speaker who talks about a fact and does not state it. The confident value suppresses the spoofing must-find, which rests on the unknown. |
 | 2 | `flow:process:self-service-kiosk>store:loans-database>write-loans` | present | removed | Invented from the inside of a question. Dan asked "Do the kiosks still write straight into the loans database, the way the old ones did?" and Priya sent the question to Dev's team. A question states no fact, so the model keeps the unanswered question in `process:self-service-kiosk.notes` and holds no flow. |
 | 3 | `store:reservations-database` | present | removed | Invented from the half-sentence Priya corrected in the same turn: "It writes to the two databases— actually, no. We merged those in the spring. It's one loans database now." The later statement stands, and the retracted one produces no element. |
 | 4 | `entity:regional-interlibrary-scheme` and `flow:process:lending-api>entity:regional-interlibrary-scheme>share-loans` | present | removed | Invented from a hypothetical: "If we ever join the regional interlibrary scheme, we'd have to stand something up for the other libraries, but nothing like that exists today." A hypothetical produces no element. |
@@ -33,6 +33,6 @@ sees an invented flow, store or entity as an element that the blessed model
 does not hold. The attribute-level corrections (1, 5, 6) are on scored
 attributes, so the extraction score sees them on any element both models
 carry. Correction 1 is also graded end-to-end by a must-find reference threat
-that rests on the unknown: the spoofing claim on the member flow. A value of
+that rests on the unknown: the spoofing claim on the app's flow to the lending API. A value of
 `internal` for exposure, taken from the note, removes the internet caller from
 the elevation-of-privilege claim on the lending API.

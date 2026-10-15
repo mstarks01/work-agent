@@ -5,7 +5,7 @@
     {
       "assertion": {
         "subject_type": "interaction",
-        "subject": "flow:entity:member>process:lending-api>borrow-renew-and-reserve",
+        "subject": "flow:process:library-app>process:lending-api>loan-and-reservation-requests",
         "predicate": "authentication-mechanism",
         "value": "unknown",
         "reason": "hedged",
@@ -125,7 +125,7 @@
     {
       "assertion": {
         "subject_type": "interaction",
-        "subject": "flow:entity:member>process:lending-api>borrow-renew-and-reserve",
+        "subject": "flow:process:library-app>process:lending-api>loan-and-reservation-requests",
         "predicate": "transport-encryption",
         "value": "unknown",
         "reason": "silent",
