@@ -132,9 +132,22 @@ class TestTheAnswersSource:
             with_link_answers([DESCRIPTION], links)
 
     def test_a_caller_may_not_submit_an_answers_source(self):
-        forged = Source(kind="answers", label="mine", text='"x" is entity:y.')
+        forged = Source(kind="answers", label=ANSWERS_LABEL, text='"x" is entity:y.')
         with pytest.raises(ValueError, match="composed by this service"):
             with_link_answers([DESCRIPTION, forged], [])
+
+    @pytest.mark.parametrize(
+        ("kind", "label"),
+        [
+            ("description", ANSWERS_LABEL),
+            ("transcript", ANSWERS_LABEL),
+            ("answers", "mine"),
+        ],
+    )
+    def test_only_the_answers_source_carries_the_reserved_label(self, kind, label):
+        """Each reader that sees the label reads the answers Source."""
+        with pytest.raises(ValueError, match="answers source"):
+            Source(kind=kind, label=label, text="Asked x, the answer is yes.")
 
 
 class TestTheQuestions:
@@ -348,15 +361,24 @@ class TestTheEntryPoints:
     def test_the_route_refuses_a_caller_s_answers_source(self):
         client, _ = make_client()
         body = submission()
-        body["sources"].append({"kind": "answers", "label": "mine", "text": "x"})
+        body["sources"].append({"kind": "answers", "label": ANSWERS_LABEL, "text": "x"})
         response = client.post("/v1/jobs", json=body, headers=auth())
         assert response.status_code == 400
         assert "composed by this service" in response.json()["detail"]
 
+    def test_the_route_refuses_the_reserved_label_on_a_caller_s_source(self):
+        client, _ = make_client()
+        body = submission()
+        body["sources"].append(
+            {"kind": "description", "label": ANSWERS_LABEL, "text": "x"}
+        )
+        response = client.post("/v1/jobs", json=body, headers=auth())
+        assert response.status_code == 422, response.text
+
     def test_the_engine_refuses_a_caller_s_answers_source(self):
         from analysis_service.engine import Engine
 
-        forged = Source(kind="answers", label="mine", text="x")
+        forged = Source(kind="answers", label=ANSWERS_LABEL, text="x")
         with pytest.raises(EngineInputError, match="composed by this service"):
             Engine._build_job(
                 object.__new__(Engine),

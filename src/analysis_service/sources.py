@@ -41,7 +41,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Literal, Self
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 # Closed and load-bearing: each kind names the register rendered around its
 # text. Adding one means editing prompts/extract.md in the same change.
@@ -55,8 +55,10 @@ SourceKind = Literal["description", "transcript", "answers"]
 DEFAULT_DESCRIPTION_LABEL = "System description"
 DEFAULT_TRANSCRIPT_LABEL = "Call transcript"
 
-#: The label of the Source the submitter's answers become. A caller's own
-#: source may not use it: the job refuses two sources that share a label.
+#: The label of the Source the submitter's answers become. The answers Source
+#: carries it and no other Source does: :class:`Source` refuses any other
+#: pairing of the label and the kind, so a reader that sees the label reads
+#: the answers Source.
 ANSWERS_LABEL = "Answers to link questions"
 
 # A label is a citation key, so it is bounded but never rewritten: trimming or
@@ -177,6 +179,21 @@ class Source(BaseModel):
         if not value.strip():
             raise ValueError("text must not be blank")
         return value
+
+    @model_validator(mode="after")
+    def _reserved_label(self) -> Self:
+        """The answers source carries :data:`ANSWERS_LABEL`, and no other does.
+
+        **The one rule of the reserved label.** A quote's ``source_label``
+        is all that a ground carries, so each reader of an answer's line
+        reads the label, and this rule makes the label mean the kind.
+        """
+        if (self.kind == "answers") != (self.label == ANSWERS_LABEL):
+            raise ValueError(
+                f"only the answers source carries the label {ANSWERS_LABEL!r},"
+                " and this service composes it"
+            )
+        return self
 
     @classmethod
     def description(cls, text: str, *, label: str = DEFAULT_DESCRIPTION_LABEL) -> Self:

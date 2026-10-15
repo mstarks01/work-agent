@@ -71,6 +71,7 @@ __all__ = [
     "link_questions",
     "merged_facts",
     "merged_links",
+    "refuse_answers_source",
     "resumed_sources",
     "with_link_answers",
 ]
@@ -182,6 +183,21 @@ def merged_links(
     return list(merged.values())
 
 
+def refuse_answers_source(sources: Sequence[Source]) -> None:
+    """Refuse a caller's ``answers`` Source, at every entry point.
+
+    The service composes it, so the text an answer's row quotes is always the
+    text code wrote for that answer. :class:`~analysis_service.sources.Source`
+    gives the answers Source alone the reserved label, so this refuses the
+    label too.
+    """
+    if any(source.kind == "answers" for source in sources):
+        raise ValueError(
+            "an answers source is composed by this service from 'links';"
+            " submit the answers there"
+        )
+
+
 def with_link_answers(
     sources: Sequence[Source],
     links: Sequence[LinkAnswer],
@@ -189,16 +205,11 @@ def with_link_answers(
 ) -> list[Source]:
     """A job's sources, with its link answers composed into one more.
 
-    A caller may not submit an ``answers`` Source of its own. The service
-    composes it, so the text an answer's row quotes is always the text code
-    wrote for that answer, and an entry point that takes no answers still
-    refuses one.
+    A caller may not submit an ``answers`` Source of its own
+    (:func:`refuse_answers_source`), and an entry point that takes no answers
+    still refuses one.
     """
-    if any(source.kind == "answers" for source in sources):
-        raise ValueError(
-            "an answers source is composed by this service from 'links';"
-            " submit the answers there"
-        )
+    refuse_answers_source(sources)
     if not links and not facts:
         return list(sources)
     _refuse_repeats(links)

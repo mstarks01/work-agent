@@ -193,6 +193,7 @@ from analysis_service.links import (
     LinkAnswer,
     NoCatalogError,
     components,
+    refuse_answers_source,
 )
 from analysis_service.model_tiers import ModelTierConfig
 from analysis_service.open_facts import open_facts_by_framework, reference_labels
@@ -1041,6 +1042,7 @@ def create_app(
         try:
             body = await request.json()
             sources = [Source.model_validate(source) for source in body["sources"]]
+            refuse_answers_source(sources)
             selection = _selection(state.frameworks, body["frameworks"])
             ask_questions = body.get("questions") is True
             answers_from = body.get("answers_from")

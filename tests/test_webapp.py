@@ -38,6 +38,7 @@ from analysis_service.budgets import BudgetPolicy
 from analysis_service.deployment import Deployment
 from analysis_service.jobs import JOB_ID_PATTERN, AdmissionOutcome, JobRecord
 from analysis_service.principals import LOCAL_ISSUER
+from analysis_service.sources import ANSWERS_LABEL
 from analysis_service.vendors import ProviderAuthError
 from tests.factories import (
     A_FACT_ANSWER,
@@ -439,6 +440,21 @@ def test_a_framework_named_twice_is_refused(client):
     """
     body = posted("A web app talks to a database.", frameworks=["asvs", "asvs"])
     assert client.post("/analyze", json=body, headers=SAME_ORIGIN).status_code == 400
+
+
+@pytest.mark.parametrize("kind", ["description", "answers"])
+def test_a_source_with_the_reserved_label_is_refused(client, kind):
+    """The service composes the answers Source, so a caller submits none."""
+    body = posted("A web app talks to a database.")
+    body["sources"].append(
+        {
+            "kind": kind,
+            "label": ANSWERS_LABEL,
+            "text": 'Asked "x", the answer is "yes".',
+        }
+    )
+    refused = client.post("/analyze", json=body, headers=SAME_ORIGIN)
+    assert refused.status_code == 400, refused.text
 
 
 def test_a_framework_this_install_does_not_carry_is_refused(tiers):
