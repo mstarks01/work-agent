@@ -9,8 +9,8 @@ coverage, a report's conditions, the critic's prompt and the answer's line.
 
 from __future__ import annotations
 
-from analysis_service.answer_round import question_set
 from analysis_service.answer_sets import AnswerSet
+from analysis_service.answer_state import question_set
 from analysis_service.claims import UnknownRef
 from analysis_service.fact_answers import (
     FactAnswer,
@@ -177,7 +177,7 @@ class TestTheDetail:
         assert "except the status endpoint" in statement.source_excerpt
 
     def test_a_changed_detail_is_new_information_for_the_follow_up(self):
-        from analysis_service.answer_round import _adds_information
+        from analysis_service.answer_state import _adds_information
 
         before = FactAnswer(key=("", "", "", "", "", "authentication"), value="yes")
         after = before.model_copy(update={"detail": "except the status endpoint"})

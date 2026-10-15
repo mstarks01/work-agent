@@ -1,7 +1,7 @@
 """The answer interface: one Answer State in, saved answers or a Resumed Job out.
 
 The ``/v1`` routes, the first-run app and the eval replay each build an
-:class:`~analysis_service.answer_round.AnswerState` from their own job record
+:class:`~analysis_service.answer_state.AnswerState` from their own job record
 and map its refusals to their own status codes. These tests drive the state
 alone, so each rule fails here with no route between the test and the rule.
 """
@@ -12,7 +12,8 @@ from dataclasses import replace
 
 import pytest
 
-from analysis_service.answer_round import (
+from analysis_service.answer_sets import NO_ANSWERS
+from analysis_service.answer_state import (
     AlreadyResumed,
     Answers,
     AnswerState,
@@ -22,7 +23,6 @@ from analysis_service.answer_round import (
     SourcesOverLimit,
     StaleRevision,
 )
-from analysis_service.answer_sets import NO_ANSWERS
 from analysis_service.sources import Source, SourceLimits
 from tests.test_pause import held
 

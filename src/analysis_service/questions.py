@@ -342,7 +342,7 @@ def fact_questions(
 ) -> tuple[FactQuestion, ...]:
     """Every open fact a report's findings rest on, in :func:`follow_up_order`.
 
-    ``earlier`` is the fact answers of the earlier rounds. A fact they answer
+    ``earlier`` is the fact answers of the earlier saves. A fact they answer
     in full (:func:`~analysis_service.fact_answers.answered_keys`) is not
     asked again. A finding that waits on a fact they answer without settling
     it (:attr:`~analysis_service.fact_answers.FactAnswer.settles`), such as

@@ -51,7 +51,7 @@ wait until an answer satisfies it. A question another framework asks is still
 asked for that framework.
 
 An answer takes the path a fact answer after the report takes: a
-:class:`~analysis_service.answer_round.QuestionSet` admits it, and the resumed
+:class:`~analysis_service.answer_state.QuestionSet` admits it, and the resumed
 job writes it (#1252).
 """
 
@@ -247,7 +247,7 @@ class EarlyQuestion:
     #: capability, how many units it could settle. The list ranks a field
     #: question by this value per choice (:attr:`decisions`), capabilities
     #: first; the recommended list takes its places with the frameworks in
-    #: turn (:func:`~analysis_service.answer_round.by_turn`). Within a turn a
+    #: turn (:func:`~analysis_service.answer_state.by_turn`). Within a turn a
     #: capability ranks by its :attr:`standing`, and what an answer settles
     #: (:mod:`analysis_service.answer_effects`) breaks a tie.
     score: float = 0.0
@@ -256,13 +256,13 @@ class EarlyQuestion:
     parent: UnknownKey | None = None
     #: The selected frameworks whose undecidable precondition this fact can
     #: decide, by name. The list asks every such question first, outside the
-    #: limits (:func:`~analysis_service.answer_round.recommended`). Empty for
+    #: limits (:func:`~analysis_service.answer_state.recommended`). Empty for
     #: every other question.
     gates: tuple[FrameworkName, ...] = ()
     #: For a capability, each framework it serves with the band of the most
     #: important unit it could settle for that framework, in name order; empty
     #: for every other question.
-    #: :func:`~analysis_service.answer_round.passes_floor` reads it, so one
+    #: :func:`~analysis_service.answer_state.passes_floor` reads it, so one
     #: framework's bands never decide another framework's floor (ADR 0071).
     framework_bands: tuple[tuple[FrameworkName, int], ...] = ()
 
@@ -278,7 +278,7 @@ class EarlyQuestion:
         **The one reader of the band-and-units order** (ADR 0055). It sorts
         ascending, the highest band and the most units first.
         :func:`capability_questions` orders the list by it, and
-        :func:`~analysis_service.answer_round.recommended` ranks by it before
+        :func:`~analysis_service.answer_state.recommended` ranks by it before
         the effects break a tie.
         """
         band = max((band for _, band in self.framework_bands), default=0)
@@ -527,7 +527,7 @@ def waiting_parts(pool: Collection[str], settled: Container[str]) -> frozenset[s
     **The one reader of when a part is listed.** A part waits while its
     nearest ancestor in ``pool`` is not in ``settled``: the questions a save
     answered, "I don't know" included, or skipped. The list leaves a waiting
-    part out (:func:`~analysis_service.answer_round.recommended`), and an
+    part out (:func:`~analysis_service.answer_state.recommended`), and an
     answer's effect reads the same rule to say what a "yes" lists
     (:mod:`analysis_service.answer_effects`). A part whose parent is "no" is
     absent, and not in the pool at all.

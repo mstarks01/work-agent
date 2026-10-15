@@ -34,7 +34,7 @@ nothing and admits no answer, so its report is final. The questions payload
 carries `answer_rounds_left`, and the report page says how many remain.
 
 Three is a judgement, not a measurement. The limit is `MAX_ANSWER_ROUNDS` in
-`analysis_service.answer_round`.
+`analysis_service.answer_state`.
 
 ## Consequences
 

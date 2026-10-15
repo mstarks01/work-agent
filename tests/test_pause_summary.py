@@ -2,7 +2,7 @@
 
 At 2fae7d3, a level 1 pause whose owner answered every capability "yes" ended
 with ``nothing-left``, no question withheld and 22 requirements still unknown;
-the page said "No question is left". A STRIDE pause skipped round by round
+the page said "No question is left". A STRIDE pause skipped save by save
 showed 40 distinct field questions under a limit of 30. These tests drive the
 same paths through the production question set.
 """
@@ -11,8 +11,8 @@ from __future__ import annotations
 
 import pytest
 
-from analysis_service.answer_round import question_set
 from analysis_service.answer_sets import AnswerSet
+from analysis_service.answer_state import question_set
 from analysis_service.fact_answers import FactAnswer
 from analysis_service.system_model import SystemModel
 from tests.factories import PROJECT_ROOT, valid_model
@@ -63,7 +63,7 @@ def _all_yes(level):
         ]
         admitted = _save(asked, held, facts)
         held, shown = admitted.answers.facts, admitted.shown
-    pytest.fail("the rounds never ended")
+    pytest.fail("the saves never ended")
 
 
 def _bands(asked):
@@ -149,7 +149,7 @@ class TestTheExposureIsCountedApartFromTheLimit:
             admitted = _save(asked, [], skips=[q.key for q in asked.early])
             shown, skipped = admitted.shown, list(admitted.skipped)
         else:
-            pytest.fail("the rounds never ended")
+            pytest.fail("the saves never ended")
         summary = asked.summary
         assert summary.introduced == len(seen) > 0
         assert summary.choices == sum(seen.values()) > summary.introduced
@@ -188,7 +188,7 @@ def test_a_pause_whose_questions_left_were_all_skipped_says_so():
         admitted = _save(asked, [], skips=[question.key for question in asked.early])
         shown, skipped = admitted.shown, list(admitted.skipped)
     else:
-        pytest.fail("the rounds never ended")
+        pytest.fail("the saves never ended")
     assert (asked.held_back, asked.below_floor) == ((), ()), "a control"
     assert asked.summary.skipped > 0
     assert asked.stop == "skipped"

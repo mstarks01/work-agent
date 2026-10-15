@@ -108,7 +108,7 @@ MAX_HELD_FACTS = 5 * MAX_FACT_ANSWERS
 #: The longest detail one answer carries: a sentence, not a description.
 MAX_DETAIL_CHARS = 300
 
-#: What a saved round skips for now: an early question's fact key, or a link
+#: What a save skips for now: an early question's fact key, or a link
 #: question's key, the :func:`~analysis_service.links.fold` of its principal.
 #: A skip of a link places nothing and never means "none of these".
 SkipKey = UnknownKey | Annotated[str, StringConstraints(min_length=1, max_length=200)]
@@ -332,8 +332,8 @@ def answered_row(catalog: AssertionCatalog, identity: str) -> Assertion | None:
 
     **The one reader of "which row does this answer settle".** That is the open
     row itself, or the stated row an earlier answer wrote in its place. The
-    second is the row a resumed job's checkpoint holds, and a later round
-    writes it again, so that its quote reads the answers Source this round
+    second is the row a resumed job's checkpoint holds, and a later run
+    writes it again, so that its quote reads the answers Source this run
     composed. A row the sources settled is neither, so no answer names it.
     """
     for entry in catalog.entries:
@@ -388,12 +388,12 @@ def merged_facts(
 
 
 def answered_keys(answers: Sequence[FactAnswer]) -> frozenset[UnknownKey]:
-    """The facts these answers answer in full, which a later round does not ask.
+    """The facts these answers answer in full, which a later list does not ask.
 
-    An answer of "I don't know" answers its fact: asking it again in every
-    round would ask a submitter who does not know until they stop. A facet
+    An answer of "I don't know" answers its fact: asking it again after every
+    save would ask a submitter who does not know until they stop. A facet
     answer answers its fact once every facet has an answer, "I don't know"
-    included, so a later round still asks the facets left out.
+    included, so a later list still asks the facets left out.
     """
     return frozenset(
         answer.key

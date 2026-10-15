@@ -22,8 +22,8 @@ figures here; ``covered`` checks that each fixture got one entry per unit.
 
 The question simulation asks a fixture's early capability questions in the
 lists a paused job serves them, answers each from the fixture's ``truth``, and
-counts how many unknown requirements each answer settled. A later round is read
-off the model with the earlier answers in, and a part whose parent its round
+counts how many unknown requirements each answer settled. A later list is read
+off the model with the earlier answers in, and a part whose parent its list
 answers "no" is not asked, as the pause page hides it. Nothing here calls a
 model, so every figure costs nothing.
 """
@@ -37,7 +37,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, get_args
 
-from analysis_service.answer_round import recommended
+from analysis_service.answer_state import recommended
 from analysis_service.capabilities import CAPABILITIES, Applicability
 from analysis_service.claims import FrameworkName, UnknownKey, UnknownRef
 from analysis_service.early_questions import capability_questions
@@ -307,7 +307,7 @@ class QuestionRun:
 def simulate_questions(fixture: Fixture) -> QuestionRun:
     """Answer the paused job's capability questions from the fixture's truth.
 
-    Save after save, as :func:`~analysis_service.answer_round.recommended`
+    Save after save, as :func:`~analysis_service.answer_state.recommended`
     serves the list: each list is read off the model with every earlier
     answer in, so an answer drops a question it settled from every later
     list. A part whose parent the list asks waits until the parent is "yes",

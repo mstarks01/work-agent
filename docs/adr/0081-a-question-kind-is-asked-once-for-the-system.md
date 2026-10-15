@@ -32,7 +32,7 @@ exists. A row the owner edits under "Answer each one separately", or unticks,
 is an exception the shared answer leaves alone. A capability question stays
 its own question.
 
-**The limit counts places** (`answer_round.limit_place`): a group of field
+**The limit counts places** (`answer_state.limit_place`): a group of field
 questions takes one place, and a capability question one. A STRIDE list holds
 fewer than 30 groups, so the floor and not the limit decides which field
 questions a pause asks. The page's progress counts a shared group's parts

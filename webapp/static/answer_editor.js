@@ -3,7 +3,7 @@
 // page keeps its own layout and its own rule for what it sends; the inputs and
 // the answer each one reads are built here, once.
 //
-// The answer limits the service admits (answer_round.ANSWER_LIMITS), handed to
+// The answer limits the service admits (answer_state.ANSWER_LIMITS), handed to
 // every page that takes answers.
 const ANSWER_LIMITS = JSON.parse(document.getElementById("answer_limits").textContent);
 // The answer that says the submitter does not know. The service writes

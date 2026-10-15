@@ -50,8 +50,8 @@ from itertools import groupby
 from pathlib import Path
 from typing import Any
 
-from analysis_service.answer_round import passes_floor, question_set
 from analysis_service.answer_sets import AnswerSet
+from analysis_service.answer_state import passes_floor, question_set
 from analysis_service.claims import FrameworkName, UnknownKey
 from analysis_service.early_questions import EarlyQuestion, early_questions
 from analysis_service.fact_answers import FactAnswer, key_ref
@@ -162,7 +162,7 @@ def _lists(model: SystemModel, frameworks: Selection) -> list[list[EarlyQuestion
 
 def _shipped_list(model: SystemModel, frameworks: Selection) -> list[EarlyQuestion]:
     """The shipped order: the list after each save, in the order the page
-    shows it (:func:`~analysis_service.answer_round.recommended`)."""
+    shows it (:func:`~analysis_service.answer_state.recommended`)."""
     return [question for shown in _lists(model, frameworks) for question in shown]
 
 

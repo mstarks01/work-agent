@@ -71,7 +71,7 @@ def a_report_that_asks(store) -> tuple[str, str]:
 
 
 def skip_the_first_early_question(client, job: str) -> dict:
-    """A waiting job's round that skips the first early question it asks."""
+    """A waiting job's save that skips the first early question it asks."""
     asked = client.get(f"/v1/jobs/{job}/questions", headers=auth()).json()
     key = asked["early_questions"][0]["key"]
     return {"save": True, "skip": [key], "presented": [key], "revision": 0}
@@ -110,7 +110,7 @@ PARSING_ROUTES = [
         "answers",
         skip_the_first_early_question,
         200,
-        id="answers-save-a-round",
+        id="answers-save-a-skip",
     ),
     pytest.param(a_report_that_asks, "POST", "answers", DRAFT, 200, id="drafts"),
     pytest.param(

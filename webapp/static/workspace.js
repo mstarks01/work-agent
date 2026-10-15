@@ -143,9 +143,9 @@ const workspace = (() => {
   };
   const progress = (data, filled, total) => {
     const done = data.early_stop != null;
-    el("round-progress-bar").max = total || 1;
-    el("round-progress-bar").value = total ? filled : done ? 1 : 0;
-    el("round-progress-label").textContent = done ? "No more recommended questions" : `${filled} of ${total} answers filled in`;
+    el("answer-progress-bar").max = total || 1;
+    el("answer-progress-bar").value = total ? filled : done ? 1 : 0;
+    el("answer-progress-label").textContent = done ? "No more recommended questions" : `${filled} of ${total} answers filled in`;
   };
   const grouped = () => {
     show("asked");

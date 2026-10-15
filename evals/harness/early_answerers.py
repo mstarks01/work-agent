@@ -31,8 +31,8 @@ and reads which questions the change reopens, which it makes unnecessary, and
 how the list moves.
 
 **The order without the effects is the shipped code with one reader stubbed.**
-``answer_round.capability_effects`` answers with no effect, so
-:func:`~analysis_service.answer_round.recommended` breaks a tie by the
+``answer_state.capability_effects`` answers with no effect, so
+:func:`~analysis_service.answer_state.recommended` breaks a tie by the
 question's place in the early list. Everything else, the limits, the floors, the turns and the
 parts that wait on a parent, is the shipped code.
 """
@@ -51,9 +51,9 @@ from pathlib import Path
 from typing import Any
 from unittest import mock
 
-from analysis_service import answer_round
-from analysis_service.answer_round import Answers, AnswerState, SavedAnswers
+from analysis_service import answer_state
 from analysis_service.answer_sets import AnswerSet
+from analysis_service.answer_state import Answers, AnswerState, SavedAnswers
 from analysis_service.capabilities import lineage
 from analysis_service.claims import FrameworkName, UnknownKey
 from analysis_service.early_questions import EarlyQuestion
@@ -138,7 +138,7 @@ def policy(effects: bool) -> Iterator[None]:
     if effects:
         yield
         return
-    with mock.patch.object(answer_round, "capability_effects", lambda *a, **k: {}):
+    with mock.patch.object(answer_state, "capability_effects", lambda *a, **k: {}):
         yield
 
 

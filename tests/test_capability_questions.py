@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import pytest
 
-from analysis_service.answer_round import question_set
 from analysis_service.answer_sets import NO_ANSWERS, AnswerSet
+from analysis_service.answer_state import question_set
 from analysis_service.capabilities import CAPABILITIES
 from analysis_service.claims import UnknownRef
 from analysis_service.early_questions import capability_questions
@@ -133,18 +133,18 @@ class TestTheAnswerCheck:
         with pytest.raises(ValueError, match="the sources state"):
             check_fact_answers([_answer("oauth", "yes")], model, None)
 
-    def test_an_earlier_round_may_answer_it_again(self):
+    def test_an_earlier_save_may_answer_it_again(self):
         earlier = [_answer("oauth", "no")]
         model = answered_model(valid_model(), earlier)
         check_fact_answers([_answer("oauth", "yes")], model, None, earlier)
 
-    def test_a_yes_under_a_no_in_one_round_is_refused(self):
+    def test_a_yes_under_a_no_in_one_save_is_refused(self):
         answers = [_answer("oauth", "no"), _answer("oauth-client", "yes")]
         with pytest.raises(ValueError, match="is part of 'oauth'"):
             check_fact_answers(answers, valid_model(), None)
 
     def test_a_no_over_an_earlier_yes_below_it_is_refused(self):
-        """Two rounds left OAuth absent and its client present (#1289, F1)."""
+        """Two saves left OAuth absent and its client present (#1289, F1)."""
         earlier = [_answer("oauth", "yes"), _answer("oauth-client", "yes")]
         asked = question_set(
             answered_model(valid_model(), earlier),

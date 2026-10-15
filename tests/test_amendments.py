@@ -13,7 +13,8 @@ import asyncio
 
 import pytest
 
-from analysis_service.answer_round import (
+from analysis_service.answer_sets import AnswerSet
+from analysis_service.answer_state import (
     AMENDMENT_LABEL,
     AlreadyResumed,
     Answers,
@@ -22,7 +23,6 @@ from analysis_service.answer_round import (
     ResumedJob,
     StaleRevision,
 )
-from analysis_service.answer_sets import AnswerSet
 from analysis_service.claims import UnknownRef
 from analysis_service.fact_answers import FactAnswer
 from analysis_service.jobs import Checkpoint, JobRecord
@@ -192,7 +192,7 @@ class TestTheCarriedAnswers:
         state = _state(carried=[FactAnswer(key=key, value="none")], model=model)
         assert [a.key for a in state.carried.dropped.facts] == [key]
 
-    def test_an_answer_the_new_rounds_gave_replaces_the_carried_one(self):
+    def test_an_answer_the_new_saves_gave_replaces_the_carried_one(self):
         key = _open_key(_state())
         carried = FactAnswer(key=key, value="none")
         later = FactAnswer(key=key, value="unknown")

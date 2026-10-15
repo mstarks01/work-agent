@@ -20,8 +20,8 @@ from analysis_service.answer_forms import (
     answer_form,
     answer_suggestions,
 )
-from analysis_service.answer_round import question_set
 from analysis_service.answer_sets import NO_ANSWERS, AnswerSet
+from analysis_service.answer_state import question_set
 from analysis_service.assertions import (
     UNKNOWN,
     Assertion,
@@ -346,7 +346,7 @@ def test_an_attribute_answer_is_written_onto_the_model_and_noted():
     assert "TLS 1.3" in flow.notes
 
 
-def test_an_attribute_answer_is_noted_once_however_many_rounds_carry_it():
+def test_an_attribute_answer_is_noted_once_however_many_runs_carry_it():
     answer = FactAnswer(
         key=(flow_id(), "encryption_in_transit", "", "", "", ""), value="TLS 1.3"
     )
@@ -527,11 +527,11 @@ def resume(checkpoint, facts=(), earlier=(), given=(DESCRIPTION,)):
     return outcome.report
 
 
-class TestASecondRound:
+class TestASecondRun:
     """A report of a resumed job, answered again.
 
-    Its checkpoint holds the first round's answered rows, and their quotes read
-    the answers Source that round composed. The second round writes that
+    Its checkpoint holds the first run's answered rows, and their quotes read
+    the answers Source that run composed. The second run writes that
     Source again from the merged answers.
     """
 
@@ -540,7 +540,7 @@ class TestASecondRound:
     )
     LATER = FactAnswer(key=("", "", "", "who rotates the keys?", "", ""), value="ops")
 
-    def first_round(self):
+    def first_run(self):
         return resume(
             Checkpoint(
                 system_model=valid_model(),
@@ -549,35 +549,35 @@ class TestASecondRound:
             [self.FIRST],
         )
 
-    def second_round(self, facts=()):
-        report = self.first_round()
+    def second_run(self, facts=()):
+        report = self.first_run()
         checkpoint = Checkpoint(
             system_model=report.system_model, assertions=report.assertions
         )
         return resume(checkpoint, facts, earlier=[self.FIRST])
 
     def test_a_later_answer_keeps_the_earlier_answer_s_row(self):
-        record = self.second_round([self.LATER]).assertions
+        record = self.second_run([self.LATER]).assertions
 
         (row,) = record.catalog.entries
         assert (row.value, row.basis) == ("required", "stated")
         assert record.quarantined == []
         assert record.issues == []
 
-    def test_the_earlier_row_quotes_this_round_s_answers_source(self):
-        report = self.second_round([self.LATER])
+    def test_the_earlier_row_quotes_this_run_s_answers_source(self):
+        report = self.second_run([self.LATER])
         (source,) = [s for s in report.input.sources if s.label == ANSWERS_LABEL]
         (row,) = report.assertions.catalog.entries
 
         assert row.support[0].digest == source.sha256
 
     def test_no_new_answer_reports_no_unmatched_answer(self):
-        record = self.second_round().assertions
+        record = self.second_run().assertions
 
         assert [issue.code for issue in record.issues] == []
 
     def test_a_later_answer_to_the_same_row_replaces_the_earlier_one(self):
-        record = self.second_round(
+        record = self.second_run(
             [self.FIRST.model_copy(update={"value": "absent"})]
         ).assertions
 
@@ -597,7 +597,7 @@ def test_a_resumed_job_keeps_the_rows_its_parent_s_gate_removed():
     assert record.refused_rows() == parent.refused_rows() == 1
 
 
-def test_a_corrected_link_answer_leaves_no_issue_from_the_earlier_round():
+def test_a_corrected_link_answer_leaves_no_issue_from_the_earlier_run():
     wrong = LinkAnswer(principal="customer accounts", element="process:ghost")
     right = LinkAnswer(principal="customer accounts", element="entity:customer")
     first = resume_links(
@@ -700,7 +700,7 @@ class TestAnAttributeAnswerOverACatalogRow:
         assert [i.code for i in report.assertions.issues] == ["superseded-by-answer"]
         assert report.assertions.refused_rows() == 0
 
-    def test_a_later_round_keeps_the_answer_and_the_issue(self):
+    def test_a_later_run_keeps_the_answer_and_the_issue(self):
         first = resume(self.checkpoint(), [self.TLS], given=[DESCRIPTION, PROOF])
         second = resume(
             Checkpoint(system_model=first.system_model, assertions=first.assertions),
@@ -827,16 +827,16 @@ class TestTheAdmissionCheck:
 
 def test_the_same_answers_twice_give_the_same_catalog():
     """A repeated submission changes nothing (#1289, Q2)."""
-    rounds = TestASecondRound()
-    first = rounds.first_round().assertions
-    again = rounds.second_round([rounds.FIRST]).assertions
+    runs = TestASecondRun()
+    first = runs.first_run().assertions
+    again = runs.second_run([runs.FIRST]).assertions
 
     assert again.catalog.entries == first.catalog.entries
     assert again.issues == first.issues == []
 
 
 class TestAnAnswerBindsToAnOpenFact:
-    """A submission answers what is open, or what an earlier round answered (D2)."""
+    """A submission answers what is open, or what an earlier save answered (D2)."""
 
     STATED = FactAnswer(
         key=(flow_id(), "encryption_in_transit", "", "", "", ""), value="mTLS"
@@ -846,7 +846,7 @@ class TestAnAnswerBindsToAnOpenFact:
         with pytest.raises(ValueError, match="is stated"):
             check_fact_answers([self.STATED], valid_model(), None)
 
-    def test_an_attribute_an_earlier_round_answered_may_be_answered_again(self):
+    def test_an_attribute_an_earlier_save_answered_may_be_answered_again(self):
         earlier = self.STATED.model_copy(update={"value": "TLS 1.3"})
         check_fact_answers([self.STATED], valid_model(), None, [earlier])
 
@@ -912,7 +912,7 @@ class TestAnUnknownAnswer:
 
 
 def test_a_fact_answered_i_do_not_know_leaves_the_list_and_the_count(report):
-    """A later round asked it again, and counted findings no answer can cover."""
+    """A later list asked it again, and counted findings no answer can cover."""
     questions = ask(report)
     if not questions:
         pytest.skip("this report asks nothing")

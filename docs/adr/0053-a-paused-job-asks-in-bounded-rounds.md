@@ -53,7 +53,7 @@ answer in it, so an answer hides the parts of a capability it rules out, and
 a named mechanism lowers the questions that rested on its lead. "Start the
 analysis" is available in every round.
 
-**Each kind has a floor and a limit.** `answer_round.EARLY_RULES` is the table.
+**Each kind has a floor and a limit.** `answer_state.EARLY_RULES` is the table.
 
 | Kind | Floor | Limit | Why |
 | --- | --- | --- | --- |
@@ -65,7 +65,7 @@ shared limit would let the higher-scored kind take every place. Each limit
 applies to each selected framework
 ([ADR 0074](0074-each-framework-has-its-own-question-limit.md)).
 
-**The selected frameworks take turns** (`answer_round.by_turn`). Where a job
+**The selected frameworks take turns** (`answer_state.by_turn`). Where a job
 selects more than one framework, each kind's places in a round go to the
 frameworks in turn: the next place goes to the first question that serves
 the framework charged the fewest choices so far, and every framework a

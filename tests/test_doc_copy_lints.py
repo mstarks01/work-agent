@@ -22,7 +22,7 @@ import pytest
 from fastapi.routing import APIRoute
 
 from analysis_service import resilience
-from analysis_service.answer_round import EARLY_RULES, POLICY_VERSION
+from analysis_service.answer_state import EARLY_RULES, POLICY_VERSION
 from analysis_service.auth import (
     ALLOWED_ALGORITHMS,
     DEFAULT_ALGORITHMS,

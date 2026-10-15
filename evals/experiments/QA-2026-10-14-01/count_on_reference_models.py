@@ -5,8 +5,8 @@ import json
 import sys
 from pathlib import Path
 
-from analysis_service.answer_round import question_set
 from analysis_service.answer_sets import AnswerSet
+from analysis_service.answer_state import question_set
 from analysis_service.field_capabilities import with_field_capabilities
 from analysis_service.frameworks import PACKAGES
 from analysis_service.system_model import CapabilityStatement, SystemModel

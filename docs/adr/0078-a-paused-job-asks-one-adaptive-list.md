@@ -65,7 +65,7 @@ hidden from the submitter is never recorded as seen or skipped.
 **A paused job asks one adaptive list.** `QuestionSet.early` holds every
 recommended question of the pause at once: each question at or above its
 kind's floor, up to each framework's limit of each kind, with the gate
-questions first (ADR 0067) and the frameworks in turn (`answer_round.by_turn`).
+questions first (ADR 0067) and the frameworks in turn (`answer_state.by_turn`).
 There is no `per_round`, no round number and no box order. A save writes the
 answers onto the job and runs no model, and the list is read again off the
 model with the saved answers in. The response carries `policy_version`, which
@@ -145,7 +145,7 @@ edits, facets or rendered rows. A skip spends no place. A read or a save with
 unchanged inputs changes nothing.
 
 > **Amended by [ADR 0081](0081-a-question-kind-is-asked-once-for-the-system.md).**
-> A limit counts places (`answer_round.limit_place`): a group of field
+> A limit counts places (`answer_state.limit_place`): a group of field
 > questions takes one place, and a capability question takes one.
 
 ## Consequences

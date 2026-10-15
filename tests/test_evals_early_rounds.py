@@ -54,7 +54,7 @@ def test_an_owner_who_skips_everything_is_asked_each_question_once():
 
 
 def test_an_owner_who_answers_in_part_and_skips_the_rest_is_not_asked_again():
-    """Answering one facet and saving asked the same question fifty rounds
+    """Answering one facet and saving asked the same question fifty saves
     over, before "Skip the rest" could set it aside (#1289)."""
     found = replay("case", open_controls(), valid_model(), STRIDE, "facets-partial")
     assert found.ended

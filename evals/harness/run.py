@@ -185,7 +185,7 @@ from evals.harness.stability import (
 from evals.harness.structural import report_issues
 from evals.harness.withheld import (
     AnswerFile,
-    answers_within_rounds,
+    answers_within_saves,
     load_answer_file,
     withheld_case,
 )
@@ -1065,19 +1065,19 @@ def command_run(args: argparse.Namespace) -> int:
     except modes.EvalRunError as refusal:
         print(refusal, file=sys.stderr)
         return 1
-    if args.answer_rounds is not None:
+    if args.answer_saves is not None:
         if args.mode != "answered" or answers is None:
-            print("--answer-rounds narrows the answered mode only", file=sys.stderr)
+            print("--answer-saves narrows the answered mode only", file=sys.stderr)
             return 1
         # Each case keeps the signed answers its pause asks by then, once,
         # before anything is spent.
         answers = {
             case.id: replace(
                 answers[case.id],
-                answers=answers_within_rounds(
+                answers=answers_within_saves(
                     case,
                     answers[case.id],
-                    args.answer_rounds,
+                    args.answer_saves,
                     tuple(args.framework),
                 ),
             )
@@ -1184,9 +1184,9 @@ def command_run(args: argparse.Namespace) -> int:
         sweep=sweep,
         series=_series_record(by_series) if by_series else None,
     )
-    if args.answer_rounds is not None and answers is not None:
+    if args.answer_saves is not None and answers is not None:
         # What this arm answered, in fields a reader can compare arms by.
-        artifact["answer_rounds"] = args.answer_rounds
+        artifact["answer_saves"] = args.answer_saves
         artifact["answered_keys"] = {
             case_id: [list(answer.key) for answer in answer_file.answers]
             for case_id, answer_file in answers.items()
@@ -2166,11 +2166,11 @@ def _run_arguments(parser: argparse.ArgumentParser) -> None:
         help="the standing roster the scored series are split by",
     )
     parser.add_argument(
-        "--answer-rounds",
+        "--answer-saves",
         type=int,
         metavar="N",
         help="with --mode answered, answer only the signed facts the pause asks"
-        " in its first N rounds, as a submitter who stops after N rounds would",
+        " in its first N saves, as a submitter who stops after N saves would",
     )
     parser.add_argument(
         "--accept-cost",
@@ -2636,7 +2636,7 @@ COMMANDS: dict[str, Command] = {
         arguments=_near_miss_rulings_arguments,
     ),
     "early-rounds": Command(
-        help="answer archived models' early questions round after round and"
+        help="answer archived models' early questions save after save and"
         " count how the list moves (offline, no credentials)",
         run=early_rounds.command_early_rounds,
         arguments=early_rounds.arguments,

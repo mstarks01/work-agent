@@ -236,7 +236,7 @@ def test_an_answer_keeps_a_scoped_fact_beside_it():
 
 
 @pytest.mark.parametrize("reason", sorted(SHAPES))
-def test_the_answer_holds_in_a_later_round_and_a_revision_replaces_it(reason):
+def test_the_answer_holds_in_a_later_run_and_a_revision_replaces_it(reason):
     attribute, rows = SHAPES[reason]
     first_value, second_value = ANSWERS[attribute]
     first = answer(attribute, first_value)

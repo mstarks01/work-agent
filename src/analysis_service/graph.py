@@ -1770,14 +1770,14 @@ def _resolve_assertions(state: SessionState, model: SystemModel) -> AssertionRec
         # over whatever the node proposed and gated with the rest. A held
         # record is gated only after that: a resumed job's catalog holds its
         # parent's answered rows, and their quotes read the answers Source the
-        # parent composed until this round writes them again.
+        # parent composed until this run writes them again.
         linked, unplaced = apply_answers(record.catalog, model, links, facts)
         record = AssertionRecord.over(
             linked,
             model,
             sources,
             proposed=record.proposed,
-            # A resumed job's catalog carries its parent's issues. This round
+            # A resumed job's catalog carries its parent's issues. This run
             # applies every answer again, so what placed nothing is its own.
             issues=[
                 *(issue for issue in record.issues if issue.code not in ANSWER_ISSUES),

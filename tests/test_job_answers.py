@@ -1,4 +1,4 @@
-"""The job answer operations: one store in, a saved round, a started job or a
+"""The job answer operations: one store in, saved answers, a started job or a
 typed refusal out.
 
 These tests drive :class:`~analysis_service.job_answers.JobAnswers` over an
@@ -14,13 +14,13 @@ from dataclasses import replace
 
 import pytest
 
-from analysis_service.answer_round import (
+from analysis_service.answer_sets import AnswerSet
+from analysis_service.answer_state import (
     AlreadyResumed,
     Answers,
     SourcesOverLimit,
     StaleRevision,
 )
-from analysis_service.answer_sets import AnswerSet
 from analysis_service.claims import UnknownRef
 from analysis_service.errors import ConfigError
 from analysis_service.fact_answers import FactAnswer
@@ -134,7 +134,7 @@ class TestReadingAJob:
 
 
 class TestAnsweringAWaitingJob:
-    def test_a_saved_round_writes_the_answers_and_starts_nothing(self):
+    def test_a_save_writes_the_answers_and_starts_nothing(self):
         store = InMemoryJobStore()
         job = waiting(store)
         answers = operations(store)
@@ -210,7 +210,7 @@ class TestAnsweringAWaitingJob:
                 )
             )
 
-    def test_an_answer_read_off_an_older_round_is_refused_and_starts_nothing(self):
+    def test_an_answer_read_off_an_older_revision_is_refused_and_starts_nothing(self):
         store = InMemoryJobStore()
         job = waiting(store)
         answers = operations(store)
@@ -235,7 +235,7 @@ class TestAnsweringAWaitingJob:
         assert starts.started == []
         assert asyncio.run(store.resumed_by(job, OWNER)) is None
 
-    def test_a_round_of_skips_alone_is_kept_and_listed(self):
+    def test_a_save_of_skips_alone_is_kept_and_listed(self):
         store = InMemoryJobStore()
         job = waiting(store)
         answers = operations(store)
