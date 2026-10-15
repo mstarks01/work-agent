@@ -11,7 +11,9 @@
   under which the list takes a question while a framework has a place left;
   the entitlement is unchanged; and by
   [ADR 0081](0081-a-question-kind-is-asked-once-for-the-system.md), under
-  which the limit counts groups of field questions rather than questions
+  which the limit counts groups of field questions rather than questions;
+  and by [ADR 0088](0088-field-questions-have-no-limit.md), under which only
+  capability questions have a limit
 - **Evidence**: `QA-2026-10-09-01-E1` in `evals/experiments/`
 
 ## Context

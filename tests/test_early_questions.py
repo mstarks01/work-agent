@@ -567,18 +567,18 @@ class TestTheFrameworkGates:
         assert dict(after.gates) == {"asvs": "undecidable"}
         assert after.early == () and after.done
 
-    def test_a_gate_answer_counts_toward_no_kinds_limit(self):
+    def test_a_gate_answer_counts_toward_no_kinds_limit(self, monkeypatch):
         """Once an answer satisfies the gate, the list holds the questions a
-        model that stated the interface would hold. Twenty-nine earlier field
-        answers leave one place, which a counted gate answer would take."""
-        from analysis_service.answer_round import EARLY_RULES
+        model that stated the interface would hold. Under a field limit of two,
+        one earlier field answer leaves one place, which a counted gate answer
+        would take."""
+        from analysis_service import answer_round
+        from analysis_service.answer_round import EarlyRule
 
+        monkeypatch.setitem(answer_round.EARLY_RULES, "field", EarlyRule(1.0, 2))
         selection = {**LEVEL_2, "stride": {}}
         model = _with_interfaces("unknown", protocols="unknown")
-        filler = [
-            FactAnswer(key=("", "", "", f"subject {n}", "", ""), value="unknown")
-            for n in range(EARLY_RULES["field"].limit - 1)
-        ]
+        filler = [FactAnswer(key=("", "", "", "subject 0", "", ""), value="unknown")]
         gates = [
             FactAnswer(key=q.key, value="web")
             for q in _paused(model, selection).early

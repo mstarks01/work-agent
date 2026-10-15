@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import pytest
 
-from analysis_service.answer_round import EARLY_RULES, question_set
+from analysis_service.answer_round import question_set
 from analysis_service.answer_sets import AnswerSet
 from analysis_service.fact_answers import FactAnswer
 from analysis_service.system_model import SystemModel
@@ -135,9 +135,8 @@ class TestTheExposureIsCountedApartFromTheLimit:
         "case", ["02-iot-fleet-telemetry", "08-sso-identity-broker"]
     )
     def test_a_pause_skipped_save_by_save_counts_every_question_it_showed(self, case):
-        """Skips spend no limit, so the list can show more questions than the
-        limit holds; ``introduced`` counts each one once, and ``choices`` a
-        choice a facet."""
+        """``introduced`` counts each question the pause showed once, however
+        many saves showed it, and ``choices`` a choice a facet."""
         path = PROJECT_ROOT / "evals/corpus" / case / "model.json"
         model = SystemModel.model_validate_json(path.read_text())
         selection = {"stride": {}}
@@ -152,7 +151,7 @@ class TestTheExposureIsCountedApartFromTheLimit:
         else:
             pytest.fail("the rounds never ended")
         summary = asked.summary
-        assert summary.introduced == len(seen) > EARLY_RULES["field"].limit
+        assert summary.introduced == len(seen) > 0
         assert summary.choices == sum(seen.values()) > summary.introduced
         assert summary.skipped == len(seen)
         assert (summary.settled, summary.partial, summary.unknown) == (0, 0, 0)

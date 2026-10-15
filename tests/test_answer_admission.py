@@ -428,7 +428,8 @@ class TestTheAdaptiveList:
                 for q in asked.early
                 if (q.kind == "capability") == (kind == "capability")
             ]
-            assert len(shown) <= EARLY_RULES[kind].limit
+            limit = EARLY_RULES[kind].limit
+            assert limit is None or len(shown) <= limit
             assert all(passes_floor(q, listed) for q in shown)
         assert asked.early, "a control: the waiting job asks something"
         assert asked.to_json()["policy_version"] == "adaptive-1"
@@ -457,7 +458,9 @@ class TestTheAdaptiveList:
         assert first.key not in {q.key for q in after.early}
         assert [(q.key, a) for q, a in after.answered_early] == [(first.key, answer)]
 
-    def test_each_kind_stops_at_its_limit(self):
+    def test_field_questions_have_no_limit(self):
+        """However many places saved field answers take, every field question
+        above the floor is listed (ADR 0088)."""
         from analysis_service.answer_round import recommended
 
         listed = _asked_after([]).early
@@ -467,8 +470,10 @@ class TestTheAdaptiveList:
         shown, _, withheld = recommended(
             listed, frozenset(answered_for), answered_for, {}
         )
-        assert not [q for q in shown if q.kind != "capability"]
-        assert len(withheld) == len([q for q in listed if q.kind != "capability"])
+        fields = [q for q in listed if q.kind != "capability"]
+        assert fields
+        assert [q for q in shown if q.kind != "capability"] == fields
+        assert not withheld
 
     @staticmethod
     def _field(element, attribute, framework, decisions=1):
