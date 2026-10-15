@@ -2,7 +2,7 @@
   {
     "category": "spoofing",
     "affected_element_ids": [
-      "flow:entity:member>process:lending-api>borrow-renew-and-reserve",
+      "flow:process:library-app>process:lending-api>loan-and-reservation-requests",
       "entity:member"
     ],
     "claim": "If the lending API does not authenticate calls from the app, an attacker borrows, renews or reserves books as another member.",
@@ -47,7 +47,7 @@
   {
     "category": "tampering",
     "affected_element_ids": [
-      "flow:entity:member>process:lending-api>borrow-renew-and-reserve"
+      "flow:process:library-app>process:lending-api>loan-and-reservation-requests"
     ],
     "claim": "If the connection between a member's phone and the lending API has no effective authenticated encryption, an attacker on the path alters a renewal or a reservation in flight.",
     "tier": "expected",
@@ -76,7 +76,7 @@
   {
     "category": "repudiation",
     "affected_element_ids": [
-      "flow:entity:member>process:lending-api>borrow-renew-and-reserve",
+      "flow:process:library-app>process:lending-api>loan-and-reservation-requests",
       "entity:member"
     ],
     "claim": "If the API does not keep trustworthy records tying renewals and reservations to authenticated members, a member could deny an action and the service may be unable to attribute it reliably.",
@@ -105,7 +105,7 @@
   {
     "category": "information-disclosure",
     "affected_element_ids": [
-      "flow:entity:member>process:lending-api>borrow-renew-and-reserve"
+      "flow:process:library-app>process:lending-api>loan-and-reservation-requests"
     ],
     "claim": "If the connection between a member's phone and the lending API has no effective encryption, an attacker on the path reads which books a member borrows and reserves.",
     "tier": "expected",
@@ -120,7 +120,7 @@
     "category": "denial-of-service",
     "affected_element_ids": [
       "process:lending-api",
-      "flow:entity:member>process:lending-api>borrow-renew-and-reserve"
+      "flow:process:library-app>process:lending-api>loan-and-reservation-requests"
     ],
     "claim": "An attacker floods the lending API with calls, and no member or kiosk can borrow or return anything, because ordinary launch-day load already took the one service down twice.",
     "tier": "must-find",
@@ -135,7 +135,7 @@
     "category": "elevation-of-privilege",
     "affected_element_ids": [
       "process:lending-api",
-      "flow:entity:member>process:lending-api>borrow-renew-and-reserve"
+      "flow:process:library-app>process:lending-api>loan-and-reservation-requests"
     ],
     "claim": "If a member or unauthenticated caller can reach the API's manual-return, block-clearing or extension operations and the API fails to enforce staff authorization, that caller could perform staff-only changes.",
     "tier": "must-find",

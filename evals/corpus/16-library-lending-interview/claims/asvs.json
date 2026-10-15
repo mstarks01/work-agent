@@ -15,7 +15,7 @@
     "chapter": "authorization",
     "requirement": "V8.2.2",
     "affected_element_ids": [
-      "flow:entity:member>process:lending-api>borrow-renew-and-reserve",
+      "flow:process:library-app>process:lending-api>loan-and-reservation-requests",
       "process:lending-api"
     ],
     "claim": "Nothing states that the lending API lets a member change only their own loans and reservations.",
@@ -27,7 +27,7 @@
     "chapter": "session-management",
     "requirement": "V7.2.1",
     "affected_element_ids": [
-      "flow:entity:member>process:lending-api>borrow-renew-and-reserve",
+      "flow:process:library-app>process:lending-api>loan-and-reservation-requests",
       "process:lending-api"
     ],
     "claim": "A token the app gets at sign-in is mentioned once, inside a hedge, and nothing says where it is verified.",
@@ -39,7 +39,7 @@
     "chapter": "secure-communication",
     "requirement": "V12.2.1",
     "affected_element_ids": [
-      "flow:entity:member>process:lending-api>borrow-renew-and-reserve"
+      "flow:process:library-app>process:lending-api>loan-and-reservation-requests"
     ],
     "claim": "Nothing states whether the connection between the app and the lending API uses TLS.",
     "tier": "must-find",
@@ -51,7 +51,7 @@
     "requirement": "V6.1.1",
     "affected_element_ids": [
       "flow:entity:desk-staff>process:lending-api>change-loans-by-hand",
-      "flow:entity:member>process:lending-api>borrow-renew-and-reserve"
+      "flow:process:library-app>process:lending-api>loan-and-reservation-requests"
     ],
     "claim": "Nothing documents what limits repeated sign-in attempts on the app or on the circulation page.",
     "tier": "expected",

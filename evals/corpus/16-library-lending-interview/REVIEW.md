@@ -109,6 +109,7 @@ Not part of the question, but the records cite these names, so you need them.
 | id | exposure | interface | zone | technology |
 |---|---|---|---|---|
 | process:lending-api | internet-facing | web | boundary:council-data-centre | a plain REST service, JSON in and JSON out |
+| process:library-app | unknown | unknown | boundary:internet | unknown |
 | process:self-service-kiosk | unknown | unknown | boundary:branch-network | unknown |
 
 **Data stores**
@@ -121,7 +122,8 @@ Not part of the question, but the records cite these names, so you need them.
 
 | id | source | destination | protocol | authentication | in transit |
 |---|---|---|---|---|---|
-| flow:entity:member>process:lending-api>borrow-renew-and-reserve | entity:member | process:lending-api | unknown | unknown | unknown |
+| flow:entity:member>process:library-app>borrow-renew-and-reserve | entity:member | process:library-app | unknown | unknown | unknown |
+| flow:process:library-app>process:lending-api>loan-and-reservation-requests | process:library-app | process:lending-api | unknown | unknown | unknown |
 | flow:process:self-service-kiosk>process:lending-api>record-loans-and-returns | process:self-service-kiosk | process:lending-api | unknown | unknown | unknown |
 | flow:entity:desk-staff>process:lending-api>change-loans-by-hand | entity:desk-staff | process:lending-api | unknown | password authentication using one login shared by all desk staff in every branch; the password is on a card taped under the desk | unknown |
 | flow:process:lending-api>store:loans-database>read-and-write-loans | process:lending-api | store:loans-database | unknown | unknown | unknown |
@@ -137,14 +139,17 @@ Not part of the question, but the records cite these names, so you need them.
 **Recorded notes** — hedges, probed gaps and source disagreements live here, so read them before the sets.
 
 - `process:lending-api` — The transcript corrects the note on exposure. Lending service note: "The lending API is internal-only." Interview transcript, Dan quotes that line and Priya answers: "That is one of the wrong bits. The phones talk straight to the lending API over the internet. We opened it up last year when the app moved off the council's old portal, and nobody updated the note because nobody owns the note." The note describes the service before that change, so exposure is internet-facing. Neither source states which operations a call from the internet can reach. Priya on load: "the API is one service with no queue in front of it"; it went down twice last summer on the reading challenge launch day.
+- `process:library-app` — The transcript gives the app behaviour of its own, so it is a process and the member's flow ends at it. Priya: "The phones talk straight to the lending API over the internet. We opened it up last year when the app moved off the council's old portal".
 - `process:self-service-kiosk` — What else the kiosks talk to was asked and not answered. Dan asked: "Do the kiosks still write straight into the loans database, the way the old ones did?" Priya: "The kiosks are Dev's team's area. I couldn't tell you what they talk to these days." A question states no fact, so the model holds no kiosk-to-database flow.
 - `store:loans-database` — Priya corrected herself in one turn: "It writes to the two databases— actually, no. We merged those in the spring. It's one loans database now." The later statement stands, so the model holds one database.
-- `flow:entity:member>process:lending-api>borrow-renew-and-reserve` — Authentication was asked about and answered with a hedge, so it stays unknown. Priya: "I think it checks a token the app gets at sign-in, but I'd have to look." and "Honestly I could not tell you today what it accepts, or what it does with a call it does not like."
+- `flow:entity:member>process:library-app>borrow-renew-and-reserve` — Sign-in to the app is mentioned once, inside Priya's hedge about the API's token; neither source states how the app itself authenticates a member.
+- `flow:process:library-app>process:lending-api>loan-and-reservation-requests` — Authentication was asked about and answered with a hedge, so it stays unknown. Priya: "I think it checks a token the app gets at sign-in, but I'd have to look." and "Honestly I could not tell you today what it accepts, or what it does with a call it does not like."
 - `flow:entity:desk-staff>process:lending-api>change-loans-by-hand` — Priya: "You can tell it was the desk. You cannot tell who, or even which branch." The history records only that the loan was closed by hand.
 
 **Assumptions**
 
 - `entity:member` — Members are placed on the internet because the schema requires a zone. (basis: Their phones reach the lending API over the internet; neither source states where members are.)
+- `process:library-app` — The library app is placed on the internet because the schema requires a zone. (basis: It runs on members' phones and reaches the lending API over the internet; neither source states where the phones are.)
 
 ### Your list
 
@@ -176,7 +181,7 @@ The narrower question, per record: **does this requirement apply to this system,
 
 **A2.** `V8.2.2` — Nothing states that the lending API lets a member change only their own loans and reservations.
 
-- `flow:entity:member>process:lending-api>borrow-renew-and-reserve`, `process:lending-api`
+- `flow:process:library-app>process:lending-api>loan-and-reservation-requests`, `process:lending-api`
 - What the API checks on a call from the app is a hedge, so whether a call is tied to one member's records is open.
 
 > mark:
@@ -186,7 +191,7 @@ The narrower question, per record: **does this requirement apply to this system,
 
 **A3.** `V7.2.1` — A token the app gets at sign-in is mentioned once, inside a hedge, and nothing says where it is verified.
 
-- `flow:entity:member>process:lending-api>borrow-renew-and-reserve`, `process:lending-api`
+- `flow:process:library-app>process:lending-api>loan-and-reservation-requests`, `process:lending-api`
 - The one mention is a hedge, so it is not evidence either way.
 
 > mark:
@@ -196,7 +201,7 @@ The narrower question, per record: **does this requirement apply to this system,
 
 **A4.** `V12.2.1` — Nothing states whether the connection between the app and the lending API uses TLS.
 
-- `flow:entity:member>process:lending-api>borrow-renew-and-reserve`
+- `flow:process:library-app>process:lending-api>loan-and-reservation-requests`
 - REST and JSON are stated and the transport never is. The transcript puts this flow on the internet.
 
 > mark:
@@ -206,7 +211,7 @@ The narrower question, per record: **does this requirement apply to this system,
 
 **A5.** `V6.1.1` — Nothing documents what limits repeated sign-in attempts on the app or on the circulation page.
 
-- `flow:entity:desk-staff>process:lending-api>change-loans-by-hand`, `flow:entity:member>process:lending-api>borrow-renew-and-reserve`
+- `flow:entity:desk-staff>process:lending-api>change-loans-by-hand`, `flow:process:library-app>process:lending-api>loan-and-reservation-requests`
 - Neither source describes a sign-in defence; a fuller description could answer it.
 
 > mark:
@@ -251,7 +256,7 @@ on either of them. That is the finding this sitting exists for.
 
 **1.** If the lending API does not authenticate calls from the app, an attacker borrows, renews or reserves books as another member.
 
-- `flow:entity:member>process:lending-api>borrow-renew-and-reserve`, `entity:member`
+- `flow:process:library-app>process:lending-api>loan-and-reservation-requests`, `entity:member`
 - severity: medium/medium · verb: `impersonate`
 - The hedge this case exists for. Priya's answer about the token is a hedge, so authentication is unknown and the finding is conditional. An extraction that records the hedged token as the value suppresses this finding.
 
@@ -278,7 +283,7 @@ on either of them. That is the finding this sitting exists for.
 
 **4.** If the connection between a member's phone and the lending API has no effective authenticated encryption, an attacker on the path alters a renewal or a reservation in flight.
 
-- `flow:entity:member>process:lending-api>borrow-renew-and-reserve`
+- `flow:process:library-app>process:lending-api>loan-and-reservation-requests`
 - severity: low/low · verb: `alter-in-transit`
 - encryption_in_transit is unknown on a flow the transcript says crosses the internet. The impact is one member's loan or reservation.
 
@@ -297,7 +302,7 @@ on either of them. That is the finding this sitting exists for.
 
 **6.** If the API does not keep trustworthy records tying renewals and reservations to authenticated members, a member could deny an action and the service may be unable to attribute it reliably.
 
-- `flow:entity:member>process:lending-api>borrow-renew-and-reserve`, `entity:member`
+- `flow:process:library-app>process:lending-api>loan-and-reservation-requests`, `entity:member`
 - severity: medium/low · verb: `unattributable`
 - Caller authentication and trustworthy records of each action are separate controls, and neither source states either one. The question differs from the spoofing claim: who acted, not who could act.
 
@@ -316,7 +321,7 @@ on either of them. That is the finding this sitting exists for.
 
 **8.** If the connection between a member's phone and the lending API has no effective encryption, an attacker on the path reads which books a member borrows and reserves.
 
-- `flow:entity:member>process:lending-api>borrow-renew-and-reserve`
+- `flow:process:library-app>process:lending-api>loan-and-reservation-requests`
 - severity: medium/medium · verb: `intercept`
 - No source states TLS on this flow. The transcript says the phones reach the API over the internet.
 
@@ -327,7 +332,7 @@ on either of them. That is the finding this sitting exists for.
 
 **9.** An attacker floods the lending API with calls, and no member or kiosk can borrow or return anything, because ordinary launch-day load already took the one service down twice.
 
-- `process:lending-api`, `flow:entity:member>process:lending-api>borrow-renew-and-reserve`
+- `process:lending-api`, `flow:process:library-app>process:lending-api>loan-and-reservation-requests`
 - severity: high/medium · verb: `flood`
 - The source states this failure already happened twice last summer under legitimate load alone, and that every kiosk and every phone depends on the one API.
 
@@ -338,7 +343,7 @@ on either of them. That is the finding this sitting exists for.
 
 **10.** If a member or unauthenticated caller can reach the API's manual-return, block-clearing or extension operations and the API fails to enforce staff authorization, that caller could perform staff-only changes.
 
-- `process:lending-api`, `flow:entity:member>process:lending-api>borrow-renew-and-reserve`
+- `process:lending-api`, `flow:process:library-app>process:lending-api>loan-and-reservation-requests`
 - severity: medium/high · verb: `escalate`
 - The transcript puts the lending API on the internet, and the circulation page and the app's calls reach one API. Neither source states which operations a call from outside the branch network can reach, or a staff role check. An extraction that believes the superseded note and writes internal removes the internet caller from this finding.
 
@@ -423,9 +428,9 @@ your missing list, your notes and a digest of each file you read:
       "opened_digests": {
       "source.md": "8bc51704b4514584c02f95f04048086a70f43a3dbb2c40af53afe13b3f79e6a9",
       "transcript.md": "c48f8b9e53090b42971ffb548ed2302d0021a8c2b8539552973211c21df3f765",
-      "model.json": "688f37efb88281779b67349b5b0fa55791a8c06e0db8f175f455678c0bfdd1c0",
-      "claims/asvs.json": "617a68c8e31065f8886e8b544ee4c67b63eaa7e43c769cd179d35b437443f8d7",
-      "claims/stride.json": "87120ad43f66af05e1a80a1dcd9cc93bbbc794b7d9d9f1c154b60dd15f2c97cc"
+      "model.json": "36e77e5be6f65329a5ec73af880699c362dd140910c4163803f69f1ae508a0f7",
+      "claims/asvs.json": "fca11a83b2576dc3b365da4924e21967e01c8c71cd55f1ac5ce6ebde6518e504",
+      "claims/stride.json": "e87860eaa76b29fcd0ef18a25830074de2ec7b6c05e56733becce7af77eedcca"
       }
     }
   }

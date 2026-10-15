@@ -41,6 +41,22 @@
       "notes": "The transcript corrects the note on exposure. Lending service note: \"The lending API is internal-only.\" Interview transcript, Dan quotes that line and Priya answers: \"That is one of the wrong bits. The phones talk straight to the lending API over the internet. We opened it up last year when the app moved off the council's old portal, and nobody updated the note because nobody owns the note.\" The note describes the service before that change, so exposure is internet-facing. Neither source states which operations a call from the internet can reach. Priya on load: \"the API is one service with no queue in front of it\"; it went down twice last summer on the reading challenge launch day."
     },
     {
+      "id": "process:library-app",
+      "name": "library app",
+      "description": "The app on a member's phone. A member borrows, renews and reserves books in it, and it calls the lending API with which book and which member.",
+      "assets": [
+        "pii",
+        "business-critical-data"
+      ],
+      "source_excerpt": "Members borrow, renew and reserve books through the library app on their phones.",
+      "source_label": "Lending service note",
+      "technology": "unknown",
+      "trust_zone": "boundary:internet",
+      "exposure": "unknown",
+      "interface_kind": "unknown",
+      "notes": "The transcript gives the app behaviour of its own, so it is a process and the member's flow ends at it. Priya: \"The phones talk straight to the lending API over the internet. We opened it up last year when the app moved off the council's old portal\"."
+    },
+    {
       "id": "process:self-service-kiosk",
       "name": "self-service kiosk",
       "description": "A kiosk in every branch where a member scans their library card and the books they borrow or return. It sends each loan and each return to the lending API.",
@@ -78,8 +94,27 @@
   ],
   "data_flows": [
     {
-      "id": "flow:entity:member>process:lending-api>borrow-renew-and-reserve",
+      "id": "flow:entity:member>process:library-app>borrow-renew-and-reserve",
       "name": "borrow, renew and reserve",
+      "description": "A member names a book or a title in the library app on their phone, to borrow or renew a loan or to reserve a title.",
+      "assets": [
+        "pii",
+        "business-critical-data"
+      ],
+      "source_excerpt": "Members borrow, renew and reserve books through the library app on their phones.",
+      "source_label": "Lending service note",
+      "source": "entity:member",
+      "destination": "process:library-app",
+      "protocol": "unknown",
+      "authentication": "unknown",
+      "data_description": "which book or title, for loans, renewals and reservations",
+      "encryption_in_transit": "unknown",
+      "operations": "read-write",
+      "notes": "Sign-in to the app is mentioned once, inside Priya's hedge about the API's token; neither source states how the app itself authenticates a member."
+    },
+    {
+      "id": "flow:process:library-app>process:lending-api>loan-and-reservation-requests",
+      "name": "loan and reservation requests",
       "description": "The library app on the member's phone names a book and a member; the lending API checks the loan rules and writes the change, or puts the member in the queue for a title.",
       "assets": [
         "pii",
@@ -88,7 +123,7 @@
       "source_excerpt": "The app on their phone calls the lending API.",
       "source_label": "Interview transcript",
       "source_speaker": "Priya",
-      "source": "entity:member",
+      "source": "process:library-app",
       "destination": "process:lending-api",
       "protocol": "unknown",
       "authentication": "unknown",
@@ -191,6 +226,12 @@
       "element_id": "entity:member",
       "attribute": "trust_zone",
       "basis": "Their phones reach the lending API over the internet; neither source states where members are."
+    },
+    {
+      "assumption": "The library app is placed on the internet because the schema requires a zone.",
+      "element_id": "process:library-app",
+      "attribute": "trust_zone",
+      "basis": "It runs on members' phones and reaches the lending API over the internet; neither source states where the phones are."
     }
   ]
 }

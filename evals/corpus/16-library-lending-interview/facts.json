@@ -5,7 +5,7 @@
     {
       "assertion": {
         "subject_type": "interaction",
-        "subject": "flow:entity:member>process:lending-api>borrow-renew-and-reserve",
+        "subject": "flow:process:library-app>process:lending-api>loan-and-reservation-requests",
         "predicate": "authentication-mechanism",
         "value": "unknown",
         "reason": "hedged",
@@ -125,7 +125,7 @@
     {
       "assertion": {
         "subject_type": "interaction",
-        "subject": "flow:entity:member>process:lending-api>borrow-renew-and-reserve",
+        "subject": "flow:process:library-app>process:lending-api>loan-and-reservation-requests",
         "predicate": "transport-encryption",
         "value": "unknown",
         "reason": "silent",
@@ -322,6 +322,22 @@
       },
       "rationale": "Members' phones reach the API over the internet, which says how they reach it and not where members are. model.json's zone is a placement the schema requires, recorded in its assumption.",
       "reviewed_by": "mstarks01"
+    },
+    {
+      "assertion": {
+        "subject_type": "component",
+        "subject": "process:library-app",
+        "predicate": "network-membership",
+        "value": "unknown",
+        "reason": "silent",
+        "scope": [],
+        "basis": "stated",
+        "quotes": [],
+        "explanation": "",
+        "exclusive": false
+      },
+      "rationale": "The app runs on members' phones, which reach the API over the internet; that says how it reaches the API and not where it runs. model.json's zone is a placement the schema requires, recorded in its assumption.",
+      "reviewed_by": null
     },
     {
       "assertion": {
