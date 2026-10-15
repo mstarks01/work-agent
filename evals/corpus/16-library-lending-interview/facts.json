@@ -337,7 +337,7 @@
         "exclusive": false
       },
       "rationale": "The app runs on members' phones, which reach the API over the internet; that says how it reaches the API and not where it runs. model.json's zone is a placement the schema requires, recorded in its assumption.",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "assertion": {
