@@ -144,6 +144,12 @@ Not part of the question, but the records cite these names, so you need them.
 - `process:billing-app` — The billing app is reachable from the internet. (basis: Customer companies' users and payers reach it in a browser; the source states no exposure directly.)
 - `process:admin-console` — The admin console runs on the cloud platform. (basis: It opens sessions in the billing app; the source states only where it is reachable from, not where it runs.)
 
+**Reviewed aliases** — other names a reader ruled identify the same element, each with the words in the source that support it. An extraction using one is named differently, not wrong.
+
+- `entity:company-user — customer user` — The source calls a company's own users "customer user" where it names them at all, and "company user" nowhere; the reference keeps the aggregate name. Ruled by the maintainer on 2026-10-15 (QA-2026-10-15-02); it authorizes the one actor's equivalence and not a merge of a company's admins and viewers into separate actors. Source: > From the admin console an agent can open a session in the billing app as any customer user.
+- `flow:entity:company-user>process:billing-app>manage-invoices — open invoice` — The reference keeps one flow for everything a company user does in the billing app; the source names the actions one by one, and an extraction that writes one flow per action is reading the same interaction. Ruled by the maintainer on 2026-10-15 (QA-2026-10-15-02). Source: > When a user opens an invoice, the billing app loads it by its invoice number.
+- `flow:entity:company-user>process:billing-app>manage-invoices — edit invoice` — Same ruling as "open invoice": one of the actions the source names inside the reference's one flow. Ruled by the maintainer on 2026-10-15 (QA-2026-10-15-02). Source: > edit form posts the whole invoice back, and the billing app saves every field
+
 ### Your list
 
 Write what could go wrong. Anything: an attack, a missing control, a question

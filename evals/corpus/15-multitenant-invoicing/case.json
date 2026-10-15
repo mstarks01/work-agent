@@ -28,5 +28,25 @@
       "exemplar_proximity": "far"
     }
   ],
-  "notes": "Holdout case 2 of 2 for #744. The corpus's first case whose tenants are our own customers inside one app and one database, rather than another company across a zone. That is why the tenant boundary here is not a trust boundary at all: every tenant's data sits in one zone, and the separation lives in a filter each query adds by hand. So the case punishes an analyst that reads only crossings: the two worst findings, invoice enumeration on the payment page and a cross-tenant invoice load, cross no zone the model can show. The object-level and field-level authorization questions are the ASVS half: an invoice loaded by a counting number, an edit form saved field for field, and a role enforced by hiding buttons. Held out of tuning: no diagnosis reads it, so it confirms a fix measured on the other cases."
+  "notes": "Holdout case 2 of 2 for #744. The corpus's first case whose tenants are our own customers inside one app and one database, rather than another company across a zone. That is why the tenant boundary here is not a trust boundary at all: every tenant's data sits in one zone, and the separation lives in a filter each query adds by hand. So the case punishes an analyst that reads only crossings: the two worst findings, invoice enumeration on the payment page and a cross-tenant invoice load, cross no zone the model can show. The object-level and field-level authorization questions are the ASVS half: an invoice loaded by a counting number, an edit form saved field for field, and a role enforced by hiding buttons. Held out of tuning: no diagnosis reads it, so it confirms a fix measured on the other cases.",
+  "aliases": [
+    {
+      "element": "entity:company-user",
+      "name": "customer user",
+      "excerpt": "From the admin console an agent can open a session in the billing app as any customer user.",
+      "ruling": "The source calls a company's own users \"customer user\" where it names them at all, and \"company user\" nowhere; the reference keeps the aggregate name. Ruled by the maintainer on 2026-10-15 (QA-2026-10-15-02); it authorizes the one actor's equivalence and not a merge of a company's admins and viewers into separate actors."
+    },
+    {
+      "element": "flow:entity:company-user>process:billing-app>manage-invoices",
+      "name": "open invoice",
+      "excerpt": "When a user opens an invoice, the billing app loads it by its invoice number.",
+      "ruling": "The reference keeps one flow for everything a company user does in the billing app; the source names the actions one by one, and an extraction that writes one flow per action is reading the same interaction. Ruled by the maintainer on 2026-10-15 (QA-2026-10-15-02)."
+    },
+    {
+      "element": "flow:entity:company-user>process:billing-app>manage-invoices",
+      "name": "edit invoice",
+      "excerpt": "edit form posts the whole invoice back, and the billing app saves every field",
+      "ruling": "Same ruling as \"open invoice\": one of the actions the source names inside the reference's one flow. Ruled by the maintainer on 2026-10-15 (QA-2026-10-15-02)."
+    }
+  ]
 }
