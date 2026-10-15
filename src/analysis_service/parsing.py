@@ -25,14 +25,17 @@ Three more questions about a file's values have one reader each here.
 because TOML and JSON read ``9.0`` and ``true`` as values equal to an integer.
 :func:`strings` asks whether a value is a list of strings, because a string
 in that place reads one character at a time. :func:`signer` asks who signed a
-file, because a value of spaces reads as a signature.
+file, because a value of spaces reads as a signature. :data:`Signer` is the
+model field that asks it as the file loads.
 """
 
 from __future__ import annotations
 
 import math
 import re
-from typing import TypeGuard
+from typing import Annotated, TypeGuard
+
+from pydantic import BeforeValidator
 
 _ASCII_DIGITS = re.compile(r"[0-9]+")
 
@@ -83,5 +86,10 @@ def signer(value: object) -> str | None:
     if value is None or value == "":
         return None
     if not isinstance(value, str) or not value.strip():
-        raise ValueError(f"signed_by {value!r} names nobody")
+        raise ValueError(f"the signer {value!r} names nobody")
     return value
+
+
+#: A model field that says who signed, read through :func:`signer` as it loads.
+#: It holds a name or ``None``, so ``is None`` is the whole unsigned test.
+Signer = Annotated[str | None, BeforeValidator(signer)]

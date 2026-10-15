@@ -101,8 +101,6 @@ class Session:
     preselect: str | None = None
     rows: tuple[sittings.Row, ...] = ()
     prepared: dict[str, sittings.Prepared] = field(default_factory=dict)
-    #: The digests each prepared case was read at, so a moved file re-reads it.
-    pinned: dict[str, dict[str, str]] = field(default_factory=dict)
     token: str = field(default_factory=lambda: secrets.token_urlsafe(24))
     dropped: set[str] = field(default_factory=set)
 
@@ -143,20 +141,16 @@ class Session:
         """The case, prepared once and re-read when a file of it moves.
 
         Preparing fingerprints every reference set, so the result is kept for
-        the session. It is kept beside the digests it was read at, because a
-        corpus edit under a running session must reach the reader: a target
-        list from before the edit would refuse the mark the new claim needs.
+        the session. It carries the digests it was built at, because a corpus
+        edit under a running session must reach the reader: a target list from
+        before the edit would refuse the mark the new claim needs.
         """
         case_dir = self.corpus_dir / case_id
         kept = self.prepared.get(case_id)
-        if (
-            kept is not None
-            and sittings.digests(case_dir, kept.files) == self.pinned[case_id]
-        ):
+        if kept is not None and sittings.digests(case_dir, kept.files) == kept.digests:
             return kept
         prepared = sittings.prepare(case_dir)
         self.prepared[case_id] = prepared
-        self.pinned[case_id] = sittings.digests(case_dir, prepared.files)
         return prepared
 
 
@@ -267,17 +261,12 @@ def create_app(session: Session, page: str, script: str) -> FastAPI:
                 f" at {MIN_OWN_LIST}; write what you think could go wrong"
                 " first, because the sitting measures your list against theirs",
             )
-        case_dir = session.corpus_dir / prepared.case_id
-        try:
-            opened = sittings.digests(case_dir, prepared.files)
-        except sittings.SittingError as exc:
-            raise HTTPException(status_code=409, detail=str(exc)) from exc
         save_draft(
             session,
             sittings.Draft(
                 case=prepared.case_id,
                 own_list=written,
-                opened_digests=opened,
+                opened_digests=dict(prepared.digests),
             ),
         )
         return JSONResponse({"case": body.case})
@@ -458,7 +447,6 @@ def held_draft(session: Session, case_id: str) -> sittings.Draft | None:
         return None
     try:
         prepared = session.prepare(case_id)
-        opened = sittings.digests(session.corpus_dir / prepared.case_id, prepared.files)
         # Two merged marks the current rule folds into one finding must agree,
         # and a disagreement is the same kind of refusal as an unreadable case.
         current = sittings.current_marks(prepared, merged.answers.marks)
@@ -467,7 +455,7 @@ def held_draft(session: Session, case_id: str) -> sittings.Draft | None:
     resumed = sittings.Draft(
         case=prepared.case_id,
         own_list=list(merged.answers.own_list),
-        opened_digests=opened,
+        opened_digests=dict(prepared.digests),
     )
     known = {target.fingerprint for target in prepared.mark_targets}
     resumed.marks = {key: mark for key, mark in current.items() if key in known}
@@ -525,10 +513,7 @@ def _served(
     """
     if draft is None:
         return
-    case_dir = session.corpus_dir / prepared.case_id
-    fresh = sittings.digests(
-        case_dir, [name for name in names if name in prepared.files]
-    )
+    fresh = {name: prepared.digests[name] for name in names if name in prepared.files}
     if all(draft.opened_digests.get(name) == digest for name, digest in fresh.items()):
         return
     draft.opened_digests = {**draft.opened_digests, **fresh}

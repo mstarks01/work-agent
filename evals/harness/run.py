@@ -118,6 +118,7 @@ from evals.harness.artifact import build as build_artifact
 from evals.harness.baseline import BASELINES_DIR
 from evals.harness.bundle import (
     assertions_from_reports,
+    check_out,
     extractions_from_reports,
     heads_from_reports,
     optional_block,
@@ -736,9 +737,9 @@ def _scored_sweep(
     sweep: Sweep,
     cases: Sequence[GoldenCase],
     runs: dict[str, modes.AnalysisRun],
-    ledger_path: Path,
-    roster_path: Path = roster.DEFAULT_ROSTER_PATH,
-) -> tuple[dict[str, Sweep], ledger.Ledger]:
+    votes: ledger.Ledger,
+    table: roster.Roster,
+) -> dict[str, Sweep]:
     """Every reading that needs the vote ledger, folded onto ``sweep``.
 
     One spelling for the two commands that compute these numbers: ``run``,
@@ -753,9 +754,8 @@ def _scored_sweep(
     always scored — what nobody has voted on yet is counted, printed, and
     served by :mod:`evals.harness.queue`.
 
-    The ledger comes back beside the sweep because it is loaded here and a
-    caller reports how many votes it read. Loading it twice would let one
-    command print a count the other's numbers were not computed from.
+    The caller loads the ledger and the roster, so ``run`` reads both before
+    it spends anything.
 
     **Every series in one pass** (#326). Standing selects which votes a series
     reads, so each entry in :data:`~evals.harness.standings.SERIES` is the
@@ -763,8 +763,6 @@ def _scored_sweep(
     primary series — maintainer votes only — and the others come back beside
     it, so no flag exists that could quietly move a published number.
     """
-    votes = ledger.load(ledger_path)
-    table = roster.load(roster_path)
     # Named, never dropped in silence. CI refuses a ledger naming somebody the
     # roster does not (#320), so this is a mid-edit tree or a hand-written
     # row — and a vote that moves nothing should say so rather than look cast.
@@ -795,7 +793,12 @@ def _scored_sweep(
             losses=charged,
             writing=writing.measure(cases, reports, read),
         )
-    return by_series, votes
+    return by_series
+
+
+def _standings_inputs(args: argparse.Namespace) -> tuple[ledger.Ledger, roster.Roster]:
+    """The vote ledger and the roster a scored sweep reads, from ``--ledger`` and ``--roster``."""
+    return ledger.load(Path(args.ledger)), roster.load(Path(args.roster))
 
 
 def _scored_keys(sweep: Sweep) -> dict[str, Any]:
@@ -1062,7 +1065,9 @@ def command_run(args: argparse.Namespace) -> int:
         answers = (
             signed_answers(cases) if args.mode in ("answered", "withheld") else None
         )
-    except modes.EvalRunError as refusal:
+        votes, table = _standings_inputs(args)
+        check_out(args.out)
+    except (modes.EvalRunError, ledger.LedgerError, roster.RosterError) as refusal:
         print(refusal, file=sys.stderr)
         return 1
     if args.answer_saves is not None:
@@ -1156,9 +1161,7 @@ def command_run(args: argparse.Namespace) -> int:
     # nothing rather than one whose numbers were all zero.
     by_series: dict[str, Sweep] = {}
     if mode_run.runs:
-        by_series, _ = _scored_sweep(
-            sweep, ran, mode_run.runs, Path(args.ledger), Path(args.roster)
-        )
+        by_series = _scored_sweep(sweep, ran, mode_run.runs, votes, table)
         sweep = by_series[standings.PRIMARY]
         unvoted = sum(score.unvoted_count for score in sweep.scores)
         if unvoted:
@@ -1419,12 +1422,9 @@ def command_score(args: argparse.Namespace) -> int:
             {block.framework for run in runs.values() for block in run.report.analyses}
         )
     )
-    by_series, votes = _scored_sweep(
-        Sweep(run=ModeRun.empty(frameworks)),
-        cases,
-        runs,
-        Path(args.ledger),
-        Path(args.roster),
+    votes, table = _standings_inputs(args)
+    by_series = _scored_sweep(
+        Sweep(run=ModeRun.empty(frameworks)), cases, runs, votes, table
     )
     sweep = by_series[standings.PRIMARY]
     render_all(sweep, scored=True)
@@ -1468,12 +1468,8 @@ def command_near_misses(args: argparse.Namespace) -> int:
             {block.framework for run in runs.values() for block in run.report.analyses}
         )
     )
-    by_series, _ = _scored_sweep(
-        Sweep(run=ModeRun.empty(frameworks)),
-        cases,
-        runs,
-        Path(args.ledger),
-        Path(args.roster),
+    by_series = _scored_sweep(
+        Sweep(run=ModeRun.empty(frameworks)), cases, runs, *_standings_inputs(args)
     )
     sweep = by_series[standings.PRIMARY]
     ballot = near_misses.rows(

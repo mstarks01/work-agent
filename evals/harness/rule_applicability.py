@@ -87,7 +87,7 @@ class Fixture:
 
     @property
     def signed(self) -> bool:
-        return bool(self.signed_by)
+        return self.signed_by is not None
 
 
 class FixtureError(ValueError):
@@ -104,7 +104,7 @@ def _refuse_untrusted(path: Path, raw: Mapping[str, Any]) -> None:
     try:
         signer(raw["signed_by"])
     except ValueError as exc:
-        raise FixtureError(f"{path}: {exc}") from exc
+        raise FixtureError(f"{path}: signed_by: {exc}") from exc
     for field in ("expected", "truth"):
         if not isinstance(raw.get(field, {}), dict):
             raise FixtureError(f"{path}: {field} is not an object")
@@ -135,7 +135,7 @@ def load_fixtures(directory: Path = FIXTURES_DIR) -> tuple[Fixture, ...]:
                 name=path.stem,
                 test_class=raw["test_class"],
                 drafted_by=raw["drafted_by"],
-                signed_by=raw["signed_by"],
+                signed_by=signer(raw["signed_by"]),
                 framework=raw["framework"],
                 options=raw["options"],
                 statements=tuple(

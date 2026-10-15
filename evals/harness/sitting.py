@@ -650,6 +650,10 @@ class Prepared:
     #: them is a count of the recorded set. No default, because a ``Prepared``
     #: built without them would refuse every mark a reader made.
     mark_targets: tuple[MarkTarget, ...]
+    #: Each file in :attr:`files` keyed to the digest of the bytes the blocks
+    #: and the targets were built from. A draft pins these, never a later read,
+    #: so a record signs only text the reader was served.
+    digests: dict[str, str]
 
     @property
     def part_one(self) -> str:
@@ -800,17 +804,39 @@ def _key_of(
 
 
 def prepare(case_dir: Path) -> Prepared:
-    """Everything a sitting needs, split at the own-list boundary."""
+    """Everything a sitting needs, split at the own-list boundary.
+
+    The build reads each file more than once, so the digests are taken before
+    and after it. Two equal readings mean that every read between them saw
+    the same bytes, and those are the digests a draft pins. A file that moves
+    during the build refuses the case, and the next open builds it again.
+    """
+    files = _files_of(load_case(case_dir))
+    before = digests(case_dir, files)
     case = load_case(case_dir)
     source_files = [source.file for source in case.meta.sources]
-    return Prepared(
+    prepared = Prepared(
         case_id=case.id,
         title=case.meta.title,
         part_one_blocks=docs.part_one_blocks(case_dir),
         part_two_blocks=docs.parts_after_blocks(case_dir),
         shared_files=shared_files(source_files),
-        files=required_files(source_files, case.frameworks),
+        files=_files_of(case),
         mark_targets=mark_targets(case),
+        digests=before,
+    )
+    if prepared.files != files or digests(case_dir, files) != before:
+        raise SittingError(
+            f"{case.id}: a file of the case changed while it was read; open the"
+            " case again"
+        )
+    return prepared
+
+
+def _files_of(case: GoldenCase) -> list[str]:
+    """What a complete sitting of this loaded case reads."""
+    return required_files(
+        [source.file for source in case.meta.sources], case.frameworks
     )
 
 

@@ -676,6 +676,36 @@ def _file_digests(directory: Path, sweep_stem: str) -> dict[str, str]:
     return digests
 
 
+@dataclass(frozen=True)
+class _CheckedSweep:
+    """One sweep that :func:`assemble` may copy: its bytes, reports and entry."""
+
+    stem: str
+    payload: bytes
+    reports: Path
+    certification: Any
+    cost: dict[str, Any]
+
+
+def _checked_sweep(source: Path, artifact: EvalArtifact, author: str) -> _CheckedSweep:
+    """One sweep, refused unless its reports sit beside it and its cost prices."""
+    payload = source.read_bytes()
+    reports = source.with_suffix(".reports")
+    if not reports.is_dir() or not any(reports.iterdir()):
+        raise BaselineError(
+            f"{source}: has no reports directory beside it; the reports"
+            " are what the free sitting path reads, so a Baseline stores"
+            " sweeps with their reports or not at all"
+        )
+    return _CheckedSweep(
+        stem=f"{author}-{hashlib.sha256(payload).hexdigest()[:8]}",
+        payload=payload,
+        reports=reports,
+        certification=artifact.block("certification"),
+        cost=price_sweep(artifact).to_json(),
+    )
+
+
 def assemble(root: Path, author: str, artifact_paths: list[Path]) -> Path:
     """Lay one or more sweeps into their Baseline directory, and write the manifest.
 
@@ -702,9 +732,13 @@ def assemble(root: Path, author: str, artifact_paths: list[Path]) -> Path:
             " different Baselines; submit them separately"
         )
     identity = identities.pop()
+    # Every sweep is checked and priced before the first copy, so a refused
+    # sweep leaves no file that the manifest does not own.
+    sweeps = [
+        _checked_sweep(source, artifact, author)
+        for source, artifact in zip(artifact_paths, artifacts, strict=True)
+    ]
     directory = root / "evals" / "baselines" / identity.name
-    directory.mkdir(parents=True, exist_ok=True)
-
     manifest_path = directory / "baseline.json"
     manifest: dict[str, Any] = (
         json.loads(manifest_path.read_text(encoding="utf-8"))
@@ -717,30 +751,22 @@ def assemble(root: Path, author: str, artifact_paths: list[Path]) -> Path:
         str(entry.get("artifact", "")): entry for entry in manifest.get("sweeps", [])
     }
 
-    for source, artifact in zip(artifact_paths, artifacts, strict=True):
-        payload = source.read_bytes()
-        stem = f"{author}-{hashlib.sha256(payload).hexdigest()[:8]}"
-        reports = source.with_suffix(".reports")
-        if not reports.is_dir() or not any(reports.iterdir()):
-            raise BaselineError(
-                f"{source}: has no reports directory beside it; the reports"
-                " are what the free sitting path reads, so a Baseline stores"
-                " sweeps with their reports or not at all"
-            )
-        (directory / f"{stem}.json").write_bytes(payload)
-        target_reports = directory / f"{stem}.reports"
+    directory.mkdir(parents=True, exist_ok=True)
+    for sweep in sweeps:
+        (directory / f"{sweep.stem}.json").write_bytes(sweep.payload)
+        target_reports = directory / f"{sweep.stem}.reports"
         target_reports.mkdir(exist_ok=True)
-        for file in sorted(reports.rglob("*")):
+        for file in sorted(sweep.reports.rglob("*")):
             if file.is_file():
-                target = target_reports / file.relative_to(reports)
+                target = target_reports / file.relative_to(sweep.reports)
                 target.parent.mkdir(parents=True, exist_ok=True)
                 target.write_bytes(file.read_bytes())
-        entries[f"{stem}.json"] = {
-            "artifact": f"{stem}.json",
+        entries[f"{sweep.stem}.json"] = {
+            "artifact": f"{sweep.stem}.json",
             "submitted_by": author,
-            "certification": artifact.block("certification"),
-            "files": _file_digests(directory, stem),
-            "cost": price_sweep(artifact).to_json(),
+            "certification": sweep.certification,
+            "files": _file_digests(directory, sweep.stem),
+            "cost": sweep.cost,
         }
 
     manifest["sweeps"] = list(entries.values())

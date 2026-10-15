@@ -70,7 +70,7 @@ from analysis_service.report import InputRef, Report
 from analysis_service.sources import render_sources
 from analysis_service.system_model import SystemModel
 from evals.harness.artifact import CORPUS_DIR, repo_commit
-from evals.harness.bundle import reports_dir
+from evals.harness.bundle import check_out, reports_dir
 from evals.harness.lane_replay import load_material
 from evals.harness.modes import EvalRunError
 from evals.harness.node_call import NodeCall, node_call
@@ -317,6 +317,7 @@ def command_critic_replay(args: argparse.Namespace) -> int:
     """Send one archived critic request again and compare the verdicts."""
     try:
         refuse_holdout(args.case)
+        check_out(args.out, args.raw)
         archived = load(args.artifact, args.case, args.framework)
     except (CorpusError, EvalRunError, FileNotFoundError) as error:
         print(error, file=sys.stderr)

@@ -73,6 +73,7 @@ from analysis_service.assertions import (
     subject_id,
 )
 from analysis_service.claims import FrameworkName
+from analysis_service.parsing import Signer
 from analysis_service.system_model import SystemModel
 from evals.harness.reference import CorpusError
 
@@ -122,7 +123,7 @@ class FactRow(BaseModel):
     rationale: str = Field(min_length=1)
     #: Who ruled that this row states what the source states. ``None`` until
     #: a person does.
-    reviewed_by: str | None = None
+    reviewed_by: Signer = None
 
 
 class Dispute(BaseModel):
@@ -141,7 +142,7 @@ class Dispute(BaseModel):
     #: The source's words, or their absence, that the dispute rests on.
     basis: str = Field(min_length=1)
     ruling: Ruling | None = None
-    reviewed_by: str | None = None
+    reviewed_by: Signer = None
 
 
 class RestingClaim(BaseModel):
@@ -169,7 +170,7 @@ class UnheldFact(BaseModel):
     claims: list[RestingClaim] = Field(min_length=1)
     #: Why no registered predicate holds the fact.
     rationale: str = Field(min_length=1)
-    reviewed_by: str | None = None
+    reviewed_by: Signer = None
 
 
 class SubjectAlias(BaseModel):
@@ -195,7 +196,7 @@ class SubjectAlias(BaseModel):
     #: produced row whose own subject is the alias is rewritten regardless.
     within: list[str] = Field(default_factory=list)
     ruling: str = Field(min_length=1)
-    reviewed_by: str | None = None
+    reviewed_by: Signer = None
 
     @field_validator("subject")
     @classmethod
@@ -238,7 +239,7 @@ class QualifierAlias(BaseModel):
     #: write in one principal's grant and not in another's states it here.
     within: list[str] = Field(default_factory=list)
     ruling: str = Field(min_length=1)
-    reviewed_by: str | None = None
+    reviewed_by: Signer = None
 
 
 class ReferenceAliases(BaseModel):

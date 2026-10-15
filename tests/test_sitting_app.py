@@ -1638,6 +1638,46 @@ class TestTheTextMovedUnderTheRead:
         assert held["own_list"] == OWN_LIST
         assert held["state"] == "finished"
 
+    def test_an_edit_while_the_case_is_built_pins_only_what_was_served(
+        self, tree, monkeypatch
+    ):
+        """The digests a draft pins come from the read that built the blocks.
+
+        An edit lands after the blocks are built and before the digests are
+        read. A draft that pinned the second read would sign bytes the reader
+        was never shown, and the finish would pass. The build refuses instead,
+        and the next open serves and pins the new bytes together.
+        """
+        app = browser(session_for(tree, "ada"))
+        real = sittings.docs.part_one_blocks
+        edits = []
+
+        def edited_after_the_build(case_dir):
+            blocks = real(case_dir)
+            if case_dir.name == CASE and not edits:
+                edits.append(case_dir)
+                self.move(tree)
+            return blocks
+
+        monkeypatch.setattr(sittings.docs, "part_one_blocks", edited_after_the_build)
+
+        first = app.get(f"/api/part-one?case={CASE}")
+        served = (
+            first if first.status_code == 200 else app.get(f"/api/part-one?case={CASE}")
+        )
+        app.post("/api/own-list", json={"case": CASE, "items": OWN_LIST})
+
+        text = next(
+            block["text"]
+            for block in served.json()["blocks"]
+            if block["kind"] == "source"
+        )
+        held = json.loads(draft_file(tree, CASE).read_text("utf-8"))
+        assert held["opened_digests"]["source.md"] == (
+            hashlib.sha256(text.encode("utf-8")).hexdigest()
+        )
+        assert first.status_code == 409
+
     def test_the_page_carries_the_warning(self, tree):
         """Both payloads that carry the drift reach the reader, and the box
         that holds it starts hidden — a case that did not move says nothing."""

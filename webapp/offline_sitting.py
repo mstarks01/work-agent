@@ -94,7 +94,7 @@ def payload(corpus_dir: Path, submitted_by: str, submitted_for: str) -> dict:
                     {"fingerprint": target.fingerprint, "claims": list(target.claims)}
                     for target in prepared.mark_targets
                 ],
-                "digests": sittings.digests(case_dir, prepared.files),
+                "digests": prepared.digests,
             }
         )
     return {
