@@ -1,9 +1,10 @@
 # Instruments
 
-Every reading available to an audit, what it answers, and what it costs. The
-commands are the real ones; `tests/test_doc_command_lints.py` checks each line
-here against the parser that would run it, so a command that moves fails this
-file rather than failing you at the terminal.
+Every reading available to an audit, what it answers, and what it costs.
+`tests/test_doc_command_lints.py` checks that each subcommand here exists and
+that each flag beside it is one the subcommand accepts. It does not check the
+positional arguments, their order or a required flag, so read a command's
+`--help` before you trust its shape.
 
 Run everything from the repository root, under `uv run`.
 
@@ -13,14 +14,14 @@ Run everything from the repository root, under `uv run`.
 | --- | --- |
 | `python -m evals.harness.run score <artifact>` | re-scores a finished sweep against the corpus and the vote ledger, and writes the loss-attribution blocks |
 | `python -m evals.harness.run replay <artifacts>` | re-scores archived extraction and assertion emissions under today's code, giving every reference element one fate |
-| `python -m evals.harness.run bind --graphs <artifacts> <proposals>` | binds archived assertion proposals to archived graphs and names every binding the graphs refuse |
+| `python -m evals.harness.run bind <proposals> --graphs <artifacts>` | binds archived assertion proposals to archived graphs and names every binding the graphs refuse |
 | `python -m evals.harness.run assembly <artifact>` | assembles every archived block again from its drafts and the rulings its report carries, and names any ruled draft the report omits |
 | `python -m evals.harness.run descendants <artifact>` | runs the fan-in again over a sweep's archived proposals, with `--inject` proposals added, and bounds what the critic would keep |
 | `python -m evals.harness.run stability <artifacts>` | the run-to-run band, from sweeps already paid for |
 | `python -m evals.harness.run compare <before> <after>` | what a prompt edit did: the instruction delta beside the score delta |
 | `python -m evals.harness.run price-verbs` | prices a verb equivalence on the frontier, with no run at all |
-| `python -m evals.harness.run extraction-losses <artifacts>` | what an end-to-end run lost before its lanes ran |
-| `python -m evals.harness.run pairing` | the two sides of one case's applicability disagreement |
+| `python -m evals.harness.run extraction-losses <end-to-end> <analysis>` | what an end-to-end run lost before its lanes ran, against an analysis-mode run of the same corpus |
+| `python -m evals.harness.run pairing <artifact> --case <case>` | the two sides of one case's applicability disagreement |
 | `python -m evals.harness.run calibrate` | how far the identity rule agrees with the calibration labels |
 | `python -m evals.harness.run review --voter <login> <artifacts>` | what a reviewer has waiting over a finished sweep |
 | `python -m evals.harness.run near-misses <artifact> --out ballot.csv` | the missed must-finds a free same-lane draft may state with another verb or place, as a ballot a person answers; `near-miss-rulings` records the answers in `rulings.json` |
@@ -59,7 +60,7 @@ costs one critic call and compares every draft's verdict with the archived one. 
 `<case>.lanes.json` and sends it again, so a `place` loss can be read against
 what the lane was shown. The material is the run's and the prompt files are
 this checkout's, and the command prints both commits. To compare a lane with and without the assertion catalog, use
-`lane-replay --case <case> --framework stride --lane <lane> --prepare-today none|signed`
+`lane-replay --case <case> --framework stride --lane <lane> --prepare-today none|signed --accept-cost unknown`
 with no artifact: it runs today's `prepare` offline, so the two arms differ only in the
 catalog, and it prints the must-finds the lane's drafts match.
 

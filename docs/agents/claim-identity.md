@@ -182,7 +182,7 @@ answer nobody gave it.
 - **`unclear`** — a reader could not decide the pair from the two sentences
   alone. Two fixtures use it.
 - **`unsupported`** — the candidate asserts a fact the model does not hold,
-  whether or not the pair also differs on identity. Twenty-five fixtures.
+  whether or not the pair also differs on identity. Twenty-four fixtures.
 - **`invalid-claim`** — the candidate is not a valid STRIDE threat claim at all.
   One fixture.
 
@@ -405,7 +405,7 @@ one requirement in one place, and one vote answering for both.
 
 | Module | What it owns |
 |---|---|
-| `evals/harness/verbs.py` | The closed vocabulary, the equivalence table, the three it cannot separate. |
+| `evals/harness/verbs.py` | The closed vocabulary, the equivalence table, the two it cannot separate. |
 | `evals/harness/fingerprint.py` | `Components`, the versioned hash, and the version read back off the value. |
 | `evals/harness/identity.py` | `endpoint_subset`, `SubsetVerbIdentity`, and the `Matcher` protocol one scoreboard scores every rule through. |
 | `evals/harness/ledger.py` | The append-only vote record, the reason split, the pool, the re-key. |

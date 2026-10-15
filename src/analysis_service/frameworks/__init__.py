@@ -407,7 +407,7 @@ class FrameworkSchemas:
     """The five shapes one framework's *model calls* speak in.
 
     Beside :class:`FrameworkPackage` rather than inside it, and the split is the
-    ten-member contract's own: a package member says what this framework judges
+    package contract's own: a package member says what this framework judges
     and what selects its text, which is what the deployment gate can check and
     what a maintainer edits. These five are the wire between the graph and a
     provider — the types an ``output_schema`` compiles to and the types a node's

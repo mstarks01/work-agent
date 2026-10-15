@@ -294,7 +294,7 @@ instead of the analysis form.
    [`examples/orders.md`](../examples/orders.md).
 2. Select at least one framework.
 3. For ASVS, select level 1, 2, or 3.
-4. Click **Analyze**.
+4. Click **Prepare analysis**.
 
 The selected frameworks affect both the answer and the cost. STRIDE runs six
 lane analyzers. ASVS runs 17. Each framework also runs its own reviewer, and a
@@ -321,7 +321,7 @@ Start with these parts of the result:
   unresolved references. These show where one proposal was degraded or removed
   without discarding the entire analysis.
 - **Provenance:** see which model route was requested, which model identifier
-  the provider returned, and which sampling fingerprint each call produced.
+  the provider returned, and which execution fingerprint each call produced.
   These values support auditing; they do not establish that a finding is right.
 
 Then replace the example with your own description. State security controls
@@ -333,8 +333,8 @@ uses `unknown`; code turns a claim resting on such an attribute into
 
 The app can ask you questions before the analysis, and after the report.
 
-- **Before the analysis.** Tick **Ask me questions before the analysis runs**.
-  The app reads your description, builds the system model and checks it. Then
+- **Before the analysis.** Leave **Ask me questions to make the report
+  better.** ticked, as the form starts. The app reads your description, builds the system model and checks it. Then
   it stops, before the threat analysis starts, and says so. It asks each open
   fact once, with a row for each part of your system it applies to: a value
   the description leaves unknown, a zone the app had to guess, or a fixed

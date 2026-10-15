@@ -227,9 +227,10 @@ questions before the analysis. A fact a description leaves unsaid becomes
 
 ## The three outcomes
 
-`analyze` returns a `PipelineOutcome`, which is the job lifecycle's
-`completed | rejected` split (see [Report-Schema](Report-Schema.md) for the full result shape);
-an internal failure raises instead. The engine never returns a partial report.
+`analyze` returns a `PipelineOutcome`: a `PipelineCompleted`, a
+`PipelineRejected`, or, where the call sets `ask_questions=True`, a
+`PipelineAwaiting` (see [Report-Schema](Report-Schema.md) for the full result
+shape); an internal failure raises instead. The engine never returns a partial report.
 
 This is [`examples/embed.py`](../examples/embed.py) — a runnable file, included
 here rather than retyped, so the shape below is provably the shape that works:

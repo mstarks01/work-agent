@@ -5,11 +5,15 @@
 - **Effort**: [#1291](https://github.com/mstarks01/work-agent/issues/1291)
 - **Amended by**: [ADR 0063](0063-a-conjunction-names-one-party-through-its-parent.md),
   on conjunctions, [ADR 0078](0078-a-paused-job-asks-one-adaptive-list.md),
-  on the order of the early capability questions, and
+  on the order of the early capability questions, under which one list
+  replaces the rounds and the benchmark's simulation asks through
+  `answer_state.recommended`, and
   [ADR 0085](0085-a-closed-field-of-the-model-proves-a-capability-present.md),
   under which a closed field of the model also states a capability present;
-  and by [ADR 0086](0086-a-separate-reader-states-the-capabilities-a-source-states.md),
-  under which a separate reader also states the capabilities a source states
+  by [ADR 0086](0086-a-separate-reader-states-the-capabilities-a-source-states.md),
+  under which a separate reader also states the capabilities a source states;
+  and by [ADR 0075](0075-the-assertion-pass-runs-by-default.md), under which
+  the assertion pass runs by default
 - **Relates to**: [ADR 0027](0027-vocabulary-raises-a-lead-and-rules-nothing-out.md), whose
   rule that silence is not absence this keeps, and
   [ADR 0048](0048-a-paused-job-ranks-its-open-facts-before-any-finding.md),

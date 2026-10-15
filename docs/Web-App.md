@@ -64,7 +64,8 @@ LD_LIBRARY_PATH=~/.local/lib/chromium-deps/usr/lib/x86_64-linux-gnu uv run --gro
 
 **The frameworks to run**, one checkbox per framework this install carries. The
 carried set comes from [`config/frameworks.toml`](../config/frameworks.toml).
-Every box starts unticked, so tick each framework you want **Analyze** to run.
+Every box starts unticked, so tick each framework you want **Prepare analysis**
+to run.
 The app refuses a submission with no box ticked. Each framework you tick costs
 its own nodes, so tick only what you need.
 
@@ -132,7 +133,8 @@ source marked as such rather than hidden.
 
 If the engine cannot be built — bad tier config, missing credentials, an
 unsupported sampling parameter — the app still starts, but serves a **diagnostic
-page instead of the form**. There is no textarea and no Analyze button, so no
+page instead of the form**. There is no textarea and no **Prepare analysis**
+button, so no
 analysis can run on a model nobody chose.
 
 Where the config itself read cleanly — the credential and sampling cases — the
@@ -268,8 +270,8 @@ Each policy grants only what its own page does:
 
 | Page | Grants beyond `default-src 'none'` |
 | --- | --- |
-| Report | `script-src`/`style-src` nonce. It loads nothing and calls nothing. |
-| Form | the same, plus `connect-src 'self'` for `/example`, `/analyze`, `/events`. |
+| Report | `script-src`/`style-src` nonce, plus `connect-src 'self'` for `/answer/{run}` and `/correct/{run}`. It loads nothing. |
+| Form | the same, for `/example`, `/analyze`, `/answer/{run}`, `/amend/{run}`, `/events/{run}` and `/workspace/runs`. |
 | Diagnostic | `style-src` nonce only — it runs no script, so it is granted none. |
 
 `base-uri` and `form-action` are `'none'` everywhere; the form posts through

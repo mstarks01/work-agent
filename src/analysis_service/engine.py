@@ -220,7 +220,9 @@ class Engine:
         Returns a :class:`~analysis_service.jobs.PipelineCompleted` carrying the
         :class:`~analysis_service.report.Report` when analysis succeeds, or
         a :class:`~analysis_service.jobs.PipelineRejected` carrying the validity
-        gate's issues when the input cannot be modelled. An internal failure
+        gate's issues when the input cannot be modelled, or, where
+        ``ask_questions`` is set, a :class:`~analysis_service.jobs.PipelineAwaiting`
+        carrying the checkpoint the answers resume from. An internal failure
         raises — the engine never returns a partial or best-effort report.
         ``on_node``, if given, is awaited with each node name as it completes,
         for progress or tracing.
@@ -230,7 +232,7 @@ class Engine:
         rather than to each caller for the reason
         :mod:`analysis_service.resilience` gives: ``timeout_ms`` bounds one HTTP
         request, ``attempts`` multiplies it, the retry budget multiplies it
-        again, and five LLM stages run in series on the graph's longest path, so
+        again, and seven LLM stages run in series on the graph's longest path, so
         the per-call knobs compose to a worst case in the hours while each one
         is individually respected. A provider ``Retry-After`` is deliberately
         uncapped (:mod:`analysis_service.retry`) precisely because a deadline

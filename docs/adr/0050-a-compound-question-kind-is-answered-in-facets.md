@@ -7,6 +7,10 @@
   whose rule that code writes every answer this keeps, and
   [ADR 0047](0047-the-critic-asks-a-kind-of-question-about-an-element.md),
   whose kinds this answers
+- **Amended by**: [ADR 0073](0073-a-finding-can-wait-on-some-facets-and-an-answer-can-carry-a-detail.md),
+  under which a finding can wait on some facets of a kind, an answer covers it
+  once each facet it needs has a known answer, and an answer can carry a
+  one-line detail in the submitter's own words
 
 ## Context
 

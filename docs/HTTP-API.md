@@ -806,7 +806,7 @@ A backend with a distinct name (or a non-OIDC mechanism — opaque-token
 introspection, mTLS, an API key) is a new entry in the `_FACTORIES` registry in
 [`src/analysis_service/auth.py`](../src/analysis_service/auth.py). Reuse
 `OidcJwtVerifier` for another OIDC issuer, or implement the `TokenVerifier`
-protocol (`verify(token) -> str`) for anything else; the API layer is unchanged.
+protocol (`verify(token) -> Identity`) for anything else; the API layer is unchanged.
 
 ## Job storage
 

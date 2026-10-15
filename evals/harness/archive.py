@@ -1,26 +1,28 @@
 """The bytes each archived file's producer writes, in one table.
 
-**The archive is not one encoding.** Five writers lay files into a **Baseline**
+**The archive is not one encoding.** Six writers lay files into a **Baseline**
 directory and they do not agree, because each one reaches for whatever its own
 call makes convenient:
 
-===================  ====================================  ======================
-file                 producer                              spelling
-===================  ====================================  ======================
-``*.report.json``    ``bundle.write_reports``              UTF-8
-``*.drafts.json``    ``bundle.write_reports``              escaped ASCII
-``*.proposals.json`` ``bundle.write_reports``              escaped ASCII
-``*.lanes.json``     ``bundle.write_reports``              escaped ASCII
-``*.failure.json``   ``bundle.write_failures``             escaped ASCII
-the sweep artifact   ``run.py`` sweep, and ``run.py``      escaped ASCII
-                     ``score``, which rewrites it
-``baseline.json``    ``baseline.assemble``                 UTF-8, keys sorted
-===================  ====================================  ======================
+=====================  ====================================  ======================
+file                   producer                              spelling
+=====================  ====================================  ======================
+``*.report.json``      ``bundle.write_reports``              UTF-8
+``*.drafts.json``      ``bundle.write_reports``              escaped ASCII
+``*.proposals.json``   ``bundle.write_reports``              escaped ASCII
+``*.lanes.json``       ``bundle.write_reports``              escaped ASCII
+``*.extraction.json``  ``bundle.write_extractions``          escaped ASCII
+``*.assertions.json``  ``bundle.write_assertions``           escaped ASCII
+``*.failure.json``     ``bundle.write_failures``             escaped ASCII
+the sweep artifact     ``run.py`` sweep, and ``run.py``      escaped ASCII
+                       ``score``, which rewrites it
+``baseline.json``      ``baseline.assemble``                 UTF-8, keys sorted
+=====================  ====================================  ======================
 
 Two of those sit in one directory, and the report and the drafts beside it are
 written three lines apart in one function. So "the archive is UTF-8" is a rule a
 reader learns from whichever writer they happened to open, and it is wrong for
-three of the five files.
+seven of the nine kinds.
 
 **It matters because a Baseline seals these bytes.** ``_file_digests`` digests
 every file a sweep owns, the artifact's own filename is a digest of its

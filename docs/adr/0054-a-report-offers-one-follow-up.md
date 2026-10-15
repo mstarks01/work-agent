@@ -30,7 +30,7 @@ came from a report's answers, and `QuestionSet.final` reads it.
 planned workflow ended, not that every answer was right. The owner of a final
 report can change an answer its run read, or take it back to "I don't know".
 The correction is kept beside the report, apart from the answers the run read
-(`JobRecord.corrections`, `Run.corrections`), and the report marks each
+(`JobRecord.corrections`), and the report marks each
 finding that rests on a corrected fact: one that quotes the fact's line of the
 answers Source, grounds on the same element's attribute, or waits on the fact
 (`report_conditions.corrected_findings`). The analysis does not run again. A report

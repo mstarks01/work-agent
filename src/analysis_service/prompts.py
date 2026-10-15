@@ -1,4 +1,4 @@
-"""Prompt composition for the five LLM node kinds.
+"""Prompt composition for the seven LLM node kinds.
 
 Prompt content lives in ``prompts/`` as Markdown, and loads through the same
 :class:`~analysis_service.markdown_loader.MarkdownLoader` the skills use. A
@@ -10,7 +10,7 @@ Composition here is concatenation only. The ``{lane}``, ``{system_model}``,
 ``{validation_issues}`` placeholders stay untouched, for ADK state templating to
 fill at run time.
 
-The five bodies are the service's, and they are framework-neutral. A prompt says
+The bodies are the service's, and they are framework-neutral. A prompt says
 what to do with this job's input, and every registered framework's lane agent
 does the same thing with it: read the model, work the leads, cite from the
 catalog, and emit an object holding ``claims``. What differs is what to look

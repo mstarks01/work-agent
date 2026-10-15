@@ -708,8 +708,9 @@ justify in the pull request.
 with the run artifacts (or a summary) in the PR so a reviewer can see the gain.
 
 **Sampling changes** need one extra step. Every report records the exact
-configuration each node ran on as a **fingerprint** — a hash of the served model
-build plus that tier's decoding parameters — and both the service and the eval
+configuration each node ran on as a **fingerprint** — a hash of both model
+routes, that tier's decoding parameters, the instruction digest and the build
+versions — and both the service and the eval
 harness check those fingerprints against the ones this deployment has
 **blessed**, in `config/blessed-fingerprints.toml`. Promoting a sampling winner
 has to update *both* the config file and that blessed list, or the two disagree

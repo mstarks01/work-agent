@@ -1351,12 +1351,12 @@ def _identity(entry: Assertion) -> str:
 def merged(
     held: AssertionCatalog, found: AssertionCatalog
 ) -> tuple[AssertionCatalog, list[CatalogIssue]]:
-    """Two catalogs as one, by the rule :func:`resolve_catalog` already merges by.
+    """Two catalogs as one, by the rule :func:`resolve_catalog` merges by.
 
-    **The one reader of "these rows and those rows are one catalog".** Rows
-    that share an identity become one row carrying both spans, through
-    :func:`_merge`, so two catalogs stating one fact keep both provenances
-    rather than becoming a duplicate the gate refuses.
+    Rows that share an identity become one row carrying both spans, through
+    :func:`_merge`, which :func:`resolve_catalog` also calls, so two catalogs
+    stating one fact keep both provenances rather than becoming a duplicate the
+    gate refuses.
 
     The subject table is rebuilt from the rows that survive, never unioned
     blindly: a subject nothing names is a row the caller does not hold, and a

@@ -135,7 +135,7 @@ the same `SystemModel` before the validity gate runs.
 
 Nothing downstream of the gate can tell the two apart, which is the point and
 also the reason the report records which one ran, in
-[`execution.extraction_format`](Report-Schema.md#execution). The adapter resolves
+[`execution.extraction_format`](Report-Schema.md#provenance). The adapter resolves
 references and copies fields; it decides no fact. `repair` writes a full
 `SystemModel` on either transport, so the one repair pass is never spent on a
 format conversion.
@@ -252,7 +252,7 @@ The tiers choose their vendor **independently**, so they can run different
 vendors at the same time. A third tier, `review`, exists so criticism can be
 bound off the model it checks; the shipped node map points nothing at it. Every
 vendor is reached through one adapter (LiteLLM), and the LLM nodes share **one
-adapter per bound tier** — so the startup checks on credentials and decoding
+adapter per bound tier** — so the checks on credentials and decoding
 parameters run once per tier rather than once per node, and a selected tier
 nothing runs on costs no credential at all.
 
@@ -266,10 +266,13 @@ The implementation records three related values:
   one had to be. It is also the one profiled family whose served build differs
   from the route you asked for, which is the distinction these three terms
   exist to draw. On Claude, both model fields hold the same string.
-- **Sampling fingerprint** — `sha256` of the provider-qualified served model
-  plus that tier's resolved decoding parameters. It identifies the generation
+- **Execution fingerprint** — `sha256` of the node's execution identity: the
+  requested route, the provider-qualified served model, how far the served
+  model is trusted, that tier's resolved decoding parameters, the instruction
+  digest, the installed versions of the distributions between the node and its
+  provider, and the identity's schema version. It identifies the generation
   setup, not everything that affected the output: the report records the input
-  digest and instruction digest separately.
+  digest separately.
 - **Blessed** — a fingerprint recorded in `config/blessed-fingerprints.toml`
   because a measured, sanctioned run produced it. The list is this deployment's
   own; nothing about it ships from this repo.
@@ -283,7 +286,7 @@ probabilistic result reproducible in the strict sense.
 | `NodeRun.requested_model` | The configured route — what was asked for (`vertex_ai/gemini-2.5-pro`). |
 | `NodeRun.model` | The served build — what actually answered (`vertex_ai/gemini-2.5-pro-002`). |
 | `NodeRun.instruction_sha256` | The digest of the instructions the graph this node ran in carried. |
-| `NodeRun.execution_fingerprint` | The identity hash: both routes, the tier's decoding params, the instruction digest, and the build versions. |
+| `NodeRun.execution_fingerprint` | The identity hash: both routes, the served trust, the tier's decoding params, the instruction digest, the build versions and the identity schema version. |
 | `Report.execution` | The identity schema version, how far the served builds can be trusted, and those build versions. |
 
 The report records both model fields and compares neither directly. A served
@@ -322,8 +325,8 @@ layer a second one on top.
 
 The service checks every completed job against the deployment's fingerprint
 manifest. This is a narrow operational attestation: it says whether the observed
-model-and-sampling fingerprints were approved. It does not judge the extracted
-model, findings, prompts, or input.
+execution fingerprints were approved. It does not judge the extracted model,
+the findings or the input.
 
 | State | Meaning | Effect on `GET /v1/jobs/{id}/report` |
 | --- | --- | --- |
@@ -337,7 +340,7 @@ anyone knows the normal range just trains people to switch it off. Promoting one
 is `python -m evals.harness.run promote <artifact> --yes`, which derives the
 blessed fingerprints from the served builds the sweep observed rather than from
 anything typed in by hand — see
-[TUNING.md](../evals/TUNING.md#step-5--promote-the-winner).
+[TUNING.md](../evals/TUNING.md#step-6--promote-the-winner).
 `unexercised` is different: every tier has a node that always runs, so it cannot
 happen on a run that produced a report at all. It is an internal assertion, and
 enforcing it costs nothing.
@@ -560,7 +563,7 @@ packaging (container, Cloud Run), and observability.
 | `analysis_service.system_model` | Canonical model + validity helpers. |
 | `analysis_service.analysis` | Deterministic traversal of a validated model: flows, reachability, paths, unknown controls. No security claims. |
 | `analysis_service.candidates` | The rule table. Structural conditions an agent should investigate — leads, never findings, never evidence. |
-| `analysis_service.domains` | Which `skills/domains/` packs a model earns, decided from its own technology fields. |
+| `analysis_service.domains` | Which `domains/` packs a model earns, decided from its own technology fields. |
 | `analysis_service.coverage` | Per-lane accounting: what each agent was offered, and what its drafts cite. |
 | `analysis_service.claims` | The neutral `Claim`, its grounds, the proposal and ruling wrappers, the marks, the severity model and the `FrameworkAnalysis` block. |
 | `analysis_service.report` | The `Report` envelope: the job, the input, the node runs and the blocks. |

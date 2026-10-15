@@ -75,7 +75,7 @@ A completed report contains:
 - warnings for repaired quotes, unresolved references, dropped proposals, and
   other faults that cost an entry rather than the whole report;
 - per-node timing, token use when the provider returns it, requested and served
-  model identifiers, and sampling fingerprints.
+  model identifiers, and execution fingerprints.
 
 Work Agent does **not** prove that a system is secure. The reports are generated
 by models and are not human-reviewed. Sparse or inaccurate input produces a
@@ -131,13 +131,14 @@ pipeline and return the same report shape.
   An optional pass records them, so a fact the system model has no field for can
   still reach the analyzers.
 - **Critic** — the model that reviews one framework's proposed claims.
-- **Fingerprint** — a hash of the served model route and resolved sampling
-  settings for one model call. It identifies that generation setup; it does not
-  prove the finding is correct or guarantee the same output on another run.
-- **Certification** — a deployment-local comparison between observed sampling
+- **Fingerprint** — a hash of what decided one model call: the requested and
+  served model routes, the resolved sampling settings, the instruction digest
+  and the installed library versions. It identifies that generation setup; it
+  does not prove the finding is correct or guarantee the same output on another
+  run.
+- **Certification** — a deployment-local comparison between observed
   fingerprints and a list the operator approved. The report separately records
-  an input digest and an instruction digest; certification does not combine or
-  judge those values.
+  an input digest; certification does not judge it.
 
 See [Concepts](docs/Concepts.md) for the full plain-language glossary.
 
@@ -173,7 +174,7 @@ uv run python examples/sync_docs.py --check
 Two commands do call configured providers:
 
 - `uv run python -m analysis_service.smoke` runs a small end-to-end analysis.
-- `uv run python -m evals.harness.run run` evaluates the corpus.
+- `uv run python -m evals.harness.run run --mode end-to-end` evaluates the corpus.
 
 The code is Apache-2.0. The ASVS catalog and the 17 ASVS lane skill files
 reproduce OWASP ASVS 5.0.0 under CC BY-SA 4.0. [NOTICE](NOTICE) records the

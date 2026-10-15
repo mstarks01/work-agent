@@ -8,6 +8,9 @@
   critic's view.
 - **Relates to**: [ADR 0031](0031-a-claim-identity-carries-no-direction.md),
   whose identity rule keyed the pairs.
+- **Amended by**: [ADR 0060](0060-two-mechanisms-at-one-place-are-two-findings.md),
+  under which `report_changes` also reads `critic.mechanism_of`, so two
+  mechanisms under one key are two findings
 
 ## Context
 

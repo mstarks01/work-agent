@@ -1,7 +1,7 @@
 """The ASVS package: what it declares, what it refuses, and what it rules.
 
 Four seams, and each is one the ticket names. The **package gate** covers all
-nine members and the disk layout. The **catalog** is this package's own private
+thirteen members and the disk layout. The **catalog** is this package's own private
 data, so its own module checks it and this checks the roster the lane skills
 publish against it. The **block** carries ASVS's own scope answer and its own
 completeness check. The **precondition** is the first one in this repo that can
@@ -96,7 +96,7 @@ def corpus_model(case_id: str) -> SystemModel:
 
 
 def test_the_shipped_package_passes_the_gate():
-    """A second package earns no exemption: the same gate, the same nine members."""
+    """A second package earns no exemption: the same gate, the same thirteen members."""
     validate_package(ASVS, ASVS_ROOT)
 
 

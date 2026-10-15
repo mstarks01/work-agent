@@ -269,10 +269,12 @@ Spelling = Literal["question", "attribute", "assertion", "subject", "capability"
 class UnknownRef(BaseModel):
     """What a ``needs-info`` verdict says has to be answered.
 
-    Two spellings in one flat shape, which is the answer :class:`Ground` and
-    :class:`Verdict` already give to "tagged variant in a provider-facing
-    schema". A union here would compile to ``oneOf``, and ``Ground`` records at
-    length what an uncompilable grammar costs.
+    Five spellings in one flat shape (:attr:`spellings`), which is the answer
+    :class:`Ground` and :class:`Verdict` already give to "tagged variant in a
+    provider-facing schema". A union here would compile to ``oneOf``, and
+    ``Ground`` records at length what an uncompilable grammar costs. The first
+    two are below; the ``assertion``, ``question`` and ``capability`` fields
+    state the other three.
 
     * **An unknown in the model** — ``element_id`` with ``attribute``. The fact
       has a place in the **System Model**, so naming it tells the submitter
