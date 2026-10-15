@@ -258,6 +258,20 @@ _DIAGNOSTIC_GRANTS = Grants(style=True)
 OPERATOR = Identity.local(DEFAULT_CALLER)
 
 
+def store_note(store: JobStore) -> str:
+    """The sentence that tells a user whether a restart keeps their runs.
+
+    The startup line and the form page both show it, so the two cannot
+    disagree about the store.
+    """
+    if isinstance(store, InMemoryJobStore):
+        return (
+            "This app keeps your runs in memory, so a restart clears them."
+            " To keep them, set a sql store as docs/Web-App.md states."
+        )
+    return "This app keeps your runs in a durable store, so a restart keeps them."
+
+
 class WorkspaceFull(Exception):
     """Every job the workspace holds waits for answers, so none can make room."""
 
@@ -889,14 +903,15 @@ def create_app(
     Without a ``workspace``, the app builds its store with
     :func:`~analysis_service.store_backends.build_store` from the service's backend
     settings, and an unusable setting raises. Where ``ANALYSIS_JOB_STORE`` is
-    unset, the store is ``memory``, so a first run needs no setting. At
-    startup, before the app takes a request, the app runs
+    unset, the store is ``memory``, so a first run needs no setting. The app
+    logs :func:`store_note` for the store it built. At startup, before the app takes a request, the app runs
     :func:`~analysis_service.store_backends.store_lifespan` over the store, as the
     service does.
     """
     state = build_startup() if startup is None else startup
     if workspace is None and state.settings is not None:
         store = build_store({"ANALYSIS_JOB_STORE": "memory", **os.environ})
+        logger.info(store_note(store))
         workspace = Workspace(state.settings, store=store)
     app = FastAPI(
         title="Work Agent",
@@ -942,6 +957,7 @@ def create_app(
                 tiers=_tier_lines(state.tiers),
                 frameworks=_framework_fields(state.frameworks),
                 questions=_QUESTIONS_FIELD,
+                store_note=escape(store_note(workspace.store)) if workspace else "",
             )
         )
 
