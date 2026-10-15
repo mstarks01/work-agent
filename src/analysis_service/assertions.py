@@ -63,9 +63,9 @@ import json
 from collections.abc import Collection, Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from types import MappingProxyType
-from typing import Literal, NamedTuple, get_args
+from typing import Literal, NamedTuple, Self, get_args
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from analysis_service.analysis import ABSENT_WORD, control_state
 from analysis_service.grounding import (
@@ -124,6 +124,7 @@ __all__ = [
     "CatalogProposal",
     "Conflict",
     "Contradiction",
+    "Origin",
     "Predicate",
     "Projection",
     "ProjectionReason",
@@ -263,6 +264,11 @@ Basis = Literal["stated", "inferred", "derived"]
 #: Whether anything checked that the support *supports* the value. It starts at
 #: ``unchecked`` and no extractor may move it.
 Assessment = Literal["unchecked", "supported", "unsupported", "unresolved"]
+
+#: Who wrote a row. ``assertion-pass`` is a row :func:`resolve_catalog` builds
+#: from a proposal: the assertion pass's, or a corpus reference's. ``answer`` is
+#: a row code writes from a submitter's answer to a question this service asked.
+Origin = Literal["answer", "assertion-pass"]
 
 #: Why a value is :data:`UNKNOWN`. ``silent`` is a source that does not answer,
 #: ``hedged`` is a speaker who voiced uncertainty, ``unmeasured`` is a predicate
@@ -661,6 +667,10 @@ class Assertion(BaseModel):
     It carries no ID field. :func:`assertion_id` computes one from the subject,
     the predicate, the scope and the value, so improving the rule re-keys the
     catalog by recomputation — the property a **Claim** identity already has.
+
+    ``origin`` names the writer, and :func:`answered` reads it. Every span of
+    an ``answer`` row quotes the answers Source, and no span of another row
+    quotes it, so the support and the writer cannot disagree.
     """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
@@ -670,6 +680,7 @@ class Assertion(BaseModel):
     value: str = Field(min_length=1, max_length=MAX_VALUE_CHARS)
     scope: list[Qualifier] = Field(default_factory=list, max_length=MAX_QUALIFIERS)
     basis: Basis
+    origin: Origin
     #: Required when ``value`` is :data:`UNKNOWN`, refused otherwise.
     reason: UnknownReason | None = None
     #: Bounded at :data:`MAX_SPANS` by the gate rather than here, so the rule
@@ -711,6 +722,21 @@ class Assertion(BaseModel):
     #: Who assessed the support, and which version of them. Required once
     #: ``assessment`` moves off ``unchecked``.
     assessor: str = Field(default="", max_length=200)
+
+    @model_validator(mode="after")
+    def _check_origin(self) -> Self:
+        quoted = [span.source_label == ANSWERS_LABEL for span in self.support]
+        if self.origin == "answer":
+            agrees = bool(quoted) and all(quoted)
+        else:
+            agrees = not any(quoted)
+        if not agrees:
+            raise ValueError(
+                "every span of an answer row quotes the answers Source, and no"
+                f" span of another row quotes it; this {self.origin} row quotes"
+                f" {sorted({span.source_label for span in self.support})}"
+            )
+        return self
 
 
 class AssertionCatalog(BaseModel):
@@ -1570,7 +1596,7 @@ def admissible(entry: Assertion) -> bool:
 
 
 def answered(entry: Assertion) -> bool:
-    """Whether this row writes a submitter's answer: it quotes the answers Source.
+    """Whether this row writes a submitter's answer: its ``origin`` is ``answer``.
 
     **The one reader of "is this row an answer".** An answer to a question this
     service asked settles the fact, even against the sources (the maintainer's
@@ -1578,7 +1604,7 @@ def answered(entry: Assertion) -> bool:
     outrank every other row, and the question readers find the row an earlier
     run wrote by it.
     """
-    return any(span.source_label == ANSWERS_LABEL for span in entry.support)
+    return entry.origin == "answer"
 
 
 def answer(catalog: AssertionCatalog, subject: str, predicate: str) -> Answer:
@@ -2142,7 +2168,12 @@ def resolve_catalog(
                 f" the cap is {MAX_ASSERTIONS}",
             )
         ]
-    prepared = _prepare(sources)
+    # The pass writes no answer. A quote of the answers Source locates nothing,
+    # as a quote of a source the job does not hold, so no row built here quotes
+    # it and a row's origin and support agree.
+    prepared = _prepare(
+        {label: text for label, text in sources.items() if label != ANSWERS_LABEL}
+    )
     checked = _checked(sources)
     element_ids = [element.id for element in model.elements()]
     labels = {element.id: element.name for element in model.elements()}
@@ -2280,6 +2311,7 @@ def _resolve_row(
         reason=row.reason if value == UNKNOWN else None,
         scope=list(row.scope),
         basis=row.basis,
+        origin="assertion-pass",
         support=spans,
         explanation=row.explanation,
         exclusive=row.exclusive,
@@ -2429,14 +2461,19 @@ def _merge(held: Assertion, found: Assertion) -> Assertion:
     silent, so every caller cuts what it merged through :func:`_bounded`, which
     records ``support-truncated`` (#926). The first row's
     spans come first, so a cut keeps them.
+
+    The merged row is validated again, so an answer row and a row of another
+    origin raise rather than join: the joined spans would quote the answers
+    Source and another source on one row.
     """
     first, second = sorted((held, found), key=_merge_rank)
     spans = list(first.support)
     for span in second.support:
         if span not in spans:
             spans.append(span)
-    return first.model_copy(
-        update={
+    return Assertion.model_validate(
+        {
+            **dict(first),
             "support": spans,
             "exclusive": held.exclusive or found.exclusive,
         }

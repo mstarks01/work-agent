@@ -178,6 +178,7 @@ def test_a_stated_absence_reaches_the_report_as_a_fact_a_claim_rests_on():
         predicate="mfa-requirement",
         value=ABSENT,
         basis="inferred",
+        origin="assertion-pass",
         explanation="the description names a password and no second factor",
     )
     replies = happy_replies() | {

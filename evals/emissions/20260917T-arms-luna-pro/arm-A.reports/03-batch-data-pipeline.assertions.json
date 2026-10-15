@@ -308,6 +308,7 @@
         "value": "static key",
         "scope": [],
         "basis": "stated",
+        "origin": "assertion-pass",
         "reason": null,
         "support": [
           {
@@ -330,6 +331,7 @@
         "value": "credential:partner-keys",
         "scope": [],
         "basis": "inferred",
+        "origin": "assertion-pass",
         "reason": null,
         "support": [],
         "premises": [],
@@ -344,6 +346,7 @@
         "value": "credential:partner-keys",
         "scope": [],
         "basis": "stated",
+        "origin": "assertion-pass",
         "reason": null,
         "support": [
           {
@@ -366,6 +369,7 @@
         "value": "per-principal",
         "scope": [],
         "basis": "stated",
+        "origin": "assertion-pass",
         "reason": null,
         "support": [
           {
@@ -388,6 +392,7 @@
         "value": "not-rotated",
         "scope": [],
         "basis": "stated",
+        "origin": "assertion-pass",
         "reason": null,
         "support": [
           {
@@ -410,6 +415,7 @@
         "value": "Airflow metadata database",
         "scope": [],
         "basis": "stated",
+        "origin": "assertion-pass",
         "reason": null,
         "support": [
           {
@@ -432,6 +438,7 @@
         "value": "boundary:landing-network",
         "scope": [],
         "basis": "stated",
+        "origin": "assertion-pass",
         "reason": null,
         "support": [
           {
@@ -454,6 +461,7 @@
         "value": "boundary:landing-network",
         "scope": [],
         "basis": "stated",
+        "origin": "assertion-pass",
         "reason": null,
         "support": [
           {
@@ -483,6 +491,7 @@
         "value": "boundary:warehouse-network",
         "scope": [],
         "basis": "stated",
+        "origin": "assertion-pass",
         "reason": null,
         "support": [
           {
@@ -505,6 +514,7 @@
         "value": "boundary:warehouse-network",
         "scope": [],
         "basis": "stated",
+        "origin": "assertion-pass",
         "reason": null,
         "support": [
           {
@@ -527,6 +537,7 @@
         "value": "SSO",
         "scope": [],
         "basis": "stated",
+        "origin": "assertion-pass",
         "reason": null,
         "support": [
           {
@@ -558,6 +569,7 @@
           }
         ],
         "basis": "stated",
+        "origin": "assertion-pass",
         "reason": null,
         "support": [
           {
@@ -580,6 +592,7 @@
         "value": "unknown",
         "scope": [],
         "basis": "stated",
+        "origin": "assertion-pass",
         "reason": "hedged",
         "support": [
           {
@@ -602,6 +615,7 @@
         "value": "unknown",
         "scope": [],
         "basis": "stated",
+        "origin": "assertion-pass",
         "reason": "hedged",
         "support": [
           {

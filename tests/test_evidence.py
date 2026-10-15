@@ -81,6 +81,7 @@ def row(**overrides):
         "predicate": "mfa-requirement",
         "value": ABSENT,
         "basis": "inferred",
+        "origin": "assertion-pass",
         "explanation": "the description names password login and nothing else",
     }
     return Assertion(**{**fields, **overrides})
@@ -580,6 +581,7 @@ class TestRenderCatalog:
             predicate="tenant-ownership",
             value=SHOPPERS.id,
             basis="inferred",
+            origin="assertion-pass",
             explanation="the description reads as the shoppers' own deployment",
         )
         kept = Assertion(
@@ -587,6 +589,7 @@ class TestRenderCatalog:
             predicate="credential-custody",
             value="the browser's cookie jar",
             basis="inferred",
+            origin="assertion-pass",
             explanation="a session cookie lives in the browser",
         )
         held = assertions(inferred, owned, kept)
@@ -1296,6 +1299,7 @@ class TestWhatTheAssertionPassReached:
                     predicate="mfa-requirement",
                     value=ABSENT,
                     basis="inferred",
+                    origin="assertion-pass",
                     explanation="the description names password login only",
                 )
             ],

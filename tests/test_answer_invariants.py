@@ -64,6 +64,7 @@ def row(predicate: str, value: str, quote: str | None, **overrides) -> Assertion
         "predicate": predicate,
         "value": value,
         "basis": "stated",
+        "origin": "assertion-pass",
         "support": support,
     }
     return Assertion(**{**fields, **overrides})
@@ -232,6 +233,10 @@ def test_an_answer_keeps_a_scoped_fact_beside_it():
 
     assert effective(report, "encryption_in_transit") == "none"
     assert staging in report.assertions.catalog.entries
+    (written,) = [
+        entry for entry in reaching(report, "encryption_in_transit") if answered(entry)
+    ]
+    assert (written.origin, written.scope) == ("answer", [])
     assert "superseded-by-answer" not in {i.code for i in report.assertions.issues}
 
 

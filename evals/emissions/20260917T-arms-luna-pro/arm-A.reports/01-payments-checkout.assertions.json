@@ -343,6 +343,7 @@
         "value": "internet-facing",
         "scope": [],
         "basis": "stated",
+        "origin": "assertion-pass",
         "reason": null,
         "support": [
           {
@@ -365,6 +366,7 @@
         "value": "internal",
         "scope": [],
         "basis": "stated",
+        "origin": "assertion-pass",
         "reason": null,
         "support": [
           {
@@ -387,6 +389,7 @@
         "value": "boundary:core-network",
         "scope": [],
         "basis": "stated",
+        "origin": "assertion-pass",
         "reason": null,
         "support": [
           {
@@ -409,6 +412,7 @@
         "value": "customer-managed key",
         "scope": [],
         "basis": "stated",
+        "origin": "assertion-pass",
         "reason": null,
         "support": [
           {
@@ -431,6 +435,7 @@
         "value": "email and password with a session cookie",
         "scope": [],
         "basis": "stated",
+        "origin": "assertion-pass",
         "reason": null,
         "support": [
           {
@@ -453,6 +458,7 @@
         "value": "absent",
         "scope": [],
         "basis": "stated",
+        "origin": "assertion-pass",
         "reason": null,
         "support": [
           {
@@ -475,6 +481,7 @@
         "value": "credential:session-cookie",
         "scope": [],
         "basis": "stated",
+        "origin": "assertion-pass",
         "reason": null,
         "support": [
           {
@@ -497,6 +504,7 @@
         "value": "absent",
         "scope": [],
         "basis": "stated",
+        "origin": "assertion-pass",
         "reason": null,
         "support": [
           {
@@ -519,6 +527,7 @@
         "value": "single application account with a password from an environment variable",
         "scope": [],
         "basis": "stated",
+        "origin": "assertion-pass",
         "reason": null,
         "support": [
           {
@@ -550,6 +559,7 @@
           }
         ],
         "basis": "stated",
+        "origin": "assertion-pass",
         "reason": null,
         "support": [
           {
@@ -572,6 +582,7 @@
         "value": "environment variable on the worker",
         "scope": [],
         "basis": "stated",
+        "origin": "assertion-pass",
         "reason": null,
         "support": [
           {
@@ -594,6 +605,7 @@
         "value": "TLS",
         "scope": [],
         "basis": "stated",
+        "origin": "assertion-pass",
         "reason": null,
         "support": [
           {
@@ -616,6 +628,7 @@
         "value": "credential:order-service-s-own-service-account",
         "scope": [],
         "basis": "stated",
+        "origin": "assertion-pass",
         "reason": null,
         "support": [
           {
@@ -647,6 +660,7 @@
           }
         ],
         "basis": "inferred",
+        "origin": "assertion-pass",
         "reason": null,
         "support": [],
         "premises": [],
@@ -661,6 +675,7 @@
         "value": "unknown",
         "scope": [],
         "basis": "stated",
+        "origin": "assertion-pass",
         "reason": "hedged",
         "support": [
           {

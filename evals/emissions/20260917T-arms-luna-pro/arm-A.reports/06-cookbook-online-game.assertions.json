@@ -382,6 +382,7 @@
         "value": "unknown",
         "scope": [],
         "basis": "stated",
+        "origin": "assertion-pass",
         "reason": "silent",
         "support": [],
         "premises": [],
@@ -396,6 +397,7 @@
         "value": "unknown",
         "scope": [],
         "basis": "stated",
+        "origin": "assertion-pass",
         "reason": "silent",
         "support": [],
         "premises": [],
@@ -410,6 +412,7 @@
         "value": "unknown",
         "scope": [],
         "basis": "stated",
+        "origin": "assertion-pass",
         "reason": "silent",
         "support": [],
         "premises": [],
@@ -424,6 +427,7 @@
         "value": "unknown",
         "scope": [],
         "basis": "stated",
+        "origin": "assertion-pass",
         "reason": "silent",
         "support": [],
         "premises": [],
@@ -438,6 +442,7 @@
         "value": "unknown",
         "scope": [],
         "basis": "stated",
+        "origin": "assertion-pass",
         "reason": "silent",
         "support": [],
         "premises": [],
@@ -452,6 +457,7 @@
         "value": "unknown",
         "scope": [],
         "basis": "stated",
+        "origin": "assertion-pass",
         "reason": "silent",
         "support": [],
         "premises": [],
@@ -466,6 +472,7 @@
         "value": "unknown",
         "scope": [],
         "basis": "stated",
+        "origin": "assertion-pass",
         "reason": "silent",
         "support": [],
         "premises": [],
@@ -480,6 +487,7 @@
         "value": "unknown",
         "scope": [],
         "basis": "stated",
+        "origin": "assertion-pass",
         "reason": "silent",
         "support": [],
         "premises": [],
@@ -494,6 +502,7 @@
         "value": "unknown",
         "scope": [],
         "basis": "stated",
+        "origin": "assertion-pass",
         "reason": "silent",
         "support": [],
         "premises": [],
@@ -508,6 +517,7 @@
         "value": "internet-facing",
         "scope": [],
         "basis": "stated",
+        "origin": "assertion-pass",
         "reason": null,
         "support": [
           {
@@ -530,6 +540,7 @@
         "value": "internet-facing",
         "scope": [],
         "basis": "stated",
+        "origin": "assertion-pass",
         "reason": null,
         "support": [
           {
@@ -552,6 +563,7 @@
         "value": "boundary:own-machines",
         "scope": [],
         "basis": "stated",
+        "origin": "assertion-pass",
         "reason": null,
         "support": [
           {
@@ -574,6 +586,7 @@
         "value": "boundary:production-network",
         "scope": [],
         "basis": "stated",
+        "origin": "assertion-pass",
         "reason": null,
         "support": [
           {
@@ -596,6 +609,7 @@
         "value": "boundary:production-network",
         "scope": [],
         "basis": "stated",
+        "origin": "assertion-pass",
         "reason": null,
         "support": [
           {
@@ -618,6 +632,7 @@
         "value": "principal:players",
         "scope": [],
         "basis": "stated",
+        "origin": "assertion-pass",
         "reason": null,
         "support": [
           {
@@ -640,6 +655,7 @@
         "value": "unknown",
         "scope": [],
         "basis": "stated",
+        "origin": "assertion-pass",
         "reason": "silent",
         "support": [],
         "premises": [],
@@ -654,6 +670,7 @@
         "value": "unknown",
         "scope": [],
         "basis": "stated",
+        "origin": "assertion-pass",
         "reason": "silent",
         "support": [],
         "premises": [],
@@ -677,6 +694,7 @@
           }
         ],
         "basis": "inferred",
+        "origin": "assertion-pass",
         "reason": null,
         "support": [
           {
@@ -708,6 +726,7 @@
           }
         ],
         "basis": "inferred",
+        "origin": "assertion-pass",
         "reason": null,
         "support": [
           {

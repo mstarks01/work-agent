@@ -185,7 +185,12 @@ from analysis_service.vendors import ServedTrust, vendor_for_route
 # ``reader``. A ``field`` statement carries a ``basis``, and a statement of
 # another origin carries none. A stored 3.0 job record gets 409
 # ``UnreadableSchema``.
-SCHEMA_VERSION = "3.1"
+#
+# Version 3.2: each row in ``assertions.catalog.entries`` carries the required
+# ``origin``, which names its writer: ``assertion-pass`` or ``answer``. Every
+# span of an ``answer`` row quotes the answers Source, and no span of another
+# row quotes it. A stored 3.1 job record gets 409 ``UnreadableSchema``.
+SCHEMA_VERSION = "3.2"
 
 # The envelope's disclaimer, which is about the *service* rather than about any
 # one framework. It does not say "threat model": that is false of a report

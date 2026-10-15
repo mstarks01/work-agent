@@ -345,7 +345,8 @@ def fact_rows(
     order of ``answers``. An assertion answer replaces the open row it answers,
     and the stated row keeps the open row's subject, predicate and scope, so it
     answers exactly what was asked. An answer an earlier run wrote is written again
-    over the row it wrote, so its quote reads this run's answers Source.
+    over the row it wrote, so its quote reads this run's answers Source. Each
+    row written here has the origin ``answer``.
 
     **An attribute answer removes every unscoped row that reaches its
     attribute.** The answer settles the attribute, and such a row left beside it
@@ -400,6 +401,7 @@ def fact_rows(
                 predicate=entry.predicate,
                 value=value,
                 basis="stated",
+                origin="answer",
                 support=[span],
             ),
         )
@@ -417,10 +419,12 @@ def fact_rows(
                 )
             )
             continue
-        replaced[assertion_id(row)] = row.model_copy(
-            update={
+        replaced[assertion_id(row)] = Assertion.model_validate(
+            {
+                **dict(row),
                 "value": answer.value,
                 "basis": "stated",
+                "origin": "answer",
                 "reason": None,
                 "support": [span],
             }

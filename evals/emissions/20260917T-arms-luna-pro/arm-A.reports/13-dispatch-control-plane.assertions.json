@@ -546,6 +546,7 @@
         "value": "boundary:corporate-network",
         "scope": [],
         "basis": "stated",
+        "origin": "assertion-pass",
         "reason": null,
         "support": [
           {
@@ -568,6 +569,7 @@
         "value": "boundary:corporate-network",
         "scope": [],
         "basis": "stated",
+        "origin": "assertion-pass",
         "reason": null,
         "support": [
           {
@@ -590,6 +592,7 @@
         "value": "boundary:production-control-plane",
         "scope": [],
         "basis": "stated",
+        "origin": "assertion-pass",
         "reason": null,
         "support": [
           {
@@ -612,6 +615,7 @@
         "value": "internal",
         "scope": [],
         "basis": "stated",
+        "origin": "assertion-pass",
         "reason": null,
         "support": [
           {
@@ -634,6 +638,7 @@
         "value": "boundary:corporate-network",
         "scope": [],
         "basis": "stated",
+        "origin": "assertion-pass",
         "reason": null,
         "support": [
           {
@@ -656,6 +661,7 @@
         "value": "boundary:production-control-plane",
         "scope": [],
         "basis": "stated",
+        "origin": "assertion-pass",
         "reason": null,
         "support": [
           {
@@ -678,6 +684,7 @@
         "value": "unknown",
         "scope": [],
         "basis": "stated",
+        "origin": "assertion-pass",
         "reason": "hedged",
         "support": [
           {
@@ -700,6 +707,7 @@
         "value": "boundary:corporate-network",
         "scope": [],
         "basis": "stated",
+        "origin": "assertion-pass",
         "reason": null,
         "support": [
           {
@@ -722,6 +730,7 @@
         "value": "unknown",
         "scope": [],
         "basis": "stated",
+        "origin": "assertion-pass",
         "reason": "hedged",
         "support": [
           {
@@ -744,6 +753,7 @@
         "value": "unknown",
         "scope": [],
         "basis": "stated",
+        "origin": "assertion-pass",
         "reason": "hedged",
         "support": [
           {
@@ -766,6 +776,7 @@
         "value": "unknown",
         "scope": [],
         "basis": "stated",
+        "origin": "assertion-pass",
         "reason": "hedged",
         "support": [
           {
@@ -793,6 +804,7 @@
           }
         ],
         "basis": "stated",
+        "origin": "assertion-pass",
         "reason": "hedged",
         "support": [
           {
@@ -815,6 +827,7 @@
         "value": "HTTPS",
         "scope": [],
         "basis": "stated",
+        "origin": "assertion-pass",
         "reason": null,
         "support": [
           {
@@ -837,6 +850,7 @@
         "value": "unknown",
         "scope": [],
         "basis": "stated",
+        "origin": "assertion-pass",
         "reason": "hedged",
         "support": [
           {
@@ -859,6 +873,7 @@
         "value": "unknown",
         "scope": [],
         "basis": "stated",
+        "origin": "assertion-pass",
         "reason": "hedged",
         "support": [
           {
@@ -881,6 +896,7 @@
         "value": "API token",
         "scope": [],
         "basis": "stated",
+        "origin": "assertion-pass",
         "reason": null,
         "support": [
           {
@@ -903,6 +919,7 @@
         "value": "credential:api-token",
         "scope": [],
         "basis": "inferred",
+        "origin": "assertion-pass",
         "reason": null,
         "support": [],
         "premises": [],
@@ -917,6 +934,7 @@
         "value": "credential:api-token",
         "scope": [],
         "basis": "inferred",
+        "origin": "assertion-pass",
         "reason": null,
         "support": [],
         "premises": [],
@@ -931,6 +949,7 @@
         "value": "not-rotated",
         "scope": [],
         "basis": "stated",
+        "origin": "assertion-pass",
         "reason": null,
         "support": [
           {
@@ -962,6 +981,7 @@
           }
         ],
         "basis": "stated",
+        "origin": "assertion-pass",
         "reason": null,
         "support": [
           {
@@ -993,6 +1013,7 @@
           }
         ],
         "basis": "stated",
+        "origin": "assertion-pass",
         "reason": null,
         "support": [
           {
@@ -1015,6 +1036,7 @@
         "value": "principal:our-company",
         "scope": [],
         "basis": "stated",
+        "origin": "assertion-pass",
         "reason": null,
         "support": [
           {
@@ -1037,6 +1059,7 @@
         "value": "principal:our-company",
         "scope": [],
         "basis": "stated",
+        "origin": "assertion-pass",
         "reason": null,
         "support": [
           {
@@ -1059,6 +1082,7 @@
         "value": "principal:our-company",
         "scope": [],
         "basis": "stated",
+        "origin": "assertion-pass",
         "reason": null,
         "support": [
           {
@@ -1081,6 +1105,7 @@
         "value": "principal:our-company",
         "scope": [],
         "basis": "stated",
+        "origin": "assertion-pass",
         "reason": null,
         "support": [
           {
@@ -1103,6 +1128,7 @@
         "value": "principal:our-company",
         "scope": [],
         "basis": "stated",
+        "origin": "assertion-pass",
         "reason": null,
         "support": [
           {
@@ -1125,6 +1151,7 @@
         "value": "principal:our-company",
         "scope": [],
         "basis": "stated",
+        "origin": "assertion-pass",
         "reason": null,
         "support": [
           {

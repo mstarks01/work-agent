@@ -58,6 +58,7 @@ def inferred(subject, predicate, value):
         predicate=predicate,
         value=value,
         basis="inferred",
+        origin="assertion-pass",
         explanation="the notes describe it",
     )
 
@@ -197,6 +198,7 @@ class TestTheRowAnAnswerWrites:
         (row,) = answer(record.catalog, PRINCIPAL, "represented-by").settled
         assert (row.value, row.basis) == ("entity:customer", "stated")
         assert row.support[0].source_label == ANSWERS_LABEL
+        assert row.origin == "answer"
 
     def test_none_of_these_settles_the_link_as_absent(self, model):
         link = LinkAnswer(principal="customer accounts", element=NONE_OF_THESE)
@@ -218,6 +220,7 @@ class TestTheRowAnAnswerWrites:
                 predicate="represented-by",
                 value="process:web-app",
                 basis="stated",
+                origin="assertion-pass",
                 support=[],
             ),
         )

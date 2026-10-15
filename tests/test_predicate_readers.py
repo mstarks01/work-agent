@@ -84,6 +84,7 @@ def fired(model, rule_id, catalog, package=STRIDE):
 
 def row(subject, predicate, value, **fields):
     fields.setdefault("basis", "stated")
+    fields.setdefault("origin", "assertion-pass")
     if value == UNKNOWN:
         fields.setdefault("reason", "silent")
     else:

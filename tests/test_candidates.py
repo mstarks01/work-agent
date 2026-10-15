@@ -527,6 +527,7 @@ class TestTheRuleThatReadsTheCatalog:
                     predicate=predicate or "mfa-requirement",
                     value=value,
                     basis=basis,
+                    origin="assertion-pass",
                     explanation="the description names one factor",
                 )
             ],
@@ -560,6 +561,7 @@ class TestTheRuleThatReadsTheCatalog:
                             predicate="mfa-requirement",
                             value=UNKNOWN,
                             basis="stated",
+                            origin="assertion-pass",
                             reason="silent",
                         )
                     ],
@@ -623,6 +625,7 @@ class TestAPrincipalReachesAnElementOnlyWhenTheSourcesSaySo:
                     predicate="represented-by",
                     value=self.ENTITY,
                     basis="stated",
+                    origin="assertion-pass",
                     support=[
                         SupportSpan(
                             source_label=SOURCE_LABEL,
@@ -642,6 +645,7 @@ class TestAPrincipalReachesAnElementOnlyWhenTheSourcesSaySo:
             predicate="mfa-requirement",
             value=ABSENT,
             basis="stated",
+            origin="assertion-pass",
             support=[
                 SupportSpan(
                     source_label=SOURCE_LABEL,
@@ -671,6 +675,7 @@ class TestAPrincipalReachesAnElementOnlyWhenTheSourcesSaySo:
             predicate="represented-by",
             value=self.ENTITY,
             basis="inferred",
+            origin="assertion-pass",
             explanation="the names look alike",
         )
         issues = catalog_issues(self.catalog(guessed, identified=False))

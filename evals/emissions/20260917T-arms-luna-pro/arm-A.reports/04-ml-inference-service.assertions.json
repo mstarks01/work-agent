@@ -386,6 +386,7 @@
         "value": "internet-facing",
         "scope": [],
         "basis": "stated",
+        "origin": "assertion-pass",
         "reason": null,
         "support": [
           {
@@ -408,6 +409,7 @@
         "value": "API key in a header",
         "scope": [],
         "basis": "stated",
+        "origin": "assertion-pass",
         "reason": null,
         "support": [
           {
@@ -430,6 +432,7 @@
         "value": "credential:api-key",
         "scope": [],
         "basis": "inferred",
+        "origin": "assertion-pass",
         "reason": null,
         "support": [
           {
@@ -452,6 +455,7 @@
         "value": "credential:api-key",
         "scope": [],
         "basis": "inferred",
+        "origin": "assertion-pass",
         "reason": null,
         "support": [
           {
@@ -481,6 +485,7 @@
         "value": "per-principal",
         "scope": [],
         "basis": "stated",
+        "origin": "assertion-pass",
         "reason": null,
         "support": [
           {
@@ -503,6 +508,7 @@
         "value": "does-not-expire",
         "scope": [],
         "basis": "stated",
+        "origin": "assertion-pass",
         "reason": null,
         "support": [
           {
@@ -525,6 +531,7 @@
         "value": "absent",
         "scope": [],
         "basis": "stated",
+        "origin": "assertion-pass",
         "reason": null,
         "support": [
           {
@@ -547,6 +554,7 @@
         "value": "boundary:model-network",
         "scope": [],
         "basis": "stated",
+        "origin": "assertion-pass",
         "reason": null,
         "support": [
           {
@@ -569,6 +577,7 @@
         "value": "service account",
         "scope": [],
         "basis": "stated",
+        "origin": "assertion-pass",
         "reason": null,
         "support": [
           {
@@ -591,6 +600,7 @@
         "value": "credential:service-account",
         "scope": [],
         "basis": "inferred",
+        "origin": "assertion-pass",
         "reason": null,
         "support": [
           {
@@ -613,6 +623,7 @@
         "value": "unknown",
         "scope": [],
         "basis": "stated",
+        "origin": "assertion-pass",
         "reason": "hedged",
         "support": [
           {
@@ -635,6 +646,7 @@
         "value": "boundary:model-network",
         "scope": [],
         "basis": "stated",
+        "origin": "assertion-pass",
         "reason": null,
         "support": [
           {
@@ -657,6 +669,7 @@
         "value": "absent",
         "scope": [],
         "basis": "stated",
+        "origin": "assertion-pass",
         "reason": null,
         "support": [
           {
@@ -688,6 +701,7 @@
           }
         ],
         "basis": "inferred",
+        "origin": "assertion-pass",
         "reason": null,
         "support": [
           {
@@ -710,6 +724,7 @@
         "value": "unknown",
         "scope": [],
         "basis": "stated",
+        "origin": "assertion-pass",
         "reason": "hedged",
         "support": [
           {
@@ -732,6 +747,7 @@
         "value": "unknown",
         "scope": [],
         "basis": "stated",
+        "origin": "assertion-pass",
         "reason": "hedged",
         "support": [
           {

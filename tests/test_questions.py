@@ -30,6 +30,7 @@ from analysis_service.assertions import (
     Quarantined,
     Subject,
     SupportSpan,
+    answered,
     assertion_id,
     support_span,
 )
@@ -293,6 +294,7 @@ class TestTheChecks:
             predicate="mfa-requirement",
             value="required",
             basis="inferred",
+            origin="assertion-pass",
             explanation="the description names two factors",
         )
         wrong = FactAnswer(
@@ -300,6 +302,15 @@ class TestTheChecks:
         )
         with pytest.raises(ValueError, match="no open assertion row"):
             check_fact_answers([wrong], valid_model(), open_catalog(settled))
+
+    def test_an_answer_to_an_open_row_writes_an_answer_row(self):
+        given = FactAnswer(
+            key=("", "", assertion_id(OPEN_ROW), "", "", ""), value="absent"
+        )
+        written, _ = apply_answers(open_catalog(), valid_model(), [], [given])
+        (row,) = written.entries
+        assert (row.value, row.origin) == ("absent", "answer")
+        assert answered(row)
 
     def test_a_row_an_earlier_answer_settled_can_be_answered_again(self):
         first = FactAnswer(
@@ -363,6 +374,7 @@ def test_an_assertion_answer_replaces_its_open_row_and_passes_the_gate():
         predicate="mfa-requirement",
         value=UNKNOWN,
         basis="stated",
+        origin="assertion-pass",
         reason="silent",
     )
     catalog = AssertionCatalog(
@@ -493,6 +505,7 @@ OPEN_ROW = Assertion(
     predicate="mfa-requirement",
     value=UNKNOWN,
     basis="stated",
+    origin="assertion-pass",
     reason="silent",
 )
 
@@ -665,6 +678,7 @@ class TestAnAttributeAnswerOverACatalogRow:
             predicate="transport-encryption",
             value="absent",
             basis="stated",
+            origin="assertion-pass",
             support=[
                 SupportSpan(
                     source_label=PROOF.label,
@@ -795,6 +809,7 @@ class TestTheAdmissionCheck:
             predicate="represented-by",
             value="entity:customer",
             basis="stated",
+            origin="assertion-pass",
             support=[support_span("customer", DESCRIPTION.label, DESCRIPTION.text)],
         )
         catalog = open_catalog(stated)

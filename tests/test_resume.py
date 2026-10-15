@@ -55,6 +55,7 @@ def parent_catalog() -> AssertionCatalog:
                 predicate="mfa-requirement",
                 value=ABSENT,
                 basis="inferred",
+                origin="assertion-pass",
                 explanation="the description names one factor",
             )
         ],

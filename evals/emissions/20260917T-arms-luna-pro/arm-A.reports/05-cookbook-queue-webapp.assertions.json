@@ -305,6 +305,7 @@
         "value": "boundary:public-internet",
         "scope": [],
         "basis": "stated",
+        "origin": "assertion-pass",
         "reason": null,
         "support": [
           {
@@ -327,6 +328,7 @@
         "value": "boundary:web-tier",
         "scope": [],
         "basis": "stated",
+        "origin": "assertion-pass",
         "reason": null,
         "support": [
           {
@@ -349,6 +351,7 @@
         "value": "internet-facing",
         "scope": [],
         "basis": "inferred",
+        "origin": "assertion-pass",
         "reason": null,
         "support": [
           {
@@ -371,6 +374,7 @@
         "value": "boundary:backend-tier",
         "scope": [],
         "basis": "stated",
+        "origin": "assertion-pass",
         "reason": null,
         "support": [
           {
@@ -393,6 +397,7 @@
         "value": "boundary:backend-tier",
         "scope": [],
         "basis": "stated",
+        "origin": "assertion-pass",
         "reason": null,
         "support": [
           {
@@ -415,6 +420,7 @@
         "value": "boundary:backend-tier",
         "scope": [],
         "basis": "stated",
+        "origin": "assertion-pass",
         "reason": null,
         "support": [
           {
@@ -437,6 +443,7 @@
         "value": "encrypted",
         "scope": [],
         "basis": "stated",
+        "origin": "assertion-pass",
         "reason": null,
         "support": [
           {
@@ -459,6 +466,7 @@
         "value": "unknown",
         "scope": [],
         "basis": "stated",
+        "origin": "assertion-pass",
         "reason": "silent",
         "support": [],
         "premises": [],
@@ -473,6 +481,7 @@
         "value": "unknown",
         "scope": [],
         "basis": "stated",
+        "origin": "assertion-pass",
         "reason": "silent",
         "support": [],
         "premises": [],
@@ -487,6 +496,7 @@
         "value": "unknown",
         "scope": [],
         "basis": "stated",
+        "origin": "assertion-pass",
         "reason": "silent",
         "support": [],
         "premises": [],
@@ -501,6 +511,7 @@
         "value": "unknown",
         "scope": [],
         "basis": "stated",
+        "origin": "assertion-pass",
         "reason": "silent",
         "support": [],
         "premises": [],
@@ -515,6 +526,7 @@
         "value": "unknown",
         "scope": [],
         "basis": "stated",
+        "origin": "assertion-pass",
         "reason": "silent",
         "support": [],
         "premises": [],
@@ -529,6 +541,7 @@
         "value": "unknown",
         "scope": [],
         "basis": "stated",
+        "origin": "assertion-pass",
         "reason": "silent",
         "support": [],
         "premises": [],
@@ -543,6 +556,7 @@
         "value": "web application config",
         "scope": [],
         "basis": "stated",
+        "origin": "assertion-pass",
         "reason": null,
         "support": [
           {
@@ -565,6 +579,7 @@
         "value": "worker config",
         "scope": [],
         "basis": "stated",
+        "origin": "assertion-pass",
         "reason": null,
         "support": [
           {

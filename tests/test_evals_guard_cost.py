@@ -45,6 +45,7 @@ def exposed_api() -> tuple:
         predicate="internet-exposure",
         value="internet-facing",
         basis="inferred",
+        origin="assertion-pass",
         explanation="fixture",
     )
     catalog = AssertionCatalog(

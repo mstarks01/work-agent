@@ -143,6 +143,7 @@ def test_each_reader_sees_a_stated_fact(facet, stated):
                     "predicate": "record-attribution",
                     "value": "principal",
                     "basis": "stated",
+                    "origin": "assertion-pass",
                     "support": [],
                 }
             ],
