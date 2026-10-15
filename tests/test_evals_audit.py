@@ -242,6 +242,25 @@ class TestTheLedgerRefusals:
         """Neutral is a different claim from holding for one package."""
         assert audit.parse(_record(), source="test").framework is None
 
+    @pytest.mark.parametrize(
+        ("field", "value"),
+        [
+            ("reads", "evals/harness/audit.py"),
+            ("artifacts", "evals/runs/a.json"),
+            ("supersedes", ["E-000"]),
+            ("parent", ["E-000"]),
+            ("framework", ["stride"]),
+            ("phase", ["extraction"]),
+            ("recorded", 20260920),
+            ("case", ["01-payments-checkout"]),
+            ("reconsider_when", 1),
+        ],
+    )
+    def test_a_field_of_the_wrong_shape_is_refused_by_name(self, field, value):
+        """A string ``reads`` would split into characters, and never go stale."""
+        with pytest.raises(audit.ExperimentError, match=field):
+            audit.parse(_record(**{field: value}), source="test")
+
     def test_a_missing_field_is_named_rather_than_defaulted(self):
         spoiled = _record()
         del spoiled["falsifier"]

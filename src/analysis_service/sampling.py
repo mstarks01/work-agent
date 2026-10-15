@@ -77,6 +77,7 @@ from pydantic import (
     BaseModel,
     ConfigDict,
     Field,
+    StrictInt,
     ValidationError,
     field_validator,
     model_validator,
@@ -211,7 +212,7 @@ class _RawSampling(BaseModel):
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
-    version: int
+    version: StrictInt
     tiers: dict[TierName, _RawTier]
 
 

@@ -322,6 +322,25 @@ class TestLoadingFailsClosed:
         with pytest.raises(ProvenanceError, match="unsupported artifact_version"):
             load_artifact(path)
 
+    @pytest.mark.parametrize("value", [float(ARTIFACT_VERSION), True])
+    def test_a_version_that_is_not_an_integer_is_refused(
+        self, tmp_path, sampling, value
+    ):
+        path = write_artifact(tmp_path, provenance(sampling), artifact_version=value)
+
+        with pytest.raises(ProvenanceError, match="unsupported artifact_version"):
+            load_artifact(path)
+
+    @pytest.mark.parametrize("value", ["false", 1, None])
+    def test_a_trusted_flag_that_is_not_a_boolean_is_refused(
+        self, tmp_path, sampling, value
+    ):
+        """``bool("false")`` is true, so a string would mark the run trusted."""
+        path = write_artifact(tmp_path, provenance(sampling), trusted=value)
+
+        with pytest.raises(ProvenanceError, match="trusted"):
+            load_artifact(path)
+
     def test_an_artifact_with_no_provenance_block_is_refused(self, tmp_path, sampling):
         path = write_artifact(tmp_path, provenance(sampling))
         payload = json.loads(path.read_text())

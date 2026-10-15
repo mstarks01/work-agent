@@ -362,3 +362,34 @@ class TestTheRecallGateIsDeclaredFromTheArchive:
 
         assert reading.verdict == "fail"
         assert reading.against_limit == pytest.approx(-2.0)
+
+
+class TestASpreadFileIsRefusedWhereItIsNotASpread:
+    """A ``--spread`` value scales a gate, so a wrong one changes the verdict."""
+
+    @pytest.mark.parametrize(
+        ("spread", "named"),
+        [
+            ({"must-find-coverage": -0.1}, "must-find-coverage"),
+            ({"must-find-coverage": "0.1"}, "must-find-coverage"),
+            ({"must-find-coverage": True}, "must-find-coverage"),
+            ({"must-find-coverage": float("nan")}, "must-find-coverage"),
+            ({"must-find-covrage": 0.1}, "must-find-covrage"),
+            ([0.1], "not a JSON object"),
+        ],
+    )
+    def test_it_is_refused_by_file_and_key(self, tmp_path, spread, named) -> None:
+        path = tmp_path / "spread.json"
+        path.write_text(json.dumps(spread), "utf-8")
+
+        with pytest.raises(ValueError, match=named) as raised:
+            promotion.read_spread(path, promotion.GATES)
+        assert str(path) in str(raised.value)
+
+    def test_a_measured_spread_reads(self, tmp_path) -> None:
+        path = tmp_path / "spread.json"
+        path.write_text(json.dumps({"must-find-coverage": 0.0}), "utf-8")
+
+        assert promotion.read_spread(path, promotion.GATES) == {
+            "must-find-coverage": 0.0
+        }

@@ -63,17 +63,17 @@ from __future__ import annotations
 
 import argparse
 import json
-import math
 import subprocess
 import sys
 from collections.abc import Iterable, Iterator, Mapping, Sequence
 from dataclasses import asdict, dataclass, field, fields, replace
 from pathlib import Path
 from types import MappingProxyType
-from typing import Any, Literal, TypeGuard
+from typing import Any, Literal
 
 from analysis_service.claims import FrameworkName
 from analysis_service.frameworks import PACKAGES
+from analysis_service.parsing import non_negative
 from evals.harness.history import current_commit
 from evals.harness.provenance import REPO_ROOT
 from evals.harness.reference import DEFAULT_CORPUS, load_corpus
@@ -619,24 +619,28 @@ def parse(row: Mapping[str, Any], *, source: str) -> Experiment:
     missing = [key for key in _REQUIRED if not row.get(key)]
     if missing:
         raise ExperimentError(f"{where}: missing {', '.join(missing)}")
+    for key in _REQUIRED:
+        _text(row[key], key, where)
     outcome = row["outcome"]
     if outcome not in OUTCOMES:
         raise ExperimentError(
             f"{where}: outcome {outcome!r} is not one of {', '.join(OUTCOMES)}"
         )
-    phase = row.get("phase")
-    if phase is not None and phase not in PHASES:
+    phase: Phase | None = row.get("phase")
+    if phase is not None and (not isinstance(phase, str) or phase not in PHASES):
         raise ExperimentError(
             f"{where}: phase {phase!r} is not one of {', '.join(PHASES)}"
         )
-    framework = row.get("framework")
-    if framework is not None and framework not in PACKAGES:
+    framework: FrameworkName | None = row.get("framework")
+    if framework is not None and (
+        not isinstance(framework, str) or framework not in PACKAGES
+    ):
         raise ExperimentError(
             f"{where}: framework {framework!r} is not one of"
             f" {', '.join(sorted(PACKAGES))}"
         )
     for cost in ("estimated_usd", "actual_usd"):
-        if row.get(cost) is not None and not _is_dollars(row[cost]):
+        if row.get(cost) is not None and not non_negative(row[cost]):
             raise ExperimentError(
                 f"{where}: {cost} {row[cost]!r} is not a dollar amount; a negative"
                 " cost would widen the audit's budget"
@@ -665,14 +669,14 @@ def parse(row: Mapping[str, Any], *, source: str) -> Experiment:
         scope=row["scope"],
         phase=phase,
         framework=framework,
-        case=row.get("case", ""),
-        reads=tuple(row.get("reads") or ()),
-        artifacts=tuple(row.get("artifacts") or ()),
+        case=_text(row.get("case"), "case", where),
+        reads=_strings(row, "reads", "row", where),
+        artifacts=_strings(row, "artifacts", "row", where),
         estimated_usd=row.get("estimated_usd"),
         actual_usd=row.get("actual_usd"),
-        parent=row.get("parent"),
-        supersedes=row.get("supersedes"),
-        reconsider_when=row.get("reconsider_when", ""),
+        parent=_text(row.get("parent"), "parent", where) or None,
+        supersedes=_text(row.get("supersedes"), "supersedes", where) or None,
+        reconsider_when=_text(row.get("reconsider_when"), "reconsider_when", where),
         condition=_condition(row.get("condition"), where),
         candidate=candidate,
         ticket=_ticket(row.get("ticket"), where),
@@ -681,16 +685,6 @@ def parse(row: Mapping[str, Any], *, source: str) -> Experiment:
         rerun_reason=_text(row.get("rerun_reason"), "rerun_reason", where),
         holdout_reads=_strings(row, "holdout_reads", "row", where),
         replicates=_text(row.get("replicates"), "replicates", where) or None,
-    )
-
-
-def _is_dollars(value: object) -> TypeGuard[float]:
-    """Whether ``value`` is a finite amount of zero or more, and not a bool."""
-    return (
-        isinstance(value, int | float)
-        and not isinstance(value, bool)
-        and math.isfinite(value)
-        and value >= 0
     )
 
 
@@ -1095,7 +1089,7 @@ def parse_grant(row: Mapping[str, Any], *, source: str) -> Grant:
             f"{where}: mode {mode!r} is not one of {', '.join(MODES)}"
         )
     budget = row.get("budget_usd")
-    if not _is_dollars(budget):
+    if not non_negative(budget):
         raise ExperimentError(f"{where}: budget_usd {budget!r} is not a dollar amount")
     attempts = row.get("attempts")
     if isinstance(attempts, bool) or not isinstance(attempts, int) or attempts < 0:

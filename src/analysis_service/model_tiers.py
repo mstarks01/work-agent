@@ -883,7 +883,7 @@ def load_model_tiers(
     _apply_env_overrides(raw, env)
 
     version = raw.get("version")
-    if version != SUPPORTED_VERSION:
+    if type(version) is not int or version != SUPPORTED_VERSION:
         raise ModelConfigError(
             f"{path}: unsupported version {version!r}; expected {SUPPORTED_VERSION}"
         )

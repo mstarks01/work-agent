@@ -84,6 +84,28 @@ def test_a_label_above_the_level_is_refused():
         score_fixture(_fixture(expected={"V17.1.1": "unknown"}))
 
 
+@pytest.mark.parametrize(
+    ("field", "value", "named"),
+    [
+        ("signed_by", " ", "signed_by"),
+        ("signed_by", True, "signed_by"),
+        ("truth", {"browser-frontnd": "present"}, "browser-frontnd"),
+        ("truth", {"browser-frontend": "yes"}, "'yes'"),
+        ("truth", ["browser-frontend"], "truth"),
+        ("expected", {"V6.2.1": "applies"}, "'applies'"),
+    ],
+)
+def test_a_fixture_no_reader_can_trust_is_refused(tmp_path, field, value, named):
+    source = FIXTURES_DIR / "01-explicit-positive.json"
+    raw = json.loads(source.read_text(encoding="utf-8"))
+    raw[field] = value
+    (tmp_path / source.name).write_text(json.dumps(raw), encoding="utf-8")
+
+    with pytest.raises(ValueError, match=named) as raised:
+        load_fixtures(tmp_path)
+    assert source.name in str(raised.value)
+
+
 def test_no_fixture_here_is_signed_by_its_drafter():
     for path in sorted(FIXTURES_DIR.glob("*.json")):
         raw = json.loads(path.read_text(encoding="utf-8"))

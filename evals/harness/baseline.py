@@ -67,6 +67,7 @@ from pathlib import Path
 from typing import Any, NamedTuple
 
 from analysis_service.model_tiers import TierName
+from analysis_service.parsing import non_negative
 from analysis_service.vendors import vendor_for_route
 
 # The tier whose model names a baseline. Spelled, not indexed: a position in
@@ -805,6 +806,62 @@ def default_base_ref(root: Path) -> str:
     return "main"
 
 
+def _strings(value: object) -> bool:
+    return isinstance(value, list) and all(isinstance(item, str) for item in value)
+
+
+def _rates(entry: object) -> bool:
+    """Whether one ``unit_prices`` entry names a model and states numbers."""
+    return (
+        isinstance(entry, Mapping)
+        and isinstance(entry.get("model"), str)
+        and all(
+            non_negative(entry.get(rate))
+            for rate in ("input_per_token", "output_per_token")
+        )
+        and all(
+            entry.get(rate) is None or non_negative(entry[rate])
+            for rate in ("cache_read_per_token", "cache_write_per_token")
+        )
+    )
+
+
+def manifest_problems(manifest: object) -> list[str]:
+    """Where a ``baseline.json`` holds a field of the wrong shape, as problems.
+
+    The shapes :func:`assemble` writes, checked before any value is
+    read. A string ``unpriced`` would read as one model per character, and a
+    list where a table belongs would raise rather than be reported.
+    """
+    if not isinstance(manifest, Mapping):
+        return ["baseline.json is not a JSON object"]
+    sweeps = manifest.get("sweeps", [])
+    if not isinstance(sweeps, list) or not all(
+        isinstance(entry, Mapping) for entry in sweeps
+    ):
+        return ["baseline.json: sweeps is not a list of objects"]
+    problems = []
+    for index, entry in enumerate(sweeps):
+        where = f"baseline.json: sweeps[{index}]"
+        cost = entry.get("cost")
+        if not isinstance(entry.get("artifact"), str):
+            problems.append(f"{where}: artifact is not a string")
+        if not isinstance(cost, Mapping):
+            problems.append(f"{where}: cost is {cost!r}, not a table")
+            continue
+        if not _strings(cost.get("unpriced", [])):
+            problems.append(f"{where}: cost.unpriced is not a list of strings")
+        prices = cost.get("unit_prices", [])
+        if not isinstance(prices, list) or not all(_rates(row) for row in prices):
+            problems.append(
+                f"{where}: cost.unit_prices is not a list of a model and its rates"
+            )
+        fallbacks = cost.get("fallbacks", {})
+        if not isinstance(fallbacks, Mapping) or not _strings(list(fallbacks.values())):
+            problems.append(f"{where}: cost.fallbacks is not a table of strings")
+    return problems
+
+
 def verify(
     directory: Path, root: Path = REPO_ROOT, base_ref: str | None = None
 ) -> list[str]:
@@ -825,6 +882,8 @@ def verify(
         manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as exc:
         return [f"{manifest_path}: cannot be read: {exc}"]
+    if shape := manifest_problems(manifest):
+        return [f"{directory.name}: {problem}" for problem in shape]
 
     sweeps = manifest.get("sweeps", [])
     if not sweeps:
@@ -906,10 +965,7 @@ def verify(
                 f"{filename}: no node_usage for {missing_usage}; the actual"
                 " cost is not computable"
             )
-        recorded = entry.get("cost")
-        if not isinstance(recorded, Mapping):
-            problems.append(f"{filename}: cost is {recorded!r}, not a table")
-            continue
+        recorded = entry["cost"]
         try:
             recomputed_cost = _recomputed_cost(artifact, recorded)
             actual = recorded_usd(recorded)

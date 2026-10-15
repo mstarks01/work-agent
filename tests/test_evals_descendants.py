@@ -88,3 +88,14 @@ def test_a_sweep_without_proposals_is_refused_by_name(archive, case):  # noqa: F
 
     with pytest.raises(descendants.EvalRunError, match="kept no lane proposals"):
         descendants.replay_artifact(archive, [case])
+
+
+@pytest.mark.parametrize(
+    ("keys", "named"),
+    [(("01-payments-checkut", "spoofing"), "01-payments-checkut"), (None, "spoofng")],
+)
+def test_an_injected_key_nothing_replays_is_refused(archive, case, keys, named):  # noqa: F811
+    """A misspelled case would inject nothing, and a misspelled lane would crash."""
+    case_id, lane = keys or (case.id, "spoofng")
+    with pytest.raises(descendants.EvalRunError, match=named):
+        descendants.replay_artifact(archive, [case], {case_id: {lane: []}})

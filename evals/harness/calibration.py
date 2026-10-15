@@ -294,6 +294,14 @@ class CalibrationResult:
         }
 
 
+def _strings(entry: Mapping[str, Any], name: str) -> tuple[str, ...]:
+    """A list of strings as a tuple; a string or other shape raises ``TypeError``."""
+    value = entry[name]
+    if not isinstance(value, list) or not all(isinstance(item, str) for item in value):
+        raise TypeError(f"{name} is not a list of strings")
+    return tuple(value)
+
+
 def load_pairs(path: Path | str = DEFAULT_PAIRS_PATH) -> tuple[LabelledPair, ...]:
     """Load the generated fixtures, failing closed on anything unexpected."""
     path = Path(path)
@@ -317,11 +325,11 @@ def load_pairs(path: Path | str = DEFAULT_PAIRS_PATH) -> tuple[LabelledPair, ...
                 fixture_id=entry["fixture_id"],
                 reference_claim=entry["reference_claim"],
                 candidate_claim=entry["candidate_claim"],
-                reference_element_ids=tuple(entry["reference_element_ids"]),
+                reference_element_ids=_strings(entry, "reference_element_ids"),
                 candidate_element_ids=(
                     None
                     if entry["candidate_element_ids"] is None
-                    else tuple(entry["candidate_element_ids"])
+                    else _strings(entry, "candidate_element_ids")
                 ),
                 reference_verb=entry.get("reference_verb"),
                 candidate_verb=entry.get("candidate_verb"),

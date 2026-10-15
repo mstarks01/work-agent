@@ -360,6 +360,10 @@ def runs_from_reports(artifact: Path, cases: Sequence[GoldenCase]) -> dict[str, 
             )
         report = Report.model_validate_json(report_path.read_text(encoding="utf-8"))
         raw = json.loads(drafts_path.read_text(encoding="utf-8"))
+        if stray := sorted(set(raw) - set(PACKAGES)):
+            raise modes.EvalRunError(
+                f"{drafts_path}: {stray} is not a framework package"
+            )
         drafts = {
             framework: tuple(
                 PACKAGES[framework].record.model_validate(claim) for claim in claims

@@ -55,7 +55,7 @@ import argparse
 import json
 import math
 import sys
-from collections.abc import Callable, Mapping, Sequence
+from collections.abc import Callable, Collection, Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from types import MappingProxyType
@@ -64,6 +64,7 @@ from typing import Any, Literal
 from pydantic import ValidationError
 
 from analysis_service.assertions import AssertionRecord
+from analysis_service.parsing import non_negative
 from analysis_service.sources import text_digest
 from evals.harness import falsify
 from evals.harness.artifact import load_artifact
@@ -587,6 +588,32 @@ def in_spreads(difference: float, spread: float) -> float:
     return 0.0 if difference == 0 else math.copysign(math.inf, difference)
 
 
+class SpreadError(ValueError):
+    """A ``--spread`` file the gates refuse, naming the file and the key."""
+
+
+def read_spread(path: Path, gates: Collection[str]) -> dict[str, float]:
+    """A ``--spread`` file: each named gate's repeat spread, checked before it is used.
+
+    Each key is one of ``gates``, and each value a finite number of zero or
+    more. A negative spread flips the sign of every difference it scales, and
+    so turns a failing gate into a passing one.
+    """
+    spread = json.loads(path.read_text(encoding="utf-8"))
+    if not isinstance(spread, dict):
+        raise SpreadError(f"{path}: the spread is not a JSON object")
+    for name, value in spread.items():
+        if name not in gates:
+            raise SpreadError(
+                f"{path}: {name!r} is not a gate; the gates are {', '.join(gates)}"
+            )
+        if not non_negative(value):
+            raise SpreadError(
+                f"{path}: {name}: {value!r} is not a finite spread of zero or more"
+            )
+    return spread
+
+
 def pooled_recall(paths: Sequence[Path]) -> float:
     """Required-fact recall over one repeat's assertion-mode files, pooled by row.
 
@@ -814,9 +841,7 @@ def command_gates(args: argparse.Namespace) -> int:
         artifact = json.loads(args.artifact.read_text(encoding="utf-8"))
         report_path = args.artifact.with_suffix(".reports") / f"{args.case}.report.json"
         report = json.loads(report_path.read_text(encoding="utf-8"))
-        spread = (
-            {} if args.spread is None else json.loads(args.spread.read_text("utf-8"))
-        )
+        spread = {} if args.spread is None else read_spread(args.spread, GATES)
     except (OSError, ValueError) as error:
         print(f"cannot read: {error}", file=sys.stderr)
         return 1

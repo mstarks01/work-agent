@@ -146,6 +146,16 @@ def test_malformed_fixtures_fail_closed(tmp_path):
         load_pairs(path)
 
 
+@pytest.mark.parametrize("field", ["reference_element_ids", "candidate_element_ids"])
+def test_an_id_list_that_is_a_string_fails_closed(tmp_path, pairs, field):
+    """A string would load as one element ID per character."""
+    path = tmp_path / "pairs.json"
+    path.write_text(json.dumps([_entry(pairs[0], **{field: "process:api"})]))
+
+    with pytest.raises(CalibrationError, match=field):
+        load_pairs(path)
+
+
 def test_unknown_label_fails_closed(tmp_path, pairs):
     path = tmp_path / "pairs.json"
     entry = _entry(pairs[0], label="probably")

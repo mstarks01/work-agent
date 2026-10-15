@@ -267,7 +267,7 @@ def load_manifest(path: Path | str) -> BlessedManifest:
     # The version check fires before shape validation, so a file on another
     # schema is named as such rather than reported as a set of stray keys.
     version = raw.get("version")
-    if version != MANIFEST_VERSION:
+    if type(version) is not int or version != MANIFEST_VERSION:
         raise CertificationError(
             f"{path}: unsupported version {version!r};"
             f" expected {MANIFEST_VERSION}, which keys blessed fingerprints"

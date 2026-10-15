@@ -16,6 +16,7 @@ from analysis_service.capabilities import (
     lineage,
     resolve,
 )
+from analysis_service.frameworks.asvs import applicability
 from analysis_service.frameworks.asvs.applicability import (
     APPLICABILITY,
     RATIONALES,
@@ -76,6 +77,17 @@ def test_every_capability_has_a_reader_in_the_table():
 def test_every_row_carries_a_rationale_and_a_review_field():
     assert set(RATIONALES) == set(APPLICABILITY) == set(REVIEWED_BY)
     assert all(isinstance(REVIEWED_BY[row], (str, type(None))) for row in REVIEWED_BY)
+
+
+@pytest.mark.parametrize("rationale", [["a reason"], " ", None])
+def test_a_rationale_that_is_not_text_is_an_issue(monkeypatch, rationale):
+    """A list would reach the report as its own ``repr``."""
+    first = {**applicability._ROWS[0], "rationale": rationale}
+    monkeypatch.setattr(applicability, "_ROWS", [first, *applicability._ROWS[1:]])
+
+    assert f"{first['id']}: the rationale is not a non-blank string" in (
+        applicability._issues()
+    )
 
 
 def test_no_oauth_rules_out_the_whole_chapter():

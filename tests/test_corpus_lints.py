@@ -195,6 +195,43 @@ def test_an_unmeasured_lane_fails_the_merge_bar():
     assert not any("spoofing" in problem for problem in problems)
 
 
+@pytest.mark.parametrize(
+    ("framework", "field", "value"),
+    [
+        ("stride", "claim", ["A claim."]),
+        ("stride", "tier", ["must-find"]),
+        ("stride", "category", ["spoofing"]),
+        ("stride", "affected_element_ids", "process:storefront-api"),
+        ("asvs", "chapter", ["V6"]),
+        ("asvs", "requirement", 621),
+    ],
+)
+def test_a_record_field_of_the_wrong_shape_is_one_problem(framework, field, value):
+    """The lint names the field, rather than raise or report each character."""
+    case_dir = verify_corpus.case_dirs()[0]
+    records = verify_corpus._load_json(verify_corpus.claims_file(case_dir, framework))
+    spoiled = [{**records[0], field: value}, *records[1:]]
+    options = verify_corpus.declared_options(
+        verify_corpus._load_json_object(case_dir / "case.json")
+    )[framework]
+
+    problems = list(verify_corpus._check_claims(framework, spoiled, set(), options))
+
+    assert f"{framework}[0] fields of the wrong shape: ['{field}']" in problems
+
+
+def test_a_severity_or_a_framework_block_of_the_wrong_shape_is_a_problem():
+    case_dir = verify_corpus.case_dirs()[0]
+    record = verify_corpus._load_json(verify_corpus.claims_file(case_dir, "stride"))[0]
+    entry = {"name": ["asvs"], "options": [1], "exemplar_proximity": ["near"]}
+
+    assert list(
+        verify_corpus._stride_record_issues("s", {**record, "severity": []}, {})
+    ) == ["s severity must carry likelihood and impact only"]
+    assert len(list(verify_corpus._check_declared_frameworks({"frameworks": [entry]})))
+    assert verify_corpus.declared_options({"frameworks": [entry]}) == {}
+
+
 def test_a_case_that_declares_no_framework_it_runs_is_caught():
     """The declaration is checked against the precondition, not trusted.
 

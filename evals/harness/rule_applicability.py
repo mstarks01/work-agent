@@ -35,10 +35,10 @@ import json
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, get_args
 
 from analysis_service.answer_round import recommended
-from analysis_service.capabilities import CAPABILITIES
+from analysis_service.capabilities import CAPABILITIES, Applicability
 from analysis_service.claims import FrameworkName, UnknownKey, UnknownRef
 from analysis_service.early_questions import capability_questions
 from analysis_service.fact_answers import FactAnswer, key_ref
@@ -50,6 +50,7 @@ __all__ = [
     "FIXTURES_DIR",
     "TRUTH_ANSWERS",
     "Fixture",
+    "FixtureError",
     "FixtureScore",
     "QuestionRun",
     "arguments",
@@ -88,11 +89,47 @@ class Fixture:
         return bool(self.signed_by)
 
 
+class FixtureError(ValueError):
+    """A fixture no reader can trust, naming the file and the field."""
+
+
+def _checked(path: Path, raw: Mapping[str, Any]) -> None:
+    """Refuse a fixture whose signer, labels or truth no reader can trust.
+
+    A blank signer reads as signed, a label outside the rule's states counts as
+    neither right nor wrong, and a truth key that names no capability answers
+    nothing.
+    """
+    signed_by = raw["signed_by"]
+    if signed_by is not None and (
+        not isinstance(signed_by, str) or (signed_by and not signed_by.strip())
+    ):
+        raise FixtureError(f"{path}: signed_by {signed_by!r} names nobody")
+    for field in ("expected", "truth"):
+        if not isinstance(raw.get(field, {}), dict):
+            raise FixtureError(f"{path}: {field} is not an object")
+    states = get_args(Applicability)
+    for unit, state in raw["expected"].items():
+        if state not in states:
+            raise FixtureError(
+                f"{path}: expected {unit}: {state!r} is not one of {', '.join(states)}"
+            )
+    for key, state in raw.get("truth", {}).items():
+        if key not in CAPABILITIES:
+            raise FixtureError(f"{path}: truth {key!r} is not a capability")
+        if not isinstance(state, str) or state not in TRUTH_ANSWERS:
+            raise FixtureError(
+                f"{path}: truth {key}: {state!r} is not one of"
+                f" {', '.join(TRUTH_ANSWERS)}"
+            )
+
+
 def load_fixtures(directory: Path = FIXTURES_DIR) -> tuple[Fixture, ...]:
     """Every fixture in ``directory``, in file-name order."""
     fixtures = []
     for path in sorted(directory.glob("*.json")):
         raw = json.loads(path.read_text(encoding="utf-8"))
+        _checked(path, raw)
         fixtures.append(
             Fixture(
                 name=path.stem,
