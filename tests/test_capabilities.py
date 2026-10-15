@@ -195,8 +195,22 @@ def test_a_need_counts_each_unit_once_and_keeps_its_highest_band():
         "low": Decision(state="unknown", missing=(child,)),
         "high": Decision(state="unknown", missing=(parent,)),
     }
-    needs = open_capability_needs(decisions, {"low": 1, "high": 3}.__getitem__)
+    needs = open_capability_needs(decisions, {"low": 1, "high": 3}.__getitem__, {})
     assert needs[child].units == 1
     assert needs[child].band == 1
     assert needs[parent].units == 2, "a parent settles its child's unit too"
     assert needs[parent].band == 3
+
+
+def test_a_need_never_credits_a_capability_the_facts_settle():
+    """An answer to a parent already present settles nothing, so it is not asked."""
+    from analysis_service.capabilities import Decision, lineage, open_capability_needs
+
+    child = next(key for key in CAPABILITIES if next(lineage(key), None))
+    parent = next(lineage(child))
+    decisions = {"unit": Decision(state="unknown", missing=(child,))}
+    known = {parent: CapabilityFact(parent, "present", ("a:parent",))}
+
+    needs = open_capability_needs(decisions, lambda unit: 1, known)
+
+    assert set(needs) == {child}
